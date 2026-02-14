@@ -7,4 +7,5 @@ license.workspace = true
 
 [dependencies]
 vsedit-keycodes = { path = "../vsedit-keycodes" }
+vsedit-platform = { path = "../vsedit-platform" }
 

@@ -3351,6 +3351,7 @@ name = "vsedit-keybindings"
 version = "0.1.0"
 dependencies = [
  "vsedit-keycodes",
+ "vsedit-platform",
 ]
 
 [[package]]
@@ -3899,6 +3900,7 @@ name = "vsedit-uri"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
  "url",
  "vsedit-path",
  "vsedit-strings",
