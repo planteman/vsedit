@@ -2782,6 +2782,7 @@ dependencies = [
 name = "vsedit-contextkey"
 version = "0.1.0"
 dependencies = [
+ "regex",
  "vsedit-di",
 ]
 
@@ -2912,6 +2913,7 @@ name = "vsedit-editor-types"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
  "vsedit-strings",
 ]
 
@@ -3862,6 +3864,7 @@ name = "vsedit-tui"
 version = "0.1.0"
 dependencies = [
  "crossterm",
+ "futures",
  "ratatui",
  "tokio",
  "vsedit-events",
