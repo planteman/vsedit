@@ -1,0 +1,1 @@
+//! Inline chat widget

@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-editor-render"
+description = "Terminal line rendering with syntax highlighting"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-text-render = { path = "../vsedit-text-render" }
+vsedit-tui = { path = "../vsedit-tui" }
+vsedit-viewmodel = { path = "../vsedit-viewmodel" }
+

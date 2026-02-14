@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-viewlayout"
+description = "Viewport and line height calculations"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-editor-config = { path = "../vsedit-editor-config" }
+

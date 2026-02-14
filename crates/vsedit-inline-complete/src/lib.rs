@@ -1,0 +1,1 @@
+//! Inline ghost text completions

@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-environment"
+description = "Environment and paths service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-di = { path = "../vsedit-di" }
+dirs = "5"
+

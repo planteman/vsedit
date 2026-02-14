@@ -1,0 +1,13 @@
+[package]
+name = "vsedit-uri"
+description = "URI parsing and resource identification"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-path = { path = "../vsedit-path" }
+vsedit-strings = { path = "../vsedit-strings" }
+serde = { version = "1", features = ["derive"] }
+url = "2"
+

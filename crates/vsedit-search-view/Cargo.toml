@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-search-view"
+description = "Search results view"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-wb-search = { path = "../vsedit-wb-search" }
+vsedit-wb-views = { path = "../vsedit-wb-views" }
+

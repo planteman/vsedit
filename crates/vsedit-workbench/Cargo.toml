@@ -1,0 +1,14 @@
+[package]
+name = "vsedit-workbench"
+description = "Workbench shell assembly"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-di = { path = "../vsedit-di" }
+vsedit-layout = { path = "../vsedit-layout" }
+vsedit-lifecycle-svc = { path = "../vsedit-lifecycle-svc" }
+vsedit-tui = { path = "../vsedit-tui" }
+vsedit-wb-layout = { path = "../vsedit-wb-layout" }
+

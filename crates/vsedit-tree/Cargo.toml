@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-tree"
+description = "Tree view widget with virtual scroll"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-scrollbar = { path = "../vsedit-scrollbar" }
+vsedit-widgets = { path = "../vsedit-widgets" }
+

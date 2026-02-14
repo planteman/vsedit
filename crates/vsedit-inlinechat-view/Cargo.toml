@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-inlinechat-view"
+description = "Inline chat widget"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-editor-widget = { path = "../vsedit-editor-widget" }
+vsedit-ext-chat = { path = "../vsedit-ext-chat" }
+

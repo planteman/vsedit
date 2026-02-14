@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-cursor"
+description = "Multi-cursor controller"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-editor-config = { path = "../vsedit-editor-config" }
+vsedit-editor-types = { path = "../vsedit-editor-types" }
+vsedit-text-model = { path = "../vsedit-text-model" }
+

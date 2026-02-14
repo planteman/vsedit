@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-dialog"
+description = "Modal dialog system"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-input = { path = "../vsedit-input" }
+vsedit-widgets = { path = "../vsedit-widgets" }
+

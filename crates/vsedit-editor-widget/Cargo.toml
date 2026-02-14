@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-editor-widget"
+description = "Complete editor widget"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-editor-controller = { path = "../vsedit-editor-controller" }
+vsedit-editor-render = { path = "../vsedit-editor-render" }
+vsedit-editor-viewparts = { path = "../vsedit-editor-viewparts" }
+

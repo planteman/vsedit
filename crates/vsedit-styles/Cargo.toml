@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-styles"
+description = "Theme color system for terminal"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-tui = { path = "../vsedit-tui" }
+

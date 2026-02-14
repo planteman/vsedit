@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-collections"
+description = "Specialized data structures"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-lifecycle = { path = "../vsedit-lifecycle" }
+

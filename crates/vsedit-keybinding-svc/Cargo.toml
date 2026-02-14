@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-keybinding-svc"
+description = "Keybinding resolution service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-commands = { path = "../vsedit-commands" }
+vsedit-contextkey = { path = "../vsedit-contextkey" }
+vsedit-keybindings = { path = "../vsedit-keybindings" }
+

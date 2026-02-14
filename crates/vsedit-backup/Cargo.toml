@@ -1,0 +1,7 @@
+[package]
+name = "vsedit-backup"
+description = "Hot exit and file backup"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+

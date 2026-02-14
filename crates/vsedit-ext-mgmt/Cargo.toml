@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-ext-mgmt"
+description = "Extension install/update management"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-extensions-plat = { path = "../vsedit-extensions-plat" }
+vsedit-files = { path = "../vsedit-files" }
+tokio = { version = "1", features = ["full"] }
+

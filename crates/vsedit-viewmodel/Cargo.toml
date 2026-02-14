@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-viewmodel"
+description = "View model with line wrapping"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-cursor = { path = "../vsedit-cursor" }
+vsedit-text-model = { path = "../vsedit-text-model" }
+vsedit-viewlayout = { path = "../vsedit-viewlayout" }
+

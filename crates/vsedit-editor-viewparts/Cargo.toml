@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-editor-viewparts"
+description = "Line numbers, margins, rulers, scrollbar"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-editor-render = { path = "../vsedit-editor-render" }
+vsedit-scrollbar = { path = "../vsedit-scrollbar" }
+

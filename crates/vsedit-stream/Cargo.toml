@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-stream"
+description = "Stream abstractions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-buffer = { path = "../vsedit-buffer" }
+vsedit-lifecycle = { path = "../vsedit-lifecycle" }
+tokio = { version = "1", features = ["io-util"] }
+

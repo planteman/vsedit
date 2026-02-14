@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-wb-layout"
+description = "Workbench layout engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-di = { path = "../vsedit-di" }
+vsedit-layout = { path = "../vsedit-layout" }
+

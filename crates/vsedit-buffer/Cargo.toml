@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-buffer"
+description = "Cross-platform buffer abstraction"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+bytes = "1"
+

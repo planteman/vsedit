@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-remote"
+description = "Remote connection management"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-di = { path = "../vsedit-di" }
+vsedit-ipc = { path = "../vsedit-ipc" }
+tokio = { version = "1", features = ["full"] }
+

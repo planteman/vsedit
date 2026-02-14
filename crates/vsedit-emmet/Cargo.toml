@@ -1,0 +1,7 @@
+[package]
+name = "vsedit-emmet"
+description = "Emmet abbreviation expansion"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+

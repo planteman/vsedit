@@ -1,0 +1,7 @@
+[package]
+name = "vsedit-refs-view"
+description = "References view"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+

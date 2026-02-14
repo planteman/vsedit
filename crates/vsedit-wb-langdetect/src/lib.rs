@@ -1,0 +1,1 @@
+//! Auto language detection

@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-paramhints"
+description = "Function signature help"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-editor-widget = { path = "../vsedit-editor-widget" }
+

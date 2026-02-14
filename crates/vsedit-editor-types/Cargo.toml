@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-editor-types"
+description = "Position, Range, Selection types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-strings = { path = "../vsedit-strings" }
+serde = { version = "1", features = ["derive"] }
+

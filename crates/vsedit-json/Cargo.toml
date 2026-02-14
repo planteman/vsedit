@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-json"
+description = "JSON and JSONC parser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-strings = { path = "../vsedit-strings" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+

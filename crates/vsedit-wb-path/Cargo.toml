@@ -1,0 +1,7 @@
+[package]
+name = "vsedit-wb-path"
+description = "Platform path resolution"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+

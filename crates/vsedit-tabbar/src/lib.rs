@@ -1,0 +1,1 @@
+//! Editor tab bar widget

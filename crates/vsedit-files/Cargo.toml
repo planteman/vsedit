@@ -1,0 +1,15 @@
+[package]
+name = "vsedit-files"
+description = "Virtual file system service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-di = { path = "../vsedit-di" }
+vsedit-stream = { path = "../vsedit-stream" }
+vsedit-uri = { path = "../vsedit-uri" }
+notify = "7"
+tokio = { version = "1", features = ["fs"] }
+walkdir = "2"
+

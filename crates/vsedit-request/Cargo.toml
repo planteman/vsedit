@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-request"
+description = "HTTP request service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+reqwest = { version = "0.12", features = ["json"] }
+

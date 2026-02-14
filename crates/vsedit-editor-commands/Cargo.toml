@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-editor-commands"
+description = "Core editing commands"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-commands = { path = "../vsedit-commands" }
+vsedit-cursor = { path = "../vsedit-cursor" }
+

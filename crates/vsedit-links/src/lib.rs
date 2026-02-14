@@ -1,0 +1,1 @@
+//! URL detection in editor

@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-di"
+description = "Dependency injection container"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-events = { path = "../vsedit-events" }
+vsedit-lifecycle = { path = "../vsedit-lifecycle" }
+

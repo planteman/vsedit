@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-text-render"
+description = "Unicode-aware terminal text rendering"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-strings = { path = "../vsedit-strings" }
+vsedit-tui = { path = "../vsedit-tui" }
+unicode-width = "0.2"
+

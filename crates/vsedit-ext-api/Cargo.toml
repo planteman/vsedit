@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-ext-api"
+description = "Extension API surface implementation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-ext-host = { path = "../vsedit-ext-host" }
+vsedit-ext-rpc = { path = "../vsedit-ext-rpc" }
+

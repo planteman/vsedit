@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-markdown"
+description = "Terminal markdown renderer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-text-render = { path = "../vsedit-text-render" }
+vsedit-widgets = { path = "../vsedit-widgets" }
+pulldown-cmark = "0.12"
+

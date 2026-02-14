@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-contextkey"
+description = "Context key system and when-clause evaluation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-di = { path = "../vsedit-di" }
+

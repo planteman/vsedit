@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-minimap"
+description = "Code minimap using braille characters"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-text-render = { path = "../vsedit-text-render" }
+vsedit-widgets = { path = "../vsedit-widgets" }
+

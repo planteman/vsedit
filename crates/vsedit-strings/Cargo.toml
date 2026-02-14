@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-strings"
+description = "String manipulation and unicode utilities"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+unicode-segmentation = "1"
+unicode-width = "0.2"
+

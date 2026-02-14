@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-wb-terminal"
+description = "Terminal management"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-terminal-plat = { path = "../vsedit-terminal-plat" }
+vsedit-tui = { path = "../vsedit-tui" }
+

@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-glob"
+description = "Glob pattern matching"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+globset = "0.4"
+

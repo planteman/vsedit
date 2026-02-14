@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-wb-views"
+description = "View container system"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-tree = { path = "../vsedit-tree" }
+vsedit-wb-layout = { path = "../vsedit-wb-layout" }
+

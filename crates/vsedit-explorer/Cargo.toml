@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-explorer"
+description = "File explorer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-files = { path = "../vsedit-files" }
+vsedit-tree = { path = "../vsedit-tree" }
+vsedit-wb-views = { path = "../vsedit-wb-views" }
+

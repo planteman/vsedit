@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-storage"
+description = "Persistent key-value storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-di = { path = "../vsedit-di" }
+rusqlite = { version = "0.32", features = ["bundled"] }
+

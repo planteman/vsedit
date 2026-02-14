@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-wb-statusbar"
+description = "Status bar service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-statusbar = { path = "../vsedit-statusbar" }
+

@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-wb-treesitter"
+description = "Tree-sitter parsing service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tree-sitter = "0.24"
+

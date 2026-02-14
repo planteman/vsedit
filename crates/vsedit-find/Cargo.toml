@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-find"
+description = "Find and replace"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-editor-widget = { path = "../vsedit-editor-widget" }
+regex = "1"
+

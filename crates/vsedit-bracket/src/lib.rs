@@ -1,0 +1,1 @@
+//! Bracket matching and colorization

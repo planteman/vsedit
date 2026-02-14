@@ -1,0 +1,7 @@
+[package]
+name = "vsedit-wb-clipboard"
+description = "System clipboard integration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+

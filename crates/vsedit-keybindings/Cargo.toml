@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-keybindings"
+description = "Keybinding chord sequences"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-keycodes = { path = "../vsedit-keycodes" }
+

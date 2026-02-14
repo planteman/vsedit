@@ -1,0 +1,13 @@
+[package]
+name = "vsedit-ext-host"
+description = "Extension host process management"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-ext-mgmt = { path = "../vsedit-ext-mgmt" }
+vsedit-ext-rpc = { path = "../vsedit-ext-rpc" }
+vsedit-ipc = { path = "../vsedit-ipc" }
+tokio = { version = "1", features = ["process", "io-util"] }
+

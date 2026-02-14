@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-ext-view"
+description = "Extensions marketplace view"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-ext-mgmt = { path = "../vsedit-ext-mgmt" }
+vsedit-wb-views = { path = "../vsedit-wb-views" }
+

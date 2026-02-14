@@ -1,0 +1,12 @@
+[package]
+name = "vsedit-wb-search"
+description = "Workspace text search"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-files = { path = "../vsedit-files" }
+grep-searcher = "0.1"
+ignore = "0.4"
+

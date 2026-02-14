@@ -1,0 +1,7 @@
+[package]
+name = "vsedit-ext-comments"
+description = "Ext API: Comments"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+

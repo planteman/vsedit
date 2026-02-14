@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-output-view"
+description = "Output panel view"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-wb-output = { path = "../vsedit-wb-output" }
+

@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-suggest"
+description = "Autocomplete and suggestions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-editor-widget = { path = "../vsedit-editor-widget" }
+vsedit-languages = { path = "../vsedit-languages" }
+

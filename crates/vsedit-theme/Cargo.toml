@@ -1,0 +1,13 @@
+[package]
+name = "vsedit-theme"
+description = "Color theme loading and mapping"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-di = { path = "../vsedit-di" }
+vsedit-styles = { path = "../vsedit-styles" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+

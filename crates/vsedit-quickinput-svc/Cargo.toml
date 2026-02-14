@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-quickinput-svc"
+description = "Quick input model service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-contextkey = { path = "../vsedit-contextkey" }
+vsedit-di = { path = "../vsedit-di" }
+

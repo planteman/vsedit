@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-bracket"
+description = "Bracket matching and colorization"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-editor-widget = { path = "../vsedit-editor-widget" }
+

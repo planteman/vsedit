@@ -1,0 +1,7 @@
+[package]
+name = "vsedit-ext-auth"
+description = "Ext API: Authentication"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+

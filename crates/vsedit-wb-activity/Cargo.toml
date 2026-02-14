@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-wb-activity"
+description = "Activity bar"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-wb-views = { path = "../vsedit-wb-views" }
+

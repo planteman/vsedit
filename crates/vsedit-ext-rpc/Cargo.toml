@@ -1,0 +1,13 @@
+[package]
+name = "vsedit-ext-rpc"
+description = "Extension RPC protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-buffer = { path = "../vsedit-buffer" }
+vsedit-ipc = { path = "../vsedit-ipc" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+

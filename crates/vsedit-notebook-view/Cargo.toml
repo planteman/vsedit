@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-notebook-view"
+description = "Notebook editor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-ext-notebook = { path = "../vsedit-ext-notebook" }
+

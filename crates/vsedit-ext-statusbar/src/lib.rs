@@ -1,0 +1,1 @@
+//! Ext API: Status bar

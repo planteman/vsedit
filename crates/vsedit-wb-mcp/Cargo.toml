@@ -1,0 +1,7 @@
+[package]
+name = "vsedit-wb-mcp"
+description = "Model Context Protocol service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+

@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-inline-complete"
+description = "Inline ghost text completions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-editor-widget = { path = "../vsedit-editor-widget" }
+

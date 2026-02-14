@@ -1,0 +1,7 @@
+[package]
+name = "vsedit-sign"
+description = "Request signing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+

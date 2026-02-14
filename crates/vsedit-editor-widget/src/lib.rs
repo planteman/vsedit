@@ -1,0 +1,1 @@
+//! Complete editor widget

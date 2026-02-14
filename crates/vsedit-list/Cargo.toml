@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-list"
+description = "Virtual scrolling list widget"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-scrollbar = { path = "../vsedit-scrollbar" }
+vsedit-widgets = { path = "../vsedit-widgets" }
+

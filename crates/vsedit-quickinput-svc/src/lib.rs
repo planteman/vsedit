@@ -1,0 +1,1 @@
+//! Quick input model service
