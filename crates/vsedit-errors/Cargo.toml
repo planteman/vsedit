@@ -1,0 +1,11 @@
+[package]
+name = "vsedit-errors"
+description = "Error types and handling patterns"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = "1"
+thiserror = "2"
+
