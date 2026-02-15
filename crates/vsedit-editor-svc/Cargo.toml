@@ -1,10 +1,10 @@
 [package]
-name = "vsedit-quickinput"
-description = "Quick pick / command palette model"
+name = "vsedit-editor-svc"
+description = "Editor group and tab management service"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
+vsedit-uri = { path = "../vsedit-uri" }
 vsedit-events = { path = "../vsedit-events" }
-

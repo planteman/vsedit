@@ -2924,6 +2924,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "vsedit-editor-svc"
+version = "0.1.0"
+dependencies = [
+ "vsedit-events",
+ "vsedit-uri",
+]
+
+[[package]]
 name = "vsedit-editor-types"
 version = "0.1.0"
 dependencies = [
@@ -3124,6 +3132,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "tokio",
  "vsedit-buffer",
  "vsedit-ipc",
 ]
@@ -3229,7 +3238,6 @@ name = "vsedit-find"
 version = "0.1.0"
 dependencies = [
  "regex",
- "vsedit-editor-widget",
 ]
 
 [[package]]
@@ -3621,9 +3629,7 @@ dependencies = [
 name = "vsedit-quickinput"
 version = "0.1.0"
 dependencies = [
- "vsedit-input",
- "vsedit-list",
- "vsedit-widgets",
+ "vsedit-events",
 ]
 
 [[package]]
@@ -3727,9 +3733,6 @@ dependencies = [
 [[package]]
 name = "vsedit-snippet"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-snippets-mgr"
@@ -3864,8 +3867,6 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
- "vsedit-di",
- "vsedit-styles",
 ]
 
 [[package]]
@@ -3953,9 +3954,9 @@ dependencies = [
 name = "vsedit-viewmodel"
 version = "0.1.0"
 dependencies = [
- "vsedit-cursor",
+ "vsedit-editor-config",
+ "vsedit-editor-types",
  "vsedit-text-model",
- "vsedit-viewlayout",
 ]
 
 [[package]]

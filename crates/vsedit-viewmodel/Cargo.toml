@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-vsedit-cursor = { path = "../vsedit-cursor" }
+vsedit-editor-config = { path = "../vsedit-editor-config" }
+vsedit-editor-types = { path = "../vsedit-editor-types" }
 vsedit-text-model = { path = "../vsedit-text-model" }
-vsedit-viewlayout = { path = "../vsedit-viewlayout" }
 

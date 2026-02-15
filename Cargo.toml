@@ -37,6 +37,7 @@ members = [
     "crates/vsedit-editor-controller",
     "crates/vsedit-editor-render",
     "crates/vsedit-editor-services",
+    "crates/vsedit-editor-svc",
     "crates/vsedit-editor-types",
     "crates/vsedit-editor-viewparts",
     "crates/vsedit-editor-widget",
