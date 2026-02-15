@@ -7,4 +7,5 @@ license.workspace = true
 
 [dependencies]
 vsedit-di = { path = "../vsedit-di" }
+base64 = "0.22"
 

@@ -8,4 +8,5 @@ license.workspace = true
 [dependencies]
 vsedit-commands = { path = "../vsedit-commands" }
 vsedit-contextkey = { path = "../vsedit-contextkey" }
+serde_json = { workspace = true }
 

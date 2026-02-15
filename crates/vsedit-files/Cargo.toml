@@ -7,9 +7,14 @@ license.workspace = true
 
 [dependencies]
 vsedit-di = { path = "../vsedit-di" }
+vsedit-events = { path = "../vsedit-events" }
 vsedit-stream = { path = "../vsedit-stream" }
 vsedit-uri = { path = "../vsedit-uri" }
 notify = "7"
+thiserror = { workspace = true }
 tokio = { version = "1", features = ["fs"] }
 walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"
 

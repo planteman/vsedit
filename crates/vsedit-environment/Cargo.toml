@@ -9,3 +9,6 @@ license.workspace = true
 vsedit-di = { path = "../vsedit-di" }
 dirs = "5"
 
+[dev-dependencies]
+tempfile = "3"
+

@@ -9,4 +9,5 @@ license.workspace = true
 vsedit-layout = { path = "../vsedit-layout" }
 vsedit-styles = { path = "../vsedit-styles" }
 vsedit-tui = { path = "../vsedit-tui" }
+ratatui = { version = "0.29", features = ["crossterm"] }
 

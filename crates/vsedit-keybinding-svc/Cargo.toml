@@ -9,4 +9,5 @@ license.workspace = true
 vsedit-commands = { path = "../vsedit-commands" }
 vsedit-contextkey = { path = "../vsedit-contextkey" }
 vsedit-keybindings = { path = "../vsedit-keybindings" }
+vsedit-keycodes = { path = "../vsedit-keycodes" }
 

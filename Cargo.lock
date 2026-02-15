@@ -1311,6 +1311,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "matchers"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1525a2a28c7f4fa0fc98bb91ae755d1e2d1505079e05539e35bc876b5d65ae9"
+dependencies = [
+ "regex-automata",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2491,10 +2500,14 @@ version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f30143827ddab0d256fd843b7a66d164e9f271cfa0dde49142c5ca0ca291f1e"
 dependencies = [
+ "matchers",
  "nu-ansi-term",
+ "once_cell",
+ "regex-automata",
  "sharded-slab",
  "smallvec",
  "thread_local",
+ "tracing",
  "tracing-core",
  "tracing-log",
 ]
@@ -2648,6 +2661,7 @@ version = "0.1.0"
 name = "vsedit-actions"
 version = "0.1.0"
 dependencies = [
+ "serde_json",
  "vsedit-commands",
  "vsedit-contextkey",
 ]
@@ -2718,6 +2732,7 @@ dependencies = [
 name = "vsedit-clipboard"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "vsedit-di",
 ]
 
@@ -2809,7 +2824,6 @@ dependencies = [
 name = "vsedit-cursor"
 version = "0.1.0"
 dependencies = [
- "vsedit-editor-config",
  "vsedit-editor-types",
  "vsedit-text-model",
 ]
@@ -2880,7 +2894,8 @@ dependencies = [
 name = "vsedit-editor-config"
 version = "0.1.0"
 dependencies = [
- "vsedit-configuration",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2950,6 +2965,7 @@ name = "vsedit-environment"
 version = "0.1.0"
 dependencies = [
  "dirs",
+ "tempfile",
  "vsedit-di",
 ]
 
@@ -3198,8 +3214,11 @@ name = "vsedit-files"
 version = "0.1.0"
 dependencies = [
  "notify",
+ "tempfile",
+ "thiserror 2.0.18",
  "tokio",
  "vsedit-di",
+ "vsedit-events",
  "vsedit-stream",
  "vsedit-uri",
  "walkdir",
@@ -3346,6 +3365,7 @@ dependencies = [
  "vsedit-commands",
  "vsedit-contextkey",
  "vsedit-keybindings",
+ "vsedit-keycodes",
 ]
 
 [[package]]
@@ -3379,7 +3399,8 @@ version = "0.1.0"
 name = "vsedit-languages"
 version = "0.1.0"
 dependencies = [
- "vsedit-di",
+ "regex",
+ "vsedit-glob",
 ]
 
 [[package]]
@@ -3402,6 +3423,7 @@ name = "vsedit-lifecycle-svc"
 version = "0.1.0"
 dependencies = [
  "vsedit-di",
+ "vsedit-events",
 ]
 
 [[package]]
@@ -3452,7 +3474,9 @@ dependencies = [
 name = "vsedit-markers"
 version = "0.1.0"
 dependencies = [
- "vsedit-di",
+ "vsedit-editor-types",
+ "vsedit-events",
+ "vsedit-uri",
 ]
 
 [[package]]
@@ -3517,9 +3541,6 @@ dependencies = [
 [[package]]
 name = "vsedit-notification"
 version = "0.1.0"
-dependencies = [
- "vsedit-widgets",
-]
 
 [[package]]
 name = "vsedit-notification-svc"
@@ -3737,6 +3758,8 @@ name = "vsedit-storage"
 version = "0.1.0"
 dependencies = [
  "rusqlite",
+ "tempfile",
+ "thiserror 2.0.18",
  "vsedit-di",
 ]
 
@@ -3818,6 +3841,7 @@ dependencies = [
 name = "vsedit-text-model"
 version = "0.1.0"
 dependencies = [
+ "regex",
  "ropey",
  "vsedit-collections",
  "vsedit-editor-types",
@@ -3883,9 +3907,6 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-undoredo"
 version = "0.1.0"
-dependencies = [
- "vsedit-di",
-]
 
 [[package]]
 name = "vsedit-unicodehl"
@@ -4152,6 +4173,7 @@ dependencies = [
 name = "vsedit-widgets"
 version = "0.1.0"
 dependencies = [
+ "ratatui",
  "vsedit-layout",
  "vsedit-styles",
  "vsedit-tui",
@@ -4179,7 +4201,9 @@ dependencies = [
 name = "vsedit-workspace"
 version = "0.1.0"
 dependencies = [
- "vsedit-di",
+ "serde",
+ "serde_json",
+ "vsedit-events",
  "vsedit-uri",
 ]
 

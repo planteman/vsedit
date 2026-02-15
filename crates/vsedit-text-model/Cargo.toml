@@ -11,4 +11,5 @@ vsedit-editor-types = { path = "../vsedit-editor-types" }
 vsedit-events = { path = "../vsedit-events" }
 vsedit-undoredo = { path = "../vsedit-undoredo" }
 ropey = "1"
+regex.workspace = true
 

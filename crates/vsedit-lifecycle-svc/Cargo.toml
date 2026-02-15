@@ -7,4 +7,5 @@ license.workspace = true
 
 [dependencies]
 vsedit-di = { path = "../vsedit-di" }
+vsedit-events = { path = "../vsedit-events" }
 
