@@ -6,6 +6,6 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-vsedit-tree = { path = "../vsedit-tree" }
-vsedit-wb-layout = { path = "../vsedit-wb-layout" }
+vsedit-contextkey = { path = "../vsedit-contextkey" }
+vsedit-events = { path = "../vsedit-events" }
 

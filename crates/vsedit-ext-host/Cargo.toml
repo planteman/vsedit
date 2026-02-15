@@ -6,8 +6,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-vsedit-ext-mgmt = { path = "../vsedit-ext-mgmt" }
 vsedit-ext-rpc = { path = "../vsedit-ext-rpc" }
-vsedit-ipc = { path = "../vsedit-ipc" }
-tokio = { version = "1", features = ["process", "io-util"] }
+vsedit-events = { path = "../vsedit-events" }
+vsedit-uri = { path = "../vsedit-uri" }
+serde = { workspace = true }
+serde_json = { workspace = true }
 

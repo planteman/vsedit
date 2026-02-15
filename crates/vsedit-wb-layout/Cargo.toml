@@ -6,6 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-vsedit-di = { path = "../vsedit-di" }
+vsedit-events = { path = "../vsedit-events" }
 vsedit-layout = { path = "../vsedit-layout" }
+vsedit-tui = { path = "../vsedit-tui" }
 

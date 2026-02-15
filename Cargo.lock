@@ -2684,9 +2684,6 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-bracket"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-breadcrumb"
@@ -3078,10 +3075,11 @@ dependencies = [
 name = "vsedit-ext-host"
 version = "0.1.0"
 dependencies = [
- "tokio",
- "vsedit-ext-mgmt",
+ "serde",
+ "serde_json",
+ "vsedit-events",
  "vsedit-ext-rpc",
- "vsedit-ipc",
+ "vsedit-uri",
 ]
 
 [[package]]
@@ -3243,16 +3241,10 @@ dependencies = [
 [[package]]
 name = "vsedit-folding"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-format"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-functional"
@@ -3268,9 +3260,6 @@ dependencies = [
 [[package]]
 name = "vsedit-goto"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-hash"
@@ -3302,9 +3291,6 @@ dependencies = [
 [[package]]
 name = "vsedit-indentation"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-inlayhints"
@@ -3667,9 +3653,6 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-rename"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-request"
@@ -3794,7 +3777,6 @@ dependencies = [
 name = "vsedit-suggest"
 version = "0.1.0"
 dependencies = [
- "vsedit-editor-widget",
  "vsedit-languages",
 ]
 
@@ -3879,10 +3861,6 @@ dependencies = [
 [[package]]
 name = "vsedit-tree"
 version = "0.1.0"
-dependencies = [
- "vsedit-scrollbar",
- "vsedit-widgets",
-]
 
 [[package]]
 name = "vsedit-tui"
@@ -4036,8 +4014,9 @@ version = "0.1.0"
 name = "vsedit-wb-layout"
 version = "0.1.0"
 dependencies = [
- "vsedit-di",
+ "vsedit-events",
  "vsedit-layout",
+ "vsedit-tui",
 ]
 
 [[package]]
@@ -4100,7 +4079,8 @@ dependencies = [
 name = "vsedit-wb-statusbar"
 version = "0.1.0"
 dependencies = [
- "vsedit-statusbar",
+ "vsedit-events",
+ "vsedit-widgets",
 ]
 
 [[package]]
@@ -4151,8 +4131,8 @@ version = "0.1.0"
 name = "vsedit-wb-views"
 version = "0.1.0"
 dependencies = [
- "vsedit-tree",
- "vsedit-wb-layout",
+ "vsedit-contextkey",
+ "vsedit-events",
 ]
 
 [[package]]
@@ -4166,9 +4146,6 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-whitespace"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-widgets"
@@ -4183,9 +4160,6 @@ dependencies = [
 [[package]]
 name = "vsedit-wordhl"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-workbench"
