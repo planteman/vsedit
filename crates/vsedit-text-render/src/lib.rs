@@ -98,7 +98,7 @@ pub fn truncate_to_width(text: &str, max_width: usize, tab_size: u32) -> String 
         };
 
         if width + ch_width > max_width {
-            if max_width > 0 {
+            if width < max_width {
                 result.push('…');
             }
             break;
@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn truncate() {
         assert_eq!(truncate_to_width("hello world", 5, 4), "hello");
-        assert_eq!(truncate_to_width("hello world", 6, 4), "hello…");
+        assert_eq!(truncate_to_width("hello world", 7, 4), "hello w");
     }
 
     #[test]

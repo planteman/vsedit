@@ -1,1 +1,21 @@
-//! Ext API: FileSystem
+//! Ext API: FileSystem.
+//!
+//! RPC bridge between the extension host and the main thread for fs.
+
+/// Proxy identifier for this extension API namespace.
+pub const PROXY_ID: &str = "ext_fs";
+
+/// Initialize the fs extension API bridge.
+pub fn register() {
+    // Registration will connect RPC handlers when extension host starts
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn proxy_id() {
+        assert!(!PROXY_ID.is_empty());
+    }
+}

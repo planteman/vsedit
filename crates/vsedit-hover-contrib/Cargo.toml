@@ -6,6 +6,5 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-vsedit-editor-widget = { path = "../vsedit-editor-widget" }
 vsedit-markdown = { path = "../vsedit-markdown" }
 

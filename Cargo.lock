@@ -2736,16 +2736,10 @@ dependencies = [
 [[package]]
 name = "vsedit-codeaction"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-codelens"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-collections"
@@ -2757,9 +2751,6 @@ dependencies = [
 [[package]]
 name = "vsedit-colorpicker"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-commands"
@@ -2771,9 +2762,6 @@ dependencies = [
 [[package]]
 name = "vsedit-comment"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-comments-view"
@@ -2808,11 +2796,11 @@ dependencies = [
  "tracing-subscriber",
  "vsedit-configuration",
  "vsedit-di",
- "vsedit-editor-widget",
  "vsedit-environment",
  "vsedit-ext-host",
  "vsedit-lifecycle-svc",
  "vsedit-log",
+ "vsedit-product",
  "vsedit-tui",
  "vsedit-workbench",
 ]
@@ -3277,7 +3265,6 @@ version = "0.1.0"
 name = "vsedit-hover-contrib"
 version = "0.1.0"
 dependencies = [
- "vsedit-editor-widget",
  "vsedit-markdown",
 ]
 
@@ -3295,22 +3282,15 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-inlayhints"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-inline-complete"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-inlinechat-view"
 version = "0.1.0"
 dependencies = [
- "vsedit-editor-widget",
  "vsedit-ext-chat",
 ]
 
@@ -3423,16 +3403,10 @@ dependencies = [
 [[package]]
 name = "vsedit-linkededit"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-links"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-list"
@@ -3493,7 +3467,6 @@ name = "vsedit-merge-editor"
 version = "0.1.0"
 dependencies = [
  "vsedit-diff",
- "vsedit-editor-widget",
 ]
 
 [[package]]
@@ -3509,7 +3482,6 @@ name = "vsedit-multicursor"
 version = "0.1.0"
 dependencies = [
  "vsedit-cursor",
- "vsedit-editor-widget",
 ]
 
 [[package]]
@@ -3575,9 +3547,6 @@ dependencies = [
 [[package]]
 name = "vsedit-paramhints"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-path"
@@ -3664,9 +3633,6 @@ dependencies = [
 [[package]]
 name = "vsedit-rulers"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-scm-view"
@@ -3709,9 +3675,6 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-smartselect"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-snippet"
@@ -3735,9 +3698,6 @@ dependencies = [
 [[package]]
 name = "vsedit-stickyscroll"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-storage"
@@ -3890,9 +3850,6 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-unicodehl"
 version = "0.1.0"
-dependencies = [
- "vsedit-editor-widget",
-]
 
 [[package]]
 name = "vsedit-update"
@@ -3983,7 +3940,6 @@ version = "0.1.0"
 name = "vsedit-wb-editor"
 version = "0.1.0"
 dependencies = [
- "vsedit-editor-widget",
  "vsedit-wb-layout",
 ]
 

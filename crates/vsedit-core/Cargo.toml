@@ -8,11 +8,11 @@ license.workspace = true
 [dependencies]
 vsedit-configuration = { path = "../vsedit-configuration" }
 vsedit-di = { path = "../vsedit-di" }
-vsedit-editor-widget = { path = "../vsedit-editor-widget" }
 vsedit-environment = { path = "../vsedit-environment" }
 vsedit-ext-host = { path = "../vsedit-ext-host" }
 vsedit-lifecycle-svc = { path = "../vsedit-lifecycle-svc" }
 vsedit-log = { path = "../vsedit-log" }
+vsedit-product = { path = "../vsedit-product" }
 vsedit-tui = { path = "../vsedit-tui" }
 vsedit-workbench = { path = "../vsedit-workbench" }
 clap = { version = "4", features = ["derive"] }
