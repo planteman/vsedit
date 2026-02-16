@@ -6,6 +6,7 @@
 use std::fmt;
 
 use unicode_width::UnicodeWidthChar;
+use unicode_width::UnicodeWidthStr;
 
 /// Errors that can occur during text rendering operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -379,6 +380,148 @@ pub fn pad_to_width(text: &str, width: usize, tab_size: u32) -> String {
     }
 }
 
+/// How text should be wrapped when it exceeds the available width.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextWrapMode {
+    /// No wrapping; lines may exceed the available width.
+    None,
+    /// Wrap at word boundaries (whitespace).
+    Word,
+    /// Wrap at any character boundary.
+    Character,
+}
+
+/// Wrap `text` into lines that fit within `max_width` display columns.
+///
+/// Uses [`UnicodeWidthChar`] to measure character widths so that wide (CJK)
+/// characters are handled correctly.  When `mode` is [`TextWrapMode::None`]
+/// the input is returned as a single element.
+pub fn wrap_text(text: &str, max_width: usize, mode: TextWrapMode) -> Vec<String> {
+    if max_width == 0 || mode == TextWrapMode::None {
+        return vec![text.to_string()];
+    }
+
+    match mode {
+        TextWrapMode::None => vec![text.to_string()],
+        TextWrapMode::Character => wrap_by_character(text, max_width),
+        TextWrapMode::Word => wrap_by_word(text, max_width),
+    }
+}
+
+fn wrap_by_character(text: &str, max_width: usize) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut col: usize = 0;
+
+    for ch in text.chars() {
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if col + w > max_width && col > 0 {
+            lines.push(current);
+            current = String::new();
+            col = 0;
+        }
+        current.push(ch);
+        col += w;
+    }
+    if !current.is_empty() || lines.is_empty() {
+        lines.push(current);
+    }
+    lines
+}
+
+fn wrap_by_word(text: &str, max_width: usize) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut col: usize = 0;
+
+    for word in text.split_inclusive(' ') {
+        let word_width: usize = UnicodeWidthStr::width(word);
+        if col + word_width > max_width && col > 0 {
+            lines.push(current.trim_end().to_string());
+            current = String::new();
+            col = 0;
+        }
+        current.push_str(word);
+        col += word_width;
+    }
+    if !current.is_empty() || lines.is_empty() {
+        lines.push(current.trim_end().to_string());
+    }
+    lines
+}
+
+/// Measurements of a text string for layout purposes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextMeasurement {
+    /// Display width in terminal columns (accounts for wide characters).
+    pub visible_width: usize,
+    /// Length in bytes.
+    pub byte_length: usize,
+    /// Number of Unicode scalar values.
+    pub char_count: usize,
+    /// Whether the text contains any characters wider than one column.
+    pub contains_wide_chars: bool,
+}
+
+/// Measure a string, returning layout-relevant metrics.
+pub fn measure_text(text: &str) -> TextMeasurement {
+    let visible_width = UnicodeWidthStr::width(text);
+    let byte_length = text.len();
+    let char_count = text.chars().count();
+    let contains_wide_chars = text
+        .chars()
+        .any(|c| UnicodeWidthChar::width(c).unwrap_or(0) > 1);
+
+    TextMeasurement {
+        visible_width,
+        byte_length,
+        char_count,
+        contains_wide_chars,
+    }
+}
+
+/// Truncate `text` to fit within `max_width` display columns, appending
+/// `ellipsis` when truncation occurs.
+///
+/// Unlike [`truncate_to_width`] this function lets the caller choose the
+/// ellipsis string (e.g. `"..."` or `"…"`).
+pub fn truncate_with_ellipsis(text: &str, max_width: usize, ellipsis: &str) -> String {
+    let text_width = UnicodeWidthStr::width(text);
+    if text_width <= max_width {
+        return text.to_string();
+    }
+
+    let ellipsis_width = UnicodeWidthStr::width(ellipsis);
+    if max_width <= ellipsis_width {
+        // Not enough room for even the ellipsis; return what fits.
+        let mut result = String::new();
+        let mut col: usize = 0;
+        for ch in text.chars() {
+            let w = UnicodeWidthChar::width(ch).unwrap_or(0);
+            if col + w > max_width {
+                break;
+            }
+            result.push(ch);
+            col += w;
+        }
+        return result;
+    }
+
+    let target = max_width - ellipsis_width;
+    let mut result = String::new();
+    let mut col: usize = 0;
+    for ch in text.chars() {
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if col + w > target {
+            break;
+        }
+        result.push(ch);
+        col += w;
+    }
+    result.push_str(ellipsis);
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -549,5 +692,73 @@ mod tests {
         let r = render_line("\x01", 4);
         assert_eq!(r.text, "\u{2401}");
         assert_eq!(r.display_width, 1);
+    }
+
+    #[test]
+    fn wrap_text_none_mode() {
+        let lines = wrap_text("hello world", 5, TextWrapMode::None);
+        assert_eq!(lines, vec!["hello world"]);
+    }
+
+    #[test]
+    fn wrap_text_character_mode() {
+        let lines = wrap_text("abcdefgh", 3, TextWrapMode::Character);
+        assert_eq!(lines, vec!["abc", "def", "gh"]);
+    }
+
+    #[test]
+    fn wrap_text_word_mode() {
+        let lines = wrap_text("hello beautiful world", 14, TextWrapMode::Word);
+        assert_eq!(lines, vec!["hello", "beautiful", "world"]);
+    }
+
+    #[test]
+    fn wrap_text_wide_chars_character() {
+        // Each CJK char is 2 columns wide, so max_width=4 fits 2 per line.
+        let lines = wrap_text("你好世界", 4, TextWrapMode::Character);
+        assert_eq!(lines, vec!["你好", "世界"]);
+    }
+
+    #[test]
+    fn measure_text_ascii() {
+        let m = measure_text("hello");
+        assert_eq!(m.visible_width, 5);
+        assert_eq!(m.byte_length, 5);
+        assert_eq!(m.char_count, 5);
+        assert!(!m.contains_wide_chars);
+    }
+
+    #[test]
+    fn measure_text_wide() {
+        let m = measure_text("你好");
+        assert_eq!(m.visible_width, 4);
+        assert_eq!(m.byte_length, 6);
+        assert_eq!(m.char_count, 2);
+        assert!(m.contains_wide_chars);
+    }
+
+    #[test]
+    fn measure_text_mixed() {
+        let m = measure_text("hi你");
+        assert_eq!(m.visible_width, 4);
+        assert_eq!(m.char_count, 3);
+        assert!(m.contains_wide_chars);
+    }
+
+    #[test]
+    fn truncate_with_ellipsis_no_truncation() {
+        assert_eq!(truncate_with_ellipsis("hi", 10, "..."), "hi");
+    }
+
+    #[test]
+    fn truncate_with_ellipsis_basic() {
+        assert_eq!(truncate_with_ellipsis("hello world", 8, "..."), "hello...");
+    }
+
+    #[test]
+    fn truncate_with_ellipsis_wide_chars() {
+        // "你好世界" is 8 columns; truncate to 6 with "…" (1 col)
+        let result = truncate_with_ellipsis("你好世界", 6, "…");
+        assert_eq!(result, "你好…");
     }
 }

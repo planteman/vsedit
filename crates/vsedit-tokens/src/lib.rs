@@ -3,6 +3,7 @@
 //! Equivalent to VS Code's `vs/editor/common/languages/supports/tokenization.ts`.
 //! Provides token types and tokenization results used by syntax highlighting.
 
+use std::fmt;
 /// Standard token type matching VS Code's classification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StandardTokenType {

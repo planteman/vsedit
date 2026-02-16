@@ -2848,6 +2848,14 @@ name = "vsedit-a11y-features"
 version = "0.1.0"
 
 [[package]]
+name = "vsedit-accessibility"
+version = "0.1.0"
+dependencies = [
+ "vsedit-a11y",
+ "vsedit-a11y-features",
+]
+
+[[package]]
 name = "vsedit-actions"
 version = "0.1.0"
 dependencies = [

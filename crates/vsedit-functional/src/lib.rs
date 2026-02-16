@@ -326,6 +326,105 @@ where
     }
 }
 
+/// Compose three functions left-to-right: `chain3(f, g, h)(x)` = `h(g(f(x)))`.
+pub fn chain3<A, B, C, D>(
+    f: impl Fn(A) -> B,
+    g: impl Fn(B) -> C,
+    h: impl Fn(C) -> D,
+) -> impl Fn(A) -> D {
+    move |a| h(g(f(a)))
+}
+
+/// Retry a fallible operation up to `max_attempts` times, returning the first
+/// `Ok` or the last `Err`.
+pub fn retry<T, E>(mut f: impl FnMut() -> Result<T, E>, max_attempts: usize) -> Result<T, E> {
+    let mut last_err = None;
+    for _ in 0..max_attempts {
+        match f() {
+            Ok(v) => return Ok(v),
+            Err(e) => last_err = Some(e),
+        }
+    }
+    Err(last_err.expect("max_attempts must be > 0"))
+}
+
+/// Accumulate intermediate results like a fold that keeps every step.
+///
+/// Returns a `Vec` containing the initial value followed by each successive
+/// accumulation.
+pub fn scan<T: Clone, A>(
+    init: T,
+    items: impl Iterator<Item = A>,
+    mut f: impl FnMut(&T, A) -> T,
+) -> Vec<T> {
+    let mut results = vec![init];
+    for item in items {
+        let next = f(results.last().unwrap(), item);
+        results.push(next);
+    }
+    results
+}
+
+/// Group items by a key function, returning a `HashMap` of key → items.
+pub fn group_by<T, K: Eq + std::hash::Hash>(
+    items: impl IntoIterator<Item = T>,
+    key_fn: impl Fn(&T) -> K,
+) -> HashMap<K, Vec<T>> {
+    let mut map: HashMap<K, Vec<T>> = HashMap::new();
+    for item in items {
+        let key = key_fn(&item);
+        map.entry(key).or_default().push(item);
+    }
+    map
+}
+
+/// Zip two iterators together using a combining function.
+pub fn zip_with<A, B, C>(
+    a: impl IntoIterator<Item = A>,
+    b: impl IntoIterator<Item = B>,
+    f: impl Fn(A, B) -> C,
+) -> Vec<C> {
+    a.into_iter().zip(b).map(|(x, y)| f(x, y)).collect()
+}
+
+/// A simple state-machine reducer that applies actions to state.
+///
+/// Holds a reducing function and the current state, letting callers dispatch
+/// actions one at a time.
+pub struct Reducer<S, A> {
+    state: S,
+    reduce_fn: Box<dyn Fn(S, A) -> S>,
+}
+
+impl<S: Clone, A> Reducer<S, A> {
+    /// Create a new `Reducer` with an initial state and a reducing function.
+    pub fn new(initial: S, reduce_fn: impl Fn(S, A) -> S + 'static) -> Self {
+        Self {
+            state: initial,
+            reduce_fn: Box::new(reduce_fn),
+        }
+    }
+
+    /// Dispatch an action, updating the internal state.
+    pub fn dispatch(&mut self, action: A) {
+        let old = self.state.clone();
+        self.state = (self.reduce_fn)(old, action);
+    }
+
+    /// Return a reference to the current state.
+    pub fn state(&self) -> &S {
+        &self.state
+    }
+}
+
+impl<S: fmt::Debug, A> fmt::Debug for Reducer<S, A> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Reducer")
+            .field("state", &self.state)
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -534,5 +633,89 @@ mod tests {
         assert_eq!(e.to_string(), "validation failed: bad");
         assert_eq!(FunctionalError::EmptyPipeline.to_string(), "pipeline is empty");
         assert_eq!(FunctionalError::NoMatch.to_string(), "no matching element found");
+    }
+
+    #[test]
+    fn test_chain3() {
+        let add1 = |x: i32| x + 1;
+        let double = |x: i32| x * 2;
+        let to_str = |x: i32| format!("{x}");
+        let f = chain3(add1, double, to_str);
+        assert_eq!(f(5), "12"); // (5+1)*2 = 12
+        assert_eq!(f(0), "2");  // (0+1)*2 = 2
+    }
+
+    #[test]
+    fn test_retry_succeeds_first_try() {
+        let result = retry(|| Ok::<i32, &str>(42), 3);
+        assert_eq!(result, Ok(42));
+    }
+
+    #[test]
+    fn test_retry_succeeds_after_failures() {
+        let mut attempts = 0;
+        let result = retry(
+            || {
+                attempts += 1;
+                if attempts < 3 { Err("not yet") } else { Ok(attempts) }
+            },
+            5,
+        );
+        assert_eq!(result, Ok(3));
+    }
+
+    #[test]
+    fn test_retry_exhausted() {
+        let result = retry(|| Err::<(), &str>("fail"), 3);
+        assert_eq!(result, Err("fail"));
+    }
+
+    #[test]
+    fn test_scan() {
+        let sums = scan(0, vec![1, 2, 3, 4].into_iter(), |acc, x| acc + x);
+        assert_eq!(sums, vec![0, 1, 3, 6, 10]);
+    }
+
+    #[test]
+    fn test_scan_empty() {
+        let result = scan(10, std::iter::empty::<i32>(), |acc, x| acc + x);
+        assert_eq!(result, vec![10]);
+    }
+
+    #[test]
+    fn test_group_by() {
+        let groups = group_by(vec![1, 2, 3, 4, 5, 6], |x| x % 3);
+        assert_eq!(groups[&0], vec![3, 6]);
+        assert_eq!(groups[&1], vec![1, 4]);
+        assert_eq!(groups[&2], vec![2, 5]);
+    }
+
+    #[test]
+    fn test_zip_with() {
+        let result = zip_with(vec![1, 2, 3], vec![10, 20, 30], |a, b| a + b);
+        assert_eq!(result, vec![11, 22, 33]);
+    }
+
+    #[test]
+    fn test_zip_with_unequal_lengths() {
+        let result = zip_with(vec![1, 2], vec![10, 20, 30], |a, b| a * b);
+        assert_eq!(result, vec![10, 40]); // stops at shorter
+    }
+
+    #[test]
+    fn test_reducer() {
+        let mut r = Reducer::new(0_i32, |state, action: i32| state + action);
+        r.dispatch(5);
+        r.dispatch(3);
+        assert_eq!(*r.state(), 8);
+        r.dispatch(-2);
+        assert_eq!(*r.state(), 6);
+    }
+
+    #[test]
+    fn test_reducer_debug() {
+        let r = Reducer::new(0_i32, |s, a: i32| s + a);
+        let dbg = format!("{:?}", r);
+        assert!(dbg.contains("Reducer"));
     }
 }

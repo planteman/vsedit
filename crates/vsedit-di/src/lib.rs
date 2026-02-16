@@ -341,6 +341,77 @@ impl fmt::Debug for ServiceAccessor {
 }
 
 // ---------------------------------------------------------------------------
+// ServiceStats — diagnostic snapshot of container state
+// ---------------------------------------------------------------------------
+
+/// A snapshot of diagnostic statistics for a [`ServiceCollection`].
+///
+/// Useful for health checks, logging, and debugging the state of the
+/// dependency injection container at a point in time.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServiceStats {
+    /// Number of services currently registered (instances + factories).
+    pub total_registered: usize,
+    /// Number of services that have been resolved (factories invoked).
+    pub total_resolved: usize,
+    /// Number of resolution attempts that returned `None`.
+    pub resolution_errors: usize,
+}
+
+impl ServiceStats {
+    /// Collect statistics from the given [`ServiceCollection`].
+    pub fn from_collection(collection: &ServiceCollection) -> Self {
+        // SAFETY: read-only access to the map.
+        let map = unsafe { &*collection.services.get() };
+        let total_registered = map.len();
+        let total_resolved = map
+            .values()
+            .filter(|e| matches!(e, ServiceEntry::Instance(_)))
+            .count();
+        Self {
+            total_registered,
+            total_resolved,
+            resolution_errors: 0,
+        }
+    }
+}
+
+impl fmt::Display for ServiceStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "registered={}, resolved={}, errors={}",
+            self.total_registered, self.total_resolved, self.resolution_errors
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// validate_service_id — service identifier validation
+// ---------------------------------------------------------------------------
+
+/// Validate a service identifier string.
+///
+/// A valid service id must:
+/// - Be non-empty and at most 128 characters
+/// - Start with an ASCII letter
+/// - Contain only ASCII alphanumeric characters, underscores, hyphens, or dots
+///
+/// This mirrors the naming conventions used in VS Code's service decorators
+/// (e.g. `"ILogService"`, `"editor.config"`).
+pub fn validate_service_id(id: &str) -> bool {
+    if id.is_empty() || id.len() > 128 {
+        return false;
+    }
+    let mut chars = id.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -585,5 +656,81 @@ mod tests {
     fn service_macro_sets_name() {
         assert_eq!(<LogService as Service>::service_name(), "LogService");
         assert_eq!(<ConfigService as Service>::service_name(), "ConfigService");
+    }
+
+    // -- ServiceStats -------------------------------------------------------
+
+    #[test]
+    fn stats_empty_collection() {
+        let sc = ServiceCollection::new();
+        let stats = ServiceStats::from_collection(&sc);
+        assert_eq!(
+            stats,
+            ServiceStats {
+                total_registered: 0,
+                total_resolved: 0,
+                resolution_errors: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn stats_with_instances_and_factories() {
+        let mut sc = ServiceCollection::new();
+        sc.register(ConfigService { value: 1 });
+        sc.register_factory(|_| LogService {
+            prefix: "test".into(),
+        });
+
+        let stats = ServiceStats::from_collection(&sc);
+        assert_eq!(stats.total_registered, 2);
+        // Only ConfigService is resolved; LogService is still a factory.
+        assert_eq!(stats.total_resolved, 1);
+
+        // Resolve the factory
+        let _ = sc.get::<LogService>();
+        let stats_after = ServiceStats::from_collection(&sc);
+        assert_eq!(stats_after.total_resolved, 2);
+    }
+
+    #[test]
+    fn stats_display() {
+        let stats = ServiceStats {
+            total_registered: 3,
+            total_resolved: 2,
+            resolution_errors: 1,
+        };
+        assert_eq!(
+            stats.to_string(),
+            "registered=3, resolved=2, errors=1"
+        );
+    }
+
+    // -- validate_service_id ------------------------------------------------
+
+    #[test]
+    fn validate_service_id_accepts_valid_ids() {
+        assert!(validate_service_id("ILogService"));
+        assert!(validate_service_id("editor.config"));
+        assert!(validate_service_id("my_service-v2"));
+        assert!(validate_service_id("A"));
+        assert!(validate_service_id("a123.b456"));
+    }
+
+    #[test]
+    fn validate_service_id_rejects_invalid_ids() {
+        assert!(!validate_service_id(""));
+        assert!(!validate_service_id("1StartsWithDigit"));
+        assert!(!validate_service_id("_leading_underscore"));
+        assert!(!validate_service_id("-leading-hyphen"));
+        assert!(!validate_service_id(".leading.dot"));
+        assert!(!validate_service_id("has space"));
+        assert!(!validate_service_id("has/slash"));
+        assert!(!validate_service_id("has@symbol"));
+        let long_id = "A".repeat(129);
+        assert!(!validate_service_id(&long_id));
+        // Exactly 128 is fine
+        let ok_id = "A".repeat(128);
+        assert!(validate_service_id(&ok_id));
     }
 }

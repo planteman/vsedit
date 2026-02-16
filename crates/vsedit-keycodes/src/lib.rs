@@ -503,6 +503,85 @@ pub fn key_chord(first: u32, second: u32) -> u32 {
 // Tests
 // ---------------------------------------------------------------------------
 
+/// Accumulated statistics for keycodes operations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeycodesStats {
+    total_operations: u64,
+    successful_operations: u64,
+    failed_operations: u64,
+    last_operation_ns: u64,
+    max_operation_ns: u64,
+    min_operation_ns: u64,
+    total_time_ns: u64,
+}
+
+impl KeycodesStats {
+    pub fn new() -> Self {
+        Self {
+            total_operations: 0,
+            successful_operations: 0,
+            failed_operations: 0,
+            last_operation_ns: 0,
+            max_operation_ns: 0,
+            min_operation_ns: u64::MAX,
+            total_time_ns: 0,
+        }
+    }
+
+    pub fn record_success(&mut self, duration_ns: u64) {
+        self.total_operations += 1;
+        self.successful_operations += 1;
+        self.last_operation_ns = duration_ns;
+        self.total_time_ns = self.total_time_ns.saturating_add(duration_ns);
+        if duration_ns > self.max_operation_ns { self.max_operation_ns = duration_ns; }
+        if duration_ns < self.min_operation_ns { self.min_operation_ns = duration_ns; }
+    }
+
+    pub fn record_failure(&mut self, duration_ns: u64) {
+        self.total_operations += 1;
+        self.failed_operations += 1;
+        self.last_operation_ns = duration_ns;
+        self.total_time_ns = self.total_time_ns.saturating_add(duration_ns);
+        if duration_ns > self.max_operation_ns { self.max_operation_ns = duration_ns; }
+        if duration_ns < self.min_operation_ns { self.min_operation_ns = duration_ns; }
+    }
+
+    pub fn average_time_ns(&self) -> u64 {
+        if self.total_operations == 0 { return 0; }
+        self.total_time_ns / self.total_operations
+    }
+
+    pub fn success_rate(&self) -> f64 {
+        if self.total_operations == 0 { return 1.0; }
+        self.successful_operations as f64 / self.total_operations as f64
+    }
+
+    pub fn failure_rate(&self) -> f64 { 1.0 - self.success_rate() }
+
+    pub fn total(&self) -> u64 { self.total_operations }
+
+    pub fn min_time_ns(&self) -> Option<u64> {
+        if self.total_operations == 0 { None } else { Some(self.min_operation_ns) }
+    }
+
+    pub fn max_time_ns(&self) -> Option<u64> {
+        if self.total_operations == 0 { None } else { Some(self.max_operation_ns) }
+    }
+
+    pub fn reset(&mut self) { *self = Self::new(); }
+
+    pub fn merge(&mut self, other: &KeycodesStats) {
+        self.total_operations += other.total_operations;
+        self.successful_operations += other.successful_operations;
+        self.failed_operations += other.failed_operations;
+        self.total_time_ns = self.total_time_ns.saturating_add(other.total_time_ns);
+        if other.max_operation_ns > self.max_operation_ns { self.max_operation_ns = other.max_operation_ns; }
+        if other.total_operations > 0 && other.min_operation_ns < self.min_operation_ns { self.min_operation_ns = other.min_operation_ns; }
+    }
+}
+
+impl Default for KeycodesStats { fn default() -> Self { Self::new() } }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -670,5 +749,51 @@ mod tests {
         assert_eq!(key_code_to_string(KeyCode::Backslash), "\\");
         assert_eq!(key_code_to_string(KeyCode::BracketRight), "]");
         assert_eq!(key_code_to_string(KeyCode::Quote), "'");
+    }
+
+    #[test]
+    fn keycodes_stats_new_defaults() {
+        let stats = KeycodesStats::new();
+        assert_eq!(stats.total(), 0);
+        assert!((stats.success_rate() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn keycodes_stats_record_success() {
+        let mut stats = KeycodesStats::new();
+        stats.record_success(100);
+        stats.record_success(200);
+        assert_eq!(stats.total(), 2);
+        assert_eq!(stats.average_time_ns(), 150);
+        assert_eq!(stats.min_time_ns(), Some(100));
+        assert_eq!(stats.max_time_ns(), Some(200));
+    }
+
+    #[test]
+    fn keycodes_stats_record_failure() {
+        let mut stats = KeycodesStats::new();
+        stats.record_success(100);
+        stats.record_failure(300);
+        assert_eq!(stats.total(), 2);
+        assert!((stats.success_rate() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn keycodes_stats_reset() {
+        let mut stats = KeycodesStats::new();
+        stats.record_success(500);
+        stats.reset();
+        assert_eq!(stats.total(), 0);
+    }
+
+    #[test]
+    fn keycodes_stats_merge() {
+        let mut a = KeycodesStats::new();
+        a.record_success(100);
+        let mut b = KeycodesStats::new();
+        b.record_failure(50);
+        a.merge(&b);
+        assert_eq!(a.total(), 2);
+        assert_eq!(a.min_time_ns(), Some(50));
     }
 }

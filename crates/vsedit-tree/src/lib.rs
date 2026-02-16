@@ -292,6 +292,159 @@ impl<T> TreeView<T> {
     }
 }
 
+/// Result of searching for a node in the tree.
+#[derive(Debug, Clone)]
+pub struct TreeSearchResult {
+    /// Index of this result in the DFS traversal order.
+    pub node_index: usize,
+    /// Depth of the matched node.
+    pub depth: u32,
+    /// Path of child indices from the root to this node.
+    pub path: Vec<usize>,
+}
+
+/// A node paired with its depth, returned by `flatten_tree`.
+#[derive(Debug)]
+pub struct FlattenedNode<'a, T> {
+    pub data: &'a T,
+    pub depth: u32,
+    pub path: Vec<usize>,
+}
+
+/// Aggregate statistics about a tree.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TreeStatistics {
+    pub total_nodes: usize,
+    pub leaf_count: usize,
+    pub max_depth: u32,
+    pub avg_children: f64,
+}
+
+/// Search all nodes in the tree that satisfy `predicate`, returning their
+/// index in DFS order, depth, and path.
+pub fn search_tree<T, F>(model: &TreeModel<T>, predicate: F) -> Vec<TreeSearchResult>
+where
+    F: Fn(&T) -> bool,
+{
+    let mut results = Vec::new();
+    let mut index = 0;
+    for (root_idx, root) in model.roots.iter().enumerate() {
+        search_node(root, &predicate, &mut results, &mut index, &mut vec![root_idx]);
+    }
+    results
+}
+
+fn search_node<T, F>(
+    node: &TreeNode<T>,
+    predicate: &F,
+    results: &mut Vec<TreeSearchResult>,
+    index: &mut usize,
+    path: &mut Vec<usize>,
+) where
+    F: Fn(&T) -> bool,
+{
+    if predicate(&node.data) {
+        results.push(TreeSearchResult {
+            node_index: *index,
+            depth: node.depth,
+            path: path.clone(),
+        });
+    }
+    *index += 1;
+    for (i, child) in node.children.iter().enumerate() {
+        path.push(i);
+        search_node(child, predicate, results, index, path);
+        path.pop();
+    }
+}
+
+/// Compute the maximum depth of the tree. Returns 0 for an empty tree.
+pub fn tree_depth<T>(model: &TreeModel<T>) -> u32 {
+    fn node_max_depth<T>(node: &TreeNode<T>) -> u32 {
+        if node.children.is_empty() {
+            node.depth
+        } else {
+            node.children.iter().map(|c| node_max_depth(c)).max().unwrap()
+        }
+    }
+    model.roots.iter().map(|r| node_max_depth(r)).max().unwrap_or(0)
+}
+
+/// Return all nodes in depth-first order together with their depth and path.
+pub fn flatten_tree<T>(model: &TreeModel<T>) -> Vec<FlattenedNode<'_, T>> {
+    let mut out = Vec::new();
+    for (root_idx, root) in model.roots.iter().enumerate() {
+        flatten_node(root, &mut out, &mut vec![root_idx]);
+    }
+    out
+}
+
+fn flatten_node<'a, T>(
+    node: &'a TreeNode<T>,
+    out: &mut Vec<FlattenedNode<'a, T>>,
+    path: &mut Vec<usize>,
+) {
+    out.push(FlattenedNode {
+        data: &node.data,
+        depth: node.depth,
+        path: path.clone(),
+    });
+    for (i, child) in node.children.iter().enumerate() {
+        path.push(i);
+        flatten_node(child, out, path);
+        path.pop();
+    }
+}
+
+/// Compute aggregate statistics for the tree.
+pub fn tree_statistics<T>(model: &TreeModel<T>) -> TreeStatistics {
+    let mut total_nodes: usize = 0;
+    let mut leaf_count: usize = 0;
+    let mut max_depth: u32 = 0;
+    let mut internal_nodes: usize = 0;
+    let mut total_children: usize = 0;
+
+    fn visit<T>(
+        node: &TreeNode<T>,
+        total: &mut usize,
+        leaves: &mut usize,
+        max_d: &mut u32,
+        internal: &mut usize,
+        children_sum: &mut usize,
+    ) {
+        *total += 1;
+        if node.depth > *max_d {
+            *max_d = node.depth;
+        }
+        if node.children.is_empty() {
+            *leaves += 1;
+        } else {
+            *internal += 1;
+            *children_sum += node.children.len();
+            for child in &node.children {
+                visit(child, total, leaves, max_d, internal, children_sum);
+            }
+        }
+    }
+
+    for root in &model.roots {
+        visit(root, &mut total_nodes, &mut leaf_count, &mut max_depth, &mut internal_nodes, &mut total_children);
+    }
+
+    let avg_children = if internal_nodes > 0 {
+        total_children as f64 / internal_nodes as f64
+    } else {
+        0.0
+    };
+
+    TreeStatistics {
+        total_nodes,
+        leaf_count,
+        max_depth,
+        avg_children,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -536,5 +689,75 @@ mod tests {
     fn default_impl() {
         let model: TreeModel<i32> = TreeModel::default();
         assert_eq!(model.node_count(), 0);
+    }
+
+    #[test]
+    fn search_tree_finds_matching_nodes() {
+        let model = sample_model();
+        let results = search_tree(&model, |data| data.ends_with(".rs"));
+        assert_eq!(results.len(), 3); // main.rs, mod.rs, utils.rs
+        assert_eq!(results[0].path, vec![0, 0]); // main.rs
+        assert_eq!(results[1].path, vec![0, 1, 0]); // mod.rs
+        assert_eq!(results[2].path, vec![0, 1, 1]); // utils.rs
+    }
+
+    #[test]
+    fn search_tree_no_matches() {
+        let model = sample_model();
+        let results = search_tree(&model, |data| data.contains("nonexistent"));
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn tree_depth_computes_max() {
+        let model = sample_model();
+        // deepest nodes are mod.rs and utils.rs at depth 2
+        assert_eq!(tree_depth(&model), 2);
+
+        let empty: TreeModel<&str> = TreeModel::new();
+        assert_eq!(tree_depth(&empty), 0);
+    }
+
+    #[test]
+    fn flatten_tree_returns_all_nodes_dfs() {
+        let model = sample_model();
+        let flat = flatten_tree(&model);
+        assert_eq!(flat.len(), 6);
+        let names: Vec<&&str> = flat.iter().map(|f| f.data).collect();
+        assert_eq!(names, vec![&"src", &"main.rs", &"lib", &"mod.rs", &"utils.rs", &"Cargo.toml"]);
+        // Verify depths
+        let depths: Vec<u32> = flat.iter().map(|f| f.depth).collect();
+        assert_eq!(depths, vec![0, 1, 1, 2, 2, 0]);
+    }
+
+    #[test]
+    fn tree_statistics_correct() {
+        let model = sample_model();
+        let stats = tree_statistics(&model);
+        assert_eq!(stats.total_nodes, 6);
+        assert_eq!(stats.leaf_count, 4); // main.rs, mod.rs, utils.rs, Cargo.toml
+        assert_eq!(stats.max_depth, 2);
+        // Internal nodes: src (2 children) and lib (2 children) => avg = 2.0
+        assert!((stats.avg_children - 2.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn tree_statistics_empty() {
+        let empty: TreeModel<&str> = TreeModel::new();
+        let stats = tree_statistics(&empty);
+        assert_eq!(stats.total_nodes, 0);
+        assert_eq!(stats.leaf_count, 0);
+        assert_eq!(stats.max_depth, 0);
+        assert!((stats.avg_children - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn search_result_depth_and_index() {
+        let model = sample_model();
+        let results = search_tree(&model, |data| *data == "lib");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].depth, 1);
+        assert_eq!(results[0].node_index, 2); // src(0), main.rs(1), lib(2)
+        assert_eq!(results[0].path, vec![0, 1]);
     }
 }

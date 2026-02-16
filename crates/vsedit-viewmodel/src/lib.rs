@@ -1,3 +1,4 @@
+use std::fmt;
 use std::sync::Arc;
 
 use vsedit_editor_config::WordWrap;

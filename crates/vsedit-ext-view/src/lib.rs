@@ -2,6 +2,7 @@
 //!
 //! RPC bridge between the extension host and the main thread for custom views.
 
+use std::fmt;
 use serde::{Deserialize, Serialize};
 
 /// Proxy identifier for this extension API namespace.

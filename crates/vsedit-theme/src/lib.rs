@@ -11,6 +11,7 @@
 //! - [`TerminalColor`] — maps theme colors to terminal-displayable colors.
 //! - [`TokenStyle`] — resolved style for a token (foreground, background, bold, italic, underline).
 
+use std::fmt;
 use std::collections::HashMap;
 use std::path::Path;
 

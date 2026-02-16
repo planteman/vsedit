@@ -300,6 +300,53 @@ impl Default for EditorViewParts {
     }
 }
 
+/// Priority level for ordering viewpart rendering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ViewPartPriority {
+    /// Rendered first (e.g. glyph margins, line numbers).
+    High,
+    /// Default rendering order (e.g. content widgets).
+    Normal,
+    /// Rendered last (e.g. decorative overlays).
+    Low,
+}
+
+/// A tagged viewpart entry used for priority-based sorting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrioritizedViewPart {
+    pub name: String,
+    pub priority: ViewPartPriority,
+    pub visible: bool,
+    pub render_time_us: u64,
+}
+
+/// Aggregate metrics computed from a collection of viewparts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewPartMetrics {
+    pub total_parts: usize,
+    pub visible_count: usize,
+    pub hidden_count: usize,
+    pub total_render_time_us: u64,
+}
+
+/// Compute aggregate metrics from a slice of prioritized viewparts.
+pub fn compute_viewpart_metrics(parts: &[PrioritizedViewPart]) -> ViewPartMetrics {
+    let visible_count = parts.iter().filter(|p| p.visible).count();
+    let total_render_time_us = parts.iter().map(|p| p.render_time_us).sum();
+    ViewPartMetrics {
+        total_parts: parts.len(),
+        visible_count,
+        hidden_count: parts.len() - visible_count,
+        total_render_time_us,
+    }
+}
+
+/// Sort viewparts by priority (High before Normal before Low), preserving
+/// insertion order among equal priorities (stable sort).
+pub fn sort_viewparts_by_priority(parts: &mut [PrioritizedViewPart]) {
+    parts.sort_by(|a, b| a.priority.cmp(&b.priority));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -569,5 +616,107 @@ mod tests {
         let bar = BreadcrumbBar::new();
         assert_eq!(bar.get_path_string(), "");
         assert_eq!(bar.items.len(), 0);
+    }
+
+    // --- ViewPartMetrics / priority tests ---
+
+    fn sample_parts() -> Vec<PrioritizedViewPart> {
+        vec![
+            PrioritizedViewPart {
+                name: "glyph_margin".into(),
+                priority: ViewPartPriority::High,
+                visible: true,
+                render_time_us: 120,
+            },
+            PrioritizedViewPart {
+                name: "content_widget".into(),
+                priority: ViewPartPriority::Normal,
+                visible: true,
+                render_time_us: 300,
+            },
+            PrioritizedViewPart {
+                name: "decorative_overlay".into(),
+                priority: ViewPartPriority::Low,
+                visible: false,
+                render_time_us: 50,
+            },
+            PrioritizedViewPart {
+                name: "minimap".into(),
+                priority: ViewPartPriority::Normal,
+                visible: true,
+                render_time_us: 500,
+            },
+        ]
+    }
+
+    #[test]
+    fn compute_metrics_counts() {
+        let parts = sample_parts();
+        let m = compute_viewpart_metrics(&parts);
+        assert_eq!(m.total_parts, 4);
+        assert_eq!(m.visible_count, 3);
+        assert_eq!(m.hidden_count, 1);
+    }
+
+    #[test]
+    fn compute_metrics_render_time() {
+        let parts = sample_parts();
+        let m = compute_viewpart_metrics(&parts);
+        assert_eq!(m.total_render_time_us, 120 + 300 + 50 + 500);
+    }
+
+    #[test]
+    fn compute_metrics_empty_slice() {
+        let m = compute_viewpart_metrics(&[]);
+        assert_eq!(m.total_parts, 0);
+        assert_eq!(m.visible_count, 0);
+        assert_eq!(m.hidden_count, 0);
+        assert_eq!(m.total_render_time_us, 0);
+    }
+
+    #[test]
+    fn sort_viewparts_ordering() {
+        let mut parts = sample_parts();
+        sort_viewparts_by_priority(&mut parts);
+        assert_eq!(parts[0].priority, ViewPartPriority::High);
+        assert_eq!(parts[1].priority, ViewPartPriority::Normal);
+        assert_eq!(parts[2].priority, ViewPartPriority::Normal);
+        assert_eq!(parts[3].priority, ViewPartPriority::Low);
+    }
+
+    #[test]
+    fn sort_viewparts_stable_within_priority() {
+        let mut parts = vec![
+            PrioritizedViewPart {
+                name: "first_normal".into(),
+                priority: ViewPartPriority::Normal,
+                visible: true,
+                render_time_us: 10,
+            },
+            PrioritizedViewPart {
+                name: "second_normal".into(),
+                priority: ViewPartPriority::Normal,
+                visible: true,
+                render_time_us: 20,
+            },
+            PrioritizedViewPart {
+                name: "high".into(),
+                priority: ViewPartPriority::High,
+                visible: true,
+                render_time_us: 5,
+            },
+        ];
+        sort_viewparts_by_priority(&mut parts);
+        assert_eq!(parts[0].name, "high");
+        // stable sort preserves insertion order within Normal
+        assert_eq!(parts[1].name, "first_normal");
+        assert_eq!(parts[2].name, "second_normal");
+    }
+
+    #[test]
+    fn priority_enum_ordering() {
+        assert!(ViewPartPriority::High < ViewPartPriority::Normal);
+        assert!(ViewPartPriority::Normal < ViewPartPriority::Low);
+        assert!(ViewPartPriority::High < ViewPartPriority::Low);
     }
 }

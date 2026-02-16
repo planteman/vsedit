@@ -291,6 +291,184 @@ impl Default for ChatWorkbenchService {
     }
 }
 
+/// Role of a message sender in a chat conversation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MessageRole {
+    User,
+    Assistant,
+    System,
+}
+
+impl fmt::Display for MessageRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MessageRole::User => write!(f, "user"),
+            MessageRole::Assistant => write!(f, "assistant"),
+            MessageRole::System => write!(f, "system"),
+        }
+    }
+}
+
+/// A single message in a chat conversation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChatMessage {
+    pub role: MessageRole,
+    pub content: String,
+    /// Timestamp as seconds since an arbitrary epoch (e.g. `UNIX_EPOCH`).
+    pub timestamp: u64,
+}
+
+/// Aggregated statistics for a chat conversation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChatStats {
+    pub total_messages: usize,
+    pub user_messages: usize,
+    pub assistant_messages: usize,
+    /// Estimated token count (word count × 1.3, rounded down).
+    pub total_tokens_estimate: usize,
+    /// Average content length in bytes across all messages (0 when empty).
+    pub avg_message_length: usize,
+}
+
+/// Compute statistics over a slice of chat messages.
+pub fn compute_chat_stats(messages: &[ChatMessage]) -> ChatStats {
+    let total_messages = messages.len();
+    let user_messages = messages.iter().filter(|m| m.role == MessageRole::User).count();
+    let assistant_messages = messages
+        .iter()
+        .filter(|m| m.role == MessageRole::Assistant)
+        .count();
+
+    let total_words: usize = messages
+        .iter()
+        .map(|m| m.content.split_whitespace().count())
+        .sum();
+    let total_tokens_estimate = (total_words as f64 * 1.3) as usize;
+
+    let total_len: usize = messages.iter().map(|m| m.content.len()).sum();
+    let avg_message_length = if total_messages > 0 {
+        total_len / total_messages
+    } else {
+        0
+    };
+
+    ChatStats {
+        total_messages,
+        user_messages,
+        assistant_messages,
+        total_tokens_estimate,
+        avg_message_length,
+    }
+}
+
+/// Exports a chat history to human-readable text formats.
+pub struct ChatExporter<'a> {
+    messages: &'a [ChatMessage],
+}
+
+impl<'a> ChatExporter<'a> {
+    pub fn new(messages: &'a [ChatMessage]) -> Self {
+        Self { messages }
+    }
+
+    /// Render the conversation as Markdown.
+    pub fn to_markdown(&self) -> String {
+        let mut buf = String::from("# Chat Export\n\n");
+        for msg in self.messages {
+            buf.push_str(&format!("**{}**: {}\n\n", msg.role, msg.content));
+        }
+        buf
+    }
+
+    /// Render the conversation as plain text.
+    pub fn to_plain_text(&self) -> String {
+        let mut buf = String::new();
+        for msg in self.messages {
+            buf.push_str(&format!("[{}] {}\n", msg.role, msg.content));
+        }
+        buf
+    }
+}
+
+/// Filter criteria for selecting a subset of chat messages.
+pub struct MessageFilter {
+    /// If set, only include messages with this role.
+    pub role: Option<MessageRole>,
+    /// If set, only include messages whose content contains this substring
+    /// (case-insensitive).
+    pub keyword: Option<String>,
+    /// If set, only include messages at or after this timestamp.
+    pub time_start: Option<u64>,
+    /// If set, only include messages at or before this timestamp.
+    pub time_end: Option<u64>,
+}
+
+impl MessageFilter {
+    pub fn new() -> Self {
+        Self {
+            role: None,
+            keyword: None,
+            time_start: None,
+            time_end: None,
+        }
+    }
+
+    pub fn with_role(mut self, role: MessageRole) -> Self {
+        self.role = Some(role);
+        self
+    }
+
+    pub fn with_keyword(mut self, kw: impl Into<String>) -> Self {
+        self.keyword = Some(kw.into());
+        self
+    }
+
+    pub fn with_time_range(mut self, start: u64, end: u64) -> Self {
+        self.time_start = Some(start);
+        self.time_end = Some(end);
+        self
+    }
+
+    /// Apply this filter to a slice of messages, returning only those that
+    /// match all specified criteria.
+    pub fn apply<'a>(&self, messages: &'a [ChatMessage]) -> Vec<&'a ChatMessage> {
+        messages
+            .iter()
+            .filter(|m| {
+                if let Some(ref role) = self.role {
+                    if m.role != *role {
+                        return false;
+                    }
+                }
+                if let Some(ref kw) = self.keyword {
+                    let lower_content = m.content.to_ascii_lowercase();
+                    let lower_kw = kw.to_ascii_lowercase();
+                    if !lower_content.contains(&lower_kw) {
+                        return false;
+                    }
+                }
+                if let Some(start) = self.time_start {
+                    if m.timestamp < start {
+                        return false;
+                    }
+                }
+                if let Some(end) = self.time_end {
+                    if m.timestamp > end {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect()
+    }
+}
+
+impl Default for MessageFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -535,5 +713,135 @@ mod tests {
         assert_eq!(a, b);
         let c = make_participant("other", true);
         assert_ne!(a, c);
+    }
+
+    // --- helpers for new feature tests ---
+
+    fn sample_messages() -> Vec<ChatMessage> {
+        vec![
+            ChatMessage {
+                role: MessageRole::User,
+                content: "Hello, can you help me?".into(),
+                timestamp: 1000,
+            },
+            ChatMessage {
+                role: MessageRole::Assistant,
+                content: "Sure! What do you need?".into(),
+                timestamp: 1001,
+            },
+            ChatMessage {
+                role: MessageRole::User,
+                content: "Explain the borrow checker in Rust.".into(),
+                timestamp: 1002,
+            },
+            ChatMessage {
+                role: MessageRole::Assistant,
+                content: "The borrow checker ensures memory safety.".into(),
+                timestamp: 1003,
+            },
+            ChatMessage {
+                role: MessageRole::System,
+                content: "Session started.".into(),
+                timestamp: 999,
+            },
+        ]
+    }
+
+    #[test]
+    fn compute_stats_counts_roles() {
+        let msgs = sample_messages();
+        let stats = compute_chat_stats(&msgs);
+        assert_eq!(stats.total_messages, 5);
+        assert_eq!(stats.user_messages, 2);
+        assert_eq!(stats.assistant_messages, 2);
+    }
+
+    #[test]
+    fn compute_stats_tokens_and_avg_length() {
+        let msgs = sample_messages();
+        let stats = compute_chat_stats(&msgs);
+        // Total words: 5 + 5 + 6 + 6 + 2 = 24, tokens = (24 * 1.3) = 31
+        assert_eq!(stats.total_tokens_estimate, 31);
+        let total_len: usize = msgs.iter().map(|m| m.content.len()).sum();
+        assert_eq!(stats.avg_message_length, total_len / msgs.len());
+    }
+
+    #[test]
+    fn compute_stats_empty() {
+        let stats = compute_chat_stats(&[]);
+        assert_eq!(stats.total_messages, 0);
+        assert_eq!(stats.total_tokens_estimate, 0);
+        assert_eq!(stats.avg_message_length, 0);
+    }
+
+    #[test]
+    fn exporter_to_markdown() {
+        let msgs = vec![ChatMessage {
+            role: MessageRole::User,
+            content: "Hi".into(),
+            timestamp: 0,
+        }];
+        let md = ChatExporter::new(&msgs).to_markdown();
+        assert!(md.starts_with("# Chat Export"));
+        assert!(md.contains("**user**: Hi"));
+    }
+
+    #[test]
+    fn exporter_to_plain_text() {
+        let msgs = vec![
+            ChatMessage { role: MessageRole::User, content: "Hi".into(), timestamp: 0 },
+            ChatMessage { role: MessageRole::Assistant, content: "Hello".into(), timestamp: 1 },
+        ];
+        let txt = ChatExporter::new(&msgs).to_plain_text();
+        assert!(txt.contains("[user] Hi"));
+        assert!(txt.contains("[assistant] Hello"));
+    }
+
+    #[test]
+    fn filter_by_role() {
+        let msgs = sample_messages();
+        let filtered = MessageFilter::new()
+            .with_role(MessageRole::User)
+            .apply(&msgs);
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|m| m.role == MessageRole::User));
+    }
+
+    #[test]
+    fn filter_by_keyword_case_insensitive() {
+        let msgs = sample_messages();
+        let filtered = MessageFilter::new()
+            .with_keyword("MEMORY SAFETY")
+            .apply(&msgs);
+        assert_eq!(filtered.len(), 1);
+        assert!(filtered[0].content.contains("memory safety"));
+    }
+
+    #[test]
+    fn filter_by_time_range() {
+        let msgs = sample_messages();
+        let filtered = MessageFilter::new()
+            .with_time_range(1001, 1002)
+            .apply(&msgs);
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|m| m.timestamp >= 1001 && m.timestamp <= 1002));
+    }
+
+    #[test]
+    fn filter_combined_role_and_keyword() {
+        let msgs = sample_messages();
+        let filtered = MessageFilter::new()
+            .with_role(MessageRole::Assistant)
+            .with_keyword("memory")
+            .apply(&msgs);
+        assert_eq!(filtered.len(), 1);
+        assert!(filtered[0].content.contains("memory safety"));
+    }
+
+    #[test]
+    fn message_role_display() {
+        assert_eq!(format!("{}", MessageRole::User), "user");
+        assert_eq!(format!("{}", MessageRole::Assistant), "assistant");
+        assert_eq!(format!("{}", MessageRole::System), "system");
     }
 }

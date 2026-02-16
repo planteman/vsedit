@@ -234,6 +234,170 @@ pub fn register() {
     // Registration will connect RPC handlers when extension host starts
 }
 
+// ── Provider capabilities & feature support ──
+
+/// Describes optional capabilities a language provider may support.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderCapabilities {
+    pub supports_workspace_symbols: bool,
+    pub supports_call_hierarchy: bool,
+    pub supports_type_hierarchy: bool,
+    pub supports_inlay_hints: bool,
+}
+
+impl Default for ProviderCapabilities {
+    fn default() -> Self {
+        Self {
+            supports_workspace_symbols: false,
+            supports_call_hierarchy: false,
+            supports_type_hierarchy: false,
+            supports_inlay_hints: false,
+        }
+    }
+}
+
+/// Summary of which language features are available for a given language.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LanguageFeatureSupport {
+    pub has_completion: bool,
+    pub has_hover: bool,
+    pub has_definition: bool,
+    pub has_diagnostics: bool,
+    pub has_code_actions: bool,
+    pub has_code_lens: bool,
+    pub has_formatting: bool,
+    pub has_signature_help: bool,
+    pub has_rename: bool,
+    pub has_document_symbol: bool,
+}
+
+/// Compute a [`LanguageFeatureSupport`] for `language` by inspecting all
+/// providers registered in the given [`LanguageBridge`].
+pub fn get_language_feature_support(bridge: &LanguageBridge, language: &str) -> LanguageFeatureSupport {
+    let mut support = LanguageFeatureSupport {
+        has_completion: false,
+        has_hover: false,
+        has_definition: false,
+        has_diagnostics: false,
+        has_code_actions: false,
+        has_code_lens: false,
+        has_formatting: false,
+        has_signature_help: false,
+        has_rename: false,
+        has_document_symbol: false,
+    };
+    for (id, reg) in &bridge.providers {
+        if reg.selector.language.as_deref() != Some(language) {
+            continue;
+        }
+        if let Some(&kind) = bridge.feature_kinds.get(id.as_str()) {
+            match kind {
+                LanguageFeatureKind::Completion => support.has_completion = true,
+                LanguageFeatureKind::Hover => support.has_hover = true,
+                LanguageFeatureKind::Definition => support.has_definition = true,
+                LanguageFeatureKind::Diagnostics => support.has_diagnostics = true,
+                LanguageFeatureKind::CodeActions => support.has_code_actions = true,
+                LanguageFeatureKind::CodeLens => support.has_code_lens = true,
+                LanguageFeatureKind::Formatting => support.has_formatting = true,
+                LanguageFeatureKind::SignatureHelp => support.has_signature_help = true,
+                LanguageFeatureKind::Rename => support.has_rename = true,
+                LanguageFeatureKind::DocumentSymbol => support.has_document_symbol = true,
+            }
+        }
+    }
+    support
+}
+
+// ── Provider priority ──
+
+/// Priority level used to order multiple providers for the same feature.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ProviderPriority {
+    /// Normal priority (default).
+    Default,
+    /// Elevated priority — preferred over `Default` providers.
+    High,
+    /// Only this provider should be used; all others are suppressed.
+    Exclusive,
+}
+
+impl ProviderPriority {
+    /// Numeric weight for sorting (higher = more important).
+    pub fn weight(self) -> u32 {
+        match self {
+            ProviderPriority::Default => 0,
+            ProviderPriority::High => 1,
+            ProviderPriority::Exclusive => 2,
+        }
+    }
+}
+
+// ── Selector scoring ──
+
+/// Score how specifically a [`LanguageSelector`] matches a document described
+/// by `language`, `scheme`, and `path`. Returns `0` if the selector does not
+/// match at all; otherwise a higher score means a more specific match.
+pub fn selector_score(
+    selector: &LanguageSelector,
+    language: &str,
+    scheme: &str,
+    path: &str,
+) -> u32 {
+    if !selector_matches(selector, language, scheme, path) {
+        return 0;
+    }
+    let mut score: u32 = 1; // baseline for a wildcard-only match
+    if selector.language.is_some() {
+        score += 10;
+    }
+    if selector.scheme.is_some() {
+        score += 5;
+    }
+    if selector.pattern.is_some() {
+        score += 3;
+    }
+    score
+}
+
+// ── Formatting helpers ──
+
+/// Produce a human-readable summary of every provider in the bridge,
+/// grouped by language. The output is sorted by language name.
+pub fn format_provider_summary(bridge: &LanguageBridge) -> String {
+    let mut by_lang: HashMap<String, Vec<String>> = HashMap::new();
+    for (id, reg) in &bridge.providers {
+        let lang = reg
+            .selector
+            .language
+            .clone()
+            .unwrap_or_else(|| "*".to_string());
+        let kind_label = bridge
+            .feature_kinds
+            .get(id.as_str())
+            .map(|k| format!("{:?}", k))
+            .unwrap_or_else(|| "Unknown".to_string());
+        by_lang
+            .entry(lang)
+            .or_default()
+            .push(format!("{} ({})", id, kind_label));
+    }
+    let mut langs: Vec<String> = by_lang.keys().cloned().collect();
+    langs.sort();
+    let mut out = String::new();
+    for lang in &langs {
+        out.push_str(&format!("[{}]\n", lang));
+        let entries = by_lang.get(lang).unwrap();
+        let mut sorted_entries = entries.clone();
+        sorted_entries.sort();
+        for entry in &sorted_entries {
+            out.push_str(&format!("  {}\n", entry));
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -522,5 +686,158 @@ mod tests {
         let json = serde_json::to_string(&kind).unwrap();
         let parsed: LanguageFeatureKind = serde_json::from_str(&json).unwrap();
         assert_eq!(kind, parsed);
+    }
+
+    // ── New tests for added types & functions ──
+
+    #[test]
+    fn provider_capabilities_default() {
+        let caps = ProviderCapabilities::default();
+        assert!(!caps.supports_workspace_symbols);
+        assert!(!caps.supports_call_hierarchy);
+        assert!(!caps.supports_type_hierarchy);
+        assert!(!caps.supports_inlay_hints);
+    }
+
+    #[test]
+    fn provider_capabilities_serde_round_trip() {
+        let caps = ProviderCapabilities {
+            supports_workspace_symbols: true,
+            supports_call_hierarchy: false,
+            supports_type_hierarchy: true,
+            supports_inlay_hints: false,
+        };
+        let json = serde_json::to_string(&caps).unwrap();
+        let parsed: ProviderCapabilities = serde_json::from_str(&json).unwrap();
+        assert_eq!(caps, parsed);
+    }
+
+    #[test]
+    fn language_feature_support_empty_bridge() {
+        let bridge = LanguageBridge::new();
+        let support = get_language_feature_support(&bridge, "rust");
+        assert!(!support.has_completion);
+        assert!(!support.has_hover);
+        assert!(!support.has_definition);
+        assert!(!support.has_formatting);
+    }
+
+    #[test]
+    fn language_feature_support_partial() {
+        let mut bridge = LanguageBridge::new();
+        bridge.handle(LanguageMessage::RegisterCompletionProvider {
+            registration: ProviderRegistration {
+                provider_id: "c1".into(),
+                selector: selector("rust"),
+            },
+        });
+        bridge.handle(LanguageMessage::RegisterHoverProvider {
+            registration: ProviderRegistration {
+                provider_id: "h1".into(),
+                selector: selector("rust"),
+            },
+        });
+        bridge.handle(LanguageMessage::RegisterFormatter {
+            registration: ProviderRegistration {
+                provider_id: "f1".into(),
+                selector: selector("python"),
+            },
+        });
+        let rust_support = get_language_feature_support(&bridge, "rust");
+        assert!(rust_support.has_completion);
+        assert!(rust_support.has_hover);
+        assert!(!rust_support.has_definition);
+        assert!(!rust_support.has_formatting);
+
+        let py_support = get_language_feature_support(&bridge, "python");
+        assert!(!py_support.has_completion);
+        assert!(py_support.has_formatting);
+    }
+
+    #[test]
+    fn provider_priority_weight_ordering() {
+        assert!(ProviderPriority::High.weight() > ProviderPriority::Default.weight());
+        assert!(ProviderPriority::Exclusive.weight() > ProviderPriority::High.weight());
+    }
+
+    #[test]
+    fn provider_priority_serde_round_trip() {
+        let prio = ProviderPriority::Exclusive;
+        let json = serde_json::to_string(&prio).unwrap();
+        let parsed: ProviderPriority = serde_json::from_str(&json).unwrap();
+        assert_eq!(prio, parsed);
+    }
+
+    #[test]
+    fn selector_score_no_match_returns_zero() {
+        let sel = LanguageSelector {
+            language: Some("python".into()),
+            scheme: None,
+            pattern: None,
+        };
+        assert_eq!(selector_score(&sel, "rust", "file", "/a/b.rs"), 0);
+    }
+
+    #[test]
+    fn selector_score_wildcard_baseline() {
+        let sel = LanguageSelector { language: None, scheme: None, pattern: None };
+        assert_eq!(selector_score(&sel, "rust", "file", "/a/b.rs"), 1);
+    }
+
+    #[test]
+    fn selector_score_specificity_increases() {
+        let lang_only = LanguageSelector {
+            language: Some("rust".into()),
+            scheme: None,
+            pattern: None,
+        };
+        let lang_scheme = LanguageSelector {
+            language: Some("rust".into()),
+            scheme: Some("file".into()),
+            pattern: None,
+        };
+        let full = LanguageSelector {
+            language: Some("rust".into()),
+            scheme: Some("file".into()),
+            pattern: Some("**/*.rs".into()),
+        };
+        let s1 = selector_score(&lang_only, "rust", "file", "/a/b.rs");
+        let s2 = selector_score(&lang_scheme, "rust", "file", "/a/b.rs");
+        let s3 = selector_score(&full, "rust", "file", "/a/b.rs");
+        assert!(s1 < s2);
+        assert!(s2 < s3);
+    }
+
+    #[test]
+    fn format_provider_summary_output() {
+        let mut bridge = LanguageBridge::new();
+        bridge.handle(LanguageMessage::RegisterCompletionProvider {
+            registration: ProviderRegistration {
+                provider_id: "comp-1".into(),
+                selector: selector("rust"),
+            },
+        });
+        bridge.handle(LanguageMessage::RegisterHoverProvider {
+            registration: ProviderRegistration {
+                provider_id: "hov-1".into(),
+                selector: selector("rust"),
+            },
+        });
+        bridge.handle(LanguageMessage::RegisterFormatter {
+            registration: ProviderRegistration {
+                provider_id: "fmt-1".into(),
+                selector: selector("go"),
+            },
+        });
+        let summary = format_provider_summary(&bridge);
+        assert!(summary.contains("[go]"));
+        assert!(summary.contains("[rust]"));
+        assert!(summary.contains("comp-1"));
+        assert!(summary.contains("hov-1"));
+        assert!(summary.contains("fmt-1"));
+        // go section should appear before rust (sorted)
+        let go_pos = summary.find("[go]").unwrap();
+        let rust_pos = summary.find("[rust]").unwrap();
+        assert!(go_pos < rust_pos);
     }
 }

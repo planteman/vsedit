@@ -2,6 +2,7 @@
 //!
 //! Equivalent to VS Code's `vs/base/common/strings.ts`.
 
+use std::fmt;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 

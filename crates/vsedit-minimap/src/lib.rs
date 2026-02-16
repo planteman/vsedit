@@ -286,6 +286,155 @@ impl MinimapRenderer {
     }
 }
 
+/// The kind of decoration displayed on a minimap line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecorationType {
+    Highlight,
+    Warning,
+    Error,
+    Info,
+    Search,
+}
+
+impl fmt::Display for DecorationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::Highlight => "highlight",
+            Self::Warning => "warning",
+            Self::Error => "error",
+            Self::Info => "info",
+            Self::Search => "search",
+        };
+        f.write_str(label)
+    }
+}
+
+/// A single decoration attached to a minimap line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MinimapDecoration {
+    pub line_number: u32,
+    pub color_id: u8,
+    pub decoration_type: DecorationType,
+}
+
+/// Manages a collection of decorations for the minimap.
+#[derive(Debug, Clone)]
+pub struct MinimapDecorationLayer {
+    decorations: Vec<MinimapDecoration>,
+}
+
+impl MinimapDecorationLayer {
+    pub fn new() -> Self {
+        Self {
+            decorations: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, decoration: MinimapDecoration) {
+        self.decorations.push(decoration);
+    }
+
+    pub fn remove_by_line(&mut self, line_number: u32) {
+        self.decorations.retain(|d| d.line_number != line_number);
+    }
+
+    pub fn get_decorations_in_range(&self, start: u32, end: u32) -> Vec<&MinimapDecoration> {
+        self.decorations
+            .iter()
+            .filter(|d| d.line_number >= start && d.line_number < end)
+            .collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.decorations.clear();
+    }
+
+    pub fn count(&self) -> usize {
+        self.decorations.len()
+    }
+}
+
+/// A collapsed or foldable region in the minimap.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MinimapRegion {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub label: String,
+}
+
+impl MinimapRegion {
+    pub fn line_span(&self) -> u32 {
+        self.end_line.saturating_sub(self.start_line)
+    }
+
+    pub fn contains_line(&self, line: u32) -> bool {
+        line >= self.start_line && line < self.end_line
+    }
+}
+
+/// Computes pixel-level layout positions for the minimap.
+#[derive(Debug, Clone)]
+pub struct MinimapLayout {
+    pub line_height: f64,
+    pub total_lines: u32,
+    pub viewport_start: u32,
+    pub viewport_end: u32,
+}
+
+impl MinimapLayout {
+    pub fn new(line_height: f64, total_lines: u32, viewport_start: u32, viewport_end: u32) -> Self {
+        Self {
+            line_height,
+            total_lines,
+            viewport_start,
+            viewport_end,
+        }
+    }
+
+    pub fn line_to_y(&self, line: u32) -> f64 {
+        line as f64 * self.line_height
+    }
+
+    pub fn y_to_line(&self, y: f64) -> u32 {
+        if self.line_height <= 0.0 {
+            return 0;
+        }
+        let line = (y / self.line_height) as u32;
+        line.min(self.total_lines.saturating_sub(1))
+    }
+
+    pub fn total_height(&self) -> f64 {
+        self.total_lines as f64 * self.line_height
+    }
+
+    pub fn viewport_y_range(&self) -> (f64, f64) {
+        (self.line_to_y(self.viewport_start), self.line_to_y(self.viewport_end))
+    }
+}
+
+impl MinimapRenderer {
+    /// Attach a decoration layer and return decorations visible in the current viewport.
+    pub fn add_decoration_layer<'a>(
+        &self,
+        layer: &'a MinimapDecorationLayer,
+    ) -> Vec<&'a MinimapDecoration> {
+        layer.get_decorations_in_range(self.viewport_start, self.viewport_end)
+    }
+
+    /// Convenience: get all decorations from multiple layers that fall within the viewport.
+    pub fn get_decorations_in_viewport<'a>(
+        &self,
+        layers: &'a [MinimapDecorationLayer],
+    ) -> Vec<&'a MinimapDecoration> {
+        layers
+            .iter()
+            .flat_map(|layer| {
+                layer.get_decorations_in_range(self.viewport_start, self.viewport_end)
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -503,5 +652,165 @@ mod tests {
         assert_eq!(format!("{}", e2), "no content loaded");
         let e3 = MinimapError::RenderFailed("out of memory".into());
         assert_eq!(format!("{}", e3), "render failed: out of memory");
+    }
+
+    #[test]
+    fn decoration_type_display() {
+        assert_eq!(format!("{}", DecorationType::Highlight), "highlight");
+        assert_eq!(format!("{}", DecorationType::Warning), "warning");
+        assert_eq!(format!("{}", DecorationType::Error), "error");
+        assert_eq!(format!("{}", DecorationType::Info), "info");
+        assert_eq!(format!("{}", DecorationType::Search), "search");
+    }
+
+    #[test]
+    fn decoration_layer_add_and_count() {
+        let mut layer = MinimapDecorationLayer::new();
+        assert_eq!(layer.count(), 0);
+        layer.add(MinimapDecoration {
+            line_number: 5,
+            color_id: 1,
+            decoration_type: DecorationType::Error,
+        });
+        layer.add(MinimapDecoration {
+            line_number: 10,
+            color_id: 2,
+            decoration_type: DecorationType::Warning,
+        });
+        assert_eq!(layer.count(), 2);
+    }
+
+    #[test]
+    fn decoration_layer_remove_by_line() {
+        let mut layer = MinimapDecorationLayer::new();
+        layer.add(MinimapDecoration {
+            line_number: 3,
+            color_id: 1,
+            decoration_type: DecorationType::Info,
+        });
+        layer.add(MinimapDecoration {
+            line_number: 3,
+            color_id: 2,
+            decoration_type: DecorationType::Search,
+        });
+        layer.add(MinimapDecoration {
+            line_number: 7,
+            color_id: 1,
+            decoration_type: DecorationType::Highlight,
+        });
+        layer.remove_by_line(3);
+        assert_eq!(layer.count(), 1);
+        assert_eq!(layer.get_decorations_in_range(0, 100)[0].line_number, 7);
+    }
+
+    #[test]
+    fn decoration_layer_range_query() {
+        let mut layer = MinimapDecorationLayer::new();
+        for i in 0..20 {
+            layer.add(MinimapDecoration {
+                line_number: i,
+                color_id: 1,
+                decoration_type: DecorationType::Highlight,
+            });
+        }
+        let in_range = layer.get_decorations_in_range(5, 10);
+        assert_eq!(in_range.len(), 5);
+        assert!(in_range.iter().all(|d| d.line_number >= 5 && d.line_number < 10));
+    }
+
+    #[test]
+    fn decoration_layer_clear() {
+        let mut layer = MinimapDecorationLayer::new();
+        layer.add(MinimapDecoration {
+            line_number: 1,
+            color_id: 0,
+            decoration_type: DecorationType::Error,
+        });
+        layer.clear();
+        assert_eq!(layer.count(), 0);
+    }
+
+    #[test]
+    fn renderer_add_decoration_layer() {
+        let mut r = MinimapRenderer::new(MinimapConfig::default());
+        let lines: Vec<MinimapLine> = (0..50)
+            .map(|i| MinimapLine { line_number: i, tokens: vec![] })
+            .collect();
+        r.update_content(lines);
+        r.set_viewport(10, 20);
+
+        let mut layer = MinimapDecorationLayer::new();
+        layer.add(MinimapDecoration {
+            line_number: 5,
+            color_id: 1,
+            decoration_type: DecorationType::Warning,
+        });
+        layer.add(MinimapDecoration {
+            line_number: 15,
+            color_id: 2,
+            decoration_type: DecorationType::Error,
+        });
+
+        let visible = r.add_decoration_layer(&layer);
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].line_number, 15);
+    }
+
+    #[test]
+    fn renderer_get_decorations_in_viewport_multi_layer() {
+        let mut r = MinimapRenderer::new(MinimapConfig::default());
+        r.update_content(vec![]);
+        r.set_viewport(0, 100);
+
+        let mut l1 = MinimapDecorationLayer::new();
+        l1.add(MinimapDecoration {
+            line_number: 10,
+            color_id: 1,
+            decoration_type: DecorationType::Info,
+        });
+        let mut l2 = MinimapDecorationLayer::new();
+        l2.add(MinimapDecoration {
+            line_number: 50,
+            color_id: 3,
+            decoration_type: DecorationType::Search,
+        });
+
+        let layers = [l1, l2];
+        let all = r.get_decorations_in_viewport(&layers);
+        assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn minimap_region_span_and_contains() {
+        let region = MinimapRegion {
+            start_line: 10,
+            end_line: 25,
+            label: "imports".to_string(),
+        };
+        assert_eq!(region.line_span(), 15);
+        assert!(region.contains_line(10));
+        assert!(region.contains_line(24));
+        assert!(!region.contains_line(25));
+        assert!(!region.contains_line(9));
+    }
+
+    #[test]
+    fn minimap_layout_positions() {
+        let layout = MinimapLayout::new(2.5, 100, 10, 30);
+        assert!((layout.line_to_y(0) - 0.0).abs() < f64::EPSILON);
+        assert!((layout.line_to_y(4) - 10.0).abs() < f64::EPSILON);
+        assert_eq!(layout.y_to_line(10.0), 4);
+        assert_eq!(layout.y_to_line(999.0), 99);
+        assert!((layout.total_height() - 250.0).abs() < f64::EPSILON);
+        let (vy_start, vy_end) = layout.viewport_y_range();
+        assert!((vy_start - 25.0).abs() < f64::EPSILON);
+        assert!((vy_end - 75.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn minimap_layout_zero_line_height() {
+        let layout = MinimapLayout::new(0.0, 50, 0, 10);
+        assert_eq!(layout.y_to_line(100.0), 0);
+        assert!((layout.total_height() - 0.0).abs() < f64::EPSILON);
     }
 }

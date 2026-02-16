@@ -380,6 +380,174 @@ fn find_single_closing(chars: &[char], from: usize, delim: char) -> Option<usize
 }
 
 // ---------------------------------------------------------------------------
+// Table parsing
+// ---------------------------------------------------------------------------
+
+/// A single row of a parsed Markdown table.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TableRow {
+    pub cells: Vec<String>,
+}
+
+/// Parse a simple pipe-delimited Markdown table.
+///
+/// Expects at least a header row and a separator row (`|---|---|`).
+/// Returns `None` if the input does not look like a valid table.
+pub fn parse_markdown_table(text: &str) -> Option<Vec<TableRow>> {
+    let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+    if lines.len() < 2 {
+        return None;
+    }
+
+    let parse_row = |line: &str| -> Vec<String> {
+        let trimmed = line.trim();
+        let trimmed = trimmed.strip_prefix('|').unwrap_or(trimmed);
+        let trimmed = trimmed.strip_suffix('|').unwrap_or(trimmed);
+        trimmed.split('|').map(|c| c.trim().to_string()).collect()
+    };
+
+    // Validate separator row (second line must contain only dashes, pipes, colons, spaces)
+    let sep = lines[1].trim();
+    if !sep.chars().all(|c| c == '-' || c == '|' || c == ':' || c == ' ') {
+        return None;
+    }
+
+    let mut rows = Vec::new();
+    for (idx, line) in lines.iter().enumerate() {
+        if idx == 1 {
+            continue; // skip separator
+        }
+        rows.push(TableRow {
+            cells: parse_row(line),
+        });
+    }
+    Some(rows)
+}
+
+// ---------------------------------------------------------------------------
+// Statistics
+// ---------------------------------------------------------------------------
+
+/// Aggregate statistics about a token stream.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct MarkdownStats {
+    pub headings: usize,
+    pub links: usize,
+    pub code_blocks: usize,
+    pub list_items: usize,
+    pub paragraphs: usize,
+    pub total_tokens: usize,
+}
+
+/// Compute aggregate statistics from a token slice.
+pub fn compute_stats(tokens: &[MarkdownToken]) -> MarkdownStats {
+    let mut stats = MarkdownStats {
+        total_tokens: tokens.len(),
+        ..Default::default()
+    };
+    for token in tokens {
+        match token {
+            MarkdownToken::Heading(_, _) => stats.headings += 1,
+            MarkdownToken::Link(_, _) => stats.links += 1,
+            MarkdownToken::CodeBlock(_, _) => stats.code_blocks += 1,
+            MarkdownToken::ListItemMd(_) => stats.list_items += 1,
+            MarkdownToken::Paragraph => stats.paragraphs += 1,
+            _ => {}
+        }
+    }
+    stats
+}
+
+// ---------------------------------------------------------------------------
+// Table of contents
+// ---------------------------------------------------------------------------
+
+/// Generate a Markdown table of contents from heading tokens.
+///
+/// Each heading is rendered as an indented list item. The indentation is
+/// relative to the minimum heading level found in the token stream.
+pub fn generate_toc(tokens: &[MarkdownToken]) -> String {
+    let headings: Vec<(u8, &str)> = tokens
+        .iter()
+        .filter_map(|t| {
+            if let MarkdownToken::Heading(level, text) = t {
+                Some((*level, text.as_str()))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if headings.is_empty() {
+        return String::new();
+    }
+
+    let min_level = headings.iter().map(|(l, _)| *l).min().unwrap_or(1);
+    let mut out = String::new();
+    for (level, text) in &headings {
+        let indent = "  ".repeat((*level - min_level) as usize);
+        let anchor: String = text
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() {
+                    c.to_ascii_lowercase()
+                } else if c == ' ' {
+                    '-'
+                } else {
+                    '-'
+                }
+            })
+            .collect();
+        out.push_str(&format!("{}- [{}](#{})\n", indent, text, anchor));
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
+// Whitespace normalisation
+// ---------------------------------------------------------------------------
+
+/// Collapse runs of whitespace (spaces, tabs, newlines) into single spaces
+/// and trim leading/trailing whitespace.
+pub fn normalize_whitespace(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut prev_ws = true; // treat start as whitespace to trim leading
+    for ch in text.chars() {
+        if ch.is_whitespace() {
+            if !prev_ws {
+                result.push(' ');
+            }
+            prev_ws = true;
+        } else {
+            result.push(ch);
+            prev_ws = false;
+        }
+    }
+    if result.ends_with(' ') {
+        result.pop();
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Code block extraction
+// ---------------------------------------------------------------------------
+
+/// Extract all code blocks from a token slice as `(language, code)` pairs.
+pub fn extract_code_blocks(tokens: &[MarkdownToken]) -> Vec<(Option<String>, String)> {
+    tokens
+        .iter()
+        .filter_map(|t| {
+            if let MarkdownToken::CodeBlock(code, lang) = t {
+                Some((lang.clone(), code.clone()))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -521,5 +689,76 @@ mod tests {
     #[test]
     fn strip_markdown_convenience() {
         assert_eq!(strip_markdown("**bold** and *italic*"), "bold and italic");
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn parse_table_basic() {
+        let table = "| Name | Age |\n|---|---|\n| Alice | 30 |\n| Bob | 25 |";
+        let rows = parse_markdown_table(table).unwrap();
+        assert_eq!(rows.len(), 3); // header + 2 data rows
+        assert_eq!(rows[0].cells, vec!["Name", "Age"]);
+        assert_eq!(rows[1].cells, vec!["Alice", "30"]);
+        assert_eq!(rows[2].cells, vec!["Bob", "25"]);
+    }
+
+    #[test]
+    fn parse_table_returns_none_for_non_table() {
+        assert!(parse_markdown_table("just some text").is_none());
+        assert!(parse_markdown_table("one\ntwo").is_none());
+    }
+
+    #[test]
+    fn compute_stats_counts_correctly() {
+        let tokens = tokenize_block(
+            "# Heading\n\nSome text\n\n- item1\n- item2\n\n```rust\ncode\n```\n\n[link](url)",
+        );
+        let stats = compute_stats(&tokens);
+        assert_eq!(stats.headings, 1);
+        assert_eq!(stats.list_items, 2);
+        assert_eq!(stats.code_blocks, 1);
+        assert!(stats.paragraphs >= 1);
+        assert_eq!(stats.total_tokens, tokens.len());
+    }
+
+    #[test]
+    fn generate_toc_produces_links() {
+        let tokens = tokenize_block("# Introduction\n## Getting Started\n## API\n### Details");
+        let toc = generate_toc(&tokens);
+        assert!(toc.contains("- [Introduction](#introduction)"));
+        assert!(toc.contains("  - [Getting Started](#getting-started)"));
+        assert!(toc.contains("  - [API](#api)"));
+        assert!(toc.contains("    - [Details](#details)"));
+    }
+
+    #[test]
+    fn generate_toc_empty_for_no_headings() {
+        let tokens = tokenize_block("just text\n\nmore text");
+        assert!(generate_toc(&tokens).is_empty());
+    }
+
+    #[test]
+    fn normalize_whitespace_collapses() {
+        assert_eq!(normalize_whitespace("  hello   world  "), "hello world");
+        assert_eq!(normalize_whitespace("a\n\n\tb"), "a b");
+        assert_eq!(normalize_whitespace(""), "");
+        assert_eq!(normalize_whitespace("   "), "");
+    }
+
+    #[test]
+    fn extract_code_blocks_returns_all() {
+        let input = "```rust\nfn main() {}\n```\n\ntext\n\n```\nplain\n```";
+        let tokens = tokenize_block(input);
+        let blocks = extract_code_blocks(&tokens);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0], (Some("rust".into()), "fn main() {}".into()));
+        assert_eq!(blocks[1], (None, "plain".into()));
+    }
+
+    #[test]
+    fn compute_stats_empty_tokens() {
+        let stats = compute_stats(&[]);
+        assert_eq!(stats, MarkdownStats::default());
     }
 }

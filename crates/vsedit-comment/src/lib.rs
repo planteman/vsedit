@@ -4,6 +4,7 @@
 //! comments for any language whose comment syntax is described by a
 //! [`CommentRule`].
 
+use std::fmt;
 /// Whether a comment operation targets lines or blocks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommentMode {
@@ -304,6 +305,239 @@ impl CommentDetector {
     }
 }
 
+// ── comment statistics ─────────────────────────────────────────────────
+
+/// Statistics about comment coverage in a set of lines.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CommentStats {
+    /// Total number of lines analysed.
+    pub total_lines: usize,
+    /// Number of lines that carry a line-comment prefix.
+    pub commented_lines: usize,
+    /// Number of lines that are blank (empty or whitespace-only).
+    pub blank_lines: usize,
+    /// Ratio of commented lines to non-blank lines (`0.0` when there are
+    /// no non-blank lines).
+    pub comment_density: f64,
+    /// Length (in lines) of the longest contiguous run of commented lines.
+    pub longest_commented_block: usize,
+}
+
+/// Analyse `lines` for comment coverage using the given line-comment
+/// `prefix`.
+pub fn compute_comment_stats(lines: &[&str], prefix: &str) -> CommentStats {
+    let total_lines = lines.len();
+    let mut commented_lines: usize = 0;
+    let mut blank_lines: usize = 0;
+    let mut longest_commented_block: usize = 0;
+    let mut current_run: usize = 0;
+
+    for line in lines {
+        if line.trim().is_empty() {
+            blank_lines += 1;
+            current_run = 0;
+        } else if is_line_commented(line, prefix) {
+            commented_lines += 1;
+            current_run += 1;
+            if current_run > longest_commented_block {
+                longest_commented_block = current_run;
+            }
+        } else {
+            current_run = 0;
+        }
+    }
+
+    let non_blank = total_lines - blank_lines;
+    let comment_density = if non_blank == 0 {
+        0.0
+    } else {
+        commented_lines as f64 / non_blank as f64
+    };
+
+    CommentStats {
+        total_lines,
+        commented_lines,
+        blank_lines,
+        comment_density,
+        longest_commented_block,
+    }
+}
+
+// ── comment blocks ────────────────────────────────────────────────────
+
+/// A contiguous block of commented lines.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommentBlock {
+    /// Index of the first commented line (inclusive).
+    pub start: usize,
+    /// Index of the last commented line (inclusive).
+    pub end: usize,
+    /// Number of lines in the block (`end - start + 1`).
+    pub line_count: usize,
+}
+
+/// Find every contiguous block of lines that start with `prefix`.
+///
+/// Blank lines break a block.  Returns an empty `Vec` when no commented
+/// lines are found.
+pub fn find_comment_blocks(lines: &[&str], prefix: &str) -> Vec<CommentBlock> {
+    let mut blocks = Vec::new();
+    let mut block_start: Option<usize> = None;
+
+    for (i, line) in lines.iter().enumerate() {
+        let is_commented = !line.trim().is_empty() && is_line_commented(line, prefix);
+        if is_commented {
+            if block_start.is_none() {
+                block_start = Some(i);
+            }
+        } else if let Some(start) = block_start.take() {
+            blocks.push(CommentBlock {
+                start,
+                end: i - 1,
+                line_count: i - start,
+            });
+        }
+    }
+    // Close a trailing block.
+    if let Some(start) = block_start {
+        blocks.push(CommentBlock {
+            start,
+            end: lines.len() - 1,
+            line_count: lines.len() - start,
+        });
+    }
+    blocks
+}
+
+/// Remove the comment prefix from the **first** contiguous commented
+/// block found in `lines`.
+///
+/// Returns the transformed lines together with the [`CommentBlock`] that
+/// was uncommented (or `None` if no commented block exists).
+pub fn uncomment_first_block(
+    lines: &[&str],
+    prefix: &str,
+) -> (Vec<String>, Option<CommentBlock>) {
+    let blocks = find_comment_blocks(lines, prefix);
+    let block = match blocks.into_iter().next() {
+        Some(b) => b,
+        None => return (lines.iter().map(|l| l.to_string()).collect(), None),
+    };
+
+    let mut result: Vec<String> = Vec::with_capacity(lines.len());
+    for (i, line) in lines.iter().enumerate() {
+        if i >= block.start && i <= block.end {
+            result.push(remove_line_prefix(line, prefix));
+        } else {
+            result.push(line.to_string());
+        }
+    }
+    (result, Some(block))
+}
+
+// ── indent-aware block comment ────────────────────────────────────────
+
+/// Wrap `lines` in a block comment while preserving relative indentation.
+///
+/// The opening marker is placed on its own line at the minimum indentation
+/// level found across all non-blank lines, and the closing marker likewise.
+/// Each original line is emitted unchanged between the markers.
+pub fn indent_aware_block_comment(
+    lines: &[&str],
+    open: &str,
+    close: &str,
+) -> Vec<String> {
+    let min_indent = lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.len() - l.trim_start().len())
+        .min()
+        .unwrap_or(0);
+
+    let pad: String = " ".repeat(min_indent);
+    let mut result = Vec::with_capacity(lines.len() + 2);
+    result.push(format!("{pad}{open}"));
+    for line in lines {
+        result.push(line.to_string());
+    }
+    result.push(format!("{pad}{close}"));
+    result
+}
+
+// ── comment style detector ────────────────────────────────────────────
+
+/// The comment style detected in a piece of source text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DetectedCommentStyle {
+    /// Lines using a single-line prefix (e.g. `//`, `#`, `--`).
+    Line(String),
+    /// Blocks delimited by an open/close pair (e.g. `/* … */`,
+    /// `<!-- … -->`).
+    Block { open: String, close: String },
+}
+
+/// Heuristic detector that guesses the comment style used in a body of
+/// source code.
+pub struct CommentStyleDetector;
+
+impl CommentStyleDetector {
+    /// Well-known line-comment prefixes, ordered by specificity.
+    const LINE_PREFIXES: &[&str] = &["//", "#", "--", ";", "%"];
+    /// Well-known block-comment pairs.
+    const BLOCK_PAIRS: &[(&str, &str)] = &[("/*", "*/"), ("<!--", "-->"), ("{-", "-}")];
+
+    /// Scan `content` and return the most likely comment style, or `None`
+    /// if no comment markers are found.
+    pub fn detect(content: &str) -> Option<DetectedCommentStyle> {
+        // Count occurrences of each line-comment prefix.
+        let mut best_line: Option<(&str, usize)> = None;
+        for &pfx in Self::LINE_PREFIXES {
+            let count = content
+                .lines()
+                .filter(|l| l.trim_start().starts_with(pfx))
+                .count();
+            if count > 0 {
+                if best_line.map_or(true, |(_, c)| count > c) {
+                    best_line = Some((pfx, count));
+                }
+            }
+        }
+
+        // Check for block comment markers.
+        let mut best_block: Option<(&str, &str, usize)> = None;
+        for &(open, close) in Self::BLOCK_PAIRS {
+            let opens = content.matches(open).count();
+            let closes = content.matches(close).count();
+            let count = opens.min(closes);
+            if count > 0 {
+                if best_block.map_or(true, |(_, _, c)| count > c) {
+                    best_block = Some((open, close, count));
+                }
+            }
+        }
+
+        // Prefer whichever style has more evidence.
+        match (best_line, best_block) {
+            (Some((pfx, lc)), Some((open, close, bc))) => {
+                if lc >= bc {
+                    Some(DetectedCommentStyle::Line(pfx.to_string()))
+                } else {
+                    Some(DetectedCommentStyle::Block {
+                        open: open.to_string(),
+                        close: close.to_string(),
+                    })
+                }
+            }
+            (Some((pfx, _)), None) => Some(DetectedCommentStyle::Line(pfx.to_string())),
+            (None, Some((open, close, _))) => Some(DetectedCommentStyle::Block {
+                open: open.to_string(),
+                close: close.to_string(),
+            }),
+            (None, None) => None,
+        }
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -498,5 +732,115 @@ mod tests {
         );
         assert_eq!(format!("{}", CommentError::InvalidRange), "invalid range");
         assert_eq!(format!("{}", CommentError::EmptySelection), "empty selection");
+    }
+
+    // ── new tests for added functionality ─────────────────────────────
+
+    #[test]
+    fn compute_comment_stats_basic() {
+        let lines = vec!["// a", "b", "// c", "", "// d", "// e"];
+        let stats = compute_comment_stats(&lines, "//");
+        assert_eq!(stats.total_lines, 6);
+        assert_eq!(stats.commented_lines, 4);
+        assert_eq!(stats.blank_lines, 1);
+        assert_eq!(stats.longest_commented_block, 2); // "// d", "// e"
+        // 4 commented out of 5 non-blank = 0.8
+        assert!((stats.comment_density - 0.8).abs() < 1e-9);
+    }
+
+    #[test]
+    fn compute_comment_stats_all_blank() {
+        let lines: Vec<&str> = vec!["", "   ", ""];
+        let stats = compute_comment_stats(&lines, "#");
+        assert_eq!(stats.total_lines, 3);
+        assert_eq!(stats.commented_lines, 0);
+        assert_eq!(stats.blank_lines, 3);
+        assert!((stats.comment_density - 0.0).abs() < 1e-9);
+        assert_eq!(stats.longest_commented_block, 0);
+    }
+
+    #[test]
+    fn find_comment_blocks_multiple() {
+        let lines = vec!["// a", "// b", "code", "// c", "", "// d"];
+        let blocks = find_comment_blocks(&lines, "//");
+        assert_eq!(blocks.len(), 3);
+        assert_eq!(blocks[0], CommentBlock { start: 0, end: 1, line_count: 2 });
+        assert_eq!(blocks[1], CommentBlock { start: 3, end: 3, line_count: 1 });
+        assert_eq!(blocks[2], CommentBlock { start: 5, end: 5, line_count: 1 });
+    }
+
+    #[test]
+    fn find_comment_blocks_none() {
+        let lines = vec!["a", "b", "c"];
+        let blocks = find_comment_blocks(&lines, "//");
+        assert!(blocks.is_empty());
+    }
+
+    #[test]
+    fn uncomment_first_block_works() {
+        let lines = vec!["code", "# x", "# y", "more"];
+        let (result, block) = uncomment_first_block(&lines, "#");
+        assert_eq!(block, Some(CommentBlock { start: 1, end: 2, line_count: 2 }));
+        assert_eq!(result, vec!["code", "x", "y", "more"]);
+    }
+
+    #[test]
+    fn uncomment_first_block_no_comments() {
+        let lines = vec!["a", "b"];
+        let (result, block) = uncomment_first_block(&lines, "//");
+        assert!(block.is_none());
+        assert_eq!(result, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn indent_aware_block_comment_preserves_indent() {
+        let lines = vec!["    fn foo() {", "        bar();", "    }"];
+        let result = indent_aware_block_comment(&lines, "/*", "*/");
+        assert_eq!(result.len(), 5);
+        assert_eq!(result[0], "    /*");
+        assert_eq!(result[1], "    fn foo() {");
+        assert_eq!(result[2], "        bar();");
+        assert_eq!(result[3], "    }");
+        assert_eq!(result[4], "    */");
+    }
+
+    #[test]
+    fn indent_aware_block_comment_no_indent() {
+        let lines = vec!["hello", "world"];
+        let result = indent_aware_block_comment(&lines, "<!--", "-->");
+        assert_eq!(result, vec!["<!--", "hello", "world", "-->"]);
+    }
+
+    #[test]
+    fn comment_style_detector_line() {
+        let content = "// first\n// second\ncode\n// third\n";
+        let style = CommentStyleDetector::detect(content);
+        assert_eq!(style, Some(DetectedCommentStyle::Line("//".to_string())));
+    }
+
+    #[test]
+    fn comment_style_detector_block() {
+        let content = "/* block one */ code /* block two */\n";
+        let style = CommentStyleDetector::detect(content);
+        assert_eq!(
+            style,
+            Some(DetectedCommentStyle::Block {
+                open: "/*".to_string(),
+                close: "*/".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn comment_style_detector_none() {
+        let content = "just plain code\nno comments here\n";
+        assert_eq!(CommentStyleDetector::detect(content), None);
+    }
+
+    #[test]
+    fn comment_style_detector_hash() {
+        let content = "# comment\ncode\n# another\n# more\n";
+        let style = CommentStyleDetector::detect(content);
+        assert_eq!(style, Some(DetectedCommentStyle::Line("#".to_string())));
     }
 }

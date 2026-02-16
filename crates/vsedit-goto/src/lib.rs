@@ -3,6 +3,7 @@
 //! Provides the location link model and a service that aggregates multiple
 //! providers to resolve go-to requests.
 
+use std::fmt;
 /// Location of a symbol.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Location {

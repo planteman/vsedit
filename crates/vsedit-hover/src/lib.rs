@@ -289,6 +289,230 @@ pub fn render_hover_to_string(hover: &Hover) -> String {
     out
 }
 
+/// Manages hover display timing based on trigger kind and configuration.
+#[derive(Debug, Clone)]
+pub struct HoverDelay;
+
+impl HoverDelay {
+    /// Returns true if enough time has elapsed to show the hover.
+    pub fn should_show(elapsed_ms: u32, config: &HoverConfig) -> bool {
+        config.enabled && elapsed_ms >= config.delay_ms
+    }
+
+    /// Computes the appropriate delay for a given trigger kind.
+    /// Explicit invocations show immediately; mouse hovers use the configured delay.
+    pub fn compute_delay(trigger_kind: HoverTriggerKind, config: &HoverConfig) -> u32 {
+        match trigger_kind {
+            HoverTriggerKind::Invoke => 0,
+            HoverTriggerKind::Hover => config.delay_ms,
+            HoverTriggerKind::ContentHover => config.delay_ms / 2,
+        }
+    }
+}
+
+/// Tracks positions where hovers have been shown, for frequency analysis.
+#[derive(Debug, Clone)]
+pub struct HoverHistory {
+    entries: Vec<(u32, u32)>,
+}
+
+impl HoverHistory {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Record that a hover was shown at the given position.
+    pub fn record(&mut self, line: u32, col: u32) {
+        self.entries.push((line, col));
+    }
+
+    /// Return the top-N most frequently hovered positions as `(line, col, count)`.
+    pub fn get_frequent_positions(&self, top_n: usize) -> Vec<(u32, u32, usize)> {
+        use std::collections::HashMap;
+        let mut counts: HashMap<(u32, u32), usize> = HashMap::new();
+        for &pos in &self.entries {
+            *counts.entry(pos).or_insert(0) += 1;
+        }
+        let mut sorted: Vec<(u32, u32, usize)> =
+            counts.into_iter().map(|((l, c), n)| (l, c, n)).collect();
+        sorted.sort_by(|a, b| b.2.cmp(&a.2));
+        sorted.truncate(top_n);
+        sorted
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl Default for HoverHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Fluent builder for constructing [`Hover`] instances.
+#[derive(Debug, Clone)]
+pub struct HoverContentBuilder {
+    contents: Vec<HoverContent>,
+    range: Option<HoverRange>,
+}
+
+impl HoverContentBuilder {
+    pub fn new() -> Self {
+        Self {
+            contents: Vec::new(),
+            range: None,
+        }
+    }
+
+    pub fn add_text(mut self, text: impl Into<String>) -> Self {
+        self.contents.push(HoverContent::Text(text.into()));
+        self
+    }
+
+    pub fn add_markdown(mut self, md: impl Into<String>) -> Self {
+        self.contents.push(HoverContent::Markdown(md.into()));
+        self
+    }
+
+    pub fn add_code(mut self, code: impl Into<String>, language: Option<&str>) -> Self {
+        self.contents.push(HoverContent::Code {
+            value: code.into(),
+            language: language.map(|s| s.to_string()),
+        });
+        self
+    }
+
+    pub fn add_separator(mut self) -> Self {
+        self.contents
+            .push(HoverContent::Text("---".to_string()));
+        self
+    }
+
+    pub fn set_range(mut self, range: HoverRange) -> Self {
+        self.range = Some(range);
+        self
+    }
+
+    pub fn build(self) -> Hover {
+        Hover {
+            contents: self.contents,
+            range: self.range,
+        }
+    }
+}
+
+impl Default for HoverContentBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Returns a new hover with each content block truncated to `max_chars`.
+pub fn truncate_hover_content(hover: &Hover, max_chars: usize) -> Hover {
+    let contents = hover
+        .contents
+        .iter()
+        .map(|c| match c {
+            HoverContent::Text(t) => {
+                HoverContent::Text(t.chars().take(max_chars).collect())
+            }
+            HoverContent::Markdown(md) => {
+                HoverContent::Markdown(md.chars().take(max_chars).collect())
+            }
+            HoverContent::Code { value, language } => HoverContent::Code {
+                value: value.chars().take(max_chars).collect(),
+                language: language.clone(),
+            },
+        })
+        .collect();
+    Hover {
+        contents,
+        range: hover.range,
+    }
+}
+
+/// Returns the total character length across all content blocks in the hover.
+pub fn hover_content_length(hover: &Hover) -> usize {
+    hover
+        .contents
+        .iter()
+        .map(|c| match c {
+            HoverContent::Text(t) => t.len(),
+            HoverContent::Markdown(md) => md.len(),
+            HoverContent::Code { value, .. } => value.len(),
+        })
+        .sum()
+}
+
+/// Conditionally filters hover results by language and position constraints.
+#[derive(Debug, Clone)]
+pub struct HoverFilter {
+    /// If set, only hovers that contain code blocks with this language are accepted.
+    pub language: Option<String>,
+    /// If set, only hovers whose range contains this position are accepted.
+    pub position: Option<(u32, u32)>,
+}
+
+impl HoverFilter {
+    pub fn new() -> Self {
+        Self {
+            language: None,
+            position: None,
+        }
+    }
+
+    pub fn with_language(mut self, lang: impl Into<String>) -> Self {
+        self.language = Some(lang.into());
+        self
+    }
+
+    pub fn with_position(mut self, line: u32, col: u32) -> Self {
+        self.position = Some((line, col));
+        self
+    }
+
+    /// Returns `true` if the hover passes all configured filters.
+    pub fn accepts(&self, hover: &Hover) -> bool {
+        if let Some(ref lang) = self.language {
+            let has_lang = hover.contents.iter().any(|c| match c {
+                HoverContent::Code { language, .. } => {
+                    language.as_deref() == Some(lang.as_str())
+                }
+                _ => false,
+            });
+            if !has_lang {
+                return false;
+            }
+        }
+        if let Some((line, col)) = self.position {
+            if let Some(ref range) = hover.range {
+                if !is_position_in_range(range, line, col) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+}
+
+impl Default for HoverFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -517,5 +741,126 @@ mod tests {
     fn hover_trigger_kind_equality() {
         assert_eq!(HoverTriggerKind::Invoke, HoverTriggerKind::Invoke);
         assert_ne!(HoverTriggerKind::Hover, HoverTriggerKind::ContentHover);
+    }
+
+    #[test]
+    fn hover_delay_should_show() {
+        let cfg = HoverConfig::default();
+        assert!(!HoverDelay::should_show(100, &cfg));
+        assert!(HoverDelay::should_show(300, &cfg));
+        assert!(HoverDelay::should_show(500, &cfg));
+
+        let disabled = HoverConfig { enabled: false, ..HoverConfig::default() };
+        assert!(!HoverDelay::should_show(1000, &disabled));
+    }
+
+    #[test]
+    fn hover_delay_compute_delay() {
+        let cfg = HoverConfig::default();
+        assert_eq!(HoverDelay::compute_delay(HoverTriggerKind::Invoke, &cfg), 0);
+        assert_eq!(HoverDelay::compute_delay(HoverTriggerKind::Hover, &cfg), 300);
+        assert_eq!(HoverDelay::compute_delay(HoverTriggerKind::ContentHover, &cfg), 150);
+    }
+
+    #[test]
+    fn hover_history_record_and_frequent() {
+        let mut history = HoverHistory::new();
+        assert!(history.is_empty());
+
+        history.record(1, 5);
+        history.record(1, 5);
+        history.record(2, 3);
+        history.record(1, 5);
+        history.record(2, 3);
+        assert_eq!(history.len(), 5);
+
+        let top = history.get_frequent_positions(2);
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0], (1, 5, 3));
+        assert_eq!(top[1], (2, 3, 2));
+    }
+
+    #[test]
+    fn hover_history_clear() {
+        let mut history = HoverHistory::new();
+        history.record(0, 0);
+        history.record(1, 1);
+        assert_eq!(history.len(), 2);
+        history.clear();
+        assert_eq!(history.len(), 0);
+        assert!(history.is_empty());
+    }
+
+    #[test]
+    fn hover_content_builder_fluent() {
+        let hover = HoverContentBuilder::new()
+            .add_text("Type info")
+            .add_markdown("**bold**")
+            .add_code("let x = 1;", Some("rust"))
+            .add_separator()
+            .set_range(HoverRange {
+                start_line: 1,
+                start_column: 0,
+                end_line: 1,
+                end_column: 10,
+            })
+            .build();
+        assert_eq!(hover.content_count(), 4);
+        assert!(hover.range.is_some());
+        assert!(hover.has_code_content());
+    }
+
+    #[test]
+    fn truncate_hover_content_test() {
+        let hover = Hover::text("hello world");
+        let truncated = truncate_hover_content(&hover, 5);
+        assert_eq!(render_hover_to_string(&truncated), "hello");
+    }
+
+    #[test]
+    fn hover_content_length_test() {
+        let hover = Hover::text("abc")
+            .add_content(HoverContent::Markdown("de".into()))
+            .add_content(HoverContent::Code {
+                value: "fgh".into(),
+                language: None,
+            });
+        assert_eq!(hover_content_length(&hover), 8);
+    }
+
+    #[test]
+    fn hover_filter_by_language() {
+        let rust_hover = Hover::code("fn main() {}", Some("rust"));
+        let py_hover = Hover::code("def main():", Some("python"));
+        let text_hover = Hover::text("plain");
+
+        let filter = HoverFilter::new().with_language("rust");
+        assert!(filter.accepts(&rust_hover));
+        assert!(!filter.accepts(&py_hover));
+        assert!(!filter.accepts(&text_hover));
+    }
+
+    #[test]
+    fn hover_filter_by_position() {
+        let range = HoverRange {
+            start_line: 5,
+            start_column: 0,
+            end_line: 5,
+            end_column: 10,
+        };
+        let hover = Hover::text("info").with_range(range);
+
+        let inside = HoverFilter::new().with_position(5, 5);
+        assert!(inside.accepts(&hover));
+
+        let outside = HoverFilter::new().with_position(6, 0);
+        assert!(!outside.accepts(&hover));
+    }
+
+    #[test]
+    fn hover_filter_no_constraints_accepts_all() {
+        let filter = HoverFilter::new();
+        assert!(filter.accepts(&Hover::text("anything")));
+        assert!(filter.accepts(&Hover::code("x", Some("go"))));
     }
 }

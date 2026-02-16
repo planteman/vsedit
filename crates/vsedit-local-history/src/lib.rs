@@ -3,6 +3,7 @@
 //! Records content snapshots keyed by URI + timestamp so that previous
 //! versions of a file can be inspected or restored.
 
+use std::fmt;
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------

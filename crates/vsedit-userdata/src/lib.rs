@@ -339,6 +339,107 @@ impl UserDataService {
     }
 }
 
+/// Validates user data keys and value sizes.
+#[derive(Debug, Clone)]
+pub struct UserDataValidator {
+    /// Maximum allowed key length in bytes.
+    pub max_key_len: usize,
+}
+
+impl UserDataValidator {
+    /// Create a validator with the given maximum key length.
+    pub fn new(max_key_len: usize) -> Self {
+        Self { max_key_len }
+    }
+
+    /// Validate that a key is non-empty, within length limits, and contains only
+    /// alphanumeric characters, hyphens, underscores, or dots.
+    pub fn validate_key(&self, key: &str) -> Result<(), UserDataError> {
+        if key.is_empty() {
+            return Err(UserDataError::InvalidProfileId(
+                "key must not be empty".into(),
+            ));
+        }
+        if key.len() > self.max_key_len {
+            return Err(UserDataError::InvalidProfileId(format!(
+                "key exceeds max length of {} bytes",
+                self.max_key_len
+            )));
+        }
+        if !key
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_' || c == '.')
+        {
+            return Err(UserDataError::InvalidProfileId(format!(
+                "key contains invalid characters: '{key}'"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Validate that a value does not exceed `max_bytes`.
+    pub fn validate_value_size(&self, value: &[u8], max_bytes: usize) -> Result<(), UserDataError> {
+        if value.len() > max_bytes {
+            return Err(UserDataError::InvalidBasePath(format!(
+                "value size {} exceeds limit of {} bytes",
+                value.len(),
+                max_bytes
+            )));
+        }
+        Ok(())
+    }
+}
+
+impl Default for UserDataValidator {
+    fn default() -> Self {
+        Self { max_key_len: 256 }
+    }
+}
+
+/// Aggregated statistics about a set of user data entries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserDataStats {
+    /// Total number of stored entries.
+    pub total_entries: usize,
+    /// Combined size of all values in bytes.
+    pub total_size_bytes: usize,
+    /// Number of distinct namespace prefixes (the portion before the first dot).
+    pub namespaces_count: usize,
+}
+
+impl UserDataStats {
+    /// Compute statistics from a set of key-value entries.
+    ///
+    /// Namespaces are derived from the portion of each key before the first `.`
+    /// character. Keys without a dot are placed in the `""` (empty) namespace.
+    pub fn from_entries(entries: &[(&str, &[u8])]) -> Self {
+        let total_entries = entries.len();
+        let total_size_bytes: usize = entries.iter().map(|(_, v)| v.len()).sum();
+
+        let mut namespaces = std::collections::HashSet::new();
+        for (key, _) in entries {
+            let ns = key.split('.').next().unwrap_or("");
+            namespaces.insert(ns);
+        }
+
+        Self {
+            total_entries,
+            total_size_bytes,
+            namespaces_count: namespaces.len(),
+        }
+    }
+}
+
+impl fmt::Display for UserDataStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} entries, {} bytes, {} namespaces",
+            self.total_entries, self.total_size_bytes, self.namespaces_count
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -580,5 +681,66 @@ mod tests {
         assert_eq!(format!("{e}"), "profile name cannot be empty");
         let e = UserDataError::ProfileNotFound("x".into());
         assert_eq!(format!("{e}"), "profile 'x' not found");
+    }
+
+    #[test]
+    fn validator_valid_key() {
+        let v = UserDataValidator::default();
+        assert!(v.validate_key("editor.fontSize").is_ok());
+        assert!(v.validate_key("my-key_01").is_ok());
+    }
+
+    #[test]
+    fn validator_invalid_keys() {
+        let v = UserDataValidator::new(10);
+        // empty key
+        assert!(v.validate_key("").is_err());
+        // too long
+        assert!(v.validate_key("abcdefghijk").is_err());
+        // invalid characters
+        assert!(v.validate_key("key with spaces").is_err());
+        assert!(v.validate_key("key/slash").is_err());
+    }
+
+    #[test]
+    fn validator_value_size() {
+        let v = UserDataValidator::default();
+        assert!(v.validate_value_size(b"hello", 10).is_ok());
+        assert!(v.validate_value_size(b"hello", 5).is_ok());
+        assert!(v.validate_value_size(b"hello!", 5).is_err());
+        assert!(v.validate_value_size(b"", 0).is_ok());
+    }
+
+    #[test]
+    fn stats_from_entries() {
+        let entries: Vec<(&str, &[u8])> = vec![
+            ("editor.fontSize", b"14"),
+            ("editor.tabSize", b"4"),
+            ("theme.name", b"dark"),
+            ("locale", b"en"),
+        ];
+        let stats = UserDataStats::from_entries(&entries);
+        assert_eq!(stats.total_entries, 4);
+        assert_eq!(stats.total_size_bytes, 2 + 1 + 4 + 2);
+        // namespaces: "editor", "theme", "locale"
+        assert_eq!(stats.namespaces_count, 3);
+    }
+
+    #[test]
+    fn stats_empty_entries() {
+        let stats = UserDataStats::from_entries(&[]);
+        assert_eq!(stats.total_entries, 0);
+        assert_eq!(stats.total_size_bytes, 0);
+        assert_eq!(stats.namespaces_count, 0);
+    }
+
+    #[test]
+    fn stats_display() {
+        let stats = UserDataStats {
+            total_entries: 5,
+            total_size_bytes: 128,
+            namespaces_count: 2,
+        };
+        assert_eq!(format!("{stats}"), "5 entries, 128 bytes, 2 namespaces");
     }
 }

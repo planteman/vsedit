@@ -3,6 +3,7 @@
 //! Equivalent to VS Code's `vs/platform/log/common/log.ts`.
 //! Wraps the `tracing` crate to provide VS Code-compatible log levels and output channels.
 
+use std::fmt;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 

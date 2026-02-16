@@ -11,6 +11,7 @@
 //! - [`ContextKeyExpr`] — parsed when-clause expression tree.
 //! - [`ContextKeyService`] — manages context key state with scoped child contexts.
 
+use std::fmt;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 

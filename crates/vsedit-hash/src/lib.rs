@@ -2,6 +2,7 @@
 //!
 //! Equivalent to VS Code's `vs/base/common/hash.ts` and UUID utils.
 
+use std::fmt;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
@@ -291,6 +292,122 @@ impl std::fmt::Debug for HashCombiner {
     }
 }
 
+/// Selects a hashing algorithm for use with [`ChecksumVerifier`] and general-purpose hashing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HashAlgorithm {
+    Djb2,
+    Sha256,
+    FnvLike,
+}
+
+impl HashAlgorithm {
+    /// Hash a string using the selected algorithm, returning a `u64`.
+    pub fn hash_str(&self, s: &str) -> u64 {
+        match self {
+            HashAlgorithm::Djb2 => {
+                let mut hash: u64 = 5381;
+                for byte in s.bytes() {
+                    hash = hash.wrapping_mul(33).wrapping_add(u64::from(byte));
+                }
+                hash
+            }
+            HashAlgorithm::Sha256 => {
+                let digest = sha256_bytes(s.as_bytes());
+                u64::from_be_bytes(digest[..8].try_into().unwrap())
+            }
+            HashAlgorithm::FnvLike => fnv1a_hash(s.as_bytes()),
+        }
+    }
+}
+
+/// FNV-1a hash for arbitrary byte data.
+pub fn fnv1a_hash(data: &[u8]) -> u64 {
+    const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+    const FNV_PRIME: u64 = 0x0100_0000_01b3;
+    let mut hash = FNV_OFFSET;
+    for &byte in data {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
+}
+
+/// Computes and verifies hex-encoded checksums using a chosen [`HashAlgorithm`].
+pub struct ChecksumVerifier;
+
+impl ChecksumVerifier {
+    /// Compute a hex checksum of `data` using `algorithm`.
+    pub fn compute(data: &[u8], algorithm: HashAlgorithm) -> String {
+        match algorithm {
+            HashAlgorithm::Sha256 => sha256_hex(data),
+            _ => {
+                let h = match algorithm {
+                    HashAlgorithm::Djb2 => {
+                        let mut hash: u64 = 5381;
+                        for &b in data {
+                            hash = hash.wrapping_mul(33).wrapping_add(u64::from(b));
+                        }
+                        hash
+                    }
+                    HashAlgorithm::FnvLike => fnv1a_hash(data),
+                    HashAlgorithm::Sha256 => unreachable!(),
+                };
+                format!("{h:016x}")
+            }
+        }
+    }
+
+    /// Verify that `data` matches `expected` hex checksum under `algorithm`.
+    pub fn verify(data: &[u8], expected: &str, algorithm: HashAlgorithm) -> bool {
+        Self::compute(data, algorithm) == expected
+    }
+}
+
+/// Consistent-hash bucket ring for distributing keys across buckets.
+pub struct HashBucket {
+    bucket_count: usize,
+}
+
+impl HashBucket {
+    /// Create a new ring with `bucket_count` buckets (must be > 0).
+    pub fn new(bucket_count: usize) -> Self {
+        assert!(bucket_count > 0, "bucket_count must be > 0");
+        Self { bucket_count }
+    }
+
+    /// Assign a key to a bucket index in `0..bucket_count`.
+    pub fn assign(&self, key: &str) -> usize {
+        let h = fnv1a_hash(key.as_bytes());
+        (h as usize) % self.bucket_count
+    }
+
+    /// Change the number of buckets.
+    pub fn rebalance(&mut self, new_count: usize) {
+        assert!(new_count > 0, "new_count must be > 0");
+        self.bucket_count = new_count;
+    }
+}
+
+/// Combine hashes of `values` in order (order matters).
+pub fn hash_combine_ordered(values: &[&str]) -> u32 {
+    let mut hash: u32 = 0;
+    for (i, v) in values.iter().enumerate() {
+        let h = string_hash(v);
+        // mix in the position so identical values at different indices differ
+        hash = hash.wrapping_add(h.wrapping_mul((i as u32).wrapping_add(1)));
+    }
+    hash
+}
+
+/// Combine hashes of `values` regardless of order (commutative).
+pub fn hash_combine_unordered(values: &[&str]) -> u32 {
+    let mut hash: u32 = 0;
+    for v in values {
+        hash ^= string_hash(v);
+    }
+    hash
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -515,5 +632,75 @@ mod tests {
         let dbg = format!("{c:?}");
         assert!(dbg.contains("HashCombiner"));
         assert!(dbg.contains("0x"));
+    }
+
+    #[test]
+    fn test_hash_algorithm_djb2_deterministic() {
+        let a = HashAlgorithm::Djb2.hash_str("hello");
+        let b = HashAlgorithm::Djb2.hash_str("hello");
+        assert_eq!(a, b);
+        assert_ne!(a, HashAlgorithm::Djb2.hash_str("world"));
+    }
+
+    #[test]
+    fn test_hash_algorithm_sha256_uses_first_8_bytes() {
+        let h = HashAlgorithm::Sha256.hash_str("test");
+        assert_ne!(h, 0);
+        assert_eq!(h, HashAlgorithm::Sha256.hash_str("test"));
+    }
+
+    #[test]
+    fn test_fnv1a_hash_deterministic() {
+        let a = fnv1a_hash(b"hello world");
+        let b = fnv1a_hash(b"hello world");
+        assert_eq!(a, b);
+        assert_ne!(a, fnv1a_hash(b"other"));
+        // empty input should return offset basis
+        assert_eq!(fnv1a_hash(b""), 0xcbf2_9ce4_8422_2325);
+    }
+
+    #[test]
+    fn test_checksum_verifier_compute_and_verify() {
+        let data = b"some data";
+        for algo in [HashAlgorithm::Djb2, HashAlgorithm::Sha256, HashAlgorithm::FnvLike] {
+            let checksum = ChecksumVerifier::compute(data, algo);
+            assert!(ChecksumVerifier::verify(data, &checksum, algo));
+            assert!(!ChecksumVerifier::verify(b"wrong", &checksum, algo));
+        }
+    }
+
+    #[test]
+    fn test_hash_bucket_assign_and_rebalance() {
+        let mut ring = HashBucket::new(8);
+        let idx = ring.assign("my-key");
+        assert!(idx < 8);
+        // deterministic
+        assert_eq!(idx, ring.assign("my-key"));
+        ring.rebalance(4);
+        let idx2 = ring.assign("my-key");
+        assert!(idx2 < 4);
+    }
+
+    #[test]
+    fn test_hash_combine_ordered_depends_on_order() {
+        let a = hash_combine_ordered(&["a", "b", "c"]);
+        let b = hash_combine_ordered(&["c", "b", "a"]);
+        assert_ne!(a, b);
+        // deterministic
+        assert_eq!(a, hash_combine_ordered(&["a", "b", "c"]));
+    }
+
+    #[test]
+    fn test_hash_combine_unordered_ignores_order() {
+        let a = hash_combine_unordered(&["a", "b", "c"]);
+        let b = hash_combine_unordered(&["c", "a", "b"]);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_hash_algorithm_fnvlike_matches_fnv1a() {
+        let algo_h = HashAlgorithm::FnvLike.hash_str("test string");
+        let direct_h = fnv1a_hash(b"test string");
+        assert_eq!(algo_h, direct_h);
     }
 }

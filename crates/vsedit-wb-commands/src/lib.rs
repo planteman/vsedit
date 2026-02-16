@@ -302,6 +302,178 @@ impl Default for CommandRegistry {
     }
 }
 
+/// Record of a single command execution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandExecutionEntry {
+    pub command_id: String,
+    pub source: CommandSource,
+    /// Monotonic sequence number assigned at log time.
+    pub seq: u64,
+}
+
+/// Append-only log of command executions.
+pub struct CommandExecutionLog {
+    entries: Vec<CommandExecutionEntry>,
+    next_seq: u64,
+}
+
+impl CommandExecutionLog {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            next_seq: 1,
+        }
+    }
+
+    /// Record a command execution and return its sequence number.
+    pub fn log(&mut self, command_id: impl Into<String>, source: CommandSource) -> u64 {
+        let seq = self.next_seq;
+        self.entries.push(CommandExecutionEntry {
+            command_id: command_id.into(),
+            source,
+            seq,
+        });
+        self.next_seq += 1;
+        seq
+    }
+
+    /// Return the `n` most recent entries (oldest first).
+    pub fn get_recent(&self, n: usize) -> &[CommandExecutionEntry] {
+        let start = self.entries.len().saturating_sub(n);
+        &self.entries[start..]
+    }
+
+    /// Return all entries matching the given command id.
+    pub fn get_by_command(&self, id: &str) -> Vec<&CommandExecutionEntry> {
+        self.entries.iter().filter(|e| e.command_id == id).collect()
+    }
+
+    /// Remove all entries from the log.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Total number of entries in the log.
+    pub fn total_count(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+impl Default for CommandExecutionLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Outcome of executing a single command within a batch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BatchStepResult {
+    /// The command executed successfully.
+    Ok,
+    /// The command failed with the given error; rollback will be attempted.
+    Failed(CommandError),
+}
+
+/// Execute a sequence of commands through a registry, with rollback support.
+///
+/// Commands are executed in order. If any command is not found or is disabled
+/// the batch stops and returns information about completed steps so that the
+/// caller can undo them.
+pub struct CommandBatch {
+    command_ids: Vec<String>,
+}
+
+impl CommandBatch {
+    pub fn new() -> Self {
+        Self {
+            command_ids: Vec::new(),
+        }
+    }
+
+    /// Append a command id to the batch.
+    pub fn push(&mut self, id: impl Into<String>) {
+        self.command_ids.push(id.into());
+    }
+
+    /// Number of commands in the batch.
+    pub fn len(&self) -> usize {
+        self.command_ids.len()
+    }
+
+    /// Returns `true` when the batch contains no commands.
+    pub fn is_empty(&self) -> bool {
+        self.command_ids.len() == 0
+    }
+
+    /// Validate and "execute" each command in order against the registry.
+    ///
+    /// Returns a vec of results, one per step attempted. On the first failure
+    /// execution stops; the returned vec will contain `Ok` for every command
+    /// that succeeded followed by a single `Failed` entry.  The caller can
+    /// use the successful prefix as a rollback list.
+    pub fn execute(&self, registry: &CommandRegistry) -> Vec<(String, BatchStepResult)> {
+        let mut results = Vec::with_capacity(self.command_ids.len());
+        for id in &self.command_ids {
+            match registry.get_command(id) {
+                None => {
+                    results.push((
+                        id.clone(),
+                        BatchStepResult::Failed(CommandError::NotFound(id.clone())),
+                    ));
+                    break;
+                }
+                Some(cmd) if !cmd.enabled => {
+                    results.push((
+                        id.clone(),
+                        BatchStepResult::Failed(CommandError::Disabled(id.clone())),
+                    ));
+                    break;
+                }
+                Some(_) => {
+                    results.push((id.clone(), BatchStepResult::Ok));
+                }
+            }
+        }
+        results
+    }
+
+    /// Return the list of command ids that would need to be rolled back given
+    /// the results of [`execute`].  Only successfully-executed ids are returned,
+    /// in reverse order.
+    pub fn rollback_ids(results: &[(String, BatchStepResult)]) -> Vec<String> {
+        results
+            .iter()
+            .filter(|(_, r)| *r == BatchStepResult::Ok)
+            .map(|(id, _)| id.clone())
+            .rev()
+            .collect()
+    }
+}
+
+impl Default for CommandBatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Stateless utilities for validating command identifiers.
+pub struct CommandValidator;
+
+impl CommandValidator {
+    /// A command id is valid when it is non-empty, ASCII-only, contains no
+    /// whitespace, and has at least one dot separator (e.g. `"editor.save"`).
+    pub fn validate_command_id(id: &str) -> bool {
+        CommandDescriptor::is_valid_id(id) && id.contains('.')
+    }
+
+    /// Validates a slice of ids, returning the first invalid one (if any).
+    pub fn first_invalid(ids: &[&str]) -> Option<String> {
+        ids.iter()
+            .find(|id| !Self::validate_command_id(id))
+            .map(|id| (*id).to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -557,5 +729,115 @@ mod tests {
 
         let c = CommandDescriptor::builder("id", "Other").build();
         assert_ne!(a, c);
+    }
+
+    // ── CommandExecutionLog tests ──────────────────────────────────
+
+    #[test]
+    fn execution_log_records_and_counts() {
+        let mut log = CommandExecutionLog::new();
+        assert_eq!(log.total_count(), 0);
+        let seq1 = log.log("editor.save", CommandSource::User);
+        let seq2 = log.log("editor.format", CommandSource::Keybinding);
+        assert_eq!(seq1, 1);
+        assert_eq!(seq2, 2);
+        assert_eq!(log.total_count(), 2);
+    }
+
+    #[test]
+    fn execution_log_get_recent_and_clear() {
+        let mut log = CommandExecutionLog::new();
+        log.log("a", CommandSource::System);
+        log.log("b", CommandSource::System);
+        log.log("c", CommandSource::System);
+
+        let recent = log.get_recent(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].command_id, "b");
+        assert_eq!(recent[1].command_id, "c");
+
+        // Requesting more than available returns all.
+        assert_eq!(log.get_recent(100).len(), 3);
+
+        log.clear();
+        assert_eq!(log.total_count(), 0);
+        assert!(log.get_recent(5).is_empty());
+    }
+
+    #[test]
+    fn execution_log_get_by_command() {
+        let mut log = CommandExecutionLog::new();
+        log.log("editor.save", CommandSource::User);
+        log.log("editor.format", CommandSource::User);
+        log.log("editor.save", CommandSource::Keybinding);
+
+        let saves = log.get_by_command("editor.save");
+        assert_eq!(saves.len(), 2);
+        assert_eq!(saves[0].source, CommandSource::User);
+        assert_eq!(saves[1].source, CommandSource::Keybinding);
+        assert!(log.get_by_command("nonexistent").is_empty());
+    }
+
+    // ── CommandBatch tests ────────────────────────────────────────
+
+    #[test]
+    fn batch_execute_all_succeed() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("cmd.a", "A"));
+        reg.register(make_cmd("cmd.b", "B"));
+
+        let mut batch = CommandBatch::new();
+        batch.push("cmd.a");
+        batch.push("cmd.b");
+        assert_eq!(batch.len(), 2);
+        assert!(!batch.is_empty());
+
+        let results = batch.execute(&reg);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].1, BatchStepResult::Ok);
+        assert_eq!(results[1].1, BatchStepResult::Ok);
+        assert!(CommandBatch::rollback_ids(&results).is_empty() == false);
+    }
+
+    #[test]
+    fn batch_stops_on_failure_and_provides_rollback() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("cmd.a", "A"));
+        // cmd.b intentionally missing
+        reg.register(make_cmd("cmd.c", "C"));
+
+        let mut batch = CommandBatch::new();
+        batch.push("cmd.a");
+        batch.push("cmd.b"); // will fail
+        batch.push("cmd.c"); // should never be reached
+
+        let results = batch.execute(&reg);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].1, BatchStepResult::Ok);
+        assert!(matches!(results[1].1, BatchStepResult::Failed(CommandError::NotFound(_))));
+
+        let rollback = CommandBatch::rollback_ids(&results);
+        assert_eq!(rollback, vec!["cmd.a"]);
+    }
+
+    // ── CommandValidator tests ────────────────────────────────────
+
+    #[test]
+    fn validator_requires_dot_separator() {
+        assert!(CommandValidator::validate_command_id("editor.save"));
+        assert!(CommandValidator::validate_command_id("a.b.c"));
+        // Valid per is_valid_id but missing dot → rejected by validator.
+        assert!(!CommandValidator::validate_command_id("nodot"));
+        assert!(!CommandValidator::validate_command_id(""));
+        assert!(!CommandValidator::validate_command_id("has space.cmd"));
+    }
+
+    #[test]
+    fn validator_first_invalid() {
+        let ids = vec!["editor.save", "view.zoom"];
+        assert_eq!(CommandValidator::first_invalid(&ids), None);
+
+        let ids_bad = vec!["editor.save", "bad", "view.zoom"];
+        assert_eq!(CommandValidator::first_invalid(&ids_bad), Some("bad".into()));
     }
 }

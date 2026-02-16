@@ -4,6 +4,7 @@
 //! Manages user settings, workspace settings, and defaults with layered
 //! merging and dot-notation path resolution.
 
+use std::fmt;
 use std::collections::HashMap;
 use std::sync::RwLock;
 

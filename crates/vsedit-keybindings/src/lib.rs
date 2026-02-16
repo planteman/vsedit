@@ -6,6 +6,7 @@
 //!
 //! Modeled after VS Code's `vs/base/common/keybindings.ts`.
 
+use std::fmt;
 use vsedit_keycodes::{key_code_to_string, string_to_key_code, KeyCode, KeyCodeChord};
 use vsedit_platform::Platform;
 

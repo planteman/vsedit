@@ -2,6 +2,7 @@
 //!
 //! Provides the rename workflow: prepare → validate → compute edits → apply.
 
+use std::fmt;
 /// A text edit for a rename operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenameEdit {

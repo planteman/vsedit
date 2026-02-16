@@ -1,5 +1,6 @@
 //! Indentation detection and manipulation.
 
+use std::fmt;
 /// Detected indentation style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndentStyle {

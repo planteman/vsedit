@@ -1,5 +1,6 @@
 //! Autocomplete and suggestions.
 
+use std::fmt;
 /// Completion item kind matching VS Code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompletionItemKind {

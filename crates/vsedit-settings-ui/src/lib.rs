@@ -317,6 +317,219 @@ pub fn filter_settings(settings: &[SettingItem], filter: &SettingsFilter) -> Vec
         .collect()
 }
 
+/// A record of a single setting change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SettingChange {
+    pub key: String,
+    pub old_value: Option<String>,
+    pub new_value: Option<String>,
+    pub timestamp_ms: u64,
+}
+
+/// An append-only log of setting changes with undo support.
+#[derive(Debug, Default)]
+pub struct SettingsChangeLog {
+    changes: Vec<SettingChange>,
+}
+
+impl SettingsChangeLog {
+    pub fn new() -> Self {
+        Self { changes: Vec::new() }
+    }
+
+    /// Record a change.
+    pub fn record(&mut self, change: SettingChange) {
+        self.changes.push(change);
+    }
+
+    /// Remove and return the most recent change.
+    pub fn undo_last(&mut self) -> Option<SettingChange> {
+        self.changes.pop()
+    }
+
+    /// Return all changes for a specific key.
+    pub fn get_changes_for_key(&self, key: &str) -> Vec<&SettingChange> {
+        self.changes.iter().filter(|c| c.key == key).collect()
+    }
+
+    /// Return the most recent `n` changes (newest last).
+    pub fn get_recent(&self, n: usize) -> &[SettingChange] {
+        let len = self.changes.len();
+        if n >= len {
+            &self.changes
+        } else {
+            &self.changes[len - n..]
+        }
+    }
+
+    /// Clear all recorded changes.
+    pub fn clear(&mut self) {
+        self.changes.clear();
+    }
+}
+
+/// Validate that a setting key is dot-separated alphanumeric segments.
+///
+/// Each segment must be non-empty and consist only of ASCII alphanumeric
+/// characters or underscores. There must be at least two segments.
+pub fn validate_setting_key(key: &str) -> Result<(), SettingsError> {
+    if key.is_empty() {
+        return Err(SettingsError::InvalidValue("key must not be empty".into()));
+    }
+    let segments: Vec<&str> = key.split('.').collect();
+    if segments.len() < 2 {
+        return Err(SettingsError::InvalidValue(
+            "key must have at least two dot-separated segments".into(),
+        ));
+    }
+    for seg in &segments {
+        if seg.is_empty() {
+            return Err(SettingsError::InvalidValue(
+                "key segments must not be empty".into(),
+            ));
+        }
+        if !seg
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            return Err(SettingsError::InvalidValue(format!(
+                "segment '{seg}' contains invalid characters"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Minimal JSON exporter/importer using only the standard library.
+pub struct SettingsExporter;
+
+impl SettingsExporter {
+    /// Serialize all settings in a registry to a JSON string.
+    pub fn to_json(registry: &SettingsRegistry) -> String {
+        let mut out = String::from("{\n");
+        let items = registry.all();
+        for (i, item) in items.iter().enumerate() {
+            let value = item
+                .current_value
+                .as_deref()
+                .unwrap_or(&item.default_value);
+            out.push_str(&format!(
+                "  \"{}\": \"{}\"",
+                Self::escape(item.key.as_str()),
+                Self::escape(value),
+            ));
+            if i + 1 < items.len() {
+                out.push(',');
+            }
+            out.push('\n');
+        }
+        out.push('}');
+        out
+    }
+
+    /// Parse a simple JSON object of `"key": "value"` pairs.
+    pub fn from_json(json: &str) -> Result<Vec<(String, String)>, SettingsError> {
+        let trimmed = json.trim();
+        if !trimmed.starts_with('{') || !trimmed.ends_with('}') {
+            return Err(SettingsError::InvalidValue("expected JSON object".into()));
+        }
+        let inner = &trimmed[1..trimmed.len() - 1];
+        let mut result = Vec::new();
+        for part in inner.split(',') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            let Some(colon) = part.find(':') else {
+                return Err(SettingsError::InvalidValue(format!(
+                    "missing ':' in '{part}'"
+                )));
+            };
+            let raw_key = part[..colon].trim();
+            let raw_val = part[colon + 1..].trim();
+            let key = Self::unquote(raw_key)?;
+            let val = Self::unquote(raw_val)?;
+            result.push((key, val));
+        }
+        Ok(result)
+    }
+
+    fn escape(s: &str) -> String {
+        s.replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .replace('\n', "\\n")
+    }
+
+    fn unquote(s: &str) -> Result<String, SettingsError> {
+        let s = s.trim();
+        if s.len() < 2 || !s.starts_with('"') || !s.ends_with('"') {
+            return Err(SettingsError::InvalidValue(format!(
+                "expected quoted string, got '{s}'"
+            )));
+        }
+        Ok(s[1..s.len() - 1]
+            .replace("\\\"", "\"")
+            .replace("\\n", "\n")
+            .replace("\\\\", "\\"))
+    }
+}
+
+/// The result of diffing two settings registries.
+#[derive(Debug, Clone, Default)]
+pub struct SettingsDiff {
+    /// Keys only in `a`.
+    pub only_in_a: Vec<String>,
+    /// Keys only in `b`.
+    pub only_in_b: Vec<String>,
+    /// Keys present in both but with different effective values (current or default).
+    pub changed: Vec<(String, String, String)>,
+}
+
+/// Compare two registries and return a diff.
+pub fn diff_settings(a: &SettingsRegistry, b: &SettingsRegistry) -> SettingsDiff {
+    let a_map: HashMap<&str, &str> = a
+        .all()
+        .iter()
+        .map(|s| {
+            (
+                s.key.as_str(),
+                s.current_value.as_deref().unwrap_or(&s.default_value),
+            )
+        })
+        .collect();
+    let b_map: HashMap<&str, &str> = b
+        .all()
+        .iter()
+        .map(|s| {
+            (
+                s.key.as_str(),
+                s.current_value.as_deref().unwrap_or(&s.default_value),
+            )
+        })
+        .collect();
+
+    let mut diff = SettingsDiff::default();
+    for (&key, &val_a) in &a_map {
+        match b_map.get(key) {
+            Some(&val_b) if val_a != val_b => {
+                diff.changed
+                    .push((key.to_string(), val_a.to_string(), val_b.to_string()));
+            }
+            None => diff.only_in_a.push(key.to_string()),
+            _ => {}
+        }
+    }
+    for &key in b_map.keys() {
+        if !a_map.contains_key(key) {
+            diff.only_in_b.push(key.to_string());
+        }
+    }
+    diff.only_in_a.sort();
+    diff.only_in_b.sort();
+    diff.changed.sort_by(|x, y| x.0.cmp(&y.0));
+    diff
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -505,5 +718,171 @@ mod tests {
         assert_eq!(groups[&SettingScope::User], vec![0, 2]);
         assert_eq!(groups[&SettingScope::Workspace], vec![1]);
         assert!(!groups.contains_key(&SettingScope::Language));
+    }
+
+    // --- change log tests ---
+
+    #[test]
+    fn change_log_record_and_undo() {
+        let mut log = SettingsChangeLog::new();
+        log.record(SettingChange {
+            key: "editor.fontSize".into(),
+            old_value: Some("14".into()),
+            new_value: Some("16".into()),
+            timestamp_ms: 1000,
+        });
+        log.record(SettingChange {
+            key: "editor.tabSize".into(),
+            old_value: None,
+            new_value: Some("2".into()),
+            timestamp_ms: 2000,
+        });
+        assert_eq!(log.get_recent(10).len(), 2);
+        let undone = log.undo_last().unwrap();
+        assert_eq!(undone.key, "editor.tabSize");
+        assert_eq!(log.get_recent(10).len(), 1);
+    }
+
+    #[test]
+    fn change_log_get_changes_for_key() {
+        let mut log = SettingsChangeLog::new();
+        log.record(SettingChange {
+            key: "a.b".into(),
+            old_value: None,
+            new_value: Some("1".into()),
+            timestamp_ms: 100,
+        });
+        log.record(SettingChange {
+            key: "c.d".into(),
+            old_value: None,
+            new_value: Some("2".into()),
+            timestamp_ms: 200,
+        });
+        log.record(SettingChange {
+            key: "a.b".into(),
+            old_value: Some("1".into()),
+            new_value: Some("3".into()),
+            timestamp_ms: 300,
+        });
+        assert_eq!(log.get_changes_for_key("a.b").len(), 2);
+        assert_eq!(log.get_changes_for_key("c.d").len(), 1);
+        assert_eq!(log.get_changes_for_key("x.y").len(), 0);
+    }
+
+    #[test]
+    fn change_log_clear() {
+        let mut log = SettingsChangeLog::new();
+        log.record(SettingChange {
+            key: "a.b".into(),
+            old_value: None,
+            new_value: Some("1".into()),
+            timestamp_ms: 0,
+        });
+        log.clear();
+        assert_eq!(log.get_recent(10).len(), 0);
+        assert!(log.undo_last().is_none());
+    }
+
+    // --- validate_setting_key tests ---
+
+    #[test]
+    fn validate_key_valid() {
+        assert!(validate_setting_key("editor.fontSize").is_ok());
+        assert!(validate_setting_key("files.auto_save.delay").is_ok());
+        assert!(validate_setting_key("a.b").is_ok());
+    }
+
+    #[test]
+    fn validate_key_invalid() {
+        assert!(validate_setting_key("").is_err());
+        assert!(validate_setting_key("nosegment").is_err());
+        assert!(validate_setting_key("a..b").is_err());
+        assert!(validate_setting_key(".a.b").is_err());
+        assert!(validate_setting_key("a.b-c").is_err());
+        assert!(validate_setting_key("a.b ").is_err());
+    }
+
+    // --- exporter tests ---
+
+    #[test]
+    fn exporter_roundtrip() {
+        let mut reg = SettingsRegistry::new();
+        reg.add(
+            SettingItemBuilder::new("editor.fontSize", SettingType::Number)
+                .default_value("14")
+                .current_value("16")
+                .build(),
+        );
+        reg.add(
+            SettingItemBuilder::new("editor.tabSize", SettingType::Number)
+                .default_value("4")
+                .build(),
+        );
+        let json = SettingsExporter::to_json(&reg);
+        let pairs = SettingsExporter::from_json(&json).unwrap();
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0], ("editor.fontSize".into(), "16".into()));
+        assert_eq!(pairs[1], ("editor.tabSize".into(), "4".into()));
+    }
+
+    #[test]
+    fn exporter_invalid_json() {
+        assert!(SettingsExporter::from_json("not json").is_err());
+        assert!(SettingsExporter::from_json("{ bad }").is_err());
+    }
+
+    // --- diff tests ---
+
+    #[test]
+    fn diff_identical_registries() {
+        let mut a = SettingsRegistry::new();
+        a.add(
+            SettingItemBuilder::new("x.y", SettingType::String)
+                .default_value("hello")
+                .build(),
+        );
+        let mut b = SettingsRegistry::new();
+        b.add(
+            SettingItemBuilder::new("x.y", SettingType::String)
+                .default_value("hello")
+                .build(),
+        );
+        let d = diff_settings(&a, &b);
+        assert!(d.only_in_a.is_empty());
+        assert!(d.only_in_b.is_empty());
+        assert!(d.changed.is_empty());
+    }
+
+    #[test]
+    fn diff_detects_changes_and_unique_keys() {
+        let mut a = SettingsRegistry::new();
+        a.add(
+            SettingItemBuilder::new("shared.key", SettingType::String)
+                .default_value("aaa")
+                .build(),
+        );
+        a.add(
+            SettingItemBuilder::new("only.a", SettingType::String)
+                .default_value("x")
+                .build(),
+        );
+
+        let mut b = SettingsRegistry::new();
+        b.add(
+            SettingItemBuilder::new("shared.key", SettingType::String)
+                .default_value("bbb")
+                .build(),
+        );
+        b.add(
+            SettingItemBuilder::new("only.b", SettingType::String)
+                .default_value("y")
+                .build(),
+        );
+
+        let d = diff_settings(&a, &b);
+        assert_eq!(d.only_in_a, vec!["only.a"]);
+        assert_eq!(d.only_in_b, vec!["only.b"]);
+        assert_eq!(d.changed.len(), 1);
+        assert_eq!(d.changed[0], ("shared.key".into(), "aaa".into(), "bbb".into()));
     }
 }

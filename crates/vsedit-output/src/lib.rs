@@ -362,6 +362,46 @@ impl Default for OutputPanel {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Aggregate statistics
+// ---------------------------------------------------------------------------
+
+/// Aggregate statistics across all channels in an [`OutputPanel`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OutputStats {
+    /// Total number of content lines across every channel.
+    pub total_lines: usize,
+    /// Total byte size of all content lines (excluding newlines).
+    pub total_bytes: usize,
+    /// Number of channels in the panel.
+    pub channel_count: usize,
+}
+
+impl fmt::Display for OutputStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "OutputStats(channels={}, lines={}, bytes={})",
+            self.channel_count, self.total_lines, self.total_bytes
+        )
+    }
+}
+
+/// Compute aggregate statistics for all channels in the given panel.
+pub fn compute_output_stats(panel: &OutputPanel) -> OutputStats {
+    let mut total_lines: usize = 0;
+    let mut total_bytes: usize = 0;
+    for ch in &panel.channels {
+        total_lines += ch.line_count();
+        total_bytes += ch.byte_size();
+    }
+    OutputStats {
+        total_lines,
+        total_bytes,
+        channel_count: panel.channels.len(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -589,5 +629,73 @@ mod tests {
         let a = OutputPanel::new();
         let b = OutputPanel::new();
         assert_eq!(a, b);
+    }
+
+    // ---- OutputStats tests ----
+
+    #[test]
+    fn compute_stats_empty_panel() {
+        let panel = OutputPanel::new();
+        let stats = compute_output_stats(&panel);
+        assert_eq!(
+            stats,
+            OutputStats {
+                total_lines: 0,
+                total_bytes: 0,
+                channel_count: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn compute_stats_single_channel() {
+        let mut panel = OutputPanel::new();
+        panel.create_channel("Log");
+        panel.append_line(0, "hello");
+        panel.append_line(0, "world!!");
+        let stats = compute_output_stats(&panel);
+        assert_eq!(stats.channel_count, 1);
+        assert_eq!(stats.total_lines, 2);
+        assert_eq!(stats.total_bytes, 5 + 7); // "hello" + "world!!"
+    }
+
+    #[test]
+    fn compute_stats_multiple_channels() {
+        let mut panel = OutputPanel::new();
+        panel.create_channel("A");
+        panel.create_channel("B");
+        panel.append_line(0, "aaa");
+        panel.append_line(1, "bb");
+        panel.append_line(1, "cccc");
+        let stats = compute_output_stats(&panel);
+        assert_eq!(stats.channel_count, 2);
+        assert_eq!(stats.total_lines, 3);
+        assert_eq!(stats.total_bytes, 3 + 2 + 4);
+    }
+
+    #[test]
+    fn output_stats_display() {
+        let stats = OutputStats {
+            total_lines: 42,
+            total_bytes: 1024,
+            channel_count: 3,
+        };
+        assert_eq!(
+            stats.to_string(),
+            "OutputStats(channels=3, lines=42, bytes=1024)"
+        );
+    }
+
+    #[test]
+    fn compute_stats_after_clear() {
+        let mut panel = OutputPanel::new();
+        let idx = panel.create_channel("Tmp");
+        panel.append_line(idx, "data");
+        panel.append_line(idx, "more data");
+        panel.clear_channel(idx);
+        let stats = compute_output_stats(&panel);
+        assert_eq!(stats.channel_count, 1);
+        assert_eq!(stats.total_lines, 0);
+        assert_eq!(stats.total_bytes, 0);
     }
 }

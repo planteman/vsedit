@@ -3,6 +3,7 @@
 //! Provides viewport-aware rendering of editor lines with decoration merging
 //! for selections, search highlights, diagnostics, and other visual markers.
 
+use std::fmt;
 /// A rendered editor line for terminal output.
 #[derive(Debug, Clone)]
 pub struct RenderedEditorLine {

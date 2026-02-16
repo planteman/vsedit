@@ -2,6 +2,7 @@
 //!
 //! RPC bridge between the extension host and the main thread for webview panels.
 
+use std::fmt;
 use serde::{Deserialize, Serialize};
 
 /// Proxy identifier for this extension API namespace.
@@ -357,6 +358,134 @@ pub fn register() {
     // Registration will connect RPC handlers when extension host starts
 }
 
+// ── Resource Policy ──
+
+/// Controls which external resources a webview is permitted to load.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WebviewResourcePolicy {
+    /// Allow all resource loads without restriction.
+    Allow,
+    /// Deny all external resource loads.
+    Deny,
+    /// Only allow resources from the same origin as the webview content.
+    SameOrigin,
+}
+
+/// Security configuration for a webview panel, combining a resource policy
+/// with explicit origin allowlisting and feature toggles.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WebviewSecurityConfig {
+    /// The resource loading policy applied to the webview.
+    pub policy: WebviewResourcePolicy,
+    /// Origins that are always permitted regardless of the policy.
+    pub allowed_origins: Vec<String>,
+    /// Whether JavaScript execution is enabled.
+    pub enable_scripts: bool,
+    /// Whether HTML form submission is enabled.
+    pub enable_forms: bool,
+}
+
+impl WebviewSecurityConfig {
+    /// Create a restrictive default configuration.
+    pub fn restrictive() -> Self {
+        Self {
+            policy: WebviewResourcePolicy::Deny,
+            allowed_origins: Vec::new(),
+            enable_scripts: false,
+            enable_forms: false,
+        }
+    }
+
+    /// Check whether a given origin is explicitly allowed.
+    pub fn is_origin_allowed(&self, origin: &str) -> bool {
+        match self.policy {
+            WebviewResourcePolicy::Allow => true,
+            WebviewResourcePolicy::Deny => {
+                self.allowed_origins.iter().any(|o| o == origin)
+            }
+            WebviewResourcePolicy::SameOrigin => {
+                self.allowed_origins.iter().any(|o| o == origin)
+            }
+        }
+    }
+}
+
+impl Default for WebviewSecurityConfig {
+    fn default() -> Self {
+        Self::restrictive()
+    }
+}
+
+// ── URI Validation ──
+
+/// Accepted URI schemes for webview resource references.
+const VALID_SCHEMES: &[&str] = &["https://", "http://", "vscode-resource://", "file:///"];
+
+/// Validate that a URI uses an accepted scheme for webview resources.
+///
+/// Returns `true` when the URI starts with one of the recognised schemes
+/// and contains at least one character after the scheme prefix.
+pub fn validate_webview_uri(uri: &str) -> bool {
+    VALID_SCHEMES
+        .iter()
+        .any(|scheme| uri.starts_with(scheme) && uri.len() > scheme.len())
+}
+
+// ── Message Router ──
+
+/// A simple message router that dispatches incoming JSON messages to
+/// registered handler functions based on a `"type"` field in the payload.
+pub struct WebviewMessageRouter {
+    handlers: std::collections::HashMap<String, Box<dyn Fn(&serde_json::Value) -> serde_json::Value>>,
+}
+
+impl WebviewMessageRouter {
+    pub fn new() -> Self {
+        Self {
+            handlers: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Register a handler for messages whose `"type"` field equals `msg_type`.
+    pub fn register_handler<F>(&mut self, msg_type: impl Into<String>, handler: F)
+    where
+        F: Fn(&serde_json::Value) -> serde_json::Value + 'static,
+    {
+        self.handlers.insert(msg_type.into(), Box::new(handler));
+    }
+
+    /// Route a JSON message to the appropriate handler.
+    ///
+    /// The message must contain a `"type"` field whose value matches a
+    /// registered handler key. Returns `None` if no handler matches or if
+    /// the `"type"` field is absent.
+    pub fn route_message(&self, message: &serde_json::Value) -> Option<serde_json::Value> {
+        let msg_type = message.get("type")?.as_str()?;
+        let handler = self.handlers.get(msg_type)?;
+        Some(handler(message))
+    }
+
+    /// Return the number of currently registered handlers.
+    pub fn handler_count(&self) -> usize {
+        self.handlers.len()
+    }
+}
+
+impl Default for WebviewMessageRouter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Debug for WebviewMessageRouter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WebviewMessageRouter")
+            .field("handler_count", &self.handlers.len())
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -558,5 +687,95 @@ mod tests {
         let display = format!("{content}");
         assert!(display.contains("handle=7"));
         assert!(display.contains("scripts=true"));
+    }
+
+    // ── New tests ──
+
+    #[test]
+    fn resource_policy_serde_roundtrip() {
+        let policy = WebviewResourcePolicy::SameOrigin;
+        let json = serde_json::to_string(&policy).unwrap();
+        assert_eq!(json, "\"sameOrigin\"");
+        let back: WebviewResourcePolicy = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, WebviewResourcePolicy::SameOrigin);
+    }
+
+    #[test]
+    fn security_config_restrictive_defaults() {
+        let config = WebviewSecurityConfig::restrictive();
+        assert_eq!(config.policy, WebviewResourcePolicy::Deny);
+        assert!(config.allowed_origins.is_empty());
+        assert!(!config.enable_scripts);
+        assert!(!config.enable_forms);
+    }
+
+    #[test]
+    fn security_config_origin_allowed() {
+        let mut config = WebviewSecurityConfig::restrictive();
+        config.allowed_origins.push("https://example.com".into());
+        assert!(config.is_origin_allowed("https://example.com"));
+        assert!(!config.is_origin_allowed("https://evil.com"));
+
+        let allow_all = WebviewSecurityConfig {
+            policy: WebviewResourcePolicy::Allow,
+            ..config
+        };
+        assert!(allow_all.is_origin_allowed("https://anything.com"));
+    }
+
+    #[test]
+    fn validate_webview_uri_accepts_valid() {
+        assert!(validate_webview_uri("https://example.com/resource"));
+        assert!(validate_webview_uri("vscode-resource://ext/file.js"));
+        assert!(validate_webview_uri("file:///workspace/style.css"));
+        assert!(validate_webview_uri("http://localhost:3000/api"));
+    }
+
+    #[test]
+    fn validate_webview_uri_rejects_invalid() {
+        assert!(!validate_webview_uri("ftp://files.example.com/a"));
+        assert!(!validate_webview_uri("javascript:alert(1)"));
+        assert!(!validate_webview_uri("data:text/html,<h1>bad</h1>"));
+        assert!(!validate_webview_uri(""));
+        // scheme-only with no path should fail
+        assert!(!validate_webview_uri("https://"));
+    }
+
+    #[test]
+    fn message_router_routes_by_type() {
+        let mut router = WebviewMessageRouter::new();
+        router.register_handler("greet", |msg| {
+            let name = msg.get("name").and_then(|v| v.as_str()).unwrap_or("world");
+            serde_json::json!({"greeting": format!("hello {name}")})
+        });
+        assert_eq!(router.handler_count(), 1);
+
+        let result = router
+            .route_message(&serde_json::json!({"type": "greet", "name": "Alice"}))
+            .unwrap();
+        assert_eq!(result, serde_json::json!({"greeting": "hello Alice"}));
+
+        // Unknown type returns None.
+        assert!(router
+            .route_message(&serde_json::json!({"type": "unknown"}))
+            .is_none());
+
+        // Missing type field returns None.
+        assert!(router
+            .route_message(&serde_json::json!({"data": 42}))
+            .is_none());
+    }
+
+    #[test]
+    fn security_config_serde_roundtrip() {
+        let config = WebviewSecurityConfig {
+            policy: WebviewResourcePolicy::SameOrigin,
+            allowed_origins: vec!["https://trusted.dev".into()],
+            enable_scripts: true,
+            enable_forms: false,
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let back: WebviewSecurityConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(config, back);
     }
 }

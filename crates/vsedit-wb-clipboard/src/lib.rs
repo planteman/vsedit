@@ -1,5 +1,6 @@
 //! System clipboard integration.
 
+use std::fmt;
 /// The editing mode in which the copy was performed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceMode {

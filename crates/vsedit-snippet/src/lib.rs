@@ -4,6 +4,7 @@
 //! Supports tabstops, placeholders, choices, variables, transforms,
 //! VS Code snippet file parsing, and snippet insertion sessions.
 
+use std::fmt;
 use std::collections::HashMap;
 
 /// A parsed snippet.

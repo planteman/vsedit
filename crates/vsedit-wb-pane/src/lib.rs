@@ -1,5 +1,6 @@
 //! Sidebar pane container.
 
+use std::collections::HashMap;
 use std::fmt;
 
 /// Errors that can occur during pane operations.
@@ -288,6 +289,191 @@ impl Default for PaneService {
     }
 }
 
+/// A rectangle representing a region of the layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rectangle {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Rectangle {
+    pub fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
+        Self { x, y, width, height }
+    }
+
+    /// Total area of this rectangle.
+    pub fn area(&self) -> u64 {
+        self.width as u64 * self.height as u64
+    }
+}
+
+impl fmt::Display for Rectangle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Rect({}, {}, {}x{})", self.x, self.y, self.width, self.height)
+    }
+}
+
+/// Computes layout rectangles for a set of panes within a bounding area.
+#[derive(Debug, Clone)]
+pub struct PaneLayout {
+    pub bounds: Rectangle,
+}
+
+impl PaneLayout {
+    pub fn new(bounds: Rectangle) -> Self {
+        Self { bounds }
+    }
+
+    /// Split the bounding rectangle horizontally (side by side) among visible panes.
+    /// Returns one `Rectangle` per visible pane, in order.
+    pub fn split_horizontal(&self, panes: &[Pane]) -> Vec<Rectangle> {
+        let visible: Vec<&Pane> = panes.iter().filter(|p| p.visible).collect();
+        let count = visible.len() as u32;
+        if count == 0 {
+            return Vec::new();
+        }
+        let each_width = self.bounds.width / count;
+        let remainder = self.bounds.width % count;
+        let mut rects = Vec::with_capacity(visible.len());
+        let mut x = self.bounds.x;
+        for (i, _) in visible.iter().enumerate() {
+            let w = if (i as u32) < remainder { each_width + 1 } else { each_width };
+            rects.push(Rectangle::new(x, self.bounds.y, w, self.bounds.height));
+            x += w;
+        }
+        rects
+    }
+
+    /// Split the bounding rectangle vertically (stacked) among visible panes.
+    /// Returns one `Rectangle` per visible pane, in order.
+    pub fn split_vertical(&self, panes: &[Pane]) -> Vec<Rectangle> {
+        let visible: Vec<&Pane> = panes.iter().filter(|p| p.visible).collect();
+        let count = visible.len() as u32;
+        if count == 0 {
+            return Vec::new();
+        }
+        let each_height = self.bounds.height / count;
+        let remainder = self.bounds.height % count;
+        let mut rects = Vec::with_capacity(visible.len());
+        let mut y = self.bounds.y;
+        for (i, _) in visible.iter().enumerate() {
+            let h = if (i as u32) < remainder { each_height + 1 } else { each_height };
+            rects.push(Rectangle::new(self.bounds.x, y, self.bounds.width, h));
+            y += h;
+        }
+        rects
+    }
+}
+
+/// Sort order for panes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PaneSortOrder {
+    Alphabetical,
+    ByLocation,
+    ByVisibility,
+    Custom,
+}
+
+/// Sort a slice of panes in place according to the given order.
+/// `Custom` leaves the slice unchanged.
+pub fn sort_panes(panes: &mut [Pane], order: PaneSortOrder) {
+    match order {
+        PaneSortOrder::Alphabetical => panes.sort_by(|a, b| a.title.cmp(&b.title)),
+        PaneSortOrder::ByLocation => {
+            panes.sort_by_key(|p| match p.location {
+                PaneLocation::Sidebar => 0,
+                PaneLocation::Editor => 1,
+                PaneLocation::Panel => 2,
+                PaneLocation::AuxiliaryBar => 3,
+            });
+        }
+        PaneSortOrder::ByVisibility => {
+            panes.sort_by_key(|p| if p.visible { 0 } else { 1 });
+        }
+        PaneSortOrder::Custom => {}
+    }
+}
+
+/// Serialize pane layout as a simple semicolon-separated string.
+/// Each pane is represented as `id:location:visible`.
+pub fn serialize_layout(panes: &[Pane]) -> String {
+    panes
+        .iter()
+        .map(|p| format!("{}:{}:{}", p.id, p.location, p.visible))
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
+/// Count panes grouped by their location.
+pub fn count_by_location(panes: &[Pane]) -> HashMap<PaneLocation, usize> {
+    let mut counts = HashMap::new();
+    for p in panes {
+        *counts.entry(p.location).or_insert(0) += 1;
+    }
+    counts
+}
+
+// Implement Hash for PaneLocation so it can be used as a HashMap key.
+impl std::hash::Hash for PaneLocation {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+    }
+}
+
+/// A named group of panes that share a common title/purpose.
+#[derive(Debug, Clone)]
+pub struct PaneGroup {
+    pub title: String,
+    pub pane_ids: Vec<String>,
+}
+
+impl PaneGroup {
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            pane_ids: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, id: impl Into<String>) {
+        self.pane_ids.push(id.into());
+    }
+
+    pub fn remove(&mut self, id: &str) -> bool {
+        let len = self.pane_ids.len();
+        self.pane_ids.retain(|i| i != id);
+        self.pane_ids.len() < len
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.pane_ids.iter().any(|i| i == id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.pane_ids.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.pane_ids.is_empty()
+    }
+
+    /// Resolve pane references against a `PaneService`, returning found panes.
+    pub fn resolve<'a>(&self, service: &'a PaneService) -> Vec<&'a Pane> {
+        self.pane_ids
+            .iter()
+            .filter_map(|id| service.get_pane(id))
+            .collect()
+    }
+}
+
+impl fmt::Display for PaneGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PaneGroup(\"{}\", {} panes)", self.title, self.pane_ids.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -504,5 +690,111 @@ mod tests {
             format!("{}", PaneError::InvalidSize { width: 1, height: 2 }),
             "invalid size: 1x2"
         );
+    }
+
+    // ---- New tests ----
+
+    #[test]
+    fn rectangle_area_and_display() {
+        let r = Rectangle::new(10, 20, 300, 400);
+        assert_eq!(r.area(), 120_000);
+        assert_eq!(format!("{r}"), "Rect(10, 20, 300x400)");
+    }
+
+    #[test]
+    fn layout_split_horizontal() {
+        let layout = PaneLayout::new(Rectangle::new(0, 0, 900, 600));
+        let panes = vec![
+            pane("a", PaneLocation::Editor),
+            pane("b", PaneLocation::Editor),
+            pane("c", PaneLocation::Editor),
+        ];
+        let rects = layout.split_horizontal(&panes);
+        assert_eq!(rects.len(), 3);
+        assert_eq!(rects[0].x, 0);
+        assert_eq!(rects[1].x, 300);
+        assert_eq!(rects[2].x, 600);
+        assert_eq!(rects[0].width + rects[1].width + rects[2].width, 900);
+    }
+
+    #[test]
+    fn layout_split_vertical_skips_hidden() {
+        let layout = PaneLayout::new(Rectangle::new(0, 0, 800, 600));
+        let mut p2 = pane("b", PaneLocation::Editor);
+        p2.visible = false;
+        let panes = vec![pane("a", PaneLocation::Editor), p2];
+        let rects = layout.split_vertical(&panes);
+        assert_eq!(rects.len(), 1);
+        assert_eq!(rects[0].height, 600);
+    }
+
+    #[test]
+    fn layout_split_empty() {
+        let layout = PaneLayout::new(Rectangle::new(0, 0, 100, 100));
+        let panes: Vec<Pane> = Vec::new();
+        assert!(layout.split_horizontal(&panes).is_empty());
+        assert!(layout.split_vertical(&panes).is_empty());
+    }
+
+    #[test]
+    fn sort_panes_alphabetical() {
+        let mut panes = vec![
+            pane("c", PaneLocation::Editor),
+            pane("a", PaneLocation::Editor),
+            pane("b", PaneLocation::Editor),
+        ];
+        sort_panes(&mut panes, PaneSortOrder::Alphabetical);
+        assert_eq!(panes[0].id, "a");
+        assert_eq!(panes[1].id, "b");
+        assert_eq!(panes[2].id, "c");
+    }
+
+    #[test]
+    fn sort_panes_by_visibility() {
+        let mut hidden = pane("h", PaneLocation::Editor);
+        hidden.visible = false;
+        let mut panes = vec![hidden, pane("v", PaneLocation::Editor)];
+        sort_panes(&mut panes, PaneSortOrder::ByVisibility);
+        assert!(panes[0].visible);
+        assert!(!panes[1].visible);
+    }
+
+    #[test]
+    fn serialize_and_count_by_location() {
+        let panes = vec![
+            pane("p1", PaneLocation::Editor),
+            pane("p2", PaneLocation::Panel),
+            pane("p3", PaneLocation::Editor),
+        ];
+        let s = serialize_layout(&panes);
+        assert!(s.contains("p1:Editor:true"));
+        assert!(s.contains("p2:Panel:true"));
+        assert!(s.contains(';'));
+
+        let counts = count_by_location(&panes);
+        assert_eq!(counts[&PaneLocation::Editor], 2);
+        assert_eq!(counts[&PaneLocation::Panel], 1);
+        assert_eq!(counts.get(&PaneLocation::Sidebar), None);
+    }
+
+    #[test]
+    fn pane_group_operations() {
+        let mut svc = PaneService::new();
+        svc.add_pane(pane("g1", PaneLocation::Sidebar));
+        svc.add_pane(pane("g2", PaneLocation::Sidebar));
+
+        let mut group = PaneGroup::new("My Group");
+        assert!(group.is_empty());
+        group.add("g1");
+        group.add("g2");
+        group.add("missing");
+        assert_eq!(group.len(), 3);
+        assert!(group.contains("g1"));
+        assert!(group.remove("missing"));
+        assert!(!group.contains("missing"));
+
+        let resolved = group.resolve(&svc);
+        assert_eq!(resolved.len(), 2);
+        assert_eq!(format!("{group}"), "PaneGroup(\"My Group\", 2 panes)");
     }
 }

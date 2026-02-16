@@ -1,5 +1,6 @@
 //! Function signature help.
 
+use std::fmt;
 /// Information about a single parameter.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParameterInformation {
@@ -276,6 +277,38 @@ impl SignatureHelpRegistry {
 impl Default for SignatureHelpRegistry {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Statistics
+// ---------------------------------------------------------------------------
+
+/// Aggregated statistics about a [`SignatureHelp`] instance.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParamHintStats {
+    /// Total number of signatures available.
+    pub total_signatures: usize,
+    /// Sum of parameters across all signatures.
+    pub total_parameters: usize,
+    /// Number of signatures whose active parameter is set (i.e. currently
+    /// presenting a highlighted hint to the user).
+    pub active_hints: usize,
+}
+
+/// Compute aggregated statistics for the given [`SignatureHelp`].
+pub fn compute_param_hint_stats(help: &SignatureHelp) -> ParamHintStats {
+    let total_signatures = help.signatures.len();
+    let total_parameters: usize = help.signatures.iter().map(|s| s.parameters.len()).sum();
+    let active_hints = help
+        .signatures
+        .iter()
+        .filter(|s| s.active_parameter.is_some())
+        .count();
+    ParamHintStats {
+        total_signatures,
+        total_parameters,
+        active_hints,
     }
 }
 
@@ -593,5 +626,110 @@ mod tests {
         assert_eq!(help.active_parameter, 0);
         help.prev_parameter(true);
         assert_eq!(help.active_parameter, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // ParamHintStats tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn stats_empty_signatures() {
+        let help = SignatureHelp {
+            signatures: vec![],
+            active_signature: 0,
+            active_parameter: 0,
+        };
+        let stats = compute_param_hint_stats(&help);
+        assert_eq!(
+            stats,
+            ParamHintStats {
+                total_signatures: 0,
+                total_parameters: 0,
+                active_hints: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn stats_single_signature_no_active_hint() {
+        let help = SignatureHelp {
+            signatures: vec![sample_signature()],
+            active_signature: 0,
+            active_parameter: 0,
+        };
+        let stats = compute_param_hint_stats(&help);
+        assert_eq!(stats.total_signatures, 1);
+        assert_eq!(stats.total_parameters, 2);
+        assert_eq!(stats.active_hints, 0);
+    }
+
+    #[test]
+    fn stats_multiple_signatures_with_active_hints() {
+        let help = SignatureHelp {
+            signatures: vec![
+                SignatureInformation {
+                    label: "fn a(x: i32)".into(),
+                    documentation: None,
+                    parameters: vec![ParameterInformation {
+                        label: "x: i32".into(),
+                        documentation: None,
+                    }],
+                    active_parameter: Some(0),
+                },
+                SignatureInformation {
+                    label: "fn b(a: u8, b: u8, c: u8)".into(),
+                    documentation: None,
+                    parameters: vec![
+                        ParameterInformation { label: "a: u8".into(), documentation: None },
+                        ParameterInformation { label: "b: u8".into(), documentation: None },
+                        ParameterInformation { label: "c: u8".into(), documentation: None },
+                    ],
+                    active_parameter: None,
+                },
+                SignatureInformation {
+                    label: "fn c()".into(),
+                    documentation: None,
+                    parameters: vec![],
+                    active_parameter: Some(0),
+                },
+            ],
+            active_signature: 0,
+            active_parameter: 0,
+        };
+        let stats = compute_param_hint_stats(&help);
+        assert_eq!(stats.total_signatures, 3);
+        assert_eq!(stats.total_parameters, 4); // 1 + 3 + 0
+        assert_eq!(stats.active_hints, 2); // first and third
+    }
+
+    #[test]
+    fn stats_all_signatures_active() {
+        let make_sig = |n: usize| SignatureInformation {
+            label: format!("fn s{n}()"),
+            documentation: None,
+            parameters: vec![ParameterInformation {
+                label: "p".into(),
+                documentation: None,
+            }],
+            active_parameter: Some(0),
+        };
+        let help = SignatureHelp {
+            signatures: vec![make_sig(0), make_sig(1), make_sig(2)],
+            active_signature: 0,
+            active_parameter: 0,
+        };
+        let stats = compute_param_hint_stats(&help);
+        assert_eq!(stats.total_signatures, 3);
+        assert_eq!(stats.total_parameters, 3);
+        assert_eq!(stats.active_hints, 3);
+    }
+
+    #[test]
+    fn stats_two_signature_help_helper() {
+        let help = two_signature_help();
+        let stats = compute_param_hint_stats(&help);
+        assert_eq!(stats.total_signatures, 2);
+        assert_eq!(stats.total_parameters, 3); // 2 + 1
+        assert_eq!(stats.active_hints, 0);
     }
 }

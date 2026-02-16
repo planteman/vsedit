@@ -295,6 +295,122 @@ impl SelectionRange {
     }
 }
 
+/// Statistics gathered from a history of selection expand/contract operations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SelectionStats {
+    /// Total number of expansion operations recorded.
+    pub total_expansions: u32,
+    /// Total number of contraction operations recorded.
+    pub total_contractions: u32,
+    /// Average character-length of all selections in the history.
+    pub avg_selection_length: f64,
+    /// Maximum character-length observed across all selections.
+    pub max_selection_length: u64,
+}
+
+/// A single entry in a selection history log.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SelectionHistoryEntry {
+    /// The selection range at this point in time.
+    pub range: SelectionRange,
+    /// Whether this entry was produced by an expansion (`true`) or contraction (`false`).
+    pub expanded: bool,
+}
+
+/// Compute [`SelectionStats`] from a slice of history entries.
+///
+/// Character-length is approximated as `(end_line - start_line) * line_width + (end_col - start_col)`
+/// using the provided `line_width` estimate (e.g. 80 for a typical terminal).
+///
+/// Returns `None` if the history is empty.
+pub fn compute_selection_stats(
+    history: &[SelectionHistoryEntry],
+    line_width: u64,
+) -> Option<SelectionStats> {
+    if history.is_empty() {
+        return None;
+    }
+
+    let mut total_expansions: u32 = 0;
+    let mut total_contractions: u32 = 0;
+    let mut sum_length: u64 = 0;
+    let mut max_length: u64 = 0;
+
+    for entry in history {
+        if entry.expanded {
+            total_expansions += 1;
+        } else {
+            total_contractions += 1;
+        }
+
+        let r = &entry.range;
+        let length = (r.end_line as u64).saturating_sub(r.start_line as u64) * line_width
+            + (r.end_col as u64).saturating_sub(r.start_col as u64);
+
+        sum_length += length;
+        if length > max_length {
+            max_length = length;
+        }
+    }
+
+    Some(SelectionStats {
+        total_expansions,
+        total_contractions,
+        avg_selection_length: sum_length as f64 / history.len() as f64,
+        max_selection_length: max_length,
+    })
+}
+
+/// A fixed anchor point within a document that a selection can be tethered to.
+///
+/// Anchors are useful for remembering a logical position (e.g. cursor origin)
+/// while the selection range expands or contracts around it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SelectionAnchor {
+    /// Line of the anchor position.
+    pub line: u32,
+    /// Column of the anchor position.
+    pub col: u32,
+}
+
+impl SelectionAnchor {
+    /// Create a new anchor at the given position.
+    pub fn new(line: u32, col: u32) -> Self {
+        Self { line, col }
+    }
+
+    /// Returns `true` if this anchor falls inside `range` (inclusive of boundaries).
+    pub fn is_inside(&self, range: &SelectionRange) -> bool {
+        let pos = (self.line, self.col);
+        (range.start_line, range.start_col) <= pos && pos <= (range.end_line, range.end_col)
+    }
+
+    /// Find the deepest (innermost) range in the parent chain that still
+    /// contains this anchor. Returns `None` if no range in the chain
+    /// contains the anchor.
+    pub fn deepest_containing<'a>(&self, range: &'a SelectionRange) -> Option<&'a SelectionRange> {
+        // The chain is innermost-first: `range` is the deepest, parents go outward.
+        // Return the first (deepest) range that contains the anchor.
+        let mut cur = range;
+        if self.is_inside(cur) {
+            return Some(cur);
+        }
+        while let Some(ref p) = cur.parent {
+            if self.is_inside(p) {
+                return Some(p);
+            }
+            cur = p;
+        }
+        None
+    }
+}
+
+impl fmt::Display for SelectionAnchor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "anchor({}:{})", self.line, self.col)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -570,5 +686,109 @@ mod tests {
 
         let e2 = SelectionError::ChildExceedsParent;
         assert!(format!("{e2}").contains("child range"));
+    }
+
+    // --- SelectionStats / compute_selection_stats tests ---
+
+    #[test]
+    fn stats_empty_history() {
+        assert!(compute_selection_stats(&[], 80).is_none());
+    }
+
+    #[test]
+    fn stats_single_expansion() {
+        let history = vec![SelectionHistoryEntry {
+            range: SelectionRange::new(1, 0, 1, 20),
+            expanded: true,
+        }];
+        let stats = compute_selection_stats(&history, 80).unwrap();
+        assert_eq!(stats.total_expansions, 1);
+        assert_eq!(stats.total_contractions, 0);
+        assert!((stats.avg_selection_length - 20.0).abs() < f64::EPSILON);
+        assert_eq!(stats.max_selection_length, 20);
+    }
+
+    #[test]
+    fn stats_mixed_history() {
+        let history = vec![
+            SelectionHistoryEntry {
+                range: SelectionRange::new(1, 0, 1, 10),
+                expanded: true,
+            },
+            SelectionHistoryEntry {
+                range: SelectionRange::new(1, 0, 3, 10),
+                expanded: true,
+            },
+            SelectionHistoryEntry {
+                range: SelectionRange::new(1, 5, 1, 15),
+                expanded: false,
+            },
+        ];
+        let stats = compute_selection_stats(&history, 80).unwrap();
+        assert_eq!(stats.total_expansions, 2);
+        assert_eq!(stats.total_contractions, 1);
+        // lengths: 10, 2*80+10=170, 10 → avg = 190/3 ≈ 63.33
+        assert!((stats.avg_selection_length - 190.0 / 3.0).abs() < 0.01);
+        assert_eq!(stats.max_selection_length, 170);
+    }
+
+    // --- SelectionAnchor tests ---
+
+    #[test]
+    fn anchor_inside_range() {
+        let anchor = SelectionAnchor::new(5, 10);
+        let range = SelectionRange::new(3, 0, 8, 0);
+        assert!(anchor.is_inside(&range));
+
+        let outside = SelectionAnchor::new(10, 0);
+        assert!(!outside.is_inside(&range));
+    }
+
+    #[test]
+    fn anchor_at_boundary() {
+        let anchor_start = SelectionAnchor::new(3, 0);
+        let anchor_end = SelectionAnchor::new(8, 0);
+        let range = SelectionRange::new(3, 0, 8, 0);
+        assert!(anchor_start.is_inside(&range));
+        assert!(anchor_end.is_inside(&range));
+    }
+
+    #[test]
+    fn anchor_deepest_containing() {
+        let chain = sample_chain(); // word [5:10-5:15] -> line [5:0-5:40] -> block [3:0-8:0]
+        let anchor = SelectionAnchor::new(5, 12);
+        // The deepest (innermost) range containing the anchor is the word range itself.
+        let deepest = anchor.deepest_containing(&chain).unwrap();
+        assert_eq!(deepest.start_col, 10);
+        assert_eq!(deepest.end_col, 15);
+
+        // Anchor outside all ranges returns None.
+        let far = SelectionAnchor::new(20, 0);
+        assert!(far.deepest_containing(&chain).is_none());
+    }
+
+    #[test]
+    fn anchor_display() {
+        let a = SelectionAnchor::new(7, 3);
+        assert_eq!(format!("{a}"), "anchor(7:3)");
+    }
+
+    #[test]
+    fn stats_multiline_max_length() {
+        let history = vec![
+            SelectionHistoryEntry {
+                range: SelectionRange::new(0, 0, 0, 5),
+                expanded: true,
+            },
+            SelectionHistoryEntry {
+                range: SelectionRange::new(0, 0, 10, 5),
+                expanded: true,
+            },
+        ];
+        let stats = compute_selection_stats(&history, 100).unwrap();
+        // lengths: 5, 10*100+5=1005
+        assert_eq!(stats.max_selection_length, 1005);
+        assert_eq!(stats.total_expansions, 2);
+        assert_eq!(stats.total_contractions, 0);
     }
 }

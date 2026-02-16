@@ -384,6 +384,297 @@ impl DialogService for InMemoryDialogService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Dialog history
+// ---------------------------------------------------------------------------
+
+/// Records shown dialogs and user responses for audit or replay.
+#[derive(Debug, Clone)]
+pub struct DialogHistoryEntry {
+    pub dialog_id: String,
+    pub kind: DialogKind,
+    pub result: DialogResult,
+}
+
+/// Tracks a history of dialog interactions.
+#[derive(Debug, Clone, Default)]
+pub struct DialogHistory {
+    entries: Vec<DialogHistoryEntry>,
+}
+
+impl DialogHistory {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Record that a dialog was shown and the user responded.
+    pub fn record(&mut self, dialog_id: impl Into<String>, kind: DialogKind, result: DialogResult) {
+        self.entries.push(DialogHistoryEntry {
+            dialog_id: dialog_id.into(),
+            kind,
+            result,
+        });
+    }
+
+    /// Get the last response for a given dialog id, if any.
+    pub fn get_last_response(&self, dialog_id: &str) -> Option<&DialogResult> {
+        self.entries
+            .iter()
+            .rev()
+            .find(|e| e.dialog_id == dialog_id)
+            .map(|e| &e.result)
+    }
+
+    /// Total number of recorded interactions.
+    pub fn count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Remove all recorded history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Iterate over all entries.
+    pub fn entries(&self) -> &[DialogHistoryEntry] {
+        &self.entries
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dialog validator
+// ---------------------------------------------------------------------------
+
+/// Errors produced by [`DialogValidator`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ValidationError {
+    TooShort { min: usize, actual: usize },
+    TooLong { max: usize, actual: usize },
+    PatternMismatch { pattern: String },
+    Empty,
+}
+
+impl fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValidationError::TooShort { min, actual } => {
+                write!(f, "input too short: {actual} < {min}")
+            }
+            ValidationError::TooLong { max, actual } => {
+                write!(f, "input too long: {actual} > {max}")
+            }
+            ValidationError::PatternMismatch { pattern } => {
+                write!(f, "input does not match pattern: {pattern}")
+            }
+            ValidationError::Empty => write!(f, "input is empty"),
+        }
+    }
+}
+
+impl std::error::Error for ValidationError {}
+
+/// Validates user-supplied text against length and character-set constraints.
+///
+/// The `pattern` parameter in [`validate_input`](DialogValidator::validate_input)
+/// is a simple character-class string (e.g. `"a-zA-Z0-9_"`) – **not** a full
+/// regex – so that the crate avoids pulling in the `regex` dependency.
+#[derive(Debug, Clone)]
+pub struct DialogValidator;
+
+impl DialogValidator {
+    /// Validate `text` against the given constraints.
+    ///
+    /// * `min_len` / `max_len` – inclusive length bounds.
+    /// * `pattern` – if `Some`, every character in `text` must appear in the
+    ///   pattern string (simple allow-list).  Pass `None` to skip the check.
+    pub fn validate_input(
+        text: &str,
+        min_len: usize,
+        max_len: usize,
+        pattern: Option<&str>,
+    ) -> Result<(), ValidationError> {
+        if text.is_empty() && min_len > 0 {
+            return Err(ValidationError::Empty);
+        }
+        let len = text.len();
+        if len < min_len {
+            return Err(ValidationError::TooShort {
+                min: min_len,
+                actual: len,
+            });
+        }
+        if len > max_len {
+            return Err(ValidationError::TooLong {
+                max: max_len,
+                actual: len,
+            });
+        }
+        if let Some(allowed) = pattern {
+            for ch in text.chars() {
+                if !allowed.contains(ch) {
+                    return Err(ValidationError::PatternMismatch {
+                        pattern: allowed.to_string(),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dialog layout
+// ---------------------------------------------------------------------------
+
+/// Computes dialog dimensions based on content.
+#[derive(Debug, Clone)]
+pub struct DialogLayout {
+    /// Minimum dialog width in columns.
+    pub min_width: usize,
+    /// Maximum dialog width in columns.
+    pub max_width: usize,
+    /// Horizontal padding on each side.
+    pub padding_x: usize,
+    /// Vertical padding (top + bottom).
+    pub padding_y: usize,
+    /// Height reserved for each button row.
+    pub button_row_height: usize,
+}
+
+impl Default for DialogLayout {
+    fn default() -> Self {
+        Self {
+            min_width: 30,
+            max_width: 120,
+            padding_x: 2,
+            padding_y: 2,
+            button_row_height: 3,
+        }
+    }
+}
+
+impl DialogLayout {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Compute the `(width, height)` of a dialog given its content.
+    ///
+    /// Width is determined by the longer of `title` and `message` (clamped to
+    /// `min_width..=max_width`).  Height accounts for title, message lines,
+    /// a button row, and padding.
+    pub fn compute_size(&self, title: &str, message: &str, button_count: usize) -> (usize, usize) {
+        let content_width = title.len().max(message.len()) + self.padding_x * 2;
+        // Each button is roughly 10 columns wide plus spacing.
+        let buttons_width = button_count * 10 + (button_count.saturating_sub(1)) * 2 + self.padding_x * 2;
+        let raw_width = content_width.max(buttons_width);
+        let width = raw_width.clamp(self.min_width, self.max_width);
+
+        // Height: title (1) + blank line (1) + message lines + button row + padding
+        let message_lines = if message.is_empty() {
+            0
+        } else {
+            message.lines().count()
+        };
+        let height = 1 + 1 + message_lines + self.button_row_height + self.padding_y;
+
+        (width, height)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dialog theme
+// ---------------------------------------------------------------------------
+
+/// ANSI color code (foreground).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Color {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
+impl Color {
+    pub const fn rgb(r: u8, g: u8, b: u8) -> Self {
+        Self { r, g, b }
+    }
+
+    /// Format as a 24-bit ANSI foreground escape sequence.
+    pub fn fg_ansi(&self) -> String {
+        format!("\x1b[38;2;{};{};{}m", self.r, self.g, self.b)
+    }
+
+    /// Format as a 24-bit ANSI background escape sequence.
+    pub fn bg_ansi(&self) -> String {
+        format!("\x1b[48;2;{};{};{}m", self.r, self.g, self.b)
+    }
+}
+
+/// Border style for drawing dialog frames.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BorderStyle {
+    None,
+    Single,
+    Double,
+    Rounded,
+}
+
+impl BorderStyle {
+    /// Returns `(horizontal, vertical, top_left, top_right, bottom_left, bottom_right)`.
+    pub fn chars(&self) -> (&str, &str, &str, &str, &str, &str) {
+        match self {
+            BorderStyle::None => (" ", " ", " ", " ", " ", " "),
+            BorderStyle::Single => ("─", "│", "┌", "┐", "└", "┘"),
+            BorderStyle::Double => ("═", "║", "╔", "╗", "╚", "╝"),
+            BorderStyle::Rounded => ("─", "│", "╭", "╮", "╰", "╯"),
+        }
+    }
+}
+
+/// Visual theme for rendering dialogs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DialogTheme {
+    pub title_color: Color,
+    pub message_color: Color,
+    pub button_color: Color,
+    pub button_primary_color: Color,
+    pub background_color: Color,
+    pub border_style: BorderStyle,
+}
+
+impl Default for DialogTheme {
+    fn default() -> Self {
+        Self {
+            title_color: Color::rgb(255, 255, 255),
+            message_color: Color::rgb(204, 204, 204),
+            button_color: Color::rgb(180, 180, 180),
+            button_primary_color: Color::rgb(100, 180, 255),
+            background_color: Color::rgb(30, 30, 30),
+            border_style: BorderStyle::Rounded,
+        }
+    }
+}
+
+impl DialogTheme {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// A high-contrast theme suitable for accessibility.
+    pub fn high_contrast() -> Self {
+        Self {
+            title_color: Color::rgb(255, 255, 0),
+            message_color: Color::rgb(255, 255, 255),
+            button_color: Color::rgb(255, 255, 255),
+            button_primary_color: Color::rgb(0, 255, 0),
+            background_color: Color::rgb(0, 0, 0),
+            border_style: BorderStyle::Double,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -538,5 +829,141 @@ mod tests {
         assert_eq!(opts.buttons.len(), 2);
         assert_eq!(opts.buttons[0].returns_value, "yes");
         assert_eq!(opts.buttons[1].returns_value, "no");
+    }
+
+    // ----- DialogHistory tests -----
+
+    #[test]
+    fn dialog_history_record_and_query() {
+        let mut history = DialogHistory::new();
+        assert_eq!(history.count(), 0);
+
+        history.record("save-confirm", DialogKind::Confirm, DialogResult::selected("yes"));
+        history.record("delete-warn", DialogKind::Warning, DialogResult::selected("no"));
+        assert_eq!(history.count(), 2);
+
+        let last = history.get_last_response("save-confirm").unwrap();
+        assert!(last.is_value("yes"));
+
+        assert!(history.get_last_response("nonexistent").is_none());
+    }
+
+    #[test]
+    fn dialog_history_last_response_returns_most_recent() {
+        let mut history = DialogHistory::new();
+        history.record("dlg", DialogKind::Info, DialogResult::selected("first"));
+        history.record("dlg", DialogKind::Info, DialogResult::selected("second"));
+        let last = history.get_last_response("dlg").unwrap();
+        assert!(last.is_value("second"));
+    }
+
+    #[test]
+    fn dialog_history_clear() {
+        let mut history = DialogHistory::new();
+        history.record("a", DialogKind::Info, DialogResult::cancelled());
+        history.clear();
+        assert_eq!(history.count(), 0);
+        assert!(history.get_last_response("a").is_none());
+    }
+
+    // ----- DialogValidator tests -----
+
+    #[test]
+    fn validator_accepts_valid_input() {
+        assert!(DialogValidator::validate_input("hello", 1, 10, None).is_ok());
+    }
+
+    #[test]
+    fn validator_rejects_empty() {
+        let err = DialogValidator::validate_input("", 1, 10, None).unwrap_err();
+        assert_eq!(err, ValidationError::Empty);
+        assert_eq!(err.to_string(), "input is empty");
+    }
+
+    #[test]
+    fn validator_rejects_too_short() {
+        let err = DialogValidator::validate_input("ab", 3, 10, None).unwrap_err();
+        assert_eq!(err, ValidationError::TooShort { min: 3, actual: 2 });
+    }
+
+    #[test]
+    fn validator_rejects_too_long() {
+        let err = DialogValidator::validate_input("abcdef", 1, 3, None).unwrap_err();
+        assert_eq!(err, ValidationError::TooLong { max: 3, actual: 6 });
+    }
+
+    #[test]
+    fn validator_pattern_mismatch() {
+        let err = DialogValidator::validate_input("abc!", 1, 10, Some("abc")).unwrap_err();
+        match err {
+            ValidationError::PatternMismatch { ref pattern } => assert_eq!(pattern, "abc"),
+            other => panic!("expected PatternMismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn validator_pattern_ok() {
+        assert!(DialogValidator::validate_input("abc", 1, 10, Some("abcdef")).is_ok());
+    }
+
+    // ----- DialogLayout tests -----
+
+    #[test]
+    fn layout_compute_size_basic() {
+        let layout = DialogLayout::new();
+        let (w, h) = layout.compute_size("Title", "Hello world", 2);
+        assert!(w >= layout.min_width);
+        assert!(w <= layout.max_width);
+        // height = 1 (title) + 1 (blank) + 1 (message line) + 3 (button row) + 2 (padding) = 8
+        assert_eq!(h, 8);
+    }
+
+    #[test]
+    fn layout_respects_min_width() {
+        let layout = DialogLayout { min_width: 50, ..DialogLayout::default() };
+        let (w, _) = layout.compute_size("Hi", "Ok", 1);
+        assert!(w >= 50);
+    }
+
+    #[test]
+    fn layout_multiline_message() {
+        let layout = DialogLayout::new();
+        let msg = "Line one\nLine two\nLine three";
+        let (_, h) = layout.compute_size("T", msg, 1);
+        // 1 + 1 + 3 + 3 + 2 = 10
+        assert_eq!(h, 10);
+    }
+
+    // ----- DialogTheme tests -----
+
+    #[test]
+    fn theme_default_has_rounded_border() {
+        let theme = DialogTheme::new();
+        assert_eq!(theme.border_style, BorderStyle::Rounded);
+    }
+
+    #[test]
+    fn theme_high_contrast() {
+        let theme = DialogTheme::high_contrast();
+        assert_eq!(theme.border_style, BorderStyle::Double);
+        assert_eq!(theme.background_color, Color::rgb(0, 0, 0));
+    }
+
+    #[test]
+    fn color_ansi_sequences() {
+        let c = Color::rgb(255, 128, 0);
+        assert!(c.fg_ansi().contains("38;2;255;128;0"));
+        assert!(c.bg_ansi().contains("48;2;255;128;0"));
+    }
+
+    #[test]
+    fn border_style_chars() {
+        let (h, v, tl, tr, bl, br) = BorderStyle::Rounded.chars();
+        assert_eq!(h, "─");
+        assert_eq!(v, "│");
+        assert_eq!(tl, "╭");
+        assert_eq!(tr, "╮");
+        assert_eq!(bl, "╰");
+        assert_eq!(br, "╯");
     }
 }

@@ -253,6 +253,160 @@ impl Default for WorkingCopyService {
     }
 }
 
+/// High-level statistics for a working copy snapshot.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct WorkingCopyStats {
+    pub total_files: usize,
+    pub dirty_count: usize,
+    pub staged_count: usize,
+    pub untracked_count: usize,
+}
+
+impl WorkingCopyStats {
+    /// Build stats from a provider by inspecting well-known group ids.
+    ///
+    /// Resources in a group whose id is `"staged"` count as staged.
+    /// Resources with `ScmStatus::Untracked` count as untracked regardless
+    /// of group.  All remaining non-untracked, non-staged resources count as
+    /// dirty.
+    pub fn from_provider(provider: &ScmProvider) -> Self {
+        let mut stats = WorkingCopyStats::default();
+        for group in &provider.groups {
+            for res in &group.resources {
+                stats.total_files += 1;
+                if group.id == "staged" {
+                    stats.staged_count += 1;
+                } else if res.status == ScmStatus::Untracked {
+                    stats.untracked_count += 1;
+                } else {
+                    stats.dirty_count += 1;
+                }
+            }
+        }
+        stats
+    }
+
+    /// Returns true when nothing is dirty, staged, or untracked.
+    pub fn is_clean(&self) -> bool {
+        self.dirty_count == 0 && self.staged_count == 0 && self.untracked_count == 0
+    }
+}
+
+/// Summary of insertions and deletions between two text snapshots.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DiffSummary {
+    pub insertions: usize,
+    pub deletions: usize,
+    pub file_path: String,
+}
+
+impl DiffSummary {
+    /// Total number of changed lines (insertions + deletions).
+    pub fn total_changes(&self) -> usize {
+        self.insertions + self.deletions
+    }
+
+    /// Returns true when there are no differences.
+    pub fn is_empty(&self) -> bool {
+        self.insertions == 0 && self.deletions == 0
+    }
+}
+
+/// Compute a line-based diff summary between an original and modified text.
+///
+/// Uses a simple longest-common-subsequence (LCS) approach on lines to count
+/// how many lines were inserted and how many were deleted.  The `file_path`
+/// field of the returned summary is left empty; callers can set it afterwards.
+pub fn compute_diff_summary(original: &str, modified: &str) -> DiffSummary {
+    let orig_lines: Vec<&str> = original.lines().collect();
+    let mod_lines: Vec<&str> = modified.lines().collect();
+
+    let n = orig_lines.len();
+    let m = mod_lines.len();
+
+    // Build LCS length table.
+    let mut dp = vec![vec![0usize; m + 1]; n + 1];
+    for i in 1..=n {
+        for j in 1..=m {
+            if orig_lines[i - 1] == mod_lines[j - 1] {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+            } else {
+                dp[i][j] = dp[i - 1][j].max(dp[i][j - 1]);
+            }
+        }
+    }
+
+    let lcs_len = dp[n][m];
+    let deletions = n.saturating_sub(lcs_len);
+    let insertions = m.saturating_sub(lcs_len);
+
+    DiffSummary {
+        insertions,
+        deletions,
+        file_path: String::new(),
+    }
+}
+
+/// Filter criteria for selecting working-copy resources.
+#[derive(Debug, Clone, Default)]
+pub struct WorkingCopyFilter {
+    /// If set, only resources with this status are included.
+    pub status: Option<ScmStatus>,
+    /// If set, only resources whose URI contains this substring are included.
+    pub path_pattern: Option<String>,
+}
+
+impl WorkingCopyFilter {
+    /// Create a filter that matches a single status.
+    pub fn by_status(status: ScmStatus) -> Self {
+        Self {
+            status: Some(status),
+            path_pattern: None,
+        }
+    }
+
+    /// Create a filter that matches URIs containing `pattern`.
+    pub fn by_path(pattern: impl Into<String>) -> Self {
+        Self {
+            status: None,
+            path_pattern: Some(pattern.into()),
+        }
+    }
+
+    /// Returns true when the resource satisfies all set criteria.
+    pub fn matches(&self, resource: &ScmResource) -> bool {
+        if let Some(st) = self.status {
+            if resource.status != st {
+                return false;
+            }
+        }
+        if let Some(ref pat) = self.path_pattern {
+            if !resource.uri.contains(pat.as_str()) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Apply this filter to a slice of resources, returning matching ones.
+    pub fn apply<'a>(&self, resources: &'a [ScmResource]) -> Vec<&'a ScmResource> {
+        resources.iter().filter(|r| self.matches(r)).collect()
+    }
+}
+
+impl WorkingCopyService {
+    /// Returns resources from a provider that match the given filter.
+    pub fn filter_resources(&self, provider_id: &str, filter: &WorkingCopyFilter) -> Vec<&ScmResource> {
+        self.providers
+            .iter()
+            .filter(|p| p.id == provider_id)
+            .flat_map(|p| &p.groups)
+            .flat_map(|g| &g.resources)
+            .filter(|r| filter.matches(r))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -544,5 +698,108 @@ mod tests {
             original_uri: None,
         });
         assert!(!svc.get_provider("git").unwrap().is_clean());
+    }
+
+    // ---- new tests ----
+
+    #[test]
+    fn working_copy_stats_from_provider() {
+        let mut svc = WorkingCopyService::new();
+        svc.register_provider(provider_with_two_groups());
+        svc.add_resource("git", "changes", ScmResource {
+            uri: "a.rs".into(), status: ScmStatus::Modified, original_uri: None,
+        });
+        svc.add_resource("git", "changes", ScmResource {
+            uri: "b.rs".into(), status: ScmStatus::Untracked, original_uri: None,
+        });
+        svc.add_resource("git", "staged", ScmResource {
+            uri: "c.rs".into(), status: ScmStatus::Added, original_uri: None,
+        });
+        let stats = WorkingCopyStats::from_provider(svc.get_provider("git").unwrap());
+        assert_eq!(stats, WorkingCopyStats {
+            total_files: 3, dirty_count: 1, staged_count: 1, untracked_count: 1,
+        });
+        assert!(!stats.is_clean());
+    }
+
+    #[test]
+    fn working_copy_stats_clean() {
+        let stats = WorkingCopyStats::from_provider(&sample_provider());
+        assert!(stats.is_clean());
+        assert_eq!(stats.total_files, 0);
+    }
+
+    #[test]
+    fn diff_summary_identical_texts() {
+        let text = "line one\nline two\nline three\n";
+        let summary = compute_diff_summary(text, text);
+        assert!(summary.is_empty());
+        assert_eq!(summary.total_changes(), 0);
+    }
+
+    #[test]
+    fn diff_summary_insertions_and_deletions() {
+        let original = "aaa\nbbb\nccc\n";
+        let modified = "aaa\nxxx\nccc\nyyy\n";
+        let summary = compute_diff_summary(original, modified);
+        // bbb removed (1 deletion), xxx and yyy added (2 insertions)
+        assert_eq!(summary.deletions, 1);
+        assert_eq!(summary.insertions, 2);
+        assert_eq!(summary.total_changes(), 3);
+    }
+
+    #[test]
+    fn diff_summary_completely_different() {
+        let summary = compute_diff_summary("a\nb\n", "x\ny\nz\n");
+        assert_eq!(summary.deletions, 2);
+        assert_eq!(summary.insertions, 3);
+    }
+
+    #[test]
+    fn filter_by_status() {
+        let resources = vec![
+            ScmResource { uri: "a.rs".into(), status: ScmStatus::Modified, original_uri: None },
+            ScmResource { uri: "b.rs".into(), status: ScmStatus::Added, original_uri: None },
+            ScmResource { uri: "c.rs".into(), status: ScmStatus::Modified, original_uri: None },
+        ];
+        let filter = WorkingCopyFilter::by_status(ScmStatus::Modified);
+        let matched = filter.apply(&resources);
+        assert_eq!(matched.len(), 2);
+        assert!(matched.iter().all(|r| r.status == ScmStatus::Modified));
+    }
+
+    #[test]
+    fn filter_by_path_pattern() {
+        let resources = vec![
+            ScmResource { uri: "src/main.rs".into(), status: ScmStatus::Modified, original_uri: None },
+            ScmResource { uri: "tests/test.rs".into(), status: ScmStatus::Added, original_uri: None },
+            ScmResource { uri: "src/lib.rs".into(), status: ScmStatus::Deleted, original_uri: None },
+        ];
+        let filter = WorkingCopyFilter::by_path("src/");
+        let matched = filter.apply(&resources);
+        assert_eq!(matched.len(), 2);
+        assert!(matched.iter().all(|r| r.uri.contains("src/")));
+    }
+
+    #[test]
+    fn filter_resources_on_service() {
+        let mut svc = WorkingCopyService::new();
+        svc.register_provider(sample_provider());
+        svc.add_resource("git", "changes", ScmResource {
+            uri: "src/a.rs".into(), status: ScmStatus::Modified, original_uri: None,
+        });
+        svc.add_resource("git", "changes", ScmResource {
+            uri: "docs/readme.md".into(), status: ScmStatus::Modified, original_uri: None,
+        });
+        svc.add_resource("git", "changes", ScmResource {
+            uri: "src/b.rs".into(), status: ScmStatus::Untracked, original_uri: None,
+        });
+        let filter = WorkingCopyFilter {
+            status: Some(ScmStatus::Modified),
+            path_pattern: Some("src/".into()),
+        };
+        let matched = svc.filter_resources("git", &filter);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].uri, "src/a.rs");
     }
 }

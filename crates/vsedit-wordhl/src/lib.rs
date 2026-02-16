@@ -3,6 +3,7 @@
 //! Finds and highlights all occurrences of the word under the cursor,
 //! distinguishing between read and write references.
 
+use std::fmt;
 /// Kind of highlight for a document symbol occurrence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DocumentHighlightKind {
@@ -337,6 +338,134 @@ impl Default for WordHighlightService {
     }
 }
 
+/// Statistics computed from a set of highlights.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HighlightStats {
+    /// Total number of highlight ranges.
+    pub total_highlights: usize,
+    /// Number of unique highlighted words.
+    pub unique_words: usize,
+    /// Average number of occurrences per unique word.
+    pub avg_occurrences: f64,
+    /// The word that appears most frequently, if any.
+    pub most_highlighted_word: Option<String>,
+}
+
+/// Compute statistics from highlights and the source text they refer to.
+///
+/// Each highlight's word is extracted from `lines` using its positional data.
+pub fn compute_highlight_stats(
+    highlights: &[DocumentHighlight],
+    lines: &[&str],
+) -> HighlightStats {
+    if highlights.is_empty() {
+        return HighlightStats {
+            total_highlights: 0,
+            unique_words: 0,
+            avg_occurrences: 0.0,
+            most_highlighted_word: None,
+        };
+    }
+
+    let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for h in highlights {
+        let line_idx = h.line.saturating_sub(1) as usize;
+        if line_idx < lines.len() {
+            let start = h.start_column.saturating_sub(1) as usize;
+            let end = h.end_column.saturating_sub(1) as usize;
+            let text = lines[line_idx];
+            if end <= text.len() && start < end {
+                let word = &text[start..end];
+                *counts.entry(word.to_string()).or_insert(0) += 1;
+            }
+        }
+    }
+
+    let unique_words = counts.len();
+    let total_highlights = highlights.len();
+    let avg_occurrences = if unique_words > 0 {
+        total_highlights as f64 / unique_words as f64
+    } else {
+        0.0
+    };
+    let most_highlighted_word = counts
+        .into_iter()
+        .max_by_key(|(_, count)| *count)
+        .map(|(word, _)| word);
+
+    HighlightStats {
+        total_highlights,
+        unique_words,
+        avg_occurrences,
+        most_highlighted_word,
+    }
+}
+
+/// A word boundary within a line of text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WordBoundary {
+    /// Byte offset where the word starts (0-based).
+    pub start: usize,
+    /// Byte offset one past the last character of the word (0-based).
+    pub end: usize,
+    /// The word text.
+    pub word: String,
+}
+
+/// Find all word boundaries in a single line of text.
+///
+/// Words consist of ASCII alphanumeric characters and underscores.
+pub fn find_word_boundaries(text: &str) -> Vec<WordBoundary> {
+    let bytes = text.as_bytes();
+    let mut boundaries = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if is_word_char(bytes[i]) {
+            let start = i;
+            while i < bytes.len() && is_word_char(bytes[i]) {
+                i += 1;
+            }
+            boundaries.push(WordBoundary {
+                start,
+                end: i,
+                word: text[start..i].to_string(),
+            });
+        } else {
+            i += 1;
+        }
+    }
+    boundaries
+}
+
+/// Merge overlapping or adjacent highlight ranges on the same line.
+///
+/// When ranges overlap the merged range uses the kind of the first range
+/// encountered (by start column).  Ranges on different lines are never merged.
+pub fn highlight_merge(highlights: &[DocumentHighlight]) -> Vec<DocumentHighlight> {
+    if highlights.is_empty() {
+        return Vec::new();
+    }
+
+    let mut sorted: Vec<DocumentHighlight> = highlights.to_vec();
+    sorted.sort_by_key(|h| (h.line, h.start_column));
+
+    let mut merged: Vec<DocumentHighlight> = Vec::new();
+    merged.push(sorted[0].clone());
+
+    for h in &sorted[1..] {
+        let last = merged.last_mut().unwrap();
+        if h.line == last.line && h.start_column <= last.end_column {
+            // Overlapping or adjacent on the same line — extend.
+            if h.end_column > last.end_column {
+                last.end_column = h.end_column;
+            }
+        } else {
+            merged.push(h.clone());
+        }
+    }
+    merged
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -542,5 +671,101 @@ mod tests {
         assert_eq!(e1.to_string(), "empty word");
         let e2 = WordHighlightError::NotAWordChar { line: 2, column: 5 };
         assert!(e2.to_string().contains("2:5"));
+    }
+
+    #[test]
+    fn compute_stats_empty() {
+        let stats = compute_highlight_stats(&[], &[]);
+        assert_eq!(stats.total_highlights, 0);
+        assert_eq!(stats.unique_words, 0);
+        assert_eq!(stats.avg_occurrences, 0.0);
+        assert!(stats.most_highlighted_word.is_none());
+    }
+
+    #[test]
+    fn compute_stats_single_word() {
+        let lines = vec!["let x = x + x;"];
+        let hl = find_word_highlights(&lines, "x");
+        let stats = compute_highlight_stats(&hl, &lines);
+        assert_eq!(stats.total_highlights, 3);
+        assert_eq!(stats.unique_words, 1);
+        assert_eq!(stats.avg_occurrences, 3.0);
+        assert_eq!(stats.most_highlighted_word.as_deref(), Some("x"));
+    }
+
+    #[test]
+    fn compute_stats_multiple_words() {
+        let lines = vec!["a b a b a"];
+        let mut hl = find_word_highlights(&lines, "a");
+        hl.extend(find_word_highlights(&lines, "b"));
+        let stats = compute_highlight_stats(&hl, &lines);
+        assert_eq!(stats.total_highlights, 5);
+        assert_eq!(stats.unique_words, 2);
+        assert_eq!(stats.most_highlighted_word.as_deref(), Some("a"));
+    }
+
+    #[test]
+    fn find_word_boundaries_basic() {
+        let boundaries = find_word_boundaries("hello world_2 +foo");
+        assert_eq!(boundaries.len(), 3);
+        assert_eq!(boundaries[0].word, "hello");
+        assert_eq!(boundaries[0].start, 0);
+        assert_eq!(boundaries[0].end, 5);
+        assert_eq!(boundaries[1].word, "world_2");
+        assert_eq!(boundaries[2].word, "foo");
+        assert_eq!(boundaries[2].start, 15);
+    }
+
+    #[test]
+    fn find_word_boundaries_empty() {
+        assert!(find_word_boundaries("").is_empty());
+        assert!(find_word_boundaries("   +-= ").is_empty());
+    }
+
+    #[test]
+    fn highlight_merge_no_overlap() {
+        let highlights = vec![
+            DocumentHighlight::new(1, 1, 4, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 6, 10, DocumentHighlightKind::Read),
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Text),
+        ];
+        let merged = highlight_merge(&highlights);
+        assert_eq!(merged.len(), 3);
+    }
+
+    #[test]
+    fn highlight_merge_overlapping() {
+        let highlights = vec![
+            DocumentHighlight::new(1, 1, 8, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 5, 12, DocumentHighlightKind::Read),
+            DocumentHighlight::new(1, 11, 15, DocumentHighlightKind::Write),
+        ];
+        let merged = highlight_merge(&highlights);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].start_column, 1);
+        assert_eq!(merged[0].end_column, 15);
+        assert_eq!(merged[0].kind, DocumentHighlightKind::Text);
+    }
+
+    #[test]
+    fn highlight_merge_adjacent() {
+        let highlights = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 5, 10, DocumentHighlightKind::Text),
+        ];
+        let merged = highlight_merge(&highlights);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].start_column, 1);
+        assert_eq!(merged[0].end_column, 10);
+    }
+
+    #[test]
+    fn highlight_merge_different_lines() {
+        let highlights = vec![
+            DocumentHighlight::new(1, 1, 10, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 10, DocumentHighlightKind::Text),
+        ];
+        let merged = highlight_merge(&highlights);
+        assert_eq!(merged.len(), 2);
     }
 }

@@ -4,6 +4,7 @@
 //! simultaneously edit all occurrences of a symbol (e.g. matching
 //! HTML open/close tags) in a document.
 
+use std::fmt;
 /// A range in a text document described by line/column coordinates (0-based).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LinkedEditingRange {

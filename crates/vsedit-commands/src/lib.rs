@@ -284,6 +284,227 @@ pub fn register_builtin_commands(
 }
 
 // ---------------------------------------------------------------------------
+// CommandHistory — tracks executed commands for recency and frequency
+// ---------------------------------------------------------------------------
+
+/// An entry in the command history.
+#[derive(Debug, Clone)]
+pub struct HistoryEntry {
+    pub command_id: String,
+    pub timestamp_ms: u64,
+}
+
+/// Records executed commands, providing recency and frequency queries.
+#[derive(Debug, Default)]
+pub struct CommandHistory {
+    entries: Vec<HistoryEntry>,
+    frequency: HashMap<String, usize>,
+}
+
+impl CommandHistory {
+    /// Create an empty command history.
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            frequency: HashMap::new(),
+        }
+    }
+
+    /// Record a command execution at the given timestamp.
+    pub fn record(&mut self, command_id: impl Into<String>, timestamp_ms: u64) {
+        let id = command_id.into();
+        *self.frequency.entry(id.clone()).or_insert(0) += 1;
+        self.entries.push(HistoryEntry {
+            command_id: id,
+            timestamp_ms,
+        });
+    }
+
+    /// Return the most recent `n` history entries (newest first).
+    pub fn get_recent(&self, n: usize) -> Vec<&HistoryEntry> {
+        self.entries.iter().rev().take(n).collect()
+    }
+
+    /// Return how many times a command has been executed.
+    pub fn get_frequency(&self, command_id: &str) -> usize {
+        self.frequency.get(command_id).copied().unwrap_or(0)
+    }
+
+    /// Return the `top_n` most frequently executed command IDs (descending).
+    pub fn most_frequent(&self, top_n: usize) -> Vec<(&str, usize)> {
+        let mut pairs: Vec<(&str, usize)> = self
+            .frequency
+            .iter()
+            .map(|(id, &count)| (id.as_str(), count))
+            .collect();
+        pairs.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+        pairs.truncate(top_n);
+        pairs
+    }
+
+    /// Clear all history entries and frequency counts.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.frequency.clear();
+    }
+
+    /// Total number of recorded executions.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` if no commands have been recorded.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandPalette — fuzzy-style filtering of commands by query
+// ---------------------------------------------------------------------------
+
+/// A match result from the command palette, carrying a relevance score.
+#[derive(Debug, Clone)]
+pub struct PaletteMatch {
+    pub command_id: String,
+    pub description: Option<String>,
+    /// Higher is more relevant.
+    pub score: u32,
+}
+
+/// Filters a list of command descriptors by a query string and sorts
+/// results by relevance.
+#[derive(Debug, Default)]
+pub struct CommandPalette {
+    entries: Vec<PaletteEntry>,
+}
+
+#[derive(Debug, Clone)]
+struct PaletteEntry {
+    id: String,
+    description: Option<String>,
+}
+
+impl CommandPalette {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Add a command to the palette.
+    pub fn add(&mut self, id: impl Into<String>, description: Option<String>) {
+        self.entries.push(PaletteEntry {
+            id: id.into(),
+            description,
+        });
+    }
+
+    /// Filter commands whose ID or description match the `query`.
+    ///
+    /// Scoring rules:
+    /// - Exact ID match: 100
+    /// - ID starts with query: 75
+    /// - ID contains query: 50
+    /// - Description contains query: 25
+    ///
+    /// Results are sorted descending by score, then alphabetically by ID.
+    pub fn filter_commands(&self, query: &str) -> Vec<PaletteMatch> {
+        if query.is_empty() {
+            return self
+                .entries
+                .iter()
+                .map(|e| PaletteMatch {
+                    command_id: e.id.clone(),
+                    description: e.description.clone(),
+                    score: 0,
+                })
+                .collect();
+        }
+
+        let query_lower = query.to_lowercase();
+        let mut matches: Vec<PaletteMatch> = self
+            .entries
+            .iter()
+            .filter_map(|entry| {
+                let id_lower = entry.id.to_lowercase();
+                let desc_lower = entry
+                    .description
+                    .as_ref()
+                    .map(|d| d.to_lowercase())
+                    .unwrap_or_default();
+
+                let score = if id_lower == query_lower {
+                    100
+                } else if id_lower.starts_with(&query_lower) {
+                    75
+                } else if id_lower.contains(&query_lower) {
+                    50
+                } else if desc_lower.contains(&query_lower) {
+                    25
+                } else {
+                    return None;
+                };
+
+                Some(PaletteMatch {
+                    command_id: entry.id.clone(),
+                    description: entry.description.clone(),
+                    score,
+                })
+            })
+            .collect();
+
+        matches.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.command_id.cmp(&b.command_id)));
+        matches
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingConflict — detection of duplicate keybinding assignments
+// ---------------------------------------------------------------------------
+
+/// Describes a conflict where two commands are bound to the same key chord.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeybindingConflict {
+    pub key: String,
+    pub command_ids: Vec<String>,
+}
+
+/// A single keybinding entry mapping a key chord to a command.
+#[derive(Debug, Clone)]
+pub struct Keybinding {
+    pub key: String,
+    pub command_id: String,
+}
+
+/// Detect keybinding conflicts: keys that are bound to more than one command.
+///
+/// Returns a list of [`KeybindingConflict`]s sorted by key.
+pub fn detect_conflicts(bindings: &[Keybinding]) -> Vec<KeybindingConflict> {
+    let mut by_key: HashMap<String, Vec<String>> = HashMap::new();
+    for b in bindings {
+        by_key
+            .entry(b.key.clone())
+            .or_default()
+            .push(b.command_id.clone());
+    }
+
+    let mut conflicts: Vec<KeybindingConflict> = by_key
+        .into_iter()
+        .filter(|(_, cmds)| cmds.len() > 1)
+        .map(|(key, mut command_ids)| {
+            command_ids.sort();
+            command_ids.dedup();
+            KeybindingConflict { key, command_ids }
+        })
+        .filter(|c| c.command_ids.len() > 1)
+        .collect();
+
+    conflicts.sort_by(|a, b| a.key.cmp(&b.key));
+    conflicts
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -538,5 +759,105 @@ mod tests {
     fn default_impls() {
         let _registry = CommandRegistry::default();
         let _service = CommandService::default();
+    }
+
+    // -- CommandHistory -----------------------------------------------------
+
+    #[test]
+    fn history_record_and_recent() {
+        let mut history = CommandHistory::new();
+        history.record("file.save", 100);
+        history.record("edit.undo", 200);
+        history.record("file.save", 300);
+
+        let recent = history.get_recent(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].command_id, "file.save");
+        assert_eq!(recent[1].command_id, "edit.undo");
+    }
+
+    #[test]
+    fn history_frequency_and_most_frequent() {
+        let mut history = CommandHistory::new();
+        history.record("a", 1);
+        history.record("b", 2);
+        history.record("a", 3);
+        history.record("a", 4);
+        history.record("b", 5);
+
+        assert_eq!(history.get_frequency("a"), 3);
+        assert_eq!(history.get_frequency("b"), 2);
+        assert_eq!(history.get_frequency("c"), 0);
+
+        let top = history.most_frequent(1);
+        assert_eq!(top.len(), 1);
+        assert_eq!(top[0], ("a", 3));
+    }
+
+    #[test]
+    fn history_clear() {
+        let mut history = CommandHistory::new();
+        history.record("x", 1);
+        assert!(!history.is_empty());
+        assert_eq!(history.len(), 1);
+
+        history.clear();
+        assert!(history.is_empty());
+        assert_eq!(history.get_frequency("x"), 0);
+    }
+
+    // -- CommandPalette -----------------------------------------------------
+
+    #[test]
+    fn palette_filter_by_relevance() {
+        let mut palette = CommandPalette::new();
+        palette.add("file.save", Some("Save the current file".into()));
+        palette.add("file.saveAll", Some("Save all files".into()));
+        palette.add("edit.find", Some("Find in file".into()));
+
+        let matches = palette.filter_commands("file");
+        assert_eq!(matches.len(), 3);
+        // "file.save" and "file.saveAll" start with "file" (score 75)
+        // "edit.find" description contains "file" (score 25)
+        assert_eq!(matches[0].score, 75);
+        assert_eq!(matches[2].score, 25);
+        assert_eq!(matches[2].command_id, "edit.find");
+    }
+
+    #[test]
+    fn palette_exact_match_highest_score() {
+        let mut palette = CommandPalette::new();
+        palette.add("save", None);
+        palette.add("saveAll", None);
+
+        let matches = palette.filter_commands("save");
+        assert_eq!(matches[0].command_id, "save");
+        assert_eq!(matches[0].score, 100);
+    }
+
+    // -- KeybindingConflict -------------------------------------------------
+
+    #[test]
+    fn detect_keybinding_conflicts() {
+        let bindings = vec![
+            Keybinding { key: "ctrl+s".into(), command_id: "file.save".into() },
+            Keybinding { key: "ctrl+s".into(), command_id: "workbench.action.save".into() },
+            Keybinding { key: "ctrl+z".into(), command_id: "edit.undo".into() },
+        ];
+
+        let conflicts = detect_conflicts(&bindings);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].key, "ctrl+s");
+        assert_eq!(conflicts[0].command_ids.len(), 2);
+        assert!(conflicts[0].command_ids.contains(&"file.save".to_string()));
+    }
+
+    #[test]
+    fn no_conflicts_when_unique() {
+        let bindings = vec![
+            Keybinding { key: "ctrl+a".into(), command_id: "selectAll".into() },
+            Keybinding { key: "ctrl+c".into(), command_id: "copy".into() },
+        ];
+        assert!(detect_conflicts(&bindings).is_empty());
     }
 }

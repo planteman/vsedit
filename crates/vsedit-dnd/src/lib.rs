@@ -1,5 +1,6 @@
 //! Mouse-based drag and drop.
 
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -283,6 +284,282 @@ pub trait DragAndDropProvider {
     fn handle_drop(&self, target: &DropTarget, event: &DragEvent) -> DropResult;
 }
 
+/// The visual effect associated with a drag-and-drop operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DragEffect {
+    Copy,
+    Move,
+    Link,
+    None,
+}
+
+impl fmt::Display for DragEffect {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DragEffect::Copy => write!(f, "copy"),
+            DragEffect::Move => write!(f, "move"),
+            DragEffect::Link => write!(f, "link"),
+            DragEffect::None => write!(f, "none"),
+        }
+    }
+}
+
+/// A transfer object that bundles multiple [`DragData`] items together with
+/// the current and allowed drag effects, mirroring the HTML DataTransfer API.
+#[derive(Debug, Clone)]
+pub struct DragDataTransfer {
+    items: Vec<DragData>,
+    drop_effect: DragEffect,
+    effect_allowed: Vec<DragEffect>,
+}
+
+impl DragDataTransfer {
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            drop_effect: DragEffect::None,
+            effect_allowed: vec![
+                DragEffect::Copy,
+                DragEffect::Move,
+                DragEffect::Link,
+            ],
+        }
+    }
+
+    /// Append a drag data item to the transfer.
+    pub fn add_item(&mut self, item: DragData) {
+        self.items.push(item);
+    }
+
+    /// Return all items whose MIME type matches `mime`.
+    pub fn get_items_by_mime(&self, mime: &str) -> Vec<&DragData> {
+        self.items.iter().filter(|i| i.mime_type == mime).collect()
+    }
+
+    /// Check whether any item in the transfer carries the given MIME type.
+    pub fn has_mime_type(&self, mime: &str) -> bool {
+        self.items.iter().any(|i| i.mime_type == mime)
+    }
+
+    /// Restrict the set of effects the drag source permits.
+    pub fn set_effect_allowed(&mut self, effects: Vec<DragEffect>) {
+        self.effect_allowed = effects;
+    }
+
+    /// Set the current drop effect, which must be one of the allowed effects.
+    /// Returns `false` if the effect is not allowed.
+    pub fn set_drop_effect(&mut self, effect: DragEffect) -> bool {
+        if effect == DragEffect::None || self.effect_allowed.contains(&effect) {
+            self.drop_effect = effect;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// The current drop effect.
+    pub fn drop_effect(&self) -> DragEffect {
+        self.drop_effect
+    }
+
+    /// The list of allowed effects.
+    pub fn effect_allowed(&self) -> &[DragEffect] {
+        &self.effect_allowed
+    }
+
+    /// All items in the transfer.
+    pub fn items(&self) -> &[DragData] {
+        &self.items
+    }
+
+    /// Remove all items and reset the drop effect.
+    pub fn clear(&mut self) {
+        self.items.clear();
+        self.drop_effect = DragEffect::None;
+    }
+}
+
+impl Default for DragDataTransfer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A region in the UI that can receive drops.
+#[derive(Debug, Clone)]
+pub struct DropZone {
+    pub id: String,
+    pub accepted_mimes: HashSet<String>,
+    pub enabled: bool,
+}
+
+impl DropZone {
+    pub fn new(id: impl Into<String>, accepted_mimes: HashSet<String>) -> Self {
+        Self {
+            id: id.into(),
+            accepted_mimes,
+            enabled: true,
+        }
+    }
+
+    /// Returns `true` if this zone accepts the given drag data's MIME type
+    /// and the zone is enabled.
+    pub fn can_accept(&self, data: &DragData) -> bool {
+        self.enabled && self.accepted_mimes.contains(&data.mime_type)
+    }
+
+    /// Returns `true` if this zone can accept *any* of the provided items.
+    pub fn can_accept_any(&self, items: &[DragData]) -> bool {
+        self.enabled && items.iter().any(|d| self.accepted_mimes.contains(&d.mime_type))
+    }
+}
+
+/// Registry that manages multiple named [`DropZone`]s.
+#[derive(Debug, Default)]
+pub struct DropZoneRegistry {
+    zones: HashMap<String, DropZone>,
+}
+
+impl DropZoneRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a new drop zone. Replaces any existing zone with the same id.
+    pub fn register(&mut self, zone: DropZone) {
+        self.zones.insert(zone.id.clone(), zone);
+    }
+
+    /// Remove a zone by id, returning it if it existed.
+    pub fn unregister(&mut self, id: &str) -> Option<DropZone> {
+        self.zones.remove(id)
+    }
+
+    /// Return a reference to a zone by id.
+    pub fn get_zone(&self, id: &str) -> Option<&DropZone> {
+        self.zones.get(id)
+    }
+
+    /// Enable or disable a zone by id. Returns `false` if the zone was not found.
+    pub fn set_enabled(&mut self, id: &str, enabled: bool) -> bool {
+        if let Some(zone) = self.zones.get_mut(id) {
+            zone.enabled = enabled;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Find all zones that can accept the given drag data item.
+    pub fn find_accepting_zones(&self, data: &DragData) -> Vec<&DropZone> {
+        self.zones.values().filter(|z| z.can_accept(data)).collect()
+    }
+
+    /// Number of registered zones.
+    pub fn len(&self) -> usize {
+        self.zones.len()
+    }
+
+    /// Whether the registry is empty.
+    pub fn is_empty(&self) -> bool {
+        self.zones.is_empty()
+    }
+}
+
+/// Preview information shown under the cursor during a drag operation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DragPreview {
+    pub width: u32,
+    pub height: u32,
+    pub offset_x: i32,
+    pub offset_y: i32,
+    pub label: String,
+}
+
+impl DragPreview {
+    pub fn new(width: u32, height: u32, label: impl Into<String>) -> Self {
+        Self {
+            width,
+            height,
+            offset_x: 0,
+            offset_y: 0,
+            label: label.into(),
+        }
+    }
+
+    /// Set the offset of the preview relative to the cursor.
+    pub fn with_offset(mut self, x: i32, y: i32) -> Self {
+        self.offset_x = x;
+        self.offset_y = y;
+        self
+    }
+}
+
+impl fmt::Display for DragPreview {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "\"{}\" ({}x{} offset {}, {})",
+            self.label, self.width, self.height, self.offset_x, self.offset_y,
+        )
+    }
+}
+
+/// Aggregate metrics computed from a [`DragHistory`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct DragMetrics {
+    pub total_drops: usize,
+    pub success_rate: f64,
+    pub most_common_mime_type: Option<String>,
+    pub avg_items_per_drop: f64,
+}
+
+impl DragMetrics {
+    /// Compute metrics from the supplied history.
+    pub fn from_history(history: &DragHistory) -> Self {
+        let entries = history.entries();
+        let total_drops = entries.len();
+
+        if total_drops == 0 {
+            return Self {
+                total_drops: 0,
+                success_rate: 0.0,
+                most_common_mime_type: None,
+                avg_items_per_drop: 0.0,
+            };
+        }
+
+        let accepted = entries
+            .iter()
+            .filter(|e| e.result == DropResult::Accepted)
+            .count();
+        let success_rate = accepted as f64 / total_drops as f64;
+
+        let total_items: usize = entries.iter().map(|e| e.data.len()).sum();
+        let avg_items_per_drop = total_items as f64 / total_drops as f64;
+
+        // Count MIME type frequencies across all items in all entries.
+        let mut mime_counts: HashMap<&str, usize> = HashMap::new();
+        for entry in entries {
+            for item in &entry.data {
+                *mime_counts.entry(item.mime_type.as_str()).or_insert(0) += 1;
+            }
+        }
+
+        let most_common_mime_type = mime_counts
+            .into_iter()
+            .max_by_key(|&(_, count)| count)
+            .map(|(mime, _)| mime.to_string());
+
+        Self {
+            total_drops,
+            success_rate,
+            most_common_mime_type,
+            avg_items_per_drop,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -496,5 +773,183 @@ mod tests {
         let entry = h.undo().unwrap();
         assert_eq!(entry.target.uri, "file:///u.rs");
         assert!(h.is_empty());
+    }
+
+    // ---- new tests ----
+
+    #[test]
+    fn drag_effect_display() {
+        assert_eq!(format!("{}", DragEffect::Copy), "copy");
+        assert_eq!(format!("{}", DragEffect::Move), "move");
+        assert_eq!(format!("{}", DragEffect::Link), "link");
+        assert_eq!(format!("{}", DragEffect::None), "none");
+    }
+
+    #[test]
+    fn drag_data_transfer_add_and_query() {
+        let mut transfer = DragDataTransfer::new();
+        transfer.add_item(DragData::text("hello"));
+        transfer.add_item(DragData::new("image/png", vec![0x89, 0x50]));
+        transfer.add_item(DragData::text("world"));
+
+        assert!(transfer.has_mime_type("text/plain"));
+        assert!(transfer.has_mime_type("image/png"));
+        assert!(!transfer.has_mime_type("application/json"));
+
+        let text_items = transfer.get_items_by_mime("text/plain");
+        assert_eq!(text_items.len(), 2);
+        assert_eq!(text_items[0].data, b"hello");
+        assert_eq!(text_items[1].data, b"world");
+
+        assert_eq!(transfer.items().len(), 3);
+    }
+
+    #[test]
+    fn drag_data_transfer_effects() {
+        let mut transfer = DragDataTransfer::new();
+        assert_eq!(transfer.drop_effect(), DragEffect::None);
+
+        // Copy is allowed by default
+        assert!(transfer.set_drop_effect(DragEffect::Copy));
+        assert_eq!(transfer.drop_effect(), DragEffect::Copy);
+
+        // Restrict to Move only
+        transfer.set_effect_allowed(vec![DragEffect::Move]);
+        assert!(!transfer.set_drop_effect(DragEffect::Copy));
+        assert!(transfer.set_drop_effect(DragEffect::Move));
+        // None is always accepted
+        assert!(transfer.set_drop_effect(DragEffect::None));
+    }
+
+    #[test]
+    fn drag_data_transfer_clear() {
+        let mut transfer = DragDataTransfer::new();
+        transfer.add_item(DragData::text("a"));
+        transfer.add_item(DragData::text("b"));
+        assert!(transfer.set_drop_effect(DragEffect::Move));
+        assert_eq!(transfer.items().len(), 2);
+
+        transfer.clear();
+        assert!(transfer.items().is_empty());
+        assert_eq!(transfer.drop_effect(), DragEffect::None);
+    }
+
+    #[test]
+    fn drop_zone_acceptance() {
+        let mimes: HashSet<String> =
+            ["text/plain", "text/uri-list"].iter().map(|s| s.to_string()).collect();
+        let zone = DropZone::new("editor-main", mimes);
+
+        assert!(zone.can_accept(&DragData::text("hi")));
+        assert!(zone.can_accept(&DragData::files(&["file:///a"])));
+        assert!(!zone.can_accept(&DragData::new("image/png", vec![0x89])));
+
+        let items = vec![
+            DragData::new("image/png", vec![0x89]),
+            DragData::text("fallback"),
+        ];
+        assert!(zone.can_accept_any(&items));
+
+        let bad_items = vec![DragData::new("image/png", vec![0x89])];
+        assert!(!zone.can_accept_any(&bad_items));
+    }
+
+    #[test]
+    fn drop_zone_disabled() {
+        let mimes: HashSet<String> = ["text/plain"].iter().map(|s| s.to_string()).collect();
+        let mut zone = DropZone::new("sidebar", mimes);
+        assert!(zone.can_accept(&DragData::text("x")));
+
+        zone.enabled = false;
+        assert!(!zone.can_accept(&DragData::text("x")));
+        assert!(!zone.can_accept_any(&[DragData::text("x")]));
+    }
+
+    #[test]
+    fn drop_zone_registry_operations() {
+        let mut registry = DropZoneRegistry::new();
+        assert!(registry.is_empty());
+
+        let mimes_text: HashSet<String> = ["text/plain"].iter().map(|s| s.to_string()).collect();
+        let mimes_img: HashSet<String> = ["image/png"].iter().map(|s| s.to_string()).collect();
+
+        registry.register(DropZone::new("editor", mimes_text));
+        registry.register(DropZone::new("preview", mimes_img));
+        assert_eq!(registry.len(), 2);
+
+        assert!(registry.get_zone("editor").is_some());
+        assert!(registry.get_zone("nonexistent").is_none());
+
+        // find_accepting_zones
+        let text_data = DragData::text("hi");
+        let accepting = registry.find_accepting_zones(&text_data);
+        assert_eq!(accepting.len(), 1);
+        assert_eq!(accepting[0].id, "editor");
+
+        // disable
+        assert!(registry.set_enabled("editor", false));
+        assert!(registry.find_accepting_zones(&text_data).is_empty());
+        assert!(registry.set_enabled("editor", true));
+        assert_eq!(registry.find_accepting_zones(&text_data).len(), 1);
+
+        // unregister
+        let removed = registry.unregister("preview");
+        assert!(removed.is_some());
+        assert_eq!(registry.len(), 1);
+        assert!(!registry.set_enabled("preview", true));
+    }
+
+    #[test]
+    fn drag_preview_creation() {
+        let preview = DragPreview::new(120, 30, "Move item")
+            .with_offset(-10, 5);
+        assert_eq!(preview.width, 120);
+        assert_eq!(preview.height, 30);
+        assert_eq!(preview.offset_x, -10);
+        assert_eq!(preview.offset_y, 5);
+        assert_eq!(preview.label, "Move item");
+        assert_eq!(
+            format!("{preview}"),
+            "\"Move item\" (120x30 offset -10, 5)"
+        );
+    }
+
+    #[test]
+    fn drag_metrics_from_history() {
+        let mut history = DragHistory::default();
+
+        // Empty history
+        let m = DragMetrics::from_history(&history);
+        assert_eq!(m.total_drops, 0);
+        assert_eq!(m.success_rate, 0.0);
+        assert_eq!(m.most_common_mime_type, None);
+        assert_eq!(m.avg_items_per_drop, 0.0);
+
+        // Add some entries
+        let target = DropTarget::from_position("file:///a.rs", 0, 0);
+        history.record(HistoryEntry {
+            data: vec![DragData::text("a"), DragData::text("b")],
+            target: target.clone(),
+            result: DropResult::Accepted,
+        });
+        history.record(HistoryEntry {
+            data: vec![DragData::new("image/png", vec![0x89])],
+            target: target.clone(),
+            result: DropResult::Accepted,
+        });
+        history.record(HistoryEntry {
+            data: vec![DragData::text("c")],
+            target: target.clone(),
+            result: DropResult::Rejected,
+        });
+
+        let m = DragMetrics::from_history(&history);
+        assert_eq!(m.total_drops, 3);
+        // 2 out of 3 accepted
+        assert!((m.success_rate - 2.0 / 3.0).abs() < f64::EPSILON);
+        // text/plain appears 3 times vs image/png 1 time
+        assert_eq!(m.most_common_mime_type.as_deref(), Some("text/plain"));
+        // total items: 2 + 1 + 1 = 4, avg = 4/3
+        assert!((m.avg_items_per_drop - 4.0 / 3.0).abs() < f64::EPSILON);
     }
 }

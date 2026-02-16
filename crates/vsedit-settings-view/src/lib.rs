@@ -3,6 +3,7 @@
 //! Provides a settings editor with search, category navigation,
 //! and type-appropriate value editors — rendered via ratatui.
 
+use std::fmt;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};

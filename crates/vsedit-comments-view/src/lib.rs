@@ -1,5 +1,6 @@
 //! Comments view (code review comments).
 
+use std::fmt;
 #[derive(Debug, Clone)]
 pub struct CommentReaction {
     pub label: String,

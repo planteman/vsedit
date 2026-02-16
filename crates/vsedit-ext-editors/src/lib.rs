@@ -2,6 +2,7 @@
 //!
 //! RPC bridge between the extension host and the main thread for editors.
 
+use std::fmt;
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};

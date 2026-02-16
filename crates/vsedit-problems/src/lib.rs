@@ -3,6 +3,7 @@
 //! Displays diagnostics (errors, warnings, info, hints) grouped by file
 //! with filtering and sorting — rendered via ratatui.
 
+use std::fmt;
 use std::collections::BTreeMap;
 
 use ratatui::buffer::Buffer;

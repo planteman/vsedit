@@ -11,6 +11,7 @@
 //! - [`TerminalId`] — unique identifier for a terminal.
 //! - [`TerminalOutput`] — buffered output read from the PTY.
 
+use std::fmt;
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;

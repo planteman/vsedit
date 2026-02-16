@@ -9,6 +9,7 @@ pub mod client;
 pub mod manager;
 pub mod transport;
 
+use std::fmt;
 pub use client::{LspClient, LspServerConfig};
 pub use manager::LspManager;
 

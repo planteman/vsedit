@@ -32,6 +32,128 @@ pub type LanguageRegistry = LanguageService;
 pub type LanguageId = String;
 
 // ---------------------------------------------------------------------------
+// Language statistics
+// ---------------------------------------------------------------------------
+
+/// Aggregate statistics about the languages registered in a [`LanguageService`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanguageStats {
+    /// Total number of registered languages.
+    pub total_languages: usize,
+    /// Total number of file extensions across all languages.
+    pub total_extensions: usize,
+    /// Number of languages that declare a first-line / shebang pattern.
+    pub languages_with_shebangs: usize,
+    /// Number of languages whose edit config includes block comments.
+    pub languages_with_block_comments: usize,
+}
+
+/// Compute aggregate statistics for all languages in a [`LanguageService`].
+pub fn compute_language_stats(svc: &LanguageService) -> LanguageStats {
+    let ids = svc.get_registered_language_ids();
+    let total_languages = ids.len();
+
+    let mut total_extensions: usize = 0;
+    let mut languages_with_shebangs: usize = 0;
+    let mut languages_with_block_comments: usize = 0;
+
+    for id in &ids {
+        if let Some(lang) = svc.get_language(id) {
+            total_extensions += lang.extensions.len();
+            if lang.first_line.is_some() {
+                languages_with_shebangs += 1;
+            }
+        }
+        if let Some(cfg) = svc.get_edit_config(id) {
+            if cfg.comments.block_comment.is_some() {
+                languages_with_block_comments += 1;
+            }
+        }
+    }
+
+    LanguageStats {
+        total_languages,
+        total_extensions,
+        languages_with_shebangs,
+        languages_with_block_comments,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Language similarity
+// ---------------------------------------------------------------------------
+
+/// Describes how similar another language is to a reference language based on
+/// the number of shared file extensions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanguageSimilarity {
+    /// The id of the similar language.
+    pub language_id: String,
+    /// File extensions shared between the two languages.
+    pub shared_extensions: Vec<String>,
+}
+
+/// Find languages that share at least one file extension with `lang_id`.
+///
+/// Results are sorted by number of shared extensions (descending).  The
+/// queried language itself is never included.
+pub fn find_similar_languages(svc: &LanguageService, lang_id: &str) -> Vec<LanguageSimilarity> {
+    let target = match svc.get_language(lang_id) {
+        Some(l) => l,
+        None => return Vec::new(),
+    };
+
+    let target_exts: std::collections::HashSet<String> =
+        target.extensions.iter().map(|e| e.to_lowercase()).collect();
+
+    let mut results: Vec<LanguageSimilarity> = Vec::new();
+
+    for other_id in svc.get_registered_language_ids() {
+        if other_id == lang_id {
+            continue;
+        }
+        if let Some(other) = svc.get_language(other_id) {
+            let shared: Vec<String> = other
+                .extensions
+                .iter()
+                .filter(|e| target_exts.contains(&e.to_lowercase()))
+                .cloned()
+                .collect();
+            if !shared.is_empty() {
+                results.push(LanguageSimilarity {
+                    language_id: other_id.to_string(),
+                    shared_extensions: shared,
+                });
+            }
+        }
+    }
+
+    results.sort_by(|a, b| b.shared_extensions.len().cmp(&a.shared_extensions.len()));
+    results
+}
+
+// ---------------------------------------------------------------------------
+// Bulk detection
+// ---------------------------------------------------------------------------
+
+/// Detect the language for each filename in `filenames`.
+///
+/// Returns a `Vec` of `(filename, language_id)` pairs. When the language
+/// cannot be determined, the second element is `None`.
+pub fn bulk_detect<'a>(
+    svc: &'a LanguageService,
+    filenames: &[&str],
+) -> Vec<(String, Option<&'a str>)> {
+    filenames
+        .iter()
+        .map(|name| {
+            let id = svc.guess_language_id(name, None);
+            ((*name).to_string(), id)
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -501,5 +623,132 @@ mod tests {
         // The first rule should match opening a block comment
         let rule = &cfg.on_enter_rules[0];
         assert!(rule.before_text.is_match("/** some doc"));
+    }
+
+    // -- compute_language_stats ---------------------------------------------
+
+    #[test]
+    fn stats_total_languages_matches_registered() {
+        let svc = make_registry();
+        let stats = compute_language_stats(&svc);
+        assert_eq!(stats.total_languages, svc.get_registered_language_ids().len());
+        assert!(stats.total_languages >= 30);
+    }
+
+    #[test]
+    fn stats_total_extensions_positive() {
+        let svc = make_registry();
+        let stats = compute_language_stats(&svc);
+        assert!(stats.total_extensions > stats.total_languages);
+    }
+
+    #[test]
+    fn stats_shebangs_positive() {
+        let svc = make_registry();
+        let stats = compute_language_stats(&svc);
+        // At least python, shellscript, ruby, perl have shebangs
+        assert!(stats.languages_with_shebangs >= 4);
+    }
+
+    #[test]
+    fn stats_block_comments_positive() {
+        let svc = make_registry();
+        let stats = compute_language_stats(&svc);
+        // Rust, JavaScript, C, etc. have block comments
+        assert!(stats.languages_with_block_comments >= 3);
+    }
+
+    #[test]
+    fn stats_empty_service() {
+        let svc = LanguageService::new();
+        let stats = compute_language_stats(&svc);
+        assert_eq!(stats, LanguageStats {
+            total_languages: 0,
+            total_extensions: 0,
+            languages_with_shebangs: 0,
+            languages_with_block_comments: 0,
+        });
+    }
+
+    // -- find_similar_languages ---------------------------------------------
+
+    #[test]
+    fn similar_languages_unknown_returns_empty() {
+        let svc = make_registry();
+        let similar = find_similar_languages(&svc, "nonexistent");
+        assert!(similar.is_empty());
+    }
+
+    #[test]
+    fn similar_languages_custom_overlap() {
+        let mut svc = LanguageService::new();
+        svc.register(LanguageDefinition {
+            id: "lang_a".into(),
+            name: "Lang A".into(),
+            extensions: vec![".x".into(), ".y".into()],
+            filenames: vec![],
+            aliases: vec![],
+            mime_types: vec![],
+            first_line: None,
+        });
+        svc.register(LanguageDefinition {
+            id: "lang_b".into(),
+            name: "Lang B".into(),
+            extensions: vec![".x".into(), ".z".into()],
+            filenames: vec![],
+            aliases: vec![],
+            mime_types: vec![],
+            first_line: None,
+        });
+        svc.register(LanguageDefinition {
+            id: "lang_c".into(),
+            name: "Lang C".into(),
+            extensions: vec![".z".into()],
+            filenames: vec![],
+            aliases: vec![],
+            mime_types: vec![],
+            first_line: None,
+        });
+
+        let similar = find_similar_languages(&svc, "lang_a");
+        assert_eq!(similar.len(), 1);
+        assert_eq!(similar[0].language_id, "lang_b");
+        assert_eq!(similar[0].shared_extensions, vec![".x".to_string()]);
+    }
+
+    #[test]
+    fn similar_languages_does_not_include_self() {
+        let svc = make_registry();
+        let similar = find_similar_languages(&svc, "rust");
+        assert!(similar.iter().all(|s| s.language_id != "rust"));
+    }
+
+    // -- bulk_detect --------------------------------------------------------
+
+    #[test]
+    fn bulk_detect_multiple_files() {
+        let svc = make_registry();
+        let results = bulk_detect(&svc, &["main.rs", "index.html", "unknown.xyz"]);
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0], ("main.rs".to_string(), Some("rust")));
+        assert_eq!(results[1], ("index.html".to_string(), Some("html")));
+        assert_eq!(results[2], ("unknown.xyz".to_string(), None));
+    }
+
+    #[test]
+    fn bulk_detect_empty_input() {
+        let svc = make_registry();
+        let results = bulk_detect(&svc, &[]);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn bulk_detect_filenames_and_extensions() {
+        let svc = make_registry();
+        let results = bulk_detect(&svc, &["Dockerfile", "app.py", "style.css", "Makefile"]);
+        assert_eq!(results[0].1, Some("dockerfile"));
+        assert_eq!(results[1].1, Some("python"));
+        assert_eq!(results[2].1, Some("css"));
+        assert_eq!(results[3].1, Some("makefile"));
     }
 }

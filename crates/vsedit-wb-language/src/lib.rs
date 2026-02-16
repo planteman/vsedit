@@ -286,6 +286,49 @@ impl LanguageRegistry {
     }
 }
 
+/// Summary statistics for the status of languages in a registry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LanguageStatusStats {
+    /// Total number of registered language items.
+    pub total_items: usize,
+    /// Number of languages that have at least one extension registered.
+    pub active_count: usize,
+    /// Number of languages that failed validation (empty id or name).
+    pub error_count: usize,
+}
+
+impl fmt::Display for LanguageStatusStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "languages: {} total, {} active, {} errors",
+            self.total_items, self.active_count, self.error_count
+        )
+    }
+}
+
+/// Computes status statistics for a slice of [`LanguageInfo`] items.
+///
+/// A language is considered *active* if it has at least one file extension.
+/// A language is counted as an *error* if its validation fails.
+pub fn compute_language_status_stats(languages: &[LanguageInfo]) -> LanguageStatusStats {
+    let total_items = languages.len();
+    let mut active_count = 0;
+    let mut error_count = 0;
+    for lang in languages {
+        if lang.validate().is_err() {
+            error_count += 1;
+        } else if !lang.extensions.is_empty() {
+            active_count += 1;
+        }
+    }
+    LanguageStatusStats {
+        total_items,
+        active_count,
+        error_count,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -590,5 +633,84 @@ mod tests {
 
         let c = sample_python();
         assert_ne!(a, c);
+    }
+
+    #[test]
+    fn stats_empty_registry() {
+        let stats = compute_language_status_stats(&[]);
+        assert_eq!(
+            stats,
+            LanguageStatusStats {
+                total_items: 0,
+                active_count: 0,
+                error_count: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn stats_all_active() {
+        let langs = vec![sample_rust(), sample_python()];
+        let stats = compute_language_status_stats(&langs);
+        assert_eq!(stats.total_items, 2);
+        assert_eq!(stats.active_count, 2);
+        assert_eq!(stats.error_count, 0);
+    }
+
+    #[test]
+    fn stats_counts_errors() {
+        let bad = LanguageInfo {
+            id: "".into(),
+            name: "Bad".into(),
+            extensions: vec![".bad".into()],
+            aliases: vec![],
+            mime_types: vec![],
+            first_line_pattern: None,
+        };
+        let langs = vec![sample_rust(), bad];
+        let stats = compute_language_status_stats(&langs);
+        assert_eq!(stats.total_items, 2);
+        assert_eq!(stats.active_count, 1);
+        assert_eq!(stats.error_count, 1);
+    }
+
+    #[test]
+    fn stats_inactive_language_without_extensions() {
+        let no_ext = LanguageInfo {
+            id: "plain".into(),
+            name: "Plaintext".into(),
+            extensions: vec![],
+            aliases: vec![],
+            mime_types: vec!["text/plain".into()],
+            first_line_pattern: None,
+        };
+        let langs = vec![sample_rust(), no_ext];
+        let stats = compute_language_status_stats(&langs);
+        assert_eq!(stats.total_items, 2);
+        assert_eq!(stats.active_count, 1);
+        assert_eq!(stats.error_count, 0);
+    }
+
+    #[test]
+    fn stats_display_format() {
+        let stats = LanguageStatusStats {
+            total_items: 5,
+            active_count: 3,
+            error_count: 1,
+        };
+        assert_eq!(
+            format!("{stats}"),
+            "languages: 5 total, 3 active, 1 errors"
+        );
+    }
+
+    #[test]
+    fn stats_from_registry() {
+        let mut reg = LanguageRegistry::new();
+        reg.register(sample_rust());
+        reg.register(sample_python());
+        let stats = compute_language_status_stats(&reg.languages);
+        assert_eq!(stats.total_items, reg.language_count());
+        assert_eq!(stats.active_count, 2);
     }
 }
