@@ -91,6 +91,16 @@ pub struct Workbench {
     pending_chords: Vec<KeyCodeChord>,
     // Keep registrations alive so commands stay registered.
     _registrations: Vec<CommandRegistration>,
+    /// Lines of the currently open file, if any.
+    editor_content: Option<Vec<String>>,
+    /// Path of the currently open file, if any.
+    file_path: Option<String>,
+    /// Whether the editor content has been modified since last save.
+    pub is_modified: bool,
+    /// Current cursor line (1-based).
+    cursor_line: u32,
+    /// Current cursor column (1-based).
+    cursor_col: u32,
 }
 
 impl Workbench {
@@ -163,6 +173,11 @@ impl Workbench {
             context,
             pending_chords: Vec::new(),
             _registrations: regs,
+            editor_content: None,
+            file_path: None,
+            is_modified: false,
+            cursor_line: 1,
+            cursor_col: 1,
         }
     }
 
@@ -176,6 +191,20 @@ impl Workbench {
         self.started
     }
 
+    /// Set the editor content and file path for rendering.
+    pub fn set_editor_content(&mut self, content: &str, path: Option<String>) {
+        self.editor_content = Some(content.lines().map(|l| l.to_string()).collect());
+        self.file_path = path;
+    }
+
+    /// Update cursor position displayed in the status bar.
+    pub fn set_cursor_info(&mut self, line: u32, col: u32) {
+        self.cursor_line = line;
+        self.cursor_col = col;
+        self.statusbar
+            .update_item("statusbar.lineColumn", &format!("Ln {}, Col {}", line, col));
+    }
+
     /// Render the entire workbench into the given frame.
     pub fn render(&self, frame: &mut Frame) {
         let area = frame.area();
@@ -183,8 +212,15 @@ impl Workbench {
 
         // Titlebar / menubar
         if let Some(menubar) = result.menubar {
+            let title_text = match &self.file_path {
+                Some(path) => {
+                    let modified = if self.is_modified { " ●" } else { "" };
+                    format!("{}{} — vsedit", path, modified)
+                }
+                None => "vsedit".to_string(),
+            };
             let title = Paragraph::new(Line::from(vec![
-                Span::styled("vsedit", Style::default().fg(Color::Cyan)),
+                Span::styled(title_text, Style::default().fg(Color::Cyan)),
             ]))
             .alignment(Alignment::Center)
             .style(Style::default().bg(Color::DarkGray));
@@ -233,10 +269,43 @@ impl Workbench {
 
         // Editor area
         {
-            let editor = Paragraph::new("No editors open")
-                .alignment(Alignment::Center)
-                .style(Style::default().fg(Color::DarkGray));
-            frame.render_widget(editor, result.editor);
+            match &self.editor_content {
+                Some(lines) if !lines.is_empty() || self.file_path.is_some() => {
+                    let num_width = if lines.is_empty() {
+                        1
+                    } else {
+                        lines.len().to_string().len()
+                    };
+                    let rendered: Vec<Line> = if lines.is_empty() {
+                        vec![Line::from(Span::styled(
+                            "  (empty file)",
+                            Style::default().fg(Color::DarkGray),
+                        ))]
+                    } else {
+                        lines
+                            .iter()
+                            .enumerate()
+                            .map(|(i, line)| {
+                                Line::from(vec![
+                                    Span::styled(
+                                        format!(" {:>width$} ", i + 1, width = num_width),
+                                        Style::default().fg(Color::DarkGray),
+                                    ),
+                                    Span::raw(line.as_str()),
+                                ])
+                            })
+                            .collect()
+                    };
+                    let editor = Paragraph::new(rendered);
+                    frame.render_widget(editor, result.editor);
+                }
+                _ => {
+                    let editor = Paragraph::new("No editors open")
+                        .alignment(Alignment::Center)
+                        .style(Style::default().fg(Color::DarkGray));
+                    frame.render_widget(editor, result.editor);
+                }
+            }
         }
 
         // Panel

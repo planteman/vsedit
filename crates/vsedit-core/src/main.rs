@@ -1,7 +1,7 @@
 //! vsedit main binary — terminal port of Visual Studio Code.
 //!
 //! Entry point that ties together the TUI framework, workbench, input handling,
-//! and editor widget into a working terminal editor.
+//! and editor controller into a working terminal editor.
 
 use std::io;
 use std::path::PathBuf;
@@ -9,43 +9,22 @@ use std::time::Duration;
 
 use crossterm::event::{Event as CtEvent, EventStream, KeyCode, KeyModifiers};
 use futures::StreamExt;
-use ratatui::layout::{Constraint, Direction, Layout};
-use ratatui::style::{Color, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph};
 
-use vsedit_editor_widget::EditorWidget;
-use vsedit_input::{from_crossterm_key, from_crossterm_mouse};
+use vsedit_editor_controller::{EditorAction, EditorController};
+use vsedit_input::{from_crossterm_key, InputEvent};
 use vsedit_tui::{restore_terminal, setup_terminal};
-
-/// Editor state managed across the event loop.
-struct EditorState {
-    /// The workbench instance (used for lifecycle; rendering delegated in the future).
-    _workbench: vsedit_workbench::Workbench,
-    /// The editor widget.
-    editor: EditorWidget,
-    /// File path being edited, if any.
-    file_path: Option<PathBuf>,
-    /// Text content of the open file.
-    content: String,
-    /// Whether the application should quit.
-    should_quit: bool,
-}
+use vsedit_workbench::{WorkbenchAction, Workbench};
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    // Parse command-line arguments: optional file path.
     let file_path = std::env::args().nth(1).map(PathBuf::from);
 
-    // Initialize logging.
     vsedit_log::init_tracing(vsedit_log::LogLevel::Info);
     tracing::info!("vsedit starting");
 
-    // Load product configuration.
     let product = vsedit_product::ProductConfiguration::default_config();
     tracing::info!("{} v{}", product.name_long, product.version);
 
-    // Set up environment and ensure data directories exist.
     let args = vsedit_environment::CliArgs {
         paths: file_path.iter().cloned().collect(),
         ..Default::default()
@@ -55,14 +34,7 @@ async fn main() -> io::Result<()> {
         tracing::warn!("Could not create data directories: {}", e);
     }
 
-    // Initialize workbench.
-    let mut workbench = vsedit_workbench::Workbench::new();
-    workbench.start();
-
-    // Set up editor widget and optionally load a file.
-    let mut editor = EditorWidget::new();
-    editor.is_focused = true;
-
+    // Load file content.
     let content = match &file_path {
         Some(path) => match std::fs::read_to_string(path) {
             Ok(text) => {
@@ -77,48 +49,61 @@ async fn main() -> io::Result<()> {
         None => String::new(),
     };
 
-    let mut state = EditorState {
-        _workbench: workbench,
-        editor,
-        file_path,
-        content,
-        should_quit: false,
-    };
+    let mut workbench = Workbench::new();
+    workbench.start();
 
-    // Set up terminal.
+    let mut controller = EditorController::new(&content);
+
+    // Sync initial state to workbench.
+    let path_str = file_path.as_ref().map(|p| p.display().to_string());
+    workbench.set_editor_content(&controller.model.get_value(), path_str.clone());
+    let pos = controller.cursors.get_primary().position();
+    workbench.set_cursor_info(pos.line, pos.column);
+
     let mut terminal = setup_terminal()?;
 
-    // Run the event loop; always restore terminal on exit.
-    let result = run_event_loop(&mut terminal, &mut state).await;
+    let result = run_event_loop(
+        &mut terminal,
+        &mut workbench,
+        &mut controller,
+        &file_path,
+        &path_str,
+    )
+    .await;
 
     restore_terminal(&mut terminal)?;
     tracing::info!("vsedit exiting");
     result
 }
 
-/// Main event loop: reads crossterm events, dispatches input, and renders.
 async fn run_event_loop(
     terminal: &mut ratatui::Terminal<ratatui::backend::CrosstermBackend<io::Stdout>>,
-    state: &mut EditorState,
+    workbench: &mut Workbench,
+    controller: &mut EditorController,
+    file_path: &Option<PathBuf>,
+    path_str: &Option<String>,
 ) -> io::Result<()> {
     let mut event_stream = EventStream::new();
     let mut tick_interval = tokio::time::interval(Duration::from_millis(16));
+    let mut should_quit = false;
 
     loop {
-        // Render a frame.
-        terminal.draw(|frame| render(frame, state))?;
+        terminal.draw(|frame| workbench.render(frame))?;
 
-        if state.should_quit {
+        if should_quit {
             break;
         }
 
-        // Wait for the next terminal event or tick.
         tokio::select! {
             maybe_event = event_stream.next() => {
                 match maybe_event {
-                    Some(Ok(event)) => handle_event(event, state),
+                    Some(Ok(event)) => {
+                        should_quit = handle_event(
+                            event, workbench, controller, file_path, path_str,
+                        );
+                    }
                     Some(Err(_)) | None => {
-                        state.should_quit = true;
+                        should_quit = true;
                     }
                 }
             }
@@ -129,110 +114,136 @@ async fn run_event_loop(
     Ok(())
 }
 
-/// Convert a crossterm event into our input model and handle it.
-fn handle_event(event: CtEvent, state: &mut EditorState) {
+/// Returns true if the application should quit.
+fn handle_event(
+    event: CtEvent,
+    workbench: &mut Workbench,
+    controller: &mut EditorController,
+    file_path: &Option<PathBuf>,
+    path_str: &Option<String>,
+) -> bool {
     match event {
         CtEvent::Key(key_event) => {
-            // Ctrl+Q or Ctrl+C quits.
-            if key_event.modifiers.contains(KeyModifiers::CONTROL) {
+            let has_ctrl = key_event.modifiers.contains(KeyModifiers::CONTROL);
+            let has_shift = key_event.modifiers.contains(KeyModifiers::SHIFT);
+
+            // Ctrl+key combos: route through workbench or handle directly.
+            if has_ctrl {
                 match key_event.code {
-                    KeyCode::Char('q') | KeyCode::Char('c') => {
-                        state.should_quit = true;
-                        return;
+                    KeyCode::Char('s') => {
+                        if let Some(path) = file_path {
+                            let value = controller.model.get_value();
+                            if let Err(e) = std::fs::write(path, &value) {
+                                tracing::error!("Failed to save: {}", e);
+                            } else {
+                                tracing::info!("Saved: {}", path.display());
+                                workbench.is_modified = false;
+                            }
+                        }
+                        sync_state(workbench, controller, path_str);
+                        return false;
                     }
-                    _ => {}
+                    KeyCode::Char('z') => {
+                        controller.execute_action(EditorAction::Undo);
+                        sync_state(workbench, controller, path_str);
+                        return false;
+                    }
+                    KeyCode::Char('y') => {
+                        controller.execute_action(EditorAction::Redo);
+                        sync_state(workbench, controller, path_str);
+                        return false;
+                    }
+                    KeyCode::Char('a') => {
+                        controller.execute_action(EditorAction::SelectAll);
+                        sync_state(workbench, controller, path_str);
+                        return false;
+                    }
+                    KeyCode::Home => {
+                        controller.execute_action(EditorAction::MoveCursorDocumentStart);
+                        sync_state(workbench, controller, path_str);
+                        return false;
+                    }
+                    KeyCode::End => {
+                        controller.execute_action(EditorAction::MoveCursorDocumentEnd);
+                        sync_state(workbench, controller, path_str);
+                        return false;
+                    }
+                    _ => {
+                        // Route through workbench keybinding resolver.
+                        let input = from_crossterm_key(key_event);
+                        let action = workbench.handle_input(InputEvent::Key(input));
+                        match action {
+                            WorkbenchAction::ExecuteCommand(ref cmd) => {
+                                if cmd == "workbench.action.quit" {
+                                    return true;
+                                }
+                                workbench.execute_command(cmd);
+                            }
+                            _ => {}
+                        }
+                        return false;
+                    }
                 }
             }
 
-            let _input = from_crossterm_key(key_event);
-            // Future: route through workbench.handle_input(_input)
+            // Non-ctrl key events → editor actions.
+            let editor_action = match key_event.code {
+                KeyCode::Char(c) => Some(EditorAction::InsertText(c.to_string())),
+                KeyCode::Backspace => Some(EditorAction::DeleteLeft),
+                KeyCode::Delete => Some(EditorAction::DeleteRight),
+                KeyCode::Enter => Some(EditorAction::NewLine),
+                KeyCode::Tab => Some(EditorAction::IndentLine),
+                KeyCode::Left => {
+                    if has_shift {
+                        Some(EditorAction::SelectLeft)
+                    } else {
+                        Some(EditorAction::MoveCursorLeft)
+                    }
+                }
+                KeyCode::Right => {
+                    if has_shift {
+                        Some(EditorAction::SelectRight)
+                    } else {
+                        Some(EditorAction::MoveCursorRight)
+                    }
+                }
+                KeyCode::Up => {
+                    if has_shift {
+                        Some(EditorAction::SelectUp)
+                    } else {
+                        Some(EditorAction::MoveCursorUp)
+                    }
+                }
+                KeyCode::Down => {
+                    if has_shift {
+                        Some(EditorAction::SelectDown)
+                    } else {
+                        Some(EditorAction::MoveCursorDown)
+                    }
+                }
+                KeyCode::Home => Some(EditorAction::MoveCursorLineStart),
+                KeyCode::End => Some(EditorAction::MoveCursorLineEnd),
+                _ => None,
+            };
+
+            if let Some(action) = editor_action {
+                controller.execute_action(action);
+                workbench.is_modified = true;
+            }
+            sync_state(workbench, controller, path_str);
+            false
         }
-        CtEvent::Mouse(mouse_event) => {
-            let _input = from_crossterm_mouse(mouse_event);
-            // Future: route through workbench.handle_input(_input)
-        }
-        CtEvent::Resize(_cols, _rows) => {
-            // Terminal will re-render on next frame automatically.
-        }
-        CtEvent::Paste(_text) => {
-            // Future: insert pasted text into the editor buffer.
-        }
-        CtEvent::FocusGained | CtEvent::FocusLost => {}
+        CtEvent::Resize(_cols, _rows) => false,
+        CtEvent::Mouse(_) | CtEvent::Paste(_) | CtEvent::FocusGained | CtEvent::FocusLost => false,
     }
 }
 
-/// Render the full editor UI into the terminal frame.
-fn render(frame: &mut ratatui::Frame, state: &EditorState) {
-    let area = frame.area();
-
-    // Layout: title bar (1 line) | editor area | status bar (1 line)
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Min(1),
-            Constraint::Length(1),
-        ])
-        .split(area);
-
-    // Title bar.
-    let title_text = match &state.file_path {
-        Some(path) => format!(" vsedit — {}", path.display()),
-        None => " vsedit — [No File]".to_string(),
-    };
-    let title_bar = Paragraph::new(Line::from(vec![
-        Span::styled(title_text, Style::default().fg(Color::Black).bg(Color::Cyan)),
-    ]))
-    .style(Style::default().bg(Color::Cyan));
-    frame.render_widget(title_bar, chunks[0]);
-
-    // Editor area.
-    let editor_block = Block::default().borders(Borders::NONE);
-    let lines: Vec<Line> = if state.content.is_empty() {
-        vec![Line::from(Span::styled(
-            "  (empty — open a file: vsedit <path>)",
-            Style::default().fg(Color::DarkGray),
-        ))]
-    } else {
-        let show_line_numbers = state.editor.show_line_numbers;
-        let num_width = state.content.lines().count().to_string().len();
-        state
-            .content
-            .lines()
-            .enumerate()
-            .map(|(i, line)| {
-                if show_line_numbers {
-                    Line::from(vec![
-                        Span::styled(
-                            format!(" {:>width$} ", i + 1, width = num_width),
-                            Style::default().fg(Color::DarkGray),
-                        ),
-                        Span::raw(line),
-                    ])
-                } else {
-                    Line::from(Span::raw(format!(" {line}")))
-                }
-            })
-            .collect()
-    };
-    let editor_paragraph = Paragraph::new(lines).block(editor_block);
-    frame.render_widget(editor_paragraph, chunks[1]);
-
-    // Status bar.
-    let line_count = state.content.lines().count();
-    let status_text = format!(
-        " {} | {} lines | Ctrl+Q to quit",
-        state
-            .file_path
-            .as_ref()
-            .and_then(|p| p.file_name())
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_else(|| "[untitled]".to_string()),
-        line_count,
-    );
-    let status_bar = Paragraph::new(Line::from(vec![
-        Span::styled(status_text, Style::default().fg(Color::Black).bg(Color::Blue)),
-    ]))
-    .style(Style::default().bg(Color::Blue));
-    frame.render_widget(status_bar, chunks[2]);
+fn sync_state(
+    workbench: &mut Workbench,
+    controller: &EditorController,
+    path_str: &Option<String>,
+) {
+    workbench.set_editor_content(&controller.model.get_value(), path_str.clone());
+    let pos = controller.cursors.get_primary().position();
+    workbench.set_cursor_info(pos.line, pos.column);
 }
