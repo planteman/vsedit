@@ -421,6 +421,84 @@ pub struct LinkedEditingHistory {
     capacity: usize,
 }
 
+// ---------------------------------------------------------------------------
+// LinkedEditGroup
+// ---------------------------------------------------------------------------
+
+/// A group of edit ranges that should be edited together.
+///
+/// Unlike `LinkedEditingRanges` which works with line/col positions,
+/// `LinkedEditGroup` works with byte offsets for simpler text manipulation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkedEditGroup {
+    /// Byte offset ranges as `(start, end)` pairs.
+    pub ranges: Vec<(usize, usize)>,
+    /// The current text at each range (should all be identical).
+    pub current_text: String,
+}
+
+impl LinkedEditGroup {
+    /// Create a new edit group from byte-offset ranges and the current text.
+    pub fn new(ranges: Vec<(usize, usize)>, current_text: impl Into<String>) -> Self {
+        Self {
+            ranges,
+            current_text: current_text.into(),
+        }
+    }
+
+    /// Number of linked ranges in this group.
+    pub fn len(&self) -> usize {
+        self.ranges.len()
+    }
+
+    /// Returns `true` if the group has no ranges.
+    pub fn is_empty(&self) -> bool {
+        self.ranges.is_empty()
+    }
+}
+
+impl fmt::Display for LinkedEditGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "LinkedEditGroup({} ranges, text='{}')",
+            self.ranges.len(),
+            self.current_text
+        )
+    }
+}
+
+/// Apply a text change to all ranges in a `LinkedEditGroup`.
+///
+/// Replaces the text at each range with `new_text`, processing from last to
+/// first so that byte offsets remain valid. Returns the edited text or `None`
+/// if any range is out of bounds.
+pub fn apply_group_edit(text: &str, group: &LinkedEditGroup, new_text: &str) -> Option<String> {
+    let mut sorted_ranges = group.ranges.clone();
+    sorted_ranges.sort_by(|a, b| b.0.cmp(&a.0));
+
+    let mut result = text.to_string();
+    for (start, end) in sorted_ranges {
+        if start > result.len() || end > result.len() || end < start {
+            return None;
+        }
+        result.replace_range(start..end, new_text);
+    }
+    Some(result)
+}
+
+/// Validate that the ranges in a `LinkedEditGroup` do not overlap.
+pub fn validate_linked_ranges(group: &LinkedEditGroup) -> bool {
+    let mut sorted = group.ranges.clone();
+    sorted.sort_by_key(|r| r.0);
+    for window in sorted.windows(2) {
+        if window[0].1 > window[1].0 {
+            return false;
+        }
+    }
+    true
+}
+
 impl LinkedEditingHistory {
     /// Create a new history with the given maximum capacity.
     pub fn new(capacity: usize) -> Self {
@@ -904,5 +982,70 @@ mod tests {
         let r = LinkedEditingRange::new(0, 5, 0, 5);
         assert_eq!(r.len(), Some(0));
         assert!(r.is_single_line());
+    }
+
+    // ── LinkedEditGroup tests ──
+
+    #[test]
+    fn edit_group_new() {
+        let group = LinkedEditGroup::new(vec![(1, 4), (12, 15)], "div");
+        assert_eq!(group.len(), 2);
+        assert!(!group.is_empty());
+        assert_eq!(group.current_text, "div");
+    }
+
+    #[test]
+    fn edit_group_empty() {
+        let group = LinkedEditGroup::new(vec![], "");
+        assert!(group.is_empty());
+    }
+
+    #[test]
+    fn edit_group_display() {
+        let group = LinkedEditGroup::new(vec![(0, 3)], "abc");
+        let s = format!("{group}");
+        assert!(s.contains("1 ranges"));
+        assert!(s.contains("abc"));
+    }
+
+    #[test]
+    fn apply_group_edit_basic() {
+        let text = "<div>hello</div>";
+        let group = LinkedEditGroup::new(vec![(1, 4), (12, 15)], "div");
+        let result = apply_group_edit(text, &group, "span").unwrap();
+        assert_eq!(result, "<span>hello</span>");
+    }
+
+    #[test]
+    fn apply_group_edit_out_of_bounds() {
+        let text = "short";
+        let group = LinkedEditGroup::new(vec![(0, 100)], "short");
+        assert!(apply_group_edit(text, &group, "x").is_none());
+    }
+
+    #[test]
+    fn validate_linked_ranges_valid() {
+        let group = LinkedEditGroup::new(vec![(0, 3), (5, 8), (10, 13)], "abc");
+        assert!(validate_linked_ranges(&group));
+    }
+
+    #[test]
+    fn validate_linked_ranges_overlapping() {
+        let group = LinkedEditGroup::new(vec![(0, 5), (3, 8)], "abc");
+        assert!(!validate_linked_ranges(&group));
+    }
+
+    #[test]
+    fn validate_linked_ranges_empty() {
+        let group = LinkedEditGroup::new(vec![], "");
+        assert!(validate_linked_ranges(&group));
+    }
+
+    #[test]
+    fn apply_group_edit_single_range() {
+        let text = "hello world";
+        let group = LinkedEditGroup::new(vec![(6, 11)], "world");
+        let result = apply_group_edit(text, &group, "rust").unwrap();
+        assert_eq!(result, "hello rust");
     }
 }

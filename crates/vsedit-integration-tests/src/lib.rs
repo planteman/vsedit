@@ -2237,3 +2237,185 @@ mod rpc_handler {
         assert!(result.get("error").is_some());
     }
 }
+
+// ─── Tab Management ─────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tab_management {
+    use vsedit_workbench::Workbench;
+
+    #[test]
+    fn tab_service_open_and_switch() {
+        let mut wb = Workbench::new();
+        wb.start();
+        // Open two files
+        wb.open_file(std::path::Path::new("/tmp/file1.rs"), "fn main() {}");
+        wb.open_file(std::path::Path::new("/tmp/file2.rs"), "fn test() {}");
+        assert_eq!(wb.tab_service.tab_count(), 2);
+        // Active tab should be the last opened
+        let active = wb.tab_service.get_active_tab().unwrap();
+        assert!(active.title.contains("file2"));
+    }
+
+    #[test]
+    fn tab_service_close_tab() {
+        let mut wb = Workbench::new();
+        wb.start();
+        wb.open_file(std::path::Path::new("/tmp/close1.rs"), "content1");
+        wb.open_file(std::path::Path::new("/tmp/close2.rs"), "content2");
+        assert_eq!(wb.tab_service.tab_count(), 2);
+        wb.execute_command("workbench.action.closeActiveEditor");
+        assert_eq!(wb.tab_service.tab_count(), 1);
+    }
+}
+
+// ─── Command & Keybinding Integration ───────────────────────────────────
+
+#[cfg(test)]
+mod command_keybinding {
+    use vsedit_workbench::Workbench;
+
+    #[test]
+    fn command_registry_default_commands_registered() {
+        let wb = Workbench::new();
+        // Core commands should be registered
+        assert!(wb.commands.has("workbench.action.quit"));
+        assert!(wb.commands.has("workbench.action.toggleSidebarVisibility"));
+        assert!(wb.commands.has("workbench.action.togglePanel"));
+        assert!(wb.commands.has("workbench.action.showCommands"));
+    }
+
+    #[test]
+    fn keybinding_resolver_has_defaults() {
+        let wb = Workbench::new();
+        // Should have keybindings registered
+        let rules = wb.keybindings.rules();
+        assert!(!rules.is_empty(), "should have default keybindings");
+    }
+}
+
+// ─── Workbench State ────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod workbench_state {
+    use vsedit_workbench::{ActivePanelView, ActiveSidebarPanel, Workbench};
+
+    #[test]
+    fn workbench_sidebar_panels() {
+        let mut wb = Workbench::new();
+        wb.start();
+        // Default should be explorer
+        assert_eq!(wb.active_sidebar, ActiveSidebarPanel::Explorer);
+        // Switch to search
+        wb.set_active_sidebar(ActiveSidebarPanel::Search);
+        assert_eq!(wb.active_sidebar, ActiveSidebarPanel::Search);
+        // Switch to source control
+        wb.set_active_sidebar(ActiveSidebarPanel::SourceControl);
+        assert_eq!(wb.active_sidebar, ActiveSidebarPanel::SourceControl);
+    }
+
+    #[test]
+    fn workbench_command_palette_toggle() {
+        let mut wb = Workbench::new();
+        wb.start();
+        assert!(!wb.show_command_palette);
+        wb.execute_command("workbench.action.showCommands");
+        assert!(wb.show_command_palette);
+    }
+
+    #[test]
+    fn workbench_panel_views() {
+        let mut wb = Workbench::new();
+        wb.start();
+        // Default should be terminal
+        assert_eq!(wb.active_panel, ActivePanelView::Terminal);
+    }
+}
+
+// ─── Editor + Model Deep Integration ────────────────────────────────────
+
+#[cfg(test)]
+mod editor_model_deep {
+    use vsedit_editor_controller::{EditorAction, EditorController};
+
+    #[test]
+    fn editor_controller_undo_redo_cursor_state() {
+        let mut ctrl = EditorController::new("hello world");
+        // Type some text
+        ctrl.execute_action(EditorAction::InsertText("X".to_string()));
+        let after_insert = ctrl.model.get_value();
+        assert!(after_insert.contains("X"));
+        // Undo
+        ctrl.execute_action(EditorAction::Undo);
+        assert_eq!(ctrl.model.get_value(), "hello world");
+        // Redo
+        ctrl.execute_action(EditorAction::Redo);
+        assert_eq!(ctrl.model.get_value(), after_insert);
+    }
+
+    #[test]
+    fn editor_controller_find_and_replace() {
+        let mut ctrl = EditorController::new("foo bar foo baz foo");
+        ctrl.execute_action(EditorAction::Find("foo".to_string()));
+        assert!(!ctrl.find_results.is_empty());
+        ctrl.execute_action(EditorAction::ReplaceAll("foo".to_string(), "qux".to_string()));
+        let result = ctrl.model.get_value();
+        assert!(!result.contains("foo"));
+        assert!(result.contains("qux"));
+    }
+
+    #[test]
+    fn editor_controller_multi_cursor() {
+        let mut ctrl = EditorController::new("line1\nline2\nline3");
+        ctrl.execute_action(EditorAction::AddCursorBelow);
+        // Should have 2 cursors now
+        assert!(ctrl.cursors.get_all().len() >= 2);
+    }
+
+    #[test]
+    fn editor_controller_auto_close_pairs() {
+        let mut ctrl = EditorController::new("");
+        ctrl.execute_action(EditorAction::InsertText("(".to_string()));
+        let val = ctrl.model.get_value();
+        // Auto-close should have inserted both ( and )
+        assert!(val.contains("(") && val.contains(")"));
+    }
+}
+
+// ─── Syntax + Editor Integration ────────────────────────────────────────
+
+#[cfg(test)]
+mod syntax_editor {
+    use vsedit_syntax::{ColoredSpan, SyntaxHighlighter};
+
+    #[test]
+    fn colored_span_merge_preserves_content() {
+        let spans = vec![
+            ColoredSpan::plain("hello"),
+            ColoredSpan::plain(" "),
+            ColoredSpan::plain("world"),
+        ];
+        let merged = ColoredSpan::merge_adjacent(&spans);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].text, "hello world");
+    }
+
+    #[test]
+    fn highlight_cache_invalidation() {
+        let mut hl = SyntaxHighlighter::new();
+        // Highlight a line (populates internal state)
+        let spans = {
+            let syntax = hl.syntax_for_file("test.rs").unwrap();
+            hl.highlight_line("let x = 1;\n", syntax)
+        };
+        assert!(!spans.is_empty());
+        // Invalidate should not panic even on empty cache
+        hl.invalidate_from(0);
+        // Re-highlight after invalidation should still work
+        let spans2 = {
+            let syntax = hl.syntax_for_file("test.rs").unwrap();
+            hl.highlight_line("let x = 1;\n", syntax)
+        };
+        assert!(!spans2.is_empty());
+    }
+}

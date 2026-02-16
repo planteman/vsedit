@@ -531,6 +531,90 @@ impl WorkspaceConfiguration {
     }
 }
 
+// ── Workspace History ──
+
+/// Tracks recently opened workspaces with timestamps.
+#[derive(Debug, Clone)]
+pub struct WorkspaceHistory {
+    /// Entries stored as `(path, timestamp)`, most recent last.
+    entries: Vec<(String, u64)>,
+    /// Maximum number of entries to retain.
+    capacity: usize,
+}
+
+impl WorkspaceHistory {
+    /// Create a new history with the given capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            capacity,
+        }
+    }
+
+    /// Add (or update) a workspace path with the given timestamp.
+    /// If the path already exists, its timestamp is updated and it moves to the end.
+    pub fn add(&mut self, path: &str, timestamp: u64) {
+        self.entries.retain(|(p, _)| p != path);
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push((path.to_string(), timestamp));
+    }
+
+    /// Return the most recent `n` entries, newest first.
+    pub fn recent(&self, n: usize) -> Vec<(&str, u64)> {
+        self.entries
+            .iter()
+            .rev()
+            .take(n)
+            .map(|(p, t)| (p.as_str(), *t))
+            .collect()
+    }
+
+    /// Number of entries in the history.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` if the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Check whether a path is already tracked.
+    pub fn contains(&self, path: &str) -> bool {
+        self.entries.iter().any(|(p, _)| p == path)
+    }
+
+    /// Clear all history entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+/// Search for `.code-workspace` files recursively under the given directory.
+pub fn find_workspace_files(root: &str) -> Vec<String> {
+    let mut results = Vec::new();
+    fn walk(dir: &std::path::Path, results: &mut Vec<String>) {
+        let entries = match std::fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, results);
+            } else if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                if name.ends_with(".code-workspace") {
+                    results.push(path.to_string_lossy().to_string());
+                }
+            }
+        }
+    }
+    walk(std::path::Path::new(root), &mut results);
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -898,5 +982,69 @@ mod tests {
         assert_eq!(stats.setting_prefix_count, 0);
         assert!(!stats.has_name);
         assert!(!stats.is_multi_root);
+    }
+
+    // ── WorkspaceHistory tests ──
+
+    #[test]
+    fn workspace_history_add_and_recent() {
+        let mut history = WorkspaceHistory::new(5);
+        history.add("/home/user/project-a", 1000);
+        history.add("/home/user/project-b", 2000);
+        history.add("/home/user/project-c", 3000);
+        let recent = history.recent(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].0, "/home/user/project-c");
+        assert_eq!(recent[1].0, "/home/user/project-b");
+    }
+
+    #[test]
+    fn workspace_history_deduplicates() {
+        let mut history = WorkspaceHistory::new(5);
+        history.add("/project", 1000);
+        history.add("/project", 2000);
+        assert_eq!(history.len(), 1);
+        let recent = history.recent(5);
+        assert_eq!(recent[0].1, 2000);
+    }
+
+    #[test]
+    fn workspace_history_capacity() {
+        let mut history = WorkspaceHistory::new(2);
+        history.add("/a", 100);
+        history.add("/b", 200);
+        history.add("/c", 300);
+        assert_eq!(history.len(), 2);
+        assert!(!history.contains("/a"));
+        assert!(history.contains("/c"));
+    }
+
+    #[test]
+    fn workspace_history_clear() {
+        let mut history = WorkspaceHistory::new(5);
+        history.add("/project", 100);
+        history.clear();
+        assert!(history.is_empty());
+    }
+
+    #[test]
+    fn find_workspace_files_in_dir() {
+        // Use a temp directory to test file discovery
+        let dir = std::env::temp_dir().join("vsedit_ws_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let ws_file = dir.join("test.code-workspace");
+        std::fs::write(&ws_file, "{}").unwrap();
+
+        let files = find_workspace_files(dir.to_str().unwrap());
+        assert!(files.iter().any(|p| p.ends_with("test.code-workspace")));
+
+        let _ = std::fs::remove_file(&ws_file);
+        let _ = std::fs::remove_dir(&dir);
+    }
+
+    #[test]
+    fn find_workspace_files_nonexistent_dir() {
+        let files = find_workspace_files("/nonexistent_path_12345");
+        assert!(files.is_empty());
     }
 }

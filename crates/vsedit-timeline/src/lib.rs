@@ -138,6 +138,60 @@ pub fn timeline_for_file(repo_dir: impl AsRef<Path>, path: &str) -> Result<Vec<T
     provider.timeline_for_file(path)
 }
 
+/// A snapshot of the timeline at a point in time, used for diffing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimelineSnapshot {
+    /// Label describing when/why this snapshot was taken.
+    pub label: String,
+    /// Timestamp when the snapshot was captured.
+    pub captured_at: u64,
+    /// The timeline items at the time of capture.
+    pub items: Vec<TimelineItem>,
+}
+
+impl TimelineSnapshot {
+    /// Create a new snapshot with the given label and items.
+    pub fn new(label: impl Into<String>, captured_at: u64, items: Vec<TimelineItem>) -> Self {
+        Self {
+            label: label.into(),
+            captured_at,
+            items,
+        }
+    }
+
+    /// Compute the difference between this snapshot and another.
+    pub fn diff(&self, other: &TimelineSnapshot) -> TimelineDiff {
+        diff_timelines(&self.items, &other.items)
+    }
+
+    /// Number of items in this snapshot.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Returns `true` if the snapshot contains no items.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+}
+
+impl fmt::Display for TimelineSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "TimelineSnapshot('{}', {} items, captured_at={})",
+            self.label,
+            self.items.len(),
+            self.captured_at
+        )
+    }
+}
+
+/// Compute the difference between two timeline snapshots.
+pub fn timeline_diff(old: &TimelineSnapshot, new: &TimelineSnapshot) -> TimelineDiff {
+    diff_timelines(&old.items, &new.items)
+}
+
 // ── Timeline Filtering ──
 
 /// Filter criteria for timeline items.
@@ -149,12 +203,19 @@ pub struct TimelineFilter {
     pub author: Option<String>,
     /// Only include items whose message contains this pattern.
     pub path_pattern: Option<String>,
+    /// Only include items from the given source/provider name.
+    pub source: Option<String>,
+    /// Only include items whose message or author matches any of the given labels.
+    pub labels: Vec<String>,
 }
 
 impl TimelineFilter {
     /// Create an empty filter that matches everything.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            labels: Vec::new(),
+            ..Self::default()
+        }
     }
 
     /// Set the date range filter.
@@ -172,6 +233,18 @@ impl TimelineFilter {
     /// Set the path/message pattern filter.
     pub fn with_path_pattern(mut self, pattern: impl Into<String>) -> Self {
         self.path_pattern = Some(pattern.into());
+        self
+    }
+
+    /// Set the source filter.
+    pub fn with_source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    /// Add a label to filter by.
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.labels.push(label.into());
         self
     }
 
@@ -196,6 +269,17 @@ impl TimelineFilter {
                 return false;
             }
         }
+        if !self.labels.is_empty() {
+            let msg_lower = item.message.to_lowercase();
+            let author_lower = item.author.to_lowercase();
+            let has_label = self.labels.iter().any(|l| {
+                let ll = l.to_lowercase();
+                msg_lower.contains(&ll) || author_lower.contains(&ll)
+            });
+            if !has_label {
+                return false;
+            }
+        }
         true
     }
 }
@@ -211,6 +295,12 @@ impl fmt::Display for TimelineFilter {
         }
         if let Some(ref pattern) = self.path_pattern {
             parts.push(format!("pattern={pattern}"));
+        }
+        if let Some(ref source) = self.source {
+            parts.push(format!("source={source}"));
+        }
+        if !self.labels.is_empty() {
+            parts.push(format!("labels=[{}]", self.labels.join(",")));
         }
         if parts.is_empty() {
             write!(f, "TimelineFilter(none)")
@@ -896,5 +986,73 @@ mod tests {
         let results = deserialize_items(input);
         assert_eq!(results.len(), 2);
         assert!(results.iter().all(|r| r.is_ok()));
+    }
+
+    // ── Snapshot & timeline_diff tests ──
+
+    #[test]
+    fn snapshot_new_and_accessors() {
+        let items = sample_items();
+        let snap = TimelineSnapshot::new("before-merge", 1700500000, items.clone());
+        assert_eq!(snap.label, "before-merge");
+        assert_eq!(snap.captured_at, 1700500000);
+        assert_eq!(snap.len(), items.len());
+        assert!(!snap.is_empty());
+    }
+
+    #[test]
+    fn snapshot_empty() {
+        let snap = TimelineSnapshot::new("empty", 0, vec![]);
+        assert!(snap.is_empty());
+        assert_eq!(snap.len(), 0);
+    }
+
+    #[test]
+    fn snapshot_display() {
+        let snap = TimelineSnapshot::new("v1", 100, sample_items());
+        let s = format!("{snap}");
+        assert!(s.contains("v1"));
+        assert!(s.contains("5 items"));
+    }
+
+    #[test]
+    fn snapshot_diff_method() {
+        let old_snap = TimelineSnapshot::new("old", 100, vec![sample_items()[0].clone()]);
+        let new_snap = TimelineSnapshot::new("new", 200, sample_items());
+        let diff = old_snap.diff(&new_snap);
+        assert_eq!(diff.added.len(), 4);
+        assert!(diff.removed.is_empty());
+    }
+
+    #[test]
+    fn timeline_diff_function() {
+        let old_snap = TimelineSnapshot::new("old", 100, sample_items());
+        let new_snap = TimelineSnapshot::new("new", 200, sample_items());
+        let diff = timeline_diff(&old_snap, &new_snap);
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn filter_by_label() {
+        let items = sample_items();
+        let filter = TimelineFilter::new().with_label("Fix");
+        let result = filter_items(&items, &filter);
+        assert_eq!(result.len(), 2); // "Fix bug in parser" and "Fix typo"
+    }
+
+    #[test]
+    fn filter_by_label_no_match() {
+        let items = sample_items();
+        let filter = TimelineFilter::new().with_label("nonexistent-label");
+        let result = filter_items(&items, &filter);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn filter_with_source_display() {
+        let filter = TimelineFilter::new().with_source("git").with_label("bug");
+        let s = format!("{filter}");
+        assert!(s.contains("source=git"));
+        assert!(s.contains("labels=[bug]"));
     }
 }

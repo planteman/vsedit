@@ -23,5 +23,6 @@ vsedit-workspace = { path = "../vsedit-workspace" }
 vsedit-uri = { path = "../vsedit-uri" }
 vsedit-configuration = { path = "../vsedit-configuration" }
 vsedit-syntax = { path = "../vsedit-syntax" }
+vsedit-workbench = { path = "../vsedit-workbench" }
 serde_json.workspace = true
 tempfile.workspace = true

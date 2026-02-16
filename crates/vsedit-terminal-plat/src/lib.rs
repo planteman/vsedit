@@ -418,6 +418,142 @@ impl Default for SharedTerminalManager {
 // Terminal output history and session statistics
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Terminal profiles
+// ---------------------------------------------------------------------------
+
+/// A terminal profile representing a configured shell with its arguments and env.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerminalProfile {
+    /// Path to the shell executable.
+    pub shell_path: String,
+    /// Human-readable name for this profile.
+    pub name: String,
+    /// Arguments to pass to the shell.
+    pub args: Vec<String>,
+    /// Environment variables specific to this profile.
+    pub env: HashMap<String, String>,
+    /// Optional icon identifier.
+    pub icon: Option<String>,
+}
+
+impl TerminalProfile {
+    /// Create a new terminal profile.
+    pub fn new(shell_path: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            shell_path: shell_path.into(),
+            name: name.into(),
+            args: Vec::new(),
+            env: HashMap::new(),
+            icon: None,
+        }
+    }
+
+    /// Add a shell argument.
+    pub fn with_arg(mut self, arg: impl Into<String>) -> Self {
+        self.args.push(arg.into());
+        self
+    }
+
+    /// Add an environment variable.
+    pub fn with_env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.env.insert(key.into(), value.into());
+        self
+    }
+
+    /// Set the icon identifier.
+    pub fn with_icon(mut self, icon: impl Into<String>) -> Self {
+        self.icon = Some(icon.into());
+        self
+    }
+
+    /// Convert this profile into a [`TerminalConfig`].
+    pub fn to_config(&self) -> TerminalConfig {
+        TerminalConfig {
+            shell: self.shell_path.clone(),
+            args: self.args.clone(),
+            env: self.env.clone(),
+            title: self.name.clone(),
+            ..TerminalConfig::default()
+        }
+    }
+}
+
+impl fmt::Display for TerminalProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TerminalProfile('{}', {})", self.name, self.shell_path)
+    }
+}
+
+/// Detect available shells on the system by checking common paths.
+pub fn detect_available_shells() -> Vec<String> {
+    let candidates = [
+        "/bin/sh",
+        "/bin/bash",
+        "/bin/zsh",
+        "/bin/fish",
+        "/usr/bin/fish",
+        "/bin/dash",
+        "/usr/bin/bash",
+        "/usr/bin/zsh",
+    ];
+    candidates
+        .iter()
+        .filter(|p| std::path::Path::new(p).exists())
+        .map(|p| p.to_string())
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Terminal environment merging
+// ---------------------------------------------------------------------------
+
+/// Merges a shell environment with editor-injected environment variables.
+#[derive(Debug, Clone)]
+pub struct TerminalEnvironment {
+    shell_env: HashMap<String, String>,
+    editor_env: HashMap<String, String>,
+}
+
+impl TerminalEnvironment {
+    /// Create a new terminal environment from shell and editor envs.
+    pub fn new(shell_env: HashMap<String, String>, editor_env: HashMap<String, String>) -> Self {
+        Self { shell_env, editor_env }
+    }
+
+    /// Return the merged environment. Editor env takes precedence over shell env.
+    pub fn merged(&self) -> HashMap<String, String> {
+        let mut result = self.shell_env.clone();
+        for (k, v) in &self.editor_env {
+            result.insert(k.clone(), v.clone());
+        }
+        result
+    }
+
+    /// Look up a variable, preferring editor env over shell env.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.editor_env
+            .get(key)
+            .or_else(|| self.shell_env.get(key))
+            .map(|v| v.as_str())
+    }
+
+    /// Return all unique keys across both environments.
+    pub fn keys(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self.shell_env.keys().cloned().collect();
+        for k in self.editor_env.keys() {
+            if !keys.contains(k) {
+                keys.push(k.clone());
+            }
+        }
+        keys
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Terminal output history and session statistics (continued)
+// ---------------------------------------------------------------------------
+
 /// Tracks terminal output history and provides search capabilities.
 #[derive(Debug, Clone)]
 pub struct TerminalOutputHistory {
@@ -901,5 +1037,99 @@ mod tests {
         let mut hist = TerminalOutputHistory::new(100);
         hist.append("hello\nworld");
         assert!(hist.search("zzz").is_empty());
+    }
+
+    // -- TerminalProfile tests ----------------------------------------------
+
+    #[test]
+    fn terminal_profile_new() {
+        let profile = TerminalProfile::new("/bin/zsh", "Zsh");
+        assert_eq!(profile.shell_path, "/bin/zsh");
+        assert_eq!(profile.name, "Zsh");
+        assert!(profile.args.is_empty());
+        assert!(profile.env.is_empty());
+        assert!(profile.icon.is_none());
+    }
+
+    #[test]
+    fn terminal_profile_with_args_and_env() {
+        let profile = TerminalProfile::new("/bin/bash", "Bash")
+            .with_arg("-l")
+            .with_env("TERM", "xterm-256color")
+            .with_icon("terminal-bash");
+        assert_eq!(profile.args, vec!["-l"]);
+        assert_eq!(profile.env.get("TERM").unwrap(), "xterm-256color");
+        assert_eq!(profile.icon.as_deref(), Some("terminal-bash"));
+    }
+
+    #[test]
+    fn terminal_profile_to_config() {
+        let profile = TerminalProfile::new("/bin/zsh", "Zsh")
+            .with_arg("-i")
+            .with_env("FOO", "bar");
+        let config = profile.to_config();
+        assert_eq!(config.shell, "/bin/zsh");
+        assert_eq!(config.args, vec!["-i"]);
+        assert_eq!(config.env.get("FOO").unwrap(), "bar");
+        assert_eq!(config.title, "Zsh");
+    }
+
+    #[test]
+    fn terminal_profile_display() {
+        let profile = TerminalProfile::new("/bin/bash", "Bash");
+        let s = format!("{profile}");
+        assert!(s.contains("Bash"));
+        assert!(s.contains("/bin/bash"));
+    }
+
+    // -- detect_available_shells tests --------------------------------------
+
+    #[test]
+    fn detect_available_shells_finds_sh() {
+        let shells = detect_available_shells();
+        // /bin/sh should exist on any Unix system
+        assert!(shells.iter().any(|s| s.contains("sh")));
+    }
+
+    // -- TerminalEnvironment tests ------------------------------------------
+
+    #[test]
+    fn terminal_environment_merge() {
+        let mut shell_env = HashMap::new();
+        shell_env.insert("PATH".to_string(), "/usr/bin".to_string());
+        shell_env.insert("HOME".to_string(), "/home/user".to_string());
+
+        let mut editor_env = HashMap::new();
+        editor_env.insert("VSEDIT".to_string(), "1".to_string());
+        editor_env.insert("PATH".to_string(), "/usr/local/bin:/usr/bin".to_string());
+
+        let env = TerminalEnvironment::new(shell_env, editor_env);
+        let merged = env.merged();
+        // editor_env overrides shell_env for PATH
+        assert_eq!(merged.get("PATH").unwrap(), "/usr/local/bin:/usr/bin");
+        assert_eq!(merged.get("HOME").unwrap(), "/home/user");
+        assert_eq!(merged.get("VSEDIT").unwrap(), "1");
+    }
+
+    #[test]
+    fn terminal_environment_get() {
+        let mut shell_env = HashMap::new();
+        shell_env.insert("KEY".to_string(), "shell_val".to_string());
+        let mut editor_env = HashMap::new();
+        editor_env.insert("KEY".to_string(), "editor_val".to_string());
+        let env = TerminalEnvironment::new(shell_env, editor_env);
+        assert_eq!(env.get("KEY"), Some("editor_val"));
+    }
+
+    #[test]
+    fn terminal_environment_keys() {
+        let mut shell_env = HashMap::new();
+        shell_env.insert("A".to_string(), "1".to_string());
+        let mut editor_env = HashMap::new();
+        editor_env.insert("B".to_string(), "2".to_string());
+        let env = TerminalEnvironment::new(shell_env, editor_env);
+        let keys = env.keys();
+        assert!(keys.contains(&"A".to_string()));
+        assert!(keys.contains(&"B".to_string()));
     }
 }

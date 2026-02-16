@@ -389,6 +389,55 @@ pub struct TableRow {
     pub cells: Vec<String>,
 }
 
+/// A parsed Markdown table with header and data rows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkdownTable {
+    /// Header row (first row of the table).
+    pub headers: Vec<String>,
+    /// Data rows (everything after the separator).
+    pub rows: Vec<Vec<String>>,
+}
+
+impl MarkdownTable {
+    /// Parse a pipe-delimited Markdown table from text.
+    /// Returns `None` if the input is not a valid table.
+    pub fn parse(text: &str) -> Option<Self> {
+        let all_rows = parse_markdown_table(text)?;
+        if all_rows.is_empty() {
+            return None;
+        }
+        let headers = all_rows[0].cells.clone();
+        let rows = all_rows[1..].iter().map(|r| r.cells.clone()).collect();
+        Some(Self { headers, rows })
+    }
+
+    /// Render the table back to a Markdown string.
+    pub fn render(&self) -> String {
+        let mut out = String::new();
+        out.push_str("| ");
+        out.push_str(&self.headers.join(" | "));
+        out.push_str(" |\n| ");
+        out.push_str(&self.headers.iter().map(|_| "---").collect::<Vec<_>>().join(" | "));
+        out.push_str(" |\n");
+        for row in &self.rows {
+            out.push_str("| ");
+            out.push_str(&row.join(" | "));
+            out.push_str(" |\n");
+        }
+        out
+    }
+
+    /// Number of columns in the table.
+    pub fn column_count(&self) -> usize {
+        self.headers.len()
+    }
+
+    /// Number of data rows (excluding header).
+    pub fn row_count(&self) -> usize {
+        self.rows.len()
+    }
+}
+
 /// Parse a simple pipe-delimited Markdown table.
 ///
 /// Expects at least a header row and a separator row (`|---|---|`).
@@ -422,6 +471,27 @@ pub fn parse_markdown_table(text: &str) -> Option<Vec<TableRow>> {
         });
     }
     Some(rows)
+}
+
+/// Extract all `[label](url)` links from raw markdown text, returning `(label, url)` pairs.
+pub fn extract_links_from_text(text: &str) -> Vec<(String, String)> {
+    let mut links = Vec::new();
+    for line in text.lines() {
+        let tokens = tokenize_inline(line);
+        for token in tokens {
+            if let MarkdownToken::Link(label, url) = token {
+                links.push((label, url));
+            }
+        }
+    }
+    links
+}
+
+/// Extract all headings from raw markdown text, returning `(level, text)` pairs
+/// suitable for building a table of contents.
+pub fn extract_headings_from_text(text: &str) -> Vec<(u8, String)> {
+    let tokens = tokenize_block(text);
+    extract_headings(&tokens)
 }
 
 // ---------------------------------------------------------------------------
@@ -897,5 +967,55 @@ mod tests {
         assert_eq!(blocks[4], BlockKind::Paragraph);
         assert_eq!(blocks[5], BlockKind::CodeFence);
         assert_eq!(blocks[6], BlockKind::Paragraph);
+    }
+
+    #[test]
+    fn markdown_table_parse_and_render() {
+        let input = "| Name | Age |\n|---|---|\n| Alice | 30 |\n| Bob | 25 |";
+        let table = MarkdownTable::parse(input).unwrap();
+        assert_eq!(table.headers, vec!["Name", "Age"]);
+        assert_eq!(table.row_count(), 2);
+        assert_eq!(table.column_count(), 2);
+        assert_eq!(table.rows[0], vec!["Alice", "30"]);
+        let rendered = table.render();
+        assert!(rendered.contains("| Name | Age |"));
+        assert!(rendered.contains("| Alice | 30 |"));
+    }
+
+    #[test]
+    fn markdown_table_parse_returns_none_for_non_table() {
+        assert!(MarkdownTable::parse("just text").is_none());
+    }
+
+    #[test]
+    fn extract_links_from_text_finds_all() {
+        let doc = "See [rust](https://rust-lang.org) and\n[docs](https://docs.rs) for info.";
+        let links = extract_links_from_text(doc);
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0].0, "rust");
+        assert_eq!(links[0].1, "https://rust-lang.org");
+        assert_eq!(links[1].0, "docs");
+        assert_eq!(links[1].1, "https://docs.rs");
+    }
+
+    #[test]
+    fn extract_links_from_text_empty() {
+        assert!(extract_links_from_text("no links here").is_empty());
+    }
+
+    #[test]
+    fn extract_headings_from_text_returns_toc() {
+        let doc = "# Title\ntext\n## Section A\n## Section B\n### Subsection";
+        let headings = extract_headings_from_text(doc);
+        assert_eq!(headings.len(), 4);
+        assert_eq!(headings[0], (1, "Title".into()));
+        assert_eq!(headings[1], (2, "Section A".into()));
+        assert_eq!(headings[2], (2, "Section B".into()));
+        assert_eq!(headings[3], (3, "Subsection".into()));
+    }
+
+    #[test]
+    fn extract_headings_from_text_empty() {
+        assert!(extract_headings_from_text("no headings").is_empty());
     }
 }

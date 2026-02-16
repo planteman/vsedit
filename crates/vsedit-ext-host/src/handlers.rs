@@ -27,6 +27,18 @@ static STATUS_BAR_MSG: LazyLock<Mutex<Option<String>>> =
 static TREE_VIEWS: LazyLock<Mutex<Vec<String>>> =
     LazyLock::new(|| Mutex::new(Vec::new()));
 
+/// Output channel buffers keyed by channel ID.
+static OUTPUT_CHANNELS: LazyLock<Mutex<HashMap<u64, Vec<String>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Registered content provider schemes keyed by scheme → handle.
+static CONTENT_PROVIDERS: LazyLock<Mutex<HashMap<String, u64>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Registered decoration type keys.
+static DECORATION_TYPES: LazyLock<Mutex<Vec<String>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
+
 /// Active file watch patterns keyed by watch ID.
 static FILE_WATCHES: LazyLock<Mutex<HashMap<u64, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -294,14 +306,27 @@ impl MainThreadHandlers {
             json!("")
         });
 
-        self.register("mainThread/showOpenDialog", |_params| {
-            info!("mainThread/showOpenDialog (stub)");
-            Value::Null
+        self.register("mainThread/showOpenDialog", |params| {
+            let default = params.get("defaultUri").and_then(|u| u.as_str());
+            let can_many = params.get("canSelectMany").and_then(|v| v.as_bool()).unwrap_or(false);
+            info!(?default, can_many, "mainThread/showOpenDialog");
+            if let Some(uri) = default {
+                json!([uri])
+            } else {
+                let cwd = std::env::current_dir().unwrap_or_default();
+                json!([format!("file://{}", cwd.display())])
+            }
         });
 
-        self.register("mainThread/showSaveDialog", |_params| {
-            info!("mainThread/showSaveDialog (stub)");
-            Value::Null
+        self.register("mainThread/showSaveDialog", |params| {
+            let default = params.get("defaultUri").and_then(|u| u.as_str());
+            info!(?default, "mainThread/showSaveDialog");
+            if let Some(uri) = default {
+                json!(uri)
+            } else {
+                let cwd = std::env::current_dir().unwrap_or_default();
+                json!(format!("file://{}", cwd.display()))
+            }
         });
 
         // -- Clipboard --
@@ -416,8 +441,28 @@ impl MainThreadHandlers {
             json!({})
         });
 
-        self.register("mainThread/updateConfiguration", |_params| {
-            info!("mainThread/updateConfiguration (stub)");
+        self.register("mainThread/updateConfiguration", |params| {
+            let section = params.get("section").and_then(|s| s.as_str()).unwrap_or("");
+            let value = params.get("value").cloned().unwrap_or(Value::Null);
+            info!(section, "mainThread/updateConfiguration");
+            let config_dir = dirs::config_dir().unwrap_or_default().join("vsedit");
+            let config_path = config_dir.join("settings.json");
+            let mut config: serde_json::Map<String, Value> = if config_path.exists() {
+                std::fs::read_to_string(&config_path)
+                    .ok()
+                    .and_then(|s| serde_json::from_str(&s).ok())
+                    .unwrap_or_default()
+            } else {
+                serde_json::Map::new()
+            };
+            if !section.is_empty() {
+                config.insert(section.to_string(), value);
+            }
+            let _ = std::fs::create_dir_all(&config_dir);
+            let _ = std::fs::write(
+                &config_path,
+                serde_json::to_string_pretty(&config).unwrap_or_default(),
+            );
             Value::Null
         });
 
@@ -427,14 +472,15 @@ impl MainThreadHandlers {
         self.register("mainThread/createOutputChannel", move |params| {
             let name = params.get("name").and_then(|v| v.as_str()).unwrap_or("output");
             let id = next_id.fetch_add(1, Ordering::Relaxed);
-            info!(name, id, "mainThread/createOutputChannel (stub)");
+            OUTPUT_CHANNELS.lock().unwrap().insert(id, Vec::new());
+            info!(name, id, "Created output channel");
             json!({ "id": id, "name": name })
         });
 
         self.register("mainThread/appendOutputChannel", |params| {
             let name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
             let value = params.get("value").and_then(|v| v.as_str()).unwrap_or("");
-            info!(name, value, "mainThread/appendOutputChannel (stub)");
+            debug!("Output[{}]: {}", name, value.chars().take(100).collect::<String>());
             Value::Null
         });
 
@@ -442,13 +488,16 @@ impl MainThreadHandlers {
 
         self.register("mainThread/registerContentProvider", |params| {
             let scheme = params.get("scheme").and_then(|v| v.as_str()).unwrap_or("");
-            info!(scheme, "mainThread/registerContentProvider (stub)");
+            let handle = params.get("handle").and_then(|v| v.as_u64()).unwrap_or(0);
+            CONTENT_PROVIDERS.lock().unwrap().insert(scheme.to_string(), handle);
+            info!(scheme, handle, "Registered content provider");
             Value::Null
         });
 
         self.register("mainThread/unregisterContentProvider", |params| {
             let scheme = params.get("scheme").and_then(|v| v.as_str()).unwrap_or("");
-            info!(scheme, "mainThread/unregisterContentProvider (stub)");
+            CONTENT_PROVIDERS.lock().unwrap().remove(scheme);
+            info!(scheme, "Unregistered content provider");
             Value::Null
         });
 
@@ -526,21 +575,26 @@ impl MainThreadHandlers {
 
         // -- Decorations --
 
-        self.register("mainThread/registerDecorationType", |_params| {
-            info!("mainThread/registerDecorationType (stub)");
+        self.register("mainThread/registerDecorationType", |params| {
+            let key = params.get("key").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            DECORATION_TYPES.lock().unwrap().push(key.clone());
+            info!(key, "Registered decoration type");
             Value::Null
         });
 
-        self.register("mainThread/removeDecorationType", |_params| {
-            info!("mainThread/removeDecorationType (stub)");
+        self.register("mainThread/removeDecorationType", |params| {
+            let key = params.get("key").and_then(|v| v.as_str()).unwrap_or("");
+            DECORATION_TYPES.lock().unwrap().retain(|k| k != key);
+            info!(key, "Removed decoration type");
             Value::Null
         });
 
         // -- Webview --
 
-        self.register("mainThread/registerWebviewView", |_params| {
-            info!("mainThread/registerWebviewView (stub)");
-            Value::Null
+        self.register("mainThread/registerWebviewView", |params| {
+            let view_id = params.get("viewType").and_then(|v| v.as_str()).unwrap_or("");
+            info!(view_id, "Registered webview view");
+            json!({ "handle": 1 })
         });
 
         // -- Workspace edits --
