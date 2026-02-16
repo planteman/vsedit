@@ -171,6 +171,7 @@ members = [
     "crates/vsedit-styles",
     "crates/vsedit-suggest",
     "crates/vsedit-tabbar",
+    "crates/vsedit-tasks",
     "crates/vsedit-tasks-feature",
     "crates/vsedit-telemetry",
     "crates/vsedit-terminal-plat",

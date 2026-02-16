@@ -3485,6 +3485,10 @@ dependencies = [
 [[package]]
 name = "vsedit-notification"
 version = "0.1.0"
+dependencies = [
+ "ratatui",
+ "vsedit-events",
+]
 
 [[package]]
 name = "vsedit-notification-svc"
@@ -3741,6 +3745,16 @@ name = "vsedit-tabbar"
 version = "0.1.0"
 dependencies = [
  "vsedit-widgets",
+]
+
+[[package]]
+name = "vsedit-tasks"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -4056,6 +4070,9 @@ dependencies = [
 [[package]]
 name = "vsedit-wb-themes"
 version = "0.1.0"
+dependencies = [
+ "vsedit-theme",
+]
 
 [[package]]
 name = "vsedit-wb-title"
