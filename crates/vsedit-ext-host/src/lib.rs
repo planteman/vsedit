@@ -5,6 +5,7 @@
 //! spawning with a `Content-Length`-framed JSON-RPC transport for
 //! communicating with VS Code extension host processes.
 
+pub mod handlers;
 pub mod process;
 pub mod scanner;
 pub mod transport;
@@ -16,6 +17,7 @@ use serde::Deserialize;
 use vsedit_events::{Emitter, Event};
 use vsedit_uri::VsUri;
 
+pub use handlers::MainThreadHandlers;
 pub use process::{ExtensionHostConfig, ExtensionHostProcess, ExtensionRuntime};
 pub use scanner::scan_extensions;
 pub use transport::RpcTransport;

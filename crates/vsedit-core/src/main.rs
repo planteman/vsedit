@@ -19,7 +19,9 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use clap::Parser;
-use crossterm::event::{Event as CtEvent, EventStream, KeyCode, KeyModifiers};
+use crossterm::event::{
+    Event as CtEvent, EventStream, KeyCode, KeyModifiers, MouseButton, MouseEventKind,
+};
 use futures::StreamExt;
 
 use vsedit_backup::BackupService;
@@ -30,6 +32,7 @@ use vsedit_configuration::{
 };
 use vsedit_contextkey::{ContextKeyService, ContextKeyValue};
 use vsedit_editor_controller::{EditorAction, EditorController};
+use vsedit_editor_types::ITextModel;
 use vsedit_editor_widget::EditorWidget;
 use vsedit_environment::EnvironmentService;
 use vsedit_ext_host::ExtensionHostManager;
@@ -777,7 +780,8 @@ fn handle_event(event: CtEvent, app: &mut AppState) -> bool {
     match event {
         CtEvent::Key(key_event) => handle_key_event(key_event, app),
         CtEvent::Resize(_cols, _rows) => false,
-        CtEvent::Mouse(_) | CtEvent::Paste(_) | CtEvent::FocusGained | CtEvent::FocusLost => false,
+        CtEvent::Mouse(mouse_event) => handle_mouse_event(mouse_event, app),
+        CtEvent::Paste(_) | CtEvent::FocusGained | CtEvent::FocusLost => false,
     }
 }
 
@@ -955,6 +959,32 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
                 sync_state(app);
                 return false;
             }
+            KeyCode::Char('w') => {
+                // Ctrl+W → close current tab
+                dispatch_command("workbench.action.closeActiveEditor", app);
+                load_active_tab_into_controller(app);
+                return false;
+            }
+            KeyCode::Tab if has_shift => {
+                // Ctrl+Shift+Tab → previous tab
+                switch_to_prev_tab(app);
+                return false;
+            }
+            KeyCode::Tab => {
+                // Ctrl+Tab → next tab
+                switch_to_next_tab(app);
+                return false;
+            }
+            KeyCode::PageUp => {
+                // Ctrl+PageUp → previous tab
+                switch_to_prev_tab(app);
+                return false;
+            }
+            KeyCode::PageDown => {
+                // Ctrl+PageDown → next tab
+                switch_to_next_tab(app);
+                return false;
+            }
             KeyCode::Char('z') => {
                 app.controller.execute_action(EditorAction::Undo);
                 sync_state(app);
@@ -1060,9 +1090,25 @@ fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
             save_active_file(app);
             sync_state(app);
         }
+        "workbench.action.files.saveAll" => {
+            save_all_dirty_tabs(app);
+        }
         "workbench.action.quickOpen" => {
             // Route to workbench quick-open (command palette in file mode).
             app.workbench.execute_command(cmd);
+        }
+        "workbench.action.showCommands" => {
+            app.workbench.execute_command(cmd);
+        }
+        "workbench.action.nextEditor" => {
+            switch_to_next_tab(app);
+        }
+        "workbench.action.previousEditor" => {
+            switch_to_prev_tab(app);
+        }
+        "workbench.action.closeActiveEditor" => {
+            app.workbench.execute_command(cmd);
+            load_active_tab_into_controller(app);
         }
         "workbench.action.gotoLine" => {
             // Stub: go to line 1 — full implementation would show input box.
@@ -1104,6 +1150,17 @@ fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
         }
         "workbench.action.tasks.build" => {
             app.workbench.execute_command(cmd);
+        }
+        "editor.action.commentLine" => {
+            exec_editor_mutating(app, EditorAction::ToggleLineComment);
+        }
+        "editor.action.addSelectionToNextFindMatch" => {
+            app.controller.execute_action(EditorAction::AddSelectionToNextFindMatch);
+            sync_state(app);
+        }
+        "editor.action.selectAllMatches" => {
+            app.controller.execute_action(EditorAction::SelectAllOccurrences);
+            sync_state(app);
         }
         _ => {
             // Try the command registry, then fall back to workbench.
@@ -1227,5 +1284,146 @@ fn sync_state(app: &mut AppState) {
                 pos.line, pos.column, cursor_count
             ),
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tab switching helpers
+// ---------------------------------------------------------------------------
+
+fn switch_to_next_tab(app: &mut AppState) {
+    app.workbench.execute_command("workbench.action.nextEditor");
+    load_active_tab_into_controller(app);
+}
+
+fn switch_to_prev_tab(app: &mut AppState) {
+    app.workbench.execute_command("workbench.action.previousEditor");
+    load_active_tab_into_controller(app);
+}
+
+fn load_active_tab_into_controller(app: &mut AppState) {
+    if let Some(tab) = app.workbench.tab_service.get_active_tab() {
+        let content = tab.content.clone();
+        let line = tab.cursor_line;
+        app.controller.model = vsedit_text_model::TextModel::new(&content);
+        app.controller.cursors = vsedit_cursor::CursorController::new();
+        if line > 0 {
+            app.controller.execute_action(EditorAction::GoToLine(line));
+        }
+    }
+    sync_state(app);
+}
+
+// ---------------------------------------------------------------------------
+// Save all dirty tabs
+// ---------------------------------------------------------------------------
+
+fn save_all_dirty_tabs(app: &mut AppState) {
+    let tabs: Vec<(usize, Option<PathBuf>, String)> = app
+        .workbench
+        .tab_service
+        .get_tabs()
+        .iter()
+        .filter(|t| t.is_modified)
+        .map(|t| (t.id, t.file_path.clone(), t.content.clone()))
+        .collect();
+
+    for (id, path, content) in tabs {
+        if let Some(path) = path {
+            app.backup_service
+                .create_backup(&path.display().to_string(), &content);
+            match std::fs::write(&path, &content) {
+                Ok(()) => {
+                    tracing::info!("Saved: {}", path.display());
+                    app.workbench.tab_service.set_modified(id, false);
+                }
+                Err(e) => {
+                    tracing::error!("Failed to save {}: {e}", path.display());
+                    app.notification_service
+                        .error(format!("Failed to save {}: {e}", path.display()));
+                }
+            }
+        }
+    }
+    app.workbench.is_modified = false;
+    sync_state(app);
+}
+
+// ---------------------------------------------------------------------------
+// Mouse event handling
+// ---------------------------------------------------------------------------
+
+fn handle_mouse_event(
+    mouse_event: crossterm::event::MouseEvent,
+    app: &mut AppState,
+) -> bool {
+    match mouse_event.kind {
+        MouseEventKind::Down(MouseButton::Left) => {
+            let row = mouse_event.row;
+            let col = mouse_event.column;
+
+            if row == 0 {
+                // Title bar — ignore.
+                return false;
+            }
+
+            if row == 1 {
+                // Tab bar area — attempt to switch tab by click position.
+                // Approximate: each tab is ~20 chars wide.
+                let tab_count = app.workbench.tab_service.tab_count();
+                if tab_count > 0 {
+                    let tab_width = 20u16;
+                    let idx = (col / tab_width) as usize;
+                    if idx < tab_count {
+                        let tabs = app.workbench.tab_service.get_tabs();
+                        let id = tabs[idx].id;
+                        app.workbench.tab_service.set_active_tab(id);
+                        load_active_tab_into_controller(app);
+                    }
+                }
+                return false;
+            }
+
+            // Editor area — move cursor to approximate position.
+            // Row 2+ maps to editor lines; adjust for header offset.
+            let editor_row_offset = 2u16;
+            let editor_col_offset = if app.workbench.layout.is_part_visible(
+                vsedit_wb_layout::Part::Sidebar,
+            ) {
+                app.workbench.layout.get_sidebar_width() as u16
+            } else {
+                0
+            };
+
+            if col >= editor_col_offset && row >= editor_row_offset {
+                let line = (row - editor_row_offset) as u32 + 1;
+                let column = (col - editor_col_offset) as u32 + 1;
+                let max_line = app.controller.model.get_line_count();
+                let target_line = line.min(max_line).max(1);
+                app.controller.execute_action(EditorAction::GoToLine(target_line));
+                // GoToLine places cursor at column 1; approximate column.
+                let line_len = app.controller.model.get_line_content(target_line).len() as u32;
+                let target_col = column.min(line_len + 1).max(1);
+                use vsedit_cursor::CursorState;
+                use vsedit_editor_types::Position;
+                app.controller.cursors.set_state(
+                    0,
+                    CursorState::from_position(Position::new(target_line, target_col)),
+                );
+                sync_state(app);
+            }
+            false
+        }
+        MouseEventKind::ScrollUp => {
+            app.controller.execute_action(EditorAction::PageUp(3));
+            sync_state(app);
+            false
+        }
+        MouseEventKind::ScrollDown => {
+            app.controller.execute_action(EditorAction::PageDown(3));
+            sync_state(app);
+            false
+        }
+        _ => false,
     }
 }

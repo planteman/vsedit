@@ -11,6 +11,7 @@ vsedit-commands = { path = "../vsedit-commands" }
 vsedit-configuration = { path = "../vsedit-configuration" }
 vsedit-contextkey = { path = "../vsedit-contextkey" }
 vsedit-di = { path = "../vsedit-di" }
+vsedit-cursor = { path = "../vsedit-cursor" }
 vsedit-editor-controller = { path = "../vsedit-editor-controller" }
 vsedit-editor-widget = { path = "../vsedit-editor-widget" }
 vsedit-environment = { path = "../vsedit-environment" }
@@ -35,6 +36,9 @@ vsedit-userdatasync = { path = "../vsedit-userdatasync" }
 vsedit-accessibility = { path = "../vsedit-accessibility" }
 vsedit-remote = { path = "../vsedit-remote" }
 vsedit-wb-clipboard = { path = "../vsedit-wb-clipboard" }
+vsedit-wb-layout = { path = "../vsedit-wb-layout" }
+vsedit-editor-types = { path = "../vsedit-editor-types" }
+vsedit-text-model = { path = "../vsedit-text-model" }
 clap = { workspace = true }
 crossterm = { workspace = true }
 futures = { workspace = true }
