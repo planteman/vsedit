@@ -2934,9 +2934,12 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "tempfile",
+ "tracing",
  "vsedit-events",
  "vsedit-ext-rpc",
  "vsedit-uri",
+ "walkdir",
 ]
 
 [[package]]

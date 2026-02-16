@@ -11,4 +11,9 @@ vsedit-events = { path = "../vsedit-events" }
 vsedit-uri = { path = "../vsedit-uri" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tracing = { workspace = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
 

@@ -1,11 +1,23 @@
 //! Extension host process management
 //!
 //! Manages extension descriptions parsed from `package.json` and tracks
-//! extension host lifecycle state and activation.
+//! extension host lifecycle state and activation. Provides child-process
+//! spawning with a `Content-Length`-framed JSON-RPC transport for
+//! communicating with VS Code extension host processes.
+
+pub mod process;
+pub mod scanner;
+pub mod transport;
+
+use std::io;
 
 use serde::Deserialize;
 use vsedit_events::{Emitter, Event};
 use vsedit_uri::VsUri;
+
+pub use process::{ExtensionHostConfig, ExtensionHostProcess, ExtensionRuntime};
+pub use scanner::scan_extensions;
+pub use transport::RpcTransport;
 
 // ---------------------------------------------------------------------------
 // Contribution types
@@ -333,11 +345,17 @@ pub enum ExtensionHostState {
 // ---------------------------------------------------------------------------
 
 /// Manages registered extensions and their activation state.
+///
+/// Optionally owns an [`ExtensionHostProcess`] that is spawned via
+/// [`start_host`](Self::start_host) and torn down via
+/// [`stop_host`](Self::stop_host).
 pub struct ExtensionHostManager {
     extensions: Vec<ExtensionDescription>,
     state: ExtensionHostState,
     activated: Vec<String>,
     on_did_change_state: Emitter<ExtensionHostState>,
+    process: Option<ExtensionHostProcess>,
+    config: ExtensionHostConfig,
 }
 
 impl ExtensionHostManager {
@@ -347,6 +365,20 @@ impl ExtensionHostManager {
             state: ExtensionHostState::Stopped,
             activated: Vec::new(),
             on_did_change_state: Emitter::new(),
+            process: None,
+            config: ExtensionHostConfig::default(),
+        }
+    }
+
+    /// Create a manager with a specific host configuration.
+    pub fn with_config(config: ExtensionHostConfig) -> Self {
+        Self {
+            extensions: Vec::new(),
+            state: ExtensionHostState::Stopped,
+            activated: Vec::new(),
+            on_did_change_state: Emitter::new(),
+            process: None,
+            config,
         }
     }
 
@@ -404,6 +436,56 @@ impl ExtensionHostManager {
     /// Subscribe to state-change events.
     pub fn on_did_change_state(&self) -> Event<ExtensionHostState> {
         self.on_did_change_state.event()
+    }
+
+    // -- Process management -------------------------------------------------
+
+    /// Spawn the extension host child process.
+    ///
+    /// Transitions the state to `Starting` and then `Running` on success, or
+    /// `Error` on failure.
+    pub fn start_host(&mut self) -> io::Result<()> {
+        if self.process.is_some() {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "extension host is already running",
+            ));
+        }
+        self.set_state(ExtensionHostState::Starting);
+
+        match ExtensionHostProcess::spawn(&self.config) {
+            Ok(proc) => {
+                self.process = Some(proc);
+                self.set_state(ExtensionHostState::Running);
+                Ok(())
+            }
+            Err(e) => {
+                self.set_state(ExtensionHostState::Error(e.to_string()));
+                Err(e)
+            }
+        }
+    }
+
+    /// Stop the extension host child process (if running).
+    pub fn stop_host(&mut self) {
+        if let Some(mut proc) = self.process.take() {
+            proc.kill();
+        }
+        self.set_state(ExtensionHostState::Stopped);
+    }
+
+    /// Check whether the extension host process is currently running.
+    pub fn is_host_running(&mut self) -> bool {
+        match &mut self.process {
+            Some(proc) => proc.is_alive(),
+            None => false,
+        }
+    }
+
+    /// Access the underlying host process (if running) for sending/receiving
+    /// messages.
+    pub fn process_mut(&mut self) -> Option<&mut ExtensionHostProcess> {
+        self.process.as_mut()
     }
 }
 
