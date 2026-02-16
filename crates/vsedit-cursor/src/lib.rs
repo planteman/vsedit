@@ -4,6 +4,8 @@
 //! Provides [`CursorState`], [`CursorController`], and standalone cursor movement
 //! functions that operate on a single cursor against an [`ITextModel`].
 
+use std::fmt;
+
 use vsedit_editor_types::{ITextModel, Position, Selection};
 
 // ---------------------------------------------------------------------------
@@ -27,6 +29,31 @@ impl CursorState {
     /// The position where the cursor is rendered (the active end of the selection).
     pub fn position(&self) -> Position {
         self.selection.active
+    }
+
+    /// Returns `true` when the cursor has a non-empty selection (anchor ≠ active).
+    pub fn is_selection(&self) -> bool {
+        self.selection.anchor != self.selection.active
+    }
+
+    /// Count the number of lines spanned by the selection.
+    ///
+    /// A collapsed cursor returns 0. A selection within a single line returns 1.
+    /// A selection spanning from line 2 to line 5 returns 4.
+    pub fn selection_line_count(&self) -> u32 {
+        if !self.is_selection() {
+            return 0;
+        }
+        let a = self.selection.anchor.line;
+        let b = self.selection.active.line;
+        if a > b { a - b + 1 } else { b - a + 1 }
+    }
+}
+
+impl fmt::Display for CursorState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let pos = self.position();
+        write!(f, "Ln {}, Col {}", pos.line, pos.column)
     }
 }
 
@@ -194,11 +221,44 @@ impl CursorController {
             self.column_select_data.pop();
         }
     }
+
+    /// Return the number of active cursors.
+    pub fn cursor_count(&self) -> usize {
+        self.cursors.len()
+    }
+
+    /// Return the positions of all cursors.
+    pub fn positions(&self) -> Vec<Position> {
+        self.cursors.iter().map(|c| c.position()).collect()
+    }
+
+    /// Return `true` when the primary cursor is at line 1, column 1.
+    pub fn is_at_origin(&self) -> bool {
+        let pos = self.cursors[0].position();
+        pos.line == 1 && pos.column == 1
+    }
+
+    /// Remove all secondary cursors, keeping only the primary cursor.
+    /// This is an alias for [`remove_secondary_cursors`](Self::remove_secondary_cursors).
+    pub fn clear_secondary(&mut self) {
+        self.remove_secondary_cursors();
+    }
 }
 
 impl Default for CursorController {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl fmt::Display for CursorController {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let n = self.cursors.len();
+        if n == 1 {
+            write!(f, "1 cursor")
+        } else {
+            write!(f, "{n} cursors")
+        }
     }
 }
 
@@ -1190,5 +1250,117 @@ mod tests {
         let r = select_word_at(&model, &c);
         assert_eq!(r.selection.anchor, Position::new(1, 1));
         assert_eq!(r.selection.active, Position::new(1, 7));
+    }
+
+    // -- New method tests ---------------------------------------------------
+
+    #[test]
+    fn cursor_count_single() {
+        let ctrl = CursorController::new();
+        assert_eq!(ctrl.cursor_count(), 1);
+    }
+
+    #[test]
+    fn cursor_count_multiple() {
+        let mut ctrl = CursorController::new();
+        ctrl.add_cursor(Position::new(2, 1));
+        ctrl.add_cursor(Position::new(3, 1));
+        assert_eq!(ctrl.cursor_count(), 3);
+    }
+
+    #[test]
+    fn positions_returns_all() {
+        let mut ctrl = CursorController::from_position(Position::new(1, 5));
+        ctrl.add_cursor(Position::new(3, 2));
+        let positions = ctrl.positions();
+        assert_eq!(positions, vec![Position::new(1, 5), Position::new(3, 2)]);
+    }
+
+    #[test]
+    fn is_at_origin_true() {
+        let ctrl = CursorController::new(); // default is (1,1)
+        assert!(ctrl.is_at_origin());
+    }
+
+    #[test]
+    fn is_at_origin_false() {
+        let ctrl = CursorController::from_position(Position::new(2, 3));
+        assert!(!ctrl.is_at_origin());
+    }
+
+    #[test]
+    fn clear_secondary_removes_extra_cursors() {
+        let mut ctrl = CursorController::new();
+        ctrl.add_cursor(Position::new(2, 1));
+        ctrl.add_cursor(Position::new(3, 1));
+        assert_eq!(ctrl.cursor_count(), 3);
+        ctrl.clear_secondary();
+        assert_eq!(ctrl.cursor_count(), 1);
+        assert!(ctrl.is_at_origin());
+    }
+
+    #[test]
+    fn is_selection_collapsed() {
+        let c = cursor_at(1, 1);
+        assert!(!c.is_selection());
+    }
+
+    #[test]
+    fn is_selection_with_range() {
+        let c = CursorState {
+            selection: Selection::new(1, 1, 1, 5),
+        };
+        assert!(c.is_selection());
+    }
+
+    #[test]
+    fn selection_line_count_collapsed() {
+        let c = cursor_at(3, 4);
+        assert_eq!(c.selection_line_count(), 0);
+    }
+
+    #[test]
+    fn selection_line_count_single_line() {
+        let c = CursorState {
+            selection: Selection::new(2, 1, 2, 8),
+        };
+        assert_eq!(c.selection_line_count(), 1);
+    }
+
+    #[test]
+    fn selection_line_count_multi_line() {
+        let c = CursorState {
+            selection: Selection::new(2, 1, 5, 3),
+        };
+        assert_eq!(c.selection_line_count(), 4);
+    }
+
+    #[test]
+    fn selection_line_count_reverse() {
+        // anchor is after active (backwards selection)
+        let c = CursorState {
+            selection: Selection::new(5, 3, 2, 1),
+        };
+        assert_eq!(c.selection_line_count(), 4);
+    }
+
+    #[test]
+    fn display_cursor_state() {
+        let c = cursor_at(10, 42);
+        assert_eq!(format!("{c}"), "Ln 10, Col 42");
+    }
+
+    #[test]
+    fn display_cursor_controller_single() {
+        let ctrl = CursorController::new();
+        assert_eq!(format!("{ctrl}"), "1 cursor");
+    }
+
+    #[test]
+    fn display_cursor_controller_multiple() {
+        let mut ctrl = CursorController::new();
+        ctrl.add_cursor(Position::new(2, 1));
+        ctrl.add_cursor(Position::new(3, 1));
+        assert_eq!(format!("{ctrl}"), "3 cursors");
     }
 }

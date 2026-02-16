@@ -649,6 +649,99 @@ pub fn follow_link_at(links: &[DocumentLink], line: u32, col: u32) -> FollowLink
     FollowLinkAction::None
 }
 
+// ---------------------------------------------------------------------------
+// Extended helpers
+// ---------------------------------------------------------------------------
+
+impl DocumentLink {
+    /// Width of the link in columns (only meaningful for single-line links).
+    pub fn span(&self) -> u32 {
+        self.end_col.saturating_sub(self.start_col)
+    }
+
+    /// Returns `true` when the target looks like an HTTP(S) URL.
+    pub fn is_url(&self) -> bool {
+        self.target.starts_with("http://") || self.target.starts_with("https://")
+    }
+}
+
+impl ClassifiedLink {
+    /// Returns `true` when the classification is `Email`.
+    pub fn is_email(&self) -> bool {
+        self.classification == LinkClassification::Email
+    }
+}
+
+impl LinkClassification {
+    /// Human-readable label for the classification variant.
+    pub fn label(&self) -> &'static str {
+        match self {
+            LinkClassification::Url => "URL",
+            LinkClassification::FilePath => "File Path",
+            LinkClassification::Email => "Email",
+            LinkClassification::Custom(_) => "Custom",
+        }
+    }
+}
+
+/// Extract the domain (host) from an `http://` or `https://` URL.
+///
+/// Returns `None` when the URL does not start with an HTTP(S) scheme or has
+/// no host component.
+pub fn extract_domain(url: &str) -> Option<&str> {
+    let rest = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))?;
+    if rest.is_empty() {
+        return None;
+    }
+    let host = rest.split('/').next().unwrap_or(rest);
+    let host = host.split(':').next().unwrap_or(host);
+    let host = host.split('?').next().unwrap_or(host);
+    if host.is_empty() {
+        None
+    } else {
+        Some(host)
+    }
+}
+
+impl LinkValidator {
+    /// Basic email format validation (no network I/O).
+    pub fn validate_email(&self, email: &str) -> Result<(), LinkError> {
+        let at_pos = email.find('@').ok_or_else(|| {
+            LinkError::InvalidUrl("missing '@' in email".into())
+        })?;
+        let local = &email[..at_pos];
+        let domain = &email[at_pos + 1..];
+        if local.is_empty() {
+            return Err(LinkError::InvalidUrl("empty local part".into()));
+        }
+        if domain.is_empty() || !domain.contains('.') {
+            return Err(LinkError::InvalidUrl("invalid domain in email".into()));
+        }
+        if domain.starts_with('.') || domain.ends_with('.') {
+            return Err(LinkError::InvalidUrl("domain starts or ends with '.'".into()));
+        }
+        Ok(())
+    }
+}
+
+/// Count classified links by type, returning `(url_count, file_count, email_count)`.
+pub fn count_links_by_type(links: &[ClassifiedLink]) -> (usize, usize, usize) {
+    let mut urls = 0usize;
+    let mut files = 0usize;
+    let mut emails = 0usize;
+    for link in links {
+        match link.classification {
+            LinkClassification::Url => urls += 1,
+            LinkClassification::FilePath => files += 1,
+            LinkClassification::Email => emails += 1,
+            LinkClassification::Custom(_) => {}
+        }
+    }
+    (urls, files, emails)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1173,5 +1266,89 @@ mod tests {
             follow_link_at(&links, 0, 5),
             FollowLinkAction::Mailto("user@example.com".into())
         );
+    }
+
+    // -- extended helper tests --
+
+    #[test]
+    fn document_link_span() {
+        let link = DocumentLink {
+            start_line: 1,
+            start_col: 5,
+            end_line: 1,
+            end_col: 25,
+            target: "x".into(),
+            tooltip: None,
+        };
+        assert_eq!(link.span(), 20);
+    }
+
+    #[test]
+    fn document_link_is_url() {
+        let http = DocumentLink {
+            start_line: 0, start_col: 0, end_line: 0, end_col: 10,
+            target: "http://example.com".into(), tooltip: None,
+        };
+        let file = DocumentLink {
+            start_line: 0, start_col: 0, end_line: 0, end_col: 10,
+            target: "./foo.rs".into(), tooltip: None,
+        };
+        assert!(http.is_url());
+        assert!(!file.is_url());
+    }
+
+    #[test]
+    fn classified_link_is_email() {
+        let email_link = ClassifiedLink {
+            start: 0, end: 10,
+            text: "a@b.com".into(),
+            classification: LinkClassification::Email,
+        };
+        let url_link = ClassifiedLink {
+            start: 0, end: 10,
+            text: "https://x.com".into(),
+            classification: LinkClassification::Url,
+        };
+        assert!(email_link.is_email());
+        assert!(!url_link.is_email());
+    }
+
+    #[test]
+    fn link_classification_labels() {
+        assert_eq!(LinkClassification::Url.label(), "URL");
+        assert_eq!(LinkClassification::FilePath.label(), "File Path");
+        assert_eq!(LinkClassification::Email.label(), "Email");
+        assert_eq!(LinkClassification::Custom("x".into()).label(), "Custom");
+    }
+
+    #[test]
+    fn extract_domain_various() {
+        assert_eq!(extract_domain("https://example.com/path"), Some("example.com"));
+        assert_eq!(extract_domain("http://sub.domain.org:8080/x"), Some("sub.domain.org"));
+        assert_eq!(extract_domain("ftp://nope.com"), None);
+        assert_eq!(extract_domain("https://"), None);
+    }
+
+    #[test]
+    fn validate_email_basic() {
+        let v = LinkValidator::new();
+        assert!(v.validate_email("user@example.com").is_ok());
+        assert!(v.validate_email("missing-at.com").is_err());
+        assert!(v.validate_email("@no-local.com").is_err());
+        assert!(v.validate_email("user@").is_err());
+        assert!(v.validate_email("user@.bad.com").is_err());
+    }
+
+    #[test]
+    fn count_links_by_type_counts() {
+        let links = vec![
+            ClassifiedLink { start: 0, end: 1, text: "https://a.com".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 2, end: 3, text: "https://b.com".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 4, end: 5, text: "./f.rs".into(), classification: LinkClassification::FilePath },
+            ClassifiedLink { start: 6, end: 7, text: "a@b.com".into(), classification: LinkClassification::Email },
+            ClassifiedLink { start: 8, end: 9, text: "a@c.com".into(), classification: LinkClassification::Email },
+            ClassifiedLink { start: 10, end: 11, text: "a@d.com".into(), classification: LinkClassification::Email },
+        ];
+        assert_eq!(count_links_by_type(&links), (2, 1, 3));
     }
 }

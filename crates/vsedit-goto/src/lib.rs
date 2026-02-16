@@ -19,6 +19,27 @@ impl Location {
         Self { uri: uri.into(), line, column, end_line: None, end_column: None }
     }
 
+    /// Create a location at a specific line with column defaulting to 0.
+    pub fn with_line(uri: impl Into<String>, line: u32) -> Self {
+        Self { uri: uri.into(), line, column: 0, end_line: None, end_column: None }
+    }
+
+    /// Extract the file name component from the URI.
+    pub fn file_name(&self) -> &str {
+        self.uri.rsplit('/').next().unwrap_or(&self.uri)
+    }
+
+    /// Returns `true` if `self` comes before `other` in the same file.
+    ///
+    /// Compares by line first, then column. Returns `false` when the
+    /// locations are in different files.
+    pub fn is_before(&self, other: &Location) -> bool {
+        if self.uri != other.uri {
+            return false;
+        }
+        (self.line, self.column) < (other.line, other.column)
+    }
+
     pub fn with_range(
         uri: impl Into<String>,
         line: u32,
@@ -66,6 +87,8 @@ pub struct LocationLink {
     pub target_selection_range: (u32, u32, u32, u32),
     /// Range in the originating document that triggered the request.
     pub origin_range: Option<(u32, u32, u32, u32)>,
+    /// URI of the originating document.
+    pub origin_uri: Option<String>,
 }
 
 impl LocationLink {
@@ -79,11 +102,23 @@ impl LocationLink {
             target_range,
             target_selection_range,
             origin_range: None,
+            origin_uri: None,
         }
     }
 
     pub fn with_origin(mut self, origin: (u32, u32, u32, u32)) -> Self {
         self.origin_range = Some(origin);
+        self
+    }
+
+    /// Returns `true` when the origin and target are in the same file.
+    pub fn is_same_file(&self) -> bool {
+        self.origin_uri.as_deref() == Some(self.target_uri.as_str())
+    }
+
+    /// Set the origin URI (builder pattern).
+    pub fn with_origin_uri(mut self, uri: impl Into<String>) -> Self {
+        self.origin_uri = Some(uri.into());
         self
     }
 
@@ -177,6 +212,46 @@ impl GotoResult {
             1 => GotoResult::Single(unique.into_iter().next().unwrap()),
             _ => GotoResult::Multiple(unique),
         }
+    }
+
+    /// Filter links to only those targeting the given file URI.
+    pub fn filter_by_file(&self, uri: &str) -> GotoResult {
+        let links: Vec<LocationLink> = match self {
+            Self::Single(l) if l.target_uri == uri => vec![l.clone()],
+            Self::Multiple(v) => v.iter().filter(|l| l.target_uri == uri).cloned().collect(),
+            _ => vec![],
+        };
+        match links.len() {
+            0 => GotoResult::None,
+            1 => GotoResult::Single(links.into_iter().next().unwrap()),
+            _ => GotoResult::Multiple(links),
+        }
+    }
+
+    /// Count the number of unique target files across all links.
+    pub fn file_count(&self) -> usize {
+        let mut uris: Vec<&str> = match self {
+            Self::Single(l) => vec![l.target_uri.as_str()],
+            Self::Multiple(v) => v.iter().map(|l| l.target_uri.as_str()).collect(),
+            Self::None => return 0,
+        };
+        uris.sort_unstable();
+        uris.dedup();
+        uris.len()
+    }
+}
+
+impl fmt::Display for Location {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}:{}", self.uri, self.line, self.column)
+    }
+}
+
+impl fmt::Display for GotoResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let n = self.len();
+        let files = self.file_count();
+        write!(f, "{n} results in {files} files")
     }
 }
 
@@ -1182,5 +1257,98 @@ mod tests {
         assert_eq!(locs[0].column, 7);
         assert!(locs[0].end_line.is_none());
         assert!(locs[0].end_column.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // New functionality tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn location_with_line_factory() {
+        let loc = Location::with_line("file:///foo.rs", 42);
+        assert_eq!(loc.uri, "file:///foo.rs");
+        assert_eq!(loc.line, 42);
+        assert_eq!(loc.column, 0);
+        assert!(loc.end_line.is_none());
+    }
+
+    #[test]
+    fn location_file_name() {
+        assert_eq!(Location::new("file:///src/main.rs", 0, 0).file_name(), "main.rs");
+        assert_eq!(Location::new("file:///a.rs", 0, 0).file_name(), "a.rs");
+        assert_eq!(Location::new("no_slash", 0, 0).file_name(), "no_slash");
+    }
+
+    #[test]
+    fn location_is_before() {
+        let a = Location::new("file:///x.rs", 5, 3);
+        let b = Location::new("file:///x.rs", 5, 10);
+        let c = Location::new("file:///x.rs", 10, 0);
+        let d = Location::new("file:///y.rs", 1, 0);
+
+        assert!(a.is_before(&b));
+        assert!(a.is_before(&c));
+        assert!(!b.is_before(&a));
+        assert!(!a.is_before(&a)); // same position is not "before"
+        assert!(!a.is_before(&d)); // different file
+    }
+
+    #[test]
+    fn location_display_trait() {
+        let loc = Location::new("file:///lib.rs", 99, 12);
+        assert_eq!(format!("{loc}"), "file:///lib.rs:99:12");
+    }
+
+    #[test]
+    fn location_link_is_same_file() {
+        let same = LocationLink::new("file:///a.rs", (0,0,0,0), (1,0,1,5))
+            .with_origin_uri("file:///a.rs");
+        assert!(same.is_same_file());
+
+        let diff = LocationLink::new("file:///b.rs", (0,0,0,0), (1,0,1,5))
+            .with_origin_uri("file:///a.rs");
+        assert!(!diff.is_same_file());
+
+        let no_origin = LocationLink::new("file:///a.rs", (0,0,0,0), (1,0,1,5));
+        assert!(!no_origin.is_same_file());
+    }
+
+    #[test]
+    fn goto_result_filter_by_file() {
+        let r = GotoResult::Multiple(vec![
+            LocationLink::new("file:///a.rs", (0,0,0,0), (1,0,1,5)),
+            LocationLink::new("file:///b.rs", (0,0,0,0), (2,0,2,5)),
+            LocationLink::new("file:///a.rs", (0,0,0,0), (3,0,3,5)),
+        ]);
+        let filtered = r.filter_by_file("file:///a.rs");
+        assert_eq!(filtered.len(), 2);
+
+        let empty = GotoResult::None.filter_by_file("file:///a.rs");
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn goto_result_file_count() {
+        let r = GotoResult::Multiple(vec![
+            LocationLink::new("file:///a.rs", (0,0,0,0), (0,0,0,0)),
+            LocationLink::new("file:///b.rs", (0,0,0,0), (0,0,0,0)),
+            LocationLink::new("file:///a.rs", (0,0,0,0), (1,0,1,5)),
+        ]);
+        assert_eq!(r.file_count(), 2);
+        assert_eq!(GotoResult::None.file_count(), 0);
+
+        let single = GotoResult::Single(LocationLink::new("x", (0,0,0,0), (0,0,0,0)));
+        assert_eq!(single.file_count(), 1);
+    }
+
+    #[test]
+    fn goto_result_display_trait() {
+        let r = GotoResult::Multiple(vec![
+            LocationLink::new("a", (0,0,0,0), (0,0,0,0)),
+            LocationLink::new("b", (0,0,0,0), (0,0,0,0)),
+            LocationLink::new("a", (0,0,0,0), (1,0,1,5)),
+        ]);
+        assert_eq!(format!("{r}"), "3 results in 2 files");
+        assert_eq!(format!("{}", GotoResult::None), "0 results in 0 files");
     }
 }

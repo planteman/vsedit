@@ -53,6 +53,21 @@ impl DetectionResult {
     pub fn exceeds_threshold(&self, threshold: f64) -> bool {
         self.confidence >= threshold
     }
+
+    /// Returns the language identifier.
+    pub fn language_id(&self) -> &str {
+        &self.language_id
+    }
+
+    /// Returns the confidence score.
+    pub fn confidence(&self) -> f64 {
+        self.confidence
+    }
+
+    /// Returns `true` if confidence is 0.8 or above.
+    pub fn is_high_confidence(&self) -> bool {
+        self.confidence >= 0.8
+    }
 }
 
 impl fmt::Display for DetectionResult {
@@ -357,6 +372,26 @@ impl LanguageDetectionService {
         results.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
         results
     }
+
+    /// Return a sorted list of all registered file extensions.
+    pub fn supported_extensions(&self) -> Vec<&str> {
+        let mut exts: Vec<&str> = self.extension_map.keys().map(|s| s.as_str()).collect();
+        exts.sort_unstable();
+        exts
+    }
+
+    /// Detect language using only the filename extension, without examining content.
+    pub fn detect_by_filename_only(&self, filename: &str) -> Option<String> {
+        let ext = filename.rsplit('.').next()?;
+        self.extension_map.get(ext).cloned()
+    }
+
+    /// Return the number of unique languages in the extension map.
+    pub fn language_count(&self) -> usize {
+        let langs: std::collections::HashSet<&str> =
+            self.extension_map.values().map(|v| v.as_str()).collect();
+        langs.len()
+    }
 }
 
 impl fmt::Display for LanguageDetectionService {
@@ -368,6 +403,19 @@ impl fmt::Display for LanguageDetectionService {
             self.min_confidence
         )
     }
+}
+
+/// Returns `true` if the given extension is a common binary file extension.
+pub fn is_binary_extension(ext: &str) -> bool {
+    matches!(
+        ext.to_ascii_lowercase().as_str(),
+        "exe" | "dll" | "so" | "bin" | "o" | "obj" | "png" | "jpg"
+    )
+}
+
+/// Normalize a language identifier by trimming whitespace and lowercasing.
+pub fn normalize_language_id(id: &str) -> String {
+    id.trim().to_lowercase()
 }
 
 /// Compute a normalised similarity score between two sets of detection results.
@@ -1176,5 +1224,79 @@ mod tests {
     fn detection_confidence_content_only() {
         let conf = detection_confidence("unknown_file", "<?xml version=\"1.0\"?>");
         assert!(conf >= 0.9);
+    }
+
+    // ── tests for new functionality ──
+
+    #[test]
+    fn detection_result_accessors() {
+        let r = DetectionResult {
+            language_id: "rust".into(),
+            confidence: 0.85,
+        };
+        assert_eq!(r.language_id(), "rust");
+        assert!((r.confidence() - 0.85).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn detection_result_is_high_confidence() {
+        let high = DetectionResult { language_id: "go".into(), confidence: 0.8 };
+        let low = DetectionResult { language_id: "go".into(), confidence: 0.79 };
+        assert!(high.is_high_confidence());
+        assert!(!low.is_high_confidence());
+    }
+
+    #[test]
+    fn is_binary_extension_known() {
+        assert!(is_binary_extension("exe"));
+        assert!(is_binary_extension("dll"));
+        assert!(is_binary_extension("so"));
+        assert!(is_binary_extension("bin"));
+        assert!(is_binary_extension("o"));
+        assert!(is_binary_extension("obj"));
+        assert!(is_binary_extension("png"));
+        assert!(is_binary_extension("jpg"));
+        assert!(is_binary_extension("EXE")); // case-insensitive
+        assert!(!is_binary_extension("rs"));
+        assert!(!is_binary_extension("txt"));
+    }
+
+    #[test]
+    fn normalize_language_id_trims_and_lowercases() {
+        assert_eq!(normalize_language_id("  Rust  "), "rust");
+        assert_eq!(normalize_language_id("JavaScript"), "javascript");
+        assert_eq!(normalize_language_id("go"), "go");
+        assert_eq!(normalize_language_id("  CPP "), "cpp");
+    }
+
+    #[test]
+    fn service_supported_extensions() {
+        let svc = LanguageDetectionService::new();
+        let exts = svc.supported_extensions();
+        assert!(exts.contains(&"rs"));
+        assert!(exts.contains(&"py"));
+        assert!(exts.contains(&"js"));
+        // verify sorted
+        let mut sorted = exts.clone();
+        sorted.sort_unstable();
+        assert_eq!(exts, sorted);
+    }
+
+    #[test]
+    fn service_detect_by_filename_only() {
+        let svc = LanguageDetectionService::new();
+        assert_eq!(svc.detect_by_filename_only("main.rs"), Some("rust".to_string()));
+        assert_eq!(svc.detect_by_filename_only("app.py"), Some("python".to_string()));
+        assert_eq!(svc.detect_by_filename_only("unknown.xyz"), None);
+        assert_eq!(svc.detect_by_filename_only("noext"), None);
+    }
+
+    #[test]
+    fn service_language_count() {
+        let svc = LanguageDetectionService::new();
+        // "yaml" and "yml" map to same language, "c" and "h" map to same language
+        let count = svc.language_count();
+        assert!(count < svc.extension_count());
+        assert!(count >= 15); // at least 15 unique languages
     }
 }

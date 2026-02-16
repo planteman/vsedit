@@ -32,6 +32,18 @@ impl std::fmt::Display for LazyError {
 
 impl std::error::Error for LazyError {}
 
+impl LazyError {
+    /// Returns `true` if this is the `NotInitialized` variant.
+    pub fn is_not_initialized(&self) -> bool {
+        matches!(self, LazyError::NotInitialized)
+    }
+
+    /// Returns `true` if this is the `AlreadyInitialized` variant.
+    pub fn is_already_initialized(&self) -> bool {
+        matches!(self, LazyError::AlreadyInitialized)
+    }
+}
+
 /// A lazily initialized value computed from a closure.
 ///
 /// The closure runs at most once, on first access.
@@ -167,6 +179,26 @@ impl<T> CachedValue<T> {
         match &self.value {
             Some(v) => predicate(v),
             None => false,
+        }
+    }
+
+    /// Return a reference to the cached value without triggering computation.
+    /// Returns `None` if no value has been computed yet.
+    pub fn get_if_cached(&self) -> Option<&T> {
+        self.value.as_ref()
+    }
+
+    /// Force recomputation of the cached value immediately.
+    pub fn refresh(&mut self) {
+        self.value = Some((self.compute)());
+    }
+}
+
+impl<T: fmt::Debug> fmt::Display for CachedValue<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.value {
+            Some(v) => write!(f, "Cached({:?})", v),
+            None => write!(f, "Empty"),
         }
     }
 }
@@ -692,6 +724,16 @@ pub fn lazy_map<T: 'static, U: 'static>(
     })
 }
 
+/// Create a `Lazy<T>` that is already initialized with the given value.
+pub fn lazy_from_value<T: 'static>(value: T) -> Lazy<T> {
+    let lazy = Lazy {
+        cell: OnceCell::new(),
+        init: None,
+    };
+    let _ = lazy.cell.set(value);
+    lazy
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1172,5 +1214,84 @@ mod tests {
     fn lazy_is_ascii_printable() {
         assert!(LazyValidator::is_ascii_printable("Hello World 123"));
         assert!(!LazyValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn cached_value_get_if_cached_none() {
+        let cached = CachedValue::new(|| 42);
+        assert!(cached.get_if_cached().is_none());
+    }
+
+    #[test]
+    fn cached_value_get_if_cached_some() {
+        let mut cached = CachedValue::new(|| 42);
+        let _ = cached.get();
+        assert_eq!(cached.get_if_cached(), Some(&42));
+    }
+
+    #[test]
+    fn cached_value_refresh() {
+        let mut counter = 0u32;
+        let mut cached = CachedValue::new(move || {
+            counter += 1;
+            counter
+        });
+        assert_eq!(*cached.get(), 1);
+        cached.refresh();
+        assert_eq!(cached.get_if_cached(), Some(&2));
+        cached.refresh();
+        assert_eq!(cached.get_if_cached(), Some(&3));
+    }
+
+    #[test]
+    fn cached_value_display_empty() {
+        let cached = CachedValue::new(|| 42);
+        assert_eq!(format!("{cached}"), "Empty");
+    }
+
+    #[test]
+    fn cached_value_display_cached() {
+        let mut cached = CachedValue::new(|| 42);
+        let _ = cached.get();
+        assert_eq!(format!("{cached}"), "Cached(42)");
+    }
+
+    #[test]
+    fn lazy_error_is_not_initialized() {
+        assert!(LazyError::NotInitialized.is_not_initialized());
+        assert!(!LazyError::AlreadyInitialized.is_not_initialized());
+        assert!(!LazyError::ComputationFailed("x".into()).is_not_initialized());
+    }
+
+    #[test]
+    fn lazy_error_is_already_initialized() {
+        assert!(LazyError::AlreadyInitialized.is_already_initialized());
+        assert!(!LazyError::NotInitialized.is_already_initialized());
+        assert!(!LazyError::ComputationFailed("x".into()).is_already_initialized());
+    }
+
+    #[test]
+    fn lazy_from_value_already_initialized() {
+        let lazy = lazy_from_value(99);
+        assert!(lazy.is_initialized());
+        assert_eq!(lazy.try_get(), Some(&99));
+    }
+
+    #[test]
+    fn lazy_from_value_into_inner() {
+        let lazy = lazy_from_value("hello".to_string());
+        assert_eq!(lazy.into_inner(), Some("hello".to_string()));
+    }
+
+    #[test]
+    fn memoized_fn_with_fn_trait() {
+        let mut memo = MemoizedFn::new(|s: &String| s.len());
+        assert_eq!(*memo.call("hello".to_string()), 5);
+        assert_eq!(*memo.call("hi".to_string()), 2);
+        assert_eq!(memo.len(), 2);
+        assert_eq!(*memo.call("hello".to_string()), 5); // cached
+        assert_eq!(memo.len(), 2); // no new entry
+        memo.clear();
+        assert!(memo.is_empty());
     }
 }

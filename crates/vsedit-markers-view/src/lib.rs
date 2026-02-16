@@ -600,6 +600,85 @@ pub fn marker_summary(markers: &[Marker]) -> std::collections::HashMap<MarkerSev
     counts
 }
 
+// ---------------------------------------------------------------------------
+// Convenience methods on MarkerSeverity
+// ---------------------------------------------------------------------------
+
+impl MarkerSeverity {
+    /// Human-readable label for the severity level.
+    pub fn label(&self) -> &'static str {
+        match self {
+            MarkerSeverity::Error => "error",
+            MarkerSeverity::Warning => "warning",
+            MarkerSeverity::Info => "info",
+            MarkerSeverity::Hint => "hint",
+        }
+    }
+
+    /// Returns `true` if this severity is `Error`.
+    pub fn is_error(&self) -> bool {
+        matches!(self, MarkerSeverity::Error)
+    }
+
+    /// Returns `true` if this severity is `Warning`.
+    pub fn is_warning(&self) -> bool {
+        matches!(self, MarkerSeverity::Warning)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Convenience methods on Marker
+// ---------------------------------------------------------------------------
+
+impl Marker {
+    /// Returns `true` if this marker has `Error` severity.
+    pub fn is_error(&self) -> bool {
+        self.severity.is_error()
+    }
+
+    /// Returns `true` if the marker has a `source` set.
+    pub fn has_source(&self) -> bool {
+        self.source.is_some()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Convenience methods on MarkersService
+// ---------------------------------------------------------------------------
+
+impl MarkersService {
+    /// Total number of markers across all URIs.
+    pub fn total_count(&self) -> usize {
+        self.markers.len()
+    }
+
+    /// Returns `true` if there are no markers at all.
+    pub fn is_empty(&self) -> bool {
+        self.markers.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Convenience methods on MarkerStats
+// ---------------------------------------------------------------------------
+
+impl MarkerStats {
+    /// Returns `true` when the error count is greater than zero.
+    pub fn has_errors(&self) -> bool {
+        self.errors > 0
+    }
+}
+
+impl std::fmt::Display for MarkerStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} errors, {} warnings, {} info, {} hints",
+            self.errors, self.warnings, self.infos, self.hints
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1193,5 +1272,72 @@ mod tests {
         assert_eq!(summary.get(&MarkerSeverity::Warning), Some(&1));
         assert_eq!(summary.get(&MarkerSeverity::Info), Some(&1));
         assert_eq!(summary.get(&MarkerSeverity::Hint), None);
+    }
+
+    // -- New convenience-method tests -------------------------------------
+
+    #[test]
+    fn severity_label() {
+        assert_eq!(MarkerSeverity::Error.label(), "error");
+        assert_eq!(MarkerSeverity::Warning.label(), "warning");
+        assert_eq!(MarkerSeverity::Info.label(), "info");
+        assert_eq!(MarkerSeverity::Hint.label(), "hint");
+    }
+
+    #[test]
+    fn severity_is_error_and_is_warning() {
+        assert!(MarkerSeverity::Error.is_error());
+        assert!(!MarkerSeverity::Error.is_warning());
+        assert!(MarkerSeverity::Warning.is_warning());
+        assert!(!MarkerSeverity::Warning.is_error());
+        assert!(!MarkerSeverity::Info.is_error());
+        assert!(!MarkerSeverity::Hint.is_warning());
+    }
+
+    #[test]
+    fn marker_is_error_delegates_to_severity() {
+        let err = make_marker("a.rs", MarkerSeverity::Error, "e");
+        let warn = make_marker("a.rs", MarkerSeverity::Warning, "w");
+        assert!(err.is_error());
+        assert!(!warn.is_error());
+    }
+
+    #[test]
+    fn marker_has_source() {
+        let without = make_marker("a.rs", MarkerSeverity::Error, "e");
+        assert!(!without.has_source());
+        let with = make_marker_ext("a.rs", MarkerSeverity::Error, "e", 1, Some("rustc"));
+        assert!(with.has_source());
+    }
+
+    #[test]
+    fn service_total_count_and_is_empty() {
+        let mut svc = MarkersService::new();
+        assert!(svc.is_empty());
+        assert_eq!(svc.total_count(), 0);
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "e1"));
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Warning, "w1"));
+        assert!(!svc.is_empty());
+        assert_eq!(svc.total_count(), 2);
+        svc.clear_all();
+        assert!(svc.is_empty());
+    }
+
+    #[test]
+    fn marker_stats_has_errors() {
+        let stats_with = MarkerStats { errors: 3, warnings: 1, infos: 0, hints: 0 };
+        assert!(stats_with.has_errors());
+        let stats_without = MarkerStats { errors: 0, warnings: 2, infos: 1, hints: 0 };
+        assert!(!stats_without.has_errors());
+    }
+
+    #[test]
+    fn marker_stats_display() {
+        let stats = MarkerStats { errors: 2, warnings: 3, infos: 1, hints: 4 };
+        let text = format!("{}", stats);
+        assert_eq!(text, "2 errors, 3 warnings, 1 info, 4 hints");
+
+        let empty = MarkerStats { errors: 0, warnings: 0, infos: 0, hints: 0 };
+        assert_eq!(format!("{}", empty), "0 errors, 0 warnings, 0 info, 0 hints");
     }
 }

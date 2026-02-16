@@ -60,6 +60,24 @@ impl Position {
     pub fn max(a: Position, b: Position) -> Position {
         if a >= b { a } else { b }
     }
+
+    /// Factory for the origin position (0, 0).
+    pub fn origin() -> Position {
+        Position { line: 0, column: 0 }
+    }
+
+    /// Create a new position by translating this one by the given deltas.
+    ///
+    /// Negative deltas move the position upward (line) or leftward (column).
+    /// The result is clamped so that neither component goes below zero.
+    pub fn translate(&self, line_delta: i32, column_delta: i32) -> Position {
+        let new_line = (self.line as i64 + line_delta as i64).max(0) as u32;
+        let new_column = (self.column as i64 + column_delta as i64).max(0) as u32;
+        Position {
+            line: new_line,
+            column: new_column,
+        }
+    }
 }
 
 impl PartialOrd for Position {
@@ -78,7 +96,7 @@ impl Ord for Position {
 
 impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {})", self.line, self.column)
+        write!(f, "Ln {}, Col {}", self.line, self.column)
     }
 }
 
@@ -180,11 +198,38 @@ impl Range {
     pub fn is_single_line(&self) -> bool {
         self.start.line == self.end.line
     }
+
+    /// Returns the number of lines spanned by this range.
+    ///
+    /// A single-line range returns 1. A range from line 1 to line 3 returns 3.
+    pub fn line_count(&self) -> u32 {
+        self.end.line - self.start.line + 1
+    }
+
+    /// Create a new range by translating both start and end positions.
+    pub fn translate(&self, line_delta: i32, column_delta: i32) -> Range {
+        Range {
+            start: self.start.translate(line_delta, column_delta),
+            end: self.end.translate(line_delta, column_delta),
+        }
+    }
+
+    /// Returns the smallest range that contains both `self` and `other`.
+    pub fn union(&self, other: &Range) -> Range {
+        Range {
+            start: Position::min(self.start, other.start),
+            end: Position::max(self.end, other.end),
+        }
+    }
 }
 
 impl fmt::Display for Range {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{} -> {}]", self.start, self.end)
+        write!(
+            f,
+            "Ln {}:Col {} - Ln {}:Col {}",
+            self.start.line, self.start.column, self.end.line, self.end.column
+        )
     }
 }
 
@@ -551,6 +596,13 @@ impl Selection {
         let end = range.end.line;
         if start <= end { end - start + 1 } else { start - end + 1 }
     }
+
+    /// Returns the number of lines in this selection.
+    ///
+    /// Delegates to `as_range().line_count()`.
+    pub fn length_in_lines(&self) -> u32 {
+        self.as_range().line_count()
+    }
 }
 
 /// Check whether a position is contained within a range (inclusive of start, exclusive of end).
@@ -666,7 +718,7 @@ mod tests {
 
     #[test]
     fn position_display() {
-        assert_eq!(Position::new(1, 5).to_string(), "(1, 5)");
+        assert_eq!(Position::new(1, 5).to_string(), "Ln 1, Col 5");
     }
 
     #[test]
@@ -795,7 +847,10 @@ mod tests {
 
     #[test]
     fn range_display() {
-        assert_eq!(Range::new(1, 1, 2, 5).to_string(), "[(1, 1) -> (2, 5)]");
+        assert_eq!(
+            Range::new(1, 1, 2, 5).to_string(),
+            "Ln 1:Col 1 - Ln 2:Col 5"
+        );
     }
 
     // -- Selection tests --
@@ -1161,5 +1216,78 @@ mod tests {
     fn selection_line_span() {
         let sel = Selection::from_positions(Position::new(2, 1), Position::new(5, 10));
         assert_eq!(sel.line_span(), 4);
+    }
+
+    // -- New functionality tests --
+
+    #[test]
+    fn position_origin() {
+        let p = Position::origin();
+        assert_eq!(p.line, 0);
+        assert_eq!(p.column, 0);
+    }
+
+    #[test]
+    fn position_translate_positive() {
+        let p = Position::new(3, 5);
+        let t = p.translate(2, 3);
+        assert_eq!(t, Position::new(5, 8));
+    }
+
+    #[test]
+    fn position_translate_negative_clamped() {
+        let p = Position::new(1, 2);
+        let t = p.translate(-10, -10);
+        assert_eq!(t, Position::new(0, 0));
+    }
+
+    #[test]
+    fn range_line_count_single_line() {
+        let r = Range::new(3, 1, 3, 10);
+        assert_eq!(r.line_count(), 1);
+    }
+
+    #[test]
+    fn range_line_count_multi_line() {
+        let r = Range::new(2, 1, 7, 5);
+        assert_eq!(r.line_count(), 6);
+    }
+
+    #[test]
+    fn range_translate() {
+        let r = Range::new(1, 1, 3, 5);
+        let t = r.translate(10, 2);
+        assert_eq!(t.start, Position::new(11, 3));
+        assert_eq!(t.end, Position::new(13, 7));
+    }
+
+    #[test]
+    fn range_union() {
+        let a = Range::new(3, 5, 5, 1);
+        let b = Range::new(1, 1, 4, 3);
+        let u = a.union(&b);
+        assert_eq!(u.start, Position::new(1, 1));
+        assert_eq!(u.end, Position::new(5, 1));
+    }
+
+    #[test]
+    fn selection_length_in_lines() {
+        let sel = Selection::new(5, 1, 2, 3);
+        assert_eq!(sel.length_in_lines(), 4);
+    }
+
+    #[test]
+    fn position_translate_zero_delta() {
+        let p = Position::new(4, 7);
+        assert_eq!(p.translate(0, 0), p);
+    }
+
+    #[test]
+    fn range_union_disjoint() {
+        let a = Range::new(1, 1, 2, 1);
+        let b = Range::new(5, 1, 6, 1);
+        let u = a.union(&b);
+        assert_eq!(u.start, Position::new(1, 1));
+        assert_eq!(u.end, Position::new(6, 1));
     }
 }

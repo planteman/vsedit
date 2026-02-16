@@ -59,6 +59,13 @@ pub struct CommandDescriptor {
     pub description: Option<String>,
 }
 
+impl CommandDescriptor {
+    /// Returns `true` if the descriptor has a non-empty description.
+    pub fn has_description(&self) -> bool {
+        self.description.as_ref().is_some_and(|d| !d.is_empty())
+    }
+}
+
 impl fmt::Debug for CommandDescriptor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandDescriptor")
@@ -175,6 +182,12 @@ impl CommandRegistry {
         map.contains_key(id)
     }
 
+    /// Returns the number of commands currently registered.
+    pub fn command_count(&self) -> usize {
+        let map = self.commands.read().unwrap();
+        map.len()
+    }
+
     /// Returns a sorted list of all registered command IDs.
     pub fn get_commands(&self) -> Vec<String> {
         let map = self.commands.read().unwrap();
@@ -246,6 +259,12 @@ impl CommandService {
     pub fn registry(&self) -> &CommandRegistry {
         &self.registry
     }
+
+    /// Returns `true` if the given command `id` is registered in the
+    /// underlying registry.
+    pub fn is_command_registered(&self, id: &str) -> bool {
+        self.registry.has(id)
+    }
 }
 
 impl Default for CommandService {
@@ -292,6 +311,12 @@ pub fn register_builtin_commands(
 pub struct HistoryEntry {
     pub command_id: String,
     pub timestamp_ms: u64,
+}
+
+impl fmt::Display for HistoryEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} @ {}", self.command_id, self.timestamp_ms)
+    }
 }
 
 /// Records executed commands, providing recency and frequency queries.
@@ -346,6 +371,19 @@ impl CommandHistory {
     pub fn clear(&mut self) {
         self.entries.clear();
         self.frequency.clear();
+    }
+
+    /// Return the most recent history entry, or `None` if empty.
+    pub fn last_entry(&self) -> Option<&HistoryEntry> {
+        self.entries.last()
+    }
+
+    /// Return all history entries whose `command_id` matches the given id.
+    pub fn entries_for_command(&self, command_id: &str) -> Vec<&HistoryEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.command_id == command_id)
+            .collect()
     }
 
     /// Total number of recorded executions.
@@ -1189,5 +1227,106 @@ mod tests {
         let cmds = vec!["a".to_string(), "b".to_string()];
         let results = command_fuzzy_search(&cmds, "");
         assert_eq!(results.len(), 2);
+    }
+
+    // -- New method tests ---------------------------------------------------
+
+    #[test]
+    fn history_last_entry() {
+        let mut history = CommandHistory::new();
+        assert!(history.last_entry().is_none());
+
+        history.record("file.save", 100);
+        history.record("edit.undo", 200);
+        let last = history.last_entry().unwrap();
+        assert_eq!(last.command_id, "edit.undo");
+        assert_eq!(last.timestamp_ms, 200);
+    }
+
+    #[test]
+    fn history_entries_for_command() {
+        let mut history = CommandHistory::new();
+        history.record("file.save", 100);
+        history.record("edit.undo", 200);
+        history.record("file.save", 300);
+        history.record("edit.redo", 400);
+
+        let saves = history.entries_for_command("file.save");
+        assert_eq!(saves.len(), 2);
+        assert_eq!(saves[0].timestamp_ms, 100);
+        assert_eq!(saves[1].timestamp_ms, 300);
+
+        let missing = history.entries_for_command("nonexistent");
+        assert!(missing.is_empty());
+    }
+
+    #[test]
+    fn history_is_empty_and_clear() {
+        let mut history = CommandHistory::new();
+        assert!(history.is_empty());
+
+        history.record("cmd.x", 1);
+        assert!(!history.is_empty());
+
+        history.clear();
+        assert!(history.is_empty());
+        assert_eq!(history.len(), 0);
+        assert_eq!(history.get_frequency("cmd.x"), 0);
+    }
+
+    #[test]
+    fn descriptor_has_description() {
+        let with_desc = CommandDescriptor {
+            id: "cmd".into(),
+            handler: Box::new(|_| Ok(None)),
+            description: Some("A description".into()),
+        };
+        assert!(with_desc.has_description());
+
+        let without_desc = CommandDescriptor {
+            id: "cmd".into(),
+            handler: Box::new(|_| Ok(None)),
+            description: None,
+        };
+        assert!(!without_desc.has_description());
+
+        let empty_desc = CommandDescriptor {
+            id: "cmd".into(),
+            handler: Box::new(|_| Ok(None)),
+            description: Some(String::new()),
+        };
+        assert!(!empty_desc.has_description());
+    }
+
+    #[test]
+    fn registry_command_count() {
+        let registry = CommandRegistry::new();
+        assert_eq!(registry.command_count(), 0);
+
+        let _r1 = registry.register("a", Box::new(|_| Ok(None)));
+        let _r2 = registry.register("b", Box::new(|_| Ok(None)));
+        assert_eq!(registry.command_count(), 2);
+
+        drop(_r1);
+        assert_eq!(registry.command_count(), 1);
+    }
+
+    #[test]
+    fn service_is_command_registered() {
+        let service = CommandService::new();
+        assert!(!service.is_command_registered("svc.missing"));
+
+        let _reg = service.registry().register("svc.ping", Box::new(|_| Ok(None)));
+        assert!(service.is_command_registered("svc.ping"));
+    }
+
+    #[test]
+    fn history_entry_display() {
+        let entry = HistoryEntry {
+            command_id: "file.save".into(),
+            timestamp_ms: 1234567890,
+        };
+        let displayed = format!("{}", entry);
+        assert_eq!(displayed, "file.save @ 1234567890");
     }
 }

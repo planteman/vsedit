@@ -656,6 +656,91 @@ impl Default for ReferenceService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Additional methods requested by user
+// ---------------------------------------------------------------------------
+
+impl Location {
+    /// Return the number of lines this location spans (alias for clarity).
+    pub fn line_count(&self) -> u32 {
+        self.end_line - self.start_line + 1
+    }
+
+    /// Return true if the given line falls within this location's line range.
+    pub fn contains_line(&self, line: u32) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+}
+
+impl ReferenceItem {
+    /// Return true if this reference points to the given URI.
+    pub fn is_same_file_as(&self, uri: &str) -> bool {
+        self.location.uri == uri
+    }
+}
+
+impl ReferenceKind {
+    /// Return a human-readable label for this kind.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Declaration => "declaration",
+            Self::Definition => "definition",
+            Self::Read => "read",
+            Self::Write => "write",
+            Self::Call => "call",
+            Self::Import => "import",
+            Self::Other => "other",
+        }
+    }
+
+    /// Return true if this kind is `Definition`.
+    pub fn is_definition(&self) -> bool {
+        matches!(self, Self::Definition)
+    }
+}
+
+/// A reference item annotated with its kind.
+#[derive(Debug, Clone)]
+pub struct KindedReferenceItem {
+    pub item: ReferenceItem,
+    pub kind: ReferenceKind,
+}
+
+impl ReferencesModel {
+    /// Return references matching the given kind from a parallel kinded list.
+    ///
+    /// This operates on a supplied slice of `KindedReferenceItem` because
+    /// `ReferencesModel` does not store kinds itself.
+    pub fn filter_by_kind<'a>(
+        items: &'a [KindedReferenceItem],
+        kind: ReferenceKind,
+    ) -> Vec<&'a ReferenceItem> {
+        items
+            .iter()
+            .filter(|k| k.kind == kind)
+            .map(|k| &k.item)
+            .collect()
+    }
+
+    /// Merge all references from `other` into `self`.
+    pub fn merge(&mut self, other: ReferencesModel) {
+        for r in other.references {
+            self.references.push(r);
+        }
+    }
+}
+
+impl fmt::Display for ReferencesModel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} references in {} files",
+            self.total_count(),
+            self.file_count()
+        )
+    }
+}
+
 /// Convenience function: find all references at a position.
 pub fn find_references_at(
     service: &ReferenceService,
@@ -1175,5 +1260,93 @@ mod tests {
         let svc = ReferenceService::new();
         let model = find_references_at(&svc, "sym", "f", 0, 0, true);
         assert!(model.is_empty());
+    }
+
+    // --- Tests for newly added functionality ---
+
+    #[test]
+    fn location_line_count() {
+        assert_eq!(Location::new("a.rs", 5, 0, 5, 10).line_count(), 1);
+        assert_eq!(Location::new("a.rs", 5, 0, 9, 10).line_count(), 5);
+        assert_eq!(Location::new("a.rs", 1, 0, 100, 0).line_count(), 100);
+    }
+
+    #[test]
+    fn location_contains_line() {
+        let l = Location::new("a.rs", 5, 0, 10, 0);
+        assert!(l.contains_line(5));
+        assert!(l.contains_line(7));
+        assert!(l.contains_line(10));
+        assert!(!l.contains_line(4));
+        assert!(!l.contains_line(11));
+    }
+
+    #[test]
+    fn reference_item_is_same_file_as() {
+        let r = ref_item("src/main.rs", 1, 0);
+        assert!(r.is_same_file_as("src/main.rs"));
+        assert!(!r.is_same_file_as("src/lib.rs"));
+    }
+
+    #[test]
+    fn reference_kind_label() {
+        assert_eq!(ReferenceKind::Declaration.label(), "declaration");
+        assert_eq!(ReferenceKind::Definition.label(), "definition");
+        assert_eq!(ReferenceKind::Read.label(), "read");
+        assert_eq!(ReferenceKind::Write.label(), "write");
+        assert_eq!(ReferenceKind::Call.label(), "call");
+        assert_eq!(ReferenceKind::Import.label(), "import");
+        assert_eq!(ReferenceKind::Other.label(), "other");
+    }
+
+    #[test]
+    fn reference_kind_is_definition() {
+        assert!(ReferenceKind::Definition.is_definition());
+        assert!(!ReferenceKind::Declaration.is_definition());
+        assert!(!ReferenceKind::Read.is_definition());
+        assert!(!ReferenceKind::Call.is_definition());
+        assert!(!ReferenceKind::Other.is_definition());
+    }
+
+    #[test]
+    fn filter_by_kind() {
+        let items = vec![
+            KindedReferenceItem { item: ref_item("a.rs", 1, 0), kind: ReferenceKind::Read },
+            KindedReferenceItem { item: ref_item("a.rs", 2, 0), kind: ReferenceKind::Write },
+            KindedReferenceItem { item: ref_item("a.rs", 3, 0), kind: ReferenceKind::Read },
+            KindedReferenceItem { item: ref_item("b.rs", 4, 0), kind: ReferenceKind::Definition },
+        ];
+        let reads = ReferencesModel::filter_by_kind(&items, ReferenceKind::Read);
+        assert_eq!(reads.len(), 2);
+        assert_eq!(reads[0].location.start_line, 1);
+        assert_eq!(reads[1].location.start_line, 3);
+
+        let defs = ReferencesModel::filter_by_kind(&items, ReferenceKind::Definition);
+        assert_eq!(defs.len(), 1);
+
+        let calls = ReferencesModel::filter_by_kind(&items, ReferenceKind::Call);
+        assert!(calls.is_empty());
+    }
+
+    #[test]
+    fn model_merge() {
+        let mut a = ReferencesModel::new("sym", loc("a.rs", 1, 0));
+        a.add_reference(ref_item("a.rs", 10, 0));
+        let mut b = ReferencesModel::new("sym", loc("a.rs", 1, 0));
+        b.add_reference(ref_item("b.rs", 20, 0));
+        b.add_reference(ref_item("c.rs", 30, 0));
+        a.merge(b);
+        assert_eq!(a.total_count(), 3);
+        assert_eq!(a.file_count(), 3);
+    }
+
+    #[test]
+    fn model_display() {
+        let mut model = ReferencesModel::new("foo", loc("a.rs", 1, 0));
+        model.add_reference(ref_item("a.rs", 10, 0));
+        model.add_reference(ref_item("b.rs", 20, 0));
+        model.add_reference(ref_item("a.rs", 30, 0));
+        let s = format!("{model}");
+        assert_eq!(s, "3 references in 2 files");
     }
 }

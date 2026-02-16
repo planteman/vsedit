@@ -49,6 +49,11 @@ impl MenuId {
         }
     }
 
+    /// Returns true for built-in standard menus, false for `Custom`.
+    pub fn is_standard(&self) -> bool {
+        !matches!(self, MenuId::Custom(_))
+    }
+
     /// Returns a human-readable label for display in the menu bar.
     pub fn label(&self) -> &str {
         match self {
@@ -80,6 +85,7 @@ pub enum MenuError {
     MenuNotFound(String),
     EntryNotFound(String),
     DuplicateEntry(String),
+    InvalidShortcut(String),
 }
 
 impl fmt::Display for MenuError {
@@ -88,6 +94,7 @@ impl fmt::Display for MenuError {
             MenuError::MenuNotFound(id) => write!(f, "menu not found: {}", id),
             MenuError::EntryNotFound(id) => write!(f, "entry not found: {}", id),
             MenuError::DuplicateEntry(id) => write!(f, "duplicate entry: {}", id),
+            MenuError::InvalidShortcut(s) => write!(f, "invalid shortcut: {}", s),
         }
     }
 }
@@ -105,6 +112,16 @@ pub struct MenuEntry {
 }
 
 impl MenuEntry {
+    /// Returns whether this entry is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Returns whether this entry has a keyboard shortcut assigned.
+    pub fn has_shortcut(&self) -> bool {
+        self.shortcut.is_some()
+    }
+
     /// Builder method to set the group.
     pub fn with_group(mut self, group: &str) -> Self {
         self.group = Some(group.to_string());
@@ -355,6 +372,61 @@ impl MenuBarService {
     /// Restores the menu bar state from a previously captured snapshot.
     pub fn restore(&mut self, snapshot: &MenuBarSnapshot) {
         self.menus = snapshot.menus.clone();
+    }
+
+    /// Returns the total number of entries across all menus.
+    pub fn total_entry_count(&self) -> usize {
+        self.menus.values().map(|v| v.len()).sum()
+    }
+
+    /// Finds entries across all menus where `command_id` starts with the given prefix.
+    pub fn find_entries_by_prefix(&self, prefix: &str) -> Vec<&MenuEntry> {
+        let mut result: Vec<&MenuEntry> = self
+            .menus
+            .values()
+            .flat_map(|entries| entries.iter())
+            .filter(|e| e.command_id.starts_with(prefix))
+            .collect();
+        result.sort_by_key(|e| &e.command_id);
+        result
+    }
+
+    /// Returns `(command_id, shortcut)` pairs for all entries that have shortcuts.
+    pub fn get_all_shortcuts(&self) -> Vec<(&str, &str)> {
+        let mut pairs: Vec<(&str, &str)> = self
+            .menus
+            .values()
+            .flat_map(|entries| entries.iter())
+            .filter_map(|e| {
+                e.shortcut
+                    .as_deref()
+                    .map(|sc| (e.command_id.as_str(), sc))
+            })
+            .collect();
+        pairs.sort_by_key(|(cmd, _)| *cmd);
+        pairs
+    }
+
+    /// Returns the number of enabled entries across all menus.
+    pub fn enabled_entry_count(&self) -> usize {
+        self.menus
+            .values()
+            .flat_map(|entries| entries.iter())
+            .filter(|e| e.enabled)
+            .count()
+    }
+
+    /// Disables an entry by `command_id`. Returns `true` if the entry was found and disabled.
+    pub fn disable_entry(&mut self, command_id: &str) -> bool {
+        for entries in self.menus.values_mut() {
+            for entry in entries.iter_mut() {
+                if entry.command_id == command_id {
+                    entry.enabled = false;
+                    return true;
+                }
+            }
+        }
+        false
     }
 }
 
@@ -1152,5 +1224,100 @@ mod tests {
         assert_eq!(MENU_ORDER.len(), 8);
         assert_eq!(MENU_ORDER[0], MenuId::File);
         assert_eq!(MENU_ORDER[7], MenuId::Help);
+    }
+
+    // --- New functionality tests ---
+
+    #[test]
+    fn menu_entry_is_enabled() {
+        let e = entry("cmd", 1);
+        assert!(e.is_enabled());
+        let e2 = entry("cmd", 1).with_enabled(false);
+        assert!(!e2.is_enabled());
+    }
+
+    #[test]
+    fn menu_entry_has_shortcut() {
+        let e = entry("cmd", 1);
+        assert!(!e.has_shortcut());
+        let e2 = entry("cmd", 1).with_shortcut("Ctrl+S");
+        assert!(e2.has_shortcut());
+    }
+
+    #[test]
+    fn menu_id_is_standard() {
+        assert!(MenuId::File.is_standard());
+        assert!(MenuId::Edit.is_standard());
+        assert!(MenuId::Selection.is_standard());
+        assert!(MenuId::View.is_standard());
+        assert!(MenuId::Go.is_standard());
+        assert!(MenuId::Run.is_standard());
+        assert!(MenuId::Terminal.is_standard());
+        assert!(MenuId::Help.is_standard());
+        assert!(!MenuId::Custom("tools".into()).is_standard());
+    }
+
+    #[test]
+    fn total_entry_count() {
+        let mut svc = MenuBarService::new();
+        assert_eq!(svc.total_entry_count(), 0);
+        svc.add_entry(&MenuId::File, entry("open", 1));
+        svc.add_entry(&MenuId::Edit, entry("undo", 1));
+        svc.add_entry(&MenuId::Edit, entry("redo", 2));
+        assert_eq!(svc.total_entry_count(), 3);
+    }
+
+    #[test]
+    fn find_entries_by_prefix() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("file.open", 1));
+        svc.add_entry(&MenuId::File, entry("file.save", 2));
+        svc.add_entry(&MenuId::Edit, entry("edit.undo", 1));
+        let found = svc.find_entries_by_prefix("file.");
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].command_id, "file.open");
+        assert_eq!(found[1].command_id, "file.save");
+        assert!(svc.find_entries_by_prefix("nonexistent").is_empty());
+    }
+
+    #[test]
+    fn get_all_shortcuts() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("open", 1).with_shortcut("Ctrl+O"));
+        svc.add_entry(&MenuId::File, entry("save", 2).with_shortcut("Ctrl+S"));
+        svc.add_entry(&MenuId::Edit, entry("undo", 1)); // no shortcut
+        let shortcuts = svc.get_all_shortcuts();
+        assert_eq!(shortcuts.len(), 2);
+        assert_eq!(shortcuts[0], ("open", "Ctrl+O"));
+        assert_eq!(shortcuts[1], ("save", "Ctrl+S"));
+    }
+
+    #[test]
+    fn enabled_entry_count() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("open", 1));
+        svc.add_entry(&MenuId::File, entry("save", 2).with_enabled(false));
+        svc.add_entry(&MenuId::Edit, entry("undo", 1));
+        assert_eq!(svc.enabled_entry_count(), 2);
+    }
+
+    #[test]
+    fn disable_entry_found() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("save", 1));
+        assert!(svc.disable_entry("save"));
+        assert!(!svc.find_item_by_command("save").unwrap().enabled);
+    }
+
+    #[test]
+    fn disable_entry_not_found() {
+        let mut svc = MenuBarService::new();
+        assert!(!svc.disable_entry("nonexistent"));
+    }
+
+    #[test]
+    fn invalid_shortcut_error_display() {
+        let err = MenuError::InvalidShortcut("bad+key".into());
+        assert_eq!(format!("{}", err), "invalid shortcut: bad+key");
     }
 }

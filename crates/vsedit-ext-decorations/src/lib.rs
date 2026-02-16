@@ -381,6 +381,52 @@ impl DecorationBridge {
     pub fn clear_uri(&mut self, uri: &str) {
         self.applied.retain(|(_, u, _)| u != uri);
     }
+
+    /// Returns `true` when no decoration types are registered.
+    pub fn is_empty(&self) -> bool {
+        self.types.is_empty()
+    }
+
+    /// Lookup a registered decoration type by key.
+    pub fn get_type(&self, key: &str) -> Option<&DecorationType> {
+        self.types.iter().find(|t| t.key == key)
+    }
+
+    /// Remove all registered types and applied decorations.
+    pub fn clear_all(&mut self) {
+        self.types.clear();
+        self.applied.clear();
+    }
+}
+
+impl fmt::Display for DecorationBridge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let n = self.types.len();
+        if n == 1 {
+            write!(f, "1 decoration type")
+        } else {
+            write!(f, "{n} decoration types")
+        }
+    }
+}
+
+impl DecorationRenderOptions {
+    /// Returns `true` if a background color is set.
+    pub fn has_background(&self) -> bool {
+        self.background_color.is_some()
+    }
+
+    /// Returns `true` if a border is set.
+    pub fn has_border(&self) -> bool {
+        self.border.is_some()
+    }
+}
+
+impl DecorationType {
+    /// Returns `true` if this decoration type applies to whole lines.
+    pub fn is_whole_line(&self) -> bool {
+        self.options.is_whole_line
+    }
 }
 
 /// Initialize the decorations extension API bridge.
@@ -1192,5 +1238,88 @@ mod tests {
     fn overview_ruler_lane_variants() {
         assert_ne!(OverviewRulerLane::Left, OverviewRulerLane::Right);
         assert_ne!(OverviewRulerLane::Center, OverviewRulerLane::Full);
+    }
+
+    // -- new functionality tests --------------------------------------------
+
+    #[test]
+    fn bridge_is_empty() {
+        let bridge = DecorationBridge::new();
+        assert!(bridge.is_empty());
+        let mut bridge2 = DecorationBridge::new();
+        bridge2.register_type("k", RenderOptionsBuilder::new().build());
+        assert!(!bridge2.is_empty());
+    }
+
+    #[test]
+    fn bridge_get_type() {
+        let mut bridge = DecorationBridge::new();
+        let opts = RenderOptionsBuilder::new().background_color("red").build();
+        bridge.register_type("err", opts.clone());
+        let dt = bridge.get_type("err").unwrap();
+        assert_eq!(dt.key, "err");
+        assert_eq!(dt.options, opts);
+        assert!(bridge.get_type("missing").is_none());
+    }
+
+    #[test]
+    fn bridge_clear_all() {
+        let mut bridge = DecorationBridge::new();
+        bridge.register_type("a", RenderOptionsBuilder::new().build());
+        bridge.register_type("b", RenderOptionsBuilder::new().build());
+        bridge.set_decorations("a", "file:///x", vec![DecorationOptions {
+            start_line: 0, start_character: 0, end_line: 0, end_character: 1,
+            hover_message: None,
+        }]);
+        assert_eq!(bridge.type_count(), 2);
+        assert_eq!(bridge.applied_count(), 1);
+        bridge.clear_all();
+        assert!(bridge.is_empty());
+        assert_eq!(bridge.applied_count(), 0);
+    }
+
+    #[test]
+    fn render_options_has_background() {
+        let with_bg = RenderOptionsBuilder::new().background_color("red").build();
+        assert!(with_bg.has_background());
+        let without = RenderOptionsBuilder::new().build();
+        assert!(!without.has_background());
+    }
+
+    #[test]
+    fn render_options_has_border() {
+        let with_border = RenderOptionsBuilder::new().border("1px solid").build();
+        assert!(with_border.has_border());
+        let without = RenderOptionsBuilder::new().build();
+        assert!(!without.has_border());
+    }
+
+    #[test]
+    fn decoration_type_is_whole_line() {
+        let whole = DecorationType {
+            key: "k".into(),
+            options: RenderOptionsBuilder::new().whole_line(true).build(),
+        };
+        assert!(whole.is_whole_line());
+        let partial = DecorationType {
+            key: "k2".into(),
+            options: RenderOptionsBuilder::new().whole_line(false).build(),
+        };
+        assert!(!partial.is_whole_line());
+    }
+
+    #[test]
+    fn bridge_display() {
+        let bridge = DecorationBridge::new();
+        assert_eq!(format!("{bridge}"), "0 decoration types");
+
+        let mut bridge1 = DecorationBridge::new();
+        bridge1.register_type("a", RenderOptionsBuilder::new().build());
+        assert_eq!(format!("{bridge1}"), "1 decoration type");
+
+        let mut bridge2 = DecorationBridge::new();
+        bridge2.register_type("a", RenderOptionsBuilder::new().build());
+        bridge2.register_type("b", RenderOptionsBuilder::new().build());
+        assert_eq!(format!("{bridge2}"), "2 decoration types");
     }
 }

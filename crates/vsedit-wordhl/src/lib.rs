@@ -12,13 +12,20 @@ pub enum DocumentHighlightKind {
     Write,
 }
 
+impl DocumentHighlightKind {
+    /// Human-readable label for this kind.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Text => "text",
+            Self::Read => "read",
+            Self::Write => "write",
+        }
+    }
+}
+
 impl std::fmt::Display for DocumentHighlightKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Text => write!(f, "text"),
-            Self::Read => write!(f, "read"),
-            Self::Write => write!(f, "write"),
-        }
+        f.write_str(self.label())
     }
 }
 
@@ -41,6 +48,11 @@ impl DocumentHighlight {
 
     /// Length of the highlight in columns.
     pub fn len(&self) -> u32 {
+        self.end_column.saturating_sub(self.start_column)
+    }
+
+    /// Width of the highlight span in columns.
+    pub fn span(&self) -> u32 {
         self.end_column.saturating_sub(self.start_column)
     }
 
@@ -280,6 +292,38 @@ impl HighlightSet {
     pub fn into_inner(self) -> Vec<DocumentHighlight> {
         self.highlights
     }
+
+    /// Merge all highlights from `other` into this set.
+    pub fn merge(&mut self, other: HighlightSet) {
+        self.highlights.extend(other.highlights);
+    }
+
+    /// Remove all highlights on the given line. Returns the number removed.
+    pub fn remove_on_line(&mut self, line: u32) -> usize {
+        let before = self.highlights.len();
+        self.highlights.retain(|h| h.line != line);
+        before - self.highlights.len()
+    }
+
+    /// Remove all highlights.
+    pub fn clear(&mut self) {
+        self.highlights.clear();
+    }
+
+    /// Return sorted unique line numbers that contain at least one highlight.
+    pub fn lines(&self) -> Vec<u32> {
+        let mut lines: Vec<u32> = self.highlights.iter().map(|h| h.line).collect();
+        lines.sort_unstable();
+        lines.dedup();
+        lines
+    }
+
+    /// Check whether any highlight in the set contains the given position.
+    pub fn contains_position(&self, line: u32, col: u32) -> bool {
+        self.highlights
+            .iter()
+            .any(|h| h.line == line && h.contains_column(col))
+    }
 }
 
 impl IntoIterator for HighlightSet {
@@ -292,7 +336,12 @@ impl IntoIterator for HighlightSet {
 
 impl std::fmt::Display for HighlightSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "HighlightSet({} items)", self.highlights.len())
+        write!(
+            f,
+            "{} highlights on {} lines",
+            self.highlights.len(),
+            self.distinct_line_count()
+        )
     }
 }
 
@@ -878,7 +927,7 @@ mod tests {
         assert_eq!(set.on_line(2).len(), 0);
         assert_eq!(set.by_kind(DocumentHighlightKind::Text).len(), 2);
         assert_eq!(set.distinct_line_count(), 2);
-        assert_eq!(set.to_string(), "HighlightSet(3 items)");
+        assert_eq!(set.to_string(), "3 highlights on 2 lines");
     }
 
     #[test]
@@ -1165,5 +1214,97 @@ mod tests {
         assert!(HighlightPriority::HIGH > HighlightPriority::NORMAL);
         assert!(HighlightPriority::NORMAL > HighlightPriority::LOW);
         assert_eq!(HighlightPriority(50), HighlightPriority::NORMAL);
+    }
+
+    #[test]
+    fn highlight_span() {
+        let h = DocumentHighlight::new(1, 3, 10, DocumentHighlightKind::Text);
+        assert_eq!(h.span(), 7);
+        let empty = DocumentHighlight::new(1, 5, 5, DocumentHighlightKind::Read);
+        assert_eq!(empty.span(), 0);
+    }
+
+    #[test]
+    fn highlight_kind_label() {
+        assert_eq!(DocumentHighlightKind::Read.label(), "read");
+        assert_eq!(DocumentHighlightKind::Write.label(), "write");
+        assert_eq!(DocumentHighlightKind::Text.label(), "text");
+    }
+
+    #[test]
+    fn highlight_set_merge() {
+        let mut a = HighlightSet::from_highlights(vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+        ]);
+        let b = HighlightSet::from_highlights(vec![
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Read),
+            DocumentHighlight::new(3, 1, 5, DocumentHighlightKind::Write),
+        ]);
+        a.merge(b);
+        assert_eq!(a.len(), 3);
+        assert_eq!(a.distinct_line_count(), 3);
+    }
+
+    #[test]
+    fn highlight_set_remove_on_line() {
+        let mut set = HighlightSet::from_highlights(vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 8, 12, DocumentHighlightKind::Read),
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Text),
+        ]);
+        let removed = set.remove_on_line(1);
+        assert_eq!(removed, 2);
+        assert_eq!(set.len(), 1);
+        assert_eq!(set.remove_on_line(99), 0);
+    }
+
+    #[test]
+    fn highlight_set_clear() {
+        let mut set = HighlightSet::from_highlights(vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Read),
+        ]);
+        assert!(!set.is_empty());
+        set.clear();
+        assert!(set.is_empty());
+        assert_eq!(set.len(), 0);
+    }
+
+    #[test]
+    fn highlight_set_lines() {
+        let set = HighlightSet::from_highlights(vec![
+            DocumentHighlight::new(5, 1, 3, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 3, DocumentHighlightKind::Read),
+            DocumentHighlight::new(5, 6, 9, DocumentHighlightKind::Write),
+            DocumentHighlight::new(1, 1, 3, DocumentHighlightKind::Text),
+        ]);
+        assert_eq!(set.lines(), vec![1, 2, 5]);
+    }
+
+    #[test]
+    fn highlight_set_contains_position() {
+        let set = HighlightSet::from_highlights(vec![
+            DocumentHighlight::new(1, 5, 10, DocumentHighlightKind::Read),
+            DocumentHighlight::new(3, 2, 6, DocumentHighlightKind::Text),
+        ]);
+        assert!(set.contains_position(1, 5));
+        assert!(set.contains_position(1, 9));
+        assert!(!set.contains_position(1, 10)); // exclusive end
+        assert!(!set.contains_position(1, 4));
+        assert!(set.contains_position(3, 3));
+        assert!(!set.contains_position(2, 5)); // wrong line
+    }
+
+    #[test]
+    fn highlight_set_display_format() {
+        let empty = HighlightSet::new();
+        assert_eq!(empty.to_string(), "0 highlights on 0 lines");
+
+        let set = HighlightSet::from_highlights(vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 8, 12, DocumentHighlightKind::Read),
+            DocumentHighlight::new(3, 1, 5, DocumentHighlightKind::Write),
+        ]);
+        assert_eq!(set.to_string(), "3 highlights on 2 lines");
     }
 }

@@ -311,6 +311,16 @@ impl MeasuredString {
     pub fn is_empty(&self) -> bool {
         self.text.is_empty()
     }
+
+    /// Check if all characters in the string are ASCII.
+    pub fn is_ascii(&self) -> bool {
+        self.text.is_ascii()
+    }
+
+    /// Return the number of Unicode scalar values (chars) in the string.
+    pub fn char_count(&self) -> usize {
+        self.text.chars().count()
+    }
 }
 
 impl std::fmt::Display for MeasuredString {
@@ -762,6 +772,126 @@ pub fn char_count(s: &str) -> usize {
     s.chars().count()
 }
 
+/// Capitalize the first character of a string.
+pub fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => {
+            let mut result = String::with_capacity(s.len());
+            for c in first.to_uppercase() {
+                result.push(c);
+            }
+            result.extend(chars);
+            result
+        }
+    }
+}
+
+/// Lowercase the first character of a string.
+pub fn decapitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => {
+            let mut result = String::with_capacity(s.len());
+            for c in first.to_lowercase() {
+                result.push(c);
+            }
+            result.extend(chars);
+            result
+        }
+    }
+}
+
+/// Check if a string is empty or contains only whitespace.
+pub fn is_blank(s: &str) -> bool {
+    s.is_empty() || s.chars().all(|c| c.is_whitespace())
+}
+
+/// Repeat a string `count` times.
+pub fn repeat_string(s: &str, count: usize) -> String {
+    s.repeat(count)
+}
+
+/// Prepend `indent` to each line of `text`.
+pub fn indent_lines(text: &str, indent: &str) -> String {
+    let lines: Vec<&str> = text.split('\n').collect();
+    let mut result = String::with_capacity(text.len() + indent.len() * lines.len());
+    for (i, line) in lines.iter().enumerate() {
+        if i > 0 {
+            result.push('\n');
+        }
+        result.push_str(indent);
+        result.push_str(line);
+    }
+    result
+}
+
+/// Remove up to `count` leading spaces from each line of `text`.
+pub fn dedent_lines(text: &str, count: usize) -> String {
+    let lines: Vec<&str> = text.split('\n').collect();
+    let mut result = String::with_capacity(text.len());
+    for (i, line) in lines.iter().enumerate() {
+        if i > 0 {
+            result.push('\n');
+        }
+        let spaces = line.chars().take_while(|c| *c == ' ').count();
+        let remove = spaces.min(count);
+        result.push_str(&line[remove..]);
+    }
+    result
+}
+
+/// Convert a camelCase or PascalCase string to snake_case, handling consecutive uppercase runs
+/// (e.g. "HTMLParser" → "html_parser").
+pub fn camel_to_snake(s: &str) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let mut result = String::with_capacity(s.len() + 4);
+    let len = chars.len();
+    let mut i = 0;
+    while i < len {
+        let c = chars[i];
+        if c.is_uppercase() {
+            // Detect a run of uppercase characters.
+            let run_start = i;
+            while i < len && chars[i].is_uppercase() {
+                i += 1;
+            }
+            let run_len = i - run_start;
+            if run_len == 1 {
+                // Single uppercase char: simple boundary.
+                if run_start > 0 {
+                    result.push('_');
+                }
+                result.extend(c.to_lowercase());
+            } else if i < len && !chars[i].is_uppercase() {
+                // Acronym followed by a lowercase char — last uppercase starts a new word.
+                if run_start > 0 {
+                    result.push('_');
+                }
+                for j in run_start..i - 1 {
+                    result.extend(chars[j].to_lowercase());
+                }
+                result.push('_');
+                result.extend(chars[i - 1].to_lowercase());
+            } else {
+                // Trailing uppercase run (e.g. "FOO" at end).
+                if run_start > 0 {
+                    result.push('_');
+                }
+                for j in run_start..i {
+                    result.extend(chars[j].to_lowercase());
+                }
+            }
+        } else {
+            result.push(c);
+            i += 1;
+        }
+    }
+    result
+}
+
 /// Convert a string to title case, capitalising the first letter of each whitespace-separated word.
 pub fn title_case(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
@@ -1164,5 +1294,72 @@ mod tests {
     #[test]
     fn title_case_unicode() {
         assert_eq!(title_case("über cool"), "Über Cool");
+    }
+
+    #[test]
+    fn test_capitalize() {
+        assert_eq!(capitalize("hello"), "Hello");
+        assert_eq!(capitalize(""), "");
+        assert_eq!(capitalize("Hello"), "Hello");
+        assert_eq!(capitalize("über"), "Über");
+    }
+
+    #[test]
+    fn test_decapitalize() {
+        assert_eq!(decapitalize("Hello"), "hello");
+        assert_eq!(decapitalize(""), "");
+        assert_eq!(decapitalize("ABC"), "aBC");
+    }
+
+    #[test]
+    fn test_is_blank() {
+        assert!(is_blank(""));
+        assert!(is_blank("   "));
+        assert!(is_blank("\t\n "));
+        assert!(!is_blank("a"));
+        assert!(!is_blank("  x  "));
+    }
+
+    #[test]
+    fn test_repeat_string() {
+        assert_eq!(repeat_string("ab", 3), "ababab");
+        assert_eq!(repeat_string("x", 0), "");
+        assert_eq!(repeat_string("", 5), "");
+    }
+
+    #[test]
+    fn test_indent_and_dedent_lines() {
+        let text = "line1\nline2\nline3";
+        let indented = indent_lines(text, "  ");
+        assert_eq!(indented, "  line1\n  line2\n  line3");
+        let dedented = dedent_lines(&indented, 2);
+        assert_eq!(dedented, text);
+        // dedent more than available spaces is safe
+        assert_eq!(dedent_lines("  hi", 10), "hi");
+    }
+
+    #[test]
+    fn test_camel_to_snake() {
+        assert_eq!(camel_to_snake("camelCase"), "camel_case");
+        assert_eq!(camel_to_snake("HTMLParser"), "html_parser");
+        assert_eq!(camel_to_snake("PascalCase"), "pascal_case");
+        assert_eq!(camel_to_snake("already_snake"), "already_snake");
+        assert_eq!(camel_to_snake("getHTTPSUrl"), "get_https_url");
+        assert_eq!(camel_to_snake("ABC"), "abc");
+    }
+
+    #[test]
+    fn test_measured_string_is_ascii_and_char_count() {
+        let ascii = MeasuredString::new("hello");
+        assert!(ascii.is_ascii());
+        assert_eq!(ascii.char_count(), 5);
+
+        let unicode = MeasuredString::new("日本語");
+        assert!(!unicode.is_ascii());
+        assert_eq!(unicode.char_count(), 3);
+
+        let empty = MeasuredString::new("");
+        assert!(empty.is_ascii());
+        assert_eq!(empty.char_count(), 0);
     }
 }

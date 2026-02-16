@@ -256,6 +256,16 @@ impl ProblemsPanel {
 
     fn render_problem_list(&self, area: Rect, buf: &mut Buffer) {
         let filtered = self.filtered_problems();
+
+        if filtered.is_empty() {
+            let msg = Line::from(Span::styled(
+                "No problems have been detected",
+                Style::default().fg(Color::DarkGray),
+            ));
+            msg.render(area, buf);
+            return;
+        }
+
         let visible = area.height as usize;
         let start = self.scroll_offset;
 

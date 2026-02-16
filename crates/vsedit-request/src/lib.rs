@@ -677,6 +677,71 @@ where
     retry
 }
 
+// ---------------------------------------------------------------------------
+// Additional RequestState helpers
+// ---------------------------------------------------------------------------
+
+impl RequestState {
+    /// Returns `true` when the state is terminal (Completed, Cancelled, or Failed).
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, RequestState::Completed | RequestState::Cancelled | RequestState::Failed(_))
+    }
+
+    /// Human-readable label for the state.
+    pub fn label(&self) -> &'static str {
+        match self {
+            RequestState::Pending => "Pending",
+            RequestState::InProgress => "In Progress",
+            RequestState::Completed => "Completed",
+            RequestState::Cancelled => "Cancelled",
+            RequestState::Failed(_) => "Failed",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional RequestService helpers
+// ---------------------------------------------------------------------------
+
+impl RequestService {
+    /// Returns `true` when the service has no tracked requests.
+    pub fn is_empty(&self) -> bool {
+        self.requests.is_empty()
+    }
+
+    /// Count of requests currently in a `Failed` state.
+    pub fn failed_count(&self) -> usize {
+        self.requests
+            .iter()
+            .filter(|r| matches!(r.state, RequestState::Failed(_)))
+            .count()
+    }
+
+    /// Return the method string of a request by its ID.
+    pub fn get_method(&self, id: RequestId) -> Option<&str> {
+        self.requests
+            .iter()
+            .find(|r| r.id == id)
+            .map(|r| r.method.as_str())
+    }
+
+    /// Cancel all pending/in-progress requests whose `created_at` timestamp is
+    /// older than `max_age` (i.e. `created_at < max_age`). Returns the number
+    /// of requests cancelled.
+    pub fn cancel_timed_out(&mut self, max_age: u64) -> usize {
+        let mut count = 0;
+        for req in &mut self.requests {
+            if req.created_at < max_age
+                && matches!(req.state, RequestState::Pending | RequestState::InProgress)
+            {
+                req.state = RequestState::Cancelled;
+                count += 1;
+            }
+        }
+        count
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1167,5 +1232,78 @@ mod tests {
         });
         assert!(!result.succeeded());
         assert_eq!(result.attempt_count(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for newly added functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn is_empty_on_new_service() {
+        let svc = RequestService::new();
+        assert!(svc.is_empty());
+        let mut svc2 = RequestService::new();
+        svc2.create_request("GET /ping");
+        assert!(!svc2.is_empty());
+    }
+
+    #[test]
+    fn failed_count_tracks_failures() {
+        let mut svc = RequestService::new();
+        let id1 = svc.create_request("a");
+        let id2 = svc.create_request("b");
+        svc.create_request("c");
+        svc.fail(id1, "timeout");
+        svc.fail(id2, "connection refused");
+        assert_eq!(svc.failed_count(), 2);
+    }
+
+    #[test]
+    fn get_method_returns_method_string() {
+        let mut svc = RequestService::new();
+        let id = svc.create_request("POST /upload");
+        assert_eq!(svc.get_method(id), Some("POST /upload"));
+        assert_eq!(svc.get_method(RequestId(999)), None);
+    }
+
+    #[test]
+    fn request_state_is_terminal() {
+        assert!(!RequestState::Pending.is_terminal());
+        assert!(!RequestState::InProgress.is_terminal());
+        assert!(RequestState::Completed.is_terminal());
+        assert!(RequestState::Cancelled.is_terminal());
+        assert!(RequestState::Failed("err".into()).is_terminal());
+    }
+
+    #[test]
+    fn request_state_label() {
+        assert_eq!(RequestState::Pending.label(), "Pending");
+        assert_eq!(RequestState::InProgress.label(), "In Progress");
+        assert_eq!(RequestState::Completed.label(), "Completed");
+        assert_eq!(RequestState::Cancelled.label(), "Cancelled");
+        assert_eq!(RequestState::Failed("x".into()).label(), "Failed");
+    }
+
+    #[test]
+    fn cancel_timed_out_cancels_old_requests() {
+        let mut svc = RequestService::new();
+        let _old = RequestBuilder::new("GET /old").created_at(10).build(&mut svc);
+        let _mid = RequestBuilder::new("GET /mid").created_at(50).build(&mut svc);
+        let _new = RequestBuilder::new("GET /new").created_at(100).build(&mut svc);
+        let cancelled = svc.cancel_timed_out(60);
+        assert_eq!(cancelled, 2);
+        assert_eq!(svc.pending_count(), 1);
+        assert_eq!(svc.get_method(_new), Some("GET /new"));
+    }
+
+    #[test]
+    fn cancel_timed_out_skips_terminal_requests() {
+        let mut svc = RequestService::new();
+        let id = RequestBuilder::new("GET /done").created_at(5).build(&mut svc);
+        svc.start(id);
+        svc.complete(id);
+        let cancelled = svc.cancel_timed_out(100);
+        assert_eq!(cancelled, 0);
+        assert_eq!(svc.get_state(id), Some(&RequestState::Completed));
     }
 }

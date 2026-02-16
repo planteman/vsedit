@@ -206,6 +206,16 @@ impl fmt::Display for RenderedLine {
 }
 
 impl RenderedLine {
+    /// Return the number of characters in the rendered text.
+    pub fn char_count(&self) -> usize {
+        self.text.chars().count()
+    }
+
+    /// Check whether the rendered text contains the given pattern.
+    pub fn contains(&self, pattern: &str) -> bool {
+        self.text.contains(pattern)
+    }
+
     /// Return the source byte offset for a given display column.
     pub fn offset_at_column(&self, col: usize) -> Result<usize, RenderError> {
         self.column_to_offset.get(col).copied().ok_or(RenderError::ColumnOutOfBounds {
@@ -249,6 +259,11 @@ impl Default for RenderConfig {
 }
 
 impl RenderConfig {
+    /// Create a default configuration with tab_size=4, no max width, no whitespace rendering.
+    pub fn default_config() -> Self {
+        Self::default()
+    }
+
     /// Create a new builder for `RenderConfig`.
     pub fn builder() -> RenderConfigBuilder {
         RenderConfigBuilder::default()
@@ -778,6 +793,53 @@ pub fn dedent(text: &str, tab_size: u32) -> String {
         .join("\n")
 }
 
+impl WhitespaceRender {
+    /// Return a human-readable label for this whitespace render mode.
+    pub fn label(&self) -> &'static str {
+        match self {
+            WhitespaceRender::None => "none",
+            WhitespaceRender::Boundary => "boundary",
+            WhitespaceRender::Selection => "selection",
+            WhitespaceRender::Trailing => "trailing",
+            WhitespaceRender::All => "all",
+        }
+    }
+}
+
+/// Count the number of leading whitespace characters in `text`.
+pub fn count_leading_whitespace(text: &str) -> usize {
+    text.chars().take_while(|c| c.is_whitespace()).count()
+}
+
+/// Count the number of trailing whitespace characters in `text`.
+pub fn count_trailing_whitespace(text: &str) -> usize {
+    text.chars().rev().take_while(|c| c.is_whitespace()).count()
+}
+
+/// Normalize line endings by converting `\r\n` sequences to `\n`.
+pub fn normalize_line_endings(text: &str) -> String {
+    text.replace("\r\n", "\n")
+}
+
+/// Count the number of visible character columns in `text`, expanding tabs
+/// to `tab_size` aligned stops and skipping line-ending characters.
+pub fn visible_char_count(text: &str, tab_size: u32) -> usize {
+    let mut count: usize = 0;
+    for ch in text.chars() {
+        match ch {
+            '\t' => {
+                let spaces = tab_size as usize - (count % tab_size as usize);
+                count += spaces;
+            }
+            '\r' | '\n' => {}
+            c => {
+                count += UnicodeWidthChar::width(c).unwrap_or(0);
+            }
+        }
+    }
+    count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1179,5 +1241,77 @@ mod tests {
     fn dedent_no_indent() {
         let text = "hello\nworld";
         assert_eq!(dedent(text, 4), "hello\nworld");
+    }
+
+    #[test]
+    fn rendered_line_char_count() {
+        let r = render_line("hello", 4);
+        assert_eq!(r.char_count(), 5);
+        let r2 = render_line("a\tb", 4);
+        // tab expands to 3 spaces: "a   b" = 5 chars
+        assert_eq!(r2.char_count(), 5);
+    }
+
+    #[test]
+    fn rendered_line_char_count_wide() {
+        let r = render_line("你好", 4);
+        assert_eq!(r.char_count(), 2);
+    }
+
+    #[test]
+    fn rendered_line_contains() {
+        let r = render_line("hello world", 4);
+        assert!(r.contains("world"));
+        assert!(!r.contains("xyz"));
+    }
+
+    #[test]
+    fn render_config_default_config() {
+        let cfg = RenderConfig::default_config();
+        assert_eq!(cfg.tab_size, 4);
+        assert_eq!(cfg.max_width, 0);
+        assert_eq!(cfg.whitespace_mode, WhitespaceRender::None);
+    }
+
+    #[test]
+    fn whitespace_render_label() {
+        assert_eq!(WhitespaceRender::None.label(), "none");
+        assert_eq!(WhitespaceRender::Boundary.label(), "boundary");
+        assert_eq!(WhitespaceRender::Selection.label(), "selection");
+        assert_eq!(WhitespaceRender::Trailing.label(), "trailing");
+        assert_eq!(WhitespaceRender::All.label(), "all");
+    }
+
+    #[test]
+    fn count_leading_whitespace_works() {
+        assert_eq!(count_leading_whitespace("  hello"), 2);
+        assert_eq!(count_leading_whitespace("hello"), 0);
+        assert_eq!(count_leading_whitespace("\t hello"), 2);
+        assert_eq!(count_leading_whitespace(""), 0);
+    }
+
+    #[test]
+    fn count_trailing_whitespace_works() {
+        assert_eq!(count_trailing_whitespace("hello  "), 2);
+        assert_eq!(count_trailing_whitespace("hello"), 0);
+        assert_eq!(count_trailing_whitespace("hello \t"), 2);
+        assert_eq!(count_trailing_whitespace(""), 0);
+    }
+
+    #[test]
+    fn normalize_line_endings_works() {
+        assert_eq!(normalize_line_endings("a\r\nb\r\n"), "a\nb\n");
+        assert_eq!(normalize_line_endings("a\nb"), "a\nb");
+        assert_eq!(normalize_line_endings("no endings"), "no endings");
+        assert_eq!(normalize_line_endings("\r\n\r\n"), "\n\n");
+    }
+
+    #[test]
+    fn visible_char_count_works() {
+        assert_eq!(visible_char_count("hello", 4), 5);
+        assert_eq!(visible_char_count("a\tb", 4), 5);
+        assert_eq!(visible_char_count("你好", 4), 4);
+        assert_eq!(visible_char_count("\t", 4), 4);
+        assert_eq!(visible_char_count("ab\r\n", 4), 2);
     }
 }

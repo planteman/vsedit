@@ -19,9 +19,21 @@ pub struct TimelineItem {
     pub sha: String,
 }
 
+impl TimelineItem {
+    /// Compute the age of this item in seconds relative to `now`.
+    pub fn age_seconds(&self, now: u64) -> u64 {
+        now.saturating_sub(self.timestamp)
+    }
+
+    /// Check whether this item was authored by `author` (case-insensitive).
+    pub fn is_by_author(&self, author: &str) -> bool {
+        self.author.eq_ignore_ascii_case(author)
+    }
+}
+
 impl fmt::Display for TimelineItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}] {} ({}) - {}", self.sha, self.message, self.author, self.timestamp)
+        write!(f, "{} {}: {}", self.sha, self.author, self.message)
     }
 }
 
@@ -157,6 +169,33 @@ impl TimelineSnapshot {
             captured_at,
             items,
         }
+    }
+
+    /// Return unique authors across all items in this snapshot.
+    pub fn authors(&self) -> Vec<&str> {
+        let mut seen = Vec::new();
+        for item in &self.items {
+            let a = item.author.as_str();
+            if !seen.contains(&a) {
+                seen.push(a);
+            }
+        }
+        seen
+    }
+
+    /// Return the most recent item by timestamp, or `None` if empty.
+    pub fn latest_item(&self) -> Option<&TimelineItem> {
+        self.items.iter().max_by_key(|i| i.timestamp)
+    }
+
+    /// Return the oldest item by timestamp, or `None` if empty.
+    pub fn oldest_item(&self) -> Option<&TimelineItem> {
+        self.items.iter().min_by_key(|i| i.timestamp)
+    }
+
+    /// Return items that match the given filter.
+    pub fn filter(&self, f: &TimelineFilter) -> Vec<&TimelineItem> {
+        self.items.iter().filter(|item| f.matches(item)).collect()
     }
 
     /// Compute the difference between this snapshot and another.
@@ -733,9 +772,7 @@ mod tests {
             sha: "abc123".into(),
         };
         let s = format!("{item}");
-        assert!(s.contains("abc123"));
-        assert!(s.contains("Fix bug"));
-        assert!(s.contains("Alice"));
+        assert_eq!(s, "abc123 Alice: Fix bug");
     }
 
     #[test]
@@ -1193,5 +1230,68 @@ mod tests {
         // Unix epoch is 1970-01-01
         let date = unix_timestamp_to_date(0);
         assert_eq!(date, "1970-01-01");
+    }
+
+    // ── New method tests ──
+
+    #[test]
+    fn age_seconds_basic() {
+        let item = TimelineItem { timestamp: 1000, message: "m".into(), author: "a".into(), sha: "s".into() };
+        assert_eq!(item.age_seconds(1500), 500);
+        // now < timestamp saturates to 0
+        assert_eq!(item.age_seconds(500), 0);
+    }
+
+    #[test]
+    fn is_by_author_case_insensitive() {
+        let item = TimelineItem { timestamp: 1, message: "m".into(), author: "Alice".into(), sha: "s".into() };
+        assert!(item.is_by_author("alice"));
+        assert!(item.is_by_author("ALICE"));
+        assert!(item.is_by_author("Alice"));
+        assert!(!item.is_by_author("Bob"));
+    }
+
+    #[test]
+    fn snapshot_authors_unique() {
+        let snap = TimelineSnapshot::new("t", 0, sample_items());
+        let authors = snap.authors();
+        assert_eq!(authors.len(), 3);
+        assert!(authors.contains(&"Alice"));
+        assert!(authors.contains(&"Bob"));
+        assert!(authors.contains(&"Charlie"));
+    }
+
+    #[test]
+    fn snapshot_latest_and_oldest() {
+        let snap = TimelineSnapshot::new("t", 0, sample_items());
+        let latest = snap.latest_item().unwrap();
+        assert_eq!(latest.sha, "eee555");
+        let oldest = snap.oldest_item().unwrap();
+        assert_eq!(oldest.sha, "aaa111");
+    }
+
+    #[test]
+    fn snapshot_latest_oldest_empty() {
+        let snap = TimelineSnapshot::new("empty", 0, vec![]);
+        assert!(snap.latest_item().is_none());
+        assert!(snap.oldest_item().is_none());
+    }
+
+    #[test]
+    fn snapshot_filter_method() {
+        let snap = TimelineSnapshot::new("t", 0, sample_items());
+        let filter = TimelineFilter::new().with_author("bob");
+        let filtered = snap.filter(&filter);
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|i| i.author == "Bob"));
+    }
+
+    #[test]
+    fn snapshot_filter_with_date_range() {
+        let snap = TimelineSnapshot::new("t", 0, sample_items());
+        let filter = TimelineFilter::new().with_date_range(1700100000, 1700200000);
+        let filtered = snap.filter(&filter);
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|i| i.timestamp >= 1700100000 && i.timestamp <= 1700200000));
     }
 }

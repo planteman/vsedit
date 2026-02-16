@@ -337,6 +337,9 @@ impl Default for TelemetryEventBuilder {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TelemetrySummary {
     pub total_events: usize,
+    pub error_count: usize,
+    pub exception_count: usize,
+    pub metric_count: usize,
     pub counts_by_type: HashMap<String, usize>,
     pub measurement_sums: HashMap<String, f64>,
     pub measurement_counts: HashMap<String, usize>,
@@ -361,6 +364,9 @@ impl TelemetrySummary {
 
         Self {
             total_events: events.len(),
+            error_count: events.iter().filter(|e| e.event_type == TelemetryEventType::Error).count(),
+            exception_count: events.iter().filter(|e| e.event_type == TelemetryEventType::Exception).count(),
+            metric_count: events.iter().filter(|e| e.event_type == TelemetryEventType::Metric).count(),
             counts_by_type,
             measurement_sums,
             measurement_counts,
@@ -626,6 +632,77 @@ impl TelemetryAggregator {
 
     pub fn drain(&mut self) -> Vec<TelemetryEvent> {
         std::mem::take(&mut self.events)
+    }
+}
+
+// --- TelemetryLevel::is_more_permissive_than ---
+
+impl TelemetryLevel {
+    /// Returns `true` if `self` permits strictly more event types than `other`.
+    ///
+    /// Permissiveness order: Off < Crash < Error < Usage.
+    pub fn is_more_permissive_than(&self, other: &TelemetryLevel) -> bool {
+        self.ordinal() > other.ordinal()
+    }
+
+    fn ordinal(&self) -> u8 {
+        match self {
+            TelemetryLevel::Off => 0,
+            TelemetryLevel::Crash => 1,
+            TelemetryLevel::Error => 2,
+            TelemetryLevel::Usage => 3,
+        }
+    }
+}
+
+// --- TelemetryEventType::is_error_type ---
+
+impl TelemetryEventType {
+    /// Returns `true` for `Error` and `Exception` variants.
+    pub fn is_error_type(&self) -> bool {
+        matches!(self, TelemetryEventType::Error | TelemetryEventType::Exception)
+    }
+}
+
+// --- Additional TelemetryService query methods ---
+
+impl TelemetryService {
+    /// Returns the number of events with type `Error`.
+    pub fn error_count(&self) -> usize {
+        self.events.iter().filter(|e| e.event_type == TelemetryEventType::Error).count()
+    }
+
+    /// Returns the number of events with type `Exception`.
+    pub fn exception_count(&self) -> usize {
+        self.events.iter().filter(|e| e.event_type == TelemetryEventType::Exception).count()
+    }
+
+    /// Returns events whose timestamp is >= `timestamp`.
+    pub fn events_since(&self, timestamp: u64) -> Vec<&TelemetryEvent> {
+        self.events.iter().filter(|e| e.timestamp >= timestamp).collect()
+    }
+
+    /// Returns a reference to the most recently recorded event, if any.
+    pub fn last_event(&self) -> Option<&TelemetryEvent> {
+        self.events.last()
+    }
+}
+
+// --- TelemetrySummary::from_service ---
+
+impl TelemetrySummary {
+    /// Build a summary from a `TelemetryService`, including convenience counts.
+    pub fn from_service(service: &TelemetryService) -> Self {
+        let mut summary = Self::from_events(service.get_events());
+        // Ensure error_count / exception_count / metric_count are present in counts_by_type
+        summary.error_count = service.error_count();
+        summary.exception_count = service.exception_count();
+        summary.metric_count = service
+            .get_events()
+            .iter()
+            .filter(|e| e.event_type == TelemetryEventType::Metric)
+            .count();
+        summary
     }
 }
 
@@ -1158,5 +1235,92 @@ mod tests {
         assert_eq!(filtered.len(), 2);
         assert_eq!(filtered[0].name, "ok");
         assert_eq!(filtered[1].name, "metric");
+    }
+
+    // --- Tests for newly added functionality ---
+
+    #[test]
+    fn error_count_returns_only_errors() {
+        let mut svc = TelemetryService::new(TelemetryLevel::Usage);
+        svc.log_error("err1", "msg", None);
+        svc.log_error("err2", "msg", None);
+        svc.log_exception("exc1", "msg");
+        svc.log_event("evt1", vec![], vec![]);
+        assert_eq!(svc.error_count(), 2);
+    }
+
+    #[test]
+    fn exception_count_returns_only_exceptions() {
+        let mut svc = TelemetryService::new(TelemetryLevel::Usage);
+        svc.log_exception("exc1", "msg");
+        svc.log_exception("exc2", "msg");
+        svc.log_error("err1", "msg", None);
+        svc.log_event("evt1", vec![], vec![]);
+        assert_eq!(svc.exception_count(), 2);
+    }
+
+    #[test]
+    fn events_since_filters_by_timestamp() {
+        let mut svc = TelemetryService::new(TelemetryLevel::Usage);
+        svc.events.push(TelemetryEvent {
+            name: "old".to_string(),
+            event_type: TelemetryEventType::Event,
+            properties: vec![],
+            measurements: vec![],
+            timestamp: 100,
+        });
+        svc.events.push(TelemetryEvent {
+            name: "new".to_string(),
+            event_type: TelemetryEventType::Event,
+            properties: vec![],
+            measurements: vec![],
+            timestamp: 500,
+        });
+        let recent = svc.events_since(200);
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].name, "new");
+    }
+
+    #[test]
+    fn last_event_returns_most_recent() {
+        let mut svc = TelemetryService::new(TelemetryLevel::Usage);
+        assert!(svc.last_event().is_none());
+        svc.log_event("first", vec![], vec![]);
+        svc.log_event("second", vec![], vec![]);
+        assert_eq!(svc.last_event().unwrap().name, "second");
+    }
+
+    #[test]
+    fn telemetry_level_is_more_permissive_than() {
+        assert!(TelemetryLevel::Usage.is_more_permissive_than(&TelemetryLevel::Error));
+        assert!(TelemetryLevel::Error.is_more_permissive_than(&TelemetryLevel::Crash));
+        assert!(TelemetryLevel::Crash.is_more_permissive_than(&TelemetryLevel::Off));
+        assert!(!TelemetryLevel::Off.is_more_permissive_than(&TelemetryLevel::Off));
+        assert!(!TelemetryLevel::Error.is_more_permissive_than(&TelemetryLevel::Usage));
+    }
+
+    #[test]
+    fn event_type_is_error_type() {
+        assert!(TelemetryEventType::Error.is_error_type());
+        assert!(TelemetryEventType::Exception.is_error_type());
+        assert!(!TelemetryEventType::Event.is_error_type());
+        assert!(!TelemetryEventType::Metric.is_error_type());
+    }
+
+    #[test]
+    fn telemetry_summary_from_service() {
+        let mut svc = TelemetryService::new(TelemetryLevel::Usage);
+        svc.log_error("e1", "msg", None);
+        svc.log_error("e2", "msg", None);
+        svc.log_exception("ex1", "msg");
+        svc.log_metric("m1", 5.0);
+        svc.log_metric("m2", 10.0);
+        svc.log_event("ev1", vec![], vec![]);
+
+        let summary = TelemetrySummary::from_service(&svc);
+        assert_eq!(summary.total_events, 6);
+        assert_eq!(summary.error_count, 2);
+        assert_eq!(summary.exception_count, 1);
+        assert_eq!(summary.metric_count, 2);
     }
 }

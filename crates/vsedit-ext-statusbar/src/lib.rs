@@ -74,6 +74,18 @@ pub enum StatusBarAlignment {
     Right,
 }
 
+impl StatusBarAlignment {
+    /// Returns `true` if this is `StatusBarAlignment::Left`.
+    pub fn is_left(&self) -> bool {
+        matches!(self, StatusBarAlignment::Left)
+    }
+
+    /// Returns `true` if this is `StatusBarAlignment::Right`.
+    pub fn is_right(&self) -> bool {
+        matches!(self, StatusBarAlignment::Right)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StatusBarItem {
     pub id: String,
@@ -270,6 +282,34 @@ impl StatusBarBridge {
     pub fn get_item_mut(&mut self, id: &str) -> Option<&mut StatusBarItem> {
         self.items.iter_mut().find(|i| i.id == id)
     }
+
+    /// Find items whose text contains the given substring (case-sensitive).
+    pub fn find_by_text(&self, text: &str) -> Vec<&StatusBarItem> {
+        self.items.iter().filter(|i| i.text.contains(text)).collect()
+    }
+
+    /// Return all items sorted by priority (descending), with stable tie-breaking by id.
+    pub fn sorted_items(&self) -> Vec<&StatusBarItem> {
+        let mut refs: Vec<&StatusBarItem> = self.items.iter().collect();
+        refs.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+        refs
+    }
+
+    /// Toggle the visibility of an item, returning an error if it does not exist.
+    pub fn toggle_visibility(&mut self, id: &str) -> Result<(), StatusBarError> {
+        let item = self
+            .items
+            .iter_mut()
+            .find(|i| i.id == id)
+            .ok_or_else(|| StatusBarError::ItemNotFound(id.to_string()))?;
+        item.is_visible = !item.is_visible;
+        Ok(())
+    }
+
+    /// Return items that have a command attached.
+    pub fn get_items_with_command(&self) -> Vec<&StatusBarItem> {
+        self.items.iter().filter(|i| i.command.is_some()).collect()
+    }
 }
 
 // ── StatusBarItem helpers ──
@@ -278,6 +318,17 @@ impl StatusBarItem {
     /// Returns `true` if the item has a command attached.
     pub fn has_command(&self) -> bool {
         self.command.is_some()
+    }
+
+    /// Returns a human-readable description of the item count context,
+    /// e.g. "1 item" or "3 items", based on the character length of the text.
+    pub fn age_description(&self) -> String {
+        let count = self.text.len();
+        if count == 1 {
+            "1 item".to_string()
+        } else {
+            format!("{count} items")
+        }
     }
 
     /// Returns the display text, falling back to the id if text is empty.
@@ -1160,5 +1211,83 @@ mod tests {
         let layout = status_bar_layout(&[]);
         assert!(layout.left_items.is_empty());
         assert!(layout.right_items.is_empty());
+    }
+
+    #[test]
+    fn find_by_text_matches() {
+        let mut bridge = StatusBarBridge::new();
+        bridge.create_item("a", StatusBarAlignment::Left, 0);
+        bridge.create_item("b", StatusBarAlignment::Left, 0);
+        bridge.create_item("c", StatusBarAlignment::Right, 0);
+        bridge.update_item("a", Some("Hello World"), None, None).unwrap();
+        bridge.update_item("b", Some("Hello Rust"), None, None).unwrap();
+        bridge.update_item("c", Some("Goodbye"), None, None).unwrap();
+        let found = bridge.find_by_text("Hello");
+        assert_eq!(found.len(), 2);
+        assert!(found.iter().all(|i| i.text.contains("Hello")));
+        let empty = bridge.find_by_text("missing");
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn sorted_items_by_priority() {
+        let mut bridge = StatusBarBridge::new();
+        bridge.create_item("low", StatusBarAlignment::Left, 1);
+        bridge.create_item("high", StatusBarAlignment::Right, 100);
+        bridge.create_item("mid", StatusBarAlignment::Left, 50);
+        let sorted = bridge.sorted_items();
+        assert_eq!(sorted[0].id, "high");
+        assert_eq!(sorted[1].id, "mid");
+        assert_eq!(sorted[2].id, "low");
+    }
+
+    #[test]
+    fn age_description_formatting() {
+        let item = StatusBarItemBuilder::new().id("x").text("A").build().unwrap();
+        assert_eq!(item.age_description(), "1 item");
+        let item2 = StatusBarItemBuilder::new().id("y").text("ABC").build().unwrap();
+        assert_eq!(item2.age_description(), "3 items");
+        let item3 = StatusBarItemBuilder::new().id("z").build().unwrap();
+        assert_eq!(item3.age_description(), "0 items");
+    }
+
+    #[test]
+    fn alignment_is_left_is_right() {
+        assert!(StatusBarAlignment::Left.is_left());
+        assert!(!StatusBarAlignment::Left.is_right());
+        assert!(StatusBarAlignment::Right.is_right());
+        assert!(!StatusBarAlignment::Right.is_left());
+    }
+
+    #[test]
+    fn toggle_visibility_works() {
+        let mut bridge = StatusBarBridge::new();
+        bridge.create_item("sb1", StatusBarAlignment::Left, 0);
+        assert!(!bridge.get_item("sb1").unwrap().is_visible);
+        bridge.toggle_visibility("sb1").unwrap();
+        assert!(bridge.get_item("sb1").unwrap().is_visible);
+        bridge.toggle_visibility("sb1").unwrap();
+        assert!(!bridge.get_item("sb1").unwrap().is_visible);
+    }
+
+    #[test]
+    fn toggle_visibility_not_found() {
+        let mut bridge = StatusBarBridge::new();
+        let err = bridge.toggle_visibility("nope").unwrap_err();
+        assert_eq!(err, StatusBarError::ItemNotFound("nope".into()));
+    }
+
+    #[test]
+    fn get_items_with_command_filters() {
+        let mut bridge = StatusBarBridge::new();
+        bridge.create_item("a", StatusBarAlignment::Left, 0);
+        bridge.create_item("b", StatusBarAlignment::Left, 0);
+        bridge.create_item("c", StatusBarAlignment::Right, 0);
+        bridge.update_item("a", None, None, Some("cmd.a")).unwrap();
+        bridge.update_item("c", None, None, Some("cmd.c")).unwrap();
+        let with_cmd = bridge.get_items_with_command();
+        assert_eq!(with_cmd.len(), 2);
+        assert!(with_cmd.iter().any(|i| i.id == "a"));
+        assert!(with_cmd.iter().any(|i| i.id == "c"));
     }
 }

@@ -14,10 +14,10 @@ A full-fidelity terminal port of [Visual Studio Code](https://github.com/microso
 | Metric | Value |
 |--------|-------|
 | Workspace crates | 242 |
-| Lines of Rust | 330,000+ |
-| Tests | 13,400+ (all passing) |
+| Lines of Rust | 334,000+ |
+| Tests | 13,600+ (all passing) |
 | Lines of JS (extension host shim) | 1,200+ |
-| Minimum crate size | 1,100+ lines |
+| Minimum crate size | 1,150+ lines |
 
 All crates compile (`cargo check --workspace` ✅) and all tests pass (`cargo test --workspace` ✅).
 
@@ -131,7 +131,7 @@ All crates compile (`cargo check --workspace` ✅) and all tests pass (`cargo te
 # Prerequisites: Rust 1.85+ (edition 2024)
 cargo check --workspace      # Type check all 242 crates
 cargo build --release         # Build optimized binary
-cargo test --workspace        # Run all 13,400+ tests
+cargo test --workspace        # Run all 13,600+ tests
 cargo run -- [file/folder]    # Run vsedit
 ```
 

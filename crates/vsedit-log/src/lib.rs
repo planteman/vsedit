@@ -225,6 +225,23 @@ impl LogLevel {
     pub fn is_enabled_at(&self, threshold: LogLevel) -> bool {
         *self >= threshold
     }
+
+    /// Returns true if this level is at least as severe as `other`.
+    pub fn is_at_least(&self, other: LogLevel) -> bool {
+        *self >= other
+    }
+
+    /// Returns a static slice of all `LogLevel` variants in order.
+    pub fn all() -> &'static [LogLevel] {
+        &[
+            LogLevel::Off,
+            LogLevel::Trace,
+            LogLevel::Debug,
+            LogLevel::Info,
+            LogLevel::Warning,
+            LogLevel::Error,
+        ]
+    }
 }
 
 // --- LogEntry helpers ---
@@ -390,6 +407,37 @@ impl BufferedLogger {
             .unwrap()
             .iter()
             .filter(|e| e.is_warning())
+            .cloned()
+            .collect()
+    }
+
+    /// Returns the number of error-level entries.
+    pub fn error_count(&self) -> usize {
+        self.entries
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|e| e.is_error())
+            .count()
+    }
+
+    /// Returns the number of warning-level entries.
+    pub fn warning_count(&self) -> usize {
+        self.entries
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|e| e.is_warning())
+            .count()
+    }
+
+    /// Returns entries matching the given level.
+    pub fn entries_at_level(&self, level: LogLevel) -> Vec<LogEntry> {
+        self.entries
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|e| e.level == level)
             .cloned()
             .collect()
     }
@@ -1167,6 +1215,90 @@ mod tests {
         let entries = logger.entries();
         assert_eq!(entries.len(), 1);
         assert!(entries[0].timestamp > 0);
+    }
+
+    #[test]
+    fn log_level_is_at_least() {
+        assert!(LogLevel::Error.is_at_least(LogLevel::Warning));
+        assert!(LogLevel::Warning.is_at_least(LogLevel::Warning));
+        assert!(!LogLevel::Info.is_at_least(LogLevel::Warning));
+        assert!(LogLevel::Trace.is_at_least(LogLevel::Off));
+        assert!(!LogLevel::Off.is_at_least(LogLevel::Trace));
+    }
+
+    #[test]
+    fn log_level_all_variants() {
+        let all = LogLevel::all();
+        assert_eq!(all.len(), 6);
+        assert_eq!(all[0], LogLevel::Off);
+        assert_eq!(all[5], LogLevel::Error);
+        // Verify ordering is ascending
+        for w in all.windows(2) {
+            assert!(w[0] <= w[1]);
+        }
+    }
+
+    #[test]
+    fn buffered_logger_error_count() {
+        let logger = BufferedLogger::new("test");
+        logger.info("ok");
+        logger.error("e1");
+        logger.warning("w1");
+        logger.error("e2");
+        assert_eq!(logger.error_count(), 2);
+    }
+
+    #[test]
+    fn buffered_logger_warning_count() {
+        let logger = BufferedLogger::new("test");
+        logger.warning("w1");
+        logger.warning("w2");
+        logger.info("i1");
+        logger.error("e1");
+        assert_eq!(logger.warning_count(), 2);
+    }
+
+    #[test]
+    fn buffered_logger_entries_at_level() {
+        let logger = BufferedLogger::new("test");
+        logger.trace("t1");
+        logger.info("i1");
+        logger.info("i2");
+        logger.error("e1");
+        let infos = logger.entries_at_level(LogLevel::Info);
+        assert_eq!(infos.len(), 2);
+        assert_eq!(infos[0].message, "i1");
+        assert_eq!(infos[1].message, "i2");
+        let traces = logger.entries_at_level(LogLevel::Trace);
+        assert_eq!(traces.len(), 1);
+        let warnings = logger.entries_at_level(LogLevel::Warning);
+        assert_eq!(warnings.len(), 0);
+    }
+
+    #[test]
+    fn log_entry_display_all_levels() {
+        for level in LogLevel::all() {
+            if *level == LogLevel::Off {
+                continue;
+            }
+            let entry = LogEntry::new(*level, "ch", "msg");
+            let display = entry.to_string();
+            assert!(display.starts_with('['));
+            assert!(display.contains("ch: msg"));
+        }
+    }
+
+    #[test]
+    fn buffered_logger_counts_after_clear() {
+        let logger = BufferedLogger::new("test");
+        logger.error("e1");
+        logger.warning("w1");
+        assert_eq!(logger.error_count(), 1);
+        assert_eq!(logger.warning_count(), 1);
+        logger.clear();
+        assert_eq!(logger.error_count(), 0);
+        assert_eq!(logger.warning_count(), 0);
+        assert!(logger.entries_at_level(LogLevel::Error).is_empty());
     }
 
     #[test]

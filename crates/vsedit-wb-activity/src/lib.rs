@@ -50,6 +50,18 @@ pub struct ActivityBarItem {
     pub order: i32,
 }
 
+impl ActivityBarItem {
+    /// Returns `true` if this item has a badge set.
+    pub fn has_badge(&self) -> bool {
+        self.badge.is_some()
+    }
+
+    /// Toggles the active state of this item.
+    pub fn toggle_active(&mut self) {
+        self.active = !self.active;
+    }
+}
+
 impl fmt::Display for ActivityBarItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[{}] {}", self.id, self.title)
@@ -221,11 +233,55 @@ impl ActivityBar {
             .filter(|i| i.title.to_lowercase().contains(&query_lower))
             .collect()
     }
+
+    /// Returns `true` if the activity bar contains no items.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Removes all items from the activity bar.
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+
+    /// Sets all items to inactive.
+    pub fn deactivate_all(&mut self) {
+        for item in &mut self.items {
+            item.active = false;
+        }
+    }
+
+    /// Returns references to all items that have a badge set.
+    pub fn get_items_with_badge(&self) -> Vec<&ActivityBarItem> {
+        self.items.iter().filter(|i| i.has_badge()).collect()
+    }
+
+    /// Moves an item to a new order value, returning an error if the item is not found.
+    pub fn move_item(&mut self, id: &str, new_order: i32) -> Result<(), ActivityBarError> {
+        let item = self
+            .items
+            .iter_mut()
+            .find(|i| i.id == id)
+            .ok_or_else(|| ActivityBarError::ItemNotFound(id.to_string()))?;
+        item.order = new_order;
+        Ok(())
+    }
 }
 
 impl Default for ActivityBar {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl fmt::Display for ActivityBar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ActivityBar({} items, position={})",
+            self.items.len(),
+            self.position
+        )
     }
 }
 
@@ -1150,5 +1206,99 @@ mod tests {
     fn wb_activity_is_ascii_printable() {
         assert!(WbActivityValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbActivityValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn is_empty_on_new_bar() {
+        let bar = ActivityBar::new();
+        assert!(bar.is_empty());
+    }
+
+    #[test]
+    fn is_empty_after_adding_item() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(make_item("a", 0));
+        assert!(!bar.is_empty());
+    }
+
+    #[test]
+    fn clear_removes_all_items() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(make_item("a", 0));
+        bar.add_item(make_item("b", 1));
+        bar.clear();
+        assert!(bar.is_empty());
+        assert_eq!(bar.item_count(), 0);
+    }
+
+    #[test]
+    fn deactivate_all_sets_all_inactive() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(make_item("a", 0));
+        bar.add_item(make_item("b", 1));
+        bar.activate("a");
+        assert!(bar.get_active().is_some());
+        bar.deactivate_all();
+        assert!(bar.get_active().is_none());
+    }
+
+    #[test]
+    fn get_items_with_badge_filters_correctly() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(make_item("a", 0));
+        bar.add_item(make_item("b", 1));
+        bar.add_item(make_item("c", 2));
+        bar.set_badge("a", Some("3".to_string()));
+        bar.set_badge("c", Some("!".to_string()));
+        let badged = bar.get_items_with_badge();
+        assert_eq!(badged.len(), 2);
+        let ids: Vec<&str> = badged.iter().map(|i| i.id.as_str()).collect();
+        assert!(ids.contains(&"a"));
+        assert!(ids.contains(&"c"));
+    }
+
+    #[test]
+    fn item_has_badge_and_toggle_active() {
+        let mut item = make_item("x", 0);
+        assert!(!item.has_badge());
+        item.badge = Some("1".to_string());
+        assert!(item.has_badge());
+        assert!(!item.active);
+        item.toggle_active();
+        assert!(item.active);
+        item.toggle_active();
+        assert!(!item.active);
+    }
+
+    #[test]
+    fn move_item_updates_order() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(make_item("a", 0));
+        bar.add_item(make_item("b", 1));
+        assert!(bar.move_item("a", 10).is_ok());
+        assert_eq!(bar.get_item("a").unwrap().order, 10);
+        bar.sort_items();
+        assert_eq!(bar.items[0].id, "b");
+        assert_eq!(bar.items[1].id, "a");
+    }
+
+    #[test]
+    fn move_item_returns_error_for_missing() {
+        let mut bar = ActivityBar::new();
+        let result = bar.move_item("nonexistent", 5);
+        assert_eq!(
+            result,
+            Err(ActivityBarError::ItemNotFound("nonexistent".to_string()))
+        );
+    }
+
+    #[test]
+    fn activity_bar_display() {
+        let mut bar = ActivityBar::new();
+        assert_eq!(format!("{bar}"), "ActivityBar(0 items, position=Side)");
+        bar.add_item(make_item("a", 0));
+        bar.add_item(make_item("b", 1));
+        bar.set_position(ActivityBarPosition::Top);
+        assert_eq!(format!("{bar}"), "ActivityBar(2 items, position=Top)");
     }
 }

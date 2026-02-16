@@ -342,11 +342,19 @@ impl fmt::Display for StatusBarAlignment {
 
 impl fmt::Display for StatusBarItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "[{}] {} ({:?}, pri={})",
-            self.id, self.text, self.alignment, self.priority
-        )
+        write!(f, "{} [{}]", self.text, self.alignment)
+    }
+}
+
+impl StatusBarItem {
+    /// Returns `true` if this item has a command associated with it.
+    pub fn has_command(&self) -> bool {
+        self.command.is_some()
+    }
+
+    /// Returns `true` if this item has a tooltip.
+    pub fn has_tooltip(&self) -> bool {
+        self.tooltip.is_some()
     }
 }
 
@@ -395,6 +403,24 @@ impl StatusBarService {
     /// Return the number of currently visible items.
     pub fn visible_count(&self) -> usize {
         self.items.iter().filter(|i| i.visible).count()
+    }
+
+    /// Returns `true` if the service has no items.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Find all items whose text contains the given substring.
+    pub fn find_by_text(&self, text: &str) -> Vec<&StatusBarItem> {
+        self.items.iter().filter(|i| i.text.contains(text)).collect()
+    }
+
+    /// Remove all items from the service.
+    pub fn clear_all(&mut self) {
+        if !self.items.is_empty() {
+            self.items.clear();
+            self.on_did_change.fire(&());
+        }
     }
 
     /// Return a slice of all items.
@@ -840,7 +866,7 @@ mod tests {
             .priority(10)
             .build();
         let display = format!("{}", item);
-        assert_eq!(display, "[sb.test] branch: main (Left, pri=10)");
+        assert_eq!(display, "branch: main [Left]");
     }
 
     #[test]
@@ -1172,5 +1198,141 @@ mod tests {
         assert_eq!(animation_frame(80, SPINNER_FRAMES), "⠙");
         // full cycle (10 frames × 80ms = 800ms)
         assert_eq!(animation_frame(800, SPINNER_FRAMES), "⠋");
+    }
+
+    // -----------------------------------------------------------------------
+    // New functionality tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_is_empty() {
+        let mut svc = StatusBarService::new();
+        assert!(svc.is_empty());
+        svc.add_item(make_item("a", StatusBarAlignment::Left, 1));
+        assert!(!svc.is_empty());
+        svc.remove_item("a");
+        assert!(svc.is_empty());
+    }
+
+    #[test]
+    fn test_find_by_text() {
+        let mut svc = StatusBarService::new();
+        svc.add_item(StatusBarItem {
+            id: "enc".into(),
+            text: "UTF-8".into(),
+            tooltip: None,
+            command: None,
+            alignment: StatusBarAlignment::Right,
+            priority: 1,
+            visible: true,
+            background_color: None,
+            foreground_color: None,
+        });
+        svc.add_item(StatusBarItem {
+            id: "lang".into(),
+            text: "Rust".into(),
+            tooltip: None,
+            command: None,
+            alignment: StatusBarAlignment::Right,
+            priority: 2,
+            visible: true,
+            background_color: None,
+            foreground_color: None,
+        });
+        svc.add_item(StatusBarItem {
+            id: "enc2".into(),
+            text: "UTF-16".into(),
+            tooltip: None,
+            command: None,
+            alignment: StatusBarAlignment::Left,
+            priority: 3,
+            visible: true,
+            background_color: None,
+            foreground_color: None,
+        });
+
+        let results = svc.find_by_text("UTF");
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().any(|i| i.id == "enc"));
+        assert!(results.iter().any(|i| i.id == "enc2"));
+
+        let none = svc.find_by_text("Python");
+        assert!(none.is_empty());
+    }
+
+    #[test]
+    fn test_clear_all() {
+        let mut svc = StatusBarService::new();
+        let count = Arc::new(Mutex::new(0u32));
+        let c = count.clone();
+        let _h = svc.on_did_change().on(move |_: &()| {
+            *c.lock().unwrap() += 1;
+        });
+
+        svc.add_item(make_item("a", StatusBarAlignment::Left, 1));
+        svc.add_item(make_item("b", StatusBarAlignment::Right, 2));
+        assert_eq!(svc.item_count(), 2);
+
+        svc.clear_all();
+        assert!(svc.is_empty());
+        assert_eq!(svc.item_count(), 0);
+        // 2 adds + 1 clear = 3 events
+        assert_eq!(*count.lock().unwrap(), 3);
+    }
+
+    #[test]
+    fn test_clear_all_empty_no_event() {
+        let mut svc = StatusBarService::new();
+        let count = Arc::new(Mutex::new(0u32));
+        let c = count.clone();
+        let _h = svc.on_did_change().on(move |_: &()| {
+            *c.lock().unwrap() += 1;
+        });
+
+        svc.clear_all();
+        assert_eq!(*count.lock().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_has_command() {
+        let with_cmd = StatusBarItemBuilder::new("cmd")
+            .command("do.something")
+            .build();
+        assert!(with_cmd.has_command());
+
+        let without_cmd = StatusBarItemBuilder::new("no_cmd").build();
+        assert!(!without_cmd.has_command());
+    }
+
+    #[test]
+    fn test_has_tooltip() {
+        let with_tt = StatusBarItemBuilder::new("tt")
+            .tooltip("A tip")
+            .build();
+        assert!(with_tt.has_tooltip());
+
+        let without_tt = StatusBarItemBuilder::new("no_tt").build();
+        assert!(!without_tt.has_tooltip());
+    }
+
+    #[test]
+    fn test_display_for_item_shows_text_and_alignment() {
+        let left_item = StatusBarItemBuilder::new("d1")
+            .text("main")
+            .alignment(StatusBarAlignment::Left)
+            .build();
+        assert_eq!(format!("{}", left_item), "main [Left]");
+
+        let right_item = StatusBarItemBuilder::new("d2")
+            .text("UTF-8")
+            .alignment(StatusBarAlignment::Right)
+            .build();
+        assert_eq!(format!("{}", right_item), "UTF-8 [Right]");
+
+        let center_item = StatusBarItemBuilder::new("d3")
+            .text("Ready")
+            .alignment(StatusBarAlignment::Center)
+            .build();
+        assert_eq!(format!("{}", center_item), "Ready [Center]");
     }
 }

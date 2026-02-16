@@ -113,6 +113,29 @@ impl LogLevel {
         self.severity() >= threshold.severity()
     }
 
+    /// Parse a log level from a case-insensitive string.
+    pub fn from_str(s: &str) -> Option<LogLevel> {
+        match s.to_ascii_lowercase().as_str() {
+            "trace" => Some(LogLevel::Trace),
+            "debug" => Some(LogLevel::Debug),
+            "info" => Some(LogLevel::Info),
+            "warning" | "warn" => Some(LogLevel::Warning),
+            "error" => Some(LogLevel::Error),
+            _ => None,
+        }
+    }
+
+    /// Return all log level variants in severity order.
+    pub fn all_levels() -> &'static [LogLevel] {
+        &[
+            LogLevel::Trace,
+            LogLevel::Debug,
+            LogLevel::Info,
+            LogLevel::Warning,
+            LogLevel::Error,
+        ]
+    }
+
     /// Human-readable label used for formatted log lines.
     pub fn label(self) -> &'static str {
         match self {
@@ -134,6 +157,11 @@ impl fmt::Display for LogLevel {
 // ── OutputChannel helpers ──
 
 impl OutputChannel {
+    /// Returns `true` if the channel has no content.
+    pub fn is_empty(&self) -> bool {
+        self.content.is_empty()
+    }
+
     /// Number of lines currently in the buffer.
     pub fn line_count(&self) -> usize {
         if self.content.is_empty() {
@@ -680,6 +708,26 @@ impl OutputBridge {
         self.channels.iter().filter(|c| c.name == name).collect()
     }
 
+    /// Find channels whose language_id matches the given string.
+    pub fn find_channels_by_language(&self, language_id: &str) -> Vec<&OutputChannel> {
+        self.channels
+            .iter()
+            .filter(|c| c.language_id.as_deref() == Some(language_id))
+            .collect()
+    }
+
+    /// Sum of line counts across all active channels.
+    pub fn total_line_count(&self) -> usize {
+        self.channels.iter().map(|c| c.line_count()).sum()
+    }
+
+    /// Clear content of all active channels.
+    pub fn clear_all(&mut self) {
+        for ch in &mut self.channels {
+            ch.content.clear();
+        }
+    }
+
     /// Merge source channel content into target channel.
     pub fn merge_channels(&mut self, source_id: &str, target_id: &str) -> Result<(), OutputError> {
         let source_content = self
@@ -1161,5 +1209,98 @@ mod tests {
         let id = bridge.create_channel("A", None);
         assert!(bridge.merge_channels("nope", &id).is_err());
         assert!(bridge.merge_channels(&id, "nope").is_err());
+    }
+
+    #[test]
+    fn log_level_from_str_valid() {
+        assert_eq!(LogLevel::from_str("trace"), Some(LogLevel::Trace));
+        assert_eq!(LogLevel::from_str("DEBUG"), Some(LogLevel::Debug));
+        assert_eq!(LogLevel::from_str("Info"), Some(LogLevel::Info));
+        assert_eq!(LogLevel::from_str("warning"), Some(LogLevel::Warning));
+        assert_eq!(LogLevel::from_str("warn"), Some(LogLevel::Warning));
+        assert_eq!(LogLevel::from_str("ERROR"), Some(LogLevel::Error));
+        assert_eq!(LogLevel::from_str("unknown"), None);
+        assert_eq!(LogLevel::from_str(""), None);
+    }
+
+    #[test]
+    fn log_level_all_levels_order() {
+        let levels = LogLevel::all_levels();
+        assert_eq!(levels.len(), 5);
+        assert_eq!(levels[0], LogLevel::Trace);
+        assert_eq!(levels[4], LogLevel::Error);
+        for window in levels.windows(2) {
+            assert!(window[0].severity() < window[1].severity());
+        }
+    }
+
+    #[test]
+    fn output_channel_is_empty() {
+        let empty_ch = OutputChannel {
+            id: "e1".into(),
+            name: "Empty".into(),
+            language_id: None,
+            content: String::new(),
+        };
+        assert!(empty_ch.is_empty());
+        let nonempty_ch = OutputChannel {
+            id: "e2".into(),
+            name: "Full".into(),
+            language_id: None,
+            content: "data".into(),
+        };
+        assert!(!nonempty_ch.is_empty());
+    }
+
+    #[test]
+    fn bridge_find_channels_by_language() {
+        let mut bridge = OutputBridge::new();
+        bridge.create_channel("Build", Some("log".into()));
+        bridge.create_channel("Test", Some("log".into()));
+        bridge.create_channel("Debug", Some("json".into()));
+        bridge.create_channel("Plain", None);
+        let log_channels = bridge.find_channels_by_language("log");
+        assert_eq!(log_channels.len(), 2);
+        let json_channels = bridge.find_channels_by_language("json");
+        assert_eq!(json_channels.len(), 1);
+        assert_eq!(json_channels[0].name, "Debug");
+        let none = bridge.find_channels_by_language("xml");
+        assert!(none.is_empty());
+    }
+
+    #[test]
+    fn bridge_total_line_count() {
+        let mut bridge = OutputBridge::new();
+        let id1 = bridge.create_channel("A", None);
+        let id2 = bridge.create_channel("B", None);
+        assert_eq!(bridge.total_line_count(), 0);
+        bridge.append_line(&id1, "line1");
+        bridge.append_line(&id1, "line2");
+        bridge.append_line(&id2, "line3");
+        assert_eq!(bridge.total_line_count(), 3);
+    }
+
+    #[test]
+    fn bridge_clear_all() {
+        let mut bridge = OutputBridge::new();
+        let id1 = bridge.create_channel("A", None);
+        let id2 = bridge.create_channel("B", None);
+        bridge.append_line(&id1, "data1");
+        bridge.append_line(&id2, "data2");
+        assert!(bridge.total_bytes() > 0);
+        bridge.clear_all();
+        assert_eq!(bridge.total_bytes(), 0);
+        assert_eq!(bridge.total_line_count(), 0);
+        // channels still exist, just cleared
+        assert_eq!(bridge.channel_count(), 2);
+    }
+
+    #[test]
+    fn log_level_display_all_variants() {
+        assert_eq!(format!("{}", LogLevel::Trace), "TRACE");
+        assert_eq!(format!("{}", LogLevel::Debug), "DEBUG");
+        assert_eq!(format!("{}", LogLevel::Info), "INFO");
+        assert_eq!(format!("{}", LogLevel::Warning), "WARN");
+        assert_eq!(format!("{}", LogLevel::Error), "ERROR");
     }
 }

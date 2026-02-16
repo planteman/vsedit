@@ -37,6 +37,16 @@ impl Keybinding {
             parts: vec![first, second],
         }
     }
+
+    /// Returns `true` if this keybinding has a second chord.
+    pub fn is_chord(&self) -> bool {
+        self.parts.len() > 1
+    }
+
+    /// Returns the number of chords (1 or 2).
+    pub fn chord_count(&self) -> usize {
+        self.parts.len()
+    }
 }
 
 impl std::fmt::Display for Keybinding {
@@ -526,6 +536,39 @@ pub enum KeybindingCategory {
     Custom(String),
 }
 
+impl KeybindingCategory {
+    /// Returns a human-readable label for this category.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::General => "General",
+            Self::Editor => "Editor",
+            Self::Navigation => "Navigation",
+            Self::Debug => "Debug",
+            Self::Custom(_) => "Custom",
+        }
+    }
+
+    /// Returns all built-in category variants (excludes `Custom`).
+    pub fn all() -> &'static [KeybindingCategory] {
+        static VARIANTS: [KeybindingCategory; 4] = [
+            KeybindingCategory::General,
+            KeybindingCategory::Editor,
+            KeybindingCategory::Navigation,
+            KeybindingCategory::Debug,
+        ];
+        &VARIANTS
+    }
+}
+
+impl fmt::Display for KeybindingCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Custom(name) => write!(f, "Custom({name})"),
+            _ => f.write_str(self.label()),
+        }
+    }
+}
+
 /// A keybinding tagged with a command and category.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CategorizedKeybinding {
@@ -589,6 +632,16 @@ impl KeybindingOverride {
     pub fn with_when(mut self, when: impl Into<String>) -> Self {
         self.when = Some(when.into());
         self
+    }
+
+    /// Returns `true` if this override adds a keybinding.
+    pub fn is_add(&self) -> bool {
+        !self.is_removal
+    }
+
+    /// Returns `true` if this override removes a keybinding.
+    pub fn is_remove(&self) -> bool {
+        self.is_removal
     }
 }
 
@@ -659,6 +712,21 @@ pub fn validate_overrides(overrides: &[KeybindingOverride]) -> Vec<KeybindingCon
         }
     }
     conflicts
+}
+
+// ---------------------------------------------------------------------------
+// Command lookup
+// ---------------------------------------------------------------------------
+
+/// Find all keybindings bound to a given command.
+pub fn find_binding_for_command<'a>(
+    bindings: &'a [CategorizedKeybinding],
+    command: &str,
+) -> Vec<&'a CategorizedKeybinding> {
+    bindings
+        .iter()
+        .filter(|kb| kb.command == command)
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -1168,5 +1236,100 @@ mod tests {
         }];
         let merged = merge_overrides(&defaults, &[]);
         assert_eq!(merged.len(), 1);
+    }
+
+    // -- New functionality tests --
+
+    #[test]
+    fn keybinding_is_chord() {
+        let single = Keybinding::new(KeyCodeChord::just(KeyCode::KeyA));
+        assert!(!single.is_chord());
+
+        let double = Keybinding::two_chords(
+            KeyCodeChord::just(KeyCode::KeyA),
+            KeyCodeChord::just(KeyCode::KeyB),
+        );
+        assert!(double.is_chord());
+    }
+
+    #[test]
+    fn keybinding_chord_count() {
+        let single = Keybinding::new(KeyCodeChord::just(KeyCode::KeyA));
+        assert_eq!(single.chord_count(), 1);
+
+        let double = Keybinding::two_chords(
+            KeyCodeChord::just(KeyCode::KeyK),
+            KeyCodeChord::just(KeyCode::KeyC),
+        );
+        assert_eq!(double.chord_count(), 2);
+    }
+
+    #[test]
+    fn category_label() {
+        assert_eq!(KeybindingCategory::General.label(), "General");
+        assert_eq!(KeybindingCategory::Editor.label(), "Editor");
+        assert_eq!(KeybindingCategory::Navigation.label(), "Navigation");
+        assert_eq!(KeybindingCategory::Debug.label(), "Debug");
+        assert_eq!(KeybindingCategory::Custom("foo".into()).label(), "Custom");
+    }
+
+    #[test]
+    fn category_all_variants() {
+        let all = KeybindingCategory::all();
+        assert_eq!(all.len(), 4);
+        assert_eq!(all[0], KeybindingCategory::General);
+        assert_eq!(all[1], KeybindingCategory::Editor);
+        assert_eq!(all[2], KeybindingCategory::Navigation);
+        assert_eq!(all[3], KeybindingCategory::Debug);
+    }
+
+    #[test]
+    fn override_is_add_and_is_remove() {
+        let kb = Keybinding::new(KeyCodeChord::just(KeyCode::KeyS));
+        let add = KeybindingOverride::add("save", kb.clone());
+        assert!(add.is_add());
+        assert!(!add.is_remove());
+
+        let rm = KeybindingOverride::remove("save", kb);
+        assert!(!rm.is_add());
+        assert!(rm.is_remove());
+    }
+
+    #[test]
+    fn find_binding_for_command_works() {
+        let bindings = vec![
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+                command: "save".into(),
+                category: KeybindingCategory::General,
+            },
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, true, false, false, KeyCode::KeyS)),
+                command: "save".into(),
+                category: KeybindingCategory::General,
+            },
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyN)),
+                command: "new".into(),
+                category: KeybindingCategory::General,
+            },
+        ];
+        let found = find_binding_for_command(&bindings, "save");
+        assert_eq!(found.len(), 2);
+
+        let none = find_binding_for_command(&bindings, "nonexistent");
+        assert!(none.is_empty());
+    }
+
+    #[test]
+    fn category_display() {
+        assert_eq!(format!("{}", KeybindingCategory::General), "General");
+        assert_eq!(format!("{}", KeybindingCategory::Editor), "Editor");
+        assert_eq!(format!("{}", KeybindingCategory::Navigation), "Navigation");
+        assert_eq!(format!("{}", KeybindingCategory::Debug), "Debug");
+        assert_eq!(
+            format!("{}", KeybindingCategory::Custom("user".into())),
+            "Custom(user)"
+        );
     }
 }

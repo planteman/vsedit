@@ -407,6 +407,11 @@ impl SnippetDefinition {
         parse_snippet(&self.body)
     }
 
+    /// Return `true` if this definition has a description.
+    pub fn has_description(&self) -> bool {
+        self.description.is_some()
+    }
+
     /// Expand the body using the given variables.
     pub fn expand(&self, variables: &SnippetVariables) -> String {
         let snippet = self.parse();
@@ -443,6 +448,18 @@ impl SnippetRegistry {
     /// Find a snippet by exact name.
     pub fn find_by_name(&self, name: &str) -> Option<&SnippetDefinition> {
         self.snippets.iter().find(|s| s.name == name)
+    }
+
+    /// Remove a snippet by name. Returns `true` if a snippet was removed.
+    pub fn remove(&mut self, name: &str) -> bool {
+        let before = self.snippets.len();
+        self.snippets.retain(|s| s.name != name);
+        self.snippets.len() < before
+    }
+
+    /// Return a slice of all registered snippet definitions.
+    pub fn all_definitions(&self) -> &[SnippetDefinition] {
+        &self.snippets
     }
 
     pub fn len(&self) -> usize {
@@ -754,6 +771,26 @@ impl SnippetTransform {
 // ---------------------------------------------------------------------------
 
 impl SnippetVariables {
+    /// Return the number of variables stored.
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    /// Return `true` if no variables are stored.
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    /// Return the names of all stored variables.
+    pub fn keys(&self) -> Vec<&str> {
+        self.values.keys().map(|k| k.as_str()).collect()
+    }
+
+    /// Return `true` if a variable with the given name exists.
+    pub fn contains(&self, name: &str) -> bool {
+        self.values.contains_key(name)
+    }
+
     /// Populate with all common VS Code snippet variables.
     pub fn with_all_defaults(
         mut self,
@@ -808,6 +845,40 @@ fn current_date_time() -> DateTimeParts {
         hour: "00".to_string(),
         minute: "00".to_string(),
         second: "00".to_string(),
+    }
+}
+
+impl Snippet {
+    /// Return `true` if the snippet contains no elements.
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
+}
+
+/// Extract only the plain-text elements from a snippet, ignoring tabstops,
+/// placeholders, choices, and variables.
+pub fn snippet_to_plain_text(snippet: &Snippet) -> String {
+    let mut out = String::new();
+    for elem in &snippet.elements {
+        snippet_plain_text_elem(elem, &mut out);
+    }
+    out
+}
+
+fn snippet_plain_text_elem(elem: &SnippetElement, out: &mut String) {
+    match elem {
+        SnippetElement::Text(t) => out.push_str(t),
+        SnippetElement::Placeholder { default, .. } => {
+            for d in default {
+                snippet_plain_text_elem(d, out);
+            }
+        }
+        SnippetElement::Variable { default: Some(d), .. } => {
+            for dd in d {
+                snippet_plain_text_elem(dd, out);
+            }
+        }
+        _ => {}
     }
 }
 
@@ -1161,5 +1232,80 @@ mod tests {
         assert_eq!(vars.get("LINE_COMMENT"), Some("//"));
         assert_eq!(vars.get("CURRENT_YEAR"), Some("2025"));
         assert_eq!(vars.get("CLIPBOARD"), Some("clip"));
+    }
+
+    // -----------------------------------------------------------------------
+    // New functionality tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn snippet_variables_len_and_is_empty() {
+        let mut vars = SnippetVariables::new();
+        assert!(vars.is_empty());
+        assert_eq!(vars.len(), 0);
+        vars.set("A", "1");
+        vars.set("B", "2");
+        assert_eq!(vars.len(), 2);
+        assert!(!vars.is_empty());
+    }
+
+    #[test]
+    fn snippet_variables_keys_and_contains() {
+        let mut vars = SnippetVariables::new();
+        vars.set("FOO", "bar");
+        vars.set("BAZ", "qux");
+        assert!(vars.contains("FOO"));
+        assert!(vars.contains("BAZ"));
+        assert!(!vars.contains("MISSING"));
+        let keys = vars.keys();
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains(&"FOO"));
+        assert!(keys.contains(&"BAZ"));
+    }
+
+    #[test]
+    fn snippet_registry_remove() {
+        let mut reg = SnippetRegistry::new();
+        reg.register(SnippetDefinition::new("Alpha", "a", "a"));
+        reg.register(SnippetDefinition::new("Beta", "b", "b"));
+        assert_eq!(reg.len(), 2);
+        assert!(reg.remove("Alpha"));
+        assert_eq!(reg.len(), 1);
+        assert!(reg.find_by_name("Alpha").is_none());
+        assert!(!reg.remove("NonExistent"));
+    }
+
+    #[test]
+    fn snippet_registry_all_definitions() {
+        let mut reg = SnippetRegistry::new();
+        reg.register(SnippetDefinition::new("X", "x", "x body"));
+        reg.register(SnippetDefinition::new("Y", "y", "y body"));
+        let defs = reg.all_definitions();
+        assert_eq!(defs.len(), 2);
+        assert_eq!(defs[0].name, "X");
+        assert_eq!(defs[1].name, "Y");
+    }
+
+    #[test]
+    fn snippet_definition_has_description() {
+        let with = SnippetDefinition::new("A", "a", "a").with_description("desc");
+        let without = SnippetDefinition::new("B", "b", "b");
+        assert!(with.has_description());
+        assert!(!without.has_description());
+    }
+
+    #[test]
+    fn snippet_is_empty() {
+        let empty = parse_snippet("");
+        assert!(empty.is_empty());
+        let nonempty = parse_snippet("hello");
+        assert!(!nonempty.is_empty());
+    }
+
+    #[test]
+    fn snippet_to_plain_text_basic() {
+        let s = parse_snippet("hello $1 world ${2:default} end");
+        let plain = snippet_to_plain_text(&s);
+        assert_eq!(plain, "hello  world default end");
     }
 }

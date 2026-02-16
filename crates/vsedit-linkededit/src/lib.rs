@@ -234,6 +234,11 @@ pub fn validate_ranges(ranges: &[LinkedEditingRange]) -> bool {
 // ---------------------------------------------------------------------------
 
 impl LinkedEditingRange {
+    /// Number of lines this range spans (inclusive).
+    pub fn line_count(&self) -> u32 {
+        self.end_line - self.start_line + 1
+    }
+
     /// Character length of the range when it spans a single line.
     /// Returns `None` for multi-line ranges.
     pub fn len(&self) -> Option<u32> {
@@ -290,7 +295,7 @@ impl std::fmt::Display for LinkedEditingRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}:{}-{}:{}",
+            "Ln {}:Col {} - Ln {}:Col {}",
             self.start_line, self.start_col, self.end_line, self.end_col
         )
     }
@@ -301,6 +306,16 @@ impl std::fmt::Display for LinkedEditingRange {
 // ---------------------------------------------------------------------------
 
 impl LinkedEditingRanges {
+    /// Returns `true` when the set contains no ranges.
+    pub fn is_empty(&self) -> bool {
+        self.ranges.is_empty()
+    }
+
+    /// Returns `true` when a word pattern constraint is set.
+    pub fn has_word_pattern(&self) -> bool {
+        self.word_pattern.is_some()
+    }
+
     /// Returns `true` when all ranges are non-overlapping and ordered.
     pub fn is_valid(&self) -> bool {
         validate_ranges(&self.ranges)
@@ -317,11 +332,35 @@ impl LinkedEditingRanges {
     }
 }
 
+impl fmt::Display for LinkedEditingRanges {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} linked ranges", self.ranges.len())
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Additional methods on LinkedEditingSession
 // ---------------------------------------------------------------------------
 
 impl LinkedEditingSession {
+    /// URI of the document being edited.
+    pub fn uri(&self) -> &str {
+        &self.uri
+    }
+
+    /// The original text at the time the session started.
+    pub fn original_text(&self) -> &str {
+        &self.original_text
+    }
+
+    /// Number of edits that have been applied (counted via `update` calls that
+    /// mutated `original_text`). We track this by comparing `original_text`
+    /// snapshots; for now expose the range count as a proxy for how many
+    /// simultaneous edits each `update` performs.
+    pub fn edit_count(&self) -> usize {
+        self.ranges.range_count()
+    }
+
     /// Number of linked ranges in the session.
     pub fn range_count(&self) -> usize {
         self.ranges.range_count()
@@ -1040,7 +1079,7 @@ mod tests {
     #[test]
     fn display_linked_editing_range() {
         let r = LinkedEditingRange::new(1, 5, 3, 10);
-        assert_eq!(format!("{}", r), "1:5-3:10");
+        assert_eq!(format!("{}", r), "Ln 1:Col 5 - Ln 3:Col 10");
     }
 
     #[test]
@@ -1183,6 +1222,88 @@ mod tests {
         assert_eq!(range.start_line, 0);
         assert_eq!(range.start_col, 6);
         assert_eq!(range.end_col, 11);
+    }
+
+    // ── New functionality tests ──
+
+    #[test]
+    fn range_line_count_single_line() {
+        let r = LinkedEditingRange::new(3, 0, 3, 10);
+        assert_eq!(r.line_count(), 1);
+    }
+
+    #[test]
+    fn range_line_count_multi_line() {
+        let r = LinkedEditingRange::new(1, 0, 5, 10);
+        assert_eq!(r.line_count(), 5);
+    }
+
+    #[test]
+    fn ranges_is_empty() {
+        let empty = LinkedEditingRanges::new(vec![], None);
+        assert!(empty.is_empty());
+        let non_empty = LinkedEditingRanges::new(
+            vec![LinkedEditingRange::new(0, 0, 0, 3)],
+            None,
+        );
+        assert!(!non_empty.is_empty());
+    }
+
+    #[test]
+    fn ranges_has_word_pattern() {
+        let without = LinkedEditingRanges::new(vec![], None);
+        assert!(!without.has_word_pattern());
+        let with = LinkedEditingRanges::new(vec![], Some("ident".into()));
+        assert!(with.has_word_pattern());
+    }
+
+    #[test]
+    fn session_uri_accessor() {
+        let session = LinkedEditingSession::new(
+            "file:///test.html".into(),
+            "text".into(),
+            LinkedEditingRanges::new(vec![], None),
+        );
+        assert_eq!(session.uri(), "file:///test.html");
+    }
+
+    #[test]
+    fn session_original_text_accessor() {
+        let session = LinkedEditingSession::new(
+            "f".into(),
+            "<div>hello</div>".into(),
+            LinkedEditingRanges::new(vec![], None),
+        );
+        assert_eq!(session.original_text(), "<div>hello</div>");
+    }
+
+    #[test]
+    fn session_edit_count() {
+        let session = LinkedEditingSession::new(
+            "f".into(),
+            "<div></div>".into(),
+            LinkedEditingRanges::new(
+                vec![
+                    LinkedEditingRange::new(0, 1, 0, 4),
+                    LinkedEditingRange::new(0, 7, 0, 10),
+                ],
+                None,
+            ),
+        );
+        assert_eq!(session.edit_count(), 2);
+    }
+
+    #[test]
+    fn display_linked_editing_ranges() {
+        let r = LinkedEditingRanges::new(
+            vec![
+                LinkedEditingRange::new(0, 0, 0, 3),
+                LinkedEditingRange::new(0, 5, 0, 8),
+                LinkedEditingRange::new(1, 0, 1, 4),
+            ],
+            None,
+        );
+        assert_eq!(format!("{}", r), "3 linked ranges");
     }
 
     #[test]

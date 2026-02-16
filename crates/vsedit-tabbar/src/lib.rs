@@ -23,6 +23,29 @@ pub struct Tab {
     pub active: bool,
 }
 
+impl Tab {
+    pub fn is_pinned(&self) -> bool {
+        self.pinned
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+}
+
+impl TabKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            TabKind::File => "File",
+            TabKind::Preview => "Preview",
+            TabKind::Diff => "Diff",
+            TabKind::Settings => "Settings",
+            TabKind::Welcome => "Welcome",
+            TabKind::Custom(_) => "Custom",
+        }
+    }
+}
+
 pub struct TabGroup {
     tabs: Vec<Tab>,
     active_tab: Option<usize>,
@@ -192,11 +215,37 @@ impl TabGroup {
     pub fn find_by_uri(&self, uri: &str) -> Option<&Tab> {
         self.tabs.iter().find(|t| t.uri.as_deref() == Some(uri))
     }
+
+    pub fn pinned_count(&self) -> usize {
+        self.tabs.iter().filter(|t| t.pinned).count()
+    }
+
+    pub fn dirty_count(&self) -> usize {
+        self.tabs.iter().filter(|t| t.dirty).count()
+    }
+
+    pub fn find_by_label(&self, label: &str) -> Option<&Tab> {
+        self.tabs.iter().find(|t| t.label == label)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tabs.is_empty()
+    }
+
+    pub fn get_tab_index(&self, id: &str) -> Option<usize> {
+        self.tabs.iter().position(|t| t.id == id)
+    }
 }
 
 impl Default for TabGroup {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl fmt::Display for TabGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} tabs ({} dirty)", self.tabs.len(), self.dirty_count())
     }
 }
 
@@ -1171,5 +1220,93 @@ mod tests {
     fn tabbar_is_ascii_printable() {
         assert!(TabbarValidator::is_ascii_printable("Hello World 123"));
         assert!(!TabbarValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn tab_is_pinned() {
+        let mut tab = make_tab("a");
+        assert!(!tab.is_pinned());
+        tab.pinned = true;
+        assert!(tab.is_pinned());
+    }
+
+    #[test]
+    fn tab_is_dirty() {
+        let mut tab = make_tab("a");
+        assert!(!tab.is_dirty());
+        tab.dirty = true;
+        assert!(tab.is_dirty());
+    }
+
+    #[test]
+    fn tabgroup_pinned_count() {
+        let mut group = TabGroup::new();
+        group.add_tab(make_tab("a"));
+        group.add_tab(make_tab("b"));
+        group.add_tab(make_tab("c"));
+        assert_eq!(group.pinned_count(), 0);
+        group.pin_tab("a");
+        group.pin_tab("c");
+        assert_eq!(group.pinned_count(), 2);
+    }
+
+    #[test]
+    fn tabgroup_dirty_count() {
+        let mut group = TabGroup::new();
+        group.add_tab(make_tab("a"));
+        group.add_tab(make_tab("b"));
+        assert_eq!(group.dirty_count(), 0);
+        group.mark_dirty("b");
+        assert_eq!(group.dirty_count(), 1);
+    }
+
+    #[test]
+    fn tabgroup_find_by_label() {
+        let mut group = TabGroup::new();
+        let mut tab = make_tab("id1");
+        tab.label = "My Label".to_string();
+        group.add_tab(tab);
+        group.add_tab(make_tab("id2"));
+        assert_eq!(group.find_by_label("My Label").unwrap().id, "id1");
+        assert!(group.find_by_label("nonexistent").is_none());
+    }
+
+    #[test]
+    fn tabgroup_is_empty() {
+        let mut group = TabGroup::new();
+        assert!(group.is_empty());
+        group.add_tab(make_tab("a"));
+        assert!(!group.is_empty());
+    }
+
+    #[test]
+    fn tabkind_label() {
+        assert_eq!(TabKind::File.label(), "File");
+        assert_eq!(TabKind::Preview.label(), "Preview");
+        assert_eq!(TabKind::Diff.label(), "Diff");
+        assert_eq!(TabKind::Settings.label(), "Settings");
+        assert_eq!(TabKind::Welcome.label(), "Welcome");
+        assert_eq!(TabKind::Custom("foo".to_string()).label(), "Custom");
+    }
+
+    #[test]
+    fn tabgroup_display() {
+        let mut group = TabGroup::new();
+        group.add_tab(make_tab("a"));
+        group.add_tab(make_tab("b"));
+        group.mark_dirty("a");
+        let s = format!("{group}");
+        assert_eq!(s, "2 tabs (1 dirty)");
+    }
+
+    #[test]
+    fn tabgroup_get_tab_index() {
+        let mut group = TabGroup::new();
+        group.add_tab(make_tab("a"));
+        group.add_tab(make_tab("b"));
+        group.add_tab(make_tab("c"));
+        assert_eq!(group.get_tab_index("a"), Some(0));
+        assert_eq!(group.get_tab_index("c"), Some(2));
+        assert_eq!(group.get_tab_index("missing"), None);
     }
 }

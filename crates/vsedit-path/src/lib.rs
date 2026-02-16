@@ -330,6 +330,50 @@ impl PathComponents {
     pub fn retain_dir_parts(&mut self, f: impl Fn(&String) -> bool) {
         self.dir_parts.retain(|item| f(item));
     }
+
+    /// Reconstruct the path string from its components.
+    pub fn to_path_string(&self) -> String {
+        let mut result = String::new();
+        result.push_str(&self.root);
+        for (i, part) in self.dir_parts.iter().enumerate() {
+            if i > 0 || (!self.root.is_empty() && !self.root.ends_with('/') && !self.root.ends_with('\\')) {
+                result.push('/');
+            }
+            result.push_str(part);
+        }
+        if !self.dir_parts.is_empty() || !self.root.is_empty() {
+            result.push('/');
+        }
+        result.push_str(&self.stem);
+        result.push_str(&self.extension);
+        result
+    }
+
+    /// Return the number of directory parts (depth of nesting).
+    pub fn depth(&self) -> usize {
+        self.dir_parts.len()
+    }
+
+    /// Create a new path string with a different extension.
+    ///
+    /// The new extension should include the leading dot (e.g. `".txt"`).
+    /// Pass an empty string to remove the extension.
+    pub fn with_extension(&self, ext: &str) -> String {
+        let mut result = String::new();
+        result.push_str(&self.root);
+        for (i, part) in self.dir_parts.iter().enumerate() {
+            if i > 0 || (!self.root.is_empty() && !self.root.ends_with('/') && !self.root.ends_with('\\')) {
+                result.push('/');
+            }
+            result.push_str(part);
+        }
+        if !self.dir_parts.is_empty() || !self.root.is_empty() {
+            result.push('/');
+        }
+        result.push_str(&self.stem);
+        result.push_str(ext);
+        result
+    }
 }
 
 impl fmt::Display for PathComponents {
@@ -672,6 +716,67 @@ impl Default for PathValidator {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Check if the filename component of a path is hidden (starts with `.`).
+pub fn is_hidden(path: &str) -> bool {
+    let name = basename(path);
+    name.starts_with('.') && name.len() > 1
+}
+
+/// Insert a suffix just before the file extension.
+///
+/// ```
+/// assert_eq!(vsedit_path::add_suffix_before_ext("file.txt", "_backup"), "file_backup.txt");
+/// assert_eq!(vsedit_path::add_suffix_before_ext("noext", "_v2"), "noext_v2");
+/// ```
+pub fn add_suffix_before_ext(path: &str, suffix: &str) -> String {
+    let p = Path::new(path);
+    let ext = p
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()))
+        .unwrap_or_default();
+    let stem = p
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let parent = p
+        .parent()
+        .map(|d| d.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let new_name = format!("{stem}{suffix}{ext}");
+    if parent.is_empty() {
+        new_name
+    } else {
+        format!("{parent}/{new_name}")
+    }
+}
+
+/// Split a path on its first `/` separator.
+///
+/// Returns `(before, after)` where `after` does not include the separator.
+/// If there is no separator the entire string is returned as the first element
+/// and the second element is empty.
+pub fn split_on_first_separator(path: &str) -> (&str, &str) {
+    let normalized = path;
+    match normalized.find('/') {
+        Some(pos) => (&normalized[..pos], &normalized[pos + 1..]),
+        None => (normalized, ""),
+    }
+}
+
+/// Count the number of segments in a path (split by `/`).
+///
+/// Empty segments (from leading/trailing/double slashes) are ignored.
+pub fn count_segments(path: &str) -> usize {
+    path.split('/')
+        .filter(|s| !s.is_empty())
+        .count()
+}
+
+/// Check if a path is relative (not absolute).
+pub fn is_relative(path: &str) -> bool {
+    !is_absolute(path)
 }
 
 #[cfg(test)]
@@ -1159,5 +1264,66 @@ mod tests {
     fn relative_to_empty_err() {
         assert!(relative_to("", "/a").is_err());
         assert!(relative_to("/a", "").is_err());
+    }
+
+    #[test]
+    fn test_path_components_to_path_string() {
+        let pc = PathComponents::parse("a/b/file.rs");
+        assert_eq!(pc.to_path_string(), "a/b/file.rs");
+
+        let pc2 = PathComponents::parse("/usr/local/bin/tool");
+        assert_eq!(pc2.to_path_string(), "/usr/local/bin/tool");
+    }
+
+    #[test]
+    fn test_path_components_depth() {
+        let pc = PathComponents::parse("a/b/c/file.rs");
+        assert_eq!(pc.depth(), 3);
+
+        let pc2 = PathComponents::parse("file.rs");
+        assert_eq!(pc2.depth(), 0);
+    }
+
+    #[test]
+    fn test_path_components_with_extension() {
+        let pc = PathComponents::parse("src/main.rs");
+        assert_eq!(pc.with_extension(".txt"), "src/main.txt");
+        assert_eq!(pc.with_extension(""), "src/main");
+    }
+
+    #[test]
+    fn test_is_hidden() {
+        assert!(is_hidden(".gitignore"));
+        assert!(is_hidden("/home/user/.bashrc"));
+        assert!(!is_hidden("visible.txt"));
+        assert!(!is_hidden(""));
+    }
+
+    #[test]
+    fn test_add_suffix_before_ext() {
+        assert_eq!(add_suffix_before_ext("file.txt", "_backup"), "file_backup.txt");
+        assert_eq!(add_suffix_before_ext("noext", "_v2"), "noext_v2");
+        assert_eq!(add_suffix_before_ext("a/b/file.rs", "_test"), "a/b/file_test.rs");
+    }
+
+    #[test]
+    fn test_split_on_first_separator() {
+        assert_eq!(split_on_first_separator("a/b/c"), ("a", "b/c"));
+        assert_eq!(split_on_first_separator("single"), ("single", ""));
+    }
+
+    #[test]
+    fn test_count_segments() {
+        assert_eq!(count_segments("a/b/c"), 3);
+        assert_eq!(count_segments("/usr/local/bin/"), 3);
+        assert_eq!(count_segments("single"), 1);
+        assert_eq!(count_segments(""), 0);
+    }
+
+    #[test]
+    fn test_is_relative() {
+        assert!(is_relative("a/b/c"));
+        assert!(is_relative("file.txt"));
+        assert!(!is_relative("/absolute/path"));
     }
 }

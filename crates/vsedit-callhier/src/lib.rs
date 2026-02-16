@@ -43,6 +43,29 @@ pub enum SymbolKind {
     Struct,
 }
 
+impl SymbolKind {
+    /// Returns `true` if this symbol kind represents something callable
+    /// (Function, Method, or Constructor).
+    pub fn is_callable(&self) -> bool {
+        matches!(self, Self::Function | Self::Method | Self::Constructor)
+    }
+
+    /// Returns a representative character for the symbol kind.
+    pub fn icon_char(&self) -> char {
+        match self {
+            Self::Function => 'f',
+            Self::Method => 'm',
+            Self::Constructor => 'k',
+            Self::Class => 'c',
+            Self::Interface => 'i',
+            Self::Module => 'M',
+            Self::Property => 'p',
+            Self::Enum => 'e',
+            Self::Struct => 's',
+        }
+    }
+}
+
 impl fmt::Display for SymbolKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
@@ -109,6 +132,11 @@ impl CallHierarchyItem {
     pub fn with_deprecated(mut self, deprecated: bool) -> Self {
         self.is_deprecated = deprecated;
         self
+    }
+
+    /// Returns a human-readable location string in the form `"uri:line:col"`.
+    pub fn display_location(&self) -> String {
+        format!("{}:{}:{}", self.uri, self.start_line, self.start_col)
     }
 }
 
@@ -669,6 +697,47 @@ impl CallGraph {
         let key = format!("{}@{}", name, uri);
         self.items.get(&key)
     }
+
+    /// Returns `true` if the graph contains an item whose name matches `name`.
+    pub fn contains_item(&self, name: &str) -> bool {
+        self.items.values().any(|item| item.name == name)
+    }
+
+    /// Compute the maximum call depth reachable from `item` via outgoing edges.
+    ///
+    /// Returns 0 if the item has no outgoing calls. Cycles are handled by
+    /// tracking visited nodes.
+    pub fn depth_from(&self, item: &CallHierarchyItem) -> usize {
+        let start_key = Self::key_for(item);
+        let mut visited = HashSet::new();
+        let mut queue: VecDeque<(String, usize)> = VecDeque::new();
+        visited.insert(start_key.clone());
+        queue.push_back((start_key, 0));
+        let mut max_depth: usize = 0;
+
+        while let Some((key, depth)) = queue.pop_front() {
+            if depth > max_depth {
+                max_depth = depth;
+            }
+            if let Some(neighbors) = self.edges.get(&key) {
+                for n in neighbors {
+                    if visited.insert(n.clone()) {
+                        queue.push_back((n.clone(), depth + 1));
+                    }
+                }
+            }
+        }
+        max_depth
+    }
+
+    /// Returns all items in the graph as a slice-compatible vector reference.
+    ///
+    /// Note: because items are stored in a `HashMap`, this collects values
+    /// into an internal `Vec` on each call. For repeated access prefer
+    /// iterating via other methods.
+    pub fn items(&self) -> Vec<&CallHierarchyItem> {
+        self.items.values().collect()
+    }
 }
 
 #[cfg(test)]
@@ -1162,5 +1231,95 @@ mod tests {
     fn callhier_is_ascii_printable() {
         assert!(CallhierValidator::is_ascii_printable("Hello World 123"));
         assert!(!CallhierValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn symbol_kind_is_callable() {
+        assert!(SymbolKind::Function.is_callable());
+        assert!(SymbolKind::Method.is_callable());
+        assert!(SymbolKind::Constructor.is_callable());
+        assert!(!SymbolKind::Class.is_callable());
+        assert!(!SymbolKind::Interface.is_callable());
+        assert!(!SymbolKind::Module.is_callable());
+        assert!(!SymbolKind::Property.is_callable());
+        assert!(!SymbolKind::Enum.is_callable());
+        assert!(!SymbolKind::Struct.is_callable());
+    }
+
+    #[test]
+    fn symbol_kind_icon_char() {
+        assert_eq!(SymbolKind::Function.icon_char(), 'f');
+        assert_eq!(SymbolKind::Method.icon_char(), 'm');
+        assert_eq!(SymbolKind::Constructor.icon_char(), 'k');
+        assert_eq!(SymbolKind::Class.icon_char(), 'c');
+        assert_eq!(SymbolKind::Interface.icon_char(), 'i');
+        assert_eq!(SymbolKind::Module.icon_char(), 'M');
+        assert_eq!(SymbolKind::Property.icon_char(), 'p');
+        assert_eq!(SymbolKind::Enum.icon_char(), 'e');
+        assert_eq!(SymbolKind::Struct.icon_char(), 's');
+    }
+
+    #[test]
+    fn display_location_format() {
+        let item = sample_item("foo", SymbolKind::Function);
+        assert_eq!(item.display_location(), "file:///src/main.rs:1:0");
+    }
+
+    #[test]
+    fn call_graph_contains_item() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("alpha", SymbolKind::Function);
+        let b = sample_item("beta", SymbolKind::Method);
+        graph.add_item(a);
+        graph.add_item(b);
+        assert!(graph.contains_item("alpha"));
+        assert!(graph.contains_item("beta"));
+        assert!(!graph.contains_item("gamma"));
+    }
+
+    #[test]
+    fn call_graph_depth_from_linear() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        let d = sample_item("d", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &c);
+        graph.add_edge(&c, &d);
+        assert_eq!(graph.depth_from(&a), 3);
+        assert_eq!(graph.depth_from(&b), 2);
+        assert_eq!(graph.depth_from(&c), 1);
+        assert_eq!(graph.depth_from(&d), 0);
+    }
+
+    #[test]
+    fn call_graph_depth_from_with_cycle() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &c);
+        graph.add_edge(&c, &a);
+        // Cycle is handled; depth should still terminate
+        assert_eq!(graph.depth_from(&a), 2);
+    }
+
+    #[test]
+    fn call_graph_items_returns_all() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("x", SymbolKind::Function);
+        let b = sample_item("y", SymbolKind::Method);
+        let c = sample_item("z", SymbolKind::Struct);
+        graph.add_item(a);
+        graph.add_item(b);
+        graph.add_item(c);
+        let items = graph.items();
+        assert_eq!(items.len(), 3);
+        let names: HashSet<&str> = items.iter().map(|i| i.name.as_str()).collect();
+        assert!(names.contains("x"));
+        assert!(names.contains("y"));
+        assert!(names.contains("z"));
     }
 }

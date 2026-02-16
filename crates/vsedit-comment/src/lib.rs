@@ -24,6 +24,16 @@ pub struct CommentRule {
 }
 
 impl CommentRule {
+    /// Returns `true` if this rule has block-comment open/close markers.
+    pub fn supports_block(&self) -> bool {
+        self.block_comment.is_some()
+    }
+
+    /// Returns `true` if this rule has a line-comment prefix.
+    pub fn supports_line(&self) -> bool {
+        self.line_comment.is_some()
+    }
+
     /// Return the comment rule for a well-known language identifier.
     ///
     /// Returns `None` for unrecognised languages.
@@ -95,6 +105,16 @@ impl std::fmt::Display for CommentMode {
         match self {
             Self::Line => write!(f, "line"),
             Self::Block => write!(f, "block"),
+        }
+    }
+}
+
+impl CommentMode {
+    /// Returns a human-readable label for this mode.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Line => "line",
+            Self::Block => "block",
         }
     }
 }
@@ -299,6 +319,11 @@ impl CommentDetector {
         self.depth > 0
     }
 
+    /// Returns the current nesting depth.
+    pub fn depth(&self) -> usize {
+        self.depth
+    }
+
     /// Reset the detector to the initial (outside) state.
     pub fn reset(&mut self) {
         self.depth = 0;
@@ -321,6 +346,22 @@ pub struct CommentStats {
     pub comment_density: f64,
     /// Length (in lines) of the longest contiguous run of commented lines.
     pub longest_commented_block: usize,
+}
+
+impl CommentStats {
+    /// Ratio of commented lines to total lines (`0.0` when there are no lines).
+    pub fn comment_ratio(&self) -> f64 {
+        if self.total_lines == 0 {
+            0.0
+        } else {
+            self.commented_lines as f64 / self.total_lines as f64
+        }
+    }
+
+    /// Returns `true` if more than half of the lines are commented.
+    pub fn is_mostly_commented(&self) -> bool {
+        self.comment_ratio() > 0.5
+    }
 }
 
 /// Analyse `lines` for comment coverage using the given line-comment
@@ -748,6 +789,20 @@ impl MultiLineBlockComment {
             self.wrap(text)
         }
     }
+}
+
+/// Remove line-comment prefixes from every line in `lines`.
+///
+/// Each occurrence of `prefix` (plus one optional trailing space) at the
+/// start of the non-whitespace portion of a line is stripped. Empty lines
+/// and lines without the prefix are left untouched.
+pub fn uncomment_all_lines(lines: &[&str], prefix: &str) -> Vec<String> {
+    lines.iter().map(|l| remove_line_prefix(l, prefix)).collect()
+}
+
+/// Wrap `text` in block-comment markers.
+pub fn wrap_in_block_comment(text: &str, open: &str, close: &str) -> String {
+    format!("{open} {text} {close}")
 }
 
 // ── tests ──────────────────────────────────────────────────────────────
@@ -1178,5 +1233,76 @@ mod tests {
         let bc = MultiLineBlockComment::new("/*", "*/");
         assert_eq!(bc.toggle("hello"), "/* hello */");
         assert_eq!(bc.toggle("/* hello */"), "hello");
+    }
+
+    // ── tests for newly added functionality ───────────────────────────
+
+    #[test]
+    fn comment_rule_supports_block() {
+        let rust = CommentRule::for_language("rust").unwrap();
+        assert!(rust.supports_block());
+        let python = CommentRule::for_language("python").unwrap();
+        assert!(!python.supports_block());
+    }
+
+    #[test]
+    fn comment_rule_supports_line() {
+        let rust = CommentRule::for_language("rust").unwrap();
+        assert!(rust.supports_line());
+        let html = CommentRule::for_language("html").unwrap();
+        assert!(!html.supports_line());
+    }
+
+    #[test]
+    fn comment_detector_depth() {
+        let mut det = CommentDetector::new("/*", "*/");
+        assert_eq!(det.depth(), 0);
+        det.feed("/* outer /* inner");
+        assert_eq!(det.depth(), 2);
+        det.feed("*/");
+        assert_eq!(det.depth(), 1);
+        det.feed("*/");
+        assert_eq!(det.depth(), 0);
+    }
+
+    #[test]
+    fn comment_stats_ratio_and_mostly_commented() {
+        // 4 commented out of 6 total → ratio ~0.667 > 0.5
+        let lines = vec!["// a", "b", "// c", "", "// d", "// e"];
+        let stats = compute_comment_stats(&lines, "//");
+        assert!((stats.comment_ratio() - 4.0 / 6.0).abs() < 1e-9);
+        assert!(stats.is_mostly_commented());
+
+        // 1 commented out of 4 total → ratio 0.25 ≤ 0.5
+        let lines2 = vec!["a", "// b", "c", "d"];
+        let stats2 = compute_comment_stats(&lines2, "//");
+        assert!(!stats2.is_mostly_commented());
+    }
+
+    #[test]
+    fn comment_stats_empty_lines() {
+        let empty: Vec<&str> = vec![];
+        let stats = compute_comment_stats(&empty, "//");
+        assert!((stats.comment_ratio() - 0.0).abs() < 1e-9);
+        assert!(!stats.is_mostly_commented());
+    }
+
+    #[test]
+    fn uncomment_all_lines_removes_prefix() {
+        let lines = vec!["// a", "  // b", "c", ""];
+        let result = uncomment_all_lines(&lines, "//");
+        assert_eq!(result, vec!["a", "  b", "c", ""]);
+    }
+
+    #[test]
+    fn wrap_in_block_comment_wraps_text() {
+        assert_eq!(wrap_in_block_comment("hello", "/*", "*/"), "/* hello */");
+        assert_eq!(wrap_in_block_comment("content", "<!--", "-->"), "<!-- content -->");
+    }
+
+    #[test]
+    fn comment_mode_label() {
+        assert_eq!(CommentMode::Line.label(), "line");
+        assert_eq!(CommentMode::Block.label(), "block");
     }
 }

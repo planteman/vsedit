@@ -489,6 +489,17 @@ impl<T> EventFilter<T> {
     pub fn matches(&self, value: &T) -> bool {
         (self.predicate)(value)
     }
+
+    /// Return a new filter whose predicate is the logical negation of this one.
+    pub fn negate(self) -> EventFilter<T>
+    where
+        T: 'static,
+    {
+        let old = self.predicate;
+        EventFilter {
+            predicate: Box::new(move |v| !old(v)),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -538,9 +549,30 @@ impl<T: Clone> EventReplayBuffer<T> {
         self.buffer.is_empty()
     }
 
+    /// Whether the buffer has reached its maximum capacity.
+    pub fn is_full(&self) -> bool {
+        self.buffer.len() >= self.capacity
+    }
+
     /// The maximum capacity of the buffer.
     pub fn capacity(&self) -> usize {
         self.capacity
+    }
+
+    /// Return the most recently pushed value, if any.
+    pub fn last(&self) -> Option<&T> {
+        self.buffer.last()
+    }
+
+    /// Iterate over buffered values from oldest to newest.
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.buffer.iter()
+    }
+}
+
+impl<T: Clone + fmt::Debug> fmt::Display for EventReplayBuffer<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[buffer: {}/{} items]", self.buffer.len(), self.capacity)
     }
 }
 
@@ -684,6 +716,55 @@ impl<T: Clone + Send + Sync + 'static> ThrottledEmitter<T> {
     pub fn reset(&self) {
         let mut last = self.last_emit_time.lock().unwrap();
         *last = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EventCounter
+// ---------------------------------------------------------------------------
+
+/// A simple counter that tracks how many events have occurred.
+pub struct EventCounter<T> {
+    count: usize,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> EventCounter<T> {
+    /// Create a new counter starting at zero.
+    pub fn new() -> Self {
+        Self {
+            count: 0,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    /// Increment the counter by one.
+    pub fn increment(&mut self) {
+        self.count += 1;
+    }
+
+    /// Return the current count.
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
+    /// Reset the counter to zero.
+    pub fn reset(&mut self) {
+        self.count = 0;
+    }
+}
+
+impl<T> Default for EventCounter<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> fmt::Debug for EventCounter<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EventCounter")
+            .field("count", &self.count)
+            .finish()
     }
 }
 
@@ -1147,5 +1228,87 @@ mod tests {
         emitter.reset();
         emitter.fire(&3); // should succeed after reset
         assert_eq!(*received.lock().unwrap(), vec![1, 3]);
+    }
+
+    // -----------------------------------------------------------------------
+    // New functionality tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn replay_buffer_is_full() {
+        let mut buf = EventReplayBuffer::new(2);
+        assert!(!buf.is_full());
+        buf.push(1);
+        assert!(!buf.is_full());
+        buf.push(2);
+        assert!(buf.is_full());
+        buf.push(3);
+        assert!(buf.is_full());
+    }
+
+    #[test]
+    fn replay_buffer_last() {
+        let mut buf = EventReplayBuffer::<i32>::new(3);
+        assert_eq!(buf.last(), None);
+        buf.push(10);
+        assert_eq!(buf.last(), Some(&10));
+        buf.push(20);
+        assert_eq!(buf.last(), Some(&20));
+        buf.push(30);
+        buf.push(40);
+        assert_eq!(buf.last(), Some(&40));
+    }
+
+    #[test]
+    fn replay_buffer_iter() {
+        let mut buf = EventReplayBuffer::new(4);
+        buf.push(1);
+        buf.push(2);
+        buf.push(3);
+        let collected: Vec<&i32> = buf.iter().collect();
+        assert_eq!(collected, vec![&1, &2, &3]);
+    }
+
+    #[test]
+    fn replay_buffer_display() {
+        let mut buf = EventReplayBuffer::new(5);
+        buf.push(1);
+        buf.push(2);
+        assert_eq!(format!("{buf}"), "[buffer: 2/5 items]");
+        buf.push(3);
+        buf.push(4);
+        buf.push(5);
+        assert_eq!(format!("{buf}"), "[buffer: 5/5 items]");
+    }
+
+    #[test]
+    fn event_filter_negate() {
+        let filter = EventFilter::new(|v: &i32| *v > 5);
+        assert!(filter.matches(&10));
+        let negated = filter.negate();
+        assert!(!negated.matches(&10));
+        assert!(negated.matches(&3));
+    }
+
+    #[test]
+    fn event_counter_basic() {
+        let mut counter = EventCounter::<i32>::new();
+        assert_eq!(counter.count(), 0);
+        counter.increment();
+        counter.increment();
+        counter.increment();
+        assert_eq!(counter.count(), 3);
+    }
+
+    #[test]
+    fn event_counter_reset() {
+        let mut counter = EventCounter::<String>::new();
+        counter.increment();
+        counter.increment();
+        assert_eq!(counter.count(), 2);
+        counter.reset();
+        assert_eq!(counter.count(), 0);
+        counter.increment();
+        assert_eq!(counter.count(), 1);
     }
 }

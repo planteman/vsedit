@@ -160,6 +160,30 @@ impl ResourceLabel {
     pub fn parent_dir(&self) -> &str {
         self.path.rfind('/').map(|i| &self.path[..i]).unwrap_or("")
     }
+
+    /// Returns `true` if the path has a file extension, indicating it likely refers to a file.
+    pub fn is_file(&self) -> bool {
+        extract_extension(&self.path).is_some()
+    }
+
+    /// Return the full path including the filename.
+    ///
+    /// If the path already ends with the name, return the path as-is.
+    /// Otherwise, join path and name with a `/` separator.
+    pub fn full_path(&self) -> String {
+        if self.path.ends_with(&self.name) {
+            self.path.clone()
+        } else {
+            let sep = if self.path.ends_with('/') { "" } else { "/" };
+            format!("{}{}{}", self.path, sep, self.name)
+        }
+    }
+
+    /// Set the icon using builder-style chaining, consuming and returning self.
+    pub fn with_icon(mut self, icon: String) -> Self {
+        self.icon = Some(icon);
+        self
+    }
 }
 
 /// A segment of a highlighted label (for fuzzy match rendering).
@@ -167,6 +191,13 @@ impl ResourceLabel {
 pub struct LabelSegment {
     pub text: String,
     pub highlighted: bool,
+}
+
+impl LabelSegment {
+    /// Returns `true` if this segment is highlighted.
+    pub fn is_highlight(&self) -> bool {
+        self.highlighted
+    }
 }
 
 /// Replace `${filename}`, `${dirname}`, and `${extname}` in the format pattern.
@@ -732,6 +763,67 @@ pub fn label_ellipsis_middle(text: &str, max_chars: usize) -> String {
     format!("{}...{}", start, end)
 }
 
+/// Truncate a label to `max_len` characters, appending a custom ellipsis string if truncated.
+///
+/// If the label already fits within `max_len`, it is returned unchanged.
+/// Otherwise the label is truncated so that the result (text + ellipsis) is at most `max_len`.
+pub fn truncate_label(label: &str, max_len: usize, ellipsis: &str) -> String {
+    let label_chars: usize = label.chars().count();
+    if label_chars <= max_len {
+        return label.to_string();
+    }
+    let ellipsis_chars = ellipsis.chars().count();
+    if max_len <= ellipsis_chars {
+        return label.chars().take(max_len).collect();
+    }
+    let keep = max_len - ellipsis_chars;
+    let truncated: String = label.chars().take(keep).collect();
+    format!("{truncated}{ellipsis}")
+}
+
+/// Format a byte count as a human-readable size label.
+///
+/// Uses binary units (1 KB = 1024 bytes) and returns strings like
+/// `"512 B"`, `"1.2 KB"`, `"3.4 MB"`, `"1.0 GB"`, or `"2.5 TB"`.
+pub fn format_size_label(bytes: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    const TB: f64 = GB * 1024.0;
+
+    let b = bytes as f64;
+    if b < KB {
+        format!("{bytes} B")
+    } else if b < MB {
+        format!("{:.1} KB", b / KB)
+    } else if b < GB {
+        format!("{:.1} MB", b / MB)
+    } else if b < TB {
+        format!("{:.1} GB", b / GB)
+    } else {
+        format!("{:.1} TB", b / TB)
+    }
+}
+
+/// Format a count with the appropriate singular or plural noun.
+///
+/// Returns e.g. `"1 file"` or `"3 files"`.
+pub fn format_count_label(count: usize, singular: &str, plural: &str) -> String {
+    if count == 1 {
+        format!("1 {singular}")
+    } else {
+        format!("{count} {plural}")
+    }
+}
+
+/// Remove control characters (Unicode category Cc) from a label string.
+///
+/// Tabs, newlines, null bytes, and other control codes are stripped.
+/// Normal whitespace (space, U+0020) is preserved.
+pub fn sanitize_label(label: &str) -> String {
+    label.chars().filter(|c| !c.is_control()).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1160,5 +1252,97 @@ mod tests {
     fn label_ellipsis_middle_truncates() {
         let result = label_ellipsis_middle("abcdefghij", 7);
         assert_eq!(result, "ab...ij");
+    }
+
+    #[test]
+    fn resource_label_is_file() {
+        let file_label = ResourceLabel {
+            name: "main.rs".into(),
+            path: "/src/main.rs".into(),
+            description: None,
+            icon: None,
+        };
+        assert!(file_label.is_file());
+
+        let dir_label = ResourceLabel {
+            name: "src".into(),
+            path: "/home/user/src".into(),
+            description: None,
+            icon: None,
+        };
+        assert!(!dir_label.is_file());
+    }
+
+    #[test]
+    fn resource_label_full_path() {
+        let label = ResourceLabel {
+            name: "main.rs".into(),
+            path: "/src/main.rs".into(),
+            description: None,
+            icon: None,
+        };
+        assert_eq!(label.full_path(), "/src/main.rs");
+
+        let label2 = ResourceLabel {
+            name: "lib.rs".into(),
+            path: "/src".into(),
+            description: None,
+            icon: None,
+        };
+        assert_eq!(label2.full_path(), "/src/lib.rs");
+    }
+
+    #[test]
+    fn resource_label_with_icon_builder() {
+        let label = ResourceLabel {
+            name: "main.rs".into(),
+            path: "/src/main.rs".into(),
+            description: None,
+            icon: None,
+        }
+        .with_icon("file-code".into());
+        assert_eq!(label.icon.as_deref(), Some("file-code"));
+    }
+
+    #[test]
+    fn label_segment_is_highlight() {
+        let hl = LabelSegment { text: "foo".into(), highlighted: true };
+        assert!(hl.is_highlight());
+        let plain = LabelSegment { text: "bar".into(), highlighted: false };
+        assert!(!plain.is_highlight());
+    }
+
+    #[test]
+    fn truncate_label_with_custom_ellipsis() {
+        assert_eq!(truncate_label("hello", 10, ".."), "hello");
+        assert_eq!(truncate_label("hello world", 7, ".."), "hello..");
+        assert_eq!(truncate_label("abcdef", 3, ">>>"), "abc");
+        assert_eq!(truncate_label("abcdefghij", 6, "---"), "abc---");
+    }
+
+    #[test]
+    fn format_size_label_various() {
+        assert_eq!(format_size_label(0), "0 B");
+        assert_eq!(format_size_label(512), "512 B");
+        assert_eq!(format_size_label(1024), "1.0 KB");
+        assert_eq!(format_size_label(1536), "1.5 KB");
+        assert_eq!(format_size_label(1048576), "1.0 MB");
+        assert_eq!(format_size_label(1073741824), "1.0 GB");
+        assert_eq!(format_size_label(1099511627776), "1.0 TB");
+    }
+
+    #[test]
+    fn format_count_label_singular_and_plural() {
+        assert_eq!(format_count_label(0, "file", "files"), "0 files");
+        assert_eq!(format_count_label(1, "file", "files"), "1 file");
+        assert_eq!(format_count_label(5, "error", "errors"), "5 errors");
+    }
+
+    #[test]
+    fn sanitize_label_removes_control_chars() {
+        assert_eq!(sanitize_label("hello\x00world"), "helloworld");
+        assert_eq!(sanitize_label("line1\nline2\ttab"), "line1line2tab");
+        assert_eq!(sanitize_label("clean string"), "clean string");
+        assert_eq!(sanitize_label("\x07bell\x1b[31m"), "bell[31m");
     }
 }

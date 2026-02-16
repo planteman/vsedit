@@ -16,6 +16,8 @@ pub enum WorkspaceError {
     InvalidName(String),
     /// The folder URI is empty or invalid.
     InvalidUri(String),
+    /// A provided index is invalid for the operation.
+    InvalidIndex(u32),
 }
 
 impl fmt::Display for WorkspaceError {
@@ -30,6 +32,7 @@ impl fmt::Display for WorkspaceError {
                 write!(f, "invalid workspace name: {}", reason)
             }
             WorkspaceError::InvalidUri(uri) => write!(f, "invalid folder URI: {}", uri),
+            WorkspaceError::InvalidIndex(idx) => write!(f, "invalid index: {}", idx),
         }
     }
 }
@@ -41,6 +44,13 @@ pub struct WorkspaceFolder {
     pub uri: String,
     pub name: String,
     pub index: u32,
+}
+
+impl WorkspaceFolder {
+    /// Returns the display name of this folder.
+    pub fn display_name(&self) -> &str {
+        &self.name
+    }
 }
 
 pub struct WorkspaceConfiguration {
@@ -247,6 +257,41 @@ impl WorkspaceConfiguration {
     /// Clear all settings.
     pub fn clear_settings(&mut self) {
         self.settings.clear();
+    }
+
+    /// Check whether a setting with the given key exists.
+    pub fn has_setting(&self, key: &str) -> bool {
+        self.settings.contains_key(key)
+    }
+
+    /// Return all setting keys as a sorted vector of string slices.
+    pub fn settings_keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.settings.keys().map(|k| k.as_str()).collect();
+        keys.sort();
+        keys
+    }
+
+    /// Rename the folder at the given index, returning an error if the index is invalid.
+    pub fn rename_folder(
+        &mut self,
+        index: u32,
+        new_name: String,
+    ) -> Result<(), WorkspaceError> {
+        let folder = self
+            .folders
+            .iter_mut()
+            .find(|f| f.index == index)
+            .ok_or(WorkspaceError::InvalidIndex(index))?;
+        folder.name = new_name;
+        Ok(())
+    }
+
+    /// Get a setting value, or return the provided default if the key is absent.
+    pub fn get_or_default(&self, key: &str, default: &str) -> String {
+        self.settings
+            .get(key)
+            .cloned()
+            .unwrap_or_else(|| default.to_string())
     }
 }
 
@@ -1155,5 +1200,72 @@ mod tests {
         let folder = WorkspaceFolder { uri: "/workspace".to_string(), name: "ws".to_string(), index: 0 };
         let resolved = resolve_workspace_path(&folder, "src/main.rs");
         assert_eq!(resolved, "/workspace/src/main.rs");
+    }
+
+    #[test]
+    fn display_name_returns_folder_name() {
+        let folder = WorkspaceFolder {
+            uri: "/home/user/project".to_string(),
+            name: "my-project".to_string(),
+            index: 0,
+        };
+        assert_eq!(folder.display_name(), "my-project");
+    }
+
+    #[test]
+    fn has_setting_checks_presence() {
+        let mut ws = WorkspaceConfiguration::new();
+        assert!(!ws.has_setting("editor.tabSize"));
+        ws.set_setting("editor.tabSize".into(), "4".into());
+        assert!(ws.has_setting("editor.tabSize"));
+        assert!(!ws.has_setting("editor.fontSize"));
+    }
+
+    #[test]
+    fn settings_keys_returns_sorted() {
+        let mut ws = WorkspaceConfiguration::new();
+        ws.set_setting("zebra".into(), "1".into());
+        ws.set_setting("alpha".into(), "2".into());
+        ws.set_setting("middle".into(), "3".into());
+        let keys = ws.settings_keys();
+        assert_eq!(keys, vec!["alpha", "middle", "zebra"]);
+    }
+
+    #[test]
+    fn rename_folder_success_and_error() {
+        let mut ws = WorkspaceConfiguration::new();
+        ws.add_folder("/src".into(), "source".into());
+        ws.add_folder("/lib".into(), "library".into());
+        ws.rename_folder(0, "renamed-source".into()).unwrap();
+        assert_eq!(ws.get_folder(0).unwrap().name, "renamed-source");
+        assert_eq!(ws.get_folder(0).unwrap().display_name(), "renamed-source");
+        let err = ws.rename_folder(99, "nope".into()).unwrap_err();
+        assert_eq!(err, WorkspaceError::InvalidIndex(99));
+    }
+
+    #[test]
+    fn get_or_default_returns_value_or_fallback() {
+        let mut ws = WorkspaceConfiguration::new();
+        ws.set_setting("theme".into(), "dark".into());
+        assert_eq!(ws.get_or_default("theme", "light"), "dark");
+        assert_eq!(ws.get_or_default("missing", "fallback"), "fallback");
+    }
+
+    #[test]
+    fn invalid_index_error_display() {
+        let err = WorkspaceError::InvalidIndex(42);
+        assert_eq!(format!("{err}"), "invalid index: 42");
+    }
+
+    #[test]
+    fn merge_settings_overwrites_on_conflict() {
+        let mut ws1 = WorkspaceConfiguration::new();
+        ws1.set_setting("key".into(), "old".into());
+        let mut ws2 = WorkspaceConfiguration::new();
+        ws2.set_setting("key".into(), "new".into());
+        ws2.set_setting("extra".into(), "val".into());
+        ws1.merge_settings(&ws2);
+        assert_eq!(ws1.get_setting("key"), Some("new"));
+        assert_eq!(ws1.get_setting("extra"), Some("val"));
     }
 }

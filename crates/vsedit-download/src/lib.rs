@@ -625,6 +625,102 @@ impl Default for BandwidthTracker {
 /// Simple URL validation and extraction utilities (no external crates).
 pub struct UrlValidator;
 
+// ---------------------------------------------------------------------------
+// DownloadProgress helpers
+// ---------------------------------------------------------------------------
+
+impl DownloadProgress {
+    /// Returns `true` when the download has finished transferring all bytes.
+    pub fn is_complete(&self) -> bool {
+        match self.total_bytes {
+            Some(total) => self.bytes_downloaded >= total,
+            None => false,
+        }
+    }
+
+    /// Returns the number of bytes still to be downloaded, if the total is
+    /// known.
+    pub fn remaining(&self) -> Option<u64> {
+        self.total_bytes
+            .map(|total| total.saturating_sub(self.bytes_downloaded))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DownloadService helpers
+// ---------------------------------------------------------------------------
+
+impl DownloadService {
+    /// Get a mutable reference to a download entry by id.
+    pub fn get_entry_mut(&mut self, id: u64) -> Option<&mut DownloadEntry> {
+        self.entries.iter_mut().find(|e| e.id == id)
+    }
+
+    /// Returns `true` when the service has no entries at all.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Total number of entries regardless of state.
+    pub fn total_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return all entries whose request URL matches the given string.
+    pub fn find_by_url(&self, url: &str) -> Vec<&DownloadEntry> {
+        self.entries.iter().filter(|e| e.request.url == url).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DownloadStats helpers
+// ---------------------------------------------------------------------------
+
+impl DownloadStats {
+    /// Fraction of finished downloads that succeeded (completed / (completed +
+    /// failed)). Returns `0.0` when no downloads have finished.
+    pub fn success_rate(&self) -> f64 {
+        let finished = (self.completed + self.failed) as f64;
+        if finished == 0.0 {
+            return 0.0;
+        }
+        self.completed as f64 / finished
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display impls
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for DownloadState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            DownloadState::Pending => "Pending",
+            DownloadState::InProgress => "In Progress",
+            DownloadState::Completed => "Completed",
+            DownloadState::Failed => "Failed",
+            DownloadState::Cancelled => "Cancelled",
+        };
+        f.write_str(label)
+    }
+}
+
+impl fmt::Display for DownloadStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Downloads: {} total, {} completed, {} failed, {} pending, {} in progress, {} cancelled, {} bytes",
+            self.total,
+            self.completed,
+            self.failed,
+            self.pending,
+            self.in_progress,
+            self.cancelled,
+            self.total_bytes,
+        )
+    }
+}
+
 impl UrlValidator {
     /// Basic validity check: must start with `http://` or `https://` and
     /// contain a host portion with at least one dot.
@@ -1152,5 +1248,172 @@ mod tests {
             UrlValidator::normalize_url("https://example.com:8080/api"),
             "https://example.com:8080/api"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for newly added functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn progress_is_complete() {
+        let mut p = DownloadProgress::new();
+        assert!(!p.is_complete());
+
+        p.total_bytes = Some(100);
+        p.bytes_downloaded = 50;
+        assert!(!p.is_complete());
+
+        p.bytes_downloaded = 100;
+        assert!(p.is_complete());
+
+        // Over-download still counts as complete.
+        p.bytes_downloaded = 120;
+        assert!(p.is_complete());
+
+        // Unknown total is never complete.
+        p.total_bytes = None;
+        assert!(!p.is_complete());
+    }
+
+    #[test]
+    fn progress_remaining() {
+        let mut p = DownloadProgress::new();
+        assert_eq!(p.remaining(), None);
+
+        p.total_bytes = Some(1000);
+        p.bytes_downloaded = 300;
+        assert_eq!(p.remaining(), Some(700));
+
+        p.bytes_downloaded = 1000;
+        assert_eq!(p.remaining(), Some(0));
+
+        // Over-download saturates to 0.
+        p.bytes_downloaded = 1500;
+        assert_eq!(p.remaining(), Some(0));
+    }
+
+    #[test]
+    fn get_entry_mut_modifies_entry() {
+        let mut svc = DownloadService::new();
+        let id = svc.enqueue(sample_request());
+
+        let entry = svc.get_entry_mut(id).unwrap();
+        entry.state = DownloadState::InProgress;
+        assert_eq!(svc.get_state(id), Some(DownloadState::InProgress));
+
+        assert!(svc.get_entry_mut(999).is_none());
+    }
+
+    #[test]
+    fn is_empty_and_total_count() {
+        let mut svc = DownloadService::new();
+        assert!(svc.is_empty());
+        assert_eq!(svc.total_count(), 0);
+
+        svc.enqueue(sample_request());
+        assert!(!svc.is_empty());
+        assert_eq!(svc.total_count(), 1);
+
+        svc.enqueue(sample_request());
+        assert_eq!(svc.total_count(), 2);
+    }
+
+    #[test]
+    fn success_rate_calculation() {
+        let stats_none = DownloadStats {
+            total: 0,
+            pending: 0,
+            in_progress: 0,
+            completed: 0,
+            failed: 0,
+            cancelled: 0,
+            total_bytes: 0,
+        };
+        assert_eq!(stats_none.success_rate(), 0.0);
+
+        let stats_all = DownloadStats {
+            total: 5,
+            pending: 0,
+            in_progress: 0,
+            completed: 5,
+            failed: 0,
+            cancelled: 0,
+            total_bytes: 500,
+        };
+        assert!((stats_all.success_rate() - 1.0).abs() < f64::EPSILON);
+
+        let stats_mixed = DownloadStats {
+            total: 4,
+            pending: 0,
+            in_progress: 0,
+            completed: 3,
+            failed: 1,
+            cancelled: 0,
+            total_bytes: 300,
+        };
+        assert!((stats_mixed.success_rate() - 0.75).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn download_state_display() {
+        assert_eq!(DownloadState::Pending.to_string(), "Pending");
+        assert_eq!(DownloadState::InProgress.to_string(), "In Progress");
+        assert_eq!(DownloadState::Completed.to_string(), "Completed");
+        assert_eq!(DownloadState::Failed.to_string(), "Failed");
+        assert_eq!(DownloadState::Cancelled.to_string(), "Cancelled");
+    }
+
+    #[test]
+    fn download_stats_display() {
+        let stats = DownloadStats {
+            total: 10,
+            pending: 2,
+            in_progress: 1,
+            completed: 5,
+            failed: 1,
+            cancelled: 1,
+            total_bytes: 4096,
+        };
+        let s = stats.to_string();
+        assert!(s.contains("10 total"));
+        assert!(s.contains("5 completed"));
+        assert!(s.contains("1 failed"));
+        assert!(s.contains("4096 bytes"));
+    }
+
+    #[test]
+    fn find_by_url_returns_matching_entries() {
+        let mut svc = DownloadService::new();
+        let url_a = "https://example.com/a.bin";
+        let url_b = "https://example.com/b.bin";
+
+        let req_a = DownloadRequest {
+            url: url_a.into(),
+            destination: "/tmp/a.bin".into(),
+            headers: vec![],
+        };
+        let req_a2 = DownloadRequest {
+            url: url_a.into(),
+            destination: "/tmp/a2.bin".into(),
+            headers: vec![],
+        };
+        let req_b = DownloadRequest {
+            url: url_b.into(),
+            destination: "/tmp/b.bin".into(),
+            headers: vec![],
+        };
+
+        svc.enqueue(req_a);
+        svc.enqueue(req_a2);
+        svc.enqueue(req_b);
+
+        let matches = svc.find_by_url(url_a);
+        assert_eq!(matches.len(), 2);
+        for entry in &matches {
+            assert_eq!(entry.request.url, url_a);
+        }
+
+        assert_eq!(svc.find_by_url(url_b).len(), 1);
+        assert_eq!(svc.find_by_url("https://nope.com").len(), 0);
     }
 }

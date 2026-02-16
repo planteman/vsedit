@@ -9,6 +9,13 @@ pub enum ShowExpanded {
     InMarkupAndStylesheetFilesOnly,
 }
 
+impl ShowExpanded {
+    /// Returns `true` if this variant is `Always`.
+    pub fn is_always(&self) -> bool {
+        matches!(self, ShowExpanded::Always)
+    }
+}
+
 /// Emmet actions that can be triggered by the editor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EmmetAction {
@@ -16,6 +23,23 @@ pub enum EmmetAction {
     Wrap,
     Balance,
     GoToMatching,
+}
+
+impl EmmetAction {
+    /// Returns a human-readable label for the action.
+    pub fn label(&self) -> &'static str {
+        match self {
+            EmmetAction::Expand => "Expand Abbreviation",
+            EmmetAction::Wrap => "Wrap with Abbreviation",
+            EmmetAction::Balance => "Balance (Select Matching)",
+            EmmetAction::GoToMatching => "Go to Matching Pair",
+        }
+    }
+
+    /// Returns `true` if this action is `Expand`.
+    pub fn is_expand(&self) -> bool {
+        matches!(self, EmmetAction::Expand)
+    }
 }
 
 /// Configuration for Emmet expansion behavior.
@@ -83,6 +107,16 @@ impl EmmetConfig {
     /// Toggle the `show_abbreviation_suggestions` flag.
     pub fn toggle_show_abbreviation_suggestions(&mut self) {
         self.show_abbreviation_suggestions = !self.show_abbreviation_suggestions;
+    }
+
+    /// Returns the number of syntaxes in the supported list.
+    pub fn syntax_count(&self) -> usize {
+        self.syntaxes.len()
+    }
+
+    /// Returns `true` if abbreviation suggestions are enabled.
+    pub fn has_suggestions_enabled(&self) -> bool {
+        self.show_abbreviation_suggestions
     }
 }
 
@@ -706,6 +740,63 @@ pub fn emmet_wrap_with_abbreviation(selections: &[&str], abbreviation: &str) -> 
     Some(results)
 }
 
+/// Returns `true` if `input` looks like a CSS abbreviation (a known CSS
+/// property prefix optionally followed by a numeric value, or a keyword-only
+/// abbreviation like `bgc`).
+pub fn is_css_abbreviation(input: &str) -> bool {
+    let input = input.trim();
+    if input.is_empty() {
+        return false;
+    }
+    // Keyword-only CSS abbreviations
+    if matches!(input, "bgc" | "ff" | "fs" | "fw") {
+        return true;
+    }
+    let prefixes = ["m", "p", "w", "h", "t", "b", "l", "r"];
+    for prefix in prefixes {
+        if let Some(rest) = input.strip_prefix(prefix) {
+            if !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit() || c == '-') {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Extracts the Emmet abbreviation fragment immediately before `cursor_col`
+/// in `line`. Returns `None` if no valid abbreviation characters precede the
+/// cursor or if `cursor_col` is out of range.
+pub fn extract_abbreviation_from_line(line: &str, cursor_col: usize) -> Option<&str> {
+    if cursor_col == 0 || cursor_col > line.len() {
+        return None;
+    }
+    let before = &line[..cursor_col];
+    let start = before
+        .rfind(|c: char| !c.is_alphanumeric() && !".#>{}+*".contains(c))
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    let abbr = &before[start..];
+    if abbr.is_empty() {
+        return None;
+    }
+    Some(abbr)
+}
+
+/// Counts the number of HTML element tags (`<tagname…>`) in `expanded`,
+/// ignoring closing tags.
+pub fn count_elements_in_expansion(expanded: &str) -> usize {
+    let mut count = 0usize;
+    let mut chars = expanded.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '<' {
+            if chars.peek() != Some(&'/') {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1182,5 +1273,91 @@ mod tests {
     fn emmet_is_ascii_printable() {
         assert!(EmmetValidator::is_ascii_printable("Hello World 123"));
         assert!(!EmmetValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn config_syntax_count() {
+        let cfg = EmmetConfig::default();
+        assert_eq!(cfg.syntax_count(), 3);
+        let mut empty_cfg = cfg.clone();
+        empty_cfg.syntaxes.clear();
+        assert_eq!(empty_cfg.syntax_count(), 0);
+    }
+
+    #[test]
+    fn config_has_suggestions_enabled() {
+        let mut cfg = EmmetConfig::default();
+        assert!(cfg.has_suggestions_enabled());
+        cfg.toggle_show_abbreviation_suggestions();
+        assert!(!cfg.has_suggestions_enabled());
+    }
+
+    #[test]
+    fn action_label() {
+        assert_eq!(EmmetAction::Expand.label(), "Expand Abbreviation");
+        assert_eq!(EmmetAction::Wrap.label(), "Wrap with Abbreviation");
+        assert_eq!(EmmetAction::Balance.label(), "Balance (Select Matching)");
+        assert_eq!(EmmetAction::GoToMatching.label(), "Go to Matching Pair");
+    }
+
+    #[test]
+    fn action_is_expand() {
+        assert!(EmmetAction::Expand.is_expand());
+        assert!(!EmmetAction::Wrap.is_expand());
+        assert!(!EmmetAction::Balance.is_expand());
+        assert!(!EmmetAction::GoToMatching.is_expand());
+    }
+
+    #[test]
+    fn is_css_abbreviation_valid() {
+        assert!(is_css_abbreviation("m10"));
+        assert!(is_css_abbreviation("p20"));
+        assert!(is_css_abbreviation("w100"));
+        assert!(is_css_abbreviation("bgc"));
+        assert!(is_css_abbreviation("ff"));
+        assert!(is_css_abbreviation("h-5"));
+    }
+
+    #[test]
+    fn is_css_abbreviation_invalid() {
+        assert!(!is_css_abbreviation(""));
+        assert!(!is_css_abbreviation("div"));
+        assert!(!is_css_abbreviation("m"));
+        assert!(!is_css_abbreviation("hello"));
+    }
+
+    #[test]
+    fn extract_abbreviation_basic() {
+        assert_eq!(
+            extract_abbreviation_from_line("  div.foo", 9),
+            Some("div.foo"),
+        );
+        assert_eq!(
+            extract_abbreviation_from_line("  ul>li", 7),
+            Some("ul>li"),
+        );
+        assert_eq!(extract_abbreviation_from_line("  div", 0), None);
+        assert_eq!(extract_abbreviation_from_line("text", 100), None);
+    }
+
+    #[test]
+    fn count_elements_in_expansion_basic() {
+        assert_eq!(count_elements_in_expansion("<div></div>"), 1);
+        assert_eq!(
+            count_elements_in_expansion("<ul>\n  <li></li>\n</ul>"),
+            2,
+        );
+        assert_eq!(
+            count_elements_in_expansion("<h1></h1>\n<p></p>\n<footer></footer>"),
+            3,
+        );
+        assert_eq!(count_elements_in_expansion(""), 0);
+    }
+
+    #[test]
+    fn show_expanded_is_always() {
+        assert!(ShowExpanded::Always.is_always());
+        assert!(!ShowExpanded::Never.is_always());
+        assert!(!ShowExpanded::InMarkupAndStylesheetFilesOnly.is_always());
     }
 }

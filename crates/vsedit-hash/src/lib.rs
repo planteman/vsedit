@@ -155,6 +155,15 @@ impl ContentAddress {
     pub fn length(&self) -> usize {
         self.length
     }
+
+    /// Check whether the digest starts with the given hex prefix (case-insensitive).
+    pub fn matches_digest_prefix(&self, prefix: &str) -> bool {
+        self.digest
+            .as_bytes()
+            .iter()
+            .zip(prefix.as_bytes())
+            .all(|(a, b)| a.to_ascii_lowercase() == b.to_ascii_lowercase())
+    }
 }
 
 impl std::fmt::Display for ContentAddress {
@@ -203,6 +212,11 @@ fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+/// Encode bytes as an uppercase hex string.
+pub fn hex_encode_upper(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02X}")).collect()
+}
+
 /// A simple hash combiner for combining multiple hash values.
 #[derive(Clone, PartialEq, Eq)]
 pub struct HashCombiner {
@@ -213,6 +227,15 @@ impl HashCombiner {
     /// Create a new combiner with initial seed.
     pub fn new() -> Self {
         Self { hash: 0 }
+    }
+
+    /// Create a combiner pre-loaded with a slice of strings.
+    pub fn from_strings(strings: &[&str]) -> Self {
+        let mut combiner = Self::new();
+        for s in strings {
+            combiner.add_string(s);
+        }
+        combiner
     }
 
     /// Add a string to the hash.
@@ -531,6 +554,16 @@ impl BloomFilter {
         true
     }
 
+    /// Insert a string into the Bloom filter (convenience wrapper).
+    pub fn insert_str(&mut self, s: &str) {
+        self.insert(s.as_bytes());
+    }
+
+    /// Check if a string may be in the set (convenience wrapper).
+    pub fn may_contain_str(&self, s: &str) -> bool {
+        self.may_contain(s.as_bytes())
+    }
+
     /// Clear all bits.
     pub fn clear(&mut self) {
         self.bits.iter_mut().for_each(|b| *b = false);
@@ -539,6 +572,15 @@ impl BloomFilter {
     /// Return the number of bits set to true.
     pub fn count_ones(&self) -> usize {
         self.bits.iter().filter(|&&b| b).count()
+    }
+
+    /// Estimate the current false-positive rate based on the proportion of set bits.
+    ///
+    /// Uses the formula `(set_bits / total_bits) ^ num_hashes`.
+    pub fn estimated_false_positive_rate(&self) -> f64 {
+        let ones = self.count_ones() as f64;
+        let total = self.bits.len() as f64;
+        (ones / total).powi(self.num_hashes as i32)
     }
 
     fn hash_index(&self, item: &[u8], seed: usize) -> usize {
@@ -585,6 +627,74 @@ impl ByteRange {
     /// Returns true if this range is valid (start <= end).
     pub fn is_valid(&self) -> bool {
         self.start <= self.end
+    }
+
+    /// Returns true if `offset` falls within the half-open range `[start, end)`.
+    pub fn contains(&self, offset: usize) -> bool {
+        offset >= self.start && offset < self.end
+    }
+
+    /// Returns true if this range and `other` share at least one offset.
+    pub fn overlaps(&self, other: &ByteRange) -> bool {
+        self.start < other.end && other.start < self.end
+    }
+
+    /// Merge two overlapping or adjacent ranges into one.
+    ///
+    /// Returns `None` if the ranges are disjoint (gap > 0).
+    pub fn merge(&self, other: &ByteRange) -> Option<ByteRange> {
+        if self.start <= other.end && other.start <= self.end {
+            Some(ByteRange::new(
+                self.start.min(other.start),
+                self.end.max(other.end),
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Returns an iterator over every offset in `[start, end)`.
+    pub fn iter(&self) -> ByteRangeIter {
+        ByteRangeIter {
+            current: self.start,
+            end: self.end,
+        }
+    }
+}
+
+/// Iterator that yields every offset in a [`ByteRange`].
+pub struct ByteRangeIter {
+    current: usize,
+    end: usize,
+}
+
+impl Iterator for ByteRangeIter {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current < self.end {
+            let val = self.current;
+            self.current += 1;
+            Some(val)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.end.saturating_sub(self.current);
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for ByteRangeIter {}
+
+impl IntoIterator for ByteRange {
+    type Item = usize;
+    type IntoIter = ByteRangeIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -1147,5 +1257,124 @@ mod tests {
         let result = compute_diff_hash(content, content);
         assert_eq!(result.changed_range_count, 0);
         assert_eq!(result.changed_bytes, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for added functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn byte_range_contains() {
+        let r = ByteRange::new(5, 10);
+        assert!(!r.contains(4));
+        assert!(r.contains(5));
+        assert!(r.contains(9));
+        assert!(!r.contains(10));
+    }
+
+    #[test]
+    fn byte_range_overlaps_and_merge() {
+        let a = ByteRange::new(0, 10);
+        let b = ByteRange::new(5, 15);
+        let c = ByteRange::new(20, 30);
+        assert!(a.overlaps(&b));
+        assert!(b.overlaps(&a));
+        assert!(!a.overlaps(&c));
+
+        let merged = a.merge(&b).unwrap();
+        assert_eq!(merged.start, 0);
+        assert_eq!(merged.end, 15);
+
+        // Adjacent ranges (touching at boundary) can merge
+        let d = ByteRange::new(10, 20);
+        let merged2 = a.merge(&d).unwrap();
+        assert_eq!(merged2.start, 0);
+        assert_eq!(merged2.end, 20);
+
+        // Disjoint ranges cannot merge
+        assert!(a.merge(&c).is_none());
+    }
+
+    #[test]
+    fn byte_range_iter() {
+        let r = ByteRange::new(3, 7);
+        let offsets: Vec<usize> = r.iter().collect();
+        assert_eq!(offsets, vec![3, 4, 5, 6]);
+
+        // ExactSizeIterator
+        let r2 = ByteRange::new(0, 5);
+        let iter = r2.iter();
+        assert_eq!(iter.len(), 5);
+
+        // Empty range yields nothing
+        let empty = ByteRange::new(5, 5);
+        assert_eq!(empty.iter().count(), 0);
+
+        // IntoIterator
+        let r3 = ByteRange::new(10, 12);
+        let v: Vec<usize> = r3.into_iter().collect();
+        assert_eq!(v, vec![10, 11]);
+    }
+
+    #[test]
+    fn bloom_filter_str_convenience() {
+        let mut bf = BloomFilter::new(512, 4);
+        bf.insert_str("apple");
+        bf.insert_str("banana");
+        assert!(bf.may_contain_str("apple"));
+        assert!(bf.may_contain_str("banana"));
+        // Item never inserted – might be false positive, but with a large
+        // filter and few insertions, extremely unlikely.
+        // We just verify the API compiles and runs without panic.
+    }
+
+    #[test]
+    fn bloom_filter_estimated_false_positive_rate() {
+        let mut bf = BloomFilter::new(1024, 3);
+        // Empty filter → rate should be 0.0
+        assert_eq!(bf.estimated_false_positive_rate(), 0.0);
+
+        for i in 0..50u32 {
+            bf.insert(&i.to_le_bytes());
+        }
+        let rate = bf.estimated_false_positive_rate();
+        assert!(rate > 0.0);
+        assert!(rate < 1.0);
+    }
+
+    #[test]
+    fn hash_combiner_from_strings() {
+        let c = HashCombiner::from_strings(&["hello", "world"]);
+        let mut manual = HashCombiner::new();
+        manual.add_string("hello").add_string("world");
+        assert_eq!(c.value(), manual.value());
+        assert!(!c.is_empty());
+
+        // Empty slice produces an empty combiner
+        let empty = HashCombiner::from_strings(&[]);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn content_address_matches_digest_prefix() {
+        let addr = ContentAddress::from_content("hello");
+        let digest = addr.digest().to_string();
+
+        assert!(addr.matches_digest_prefix(&digest[..8]));
+        assert!(addr.matches_digest_prefix(&digest[..8].to_uppercase()));
+        assert!(addr.matches_digest_prefix(""));
+        assert!(!addr.matches_digest_prefix("zzzzzzzz"));
+    }
+
+    #[test]
+    fn hex_encode_upper_works() {
+        let bytes = sha256_bytes(b"test");
+        let upper = hex_encode_upper(&bytes);
+        let lower = sha256_hex(b"test");
+        assert_eq!(upper.len(), 64);
+        assert_eq!(upper.to_lowercase(), lower);
+        assert!(upper.chars().all(|c| c.is_ascii_hexdigit()));
+        // Spot-check that it actually contains uppercase letters
+        assert!(upper.chars().any(|c| c.is_ascii_uppercase()));
     }
 }

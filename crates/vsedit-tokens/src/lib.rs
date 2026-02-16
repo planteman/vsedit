@@ -779,6 +779,69 @@ pub fn compute_classification_stats(tokens: &[ClassifiedToken]) -> Classificatio
     stats
 }
 
+// ---------------------------------------------------------------------------
+// StandardTokenType helpers
+// ---------------------------------------------------------------------------
+
+impl StandardTokenType {
+    /// Returns a lowercase label for the token type.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Other => "other",
+            Self::Comment => "comment",
+            Self::String => "string",
+            Self::RegExp => "regex",
+        }
+    }
+
+    /// Returns `true` for textual token types (String and Comment).
+    pub fn is_textual(&self) -> bool {
+        matches!(self, Self::String | Self::Comment)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Token helpers
+// ---------------------------------------------------------------------------
+
+impl Token {
+    /// Returns `true` if this token is a comment.
+    pub fn is_comment(&self) -> bool {
+        self.metadata.token_type() == StandardTokenType::Comment
+    }
+
+    /// Returns `true` if this token is a string.
+    pub fn is_string(&self) -> bool {
+        self.metadata.token_type() == StandardTokenType::String
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LineTokens – convenience accessors
+// ---------------------------------------------------------------------------
+
+impl LineTokens {
+    /// Returns the number of comment tokens.
+    pub fn comment_count(&self) -> usize {
+        self.count_type(StandardTokenType::Comment)
+    }
+
+    /// Returns the number of string tokens.
+    pub fn string_count(&self) -> usize {
+        self.count_type(StandardTokenType::String)
+    }
+
+    /// Returns the first token, if any.
+    pub fn first(&self) -> Option<&Token> {
+        self.tokens.first()
+    }
+
+    /// Returns the last token, if any.
+    pub fn last(&self) -> Option<&Token> {
+        self.tokens.last()
+    }
+}
+
 /// Map a `TokenClassification` to a semantic color name.
 pub fn classification_color_name(cls: TokenClassification) -> &'static str {
     match cls {
@@ -1191,5 +1254,85 @@ mod tests {
         assert_eq!(classification_color_name(TokenClassification::Comment), "comment.foreground");
         assert_eq!(classification_color_name(TokenClassification::Keyword), "keyword.foreground");
         assert_eq!(classification_color_name(TokenClassification::Unknown), "editor.foreground");
+    }
+
+    #[test]
+    fn standard_token_type_label() {
+        assert_eq!(StandardTokenType::Other.label(), "other");
+        assert_eq!(StandardTokenType::Comment.label(), "comment");
+        assert_eq!(StandardTokenType::String.label(), "string");
+        assert_eq!(StandardTokenType::RegExp.label(), "regex");
+    }
+
+    #[test]
+    fn standard_token_type_is_textual() {
+        assert!(StandardTokenType::Comment.is_textual());
+        assert!(StandardTokenType::String.is_textual());
+        assert!(!StandardTokenType::Other.is_textual());
+        assert!(!StandardTokenType::RegExp.is_textual());
+    }
+
+    #[test]
+    fn font_style_is_none() {
+        assert!(FontStyle::NONE.is_none());
+        assert!(!FontStyle::BOLD.is_none());
+        assert!(!(FontStyle::ITALIC | FontStyle::BOLD).is_none());
+    }
+
+    #[test]
+    fn token_is_comment_and_is_string() {
+        let comment_meta = TokenMetadata::new(0, StandardTokenType::Comment, FontStyle::NONE, 0, 0);
+        let string_meta = TokenMetadata::new(0, StandardTokenType::String, FontStyle::NONE, 0, 0);
+        let other_meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+
+        let comment_tok = Token { start_offset: 0, metadata: comment_meta };
+        let string_tok = Token { start_offset: 5, metadata: string_meta };
+        let other_tok = Token { start_offset: 10, metadata: other_meta };
+
+        assert!(comment_tok.is_comment());
+        assert!(!comment_tok.is_string());
+        assert!(string_tok.is_string());
+        assert!(!string_tok.is_comment());
+        assert!(!other_tok.is_comment());
+        assert!(!other_tok.is_string());
+    }
+
+    #[test]
+    fn line_tokens_comment_and_string_count() {
+        let comment_meta = TokenMetadata::new(0, StandardTokenType::Comment, FontStyle::NONE, 0, 0);
+        let string_meta = TokenMetadata::new(0, StandardTokenType::String, FontStyle::NONE, 0, 0);
+        let other_meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: comment_meta },
+            Token { start_offset: 5, metadata: string_meta },
+            Token { start_offset: 10, metadata: comment_meta },
+            Token { start_offset: 15, metadata: other_meta },
+            Token { start_offset: 20, metadata: string_meta },
+        ]);
+        assert_eq!(lt.comment_count(), 2);
+        assert_eq!(lt.string_count(), 2);
+    }
+
+    #[test]
+    fn line_tokens_first_and_last() {
+        let meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: meta },
+            Token { start_offset: 10, metadata: meta },
+            Token { start_offset: 20, metadata: meta },
+        ]);
+        assert_eq!(lt.first().unwrap().start_offset, 0);
+        assert_eq!(lt.last().unwrap().start_offset, 20);
+
+        let empty = LineTokens::empty();
+        assert!(empty.first().is_none());
+        assert!(empty.last().is_none());
+    }
+
+    #[test]
+    fn line_tokens_empty_comment_string_count() {
+        let empty = LineTokens::empty();
+        assert_eq!(empty.comment_count(), 0);
+        assert_eq!(empty.string_count(), 0);
     }
 }
