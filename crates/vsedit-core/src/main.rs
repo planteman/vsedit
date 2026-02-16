@@ -54,10 +54,12 @@ use vsedit_wb_clipboard::ClipboardService;
 use vsedit_theme::dark_plus;
 use vsedit_tui::{restore_terminal, setup_terminal};
 use vsedit_userdatasync::{SyncResource, SyncService};
-use vsedit_workbench::{FocusedPart, Workbench, WorkbenchAction};
+use vsedit_workbench::{ActivePanelView, FocusedPart, Workbench, WorkbenchAction};
 use vsedit_workspace::Workspace;
 use vsedit_lsp::{DiagnosticCollection, Severity as LspSeverity};
 use vsedit_debug::BreakpointStore;
+use vsedit_terminal::PtySession;
+use vsedit_files::watcher::FileWatcher;
 
 // ---------------------------------------------------------------------------
 // CLI argument parsing
@@ -173,6 +175,12 @@ struct AppState {
     breakpoints: HashMap<PathBuf, Vec<u32>>,
     /// DAP breakpoint store from the debug subsystem.
     breakpoint_store: BreakpointStore,
+    /// Active PTY sessions for the integrated terminal panel.
+    pty_sessions: Vec<PtySession>,
+    /// Whether a debug session is currently active.
+    pub debug_active: bool,
+    /// File watcher for detecting external modifications.
+    pub file_watcher: Option<FileWatcher>,
 }
 
 // ---------------------------------------------------------------------------
@@ -521,9 +529,22 @@ async fn run() -> io::Result<()> {
         lsp_diagnostic_summary,
         breakpoints,
         breakpoint_store,
+        pty_sessions: Vec::new(),
+        debug_active: false,
+        file_watcher: None,
     };
 
     app.lifecycle.set_phase(LifecyclePhase::Restored);
+
+    // Start watching the open file for external changes.
+    if let Some(ref file_path) = app.file_path {
+        if let Ok(mut watcher) = FileWatcher::new() {
+            if watcher.watch(file_path).is_ok() {
+                tracing::info!("Watching file for changes: {}", file_path.display());
+                app.file_watcher = Some(watcher);
+            }
+        }
+    }
 
     let result = run_event_loop(&mut terminal, &mut app).await;
 
@@ -540,6 +561,12 @@ async fn run() -> io::Result<()> {
 
     // Stop extension host.
     app.ext_host.stop_host();
+
+    // Kill any remaining PTY sessions.
+    for pty in &mut app.pty_sessions {
+        let _ = pty.kill();
+    }
+    app.pty_sessions.clear();
 
     restore_terminal(&mut terminal)?;
     tracing::info!("vsedit exiting");
@@ -821,6 +848,34 @@ async fn run_event_loop(
             }
             _ = tick_interval.tick() => {
                 // Periodic housekeeping: dismiss expired notifications, etc.
+                // Poll PTY sessions for output and feed into terminal view.
+                for pty in &mut app.pty_sessions {
+                    if let Ok(data) = pty.read_output() {
+                        if !data.is_empty() {
+                            app.workbench.terminal_view.process_active_output(&data);
+                        }
+                    }
+                }
+                // Poll file watcher for external changes.
+                if let Some(ref mut watcher) = app.file_watcher {
+                    while let Some(event) = watcher.try_recv() {
+                        match event.kind {
+                            vsedit_files::watcher::FileChangeKind::Modified => {
+                                tracing::info!("File modified externally: {:?}", event.path);
+                                if !app.workbench.is_modified {
+                                    if let Ok(content) = std::fs::read_to_string(&event.path) {
+                                        app.controller = EditorController::new(&content);
+                                        app.workbench.set_editor_content(
+                                            &content,
+                                            event.path.to_str().map(|s| s.to_string()),
+                                        );
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             }
         }
     }
@@ -855,6 +910,33 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
         let input = from_crossterm_key(key_event);
         let action = app.workbench.handle_input(InputEvent::Key(input));
         return handle_workbench_action(&action, app);
+    }
+
+    // ── Terminal panel focused → route keystrokes to PTY ─────────────
+    if app.workbench.focused == FocusedPart::Panel
+        && app.workbench.active_panel == ActivePanelView::Terminal
+        && !app.pty_sessions.is_empty()
+    {
+        // Allow Ctrl+J and Ctrl+` to toggle panel even from terminal.
+        if has_ctrl {
+            match key_event.code {
+                KeyCode::Char('j') => {
+                    return dispatch_command("workbench.action.togglePanel", app);
+                }
+                KeyCode::Char('`') => {
+                    return dispatch_command("workbench.action.terminal.toggleTerminal", app);
+                }
+                _ => {}
+            }
+        }
+        // Send keystroke to the PTY.
+        if let Some(pty) = app.pty_sessions.first_mut() {
+            let data = crossterm_key_to_bytes(key_event);
+            if !data.is_empty() {
+                let _ = pty.write_input(&data);
+            }
+        }
+        return false;
     }
 
     // ── Find overlay keys ──────────────────────────────────────────────
@@ -964,6 +1046,10 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
             KeyCode::Char('j') => {
                 // Ctrl+J → Toggle bottom panel
                 return dispatch_command("workbench.action.togglePanel", app);
+            }
+            KeyCode::Char('`') => {
+                // Ctrl+` → Toggle terminal
+                return dispatch_command("workbench.action.terminal.toggleTerminal", app);
             }
             KeyCode::Char('1') => {
                 return dispatch_command("workbench.action.focusFirstEditorGroup", app);
@@ -1102,9 +1188,30 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
         return false;
     }
 
-    // ── F5 → Start debugging ───────────────────────────────────────────
+    // ── F5 → Start debugging / Shift+F5 → Stop debugging ────────────
     if key_event.code == KeyCode::F(5) && !has_ctrl && !has_alt {
+        if has_shift && app.debug_active {
+            // Stop debugging
+            app.debug_active = false;
+            app.workbench.statusbar.update_item("statusbar.debug", "");
+            app.context_keys
+                .set_context("inDebugMode", ContextKeyValue::Bool(false));
+            tracing::info!("Debug session stopped");
+            return false;
+        }
         return dispatch_command("workbench.action.debug.start", app);
+    }
+
+    // ── F10 → Step over (debug) ────────────────────────────────────────
+    if key_event.code == KeyCode::F(10) && app.debug_active {
+        tracing::info!("Step over");
+        return false;
+    }
+
+    // ── F11 → Step into (debug) ────────────────────────────────────────
+    if key_event.code == KeyCode::F(11) && app.debug_active {
+        tracing::info!("Step into");
+        return false;
     }
 
     // ── Non-ctrl key events → editor actions ───────────────────────────
@@ -1199,6 +1306,20 @@ fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
             let visible = app.workbench.focused == FocusedPart::Panel;
             app.context_keys
                 .set_context("panelVisible", ContextKeyValue::Bool(visible));
+            // Spawn a PTY session on first terminal toggle if none exists.
+            if visible && app.pty_sessions.is_empty() {
+                let shell = vsedit_terminal::detect_default_shell();
+                match PtySession::spawn(shell.to_string_lossy().as_ref(), 80, 24) {
+                    Ok(pty) => {
+                        app.pty_sessions.push(pty);
+                        // Add a terminal tab to the view if none exists.
+                        if app.workbench.terminal_view.is_terminal_tabs_empty() {
+                            app.workbench.terminal_view.add_tab("bash");
+                        }
+                    }
+                    Err(e) => tracing::warn!("Failed to spawn terminal: {e}"),
+                }
+            }
         }
         "workbench.action.toggleSidebarVisibility" => {
             app.workbench.execute_command(cmd);
@@ -1207,9 +1328,41 @@ fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
                 .set_context("sideBarVisible", ContextKeyValue::Bool(visible));
         }
         "workbench.action.debug.start" => {
+            // Look for .vscode/launch.json in workspace
+            if let Some(root) = app._workspace.get_workspace_root() {
+                let launch_path = root.join(".vscode").join("launch.json");
+                if launch_path.exists() {
+                    match std::fs::read_to_string(&launch_path) {
+                        Ok(content) => {
+                            match vsedit_json::parse_jsonc(&content) {
+                                Ok(config) => {
+                                    if let Some(configs) = config.get("configurations").and_then(|c| c.as_array()) {
+                                        if let Some(first) = configs.first() {
+                                            let program = first.get("program")
+                                                .and_then(|p| p.as_str())
+                                                .unwrap_or("");
+                                            let debug_type = first.get("type")
+                                                .and_then(|t| t.as_str())
+                                                .unwrap_or("unknown");
+                                            tracing::info!("Starting debug session: type={}, program={}", debug_type, program);
+                                            app.workbench.statusbar.update_item("statusbar.debug", "⚡ Debugging");
+                                            app.debug_active = true;
+                                        }
+                                    }
+                                }
+                                Err(e) => tracing::warn!("Failed to parse launch.json: {e}"),
+                            }
+                        }
+                        Err(e) => tracing::warn!("Failed to read launch.json: {e}"),
+                    }
+                } else {
+                    tracing::info!("No launch.json found — create .vscode/launch.json to configure debugging");
+                }
+            }
             app.context_keys
                 .set_context("inDebugMode", ContextKeyValue::Bool(true));
             app.workbench.execute_command(cmd);
+            app.workbench.layout.set_part_visible(vsedit_wb_layout::Part::Panel, true);
         }
         "workbench.action.tasks.build" => {
             app.workbench.execute_command(cmd);
@@ -1274,6 +1427,48 @@ fn update_context_keys(app: &mut AppState) {
             *focused == FocusedPart::CommandPalette || *focused == FocusedPart::QuickInput,
         ),
     );
+    app.context_keys.set_context(
+        "terminalFocus",
+        ContextKeyValue::Bool(
+            *focused == FocusedPart::Panel
+                && app.workbench.active_panel == ActivePanelView::Terminal,
+        ),
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Terminal PTY helpers
+// ---------------------------------------------------------------------------
+
+/// Convert a crossterm key event into bytes suitable for writing to a PTY.
+fn crossterm_key_to_bytes(key_event: crossterm::event::KeyEvent) -> Vec<u8> {
+    let ctrl = key_event.modifiers.contains(KeyModifiers::CONTROL);
+    match key_event.code {
+        KeyCode::Char(c) if ctrl => {
+            // Ctrl+A..Z → 0x01..0x1A
+            let byte = (c.to_ascii_lowercase() as u8).wrapping_sub(b'a').wrapping_add(1);
+            if byte <= 26 { vec![byte] } else { vec![] }
+        }
+        KeyCode::Char(c) => {
+            let mut buf = [0u8; 4];
+            let s = c.encode_utf8(&mut buf);
+            s.as_bytes().to_vec()
+        }
+        KeyCode::Enter => vec![b'\r'],
+        KeyCode::Backspace => vec![0x7f],
+        KeyCode::Tab => vec![b'\t'],
+        KeyCode::Esc => vec![0x1b],
+        KeyCode::Up => b"\x1b[A".to_vec(),
+        KeyCode::Down => b"\x1b[B".to_vec(),
+        KeyCode::Right => b"\x1b[C".to_vec(),
+        KeyCode::Left => b"\x1b[D".to_vec(),
+        KeyCode::Home => b"\x1b[H".to_vec(),
+        KeyCode::End => b"\x1b[F".to_vec(),
+        KeyCode::Delete => b"\x1b[3~".to_vec(),
+        KeyCode::PageUp => b"\x1b[5~".to_vec(),
+        KeyCode::PageDown => b"\x1b[6~".to_vec(),
+        _ => vec![],
+    }
 }
 
 // ---------------------------------------------------------------------------

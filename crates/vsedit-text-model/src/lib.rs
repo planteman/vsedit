@@ -203,6 +203,92 @@ pub fn encode_text(text: &str, encoding: Encoding) -> Vec<u8> {
 }
 
 // ---------------------------------------------------------------------------
+// FileEncoding — lightweight encoding detection with self-contained methods
+// ---------------------------------------------------------------------------
+
+/// Detected file encoding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileEncoding {
+    Utf8,
+    Utf8Bom,
+    Utf16Le,
+    Utf16Be,
+    Latin1,
+}
+
+impl FileEncoding {
+    /// Detect encoding from raw bytes by examining BOM and byte patterns.
+    pub fn detect(data: &[u8]) -> Self {
+        // Check for BOM
+        if data.starts_with(&[0xEF, 0xBB, 0xBF]) {
+            return Self::Utf8Bom;
+        }
+        if data.starts_with(&[0xFF, 0xFE]) {
+            return Self::Utf16Le;
+        }
+        if data.starts_with(&[0xFE, 0xFF]) {
+            return Self::Utf16Be;
+        }
+        // Try UTF-8
+        if std::str::from_utf8(data).is_ok() {
+            return Self::Utf8;
+        }
+        // Fallback to Latin1 (always valid for any byte sequence)
+        Self::Latin1
+    }
+
+    /// Decode bytes to string using detected encoding.
+    pub fn decode(&self, data: &[u8]) -> String {
+        match self {
+            Self::Utf8 => String::from_utf8_lossy(data).into_owned(),
+            Self::Utf8Bom => String::from_utf8_lossy(&data[3..]).into_owned(),
+            Self::Utf16Le => {
+                let chars: Vec<u16> = data[2..]
+                    .chunks(2)
+                    .map(|c| u16::from_le_bytes([c[0], c.get(1).copied().unwrap_or(0)]))
+                    .collect();
+                String::from_utf16_lossy(&chars)
+            }
+            Self::Utf16Be => {
+                let chars: Vec<u16> = data[2..]
+                    .chunks(2)
+                    .map(|c| u16::from_be_bytes([c[0], c.get(1).copied().unwrap_or(0)]))
+                    .collect();
+                String::from_utf16_lossy(&chars)
+            }
+            Self::Latin1 => data.iter().map(|&b| b as char).collect(),
+        }
+    }
+
+    /// Encode string back to bytes using this encoding.
+    pub fn encode(&self, text: &str) -> Vec<u8> {
+        match self {
+            Self::Utf8 => text.as_bytes().to_vec(),
+            Self::Utf8Bom => {
+                let mut buf = vec![0xEF, 0xBB, 0xBF];
+                buf.extend_from_slice(text.as_bytes());
+                buf
+            }
+            Self::Utf16Le => {
+                let mut buf = vec![0xFF, 0xFE];
+                for c in text.encode_utf16() {
+                    buf.extend_from_slice(&c.to_le_bytes());
+                }
+                buf
+            }
+            Self::Utf16Be => {
+                let mut buf = vec![0xFE, 0xFF];
+                for c in text.encode_utf16() {
+                    buf.extend_from_slice(&c.to_be_bytes());
+                }
+                buf
+            }
+            Self::Latin1 => text.chars().map(|c| c as u8).collect(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Large file support
 // ---------------------------------------------------------------------------
 
@@ -307,6 +393,8 @@ pub struct TextModel {
     line_ending: LineEnding,
     /// Detected/configured encoding.
     encoding: Encoding,
+    /// Detected file encoding (lightweight variant).
+    pub file_encoding: FileEncoding,
 }
 
 impl TextModel {
@@ -326,6 +414,7 @@ impl TextModel {
             alternative_version_id: 1,
             line_ending: eol,
             encoding: Encoding::UTF8,
+            file_encoding: FileEncoding::Utf8,
         }
     }
 
@@ -337,9 +426,11 @@ impl TextModel {
     /// Create a `TextModel` from raw bytes, auto-detecting encoding.
     pub fn from_bytes(bytes: &[u8]) -> Self {
         let enc = detect_encoding(bytes);
+        let file_enc = FileEncoding::detect(bytes);
         let text = decode_text(bytes, enc);
         let mut model = Self::new(&text);
         model.encoding = enc;
+        model.file_encoding = file_enc;
         model
     }
 
@@ -387,6 +478,16 @@ impl TextModel {
     /// Set the encoding.
     pub fn set_encoding(&mut self, enc: Encoding) {
         self.encoding = enc;
+    }
+
+    /// Get the detected file encoding.
+    pub fn get_file_encoding(&self) -> FileEncoding {
+        self.file_encoding
+    }
+
+    /// Set the file encoding.
+    pub fn set_file_encoding(&mut self, enc: FileEncoding) {
+        self.file_encoding = enc;
     }
 
     // -- Event accessor -----------------------------------------------------
@@ -1527,5 +1628,114 @@ mod tests {
     #[test]
     fn is_large_file_nonexistent() {
         assert!(!is_large_file(Path::new("/nonexistent/path/file.txt")));
+    }
+
+    // -- FileEncoding -------------------------------------------------------
+
+    #[test]
+    fn file_encoding_detect_utf8() {
+        assert_eq!(FileEncoding::detect(b"hello world"), FileEncoding::Utf8);
+    }
+
+    #[test]
+    fn file_encoding_detect_utf8_bom() {
+        let bytes = b"\xEF\xBB\xBFhello";
+        assert_eq!(FileEncoding::detect(bytes), FileEncoding::Utf8Bom);
+    }
+
+    #[test]
+    fn file_encoding_detect_utf16le() {
+        let bytes = b"\xFF\xFEh\x00i\x00";
+        assert_eq!(FileEncoding::detect(bytes), FileEncoding::Utf16Le);
+    }
+
+    #[test]
+    fn file_encoding_detect_utf16be() {
+        let bytes = b"\xFE\xFF\x00h\x00i";
+        assert_eq!(FileEncoding::detect(bytes), FileEncoding::Utf16Be);
+    }
+
+    #[test]
+    fn file_encoding_detect_latin1() {
+        // Invalid UTF-8 bytes that don't match any BOM → Latin1 fallback.
+        let bytes: &[u8] = &[0x80, 0x81, 0xFE, 0xFD];
+        assert_eq!(FileEncoding::detect(bytes), FileEncoding::Latin1);
+    }
+
+    #[test]
+    fn file_encoding_decode_utf8() {
+        assert_eq!(FileEncoding::Utf8.decode(b"hello"), "hello");
+    }
+
+    #[test]
+    fn file_encoding_decode_utf8_bom() {
+        let bytes = b"\xEF\xBB\xBFhello";
+        assert_eq!(FileEncoding::Utf8Bom.decode(bytes), "hello");
+    }
+
+    #[test]
+    fn file_encoding_roundtrip_utf8() {
+        let text = "hello world";
+        let encoded = FileEncoding::Utf8.encode(text);
+        let detected = FileEncoding::detect(&encoded);
+        assert_eq!(detected, FileEncoding::Utf8);
+        assert_eq!(detected.decode(&encoded), text);
+    }
+
+    #[test]
+    fn file_encoding_roundtrip_utf8_bom() {
+        let text = "hello BOM";
+        let encoded = FileEncoding::Utf8Bom.encode(text);
+        assert_eq!(&encoded[..3], &[0xEF, 0xBB, 0xBF]);
+        let detected = FileEncoding::detect(&encoded);
+        assert_eq!(detected, FileEncoding::Utf8Bom);
+        assert_eq!(detected.decode(&encoded), text);
+    }
+
+    #[test]
+    fn file_encoding_roundtrip_utf16le() {
+        let text = "ABC";
+        let encoded = FileEncoding::Utf16Le.encode(text);
+        assert_eq!(&encoded[..2], &[0xFF, 0xFE]);
+        let detected = FileEncoding::detect(&encoded);
+        assert_eq!(detected, FileEncoding::Utf16Le);
+        assert_eq!(detected.decode(&encoded), text);
+    }
+
+    #[test]
+    fn file_encoding_roundtrip_utf16be() {
+        let text = "ABC";
+        let encoded = FileEncoding::Utf16Be.encode(text);
+        assert_eq!(&encoded[..2], &[0xFE, 0xFF]);
+        let detected = FileEncoding::detect(&encoded);
+        assert_eq!(detected, FileEncoding::Utf16Be);
+        assert_eq!(detected.decode(&encoded), text);
+    }
+
+    #[test]
+    fn file_encoding_roundtrip_latin1() {
+        let text = "caf";
+        let encoded = FileEncoding::Latin1.encode(text);
+        let decoded = FileEncoding::Latin1.decode(&encoded);
+        assert_eq!(decoded, text);
+    }
+
+    #[test]
+    fn file_encoding_detect_empty() {
+        assert_eq!(FileEncoding::detect(b""), FileEncoding::Utf8);
+    }
+
+    #[test]
+    fn model_from_bytes_sets_file_encoding() {
+        let bytes = b"\xEF\xBB\xBFhello";
+        let model = TextModel::from_bytes(bytes);
+        assert_eq!(model.get_file_encoding(), FileEncoding::Utf8Bom);
+        assert_eq!(model.get_value(), "hello");
+    }
+
+    #[test]
+    fn model_new_defaults_to_utf8_file_encoding() {
+        let model = TextModel::new("hello");
+        assert_eq!(model.get_file_encoding(), FileEncoding::Utf8);
     }
 }

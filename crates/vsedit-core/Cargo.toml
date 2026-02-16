@@ -41,7 +41,10 @@ vsedit-editor-types = { path = "../vsedit-editor-types" }
 vsedit-text-model = { path = "../vsedit-text-model" }
 vsedit-lsp = { path = "../vsedit-lsp" }
 vsedit-debug = { path = "../vsedit-debug" }
+vsedit-files = { path = "../vsedit-files" }
+vsedit-json = { path = "../vsedit-json" }
 vsedit-ext-scm = { path = "../vsedit-ext-scm" }
+vsedit-terminal = { path = "../vsedit-terminal" }
 walkdir = { workspace = true }
 clap = { workspace = true }
 crossterm = { workspace = true }
