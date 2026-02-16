@@ -1,13 +1,28 @@
 //! Quick pick / command palette model.
 //!
-//! Provides the core data types and fuzzy-matching logic for VS Code-style
-//! quick-input UIs (quick picks and text inputs).
+//! Provides the core data types, fuzzy-matching logic, input box model,
+//! command palette integration, Go-to-Line support, and rendering helpers
+//! for VS Code-style quick-input UIs.
 
+use std::collections::VecDeque;
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::Widget;
 use vsedit_events::{Emitter, Event};
 
 // ---------------------------------------------------------------------------
 // Data types
 // ---------------------------------------------------------------------------
+
+/// The kind of quick-pick item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuickPickItemKind {
+    Default,
+    Separator,
+}
 
 /// A single item in a quick pick list.
 #[derive(Debug, Clone)]
@@ -16,8 +31,28 @@ pub struct QuickPickItem {
     pub description: Option<String>,
     pub detail: Option<String>,
     pub icon: Option<String>,
+    pub kind: QuickPickItemKind,
+    pub picked: bool,
     /// Always show even when not matching the current filter.
     pub always_show: bool,
+    /// Keybinding string to display next to the item.
+    pub keybinding: Option<String>,
+}
+
+impl QuickPickItem {
+    /// Create a separator item with the given label.
+    pub fn separator(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            description: None,
+            detail: None,
+            icon: None,
+            kind: QuickPickItemKind::Separator,
+            picked: false,
+            always_show: true,
+            keybinding: None,
+        }
+    }
 }
 
 /// Options that configure a quick pick session.
@@ -38,6 +73,169 @@ pub struct QuickInputOptions {
     pub value: Option<String>,
     pub placeholder: Option<String>,
     pub password: bool,
+}
+
+// ---------------------------------------------------------------------------
+// Input Box model
+// ---------------------------------------------------------------------------
+
+/// Options for an input box.
+#[derive(Debug, Clone, Default)]
+pub struct InputBoxOptions {
+    pub title: Option<String>,
+    pub placeholder: Option<String>,
+    pub value: String,
+    pub prompt: Option<String>,
+    pub password: bool,
+}
+
+/// State for an input box.
+#[derive(Debug, Clone)]
+pub struct InputBoxState {
+    pub value: String,
+    pub cursor_pos: usize,
+    pub is_active: bool,
+    pub validation_message: Option<String>,
+}
+
+impl InputBoxState {
+    pub fn new() -> Self {
+        Self {
+            value: String::new(),
+            cursor_pos: 0,
+            is_active: false,
+            validation_message: None,
+        }
+    }
+
+    pub fn with_value(mut self, value: impl Into<String>) -> Self {
+        self.value = value.into();
+        self.cursor_pos = self.value.len();
+        self
+    }
+
+    /// Insert a character at the cursor position.
+    pub fn insert_char(&mut self, c: char) {
+        self.value.insert(self.cursor_pos, c);
+        self.cursor_pos += c.len_utf8();
+    }
+
+    /// Delete the character before the cursor (backspace).
+    pub fn backspace(&mut self) {
+        if self.cursor_pos > 0 {
+            let prev = self.value[..self.cursor_pos]
+                .chars()
+                .last()
+                .map(|c| c.len_utf8())
+                .unwrap_or(0);
+            self.cursor_pos -= prev;
+            self.value.remove(self.cursor_pos);
+        }
+    }
+
+    /// Delete the character at the cursor (delete key).
+    pub fn delete(&mut self) {
+        if self.cursor_pos < self.value.len() {
+            self.value.remove(self.cursor_pos);
+        }
+    }
+
+    /// Move cursor left by one character.
+    pub fn move_left(&mut self) {
+        if self.cursor_pos > 0 {
+            let prev = self.value[..self.cursor_pos]
+                .chars()
+                .last()
+                .map(|c| c.len_utf8())
+                .unwrap_or(0);
+            self.cursor_pos -= prev;
+        }
+    }
+
+    /// Move cursor right by one character.
+    pub fn move_right(&mut self) {
+        if self.cursor_pos < self.value.len() {
+            let next = self.value[self.cursor_pos..]
+                .chars()
+                .next()
+                .map(|c| c.len_utf8())
+                .unwrap_or(0);
+            self.cursor_pos += next;
+        }
+    }
+
+    /// Move cursor to the start of the value.
+    pub fn move_home(&mut self) {
+        self.cursor_pos = 0;
+    }
+
+    /// Move cursor to the end of the value.
+    pub fn move_end(&mut self) {
+        self.cursor_pos = self.value.len();
+    }
+
+    /// Set the entire value, moving cursor to end.
+    pub fn set_value(&mut self, value: impl Into<String>) {
+        self.value = value.into();
+        self.cursor_pos = self.value.len();
+    }
+
+    /// Validate the current value using a validation function.
+    pub fn validate(&mut self, validator: &dyn Fn(&str) -> Option<String>) {
+        self.validation_message = validator(&self.value);
+    }
+}
+
+impl Default for InputBoxState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// QuickPick state
+// ---------------------------------------------------------------------------
+
+/// Full state for a quick pick session (model + UI state).
+#[derive(Debug, Clone)]
+pub struct QuickPickState {
+    pub items: Vec<QuickPickItem>,
+    pub filtered_items: Vec<FilteredItem>,
+    pub selected_idx: usize,
+    pub input_text: String,
+    pub is_active: bool,
+    pub scroll_offset: usize,
+}
+
+impl QuickPickState {
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            filtered_items: Vec::new(),
+            selected_idx: 0,
+            input_text: String::new(),
+            is_active: false,
+            scroll_offset: 0,
+        }
+    }
+
+    /// The maximum number of visible items in the pick list.
+    pub const MAX_VISIBLE_ITEMS: usize = 10;
+
+    /// Ensure the selected item is visible within the scroll window.
+    pub fn ensure_visible(&mut self) {
+        if self.selected_idx < self.scroll_offset {
+            self.scroll_offset = self.selected_idx;
+        } else if self.selected_idx >= self.scroll_offset + Self::MAX_VISIBLE_ITEMS {
+            self.scroll_offset = self.selected_idx + 1 - Self::MAX_VISIBLE_ITEMS;
+        }
+    }
+}
+
+impl Default for QuickPickState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -213,12 +411,32 @@ impl QuickPickService {
         self.on_did_change_value.event()
     }
 
+    /// Get the item at the given original index.
+    pub fn get_item(&self, index: usize) -> Option<&QuickPickItem> {
+        self.items.get(index)
+    }
+
+    /// Return the current filter text.
+    pub fn filter_text(&self) -> &str {
+        &self.filter_text
+    }
+
     // -- internals ----------------------------------------------------------
 
     fn apply_filter(&mut self) {
         self.filtered_items.clear();
 
         for (idx, item) in self.items.iter().enumerate() {
+            // Separators always show
+            if item.kind == QuickPickItemKind::Separator {
+                self.filtered_items.push(FilteredItem {
+                    original_index: idx,
+                    score: i32::MAX,
+                    highlight_positions: Vec::new(),
+                });
+                continue;
+            }
+
             if self.filter_text.is_empty() {
                 self.filtered_items.push(FilteredItem {
                     original_index: idx,
@@ -248,8 +466,7 @@ impl QuickPickService {
         }
 
         // Stable sort by score descending so equal-score items keep insertion order.
-        self.filtered_items
-            .sort_by(|a, b| b.score.cmp(&a.score));
+        self.filtered_items.sort_by(|a, b| b.score.cmp(&a.score));
 
         // Reset selection to top.
         self.selected_index = 0;
@@ -303,6 +520,412 @@ impl Default for QuickPickService {
 }
 
 // ---------------------------------------------------------------------------
+// CommandPaletteService
+// ---------------------------------------------------------------------------
+
+/// A command entry for the command palette.
+#[derive(Debug, Clone)]
+pub struct CommandEntry {
+    pub id: String,
+    pub label: String,
+    pub keybinding: Option<String>,
+    pub category: Option<String>,
+}
+
+/// Manages the command palette state, including recently-used tracking.
+pub struct CommandPaletteService {
+    commands: Vec<CommandEntry>,
+    recent: VecDeque<String>,
+    pick: QuickPickService,
+    is_active: bool,
+    max_recent: usize,
+}
+
+impl CommandPaletteService {
+    pub fn new() -> Self {
+        Self {
+            commands: Vec::new(),
+            recent: VecDeque::new(),
+            pick: QuickPickService::new(),
+            is_active: false,
+            max_recent: 10,
+        }
+    }
+
+    /// Register all commands and rebuild the quick pick items.
+    pub fn set_commands(&mut self, commands: Vec<CommandEntry>) {
+        self.commands = commands;
+        self.rebuild_items();
+    }
+
+    /// Open the command palette.
+    pub fn open(&mut self) {
+        self.is_active = true;
+        self.pick.set_filter(String::new());
+        self.rebuild_items();
+    }
+
+    /// Close the command palette.
+    pub fn close(&mut self) {
+        self.is_active = false;
+    }
+
+    /// Returns whether the palette is currently active.
+    pub fn is_active(&self) -> bool {
+        self.is_active
+    }
+
+    /// Update the filter text.
+    pub fn set_filter(&mut self, text: String) {
+        self.pick.set_filter(text);
+    }
+
+    /// Move selection down.
+    pub fn select_next(&mut self) {
+        self.pick.select_next();
+    }
+
+    /// Move selection up.
+    pub fn select_previous(&mut self) {
+        self.pick.select_previous();
+    }
+
+    /// Accept the current selection and return the command ID.
+    pub fn accept(&mut self) -> Option<String> {
+        let idx = self.pick.get_selected_index();
+        if let Some(fi) = self.pick.get_filtered_items().get(idx) {
+            let item = &self.pick.items[fi.original_index];
+            if item.kind == QuickPickItemKind::Separator {
+                return None;
+            }
+            if let Some(cmd) = self.commands.iter().find(|c| c.label == item.label) {
+                let id = cmd.id.clone();
+                self.record_recent(&id);
+                return Some(id);
+            }
+        }
+        None
+    }
+
+    /// Get the underlying quick pick service for rendering.
+    pub fn pick_service(&self) -> &QuickPickService {
+        &self.pick
+    }
+
+    /// Get the list of recently used command IDs.
+    pub fn recent_commands(&self) -> &VecDeque<String> {
+        &self.recent
+    }
+
+    fn record_recent(&mut self, id: &str) {
+        self.recent.retain(|r| r != id);
+        self.recent.push_front(id.to_string());
+        if self.recent.len() > self.max_recent {
+            self.recent.pop_back();
+        }
+    }
+
+    fn rebuild_items(&mut self) {
+        let mut items = Vec::new();
+
+        let recent_cmds: Vec<&CommandEntry> = self
+            .recent
+            .iter()
+            .filter_map(|id| self.commands.iter().find(|c| &c.id == id))
+            .collect();
+
+        if !recent_cmds.is_empty() {
+            items.push(QuickPickItem::separator("recently used"));
+            for cmd in &recent_cmds {
+                items.push(command_to_item(cmd));
+            }
+        }
+
+        let non_recent: Vec<&CommandEntry> = self
+            .commands
+            .iter()
+            .filter(|c| !self.recent.contains(&c.id))
+            .collect();
+
+        if !non_recent.is_empty() {
+            if !recent_cmds.is_empty() {
+                items.push(QuickPickItem::separator("other commands"));
+            }
+            for cmd in &non_recent {
+                items.push(command_to_item(cmd));
+            }
+        }
+
+        self.pick.set_items(items);
+    }
+}
+
+impl Default for CommandPaletteService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn command_to_item(cmd: &CommandEntry) -> QuickPickItem {
+    let desc = match (&cmd.category, &cmd.keybinding) {
+        (Some(cat), Some(kb)) => Some(format!("{cat}: {kb}")),
+        (Some(cat), None) => Some(cat.clone()),
+        (None, Some(kb)) => Some(kb.clone()),
+        (None, None) => None,
+    };
+    QuickPickItem {
+        label: cmd.label.clone(),
+        description: desc,
+        detail: None,
+        icon: None,
+        kind: QuickPickItemKind::Default,
+        picked: false,
+        always_show: false,
+        keybinding: cmd.keybinding.clone(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Go to Line
+// ---------------------------------------------------------------------------
+
+/// Result of a "Go to Line" interaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GoToLineResult {
+    pub line: usize,
+    pub column: Option<usize>,
+}
+
+/// Parse a go-to-line input string. Accepts `:line`, `:line:col`, `line`,
+/// or `line:col` formats.
+pub fn parse_goto_line(input: &str) -> Option<GoToLineResult> {
+    let input = input.trim().trim_start_matches(':');
+    if input.is_empty() {
+        return None;
+    }
+
+    let parts: Vec<&str> = input.splitn(2, ':').collect();
+    let line: usize = parts[0].trim().parse().ok()?;
+    if line == 0 {
+        return None;
+    }
+
+    let column = if parts.len() > 1 {
+        let col: usize = parts[1].trim().parse().ok()?;
+        if col == 0 { None } else { Some(col) }
+    } else {
+        None
+    };
+
+    Some(GoToLineResult { line, column })
+}
+
+// ---------------------------------------------------------------------------
+// Rendering — centered overlay for quick input
+// ---------------------------------------------------------------------------
+
+/// Maximum width of the quick input overlay.
+const OVERLAY_MAX_WIDTH: u16 = 60;
+/// Minimum width of the quick input overlay.
+const OVERLAY_MIN_WIDTH: u16 = 20;
+
+/// Render a quick pick overlay centered in the given area.
+pub fn render_quick_pick(
+    area: Rect,
+    buf: &mut Buffer,
+    pick: &QuickPickService,
+    items: &[QuickPickItem],
+    title: Option<&str>,
+    placeholder: Option<&str>,
+) {
+    let width = area.width / 2;
+    let width = width.max(OVERLAY_MIN_WIDTH).min(OVERLAY_MAX_WIDTH);
+
+    let max_visible = 10u16;
+    let item_count = pick.get_filtered_items().len().min(max_visible as usize) as u16;
+    let height = 3 + item_count; // border + input + items + border
+
+    if area.width < width || area.height < height {
+        return;
+    }
+
+    let x = area.x + (area.width - width) / 2;
+    let y = area.y + area.height / 4;
+
+    let overlay = Rect::new(x, y, width, height.min(area.height - y));
+
+    let bg = Color::DarkGray;
+    let fg = Color::White;
+    for row in overlay.y..overlay.y + overlay.height {
+        for col in overlay.x..overlay.x + overlay.width {
+            if let Some(cell) = buf.cell_mut((col, row)) {
+                cell.set_style(Style::default().bg(bg).fg(fg));
+                cell.set_char(' ');
+            }
+        }
+    }
+
+    let content_x = overlay.x + 1;
+    let content_width = overlay.width.saturating_sub(2);
+    let mut row = overlay.y;
+
+    if let Some(t) = title {
+        let title_line = Line::from(vec![Span::styled(
+            t.chars().take(content_width as usize).collect::<String>(),
+            Style::default().bg(bg).fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        )]);
+        title_line.render(Rect::new(content_x, row, content_width, 1), buf);
+        row += 1;
+    }
+
+    // Input field
+    let input_text = if pick.filter_text().is_empty() {
+        placeholder.unwrap_or("").to_string()
+    } else {
+        pick.filter_text().to_string()
+    };
+    let input_style = if pick.filter_text().is_empty() {
+        Style::default().bg(Color::Black).fg(Color::DarkGray)
+    } else {
+        Style::default().bg(Color::Black).fg(Color::White)
+    };
+    let input_line = Line::from(vec![Span::styled(
+        format!(" {}", input_text.chars().take(content_width as usize - 1).collect::<String>()),
+        input_style,
+    )]);
+    input_line.render(Rect::new(content_x, row, content_width, 1), buf);
+    row += 1;
+
+    // Filtered items
+    let selected = pick.get_selected_index();
+    for (i, fi) in pick.get_filtered_items().iter().take(max_visible as usize).enumerate() {
+        if row >= overlay.y + overlay.height {
+            break;
+        }
+        let item = &items[fi.original_index];
+
+        if item.kind == QuickPickItemKind::Separator {
+            let sep_line = Line::from(vec![Span::styled(
+                format!("── {} ──", item.label),
+                Style::default().bg(bg).fg(Color::DarkGray),
+            )]);
+            sep_line.render(Rect::new(content_x, row, content_width, 1), buf);
+        } else {
+            let is_selected = i == selected;
+            let item_bg = if is_selected { Color::Blue } else { bg };
+            let item_fg = Color::White;
+
+            let mut spans = Vec::new();
+            let prefix = if is_selected { "▸ " } else { "  " };
+            spans.push(Span::styled(prefix, Style::default().bg(item_bg).fg(item_fg)));
+
+            for (ci, ch) in item.label.chars().enumerate() {
+                let is_highlight = fi.highlight_positions.contains(&ci);
+                let style = if is_highlight {
+                    Style::default().bg(item_bg).fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().bg(item_bg).fg(item_fg)
+                };
+                spans.push(Span::styled(ch.to_string(), style));
+            }
+
+            if let Some(ref kb) = item.keybinding {
+                let label_len = item.label.len() + 2;
+                let kb_len = kb.len() + 2;
+                let remaining = (content_width as usize).saturating_sub(label_len + kb_len);
+                if remaining > 0 {
+                    spans.push(Span::styled(" ".repeat(remaining), Style::default().bg(item_bg)));
+                    spans.push(Span::styled(
+                        format!(" {kb}"),
+                        Style::default().bg(item_bg).fg(Color::DarkGray),
+                    ));
+                }
+            }
+
+            let item_line = Line::from(spans);
+            item_line.render(Rect::new(content_x, row, content_width, 1), buf);
+        }
+        row += 1;
+    }
+}
+
+/// Render an input box overlay centered in the given area.
+pub fn render_input_box(
+    area: Rect,
+    buf: &mut Buffer,
+    state: &InputBoxState,
+    title: Option<&str>,
+    prompt: Option<&str>,
+) {
+    let width = area.width / 2;
+    let width = width.max(OVERLAY_MIN_WIDTH).min(OVERLAY_MAX_WIDTH);
+    let height = if state.validation_message.is_some() { 5 } else { 4 };
+
+    if area.width < width || area.height < height {
+        return;
+    }
+
+    let x = area.x + (area.width - width) / 2;
+    let y = area.y + area.height / 4;
+    let overlay = Rect::new(x, y, width, height.min(area.height - y));
+
+    let bg = Color::DarkGray;
+    let fg = Color::White;
+    for row in overlay.y..overlay.y + overlay.height {
+        for col in overlay.x..overlay.x + overlay.width {
+            if let Some(cell) = buf.cell_mut((col, row)) {
+                cell.set_style(Style::default().bg(bg).fg(fg));
+                cell.set_char(' ');
+            }
+        }
+    }
+
+    let content_x = overlay.x + 1;
+    let content_width = overlay.width.saturating_sub(2);
+    let mut row = overlay.y;
+
+    if let Some(t) = title {
+        let title_line = Line::from(vec![Span::styled(
+            t.chars().take(content_width as usize).collect::<String>(),
+            Style::default().bg(bg).fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        )]);
+        title_line.render(Rect::new(content_x, row, content_width, 1), buf);
+        row += 1;
+    }
+
+    if let Some(p) = prompt {
+        let prompt_line = Line::from(vec![Span::styled(
+            p.chars().take(content_width as usize).collect::<String>(),
+            Style::default().bg(bg).fg(Color::Gray),
+        )]);
+        prompt_line.render(Rect::new(content_x, row, content_width, 1), buf);
+        row += 1;
+    }
+
+    let display = if state.value.is_empty() {
+        " ".to_string()
+    } else {
+        format!(" {}", &state.value)
+    };
+    let input_line = Line::from(vec![Span::styled(
+        display.chars().take(content_width as usize).collect::<String>(),
+        Style::default().bg(Color::Black).fg(Color::White),
+    )]);
+    input_line.render(Rect::new(content_x, row, content_width, 1), buf);
+    row += 1;
+
+    if let Some(ref msg) = state.validation_message {
+        if row < overlay.y + overlay.height {
+            let val_line = Line::from(vec![Span::styled(
+                msg.chars().take(content_width as usize).collect::<String>(),
+                Style::default().bg(bg).fg(Color::Red),
+            )]);
+            val_line.render(Rect::new(content_x, row, content_width, 1), buf);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -334,8 +957,6 @@ mod tests {
 
     #[test]
     fn fuzzy_match_scoring_prefers_word_boundary() {
-        // "fb" in "FooBar" (both at word boundaries) should score higher
-        // than "fb" in "afbx" (only 'f' is non-boundary).
         let boundary = fuzzy_match("fb", "FooBar").unwrap();
         let mid_word = fuzzy_match("fb", "xfbx").unwrap();
         assert!(
@@ -348,9 +969,7 @@ mod tests {
 
     #[test]
     fn fuzzy_match_consecutive_bonus() {
-        // "abc" in "xabcx" has all consecutive characters after the first.
         let consec = fuzzy_match("abc", "xabcx").unwrap();
-        // "abc" in "xaxbxc" has no consecutive matches.
         let spread = fuzzy_match("abc", "xaxbxc").unwrap();
         assert!(
             consec.score > spread.score,
@@ -430,7 +1049,7 @@ mod tests {
         svc.select_next();
         assert_eq!(svc.get_selected_index(), 2);
         svc.select_next();
-        assert_eq!(svc.get_selected_index(), 0); // wrapped
+        assert_eq!(svc.get_selected_index(), 0);
     }
 
     #[test]
@@ -439,7 +1058,7 @@ mod tests {
         svc.set_items(vec![make_item("A"), make_item("B"), make_item("C")]);
         assert_eq!(svc.get_selected_index(), 0);
         svc.select_previous();
-        assert_eq!(svc.get_selected_index(), 2); // wrapped to end
+        assert_eq!(svc.get_selected_index(), 2);
         svc.select_previous();
         assert_eq!(svc.get_selected_index(), 1);
     }
@@ -472,11 +1091,9 @@ mod tests {
 
         let received = Arc::new(Mutex::new(Vec::new()));
         let r = received.clone();
-        let _h = svc
-            .on_did_change_value()
-            .on(move |text: &String| {
-                r.lock().unwrap().push(text.clone());
-            });
+        let _h = svc.on_did_change_value().on(move |text: &String| {
+            r.lock().unwrap().push(text.clone());
+        });
 
         svc.set_filter("he".into());
         svc.set_filter("hel".into());
@@ -496,6 +1113,294 @@ mod tests {
         assert!(opts.can_select_many);
     }
 
+    // -- InputBoxState tests ------------------------------------------------
+
+    #[test]
+    fn input_box_insert_and_backspace() {
+        let mut state = InputBoxState::new();
+        state.is_active = true;
+        state.insert_char('h');
+        state.insert_char('i');
+        assert_eq!(state.value, "hi");
+        assert_eq!(state.cursor_pos, 2);
+        state.backspace();
+        assert_eq!(state.value, "h");
+        assert_eq!(state.cursor_pos, 1);
+    }
+
+    #[test]
+    fn input_box_cursor_movement() {
+        let mut state = InputBoxState::new().with_value("hello");
+        assert_eq!(state.cursor_pos, 5);
+        state.move_left();
+        assert_eq!(state.cursor_pos, 4);
+        state.move_home();
+        assert_eq!(state.cursor_pos, 0);
+        state.move_right();
+        assert_eq!(state.cursor_pos, 1);
+        state.move_end();
+        assert_eq!(state.cursor_pos, 5);
+    }
+
+    #[test]
+    fn input_box_delete() {
+        let mut state = InputBoxState::new().with_value("abc");
+        state.move_home();
+        state.delete();
+        assert_eq!(state.value, "bc");
+    }
+
+    #[test]
+    fn input_box_validation() {
+        let mut state = InputBoxState::new().with_value("");
+        let validator = |v: &str| {
+            if v.is_empty() {
+                Some("Value required".to_string())
+            } else {
+                None
+            }
+        };
+        state.validate(&validator);
+        assert_eq!(
+            state.validation_message,
+            Some("Value required".to_string())
+        );
+        state.set_value("x");
+        state.validate(&validator);
+        assert_eq!(state.validation_message, None);
+    }
+
+    #[test]
+    fn input_box_backspace_at_start() {
+        let mut state = InputBoxState::new();
+        state.backspace();
+        assert_eq!(state.value, "");
+    }
+
+    #[test]
+    fn input_box_delete_at_end() {
+        let mut state = InputBoxState::new().with_value("x");
+        state.delete(); // cursor at end, no-op
+        assert_eq!(state.value, "x");
+    }
+
+    // -- QuickPickState tests -----------------------------------------------
+
+    #[test]
+    fn quick_pick_state_ensure_visible() {
+        let mut state = QuickPickState::new();
+        state.selected_idx = 15;
+        state.ensure_visible();
+        assert_eq!(state.scroll_offset, 6);
+    }
+
+    #[test]
+    fn quick_pick_state_scroll_up() {
+        let mut state = QuickPickState::new();
+        state.scroll_offset = 5;
+        state.selected_idx = 3;
+        state.ensure_visible();
+        assert_eq!(state.scroll_offset, 3);
+    }
+
+    // -- QuickPickItemKind tests --------------------------------------------
+
+    #[test]
+    fn separator_item() {
+        let sep = QuickPickItem::separator("Group A");
+        assert_eq!(sep.kind, QuickPickItemKind::Separator);
+        assert!(sep.always_show);
+    }
+
+    #[test]
+    fn separator_always_shows_in_filter() {
+        let mut svc = QuickPickService::new();
+        svc.set_items(vec![
+            QuickPickItem::separator("Group"),
+            make_item("Alpha"),
+        ]);
+        svc.set_filter("zzz".into());
+        let items = svc.get_filtered_items();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].original_index, 0);
+    }
+
+    // -- Go to Line ---------------------------------------------------------
+
+    #[test]
+    fn parse_goto_line_simple() {
+        let r = parse_goto_line("42").unwrap();
+        assert_eq!(r.line, 42);
+        assert_eq!(r.column, None);
+    }
+
+    #[test]
+    fn parse_goto_line_with_colon() {
+        let r = parse_goto_line(":10").unwrap();
+        assert_eq!(r.line, 10);
+    }
+
+    #[test]
+    fn parse_goto_line_with_col() {
+        let r = parse_goto_line("10:5").unwrap();
+        assert_eq!(r.line, 10);
+        assert_eq!(r.column, Some(5));
+    }
+
+    #[test]
+    fn parse_goto_line_colon_line_col() {
+        let r = parse_goto_line(":20:8").unwrap();
+        assert_eq!(r.line, 20);
+        assert_eq!(r.column, Some(8));
+    }
+
+    #[test]
+    fn parse_goto_line_empty() {
+        assert!(parse_goto_line("").is_none());
+    }
+
+    #[test]
+    fn parse_goto_line_zero() {
+        assert!(parse_goto_line("0").is_none());
+    }
+
+    #[test]
+    fn parse_goto_line_invalid() {
+        assert!(parse_goto_line("abc").is_none());
+    }
+
+    // -- CommandPaletteService tests ----------------------------------------
+
+    #[test]
+    fn command_palette_basic() {
+        let mut palette = CommandPaletteService::new();
+        palette.set_commands(vec![
+            CommandEntry {
+                id: "file.save".into(),
+                label: "File: Save".into(),
+                keybinding: Some("Ctrl+S".into()),
+                category: Some("File".into()),
+            },
+            CommandEntry {
+                id: "file.open".into(),
+                label: "File: Open".into(),
+                keybinding: Some("Ctrl+O".into()),
+                category: Some("File".into()),
+            },
+        ]);
+        palette.open();
+        assert!(palette.is_active());
+        assert_eq!(palette.pick_service().get_filtered_items().len(), 2);
+    }
+
+    #[test]
+    fn command_palette_filter() {
+        let mut palette = CommandPaletteService::new();
+        palette.set_commands(vec![
+            CommandEntry {
+                id: "file.save".into(),
+                label: "File: Save".into(),
+                keybinding: None,
+                category: None,
+            },
+            CommandEntry {
+                id: "edit.undo".into(),
+                label: "Edit: Undo".into(),
+                keybinding: None,
+                category: None,
+            },
+        ]);
+        palette.open();
+        palette.set_filter("undo".into());
+        assert_eq!(palette.pick_service().get_filtered_items().len(), 1);
+    }
+
+    #[test]
+    fn command_palette_accept_records_recent() {
+        let mut palette = CommandPaletteService::new();
+        palette.set_commands(vec![CommandEntry {
+            id: "cmd.a".into(),
+            label: "Command A".into(),
+            keybinding: None,
+            category: None,
+        }]);
+        palette.open();
+        let result = palette.accept();
+        assert_eq!(result, Some("cmd.a".into()));
+        assert!(palette.recent_commands().contains(&"cmd.a".into()));
+    }
+
+    #[test]
+    fn command_palette_recent_shown_first() {
+        let mut palette = CommandPaletteService::new();
+        palette.set_commands(vec![
+            CommandEntry {
+                id: "a".into(),
+                label: "Alpha".into(),
+                keybinding: None,
+                category: None,
+            },
+            CommandEntry {
+                id: "b".into(),
+                label: "Beta".into(),
+                keybinding: None,
+                category: None,
+            },
+        ]);
+        palette.open();
+        palette.select_next(); // select Beta
+        palette.accept();
+        palette.open();
+        let items = palette.pick_service().get_filtered_items();
+        assert!(items.len() >= 3);
+    }
+
+    #[test]
+    fn command_palette_close() {
+        let mut palette = CommandPaletteService::new();
+        palette.open();
+        assert!(palette.is_active());
+        palette.close();
+        assert!(!palette.is_active());
+    }
+
+    // -- Rendering tests (smoke tests) --------------------------------------
+
+    #[test]
+    fn render_quick_pick_smoke() {
+        let area = Rect::new(0, 0, 80, 24);
+        let mut buf = Buffer::empty(area);
+        let mut svc = QuickPickService::new();
+        let items = vec![make_item("Alpha"), make_item("Beta")];
+        svc.set_items(items.clone());
+        render_quick_pick(area, &mut buf, &svc, &items, Some("Title"), Some("Type..."));
+    }
+
+    #[test]
+    fn render_input_box_smoke() {
+        let area = Rect::new(0, 0, 80, 24);
+        let mut buf = Buffer::empty(area);
+        let state = InputBoxState::new().with_value("test");
+        render_input_box(area, &mut buf, &state, Some("Go to Line"), Some("Type line:col"));
+    }
+
+    #[test]
+    fn render_quick_pick_area_too_small() {
+        let area = Rect::new(0, 0, 10, 3);
+        let mut buf = Buffer::empty(area);
+        let svc = QuickPickService::new();
+        render_quick_pick(area, &mut buf, &svc, &[], None, None);
+    }
+
+    #[test]
+    fn render_input_box_with_validation() {
+        let area = Rect::new(0, 0, 80, 24);
+        let mut buf = Buffer::empty(area);
+        let mut state = InputBoxState::new();
+        state.validation_message = Some("Invalid input".into());
+        render_input_box(area, &mut buf, &state, None, None);
+    }
+
     // -- helpers ------------------------------------------------------------
 
     fn make_item(label: &str) -> QuickPickItem {
@@ -504,115 +1409,10 @@ mod tests {
             description: None,
             detail: None,
             icon: None,
+            kind: QuickPickItemKind::Default,
+            picked: false,
             always_show: false,
+            keybinding: None,
         }
-    }
-
-    #[test]
-    fn behavior_check_0() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_1() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_2() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_3() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_4() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_5() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_6() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_7() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_8() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_9() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_10() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        let _svc = QuickPickService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
     }
 }

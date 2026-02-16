@@ -3577,6 +3577,7 @@ dependencies = [
 name = "vsedit-quickinput"
 version = "0.1.0"
 dependencies = [
+ "ratatui",
  "vsedit-events",
 ]
 

@@ -7,4 +7,5 @@ license.workspace = true
 
 [dependencies]
 vsedit-events = { path = "../vsedit-events" }
+ratatui = { version = "0.29", features = ["crossterm"] }
 
