@@ -425,6 +425,151 @@ pub fn apply_config(text: &str, config: &IndentConfig) -> Result<String, IndentE
     Ok(normalised)
 }
 
+// ---------------------------------------------------------------------------
+// Smart indentation (Enter key behavior)
+// ---------------------------------------------------------------------------
+
+/// Describes the indentation to apply when Enter is pressed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NewlineIndent {
+    /// Insert a newline and match the current line's indentation.
+    SameLevel(String),
+    /// Insert a newline with one extra indent level (line ends with open bracket).
+    Deeper(String),
+    /// Cursor is between brackets `{|}`: split into 3 lines.
+    /// Fields: (indent_for_cursor_line, indent_for_closing_bracket_line)
+    BetweenBrackets {
+        cursor_indent: String,
+        close_indent: String,
+    },
+}
+
+/// Compute the indentation for a new line when Enter is pressed.
+///
+/// `lines` is the document split into lines, `line` is the 1-based line number
+/// where the cursor is, `col` is the 1-based column of the cursor.
+pub fn compute_indent_for_newline(
+    lines: &[&str],
+    line: u32,
+    col: u32,
+    style: IndentStyle,
+) -> NewlineIndent {
+    if line == 0 || line as usize > lines.len() {
+        return NewlineIndent::SameLevel(String::new());
+    }
+    let current = lines[(line - 1) as usize];
+    let current_indent = extract_leading_whitespace(current);
+    let one_level = style.indent_string();
+
+    // Text before and after cursor on the current line
+    let col_idx = (col as usize).saturating_sub(1).min(current.len());
+    let before = current[..col_idx].trim_end();
+    let after = current[col_idx..].trim_start();
+
+    let ends_with_open = before.ends_with('{')
+        || before.ends_with('[')
+        || before.ends_with('(');
+    let starts_with_close = after.starts_with('}')
+        || after.starts_with(']')
+        || after.starts_with(')');
+
+    if ends_with_open && starts_with_close {
+        // Between brackets: split into 3 lines
+        let cursor_indent = format!("{}{}", current_indent, one_level);
+        let close_indent = current_indent.to_string();
+        return NewlineIndent::BetweenBrackets {
+            cursor_indent,
+            close_indent,
+        };
+    }
+
+    if ends_with_open {
+        let deeper_indent = format!("{}{}", current_indent, one_level);
+        return NewlineIndent::Deeper(deeper_indent);
+    }
+
+    // Check if next line starts with closing bracket (dedent case)
+    if line < lines.len() as u32 {
+        let next = lines[line as usize];
+        let next_trimmed = next.trim_start();
+        if next_trimmed.starts_with('}')
+            || next_trimmed.starts_with(']')
+            || next_trimmed.starts_with(')')
+        {
+            // Keep current indent (don't add extra)
+            return NewlineIndent::SameLevel(current_indent.to_string());
+        }
+    }
+
+    NewlineIndent::SameLevel(current_indent.to_string())
+}
+
+/// Extract leading whitespace from a line.
+fn extract_leading_whitespace(line: &str) -> &str {
+    let trimmed = line.trim_start();
+    &line[..line.len() - trimmed.len()]
+}
+
+/// Adjust pasted text indentation to match the context at the cursor.
+///
+/// `base_indent` is the indentation of the line where the paste occurs.
+pub fn auto_indent_on_paste(paste_text: &str, base_indent: &str, style: IndentStyle) -> String {
+    let paste_lines: Vec<&str> = paste_text.lines().collect();
+    if paste_lines.is_empty() {
+        return String::new();
+    }
+
+    // Detect the indentation of the first non-empty line in paste
+    let paste_indent_len = paste_lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| {
+            let ws = extract_leading_whitespace(l);
+            indent_visual_width(ws, style)
+        })
+        .min()
+        .unwrap_or(0);
+
+    let base_width = indent_visual_width(base_indent, style);
+
+    let mut result = Vec::with_capacity(paste_lines.len());
+    for &line in paste_lines.iter() {
+        if line.trim().is_empty() {
+            result.push(String::new());
+            continue;
+        }
+        let line_ws = extract_leading_whitespace(line);
+        let line_width = indent_visual_width(line_ws, style);
+        let relative = line_width.saturating_sub(paste_indent_len);
+        let new_width = base_width + relative;
+        let new_indent = build_indent(new_width, style);
+        result.push(format!("{}{}", new_indent, line.trim_start()));
+    }
+
+    result.join("\n")
+}
+
+fn indent_visual_width(ws: &str, style: IndentStyle) -> u32 {
+    let tab_width = match style {
+        IndentStyle::Tabs => 4,
+        IndentStyle::Spaces(n) => n,
+    };
+    ws.chars()
+        .map(|c| if c == '\t' { tab_width } else { 1 })
+        .sum()
+}
+
+fn build_indent(width: u32, style: IndentStyle) -> String {
+    match style {
+        IndentStyle::Tabs => {
+            let tabs = width / 4;
+            let spaces = width % 4;
+            format!("{}{}", "\t".repeat(tabs as usize), " ".repeat(spaces as usize))
+        }
+        IndentStyle::Spaces(_) => " ".repeat(width as usize),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -632,5 +777,46 @@ mod tests {
         let s = format!("{}", cfg);
         assert!(s.contains("Spaces(4)"));
         assert!(s.contains("max_depth=20"));
+    }
+
+    // -- Smart indentation tests --------------------------------------------
+
+    #[test]
+    fn newline_same_level() {
+        let lines = vec!["    let x = 1;", "    let y = 2;"];
+        let result = compute_indent_for_newline(&lines, 1, 15, IndentStyle::Spaces(4));
+        assert_eq!(result, NewlineIndent::SameLevel("    ".into()));
+    }
+
+    #[test]
+    fn newline_deeper_after_open_brace() {
+        let lines = vec!["fn main() {", ""];
+        let result = compute_indent_for_newline(&lines, 1, 12, IndentStyle::Spaces(4));
+        assert_eq!(result, NewlineIndent::Deeper("    ".into()));
+    }
+
+    #[test]
+    fn newline_between_brackets() {
+        let lines = vec!["fn main() {}"];
+        // Cursor between { and } (col 12)
+        let result = compute_indent_for_newline(&lines, 1, 12, IndentStyle::Spaces(4));
+        assert_eq!(result, NewlineIndent::BetweenBrackets {
+            cursor_indent: "    ".into(),
+            close_indent: "".into(),
+        });
+    }
+
+    #[test]
+    fn newline_deeper_after_open_paren() {
+        let lines = vec!["    foo("];
+        let result = compute_indent_for_newline(&lines, 1, 9, IndentStyle::Spaces(4));
+        assert_eq!(result, NewlineIndent::Deeper("        ".into()));
+    }
+
+    #[test]
+    fn auto_indent_paste_adjusts() {
+        let paste = "    line1\n        line2\n    line3";
+        let result = auto_indent_on_paste(paste, "  ", IndentStyle::Spaces(4));
+        assert_eq!(result, "  line1\n      line2\n  line3");
     }
 }

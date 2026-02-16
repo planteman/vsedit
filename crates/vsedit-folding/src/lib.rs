@@ -288,6 +288,141 @@ impl FoldingProvider for IndentFoldingProvider {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Bracket-based folding
+// ---------------------------------------------------------------------------
+
+impl FoldingModel {
+    /// Compute foldable ranges from bracket pairs `{}`.
+    pub fn compute_from_brackets(lines: &[&str]) -> Vec<FoldingRange> {
+        let mut ranges = Vec::new();
+        let mut stack: Vec<u32> = Vec::new(); // line numbers of opening braces
+
+        for (i, line) in lines.iter().enumerate() {
+            let line_num = (i + 1) as u32;
+            let bytes = line.as_bytes();
+            let mut j = 0;
+            let len = bytes.len();
+            while j < len {
+                // Skip strings
+                if bytes[j] == b'"' || bytes[j] == b'\'' {
+                    let q = bytes[j];
+                    j += 1;
+                    while j < len {
+                        if bytes[j] == b'\\' { j += 2; continue; }
+                        if bytes[j] == q { break; }
+                        j += 1;
+                    }
+                    j += 1;
+                    continue;
+                }
+                // Skip line comments
+                if j + 1 < len && bytes[j] == b'/' && bytes[j + 1] == b'/' {
+                    break;
+                }
+                if bytes[j] == b'{' {
+                    stack.push(line_num);
+                } else if bytes[j] == b'}' {
+                    if let Some(start) = stack.pop() {
+                        if line_num > start {
+                            ranges.push(FoldingRange {
+                                start_line: start,
+                                end_line: line_num,
+                                kind: FoldingRangeKind::Region,
+                                is_collapsed: false,
+                            });
+                        }
+                    }
+                }
+                j += 1;
+            }
+        }
+        ranges.sort_by_key(|r| r.start_line);
+        ranges
+    }
+
+    /// Detect import blocks and create folding ranges for them.
+    ///
+    /// An import block is a sequence of consecutive lines starting with
+    /// `use `, `import `, or `from ` (common in Rust/JS/Python).
+    pub fn compute_from_imports(lines: &[&str]) -> Vec<FoldingRange> {
+        let mut ranges = Vec::new();
+        let mut block_start: Option<u32> = None;
+
+        for (i, line) in lines.iter().enumerate() {
+            let line_num = (i + 1) as u32;
+            let trimmed = line.trim();
+            let is_import = trimmed.starts_with("use ")
+                || trimmed.starts_with("import ")
+                || trimmed.starts_with("from ");
+
+            if is_import {
+                if block_start.is_none() {
+                    block_start = Some(line_num);
+                }
+            } else if !trimmed.is_empty() {
+                if let Some(start) = block_start.take() {
+                    let end = line_num - 1;
+                    if end > start {
+                        ranges.push(FoldingRange {
+                            start_line: start,
+                            end_line: end,
+                            kind: FoldingRangeKind::Imports,
+                            is_collapsed: false,
+                        });
+                    }
+                }
+            }
+        }
+        // Close any trailing import block
+        if let Some(start) = block_start {
+            let end = lines.len() as u32;
+            if end > start {
+                ranges.push(FoldingRange {
+                    start_line: start,
+                    end_line: end,
+                    kind: FoldingRangeKind::Imports,
+                    is_collapsed: false,
+                });
+            }
+        }
+        ranges
+    }
+
+    /// Compute folding ranges combining multiple strategies.
+    pub fn compute_all_ranges(lines: &[&str], tab_size: u32) -> Vec<FoldingRange> {
+        let mut ranges = Vec::new();
+        ranges.extend(Self::compute_from_indentation(lines, tab_size));
+        ranges.extend(Self::compute_from_brackets(lines));
+        ranges.extend(Self::compute_from_markers(lines, "#region", "#endregion"));
+        ranges.extend(Self::compute_from_markers(lines, "// #region", "// #endregion"));
+        ranges.extend(Self::compute_from_imports(lines));
+
+        // Deduplicate: prefer bracket-based over indent when same start_line
+        ranges.sort_by(|a, b| a.start_line.cmp(&b.start_line).then(a.end_line.cmp(&b.end_line)));
+        ranges.dedup_by(|a, b| a.start_line == b.start_line && a.end_line == b.end_line);
+        ranges
+    }
+}
+
+/// A folding provider that combines indentation, bracket, region, and import strategies.
+pub struct CompositeFoldingProvider {
+    pub tab_size: u32,
+}
+
+impl CompositeFoldingProvider {
+    pub fn new(tab_size: u32) -> Self {
+        Self { tab_size }
+    }
+}
+
+impl FoldingProvider for CompositeFoldingProvider {
+    fn compute_folding_ranges(&self, text: &str) -> Vec<FoldingRange> {
+        let lines: Vec<&str> = text.lines().collect();
+        FoldingModel::compute_all_ranges(&lines, self.tab_size)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -613,5 +748,52 @@ mod tests {
     fn behavior_check_26() {
         let _svc = FoldingModel::new();
         assert!(std::mem::size_of::<usize>() > 0);
+    }
+
+    // -- Bracket-based folding -----------------------------------------------
+
+    #[test]
+    fn fold_from_brackets() {
+        let lines = vec!["fn main() {", "    println!(\"hello\");", "}"];
+        let ranges = FoldingModel::compute_from_brackets(&lines);
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].start_line, 1);
+        assert_eq!(ranges[0].end_line, 3);
+    }
+
+    #[test]
+    fn fold_from_brackets_nested() {
+        let lines = vec!["fn f() {", "    if true {", "        x;", "    }", "}"];
+        let ranges = FoldingModel::compute_from_brackets(&lines);
+        assert_eq!(ranges.len(), 2);
+    }
+
+    #[test]
+    fn fold_from_brackets_skips_strings() {
+        let lines = vec!["let s = \"{\";", "let t = \"}\";"];
+        let ranges = FoldingModel::compute_from_brackets(&lines);
+        assert!(ranges.is_empty());
+    }
+
+    // -- Import folding -------------------------------------------------------
+
+    #[test]
+    fn fold_imports_rust() {
+        let lines = vec!["use std::io;", "use std::fmt;", "", "fn main() {}"];
+        let ranges = FoldingModel::compute_from_imports(&lines);
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].start_line, 1);
+        assert_eq!(ranges[0].end_line, 3); // includes the blank line after imports
+        assert_eq!(ranges[0].kind, FoldingRangeKind::Imports);
+    }
+
+    // -- Composite folding ----------------------------------------------------
+
+    #[test]
+    fn composite_folding_provider() {
+        let provider = CompositeFoldingProvider::new(4);
+        let text = "use std::io;\nuse std::fmt;\n\nfn main() {\n    println!(\"hello\");\n}\n";
+        let ranges = provider.compute_folding_ranges(text);
+        assert!(ranges.len() >= 2); // imports + bracket fold
     }
 }

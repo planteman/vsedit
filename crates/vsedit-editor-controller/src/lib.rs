@@ -829,6 +829,68 @@ impl EditorController {
             CursorState::from_position(Position::new(target, 1)),
         );
     }
+
+    // -- Selection operations -----------------------------------------------
+
+    /// Select the word under the primary cursor (double-click behavior).
+    pub fn select_word_at_cursor(&mut self) {
+        let cursor = self.cursors.get_primary().clone();
+        let new_state = vsedit_cursor::select_word_at(&self.model, &cursor);
+        self.cursors.set_state(0, new_state);
+    }
+
+    /// Select a specific line number (including newline).
+    pub fn select_line_number(&mut self, line_num: u32) {
+        let line = line_num.max(1).min(self.model.get_line_count());
+        let start = Position::new(line, 1);
+        let end = if line < self.model.get_line_count() {
+            Position::new(line + 1, 1)
+        } else {
+            Position::new(line, self.model.get_line_max_column(line))
+        };
+        self.cursors.set_state(
+            0,
+            CursorState {
+                selection: Selection::from_positions(start, end),
+            },
+        );
+    }
+
+    /// Find all occurrences of `word` in the text and return their ranges.
+    pub fn find_all_occurrences(&self, word: &str) -> Vec<Range> {
+        self.model.find_matches(word, false, true)
+    }
+
+    /// Create a column (box/rectangular) selection from start to end positions.
+    /// This creates one cursor per line in the rectangle.
+    pub fn column_selection(&mut self, start: Position, end: Position) {
+        let start_line = start.line.min(end.line);
+        let end_line = start.line.max(end.line);
+        let start_col = start.column.min(end.column);
+        let end_col = start.column.max(end.column);
+
+        let line_count = self.model.get_line_count();
+        let mut first = true;
+        for line in start_line..=end_line.min(line_count) {
+            let max_col = self.model.get_line_max_column(line);
+            let sc = start_col.min(max_col);
+            let ec = end_col.min(max_col);
+            let state = CursorState {
+                selection: Selection::from_positions(
+                    Position::new(line, sc),
+                    Position::new(line, ec),
+                ),
+            };
+            if first {
+                self.cursors.set_state(0, state);
+                first = false;
+            } else {
+                self.cursors.add_cursor(Position::new(line, ec));
+                let idx = self.cursors.get_all().len() - 1;
+                self.cursors.set_state(idx, state);
+            }
+        }
+    }
 }
 
 fn is_word_char(b: u8) -> bool {
@@ -1161,5 +1223,67 @@ mod tests {
     fn compute_end_position_multiline() {
         let pos = compute_end_position(Position::new(1, 1), "ab\ncd\ne");
         assert_eq!(pos, Position::new(3, 2));
+    }
+
+    // -- New editor operation tests -----------------------------------------
+
+    #[test]
+    fn select_word_at_cursor_selects_word() {
+        let mut c = ctrl("hello world");
+        c.cursors.set_state(0, CursorState::from_position(Position::new(1, 3)));
+        c.select_word_at_cursor();
+        let sel = c.cursors.get_primary().selection;
+        assert_eq!(sel.anchor, Position::new(1, 1));
+        assert_eq!(sel.active, Position::new(1, 6));
+    }
+
+    #[test]
+    fn select_line_number_basic() {
+        let mut c = ctrl("hello\nworld\nfoo");
+        c.select_line_number(2);
+        let sel = c.cursors.get_primary().selection;
+        assert_eq!(sel.anchor, Position::new(2, 1));
+        assert_eq!(sel.active, Position::new(3, 1));
+    }
+
+    #[test]
+    fn select_line_number_last_line() {
+        let mut c = ctrl("hello\nworld");
+        c.select_line_number(2);
+        let sel = c.cursors.get_primary().selection;
+        assert_eq!(sel.anchor, Position::new(2, 1));
+        assert_eq!(sel.active, Position::new(2, 6));
+    }
+
+    #[test]
+    fn find_all_occurrences_basic() {
+        let c = ctrl("hello world hello");
+        let results = c.find_all_occurrences("hello");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn column_selection_creates_multi_cursor() {
+        let mut c = ctrl("hello\nworld\nfoo!!");
+        c.column_selection(Position::new(1, 1), Position::new(3, 3));
+        assert_eq!(c.cursors.get_all().len(), 3);
+        // Each cursor selects columns 1-3 on its line
+        assert_eq!(c.cursors.get_all()[0].selection.anchor, Position::new(1, 1));
+        assert_eq!(c.cursors.get_all()[0].selection.active, Position::new(1, 3));
+    }
+
+    #[test]
+    fn jump_to_matching_bracket_action() {
+        let mut c = ctrl("fn f() { x }");
+        c.cursors.set_state(0, CursorState::from_position(Position::new(1, 8)));
+        c.execute_action(EditorAction::JumpToMatchingBracket);
+        assert_eq!(c.cursors.get_primary().position(), Position::new(1, 12));
+    }
+
+    #[test]
+    fn go_to_line_action() {
+        let mut c = ctrl("line1\nline2\nline3");
+        c.execute_action(EditorAction::GoToLine(3));
+        assert_eq!(c.cursors.get_primary().position(), Position::new(3, 1));
     }
 }

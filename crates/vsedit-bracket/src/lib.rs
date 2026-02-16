@@ -268,6 +268,212 @@ pub fn find_enclosing_brackets(
     best.cloned().ok_or(BracketError::NoBracketAtPosition { line, col })
 }
 
+// ---------------------------------------------------------------------------
+// Auto-close and surround
+// ---------------------------------------------------------------------------
+
+/// Returns the closing bracket character when an opening bracket is typed.
+/// Returns `None` if the character is not an opening bracket.
+pub fn auto_close_bracket(ch: char) -> Option<char> {
+    match ch {
+        '(' => Some(')'),
+        '[' => Some(']'),
+        '{' => Some('}'),
+        '<' => Some('>'),
+        '"' => Some('"'),
+        '\'' => Some('\''),
+        '`' => Some('`'),
+        _ => None,
+    }
+}
+
+/// Wraps the given selection text with the specified opening bracket and its
+/// matching close bracket. Returns the wrapped text.
+pub fn auto_surround_selection(selection_text: &str, bracket: char) -> String {
+    let close = auto_close_bracket(bracket).unwrap_or(bracket);
+    format!("{}{}{}", bracket, selection_text, close)
+}
+
+/// A bracket pair with its nesting level for colorization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColorizedBracketPair {
+    pub line: u32,
+    pub col: u32,
+    pub bracket: char,
+    pub nesting_level: u32,
+    pub is_open: bool,
+}
+
+/// Compute bracket pairs with nesting level for colorization.
+/// Skips brackets inside string literals (delimited by `"` or `'`) and
+/// line comments (starting with `//`).
+pub fn bracket_pair_colorization(
+    lines: &[&str],
+    pairs: &[BracketPair],
+) -> Vec<ColorizedBracketPair> {
+    let mut results = Vec::new();
+    let mut stacks: Vec<Vec<(u32, u32)>> = vec![Vec::new(); pairs.len()];
+
+    for (li, line) in lines.iter().enumerate() {
+        let line1 = (li + 1) as u32;
+        let bytes = line.as_bytes();
+        let mut i = 0;
+        let len = bytes.len();
+        while i < len {
+            // Skip line comments
+            if i + 1 < len && bytes[i] == b'/' && bytes[i + 1] == b'/' {
+                break;
+            }
+            // Skip string literals
+            if bytes[i] == b'"' || bytes[i] == b'\'' {
+                let quote = bytes[i];
+                i += 1;
+                while i < len {
+                    if bytes[i] == b'\\' {
+                        i += 2;
+                        continue;
+                    }
+                    if bytes[i] == quote {
+                        break;
+                    }
+                    i += 1;
+                }
+                i += 1;
+                continue;
+            }
+
+            let ch = bytes[i] as char;
+            let col1 = (i + 1) as u32;
+
+            for (pi, pair) in pairs.iter().enumerate() {
+                if ch == pair.open {
+                    let level = stacks[pi].len() as u32;
+                    results.push(ColorizedBracketPair {
+                        line: line1,
+                        col: col1,
+                        bracket: ch,
+                        nesting_level: level,
+                        is_open: true,
+                    });
+                    stacks[pi].push((line1, col1));
+                } else if ch == pair.close {
+                    let level = if stacks[pi].is_empty() {
+                        0
+                    } else {
+                        stacks[pi].len() as u32 - 1
+                    };
+                    stacks[pi].pop();
+                    results.push(ColorizedBracketPair {
+                        line: line1,
+                        col: col1,
+                        bracket: ch,
+                        nesting_level: level,
+                        is_open: false,
+                    });
+                }
+            }
+            i += 1;
+        }
+    }
+    results
+}
+
+/// Find matching bracket, skipping brackets inside strings and comments.
+pub fn find_matching_bracket_smart(
+    lines: &[&str],
+    line: u32,
+    col: u32,
+    pairs: &[BracketPair],
+) -> Option<(u32, u32)> {
+    let target_line = lines.get((line - 1) as usize)?;
+    let ch = target_line.chars().nth((col - 1) as usize)?;
+
+    let pair = pairs.iter().find(|p| p.open == ch || p.close == ch)?;
+    let is_open = ch == pair.open;
+
+    if is_open {
+        find_closing_smart(lines, line, col, pair)
+    } else {
+        find_opening_smart(lines, line, col, pair)
+    }
+}
+
+fn is_in_string_or_comment(line: &str, col_idx: usize) -> bool {
+    let bytes = line.as_bytes();
+    let mut in_string = false;
+    let mut quote_char = 0u8;
+    let mut i = 0;
+    while i < col_idx && i < bytes.len() {
+        if !in_string && i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'/' {
+            return true; // rest of line is comment
+        }
+        if !in_string && (bytes[i] == b'"' || bytes[i] == b'\'') {
+            in_string = true;
+            quote_char = bytes[i];
+        } else if in_string {
+            if bytes[i] == b'\\' {
+                i += 1; // skip escaped char
+            } else if bytes[i] == quote_char {
+                in_string = false;
+            }
+        }
+        i += 1;
+    }
+    in_string
+}
+
+fn find_closing_smart(
+    lines: &[&str],
+    start_line: u32,
+    start_col: u32,
+    pair: &BracketPair,
+) -> Option<(u32, u32)> {
+    let mut depth: i32 = 0;
+    for (li, line) in lines.iter().enumerate().skip((start_line - 1) as usize) {
+        let start = if li == (start_line - 1) as usize { (start_col - 1) as usize } else { 0 };
+        for (ci, ch) in line.char_indices().skip(start) {
+            if is_in_string_or_comment(line, ci) {
+                continue;
+            }
+            if ch == pair.open { depth += 1; }
+            else if ch == pair.close {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(((li + 1) as u32, (ci + 1) as u32));
+                }
+            }
+        }
+    }
+    None
+}
+
+fn find_opening_smart(
+    lines: &[&str],
+    start_line: u32,
+    start_col: u32,
+    pair: &BracketPair,
+) -> Option<(u32, u32)> {
+    let mut depth: i32 = 0;
+    for li in (0..start_line as usize).rev() {
+        let line = lines[li];
+        let end = if li == (start_line - 1) as usize { start_col as usize } else { line.len() };
+        let chars: Vec<(usize, char)> = line.char_indices().take_while(|(i, _)| *i < end).collect();
+        for &(ci, ch) in chars.iter().rev() {
+            if is_in_string_or_comment(line, ci) {
+                continue;
+            }
+            if ch == pair.close { depth += 1; }
+            else if ch == pair.open {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(((li + 1) as u32, (ci + 1) as u32));
+                }
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -604,5 +810,75 @@ mod tests {
     fn bracket_pair_debug() {
         let bp = BracketPair { open: '(', close: ')' };
         assert!(format!("{:?}", bp).contains("BracketPair"));
+    }
+
+    // -- auto-close tests ---------------------------------------------------
+
+    #[test]
+    fn auto_close_opening_brackets() {
+        assert_eq!(auto_close_bracket('('), Some(')'));
+        assert_eq!(auto_close_bracket('['), Some(']'));
+        assert_eq!(auto_close_bracket('{'), Some('}'));
+        assert_eq!(auto_close_bracket('<'), Some('>'));
+        assert_eq!(auto_close_bracket('"'), Some('"'));
+        assert_eq!(auto_close_bracket('a'), None);
+    }
+
+    #[test]
+    fn auto_surround_wraps_text() {
+        assert_eq!(auto_surround_selection("hello", '('), "(hello)");
+        assert_eq!(auto_surround_selection("x", '{'), "{x}");
+        assert_eq!(auto_surround_selection("abc", '['), "[abc]");
+        assert_eq!(auto_surround_selection("text", '"'), "\"text\"");
+    }
+
+    // -- bracket pair colorization ------------------------------------------
+
+    #[test]
+    fn colorization_basic() {
+        let lines = vec!["(a + (b))"];
+        let pairs = default_bracket_pairs();
+        let result = bracket_pair_colorization(&lines, &pairs);
+        assert_eq!(result.len(), 4);
+        assert_eq!(result[0].nesting_level, 0); // outer (
+        assert_eq!(result[1].nesting_level, 1); // inner (
+        assert_eq!(result[2].nesting_level, 1); // inner )
+        assert_eq!(result[3].nesting_level, 0); // outer )
+    }
+
+    #[test]
+    fn colorization_skips_strings() {
+        let lines = vec!["let s = \"(\";"];
+        let pairs = default_bracket_pairs();
+        let result = bracket_pair_colorization(&lines, &pairs);
+        // The ( inside the string should be skipped
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn colorization_skips_comments() {
+        let lines = vec!["let x = 1; // (not a bracket)"];
+        let pairs = default_bracket_pairs();
+        let result = bracket_pair_colorization(&lines, &pairs);
+        assert!(result.is_empty());
+    }
+
+    // -- smart bracket matching (skips strings/comments) --------------------
+
+    #[test]
+    fn smart_match_skips_string() {
+        let lines = vec!["fn(\")(\"  , x)"];
+        let pairs = default_bracket_pairs();
+        // Match the outer ( at col 3 — should skip brackets in string
+        let result = find_matching_bracket_smart(&lines, 1, 3, &pairs);
+        assert_eq!(result, Some((1, 13)));
+    }
+
+    #[test]
+    fn smart_match_skips_comment() {
+        let lines = vec!["fn f() {", "  // }", "}"];
+        let pairs = default_bracket_pairs();
+        let result = find_matching_bracket_smart(&lines, 1, 8, &pairs);
+        assert_eq!(result, Some((3, 1)));
     }
 }

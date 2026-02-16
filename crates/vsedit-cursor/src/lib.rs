@@ -365,25 +365,56 @@ pub fn move_to_document_end(
 }
 
 // ---------------------------------------------------------------------------
-// Word classification (VS Code rules)
+// Word classification (VS Code rules with camelCase support)
 // ---------------------------------------------------------------------------
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 enum CharClass {
-    Word,
-    Separator,
+    Uppercase,
+    Lowercase,
+    Digit,
+    Underscore,
     Whitespace,
+    Separator,
 }
 
-fn classify(ch: u8) -> CharClass {
+fn classify_char(ch: u8) -> CharClass {
     match ch {
-        b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' => CharClass::Word,
+        b'A'..=b'Z' => CharClass::Uppercase,
+        b'a'..=b'z' => CharClass::Lowercase,
+        b'0'..=b'9' => CharClass::Digit,
+        b'_' => CharClass::Underscore,
         b' ' | b'\t' | b'\r' | b'\n' => CharClass::Whitespace,
         _ => CharClass::Separator,
     }
 }
 
-/// Move the cursor to the start of the previous word.
+/// Returns true if there is a word boundary between `left` and `right` chars
+/// (VS Code algorithm with camelCase support).
+#[allow(dead_code)]
+fn is_word_boundary(left: u8, right: u8) -> bool {
+    let lc = classify_char(left);
+    let rc = classify_char(right);
+    if lc == rc {
+        return false;
+    }
+    // camelCase boundary: lowercase→uppercase
+    if lc == CharClass::Lowercase && rc == CharClass::Uppercase {
+        return true;
+    }
+    // Underscore groups with nothing (always a boundary with non-underscore)
+    // but sequences of underscores are one group
+    if lc == CharClass::Underscore && rc == CharClass::Underscore {
+        return false;
+    }
+    // Same "word-like" group: uppercase+lowercase (e.g. mid-word in PascalCase
+    // like "HTMLParser" — "HTMLP" then "arser": boundary before 'a' because
+    // uppercase→lowercase when preceded by multiple uppercase)
+    // This is handled by the movement functions with lookahead.
+    lc != rc
+}
+
+/// Move the cursor to the start of the previous word (VS Code Ctrl+Left).
 pub fn move_word_left(
     model: &dyn ITextModel,
     cursor: &CursorState,
@@ -395,11 +426,9 @@ pub fn move_word_left(
     loop {
         let content = model.get_line_content(line);
         let bytes = content.as_bytes();
-        // col is 1-based; byte index = col - 1
         let mut idx = (col as usize).saturating_sub(1);
 
         if idx == 0 {
-            // Wrap to previous line.
             if line > 1 {
                 line -= 1;
                 col = model.get_line_max_column(line);
@@ -409,7 +438,7 @@ pub fn move_word_left(
         }
 
         // Skip whitespace to the left.
-        while idx > 0 && classify(bytes[idx - 1]) == CharClass::Whitespace {
+        while idx > 0 && classify_char(bytes[idx - 1]) == CharClass::Whitespace {
             idx -= 1;
         }
 
@@ -418,10 +447,25 @@ pub fn move_word_left(
             break;
         }
 
-        // Consume contiguous characters of the same class.
-        let cls = classify(bytes[idx - 1]);
-        while idx > 0 && classify(bytes[idx - 1]) == cls {
-            idx -= 1;
+        let cls = classify_char(bytes[idx - 1]);
+        if cls == CharClass::Separator || cls == CharClass::Underscore {
+            // Consume contiguous separators/underscores
+            while idx > 0 && classify_char(bytes[idx - 1]) == cls {
+                idx -= 1;
+            }
+        } else if cls == CharClass::Lowercase || cls == CharClass::Digit {
+            while idx > 0 && classify_char(bytes[idx - 1]) == cls {
+                idx -= 1;
+            }
+            // If preceded by uppercase (camelCase prefix), consume one uppercase
+            if idx > 0 && classify_char(bytes[idx - 1]) == CharClass::Uppercase {
+                idx -= 1;
+            }
+        } else if cls == CharClass::Uppercase {
+            // Consume uppercase run
+            while idx > 0 && classify_char(bytes[idx - 1]) == CharClass::Uppercase {
+                idx -= 1;
+            }
         }
 
         col = (idx as u32) + 1;
@@ -431,7 +475,7 @@ pub fn move_word_left(
     make_state(cursor, select, Position::new(line, col))
 }
 
-/// Move the cursor to the end of the next word.
+/// Move the cursor to the end of the next word (VS Code Ctrl+Right).
 pub fn move_word_right(
     model: &dyn ITextModel,
     cursor: &CursorState,
@@ -448,7 +492,6 @@ pub fn move_word_right(
         let mut idx = (col as usize).saturating_sub(1);
 
         if idx >= len {
-            // Wrap to next line.
             if line < line_count {
                 line += 1;
                 col = 1;
@@ -458,7 +501,7 @@ pub fn move_word_right(
         }
 
         // Skip whitespace to the right.
-        while idx < len && classify(bytes[idx]) == CharClass::Whitespace {
+        while idx < len && classify_char(bytes[idx]) == CharClass::Whitespace {
             idx += 1;
         }
 
@@ -467,10 +510,36 @@ pub fn move_word_right(
             break;
         }
 
-        // Consume contiguous characters of the same class.
-        let cls = classify(bytes[idx]);
-        while idx < len && classify(bytes[idx]) == cls {
-            idx += 1;
+        let cls = classify_char(bytes[idx]);
+        if cls == CharClass::Separator || cls == CharClass::Underscore {
+            while idx < len && classify_char(bytes[idx]) == cls {
+                idx += 1;
+            }
+        } else if cls == CharClass::Uppercase {
+            // Consume uppercase run
+            let start = idx;
+            while idx < len && classify_char(bytes[idx]) == CharClass::Uppercase {
+                idx += 1;
+            }
+            // If followed by lowercase (e.g. "HTMLParser" → stop before last upper "P")
+            if idx < len && classify_char(bytes[idx]) == CharClass::Lowercase && idx - start > 1 {
+                idx -= 1;
+            }
+            // Then consume lowercase/digits
+            if idx < len && (classify_char(bytes[idx]) == CharClass::Lowercase
+                || classify_char(bytes[idx]) == CharClass::Digit)
+            {
+                while idx < len && (classify_char(bytes[idx]) == CharClass::Lowercase
+                    || classify_char(bytes[idx]) == CharClass::Digit)
+                {
+                    idx += 1;
+                }
+            }
+        } else {
+            // Lowercase or digit run
+            while idx < len && classify_char(bytes[idx]) == cls {
+                idx += 1;
+            }
         }
 
         col = (idx as u32) + 1;
@@ -478,6 +547,102 @@ pub fn move_word_right(
     }
 
     make_state(cursor, select, Position::new(line, col))
+}
+
+/// Delete the text from cursor to the word boundary to the left.
+/// Returns `(new_text, new_position)` for the line.
+pub fn delete_word_left(
+    model: &dyn ITextModel,
+    cursor: &CursorState,
+) -> (Position, Position) {
+    let word_start = move_word_left(model, cursor, false);
+    (word_start.position(), cursor.position())
+}
+
+/// Delete the text from cursor to the word boundary to the right.
+/// Returns `(start, end)` positions for the range to delete.
+pub fn delete_word_right(
+    model: &dyn ITextModel,
+    cursor: &CursorState,
+) -> (Position, Position) {
+    let word_end = move_word_right(model, cursor, false);
+    (cursor.position(), word_end.position())
+}
+
+/// Select the word at the given cursor position (double-click behavior).
+/// Returns a CursorState with the word selected, or the original if no word.
+pub fn select_word_at(
+    model: &dyn ITextModel,
+    cursor: &CursorState,
+) -> CursorState {
+    let pos = cursor.position();
+    let content = model.get_line_content(pos.line);
+    let bytes = content.as_bytes();
+    let col_idx = (pos.column as usize).saturating_sub(1);
+
+    if bytes.is_empty() || col_idx >= bytes.len() {
+        return cursor.clone();
+    }
+
+    let ch_class = classify_char(bytes[col_idx]);
+    if ch_class == CharClass::Whitespace {
+        // Select whitespace run
+        let mut start = col_idx;
+        let mut end = col_idx;
+        while start > 0 && classify_char(bytes[start - 1]) == CharClass::Whitespace {
+            start -= 1;
+        }
+        while end < bytes.len() && classify_char(bytes[end]) == CharClass::Whitespace {
+            end += 1;
+        }
+        return CursorState {
+            selection: Selection::from_positions(
+                Position::new(pos.line, (start as u32) + 1),
+                Position::new(pos.line, (end as u32) + 1),
+            ),
+        };
+    }
+
+    if ch_class == CharClass::Separator {
+        // Select separator run
+        let mut start = col_idx;
+        let mut end = col_idx;
+        while start > 0 && classify_char(bytes[start - 1]) == CharClass::Separator {
+            start -= 1;
+        }
+        while end < bytes.len() && classify_char(bytes[end]) == CharClass::Separator {
+            end += 1;
+        }
+        return CursorState {
+            selection: Selection::from_positions(
+                Position::new(pos.line, (start as u32) + 1),
+                Position::new(pos.line, (end as u32) + 1),
+            ),
+        };
+    }
+
+    // Word character (upper, lower, digit, underscore) — select word
+    let is_word = |b: u8| {
+        let c = classify_char(b);
+        c == CharClass::Uppercase || c == CharClass::Lowercase
+            || c == CharClass::Digit || c == CharClass::Underscore
+    };
+
+    let mut start = col_idx;
+    let mut end = col_idx;
+    while start > 0 && is_word(bytes[start - 1]) {
+        start -= 1;
+    }
+    while end < bytes.len() && is_word(bytes[end]) {
+        end += 1;
+    }
+
+    CursorState {
+        selection: Selection::from_positions(
+            Position::new(pos.line, (start as u32) + 1),
+            Position::new(pos.line, (end as u32) + 1),
+        ),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -885,5 +1050,126 @@ mod tests {
         assert_eq!(ctrl.get_column_memory(0), None);
         ctrl.set_column_memory(0, Some(10));
         assert_eq!(ctrl.get_column_memory(0), Some(10));
+    }
+
+    // -- camelCase word movement --------------------------------------------
+
+    #[test]
+    fn word_right_camel_case() {
+        let model = SimpleModel::new("camelCaseWord");
+        let c = cursor_at(1, 1);
+        let r = move_word_right(&model, &c, false);
+        // Should stop at end of "camel" (before "C")
+        assert_eq!(r.position(), Position::new(1, 6));
+        let r2 = move_word_right(&model, &r, false);
+        // Should stop at end of "Case"
+        assert_eq!(r2.position(), Position::new(1, 10));
+        let r3 = move_word_right(&model, &r2, false);
+        // Should stop at end of "Word"
+        assert_eq!(r3.position(), Position::new(1, 14));
+    }
+
+    #[test]
+    fn word_left_camel_case() {
+        let model = SimpleModel::new("camelCaseWord");
+        let c = cursor_at(1, 14);
+        let r = move_word_left(&model, &c, false);
+        assert_eq!(r.position(), Position::new(1, 10)); // start of "Word"
+        let r2 = move_word_left(&model, &r, false);
+        assert_eq!(r2.position(), Position::new(1, 6)); // start of "Case"
+        let r3 = move_word_left(&model, &r2, false);
+        assert_eq!(r3.position(), Position::new(1, 1)); // start of "camel"
+    }
+
+    #[test]
+    fn word_right_underscore_boundaries() {
+        let model = SimpleModel::new("snake_case_word");
+        let c = cursor_at(1, 1);
+        let r = move_word_right(&model, &c, false);
+        assert_eq!(r.position(), Position::new(1, 6)); // end of "snake"
+        let r2 = move_word_right(&model, &r, false);
+        assert_eq!(r2.position(), Position::new(1, 7)); // past "_"
+        let r3 = move_word_right(&model, &r2, false);
+        assert_eq!(r3.position(), Position::new(1, 11)); // end of "case"
+    }
+
+    #[test]
+    fn word_left_underscore_boundaries() {
+        let model = SimpleModel::new("snake_case_word");
+        let c = cursor_at(1, 16);
+        let r = move_word_left(&model, &c, false);
+        assert_eq!(r.position(), Position::new(1, 12)); // start of "word"
+        let r2 = move_word_left(&model, &r, false);
+        assert_eq!(r2.position(), Position::new(1, 11)); // start of "_"
+    }
+
+    #[test]
+    fn word_right_all_caps_then_lowercase() {
+        // "HTMLParser" — should stop: HTML|Parser
+        let model = SimpleModel::new("HTMLParser");
+        let c = cursor_at(1, 1);
+        let r = move_word_right(&model, &c, false);
+        // Should stop at boundary between HTML and Parser
+        assert_eq!(r.position(), Position::new(1, 5)); // end of "HTML"
+        let r2 = move_word_right(&model, &r, false);
+        assert_eq!(r2.position(), Position::new(1, 11)); // end of "Parser"
+    }
+
+    // -- delete word boundaries ---------------------------------------------
+
+    #[test]
+    fn delete_word_left_returns_range() {
+        let model = SimpleModel::new("hello world");
+        let c = cursor_at(1, 12);
+        let (start, end) = delete_word_left(&model, &c);
+        assert_eq!(start, Position::new(1, 7));
+        assert_eq!(end, Position::new(1, 12));
+    }
+
+    #[test]
+    fn delete_word_right_returns_range() {
+        let model = SimpleModel::new("hello world");
+        let c = cursor_at(1, 1);
+        let (start, end) = delete_word_right(&model, &c);
+        assert_eq!(start, Position::new(1, 1));
+        assert_eq!(end, Position::new(1, 6));
+    }
+
+    // -- select_word_at (double-click) --------------------------------------
+
+    #[test]
+    fn select_word_at_basic() {
+        let model = SimpleModel::new("hello world");
+        let c = cursor_at(1, 3); // in "hello"
+        let r = select_word_at(&model, &c);
+        assert_eq!(r.selection.anchor, Position::new(1, 1));
+        assert_eq!(r.selection.active, Position::new(1, 6));
+    }
+
+    #[test]
+    fn select_word_at_separator() {
+        let model = SimpleModel::new("foo..bar");
+        let c = cursor_at(1, 5); // on second "."
+        let r = select_word_at(&model, &c);
+        assert_eq!(r.selection.anchor, Position::new(1, 4));
+        assert_eq!(r.selection.active, Position::new(1, 6));
+    }
+
+    #[test]
+    fn select_word_at_whitespace() {
+        let model = SimpleModel::new("hello   world");
+        let c = cursor_at(1, 7); // in whitespace
+        let r = select_word_at(&model, &c);
+        assert_eq!(r.selection.anchor, Position::new(1, 6));
+        assert_eq!(r.selection.active, Position::new(1, 9));
+    }
+
+    #[test]
+    fn select_word_at_with_underscore() {
+        let model = SimpleModel::new("my_var = 1");
+        let c = cursor_at(1, 4); // on "v" in "my_var"
+        let r = select_word_at(&model, &c);
+        assert_eq!(r.selection.anchor, Position::new(1, 1));
+        assert_eq!(r.selection.active, Position::new(1, 7));
     }
 }
