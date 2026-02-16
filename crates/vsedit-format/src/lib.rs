@@ -50,6 +50,131 @@ pub trait OnTypeFormattingProvider: Send + Sync {
     fn format_on_type(&self, uri: &str, line: u32, column: u32, ch: char, options: &FormattingOptions) -> Vec<TextEdit>;
 }
 
+/// Service that manages formatting providers and dispatches requests.
+pub struct FormattingService {
+    document_providers: Vec<Box<dyn DocumentFormattingProvider>>,
+    range_providers: Vec<Box<dyn DocumentRangeFormattingProvider>>,
+    on_type_providers: Vec<Box<dyn OnTypeFormattingProvider>>,
+    format_on_save: bool,
+}
+
+impl FormattingService {
+    pub fn new() -> Self {
+        Self {
+            document_providers: Vec::new(),
+            range_providers: Vec::new(),
+            on_type_providers: Vec::new(),
+            format_on_save: false,
+        }
+    }
+
+    pub fn register_document_provider(&mut self, provider: Box<dyn DocumentFormattingProvider>) {
+        self.document_providers.push(provider);
+    }
+
+    pub fn register_range_provider(&mut self, provider: Box<dyn DocumentRangeFormattingProvider>) {
+        self.range_providers.push(provider);
+    }
+
+    pub fn register_on_type_provider(&mut self, provider: Box<dyn OnTypeFormattingProvider>) {
+        self.on_type_providers.push(provider);
+    }
+
+    pub fn set_format_on_save(&mut self, enabled: bool) {
+        self.format_on_save = enabled;
+    }
+
+    pub fn is_format_on_save(&self) -> bool {
+        self.format_on_save
+    }
+
+    /// Format an entire document (Shift+Alt+F).
+    pub fn format_document(&self, uri: &str, options: &FormattingOptions) -> Vec<TextEdit> {
+        for provider in &self.document_providers {
+            let edits = provider.format_document(uri, options);
+            if !edits.is_empty() {
+                return edits;
+            }
+        }
+        Vec::new()
+    }
+
+    /// Format a selection/range.
+    pub fn format_selection(
+        &self,
+        uri: &str,
+        start_line: u32,
+        end_line: u32,
+        options: &FormattingOptions,
+    ) -> Vec<TextEdit> {
+        for provider in &self.range_providers {
+            let edits = provider.format_range(uri, start_line, end_line, options);
+            if !edits.is_empty() {
+                return edits;
+            }
+        }
+        Vec::new()
+    }
+
+    /// Format on type (triggered by a character).
+    pub fn format_on_type(
+        &self,
+        uri: &str,
+        line: u32,
+        column: u32,
+        ch: char,
+        options: &FormattingOptions,
+    ) -> Vec<TextEdit> {
+        for provider in &self.on_type_providers {
+            if provider.trigger_characters().contains(&ch) {
+                let edits = provider.format_on_type(uri, line, column, ch, options);
+                if !edits.is_empty() {
+                    return edits;
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    /// Format on save (if enabled).
+    pub fn format_on_save(&self, uri: &str, options: &FormattingOptions) -> Vec<TextEdit> {
+        if self.format_on_save {
+            self.format_document(uri, options)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Whether any document formatting provider is registered.
+    pub fn has_document_provider(&self) -> bool {
+        !self.document_providers.is_empty()
+    }
+
+    /// Whether any range formatting provider is registered.
+    pub fn has_range_provider(&self) -> bool {
+        !self.range_providers.is_empty()
+    }
+
+    /// Collect all on-type trigger characters from registered providers.
+    pub fn all_trigger_characters(&self) -> Vec<char> {
+        let mut chars = Vec::new();
+        for provider in &self.on_type_providers {
+            for ch in provider.trigger_characters() {
+                if !chars.contains(&ch) {
+                    chars.push(ch);
+                }
+            }
+        }
+        chars
+    }
+}
+
+impl Default for FormattingService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Apply basic whitespace formatting.
 pub fn format_whitespace(text: &str, options: &FormattingOptions) -> String {
     let mut lines: Vec<String> = text.lines().map(|l| {
@@ -983,5 +1108,114 @@ mod tests {
     fn format_is_ascii_printable() {
         assert!(FormatValidator::is_ascii_printable("Hello World 123"));
         assert!(!FormatValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn formatting_service_empty() {
+        let svc = FormattingService::new();
+        assert!(!svc.has_document_provider());
+        assert!(!svc.has_range_provider());
+        assert!(!svc.is_format_on_save());
+        assert!(svc.all_trigger_characters().is_empty());
+    }
+
+    #[test]
+    fn formatting_service_format_document() {
+        struct TestDocProvider;
+        impl DocumentFormattingProvider for TestDocProvider {
+            fn format_document(&self, _uri: &str, _opts: &FormattingOptions) -> Vec<TextEdit> {
+                vec![TextEdit {
+                    start_line: 0, start_column: 0, end_line: 0, end_column: 3,
+                    new_text: "bar".into(),
+                }]
+            }
+        }
+        let mut svc = FormattingService::new();
+        svc.register_document_provider(Box::new(TestDocProvider));
+        assert!(svc.has_document_provider());
+        let edits = svc.format_document("f.rs", &FormattingOptions::default());
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].new_text, "bar");
+    }
+
+    #[test]
+    fn formatting_service_format_selection() {
+        struct TestRangeProvider;
+        impl DocumentRangeFormattingProvider for TestRangeProvider {
+            fn format_range(&self, _: &str, start: u32, _end: u32, _opts: &FormattingOptions) -> Vec<TextEdit> {
+                vec![TextEdit {
+                    start_line: start, start_column: 0, end_line: start, end_column: 5,
+                    new_text: "fixed".into(),
+                }]
+            }
+        }
+        let mut svc = FormattingService::new();
+        svc.register_range_provider(Box::new(TestRangeProvider));
+        assert!(svc.has_range_provider());
+        let edits = svc.format_selection("f.rs", 2, 5, &FormattingOptions::default());
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].start_line, 2);
+    }
+
+    #[test]
+    fn formatting_service_format_on_type() {
+        struct TestOnTypeProvider;
+        impl OnTypeFormattingProvider for TestOnTypeProvider {
+            fn trigger_characters(&self) -> Vec<char> { vec![';'] }
+            fn format_on_type(&self, _: &str, line: u32, _col: u32, _ch: char, _opts: &FormattingOptions) -> Vec<TextEdit> {
+                vec![TextEdit {
+                    start_line: line, start_column: 0, end_line: line, end_column: 0,
+                    new_text: "    ".into(),
+                }]
+            }
+        }
+        let mut svc = FormattingService::new();
+        svc.register_on_type_provider(Box::new(TestOnTypeProvider));
+        assert_eq!(svc.all_trigger_characters(), vec![';']);
+
+        let edits = svc.format_on_type("f.rs", 3, 10, ';', &FormattingOptions::default());
+        assert_eq!(edits.len(), 1);
+
+        // Wrong trigger char returns empty
+        let empty = svc.format_on_type("f.rs", 3, 10, '}', &FormattingOptions::default());
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn formatting_service_format_on_save() {
+        struct TestDocProvider;
+        impl DocumentFormattingProvider for TestDocProvider {
+            fn format_document(&self, _: &str, _: &FormattingOptions) -> Vec<TextEdit> {
+                vec![TextEdit {
+                    start_line: 0, start_column: 0, end_line: 0, end_column: 1,
+                    new_text: "X".into(),
+                }]
+            }
+        }
+        let mut svc = FormattingService::new();
+        svc.register_document_provider(Box::new(TestDocProvider));
+
+        // Disabled by default
+        let edits = svc.format_on_save("f.rs", &FormattingOptions::default());
+        assert!(edits.is_empty());
+
+        // Enable and try again
+        svc.set_format_on_save(true);
+        let edits = svc.format_on_save("f.rs", &FormattingOptions::default());
+        assert_eq!(edits.len(), 1);
+    }
+
+    #[test]
+    fn formatting_service_no_provider_returns_empty() {
+        let svc = FormattingService::new();
+        assert!(svc.format_document("f.rs", &FormattingOptions::default()).is_empty());
+        assert!(svc.format_selection("f.rs", 0, 5, &FormattingOptions::default()).is_empty());
+        assert!(svc.format_on_type("f.rs", 0, 0, ';', &FormattingOptions::default()).is_empty());
+    }
+
+    #[test]
+    fn formatting_service_default() {
+        let svc = FormattingService::default();
+        assert!(!svc.is_format_on_save());
     }
 }

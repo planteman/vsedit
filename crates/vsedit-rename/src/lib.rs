@@ -2,7 +2,8 @@
 //!
 //! Provides the rename workflow: prepare → validate → compute edits → apply.
 
-use std::fmt;
+use std::collections::HashMap;
+
 /// A text edit for a rename operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenameEdit {
@@ -36,6 +37,15 @@ impl RenameLocation {
     }
 }
 
+/// Range returned from prepare-rename indicating the symbol span and default name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenameRange {
+    pub line: u32,
+    pub start_column: u32,
+    pub end_column: u32,
+    pub placeholder: String,
+}
+
 /// Result of preparing a rename — the range and placeholder text.
 #[derive(Debug, Clone)]
 pub struct PrepareRenameResult {
@@ -45,28 +55,71 @@ pub struct PrepareRenameResult {
     pub placeholder: String,
 }
 
+impl PrepareRenameResult {
+    /// Convert to a `RenameRange`.
+    pub fn to_range(&self) -> RenameRange {
+        RenameRange {
+            line: self.line,
+            start_column: self.start_column,
+            end_column: self.end_column,
+            placeholder: self.placeholder.clone(),
+        }
+    }
+}
+
+/// A single text edit within a workspace edit (file-local coordinates).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextEdit {
+    pub start_line: u32,
+    pub start_column: u32,
+    pub end_line: u32,
+    pub end_column: u32,
+    pub new_text: String,
+}
+
 /// Result of performing a rename across the workspace.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WorkspaceEdit {
     pub edits: Vec<RenameEdit>,
+    /// Multi-file changes keyed by URI.
+    pub changes: HashMap<String, Vec<TextEdit>>,
 }
 
 impl WorkspaceEdit {
     pub fn new() -> Self {
-        Self { edits: Vec::new() }
+        Self {
+            edits: Vec::new(),
+            changes: HashMap::new(),
+        }
     }
 
-    /// Number of files affected by this edit.
+    /// Build a `WorkspaceEdit` from the `changes` map representation.
+    pub fn from_changes(changes: HashMap<String, Vec<TextEdit>>) -> Self {
+        Self {
+            edits: Vec::new(),
+            changes,
+        }
+    }
+
+    /// Number of files affected by this edit (union of edits + changes).
     pub fn affected_file_count(&self) -> usize {
         let mut uris: Vec<&str> = self.edits.iter().map(|e| e.uri.as_str()).collect();
+        for key in self.changes.keys() {
+            uris.push(key.as_str());
+        }
         uris.sort();
         uris.dedup();
         uris.len()
     }
 
-    /// Total number of individual edits.
+    /// Total number of individual edits (flat edits + changes entries).
     pub fn edit_count(&self) -> usize {
-        self.edits.len()
+        self.edits.len() + self.changes.values().map(|v| v.len()).sum::<usize>()
+    }
+
+    /// Insert a text edit for a specific file into the `changes` map.
+    pub fn add_change(&mut self, uri: impl Into<String>, edit: TextEdit) {
+        self.changes.entry(uri.into()).or_default().push(edit);
     }
 }
 
@@ -96,7 +149,17 @@ impl RenameService {
         self.providers.push(provider);
     }
 
-    /// Prepare rename: ask providers if rename is valid at this position.
+    /// Prepare rename: validate rename is possible and get default name / range.
+    pub fn prepare_rename(&self, uri: &str, line: u32, column: u32) -> Option<RenameRange> {
+        for provider in &self.providers {
+            if let Some(result) = provider.prepare_rename(uri, line, column) {
+                return Some(result.to_range());
+            }
+        }
+        None
+    }
+
+    /// Legacy alias for `prepare_rename`.
     pub fn prepare(&self, uri: &str, line: u32, column: u32) -> Option<PrepareRenameResult> {
         for provider in &self.providers {
             if let Some(result) = provider.prepare_rename(uri, line, column) {
@@ -104,6 +167,23 @@ impl RenameService {
             }
         }
         None
+    }
+
+    /// Execute rename: compute all edits for the given new name.
+    pub fn execute_rename(
+        &self,
+        uri: &str,
+        line: u32,
+        column: u32,
+        new_name: &str,
+    ) -> Result<WorkspaceEdit, RenameError> {
+        Self::validate_new_name(new_name)?;
+        for provider in &self.providers {
+            if let Some(edit) = provider.provide_rename_edits(uri, line, column, new_name) {
+                return Ok(edit);
+            }
+        }
+        Err(RenameError::NoProvider)
     }
 
     /// Validate the new name (non-empty, no whitespace-only, etc.).
@@ -120,7 +200,7 @@ impl RenameService {
         Ok(())
     }
 
-    /// Compute edits for the rename.
+    /// Compute edits for the rename (alias for `execute_rename`).
     pub fn compute_edits(
         &self,
         uri: &str,
@@ -128,19 +208,153 @@ impl RenameService {
         column: u32,
         new_name: &str,
     ) -> Result<WorkspaceEdit, RenameError> {
-        Self::validate_new_name(new_name)?;
-        for provider in &self.providers {
-            if let Some(edits) = provider.provide_rename_edits(uri, line, column, new_name) {
-                return Ok(edits);
-            }
-        }
-        Err(RenameError::NoProvider)
+        self.execute_rename(uri, line, column, new_name)
     }
 }
 
 impl Default for RenameService {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Apply a workspace edit atomically. Returns per-file results.
+/// Files are represented as `(uri, content)` pairs; the function returns
+/// the transformed contents keyed by URI.
+pub fn apply_workspace_edit(
+    files: &HashMap<String, String>,
+    edit: &WorkspaceEdit,
+) -> Result<HashMap<String, String>, RenameError> {
+    let mut result = files.clone();
+
+    // Apply flat edits grouped by file (reverse order to preserve positions).
+    let mut by_file: HashMap<&str, Vec<&RenameEdit>> = HashMap::new();
+    for e in &edit.edits {
+        by_file.entry(e.uri.as_str()).or_default().push(e);
+    }
+    for (uri, mut edits) in by_file {
+        let content = result
+            .get(uri)
+            .ok_or_else(|| RenameError::FileNotFound(uri.to_string()))?;
+        edits.sort_by(|a, b| b.line.cmp(&a.line).then(b.start_column.cmp(&a.start_column)));
+        let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+        for e in edits {
+            let idx = e.line as usize;
+            if idx < lines.len() {
+                let line = &lines[idx];
+                let s = e.start_column as usize;
+                let end = e.end_column as usize;
+                let new_line = format!(
+                    "{}{}{}",
+                    &line[..s.min(line.len())],
+                    e.new_text,
+                    &line[end.min(line.len())..]
+                );
+                lines[idx] = new_line;
+            }
+        }
+        result.insert(uri.to_string(), lines.join("\n"));
+    }
+
+    // Apply changes map.
+    for (uri, text_edits) in &edit.changes {
+        let content = result
+            .get(uri.as_str())
+            .ok_or_else(|| RenameError::FileNotFound(uri.clone()))?;
+        let mut sorted: Vec<&TextEdit> = text_edits.iter().collect();
+        sorted.sort_by(|a, b| {
+            b.start_line
+                .cmp(&a.start_line)
+                .then(b.start_column.cmp(&a.start_column))
+        });
+        let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+        for te in sorted {
+            if te.start_line == te.end_line {
+                let idx = te.start_line as usize;
+                if idx < lines.len() {
+                    let line = &lines[idx];
+                    let s = te.start_column as usize;
+                    let e = te.end_column as usize;
+                    lines[idx] = format!(
+                        "{}{}{}",
+                        &line[..s.min(line.len())],
+                        te.new_text,
+                        &line[e.min(line.len())..]
+                    );
+                }
+            }
+        }
+        result.insert(uri.clone(), lines.join("\n"));
+    }
+
+    Ok(result)
+}
+
+/// Preview of changes a rename would produce.
+#[derive(Debug, Clone)]
+pub struct RenamePreview {
+    /// Mapping of uri → list of (line_number, old_line, new_line).
+    pub file_changes: HashMap<String, Vec<(u32, String, String)>>,
+}
+
+impl RenamePreview {
+    /// Build a preview from a workspace edit and existing file contents.
+    pub fn from_edit(files: &HashMap<String, String>, edit: &WorkspaceEdit) -> Self {
+        let mut file_changes: HashMap<String, Vec<(u32, String, String)>> = HashMap::new();
+
+        // Collect all edits by file.
+        let mut by_file: HashMap<String, Vec<(u32, u32, u32, &str)>> = HashMap::new();
+        for e in &edit.edits {
+            by_file
+                .entry(e.uri.clone())
+                .or_default()
+                .push((e.line, e.start_column, e.end_column, e.new_text.as_str()));
+        }
+        for (uri, text_edits) in &edit.changes {
+            for te in text_edits {
+                if te.start_line == te.end_line {
+                    by_file
+                        .entry(uri.clone())
+                        .or_default()
+                        .push((te.start_line, te.start_column, te.end_column, te.new_text.as_str()));
+                }
+            }
+        }
+
+        for (uri, edits) in &by_file {
+            if let Some(content) = files.get(uri.as_str()) {
+                let lines: Vec<&str> = content.lines().collect();
+                let mut changes = Vec::new();
+                for &(line, sc, ec, new_text) in edits {
+                    let idx = line as usize;
+                    if idx < lines.len() {
+                        let old_line = lines[idx].to_string();
+                        let s = sc as usize;
+                        let e = ec as usize;
+                        let new_line = format!(
+                            "{}{}{}",
+                            &old_line[..s.min(old_line.len())],
+                            new_text,
+                            &old_line[e.min(old_line.len())..]
+                        );
+                        changes.push((line, old_line, new_line));
+                    }
+                }
+                file_changes.insert(uri.clone(), changes);
+            }
+        }
+
+        Self { file_changes }
+    }
+
+    /// Total number of changed lines across all files.
+    pub fn total_changes(&self) -> usize {
+        self.file_changes.values().map(|v| v.len()).sum()
+    }
+
+    /// Number of files affected.
+    pub fn file_count(&self) -> usize {
+        self.file_changes.len()
     }
 }
 
@@ -151,6 +365,8 @@ pub enum RenameError {
     WhitespaceOnly,
     ContainsNewline,
     NoProvider,
+    /// A file referenced in the edit was not found.
+    FileNotFound(String),
 }
 
 impl std::fmt::Display for RenameError {
@@ -160,6 +376,7 @@ impl std::fmt::Display for RenameError {
             Self::WhitespaceOnly => write!(f, "New name cannot be whitespace only"),
             Self::ContainsNewline => write!(f, "New name cannot contain newlines"),
             Self::NoProvider => write!(f, "No rename provider available"),
+            Self::FileNotFound(uri) => write!(f, "File not found: {}", uri),
         }
     }
 }
@@ -286,6 +503,9 @@ impl WorkspaceEdit {
     /// Merge another WorkspaceEdit into this one.
     pub fn merge(&mut self, other: WorkspaceEdit) {
         self.edits.extend(other.edits);
+        for (uri, edits) in other.changes {
+            self.changes.entry(uri).or_default().extend(edits);
+        }
     }
 
     /// Sort edits by (uri, line, start_column) for deterministic application.
@@ -294,9 +514,12 @@ impl WorkspaceEdit {
             .sort_by(|a, b| (&a.uri, a.line, a.start_column).cmp(&(&b.uri, b.line, b.start_column)));
     }
 
-    /// Return all unique file URIs touched by these edits.
+    /// Return all unique file URIs touched by these edits (flat + changes).
     pub fn affected_uris(&self) -> Vec<String> {
         let mut uris: Vec<String> = self.edits.iter().map(|e| e.uri.clone()).collect();
+        for key in self.changes.keys() {
+            uris.push(key.clone());
+        }
         uris.sort();
         uris.dedup();
         uris
@@ -443,6 +666,7 @@ mod tests {
                 RenameEdit { uri: "b.rs".into(), line: 2, start_column: 0, end_column: 3, new_text: "x".into() },
                 RenameEdit { uri: "a.rs".into(), line: 5, start_column: 0, end_column: 3, new_text: "x".into() },
             ],
+            changes: HashMap::new(),
         };
         assert_eq!(we.affected_file_count(), 2);
         assert_eq!(we.edit_count(), 3);
@@ -602,6 +826,7 @@ mod tests {
                 RenameEdit { uri: "b.rs".into(), line: 2, start_column: 0, end_column: 3, new_text: "x".into() },
                 RenameEdit { uri: "a.rs".into(), line: 5, start_column: 0, end_column: 3, new_text: "x".into() },
             ],
+            changes: HashMap::new(),
         };
         assert_eq!(we.edits_for_file("a.rs").len(), 2);
         assert_eq!(we.edits_for_file("c.rs").len(), 0);
@@ -613,11 +838,13 @@ mod tests {
             edits: vec![
                 RenameEdit { uri: "b.rs".into(), line: 3, start_column: 0, end_column: 2, new_text: "x".into() },
             ],
+            changes: HashMap::new(),
         };
         let we2 = WorkspaceEdit {
             edits: vec![
                 RenameEdit { uri: "a.rs".into(), line: 1, start_column: 0, end_column: 2, new_text: "y".into() },
             ],
+            changes: HashMap::new(),
         };
         we1.merge(we2);
         assert_eq!(we1.edit_count(), 2);
@@ -633,6 +860,7 @@ mod tests {
                 RenameEdit { uri: "a.rs".into(), line: 1, start_column: 0, end_column: 1, new_text: "b".into() },
                 RenameEdit { uri: "z.rs".into(), line: 2, start_column: 0, end_column: 1, new_text: "c".into() },
             ],
+            changes: HashMap::new(),
         };
         let uris = we.affected_uris();
         assert_eq!(uris, vec!["a.rs", "z.rs"]);
@@ -709,5 +937,179 @@ mod tests {
     fn rename_error_display() {
         assert_eq!(format!("{}", RenameError::EmptyName), "New name cannot be empty");
         assert_eq!(format!("{}", RenameError::NoProvider), "No rename provider available");
+    }
+
+    #[test]
+    fn rename_error_file_not_found() {
+        let err = RenameError::FileNotFound("missing.rs".into());
+        assert!(format!("{}", err).contains("missing.rs"));
+    }
+
+    #[test]
+    fn rename_range_from_prepare_result() {
+        let pr = PrepareRenameResult {
+            line: 5,
+            start_column: 2,
+            end_column: 8,
+            placeholder: "myVar".into(),
+        };
+        let rr = pr.to_range();
+        assert_eq!(rr.line, 5);
+        assert_eq!(rr.placeholder, "myVar");
+    }
+
+    #[test]
+    fn prepare_rename_via_service() {
+        struct TestProvider;
+        impl RenameProvider for TestProvider {
+            fn prepare_rename(&self, _uri: &str, _line: u32, _col: u32) -> Option<PrepareRenameResult> {
+                Some(PrepareRenameResult {
+                    line: 1,
+                    start_column: 0,
+                    end_column: 3,
+                    placeholder: "foo".into(),
+                })
+            }
+            fn provide_rename_edits(&self, _: &str, _: u32, _: u32, _: &str) -> Option<WorkspaceEdit> { None }
+        }
+        let mut svc = RenameService::new();
+        svc.register(Box::new(TestProvider));
+        let rr = svc.prepare_rename("f.rs", 1, 1).unwrap();
+        assert_eq!(rr.placeholder, "foo");
+    }
+
+    #[test]
+    fn execute_rename_via_service() {
+        struct TestProvider;
+        impl RenameProvider for TestProvider {
+            fn prepare_rename(&self, _: &str, _: u32, _: u32) -> Option<PrepareRenameResult> { None }
+            fn provide_rename_edits(&self, _uri: &str, _: u32, _: u32, new_name: &str) -> Option<WorkspaceEdit> {
+                let mut we = WorkspaceEdit::new();
+                we.edits.push(RenameEdit {
+                    uri: "f.rs".into(), line: 0, start_column: 0, end_column: 3,
+                    new_text: new_name.to_string(),
+                });
+                Some(we)
+            }
+        }
+        let mut svc = RenameService::new();
+        svc.register(Box::new(TestProvider));
+        let edit = svc.execute_rename("f.rs", 0, 0, "bar").unwrap();
+        assert_eq!(edit.edits[0].new_text, "bar");
+    }
+
+    #[test]
+    fn workspace_edit_add_change() {
+        let mut we = WorkspaceEdit::new();
+        we.add_change("a.rs", TextEdit {
+            start_line: 0, start_column: 0, end_line: 0, end_column: 3,
+            new_text: "bar".into(),
+        });
+        assert_eq!(we.changes["a.rs"].len(), 1);
+        assert_eq!(we.edit_count(), 1);
+        assert_eq!(we.affected_file_count(), 1);
+    }
+
+    #[test]
+    fn workspace_edit_from_changes() {
+        let mut map = HashMap::new();
+        map.insert("x.rs".to_string(), vec![TextEdit {
+            start_line: 0, start_column: 0, end_line: 0, end_column: 1,
+            new_text: "Y".into(),
+        }]);
+        let we = WorkspaceEdit::from_changes(map);
+        assert_eq!(we.affected_file_count(), 1);
+        assert_eq!(we.edit_count(), 1);
+    }
+
+    #[test]
+    fn apply_workspace_edit_flat_edits() {
+        let mut files = HashMap::new();
+        files.insert("a.rs".to_string(), "let foo = 1;\nfoo + 2".to_string());
+
+        let we = WorkspaceEdit {
+            edits: vec![
+                RenameEdit { uri: "a.rs".into(), line: 0, start_column: 4, end_column: 7, new_text: "bar".into() },
+                RenameEdit { uri: "a.rs".into(), line: 1, start_column: 0, end_column: 3, new_text: "bar".into() },
+            ],
+            changes: HashMap::new(),
+        };
+
+        let result = apply_workspace_edit(&files, &we).unwrap();
+        assert!(result["a.rs"].contains("bar"));
+        assert!(!result["a.rs"].contains("foo"));
+    }
+
+    #[test]
+    fn apply_workspace_edit_changes_map() {
+        let mut files = HashMap::new();
+        files.insert("b.rs".to_string(), "let old = 1;".to_string());
+
+        let mut we = WorkspaceEdit::new();
+        we.add_change("b.rs", TextEdit {
+            start_line: 0, start_column: 4, end_line: 0, end_column: 7,
+            new_text: "new".into(),
+        });
+
+        let result = apply_workspace_edit(&files, &we).unwrap();
+        assert!(result["b.rs"].contains("new"));
+    }
+
+    #[test]
+    fn apply_workspace_edit_file_not_found() {
+        let files = HashMap::new();
+        let we = WorkspaceEdit {
+            edits: vec![
+                RenameEdit { uri: "missing.rs".into(), line: 0, start_column: 0, end_column: 1, new_text: "x".into() },
+            ],
+            changes: HashMap::new(),
+        };
+        assert!(apply_workspace_edit(&files, &we).is_err());
+    }
+
+    #[test]
+    fn rename_preview_from_edit() {
+        let mut files = HashMap::new();
+        files.insert("c.rs".to_string(), "let foo = 1;\nfoo + 2".to_string());
+
+        let we = WorkspaceEdit {
+            edits: vec![
+                RenameEdit { uri: "c.rs".into(), line: 0, start_column: 4, end_column: 7, new_text: "bar".into() },
+            ],
+            changes: HashMap::new(),
+        };
+
+        let preview = RenamePreview::from_edit(&files, &we);
+        assert_eq!(preview.file_count(), 1);
+        assert_eq!(preview.total_changes(), 1);
+        let changes = &preview.file_changes["c.rs"];
+        assert!(changes[0].1.contains("foo"));
+        assert!(changes[0].2.contains("bar"));
+    }
+
+    #[test]
+    fn workspace_edit_merge_changes() {
+        let mut we1 = WorkspaceEdit::new();
+        we1.add_change("a.rs", TextEdit {
+            start_line: 0, start_column: 0, end_line: 0, end_column: 1,
+            new_text: "X".into(),
+        });
+        let mut we2 = WorkspaceEdit::new();
+        we2.add_change("a.rs", TextEdit {
+            start_line: 1, start_column: 0, end_line: 1, end_column: 1,
+            new_text: "Y".into(),
+        });
+        we1.merge(we2);
+        assert_eq!(we1.changes["a.rs"].len(), 2);
+    }
+
+    #[test]
+    fn text_edit_struct() {
+        let te = TextEdit {
+            start_line: 1, start_column: 2, end_line: 1, end_column: 5,
+            new_text: "abc".into(),
+        };
+        assert_eq!(te.start_line, 1);
+        assert_eq!(te.new_text, "abc");
     }
 }

@@ -1,6 +1,8 @@
 //! Quick fix and refactoring.
 
+use std::collections::HashMap;
 use std::fmt;
+
 /// The kind of a code action.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CodeActionKind {
@@ -33,17 +35,101 @@ impl CodeActionKind {
     pub fn contains(&self, other: &CodeActionKind) -> bool {
         other.as_str().starts_with(self.as_str())
     }
+
+    /// Parse a kind string back to an enum variant.
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "quickfix" => Some(Self::QuickFix),
+            "refactor" => Some(Self::Refactor),
+            "refactor.extract" => Some(Self::RefactorExtract),
+            "refactor.inline" => Some(Self::RefactorInline),
+            "refactor.rewrite" => Some(Self::RefactorRewrite),
+            "source" => Some(Self::Source),
+            "source.organizeImports" => Some(Self::SourceOrganizeImports),
+            "source.fixAll" => Some(Self::SourceFixAll),
+            _ => None,
+        }
+    }
 }
 
-/// A text edit within a code action.
+/// A single text edit within a workspace edit.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorkspaceEdit {
-    pub uri: String,
+pub struct TextEdit {
     pub start_line: u32,
     pub start_col: u32,
     pub end_line: u32,
     pub end_col: u32,
     pub new_text: String,
+}
+
+/// Multi-file workspace edit: maps URI → list of text edits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceEdit {
+    pub changes: HashMap<String, Vec<TextEdit>>,
+}
+
+impl WorkspaceEdit {
+    pub fn new() -> Self {
+        Self {
+            changes: HashMap::new(),
+        }
+    }
+
+    /// Create from a single file URI and its edits.
+    pub fn single_file(uri: impl Into<String>, edits: Vec<TextEdit>) -> Self {
+        let mut changes = HashMap::new();
+        changes.insert(uri.into(), edits);
+        Self { changes }
+    }
+
+    /// Add a text edit for a specific file.
+    pub fn add_edit(&mut self, uri: impl Into<String>, edit: TextEdit) {
+        self.changes.entry(uri.into()).or_default().push(edit);
+    }
+
+    /// Number of files affected.
+    pub fn file_count(&self) -> usize {
+        self.changes.len()
+    }
+
+    /// Total number of edits across all files.
+    pub fn edit_count(&self) -> usize {
+        self.changes.values().map(|v| v.len()).sum()
+    }
+
+    /// Whether this edit is empty.
+    pub fn is_empty(&self) -> bool {
+        self.changes.is_empty()
+    }
+}
+
+impl Default for WorkspaceEdit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A command that can be executed after applying a code action.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Command {
+    pub title: String,
+    pub command: String,
+    pub arguments: Vec<String>,
+}
+
+impl Command {
+    pub fn new(title: impl Into<String>, command: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            command: command.into(),
+            arguments: Vec::new(),
+        }
+    }
+
+    pub fn with_args(mut self, args: Vec<String>) -> Self {
+        self.arguments = args;
+        self
+    }
 }
 
 /// A diagnostic associated with a code action.
@@ -71,6 +157,7 @@ pub struct CodeAction {
     pub kind: CodeActionKind,
     pub diagnostics: Vec<Diagnostic>,
     pub edit: Option<WorkspaceEdit>,
+    pub command: Option<Command>,
     pub is_preferred: bool,
     pub disabled_reason: Option<String>,
 }
@@ -82,6 +169,7 @@ impl CodeAction {
             kind,
             diagnostics: Vec::new(),
             edit: None,
+            command: None,
             is_preferred: false,
             disabled_reason: None,
         }
@@ -89,6 +177,11 @@ impl CodeAction {
 
     pub fn with_edit(mut self, edit: WorkspaceEdit) -> Self {
         self.edit = Some(edit);
+        self
+    }
+
+    pub fn with_command(mut self, command: Command) -> Self {
+        self.command = Some(command);
         self
     }
 
@@ -112,6 +205,17 @@ impl CodeAction {
 pub struct CodeActionContext {
     pub diagnostics: Vec<Diagnostic>,
     pub only: Option<Vec<CodeActionKind>>,
+    pub trigger: CodeActionTrigger,
+}
+
+impl CodeActionContext {
+    pub fn new(trigger: CodeActionTrigger) -> Self {
+        Self {
+            diagnostics: Vec::new(),
+            only: None,
+            trigger,
+        }
+    }
 }
 
 /// Provider of code actions.
@@ -123,6 +227,111 @@ pub trait CodeActionProvider: Send + Sync {
         end_line: u32,
         context: &CodeActionContext,
     ) -> Vec<CodeAction>;
+}
+
+/// Service that manages code action providers and dispatches requests.
+pub struct CodeActionService {
+    providers: Vec<Box<dyn CodeActionProvider>>,
+}
+
+impl CodeActionService {
+    pub fn new() -> Self {
+        Self {
+            providers: Vec::new(),
+        }
+    }
+
+    pub fn register(&mut self, provider: Box<dyn CodeActionProvider>) {
+        self.providers.push(provider);
+    }
+
+    /// Get code actions from all providers for a given range.
+    pub fn get_code_actions(
+        &self,
+        uri: &str,
+        start_line: u32,
+        end_line: u32,
+        context: &CodeActionContext,
+    ) -> Vec<CodeAction> {
+        let mut all = Vec::new();
+        for provider in &self.providers {
+            all.extend(provider.provide_code_actions(uri, start_line, end_line, context));
+        }
+        // Filter by `only` kinds if specified.
+        if let Some(ref only) = context.only {
+            all.retain(|a| only.iter().any(|k| k.contains(&a.kind)));
+        }
+        all
+    }
+
+    /// Whether any code action is available (for light bulb indicator).
+    pub fn has_actions(
+        &self,
+        uri: &str,
+        start_line: u32,
+        end_line: u32,
+        context: &CodeActionContext,
+    ) -> bool {
+        !self.get_code_actions(uri, start_line, end_line, context).is_empty()
+    }
+}
+
+impl Default for CodeActionService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Apply a code action: apply its workspace edit and return the command to run (if any).
+pub fn apply_code_action(
+    files: &mut HashMap<String, String>,
+    action: &CodeAction,
+) -> Option<Command> {
+    if let Some(ref edit) = action.edit {
+        apply_workspace_edit(files, edit);
+    }
+    action.command.clone()
+}
+
+/// Apply a workspace edit to in-memory file contents.
+pub fn apply_workspace_edit(files: &mut HashMap<String, String>, edit: &WorkspaceEdit) {
+    for (uri, edits) in &edit.changes {
+        if let Some(content) = files.get(uri) {
+            let new_content = apply_edits_to_text(content, edits);
+            files.insert(uri.clone(), new_content);
+        }
+    }
+}
+
+/// Apply text edits to a string, applying in reverse order to preserve positions.
+fn apply_edits_to_text(text: &str, edits: &[TextEdit]) -> String {
+    let mut sorted: Vec<&TextEdit> = edits.iter().collect();
+    sorted.sort_by(|a, b| {
+        b.start_line.cmp(&a.start_line).then(b.start_col.cmp(&a.start_col))
+    });
+
+    let lines: Vec<&str> = text.lines().collect();
+    let mut result_lines: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
+
+    for edit in sorted {
+        if edit.start_line == edit.end_line {
+            let idx = edit.start_line as usize;
+            if idx < result_lines.len() {
+                let line = &result_lines[idx];
+                let start = edit.start_col as usize;
+                let end = edit.end_col as usize;
+                let new_line = format!(
+                    "{}{}{}",
+                    &line[..start.min(line.len())],
+                    edit.new_text,
+                    &line[end.min(line.len())..]
+                );
+                result_lines[idx] = new_line;
+            }
+        }
+    }
+
+    result_lines.join("\n")
 }
 
 /// Filter code actions by kind.
@@ -197,48 +406,95 @@ pub fn sort_actions(actions: &mut [CodeAction]) {
 }
 
 // ---------------------------------------------------------------------------
-// Apply edit
+// Refactoring preview
 // ---------------------------------------------------------------------------
 
-/// Apply a single `WorkspaceEdit` to `text`, treating it as a flat string
-/// addressed by line/column offsets. Only edits on the same content are useful.
-pub fn apply_edit(text: &str, edit: &WorkspaceEdit) -> String {
-    let lines: Vec<&str> = text.lines().collect();
-    let mut result = String::new();
+/// Preview of changes a refactoring would produce, showing old vs new lines.
+#[derive(Debug, Clone)]
+pub struct RefactoringPreview {
+    pub file_diffs: HashMap<String, Vec<(u32, String, String)>>,
+}
 
-    for (i, line) in lines.iter().enumerate() {
-        let line_idx = i as u32;
-        if line_idx < edit.start_line || line_idx > edit.end_line {
-            result.push_str(line);
-            result.push('\n');
-        } else if line_idx == edit.start_line && line_idx == edit.end_line {
-            let start = edit.start_col as usize;
-            let end = edit.end_col as usize;
-            result.push_str(&line[..start.min(line.len())]);
-            result.push_str(&edit.new_text);
-            if end < line.len() {
-                result.push_str(&line[end..]);
+impl RefactoringPreview {
+    /// Build a preview from a workspace edit and file contents.
+    pub fn from_edit(files: &HashMap<String, String>, edit: &WorkspaceEdit) -> Self {
+        let mut file_diffs: HashMap<String, Vec<(u32, String, String)>> = HashMap::new();
+
+        for (uri, edits) in &edit.changes {
+            if let Some(content) = files.get(uri) {
+                let lines: Vec<&str> = content.lines().collect();
+                let mut diffs = Vec::new();
+                for te in edits {
+                    if te.start_line == te.end_line {
+                        let idx = te.start_line as usize;
+                        if idx < lines.len() {
+                            let old = lines[idx].to_string();
+                            let s = te.start_col as usize;
+                            let e = te.end_col as usize;
+                            let new = format!(
+                                "{}{}{}",
+                                &old[..s.min(old.len())],
+                                te.new_text,
+                                &old[e.min(old.len())..]
+                            );
+                            diffs.push((te.start_line, old, new));
+                        }
+                    }
+                }
+                file_diffs.insert(uri.clone(), diffs);
             }
-            result.push('\n');
-        } else if line_idx == edit.start_line {
-            let start = edit.start_col as usize;
-            result.push_str(&line[..start.min(line.len())]);
-            result.push_str(&edit.new_text);
-        } else if line_idx == edit.end_line {
-            let end = edit.end_col as usize;
-            if end < line.len() {
-                result.push_str(&line[end..]);
-            }
-            result.push('\n');
         }
-        // lines strictly between start and end are dropped
+
+        Self { file_diffs }
     }
 
-    // Remove trailing newline if original didn't end with one
-    if !text.ends_with('\n') && result.ends_with('\n') {
-        result.pop();
+    /// Total number of changed lines.
+    pub fn total_changes(&self) -> usize {
+        self.file_diffs.values().map(|v| v.len()).sum()
     }
-    result
+
+    /// Number of files affected.
+    pub fn file_count(&self) -> usize {
+        self.file_diffs.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Organize Imports
+// ---------------------------------------------------------------------------
+
+/// Sort and deduplicate import lines in source text.
+/// Recognizes lines starting with `use ` or `import `.
+pub fn organize_imports(text: &str) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut result = Vec::new();
+    let mut import_block: Vec<String> = Vec::new();
+    let mut in_imports = false;
+
+    for line in &lines {
+        let trimmed = line.trim();
+        let is_import = trimmed.starts_with("use ") || trimmed.starts_with("import ");
+        if is_import {
+            import_block.push(line.to_string());
+            in_imports = true;
+        } else {
+            if in_imports && !import_block.is_empty() {
+                import_block.sort();
+                import_block.dedup();
+                result.extend(import_block.drain(..));
+                in_imports = false;
+            }
+            result.push(line.to_string());
+        }
+    }
+    // Flush trailing imports.
+    if !import_block.is_empty() {
+        import_block.sort();
+        import_block.dedup();
+        result.extend(import_block);
+    }
+
+    result.join("\n")
 }
 
 // ---------------------------------------------------------------------------
@@ -518,11 +774,12 @@ mod tests {
     fn code_action_creation() {
         let action = CodeAction::new("Fix typo", CodeActionKind::QuickFix)
             .preferred()
-            .with_edit(WorkspaceEdit {
-                uri: "file:///test.rs".into(),
-                start_line: 1, start_col: 0, end_line: 1, end_col: 5,
-                new_text: "fixed".into(),
-            });
+            .with_edit(WorkspaceEdit::single_file("file:///test.rs", vec![
+                TextEdit {
+                    start_line: 1, start_col: 0, end_line: 1, end_col: 5,
+                    new_text: "fixed".into(),
+                },
+            ]));
         assert_eq!(action.title, "Fix typo");
         assert!(action.is_preferred);
         assert!(action.is_enabled());
@@ -551,6 +808,13 @@ mod tests {
     fn kind_strings() {
         assert_eq!(CodeActionKind::QuickFix.as_str(), "quickfix");
         assert_eq!(CodeActionKind::SourceOrganizeImports.as_str(), "source.organizeImports");
+    }
+
+    #[test]
+    fn kind_from_str() {
+        assert_eq!(CodeActionKind::from_str("quickfix"), Some(CodeActionKind::QuickFix));
+        assert_eq!(CodeActionKind::from_str("refactor.extract"), Some(CodeActionKind::RefactorExtract));
+        assert_eq!(CodeActionKind::from_str("unknown"), None);
     }
 
     #[test]
@@ -598,19 +862,51 @@ mod tests {
     }
 
     #[test]
-    fn apply_edit_single_line() {
-        let text = "fn main() {\n    old_call();\n}";
-        let edit = WorkspaceEdit {
-            uri: "file:///test.rs".into(),
-            start_line: 1,
-            start_col: 4,
-            end_line: 1,
-            end_col: 14,
-            new_text: "new_call()".into(),
-        };
-        let result = apply_edit(text, &edit);
-        assert!(result.contains("new_call()"));
-        assert!(!result.contains("old_call()"));
+    fn workspace_edit_multi_file() {
+        let mut we = WorkspaceEdit::new();
+        we.add_edit("a.rs", TextEdit {
+            start_line: 0, start_col: 0, end_line: 0, end_col: 3,
+            new_text: "bar".into(),
+        });
+        we.add_edit("b.rs", TextEdit {
+            start_line: 1, start_col: 0, end_line: 1, end_col: 2,
+            new_text: "xy".into(),
+        });
+        assert_eq!(we.file_count(), 2);
+        assert_eq!(we.edit_count(), 2);
+    }
+
+    #[test]
+    fn workspace_edit_single_file() {
+        let we = WorkspaceEdit::single_file("f.rs", vec![
+            TextEdit { start_line: 0, start_col: 0, end_line: 0, end_col: 1, new_text: "X".into() },
+        ]);
+        assert_eq!(we.file_count(), 1);
+        assert_eq!(we.edit_count(), 1);
+        assert!(!we.is_empty());
+    }
+
+    #[test]
+    fn workspace_edit_empty() {
+        let we = WorkspaceEdit::new();
+        assert!(we.is_empty());
+        assert_eq!(we.file_count(), 0);
+    }
+
+    #[test]
+    fn apply_workspace_edit_test() {
+        let mut files = HashMap::new();
+        files.insert("test.rs".to_string(), "fn main() {\n    old_call();\n}".to_string());
+
+        let we = WorkspaceEdit::single_file("test.rs", vec![
+            TextEdit {
+                start_line: 1, start_col: 4, end_line: 1, end_col: 14,
+                new_text: "new_call()".into(),
+            },
+        ]);
+        apply_workspace_edit(&mut files, &we);
+        assert!(files["test.rs"].contains("new_call()"));
+        assert!(!files["test.rs"].contains("old_call()"));
     }
 
     #[test]
@@ -630,14 +926,9 @@ mod tests {
                 column: 0,
                 severity: DiagnosticSeverity::Error,
             })
-            .with_edit(WorkspaceEdit {
-                uri: "f".into(),
-                start_line: 0,
-                start_col: 0,
-                end_line: 0,
-                end_col: 1,
-                new_text: "x".into(),
-            });
+            .with_edit(WorkspaceEdit::single_file("f", vec![
+                TextEdit { start_line: 0, start_col: 0, end_line: 0, end_col: 1, new_text: "x".into() },
+            ]));
         assert!(action.has_diagnostics());
         assert_eq!(action.edit_count(), 1);
 
@@ -675,178 +966,121 @@ mod tests {
     }
 
     #[test]
-    fn eq_codeactionkind_same() {
-        assert_eq!(CodeActionKind::QuickFix, CodeActionKind::QuickFix);
+    fn command_creation() {
+        let cmd = Command::new("Run", "editor.run").with_args(vec!["--fast".into()]);
+        assert_eq!(cmd.title, "Run");
+        assert_eq!(cmd.command, "editor.run");
+        assert_eq!(cmd.arguments, vec!["--fast"]);
     }
 
     #[test]
-    fn ne_codeactionkind_diff() {
-        assert_ne!(CodeActionKind::QuickFix, CodeActionKind::Refactor);
+    fn code_action_with_command() {
+        let action = CodeAction::new("Fix", CodeActionKind::QuickFix)
+            .with_command(Command::new("Run fix", "fix.apply"));
+        assert!(action.command.is_some());
+        assert_eq!(action.command.unwrap().command, "fix.apply");
     }
 
     #[test]
-    fn eq_diagnosticseverity_same() {
-        assert_eq!(DiagnosticSeverity::Error, DiagnosticSeverity::Error);
+    fn code_action_service_get_actions() {
+        struct TestProvider;
+        impl CodeActionProvider for TestProvider {
+            fn provide_code_actions(&self, _uri: &str, _s: u32, _e: u32, _ctx: &CodeActionContext) -> Vec<CodeAction> {
+                vec![CodeAction::new("Test Fix", CodeActionKind::QuickFix)]
+            }
+        }
+        let mut svc = CodeActionService::new();
+        svc.register(Box::new(TestProvider));
+        let ctx = CodeActionContext::new(CodeActionTrigger::Invoke);
+        let actions = svc.get_code_actions("f.rs", 0, 10, &ctx);
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0].title, "Test Fix");
     }
 
     #[test]
-    fn ne_diagnosticseverity_diff() {
-        assert_ne!(DiagnosticSeverity::Error, DiagnosticSeverity::Warning);
+    fn code_action_service_filter_by_only() {
+        struct TestProvider;
+        impl CodeActionProvider for TestProvider {
+            fn provide_code_actions(&self, _: &str, _: u32, _: u32, _: &CodeActionContext) -> Vec<CodeAction> {
+                vec![
+                    CodeAction::new("Fix", CodeActionKind::QuickFix),
+                    CodeAction::new("Extract", CodeActionKind::RefactorExtract),
+                ]
+            }
+        }
+        let mut svc = CodeActionService::new();
+        svc.register(Box::new(TestProvider));
+        let mut ctx = CodeActionContext::new(CodeActionTrigger::Invoke);
+        ctx.only = Some(vec![CodeActionKind::QuickFix]);
+        let actions = svc.get_code_actions("f.rs", 0, 10, &ctx);
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0].title, "Fix");
     }
 
     #[test]
-    fn eq_codeactiontrigger_same() {
-        assert_eq!(CodeActionTrigger::Invoke, CodeActionTrigger::Invoke);
+    fn code_action_service_has_actions() {
+        let svc = CodeActionService::new();
+        let ctx = CodeActionContext::new(CodeActionTrigger::Invoke);
+        assert!(!svc.has_actions("f.rs", 0, 10, &ctx));
     }
 
     #[test]
-    fn ne_codeactiontrigger_diff() {
-        assert_ne!(CodeActionTrigger::Invoke, CodeActionTrigger::Automatic);
+    fn apply_code_action_with_edit_and_command() {
+        let mut files = HashMap::new();
+        files.insert("f.rs".to_string(), "let old = 1;".to_string());
+
+        let action = CodeAction::new("Fix", CodeActionKind::QuickFix)
+            .with_edit(WorkspaceEdit::single_file("f.rs", vec![
+                TextEdit { start_line: 0, start_col: 4, end_line: 0, end_col: 7, new_text: "new".into() },
+            ]))
+            .with_command(Command::new("Format", "editor.format"));
+
+        let cmd = apply_code_action(&mut files, &action);
+        assert!(files["f.rs"].contains("new"));
+        assert!(cmd.is_some());
+        assert_eq!(cmd.unwrap().command, "editor.format");
     }
 
     #[test]
-    fn behavior_check_0() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn refactoring_preview() {
+        let mut files = HashMap::new();
+        files.insert("r.rs".to_string(), "let foo = 1;\nfoo + 2".to_string());
+
+        let we = WorkspaceEdit::single_file("r.rs", vec![
+            TextEdit { start_line: 0, start_col: 4, end_line: 0, end_col: 7, new_text: "bar".into() },
+        ]);
+
+        let preview = RefactoringPreview::from_edit(&files, &we);
+        assert_eq!(preview.file_count(), 1);
+        assert_eq!(preview.total_changes(), 1);
+        let diffs = &preview.file_diffs["r.rs"];
+        assert!(diffs[0].1.contains("foo"));
+        assert!(diffs[0].2.contains("bar"));
     }
 
     #[test]
-    fn behavior_check_1() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn organize_imports_sorts_and_deduplicates() {
+        let text = "use std::io;\nuse std::fmt;\nuse std::io;\n\nfn main() {}";
+        let result = organize_imports(text);
+        assert!(result.starts_with("use std::fmt;"));
+        // Duplicate removed
+        assert_eq!(result.matches("use std::io;").count(), 1);
     }
 
     #[test]
-    fn behavior_check_2() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn organize_imports_preserves_non_import_lines() {
+        let text = "use b;\nuse a;\n\nfn main() {}\n\nlet x = 1;";
+        let result = organize_imports(text);
+        assert!(result.contains("fn main() {}"));
+        assert!(result.contains("let x = 1;"));
     }
 
     #[test]
-    fn behavior_check_3() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_4() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_5() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_6() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_7() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_8() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_9() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_10() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_27() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_28() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn code_action_context_new() {
+        let ctx = CodeActionContext::new(CodeActionTrigger::Automatic);
+        assert_eq!(ctx.trigger, CodeActionTrigger::Automatic);
+        assert!(ctx.diagnostics.is_empty());
+        assert!(ctx.only.is_none());
     }
 
     #[test]
