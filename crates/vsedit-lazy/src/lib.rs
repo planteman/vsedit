@@ -972,6 +972,59 @@ impl<T> LazyExpiring<T> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Lazy utility functions
+// ---------------------------------------------------------------------------
+
+/// Creates a `Lazy<T>` that is already initialized with the given value.
+pub fn lazy_of<T: 'static>(value: T) -> Lazy<T> {
+    let mut lazy = Lazy::new(move || unreachable!());
+    let _ = lazy.cell.set(value);
+    lazy.init = None;
+    lazy
+}
+
+/// Creates a `CachedValue<T>` whose compute function always returns `value`.
+pub fn cached_constant<T: Clone + 'static>(value: T) -> CachedValue<T> {
+    CachedValue::new(move || value.clone())
+}
+
+/// Runs a closure and returns both the result and the elapsed duration.
+pub fn timed<T>(f: impl FnOnce() -> T) -> (T, Duration) {
+    let start = Instant::now();
+    let result = f();
+    (result, start.elapsed())
+}
+
+/// Returns `true` if a `CachedValue` is cached and the cached value satisfies
+/// the given predicate.
+pub fn cached_matches<T>(cache: &CachedValue<T>, pred: impl FnOnce(&T) -> bool) -> bool {
+    cache.get_if_cached().map_or(false, pred)
+}
+
+/// Returns `true` if a `MemoizedFn` already has a cached result for the key.
+pub fn memo_contains<K: Eq + std::hash::Hash + Clone, V>(
+    memo: &MemoizedFn<K, V>,
+    key: &K,
+) -> bool {
+    memo.cache.contains_key(key)
+}
+
+/// Creates a `MemoizedFn<String, usize>` that computes string lengths.
+pub fn memo_strlen() -> MemoizedFn<String, usize> {
+    MemoizedFn::new(|s: &String| s.len())
+}
+
+/// Helper: measure how many times a cached value has been refreshed by
+/// wrapping a counter-incrementing closure.
+pub fn counting_cached(counter: std::rc::Rc<std::cell::Cell<u32>>) -> CachedValue<u32> {
+    CachedValue::new(move || {
+        let n = counter.get() + 1;
+        counter.set(n);
+        n
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1627,5 +1680,75 @@ mod tests {
         lazy.expire();
         assert!(lazy.is_expired());
         assert_eq!(*lazy.get(), 2);
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn test_lazy_of_already_initialized() {
+        let mut l = lazy_of(42);
+        assert!(l.is_initialized());
+        assert_eq!(*l.get(), 42);
+    }
+
+    #[test]
+    fn test_lazy_of_into_inner() {
+        let l = lazy_of("hello".to_string());
+        assert_eq!(l.into_inner(), Some("hello".to_string()));
+    }
+
+    #[test]
+    fn test_cached_constant_returns_value() {
+        let mut c = cached_constant(99);
+        assert_eq!(*c.get(), 99);
+        c.invalidate();
+        assert_eq!(*c.get(), 99);
+    }
+
+    #[test]
+    fn test_timed_returns_result_and_duration() {
+        let (val, dur) = timed(|| 2 + 3);
+        assert_eq!(val, 5);
+        assert!(dur.as_nanos() < 1_000_000_000); // less than 1s
+    }
+
+    #[test]
+    fn test_cached_matches_true() {
+        let mut c = cached_constant(10);
+        c.get(); // initialise
+        assert!(cached_matches(&c, |v| *v == 10));
+    }
+
+    #[test]
+    fn test_cached_matches_false_not_cached() {
+        let c = cached_constant(10);
+        assert!(!cached_matches(&c, |v| *v == 10));
+    }
+
+    #[test]
+    fn test_memo_contains_after_call() {
+        let mut m = memo_strlen();
+        m.call("abc".to_string());
+        assert!(memo_contains(&m, &"abc".to_string()));
+        assert!(!memo_contains(&m, &"xyz".to_string()));
+    }
+
+    #[test]
+    fn test_memo_strlen() {
+        let mut m = memo_strlen();
+        assert_eq!(*m.call("hello".to_string()), 5);
+        assert_eq!(*m.call("".to_string()), 0);
+        assert_eq!(m.len(), 2);
+    }
+
+    #[test]
+    fn test_counting_cached_increments() {
+        let counter = Rc::new(Cell::new(0));
+        let mut c = counting_cached(counter.clone());
+        assert_eq!(*c.get(), 1);
+        assert_eq!(*c.get(), 1); // still cached
+        c.invalidate();
+        assert_eq!(*c.get(), 2);
+        assert_eq!(counter.get(), 2);
     }
 }

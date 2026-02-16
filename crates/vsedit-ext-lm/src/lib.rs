@@ -858,6 +858,74 @@ impl ResponseParser {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Model comparison and conversation utilities
+// ---------------------------------------------------------------------------
+
+/// Check if two models belong to the same family.
+pub fn same_family(a: &LanguageModelChat, b: &LanguageModelChat) -> bool {
+    a.family == b.family
+}
+
+/// Check if two models are from the same vendor.
+pub fn same_vendor(a: &LanguageModelChat, b: &LanguageModelChat) -> bool {
+    a.vendor == b.vendor
+}
+
+/// Format a model identifier as "vendor/family/name".
+pub fn format_model_id(model: &LanguageModelChat) -> String {
+    format!("{}/{}/{}", model.vendor, model.family, model.name)
+}
+
+/// Compute the average token estimate across conversation messages.
+pub fn average_message_tokens(history: &ConversationHistory) -> usize {
+    let msgs = history.get_messages();
+    if msgs.is_empty() {
+        return 0;
+    }
+    history.total_tokens_estimate() / msgs.len()
+}
+
+/// Count the number of user messages in a conversation.
+pub fn count_user_messages(history: &ConversationHistory) -> usize {
+    history
+        .get_messages()
+        .iter()
+        .filter(|m| matches!(m, LanguageModelMessage::User { .. }))
+        .count()
+}
+
+/// Count the number of assistant messages in a conversation.
+pub fn count_assistant_messages(history: &ConversationHistory) -> usize {
+    history
+        .get_messages()
+        .iter()
+        .filter(|m| matches!(m, LanguageModelMessage::Assistant { .. }))
+        .count()
+}
+
+/// Extract all user message texts from a conversation history.
+pub fn extract_user_texts(history: &ConversationHistory) -> Vec<&str> {
+    history
+        .get_messages()
+        .iter()
+        .filter_map(|m| match m {
+            LanguageModelMessage::User { content } => Some(content.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Determine if a model has sufficient capacity for a given token count.
+pub fn model_has_capacity(model: &LanguageModelChat, required_tokens: u32) -> bool {
+    model.max_input_tokens >= required_tokens
+}
+
+/// Find the model with the largest token capacity from a bridge.
+pub fn largest_model(bridge: &LmBridge) -> Option<&LanguageModelChat> {
+    bridge.list_models().iter().max_by_key(|m| m.max_input_tokens)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1621,5 +1689,106 @@ mod tests {
         assert_eq!(ResponseParser::sentence_count("Hello. World! How?"), 3);
         assert_eq!(ResponseParser::sentence_count(""), 0);
         assert_eq!(ResponseParser::sentence_count("No punctuation here"), 1);
+    }
+
+    #[test]
+    fn same_family_true() {
+        let a = test_model();
+        let b = LanguageModelChat {
+            id: "other".into(),
+            name: "Other".into(),
+            vendor: "different-vendor".into(),
+            family: "gpt".into(),
+            version: "2.0".into(),
+            max_input_tokens: 2048,
+        };
+        assert!(same_family(&a, &b));
+    }
+
+    #[test]
+    fn same_family_false() {
+        let a = test_model();
+        let b = LanguageModelChat {
+            id: "other".into(),
+            name: "Other".into(),
+            vendor: "openai".into(),
+            family: "claude".into(),
+            version: "1.0".into(),
+            max_input_tokens: 2048,
+        };
+        assert!(!same_family(&a, &b));
+    }
+
+    #[test]
+    fn format_model_id_format() {
+        let m = test_model();
+        assert_eq!(format_model_id(&m), "openai/gpt/GPT-4");
+    }
+
+    #[test]
+    fn average_message_tokens_empty() {
+        let h = ConversationHistory::new();
+        assert_eq!(average_message_tokens(&h), 0);
+    }
+
+    #[test]
+    fn count_user_and_assistant_messages() {
+        let mut h = ConversationHistory::new();
+        h.add_message(LanguageModelMessage::User { content: "hello".into() });
+        h.add_message(LanguageModelMessage::Assistant { content: "hi".into() });
+        h.add_message(LanguageModelMessage::User { content: "bye".into() });
+        assert_eq!(count_user_messages(&h), 2);
+        assert_eq!(count_assistant_messages(&h), 1);
+    }
+
+    #[test]
+    fn extract_user_texts_filters() {
+        let mut h = ConversationHistory::new();
+        h.add_message(LanguageModelMessage::User { content: "q1".into() });
+        h.add_message(LanguageModelMessage::Assistant { content: "a1".into() });
+        h.add_message(LanguageModelMessage::User { content: "q2".into() });
+        let texts = extract_user_texts(&h);
+        assert_eq!(texts, vec!["q1", "q2"]);
+    }
+
+    #[test]
+    fn model_has_capacity_sufficient() {
+        let m = test_model();
+        assert!(model_has_capacity(&m, 100));
+    }
+
+    #[test]
+    fn model_has_capacity_insufficient() {
+        let m = test_model();
+        assert!(!model_has_capacity(&m, 100_000));
+    }
+
+    #[test]
+    fn largest_model_finds_max() {
+        let mut bridge = LmBridge::new();
+        bridge.register_model(LanguageModelChat {
+            id: "small".into(),
+            name: "Small".into(),
+            vendor: "v".into(),
+            family: "f".into(),
+            version: "1".into(),
+            max_input_tokens: 100,
+        });
+        bridge.register_model(LanguageModelChat {
+            id: "big".into(),
+            name: "Big".into(),
+            vendor: "v".into(),
+            family: "f".into(),
+            version: "1".into(),
+            max_input_tokens: 10000,
+        });
+        let best = largest_model(&bridge).unwrap();
+        assert_eq!(best.id, "big");
+    }
+
+    #[test]
+    fn largest_model_empty_bridge() {
+        let bridge = LmBridge::new();
+        assert!(largest_model(&bridge).is_none());
     }
 }

@@ -1080,6 +1080,78 @@ impl Default for MacroRecorder {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Text analysis utilities for editor commands
+// ---------------------------------------------------------------------------
+
+/// Count the number of lines in the given text.
+pub fn count_lines(text: &str) -> usize {
+    if text.is_empty() {
+        return 0;
+    }
+    text.lines().count()
+}
+
+/// Count the number of words (whitespace-separated tokens) in the given text.
+pub fn count_words(text: &str) -> usize {
+    text.split_whitespace().count()
+}
+
+/// Return the length (in characters) of each line.
+pub fn line_lengths(text: &str) -> Vec<usize> {
+    text.lines().map(|l| l.len()).collect()
+}
+
+/// Return the index of the longest line (0-based). Ties go to the first occurrence.
+pub fn longest_line_index(text: &str) -> Option<usize> {
+    if text.is_empty() {
+        return None;
+    }
+    text.lines()
+        .enumerate()
+        .max_by_key(|(_, l)| l.len())
+        .map(|(i, _)| i)
+}
+
+/// Indent every line of `text` by `count` spaces.
+pub fn indent_all_lines(text: &str, count: usize) -> String {
+    let prefix = " ".repeat(count);
+    text.lines()
+        .map(|l| format!("{}{}", prefix, l))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Remove up to `count` leading spaces from every line.
+pub fn dedent_all_lines(text: &str, count: usize) -> String {
+    text.lines()
+        .map(|l| {
+            let spaces = l.chars().take_while(|c| *c == ' ').count();
+            let remove = spaces.min(count);
+            &l[remove..]
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Sort lines in the document alphabetically.
+pub fn sort_lines(text: &str) -> String {
+    let mut lines: Vec<&str> = text.lines().collect();
+    lines.sort();
+    lines.join("\n")
+}
+
+/// Remove consecutive duplicate lines from the text.
+pub fn remove_duplicate_lines(text: &str) -> String {
+    let mut result: Vec<&str> = Vec::new();
+    for line in text.lines() {
+        if result.last().map_or(true, |prev| *prev != line) {
+            result.push(line);
+        }
+    }
+    result.join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1612,5 +1684,60 @@ mod tests {
     fn macro_recorder_find_nonexistent() {
         let rec = MacroRecorder::new();
         assert!(rec.find_macro("nope").is_none());
+    }
+
+    #[test]
+    fn count_lines_basic() {
+        assert_eq!(count_lines("a\nb\nc"), 3);
+        assert_eq!(count_lines(""), 0);
+        assert_eq!(count_lines("single"), 1);
+    }
+
+    #[test]
+    fn count_words_basic() {
+        assert_eq!(count_words("hello world foo"), 3);
+        assert_eq!(count_words(""), 0);
+        assert_eq!(count_words("  spaced  "), 1);
+    }
+
+    #[test]
+    fn line_lengths_measures_each() {
+        let lens = line_lengths("ab\ncde\nf");
+        assert_eq!(lens, vec![2, 3, 1]);
+    }
+
+    #[test]
+    fn longest_line_index_finds_longest() {
+        assert_eq!(longest_line_index("ab\ncdef\ng"), Some(1));
+        assert_eq!(longest_line_index(""), None);
+    }
+
+    #[test]
+    fn indent_all_lines_adds_spaces() {
+        let result = indent_all_lines("a\nb", 4);
+        assert_eq!(result, "    a\n    b");
+    }
+
+    #[test]
+    fn dedent_all_lines_removes_spaces() {
+        let result = dedent_all_lines("    a\n  b", 2);
+        assert_eq!(result, "  a\nb");
+    }
+
+    #[test]
+    fn sort_lines_alphabetical() {
+        let result = sort_lines("cherry\napple\nbanana");
+        assert_eq!(result, "apple\nbanana\ncherry");
+    }
+
+    #[test]
+    fn remove_duplicate_lines_removes_consecutive() {
+        let result = remove_duplicate_lines("a\na\nb\nc\nc");
+        assert_eq!(result, "a\nb\nc");
+    }
+
+    #[test]
+    fn remove_duplicate_lines_empty() {
+        assert_eq!(remove_duplicate_lines(""), "");
     }
 }

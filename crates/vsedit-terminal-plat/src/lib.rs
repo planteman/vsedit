@@ -990,6 +990,79 @@ impl fmt::Display for TerminalTheme {
     }
 }
 
+impl TerminalConfig {
+    /// Return the total environment variable count.
+    pub fn env_var_count(&self) -> usize {
+        self.env.len()
+    }
+
+    /// Return a display-friendly summary of this config.
+    pub fn summary(&self) -> String {
+        format!(
+            "{}x{} shell={} title={}",
+            self.initial_cols, self.initial_rows, self.shell, self.title
+        )
+    }
+
+    /// Return true if this config uses non-default dimensions.
+    pub fn has_custom_dimensions(&self) -> bool {
+        self.initial_cols != 80 || self.initial_rows != 24
+    }
+}
+
+impl TerminalProfile {
+    /// Return the number of arguments configured.
+    pub fn arg_count(&self) -> usize {
+        self.args.len()
+    }
+
+    /// Return the number of environment variables configured.
+    pub fn env_count(&self) -> usize {
+        self.env.len()
+    }
+
+    /// Return a display name including shell path.
+    pub fn display_name(&self) -> String {
+        format!("{} ({})", self.name, self.shell_path)
+    }
+}
+
+impl TerminalOutputHistory {
+    /// Return the last line, if any.
+    pub fn last_line(&self) -> Option<&str> {
+        self.lines().last().map(|s| s.as_str())
+    }
+
+    /// Return true if any line contains the query.
+    pub fn contains(&self, query: &str) -> bool {
+        self.lines().iter().any(|l| l.contains(query))
+    }
+}
+
+impl TerminalSessionStats {
+    /// Return the total bytes transferred (read + written).
+    pub fn total_bytes_transferred(&self) -> u64 {
+        self.total_bytes()
+    }
+
+    /// Return the number of resize events recorded.
+    pub fn resize_event_count(&self) -> u32 {
+        self.resize_count
+    }
+}
+
+impl TerminalCommandHistory {
+    /// Clear all recorded history entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Return true if a command with the given name exists.
+    pub fn contains_command(&self, command: &str) -> bool {
+        self.entries.iter().any(|e| e.command == command)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -1613,5 +1686,94 @@ mod tests {
     fn theme_display() {
         let t = TerminalTheme::dark_default();
         assert_eq!(format!("{t}"), "TerminalTheme(Dark Default)");
+    }
+
+    #[test]
+    fn config_env_var_count_default() {
+        let cfg = TerminalConfig::default();
+        assert_eq!(cfg.env_var_count(), 0);
+    }
+
+    #[test]
+    fn config_summary_format() {
+        let cfg = TerminalConfig::default();
+        let s = cfg.summary();
+        assert!(s.contains("80x24"));
+        assert!(s.contains("Terminal"));
+    }
+
+    #[test]
+    fn config_has_custom_dimensions_false() {
+        let cfg = TerminalConfig::default();
+        assert!(!cfg.has_custom_dimensions());
+    }
+
+    #[test]
+    fn config_has_custom_dimensions_true() {
+        let mut cfg = TerminalConfig::default();
+        cfg.initial_cols = 120;
+        assert!(cfg.has_custom_dimensions());
+    }
+
+    #[test]
+    fn profile_arg_and_env_count() {
+        let p = TerminalProfile::new("/bin/bash", "Bash")
+            .with_arg("-l")
+            .with_env("TERM", "xterm");
+        assert_eq!(p.arg_count(), 1);
+        assert_eq!(p.env_count(), 1);
+    }
+
+    #[test]
+    fn profile_display_name() {
+        let p = TerminalProfile::new("/bin/bash", "Bash");
+        assert_eq!(p.display_name(), "Bash (/bin/bash)");
+    }
+
+    #[test]
+    fn output_history_last_line() {
+        let mut h = TerminalOutputHistory::new(100);
+        assert!(h.last_line().is_none());
+        h.append("first\nsecond\n");
+        assert_eq!(h.last_line(), Some("second"));
+    }
+
+    #[test]
+    fn output_history_contains_query() {
+        let mut h = TerminalOutputHistory::new(100);
+        h.append("hello world\nfoo bar\n");
+        assert!(h.contains("foo"));
+        assert!(!h.contains("missing"));
+    }
+
+    #[test]
+    fn session_stats_total_bytes() {
+        let mut stats = TerminalSessionStats::new(80, 24);
+        stats.record_write(100);
+        stats.record_read(50);
+        assert_eq!(stats.total_bytes_transferred(), 150);
+    }
+
+    #[test]
+    fn session_stats_resize_events() {
+        let mut stats = TerminalSessionStats::new(80, 24);
+        stats.record_resize(100, 50);
+        assert_eq!(stats.resize_event_count(), 1);
+    }
+
+    #[test]
+    fn command_history_clear_removes_all() {
+        let mut hist = TerminalCommandHistory::new(100);
+        hist.record("ls", 1000);
+        hist.clear();
+        assert_eq!(hist.unique_count(), 0);
+    }
+
+    #[test]
+    fn command_history_contains_command() {
+        let mut hist = TerminalCommandHistory::new(100);
+        hist.record("ls", 1000);
+        assert!(hist.contains_command("ls"));
+        assert!(!hist.contains_command("cd"));
     }
 }

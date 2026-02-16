@@ -954,6 +954,73 @@ pub fn selections_equal_position(a: &SelectionRange, b: &SelectionRange) -> bool
         && a.end_col == b.end_col
 }
 
+// ---------------------------------------------------------------------------
+// Selection range utilities
+// ---------------------------------------------------------------------------
+
+/// Calculate the total character area (sum of per-line column spans) of a selection.
+pub fn selection_char_count(range: &SelectionRange) -> u64 {
+    if range.is_single_line() {
+        return (range.end_col.saturating_sub(range.start_col)) as u64;
+    }
+    // Approximate: first line partial + middle full lines unknown + last line partial
+    // We only have column info, so estimate conservatively
+    let first_line = 80u64.saturating_sub(range.start_col as u64);
+    let last_line = range.end_col as u64;
+    let middle = if range.line_count() > 2 {
+        (range.line_count() as u64 - 2) * 80
+    } else {
+        0
+    };
+    first_line + middle + last_line
+}
+
+/// Check if a selection range is a strict subset of another (proper containment).
+pub fn is_strict_subset(inner: &SelectionRange, outer: &SelectionRange) -> bool {
+    selection_contains(outer, inner) && !selections_equal_position(inner, outer)
+}
+
+/// Find the deepest chain depth among a set of selection ranges.
+pub fn max_chain_depth(ranges: &[SelectionRange]) -> usize {
+    ranges.iter().map(|r| r.depth()).max().unwrap_or(0)
+}
+
+/// Flatten a selection chain into a vector of (start_line, start_col, end_line, end_col) tuples.
+pub fn flatten_chain(range: &SelectionRange) -> Vec<(u32, u32, u32, u32)> {
+    collect_chain(range)
+        .iter()
+        .map(|r| (r.start_line, r.start_col, r.end_line, r.end_col))
+        .collect()
+}
+
+/// Create a selection range that covers multiple ranges (bounding box).
+pub fn bounding_range(ranges: &[SelectionRange]) -> Option<SelectionRange> {
+    if ranges.is_empty() {
+        return None;
+    }
+    let min_line = ranges.iter().map(|r| r.start_line).min().unwrap();
+    let min_col = ranges
+        .iter()
+        .filter(|r| r.start_line == min_line)
+        .map(|r| r.start_col)
+        .min()
+        .unwrap();
+    let max_line = ranges.iter().map(|r| r.end_line).max().unwrap();
+    let max_col = ranges
+        .iter()
+        .filter(|r| r.end_line == max_line)
+        .map(|r| r.end_col)
+        .max()
+        .unwrap();
+    Some(SelectionRange::new(min_line, min_col, max_line, max_col))
+}
+
+/// Check if two selection ranges are adjacent (one ends where the other begins on the same line).
+pub fn selections_adjacent(a: &SelectionRange, b: &SelectionRange) -> bool {
+    (a.end_line == b.start_line && a.end_col == b.start_col)
+        || (b.end_line == a.start_line && b.end_col == a.start_col)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1621,5 +1688,88 @@ mod tests {
         let a = SelectionRange::new(1, 1, 2, 5);
         let b = SelectionRange::new(1, 1, 2, 5).with_parent(SelectionRange::new(1, 1, 3, 1));
         assert!(selections_equal_position(&a, &b));
+    }
+
+    #[test]
+    fn selection_char_count_single_line() {
+        let r = SelectionRange::new(1, 5, 1, 15);
+        assert_eq!(selection_char_count(&r), 10);
+    }
+
+    #[test]
+    fn selection_char_count_multi_line() {
+        let r = SelectionRange::new(1, 10, 4, 20);
+        // first: 80-10=70, middle: 2*80=160, last: 20 => 250
+        assert_eq!(selection_char_count(&r), 250);
+    }
+
+    #[test]
+    fn is_strict_subset_true() {
+        let outer = SelectionRange::new(1, 1, 10, 10);
+        let inner = SelectionRange::new(2, 2, 5, 5);
+        assert!(is_strict_subset(&inner, &outer));
+    }
+
+    #[test]
+    fn is_strict_subset_equal_is_false() {
+        let a = SelectionRange::new(1, 1, 5, 5);
+        let b = SelectionRange::new(1, 1, 5, 5);
+        assert!(!is_strict_subset(&a, &b));
+    }
+
+    #[test]
+    fn max_chain_depth_empty() {
+        let ranges: Vec<SelectionRange> = vec![];
+        assert_eq!(max_chain_depth(&ranges), 0);
+    }
+
+    #[test]
+    fn max_chain_depth_with_parent() {
+        let r1 = SelectionRange::new(1, 1, 1, 5);
+        let r2 = SelectionRange::new(1, 1, 1, 5)
+            .with_parent(SelectionRange::new(1, 1, 5, 5));
+        assert_eq!(max_chain_depth(&[r1, r2]), 1);
+    }
+
+    #[test]
+    fn flatten_chain_extracts_tuples() {
+        let r = SelectionRange::new(1, 1, 1, 5)
+            .with_parent(SelectionRange::new(1, 1, 3, 10));
+        let flat = flatten_chain(&r);
+        assert_eq!(flat.len(), 2);
+        assert_eq!(flat[0], (1, 1, 1, 5));
+        assert_eq!(flat[1], (1, 1, 3, 10));
+    }
+
+    #[test]
+    fn bounding_range_multiple() {
+        let ranges = vec![
+            SelectionRange::new(2, 5, 3, 10),
+            SelectionRange::new(1, 1, 2, 8),
+        ];
+        let b = bounding_range(&ranges).unwrap();
+        assert_eq!(b.start_line, 1);
+        assert_eq!(b.start_col, 1);
+        assert_eq!(b.end_line, 3);
+        assert_eq!(b.end_col, 10);
+    }
+
+    #[test]
+    fn bounding_range_empty() {
+        assert!(bounding_range(&[]).is_none());
+    }
+
+    #[test]
+    fn selections_adjacent_true() {
+        let a = SelectionRange::new(1, 1, 1, 5);
+        let b = SelectionRange::new(1, 5, 1, 10);
+        assert!(selections_adjacent(&a, &b));
+    }
+
+    #[test]
+    fn selections_adjacent_false() {
+        let a = SelectionRange::new(1, 1, 1, 5);
+        let b = SelectionRange::new(1, 7, 1, 10);
+        assert!(!selections_adjacent(&a, &b));
     }
 }

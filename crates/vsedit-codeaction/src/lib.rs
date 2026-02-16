@@ -949,6 +949,72 @@ pub fn categorize_actions(actions: &[CodeAction]) -> Vec<CodeActionCategory> {
     categories
 }
 
+/// Collect all unique `CodeActionKind` values from a slice of actions.
+pub fn unique_kinds(actions: &[CodeAction]) -> Vec<CodeActionKind> {
+    let mut seen = Vec::new();
+    for a in actions {
+        if !seen.contains(&a.kind) {
+            seen.push(a.kind.clone());
+        }
+    }
+    seen
+}
+
+/// Return only enabled actions from a slice.
+pub fn enabled_actions(actions: &[CodeAction]) -> Vec<CodeAction> {
+    actions
+        .iter()
+        .filter(|a| a.is_enabled())
+        .cloned()
+        .collect()
+}
+
+/// Count how many actions of each kind appear.
+pub fn count_by_kind(actions: &[CodeAction]) -> Vec<(CodeActionKind, usize)> {
+    let mut counts: Vec<(CodeActionKind, usize)> = Vec::new();
+    for a in actions {
+        if let Some(entry) = counts.iter_mut().find(|(k, _)| *k == a.kind) {
+            entry.1 += 1;
+        } else {
+            counts.push((a.kind.clone(), 1));
+        }
+    }
+    counts
+}
+
+/// Build a summary string describing the action set.
+pub fn action_set_summary(actions: &[CodeAction]) -> String {
+    let total = actions.len();
+    let preferred = actions.iter().filter(|a| a.is_preferred).count();
+    let disabled = actions.iter().filter(|a| !a.is_enabled()).count();
+    format!(
+        "{} actions ({} preferred, {} disabled)",
+        total, preferred, disabled
+    )
+}
+
+/// Find the first action matching a given title (case-insensitive).
+pub fn find_action_by_title<'a>(actions: &'a [CodeAction], title: &str) -> Option<&'a CodeAction> {
+    let lower = title.to_lowercase();
+    actions
+        .iter()
+        .find(|a| a.title.to_lowercase() == lower)
+}
+
+/// Partition actions into two groups: quick-fixes and everything else.
+pub fn partition_quickfixes(actions: &[CodeAction]) -> (Vec<CodeAction>, Vec<CodeAction>) {
+    let mut fixes = Vec::new();
+    let mut rest = Vec::new();
+    for a in actions {
+        if a.kind == CodeActionKind::QuickFix {
+            fixes.push(a.clone());
+        } else {
+            rest.push(a.clone());
+        }
+    }
+    (fixes, rest)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1603,5 +1669,88 @@ mod tests {
         assert_eq!(actions[0].title, "Fix");
         assert_eq!(actions[1].title, "Extract");
         assert_eq!(actions[2].title, "Organize");
+    }
+
+    #[test]
+    fn unique_kinds_returns_distinct() {
+        let actions = vec![
+            CodeAction::new("A", CodeActionKind::QuickFix),
+            CodeAction::new("B", CodeActionKind::QuickFix),
+            CodeAction::new("C", CodeActionKind::RefactorExtract),
+        ];
+        let kinds = unique_kinds(&actions);
+        assert_eq!(kinds.len(), 2);
+        assert!(kinds.contains(&CodeActionKind::QuickFix));
+        assert!(kinds.contains(&CodeActionKind::RefactorExtract));
+    }
+
+    #[test]
+    fn unique_kinds_empty_input() {
+        assert!(unique_kinds(&[]).is_empty());
+    }
+
+    #[test]
+    fn enabled_actions_filters_disabled() {
+        let actions = vec![
+            CodeAction::new("Ok", CodeActionKind::QuickFix),
+            CodeAction::new("Nope", CodeActionKind::QuickFix).disabled("reason"),
+        ];
+        let result = enabled_actions(&actions);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].title, "Ok");
+    }
+
+    #[test]
+    fn count_by_kind_tallies() {
+        let actions = vec![
+            CodeAction::new("A", CodeActionKind::QuickFix),
+            CodeAction::new("B", CodeActionKind::Source),
+            CodeAction::new("C", CodeActionKind::QuickFix),
+        ];
+        let counts = count_by_kind(&actions);
+        let qf = counts.iter().find(|(k, _)| *k == CodeActionKind::QuickFix).unwrap();
+        assert_eq!(qf.1, 2);
+    }
+
+    #[test]
+    fn action_set_summary_format() {
+        let actions = vec![
+            CodeAction::new("A", CodeActionKind::QuickFix).preferred(),
+            CodeAction::new("B", CodeActionKind::QuickFix).disabled("no"),
+        ];
+        let s = action_set_summary(&actions);
+        assert!(s.contains("2 actions"));
+        assert!(s.contains("1 preferred"));
+        assert!(s.contains("1 disabled"));
+    }
+
+    #[test]
+    fn find_action_by_title_case_insensitive() {
+        let actions = vec![
+            CodeAction::new("Fix Typo", CodeActionKind::QuickFix),
+        ];
+        assert!(find_action_by_title(&actions, "fix typo").is_some());
+        assert!(find_action_by_title(&actions, "FIX TYPO").is_some());
+        assert!(find_action_by_title(&actions, "other").is_none());
+    }
+
+    #[test]
+    fn partition_quickfixes_splits() {
+        let actions = vec![
+            CodeAction::new("Fix", CodeActionKind::QuickFix),
+            CodeAction::new("Extract", CodeActionKind::RefactorExtract),
+            CodeAction::new("Fix2", CodeActionKind::QuickFix),
+        ];
+        let (fixes, rest) = partition_quickfixes(&actions);
+        assert_eq!(fixes.len(), 2);
+        assert_eq!(rest.len(), 1);
+        assert_eq!(rest[0].title, "Extract");
+    }
+
+    #[test]
+    fn partition_quickfixes_empty() {
+        let (fixes, rest) = partition_quickfixes(&[]);
+        assert!(fixes.is_empty());
+        assert!(rest.is_empty());
     }
 }

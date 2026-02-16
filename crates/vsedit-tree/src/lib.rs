@@ -1075,6 +1075,87 @@ fn collect_leaves_node<'a, T>(node: &'a TreeNode<T>, out: &mut Vec<&'a T>) {
     }
 }
 
+/// Count the number of expanded nodes in the entire tree.
+pub fn expanded_count<T>(model: &TreeModel<T>) -> usize {
+    fn count_expanded_node<T>(node: &TreeNode<T>) -> usize {
+        let me = if node.is_expanded { 1 } else { 0 };
+        me + node.children.iter().map(count_expanded_node).sum::<usize>()
+    }
+    model.roots.iter().map(count_expanded_node).sum()
+}
+
+/// Collect all node data at a specific depth level.
+pub fn nodes_at_depth<'a, T>(model: &'a TreeModel<T>, target_depth: u32) -> Vec<&'a T> {
+    fn collect_at_depth<'a, T>(node: &'a TreeNode<T>, target: u32, out: &mut Vec<&'a T>) {
+        if node.depth == target {
+            out.push(&node.data);
+        }
+        for child in &node.children {
+            collect_at_depth(child, target, out);
+        }
+    }
+    let mut result = Vec::new();
+    for root in &model.roots {
+        collect_at_depth(root, target_depth, &mut result);
+    }
+    result
+}
+
+/// Check if the tree model has any nodes at all.
+pub fn is_tree_empty<T>(model: &TreeModel<T>) -> bool {
+    model.roots.is_empty()
+}
+
+/// Count internal (non-leaf) nodes in the tree.
+pub fn internal_node_count<T>(model: &TreeModel<T>) -> usize {
+    fn count_internal<T>(node: &TreeNode<T>) -> usize {
+        let me = if node.children.is_empty() { 0 } else { 1 };
+        me + node.children.iter().map(count_internal).sum::<usize>()
+    }
+    model.roots.iter().map(count_internal).sum()
+}
+
+/// Compute the width of the widest level (most nodes at the same depth).
+pub fn max_breadth<T>(model: &TreeModel<T>) -> usize {
+    let max_depth = tree_depth(model);
+    (0..=max_depth)
+        .map(|d| nodes_at_depth(model, d).len())
+        .max()
+        .unwrap_or(0)
+}
+
+/// Collect all root-level data references.
+pub fn root_data<'a, T>(model: &'a TreeModel<T>) -> Vec<&'a T> {
+    model.roots.iter().map(|r| &r.data).collect()
+}
+
+/// Return the depth of the first node matching the predicate, or None.
+pub fn find_depth<T, F>(model: &TreeModel<T>, predicate: F) -> Option<u32>
+where
+    F: Fn(&T) -> bool,
+{
+    fn search<T, F>(node: &TreeNode<T>, pred: &F) -> Option<u32>
+    where
+        F: Fn(&T) -> bool,
+    {
+        if pred(&node.data) {
+            return Some(node.depth);
+        }
+        for child in &node.children {
+            if let Some(d) = search(child, pred) {
+                return Some(d);
+            }
+        }
+        None
+    }
+    for root in &model.roots {
+        if let Some(d) = search(root, &predicate) {
+            return Some(d);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1629,5 +1710,91 @@ mod tests {
         let depth1: Vec<_> = DepthIter::new(&roots, 1).collect();
         assert_eq!(depth1.len(), 2);
         assert_eq!(depth1[0].data, "a");
+    }
+
+    #[test]
+    fn expanded_count_none_expanded() {
+        let model = sample_model();
+        assert_eq!(expanded_count(&model), 0);
+    }
+
+    #[test]
+    fn expanded_count_after_expand_all() {
+        let mut model = sample_model();
+        model.expand_all();
+        let total_nodes = model.node_count();
+        assert_eq!(expanded_count(&model), total_nodes);
+    }
+
+    #[test]
+    fn nodes_at_depth_zero_returns_roots() {
+        let model = sample_model();
+        let roots = nodes_at_depth(&model, 0);
+        assert_eq!(roots.len(), 2); // "src" and "Cargo.toml"
+    }
+
+    #[test]
+    fn nodes_at_depth_one() {
+        let model = sample_model();
+        let depth1 = nodes_at_depth(&model, 1);
+        assert_eq!(depth1.len(), 2); // "main.rs" and "lib"
+    }
+
+    #[test]
+    fn nodes_at_depth_too_deep_returns_empty() {
+        let model = sample_model();
+        assert!(nodes_at_depth(&model, 100).is_empty());
+    }
+
+    #[test]
+    fn is_tree_empty_false() {
+        let model = sample_model();
+        assert!(!is_tree_empty(&model));
+    }
+
+    #[test]
+    fn is_tree_empty_true() {
+        let model: TreeModel<&str> = TreeModel::new();
+        assert!(is_tree_empty(&model));
+    }
+
+    #[test]
+    fn internal_node_count_sample() {
+        let model = sample_model();
+        let internals = internal_node_count(&model);
+        let leaves = leaf_count(&model);
+        assert_eq!(internals + leaves, model.node_count());
+    }
+
+    #[test]
+    fn max_breadth_sample() {
+        let model = sample_model();
+        let mb = max_breadth(&model);
+        assert!(mb >= 1);
+    }
+
+    #[test]
+    fn root_data_returns_all_roots() {
+        let mut model: TreeModel<&str> = TreeModel::new();
+        model.add_root("a");
+        model.add_root("b");
+        let data = root_data(&model);
+        assert_eq!(data, vec![&"a", &"b"]);
+    }
+
+    #[test]
+    fn find_depth_found() {
+        let model = sample_model();
+        let d = find_depth(&model, |s| *s == "src");
+        assert_eq!(d, Some(0));
+        let d2 = find_depth(&model, |s| *s == "mod.rs");
+        assert_eq!(d2, Some(2));
+    }
+
+    #[test]
+    fn find_depth_not_found() {
+        let model = sample_model();
+        let d = find_depth(&model, |s| *s == "nonexistent");
+        assert!(d.is_none());
     }
 }

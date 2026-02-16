@@ -966,6 +966,85 @@ impl CommandGroup {
     }
 }
 
+/// Summary statistics for a `CommandRegistry`.
+pub struct CommandRegistryStats {
+    pub total: usize,
+    pub enabled: usize,
+    pub disabled: usize,
+    pub category_count: usize,
+}
+
+impl CommandRegistry {
+    /// Compute summary statistics for the registry.
+    pub fn stats(&self) -> CommandRegistryStats {
+        let enabled = self.get_enabled_commands().len();
+        CommandRegistryStats {
+            total: self.command_count(),
+            enabled,
+            disabled: self.command_count() - enabled,
+            category_count: self.categories().len(),
+        }
+    }
+
+    /// Return commands whose id starts with the given prefix.
+    pub fn find_by_prefix(&self, prefix: &str) -> Vec<&CommandDescriptor> {
+        self.commands
+            .iter()
+            .filter(|c| c.id.starts_with(prefix))
+            .collect()
+    }
+
+    /// Return the ids of all disabled commands.
+    pub fn disabled_command_ids(&self) -> Vec<&str> {
+        self.commands
+            .iter()
+            .filter(|c| !c.enabled)
+            .map(|c| c.id.as_str())
+            .collect()
+    }
+
+    /// Rename a command's title, returning true if found.
+    pub fn rename_title(&mut self, id: &str, new_title: &str) -> bool {
+        if let Some(cmd) = self.commands.iter_mut().find(|c| c.id == id) {
+            cmd.title = new_title.to_string();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return commands sorted alphabetically by title.
+    pub fn sorted_by_title(&self) -> Vec<&CommandDescriptor> {
+        let mut cmds: Vec<&CommandDescriptor> = self.commands.iter().collect();
+        cmds.sort_by(|a, b| a.title.cmp(&b.title));
+        cmds
+    }
+}
+
+impl CommandExecutionLog {
+    /// Return the most frequently executed command id and its count, if any.
+    pub fn most_frequent(&self) -> Option<(String, usize)> {
+        let mut counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for entry in &self.entries {
+            *counts.entry(entry.command_id.as_str()).or_insert(0) += 1;
+        }
+        counts
+            .into_iter()
+            .max_by_key(|&(_, c)| c)
+            .map(|(id, c)| (id.to_string(), c))
+    }
+
+    /// Return distinct command ids that have been executed.
+    pub fn distinct_command_ids(&self) -> Vec<String> {
+        let mut seen = std::collections::HashSet::new();
+        self.entries
+            .iter()
+            .filter(|e| seen.insert(e.command_id.clone()))
+            .map(|e| e.command_id.clone())
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1612,5 +1691,112 @@ mod tests {
         group.add("missing");
         let resolved = group.resolve(&reg);
         assert_eq!(resolved.len(), 2);
+    }
+
+    #[test]
+    fn registry_stats_empty() {
+        let reg = CommandRegistry::new();
+        let s = reg.stats();
+        assert_eq!(s.total, 0);
+        assert_eq!(s.enabled, 0);
+        assert_eq!(s.disabled, 0);
+        assert_eq!(s.category_count, 0);
+    }
+
+    #[test]
+    fn registry_stats_with_mixed_commands() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("a", "A"));
+        let mut cmd_b = make_cmd("b", "B");
+        cmd_b.enabled = false;
+        reg.register(cmd_b);
+        let s = reg.stats();
+        assert_eq!(s.total, 2);
+        assert_eq!(s.enabled, 1);
+        assert_eq!(s.disabled, 1);
+    }
+
+    #[test]
+    fn find_by_prefix_matches() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("editor.copy", "Copy"));
+        reg.register(make_cmd("editor.paste", "Paste"));
+        reg.register(make_cmd("file.save", "Save"));
+        let results = reg.find_by_prefix("editor.");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn find_by_prefix_no_match() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("file.save", "Save"));
+        let results = reg.find_by_prefix("editor.");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn disabled_command_ids_returns_only_disabled() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("a", "A"));
+        let mut cmd_b = make_cmd("b", "B");
+        cmd_b.enabled = false;
+        reg.register(cmd_b);
+        let ids = reg.disabled_command_ids();
+        assert_eq!(ids, vec!["b"]);
+    }
+
+    #[test]
+    fn rename_title_updates_existing() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("x", "Old"));
+        assert!(reg.rename_title("x", "New"));
+        assert_eq!(reg.get_command("x").unwrap().title, "New");
+    }
+
+    #[test]
+    fn rename_title_returns_false_for_missing() {
+        let mut reg = CommandRegistry::new();
+        assert!(!reg.rename_title("nope", "New"));
+    }
+
+    #[test]
+    fn sorted_by_title_alphabetical() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("c", "Zebra"));
+        reg.register(make_cmd("a", "Apple"));
+        reg.register(make_cmd("b", "Mango"));
+        let sorted = reg.sorted_by_title();
+        assert_eq!(sorted[0].title, "Apple");
+        assert_eq!(sorted[1].title, "Mango");
+        assert_eq!(sorted[2].title, "Zebra");
+    }
+
+    #[test]
+    fn execution_log_most_frequent() {
+        let mut log = CommandExecutionLog::new();
+        log.log("a", CommandSource::User);
+        log.log("b", CommandSource::User);
+        log.log("a", CommandSource::Keybinding);
+        let (id, count) = log.most_frequent().unwrap();
+        assert_eq!(id, "a");
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn execution_log_most_frequent_empty() {
+        let log = CommandExecutionLog::new();
+        assert!(log.most_frequent().is_none());
+    }
+
+    #[test]
+    fn execution_log_distinct_command_ids() {
+        let mut log = CommandExecutionLog::new();
+        log.log("a", CommandSource::User);
+        log.log("b", CommandSource::User);
+        log.log("a", CommandSource::Keybinding);
+        let ids = log.distinct_command_ids();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&"a".to_string()));
+        assert!(ids.contains(&"b".to_string()));
     }
 }

@@ -898,6 +898,88 @@ impl MenuBarService {
     }
 }
 
+/// Summary statistics for the menu bar.
+pub struct MenuBarStats {
+    pub menu_count: usize,
+    pub total_entries: usize,
+    pub enabled_entries: usize,
+    pub disabled_entries: usize,
+    pub entries_with_shortcuts: usize,
+}
+
+impl MenuBarService {
+    /// Compute summary statistics across all menus.
+    pub fn stats(&self) -> MenuBarStats {
+        let total = self.total_entry_count();
+        let enabled = self.enabled_entry_count();
+        let with_shortcuts = self
+            .flatten_items()
+            .iter()
+            .filter(|(_, e)| e.has_shortcut())
+            .count();
+        MenuBarStats {
+            menu_count: self.menu_count(),
+            total_entries: total,
+            enabled_entries: enabled,
+            disabled_entries: total - enabled,
+            entries_with_shortcuts: with_shortcuts,
+        }
+    }
+
+    /// Return all command ids across every menu.
+    pub fn all_command_ids(&self) -> Vec<String> {
+        self.flatten_items()
+            .iter()
+            .map(|(_, e)| e.command_id.clone())
+            .collect()
+    }
+
+    /// Return menus that have at least one entry.
+    pub fn non_empty_menu_ids(&self) -> Vec<String> {
+        self.menus
+            .iter()
+            .filter(|(_, entries)| !entries.is_empty())
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+
+    /// Return entries across all menus that have a `when` clause set.
+    pub fn entries_with_when_clause(&self) -> Vec<&MenuEntry> {
+        self.menus
+            .values()
+            .flat_map(|entries| entries.iter())
+            .filter(|e| e.when.is_some())
+            .collect()
+    }
+
+    /// Count how many distinct groups exist across all menus.
+    pub fn distinct_group_count(&self) -> usize {
+        let mut groups = std::collections::HashSet::new();
+        for entries in self.menus.values() {
+            for e in entries {
+                if let Some(ref g) = e.group {
+                    groups.insert(g.clone());
+                }
+            }
+        }
+        groups.len()
+    }
+
+    /// Enable all entries across every menu. Returns how many were changed.
+    pub fn enable_all_entries(&mut self) -> usize {
+        let mut count = 0;
+        for entries in self.menus.values_mut() {
+            for e in entries.iter_mut() {
+                if !e.enabled {
+                    e.enabled = true;
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1612,5 +1694,88 @@ mod tests {
         let bc = svc.breadcrumb_for("saveAs").unwrap();
         assert_eq!(bc.depth(), 2);
         assert_eq!(bc.current(), Some("Save As..."));
+    }
+
+    #[test]
+    fn menu_bar_stats_empty() {
+        let svc = MenuBarService::new();
+        let s = svc.stats();
+        assert_eq!(s.menu_count, 0);
+        assert_eq!(s.total_entries, 0);
+        assert_eq!(s.enabled_entries, 0);
+        assert_eq!(s.disabled_entries, 0);
+        assert_eq!(s.entries_with_shortcuts, 0);
+    }
+
+    #[test]
+    fn menu_bar_stats_with_entries() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("open", 1).with_shortcut("Ctrl+O"));
+        svc.add_entry(&MenuId::File, entry("close", 2));
+        let s = svc.stats();
+        assert_eq!(s.total_entries, 2);
+        assert_eq!(s.entries_with_shortcuts, 1);
+    }
+
+    #[test]
+    fn all_command_ids_lists_all() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("open", 1));
+        svc.add_entry(&MenuId::Edit, entry("undo", 1));
+        let ids = svc.all_command_ids();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&"open".to_string()));
+        assert!(ids.contains(&"undo".to_string()));
+    }
+
+    #[test]
+    fn non_empty_menu_ids_filters() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("open", 1));
+        let non_empty = svc.non_empty_menu_ids();
+        assert_eq!(non_empty.len(), 1);
+    }
+
+    #[test]
+    fn entries_with_when_clause_finds_matching() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("a", 1).with_when("editorFocus"));
+        svc.add_entry(&MenuId::File, entry("b", 2));
+        let with_when = svc.entries_with_when_clause();
+        assert_eq!(with_when.len(), 1);
+        assert_eq!(with_when[0].command_id, "a");
+    }
+
+    #[test]
+    fn distinct_group_count_counts_unique() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("a", 1).with_group("io"));
+        svc.add_entry(&MenuId::File, entry("b", 2).with_group("io"));
+        svc.add_entry(&MenuId::Edit, entry("c", 1).with_group("clipboard"));
+        assert_eq!(svc.distinct_group_count(), 2);
+    }
+
+    #[test]
+    fn distinct_group_count_empty() {
+        let svc = MenuBarService::new();
+        assert_eq!(svc.distinct_group_count(), 0);
+    }
+
+    #[test]
+    fn enable_all_entries_re_enables_disabled() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("a", 1).with_enabled(false));
+        svc.add_entry(&MenuId::File, entry("b", 2));
+        let changed = svc.enable_all_entries();
+        assert_eq!(changed, 1);
+        assert_eq!(svc.enabled_entry_count(), 2);
+    }
+
+    #[test]
+    fn enable_all_entries_none_disabled() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("a", 1));
+        let changed = svc.enable_all_entries();
+        assert_eq!(changed, 0);
     }
 }

@@ -958,6 +958,90 @@ impl fmt::Display for HomoglyphMap {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Unicode utility functions
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if every character in the string is basic ASCII
+/// (printable ASCII 0x20..=0x7E plus newline/tab/CR).
+pub fn is_safe_text(s: &str) -> bool {
+    s.chars().all(|ch| ch.is_ascii() && !is_invisible(ch))
+}
+
+/// Extracts only the non-ASCII characters from a string, preserving order.
+pub fn extract_non_ascii(s: &str) -> Vec<char> {
+    s.chars().filter(|ch| !ch.is_ascii()).collect()
+}
+
+/// Returns a mapping of non-ASCII characters to their confusable ASCII
+/// equivalents found in `s`. Characters that are not confusable are omitted.
+pub fn confusable_pairs_in(s: &str) -> Vec<(char, char)> {
+    s.chars()
+        .filter_map(|ch| is_confusable(ch).map(|ascii| (ch, ascii)))
+        .collect()
+}
+
+/// Groups highlights by their category, returning a map from category
+/// display name to a vector of highlights.
+pub fn group_highlights_by_category(
+    highlights: &[UnicodeHighlight],
+) -> std::collections::HashMap<String, Vec<&UnicodeHighlight>> {
+    let mut map: std::collections::HashMap<String, Vec<&UnicodeHighlight>> =
+        std::collections::HashMap::new();
+    for h in highlights {
+        map.entry(format!("{}", h.category))
+            .or_default()
+            .push(h);
+    }
+    map
+}
+
+/// Returns `true` if the string contains any RTL override characters.
+pub fn contains_rtl_override(s: &str) -> bool {
+    s.chars().any(is_rtl_override)
+}
+
+/// Filters a list of highlights down to only those at or above `min_severity`.
+pub fn filter_by_min_severity(
+    highlights: &[UnicodeHighlight],
+    min_severity: Severity,
+) -> Vec<&UnicodeHighlight> {
+    let min_level = match min_severity {
+        Severity::Error => 0,
+        Severity::Warning => 1,
+        Severity::Info => 2,
+    };
+    highlights
+        .iter()
+        .filter(|h| {
+            let level = match h.severity() {
+                Severity::Error => 0,
+                Severity::Warning => 1,
+                Severity::Info => 2,
+            };
+            level <= min_level
+        })
+        .collect()
+}
+
+/// Produces a one-line diagnostic summary for each highlight.
+pub fn format_diagnostics(highlights: &[UnicodeHighlight]) -> Vec<String> {
+    highlights
+        .iter()
+        .map(|h| {
+            format!(
+                "[{}] U+{:04X} '{}' at {}:{} ({})",
+                h.severity(),
+                h.character as u32,
+                h.character,
+                h.line,
+                h.column,
+                h.category,
+            )
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1623,5 +1707,103 @@ mod tests {
         let map = HomoglyphMap::from(vec![('а', 'a'), ('е', 'e')]);
         let collected: Vec<_> = map.iter().collect();
         assert_eq!(collected.len(), 2);
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn test_is_safe_text_ascii() {
+        assert!(is_safe_text("Hello world!"));
+        assert!(is_safe_text("fn main() { }"));
+    }
+
+    #[test]
+    fn test_is_safe_text_non_ascii() {
+        assert!(!is_safe_text("café"));
+        assert!(!is_safe_text("a\u{200B}b")); // zero-width space
+    }
+
+    #[test]
+    fn test_is_safe_text_empty() {
+        assert!(is_safe_text(""));
+    }
+
+    #[test]
+    fn test_extract_non_ascii() {
+        assert_eq!(extract_non_ascii("abcdef"), Vec::<char>::new());
+        assert_eq!(extract_non_ascii("café"), vec!['é']);
+    }
+
+    #[test]
+    fn test_confusable_pairs_in_string() {
+        // Cyrillic 'а' (U+0430) is confusable with ASCII 'a'
+        let pairs = confusable_pairs_in("h\u{0435}llo");
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(pairs[0], ('\u{0435}', 'e'));
+    }
+
+    #[test]
+    fn test_confusable_pairs_empty() {
+        let pairs = confusable_pairs_in("hello");
+        assert!(pairs.is_empty());
+    }
+
+    #[test]
+    fn test_contains_rtl_override_yes() {
+        assert!(contains_rtl_override("abc\u{202E}def"));
+    }
+
+    #[test]
+    fn test_contains_rtl_override_no() {
+        assert!(!contains_rtl_override("hello world"));
+    }
+
+    #[test]
+    fn test_group_highlights_by_category() {
+        let h1 = UnicodeHighlight {
+            line: 0, column: 0, character: '\u{0430}',
+            category: UnicodeCategory::ConfusableWithAscii,
+            replacement: Some('a'),
+        };
+        let h2 = UnicodeHighlight {
+            line: 0, column: 1, character: '\u{200B}',
+            category: UnicodeCategory::Invisible,
+            replacement: None,
+        };
+        let highlights = vec![h1, h2];
+        let grouped = group_highlights_by_category(&highlights);
+        assert_eq!(grouped.len(), 2);
+        assert!(grouped.contains_key("confusable with ASCII"));
+        assert!(grouped.contains_key("invisible"));
+    }
+
+    #[test]
+    fn test_filter_by_min_severity_error() {
+        let h_err = UnicodeHighlight {
+            line: 0, column: 0, character: '\u{200B}',
+            category: UnicodeCategory::Invisible,
+            replacement: None,
+        };
+        let h_info = UnicodeHighlight {
+            line: 0, column: 1, character: '\u{00E9}',
+            category: UnicodeCategory::NonBasicAscii,
+            replacement: None,
+        };
+        let highlights = vec![h_err, h_info];
+        let filtered = filter_by_min_severity(&highlights, Severity::Error);
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn test_format_diagnostics() {
+        let h = UnicodeHighlight {
+            line: 5, column: 10, character: '\u{0430}',
+            category: UnicodeCategory::ConfusableWithAscii,
+            replacement: Some('a'),
+        };
+        let diags = format_diagnostics(&[h]);
+        assert_eq!(diags.len(), 1);
+        assert!(diags[0].contains("U+0430"));
+        assert!(diags[0].contains("5:10"));
     }
 }

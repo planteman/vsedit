@@ -909,6 +909,71 @@ impl fmt::Display for LayoutDiff {
     }
 }
 
+impl WorkbenchLayout {
+    /// Return the number of currently visible parts.
+    pub fn visible_part_count(&self) -> usize {
+        [
+            Part::Menubar,
+            Part::ActivityBar,
+            Part::Sidebar,
+            Part::Editor,
+            Part::Panel,
+            Part::StatusBar,
+        ]
+        .iter()
+        .filter(|&&p| self.is_part_visible(p))
+        .count()
+    }
+
+    /// Return a list of all hidden parts.
+    pub fn hidden_parts(&self) -> Vec<Part> {
+        [
+            Part::Menubar,
+            Part::ActivityBar,
+            Part::Sidebar,
+            Part::Editor,
+            Part::Panel,
+            Part::StatusBar,
+        ]
+        .iter()
+        .copied()
+        .filter(|&p| !self.is_part_visible(p))
+        .collect()
+    }
+
+    /// Reset sidebar and panel to default dimensions.
+    pub fn reset_dimensions(&mut self) {
+        self.set_sidebar_width(220);
+        self.set_panel_height(200);
+    }
+}
+
+impl LayoutSplit {
+    /// Return the ratios as percentages (0–100).
+    pub fn ratios_as_percentages(&self) -> Vec<f32> {
+        self.ratios.iter().map(|r| r * 100.0).collect()
+    }
+
+    /// Return true if all panes have equal ratios.
+    pub fn is_equal_split(&self) -> bool {
+        if self.ratios.is_empty() {
+            return true;
+        }
+        let first = self.ratios[0];
+        self.ratios.iter().all(|&r| (r - first).abs() < 0.001)
+    }
+}
+
+/// Compute the total area in cells (width * height) of a Rect.
+pub fn rect_area(r: &Rect) -> u32 {
+    r.width as u32 * r.height as u32
+}
+
+/// Return true if two Rects overlap.
+pub fn rects_overlap(a: &Rect, b: &Rect) -> bool {
+    a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1616,5 +1681,99 @@ mod tests {
         assert!(diff.is_empty());
         assert_eq!(diff.change_count(), 0);
         assert_eq!(format!("{}", diff), "(no changes)");
+    }
+
+    #[test]
+    fn visible_part_count_default() {
+        let layout = WorkbenchLayout::new();
+        assert_eq!(layout.visible_part_count(), 6);
+    }
+
+    #[test]
+    fn visible_part_count_after_hiding() {
+        let mut layout = WorkbenchLayout::new();
+        layout.set_part_visible(Part::Panel, false);
+        layout.set_part_visible(Part::StatusBar, false);
+        assert_eq!(layout.visible_part_count(), 4);
+    }
+
+    #[test]
+    fn hidden_parts_default_is_empty() {
+        let layout = WorkbenchLayout::new();
+        assert!(layout.hidden_parts().is_empty());
+    }
+
+    #[test]
+    fn hidden_parts_after_toggle() {
+        let mut layout = WorkbenchLayout::new();
+        layout.toggle_sidebar();
+        let hidden = layout.hidden_parts();
+        assert_eq!(hidden.len(), 1);
+        assert_eq!(hidden[0], Part::Sidebar);
+    }
+
+    #[test]
+    fn reset_dimensions_restores_defaults() {
+        let mut layout = WorkbenchLayout::new();
+        layout.set_sidebar_width(500);
+        layout.set_panel_height(500);
+        layout.reset_dimensions();
+        assert_eq!(layout.get_sidebar_width(), 220);
+        assert_eq!(layout.get_panel_height(), 200);
+    }
+
+    #[test]
+    fn split_ratios_as_percentages() {
+        let split = LayoutSplit::new(SplitDirection::Horizontal, 4);
+        let pct = split.ratios_as_percentages();
+        assert_eq!(pct.len(), 4);
+        for p in &pct {
+            assert!((p - 25.0).abs() < 0.1);
+        }
+    }
+
+    #[test]
+    fn split_is_equal_true() {
+        let split = LayoutSplit::new(SplitDirection::Vertical, 3);
+        assert!(split.is_equal_split());
+    }
+
+    #[test]
+    fn split_is_equal_false_custom_ratios() {
+        let split = LayoutSplit::with_ratios(SplitDirection::Horizontal, vec![0.3, 0.7]);
+        assert!(!split.is_equal_split());
+    }
+
+    #[test]
+    fn rect_area_calculation() {
+        let r = rect(0, 0, 10, 20);
+        assert_eq!(rect_area(&r), 200);
+    }
+
+    #[test]
+    fn rect_area_zero() {
+        let r = rect(5, 5, 0, 10);
+        assert_eq!(rect_area(&r), 0);
+    }
+
+    #[test]
+    fn rects_overlap_true() {
+        let a = rect(0, 0, 10, 10);
+        let b = rect(5, 5, 10, 10);
+        assert!(rects_overlap(&a, &b));
+    }
+
+    #[test]
+    fn rects_overlap_false() {
+        let a = rect(0, 0, 10, 10);
+        let b = rect(20, 20, 10, 10);
+        assert!(!rects_overlap(&a, &b));
+    }
+
+    #[test]
+    fn rects_overlap_adjacent_is_false() {
+        let a = rect(0, 0, 10, 10);
+        let b = rect(10, 0, 10, 10);
+        assert!(!rects_overlap(&a, &b));
     }
 }

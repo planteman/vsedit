@@ -973,6 +973,75 @@ pub fn unavailable_features_for_version(
         .collect()
 }
 
+// ── Port-forwarding utilities ───────────────────────────────────────────
+
+/// Deduplicate port forwards by local port, keeping the first occurrence.
+pub fn dedup_port_forwards(forwards: &[PortForward]) -> Vec<PortForward> {
+    let mut seen = std::collections::HashSet::new();
+    forwards
+        .iter()
+        .filter(|f| seen.insert(f.local_port))
+        .cloned()
+        .collect()
+}
+
+/// Sort port forwards by local port ascending.
+pub fn sort_forwards_by_local_port(forwards: &mut [PortForward]) {
+    forwards.sort_by_key(|f| f.local_port);
+}
+
+/// Return all port forwards whose local port falls within the given range.
+pub fn forwards_in_port_range(forwards: &[PortForward], range: &PortRange) -> Vec<PortForward> {
+    forwards
+        .iter()
+        .filter(|f| range.contains(f.local_port))
+        .cloned()
+        .collect()
+}
+
+/// Compute a summary string for a list of port forwards.
+pub fn port_forwards_summary(forwards: &[PortForward]) -> String {
+    if forwards.is_empty() {
+        return "No active port forwards".to_string();
+    }
+    let auto_count = forwards.iter().filter(|f| f.auto_forward).count();
+    format!(
+        "{} port forward(s), {} auto-forwarded",
+        forwards.len(),
+        auto_count
+    )
+}
+
+/// Check whether any port forward conflicts with a given local port.
+pub fn has_local_port_conflict(forwards: &[PortForward], port: u16) -> bool {
+    forwards.iter().any(|f| f.local_port == port)
+}
+
+/// Collect all unique protocols in use across forwarded ports.
+pub fn unique_protocols(forwards: &[PortForward]) -> Vec<PortProtocol> {
+    let mut protos = Vec::new();
+    for f in forwards {
+        if !protos.contains(&f.protocol) {
+            protos.push(f.protocol.clone());
+        }
+    }
+    protos
+}
+
+/// Partition port forwards into auto-forwarded and manual groups.
+pub fn partition_forwards(forwards: &[PortForward]) -> (Vec<PortForward>, Vec<PortForward>) {
+    let mut auto = Vec::new();
+    let mut manual = Vec::new();
+    for f in forwards {
+        if f.auto_forward {
+            auto.push(f.clone());
+        } else {
+            manual.push(f.clone());
+        }
+    }
+    (auto, manual)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1635,5 +1704,95 @@ mod tests {
         assert_eq!(format!("{}", CapabilityLevel::Full), "Full");
         assert_eq!(format!("{}", CapabilityLevel::Partial), "Partial");
         assert_eq!(format!("{}", CapabilityLevel::None), "None");
+    }
+
+    #[test]
+    fn dedup_port_forwards_removes_dups() {
+        let a = PortForwardBuilder::new(8080, 80).build();
+        let b = PortForwardBuilder::new(8080, 81).build();
+        let c = PortForwardBuilder::new(3000, 3000).build();
+        let result = dedup_port_forwards(&[a, b, c]);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].local_port, 8080);
+        assert_eq!(result[1].local_port, 3000);
+    }
+
+    #[test]
+    fn dedup_port_forwards_empty() {
+        let result = dedup_port_forwards(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn sort_forwards_by_local_port_order() {
+        let mut forwards = vec![
+            PortForwardBuilder::new(9000, 90).build(),
+            PortForwardBuilder::new(3000, 30).build(),
+            PortForwardBuilder::new(5000, 50).build(),
+        ];
+        sort_forwards_by_local_port(&mut forwards);
+        assert_eq!(forwards[0].local_port, 3000);
+        assert_eq!(forwards[1].local_port, 5000);
+        assert_eq!(forwards[2].local_port, 9000);
+    }
+
+    #[test]
+    fn forwards_in_port_range_filters() {
+        let forwards = vec![
+            PortForwardBuilder::new(80, 80).build(),
+            PortForwardBuilder::new(3000, 3000).build(),
+            PortForwardBuilder::new(8080, 8080).build(),
+        ];
+        let range = PortRange::new(3000, 9000);
+        let result = forwards_in_port_range(&forwards, &range);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].local_port, 3000);
+        assert_eq!(result[1].local_port, 8080);
+    }
+
+    #[test]
+    fn port_forwards_summary_formatting() {
+        assert_eq!(port_forwards_summary(&[]), "No active port forwards");
+        let forwards = vec![
+            PortForwardBuilder::new(8080, 80).auto_forward(true).build(),
+            PortForwardBuilder::new(3000, 3000).auto_forward(false).build(),
+        ];
+        let summary = port_forwards_summary(&forwards);
+        assert!(summary.contains("2 port forward(s)"));
+        assert!(summary.contains("1 auto-forwarded"));
+    }
+
+    #[test]
+    fn has_local_port_conflict_detection() {
+        let forwards = vec![
+            PortForwardBuilder::new(8080, 80).build(),
+        ];
+        assert!(has_local_port_conflict(&forwards, 8080));
+        assert!(!has_local_port_conflict(&forwards, 3000));
+        assert!(!has_local_port_conflict(&[], 8080));
+    }
+
+    #[test]
+    fn unique_protocols_collection() {
+        let forwards = vec![
+            PortForwardBuilder::new(80, 80).protocol(PortProtocol::Http).build(),
+            PortForwardBuilder::new(443, 443).protocol(PortProtocol::Https).build(),
+            PortForwardBuilder::new(8080, 8080).protocol(PortProtocol::Http).build(),
+        ];
+        let protos = unique_protocols(&forwards);
+        assert_eq!(protos.len(), 2);
+    }
+
+    #[test]
+    fn partition_forwards_splits() {
+        let forwards = vec![
+            PortForwardBuilder::new(80, 80).auto_forward(true).build(),
+            PortForwardBuilder::new(3000, 3000).auto_forward(false).build(),
+            PortForwardBuilder::new(8080, 8080).auto_forward(true).build(),
+        ];
+        let (auto, manual) = partition_forwards(&forwards);
+        assert_eq!(auto.len(), 2);
+        assert_eq!(manual.len(), 1);
+        assert_eq!(manual[0].local_port, 3000);
     }
 }

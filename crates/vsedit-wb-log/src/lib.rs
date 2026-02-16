@@ -863,6 +863,82 @@ pub fn extract_fields(message: &str) -> Vec<(String, String)> {
     fields
 }
 
+impl LogService {
+    /// Return the most recent entry, if any.
+    pub fn last_entry(&self) -> Option<&LogEntry> {
+        self.entries.last()
+    }
+
+    /// Return entries whose message starts with the given prefix.
+    pub fn search_prefix(&self, prefix: &str) -> Vec<&LogEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.message.starts_with(prefix))
+            .collect()
+    }
+
+    /// Return a breakdown of entry counts by level.
+    pub fn level_counts(&self) -> std::collections::HashMap<String, usize> {
+        let mut map = std::collections::HashMap::new();
+        for entry in &self.entries {
+            *map.entry(format!("{}", entry.level)).or_insert(0) += 1;
+        }
+        map
+    }
+
+    /// Return the average message length across all entries.
+    pub fn average_message_length(&self) -> usize {
+        if self.entries.is_empty() {
+            return 0;
+        }
+        let total: usize = self.entries.iter().map(|e| e.message.len()).sum();
+        total / self.entries.len()
+    }
+
+    /// Return the longest message entry, if any.
+    pub fn longest_message(&self) -> Option<&LogEntry> {
+        self.entries.iter().max_by_key(|e| e.message.len())
+    }
+}
+
+impl LogFilter {
+    /// Return true if this filter has no criteria set.
+    pub fn is_empty_filter(&self) -> bool {
+        self.level.is_none() && self.source.is_none() && self.message_contains.is_none()
+    }
+
+    /// Return a human-readable description of the active filters.
+    pub fn describe(&self) -> String {
+        let mut parts = Vec::new();
+        if let Some(ref level) = self.level {
+            parts.push(format!("level={}", level));
+        }
+        if let Some(ref src) = self.source {
+            parts.push(format!("source={}", src));
+        }
+        if let Some(ref msg) = self.message_contains {
+            parts.push(format!("contains={}", msg));
+        }
+        if parts.is_empty() {
+            "no filters".to_string()
+        } else {
+            parts.join(", ")
+        }
+    }
+}
+
+/// Count entries per source, returning source name and count pairs.
+pub fn count_by_source(entries: &[LogEntry]) -> Vec<(String, usize)> {
+    let mut map: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for e in entries {
+        let src = e.source.clone().unwrap_or_else(|| "<none>".to_string());
+        *map.entry(src).or_insert(0) += 1;
+    }
+    let mut result: Vec<_> = map.into_iter().collect();
+    result.sort_by(|a, b| b.1.cmp(&a.1));
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1616,5 +1692,130 @@ mod tests {
         assert_eq!(fields.len(), 2);
         assert_eq!(fields[0], ("msg".into(), "hello world".into()));
         assert_eq!(fields[1], ("code".into(), "42".into()));
+    }
+
+    #[test]
+    fn last_entry_returns_most_recent() {
+        let mut svc = LogService::new(LogLevel::Info);
+        svc.info("first");
+        svc.info("second");
+        assert_eq!(svc.last_entry().unwrap().message, "second");
+    }
+
+    #[test]
+    fn last_entry_empty_service() {
+        let svc = LogService::new(LogLevel::Info);
+        assert!(svc.last_entry().is_none());
+    }
+
+    #[test]
+    fn search_prefix_finds_matching() {
+        let mut svc = LogService::new(LogLevel::Info);
+        svc.info("auth: login success");
+        svc.info("db: query done");
+        svc.info("auth: logout");
+        let results = svc.search_prefix("auth:");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn search_prefix_no_match() {
+        let mut svc = LogService::new(LogLevel::Info);
+        svc.info("hello");
+        assert!(svc.search_prefix("xyz").is_empty());
+    }
+
+    #[test]
+    fn level_counts_breakdown() {
+        let mut svc = LogService::new(LogLevel::Debug);
+        svc.info("a");
+        svc.info("b");
+        svc.error("c");
+        let counts = svc.level_counts();
+        assert_eq!(counts.get("INFO"), Some(&2));
+        assert_eq!(counts.get("ERROR"), Some(&1));
+    }
+
+    #[test]
+    fn average_message_length_computed() {
+        let mut svc = LogService::new(LogLevel::Info);
+        svc.info("ab");
+        svc.info("abcd");
+        assert_eq!(svc.average_message_length(), 3);
+    }
+
+    #[test]
+    fn average_message_length_empty() {
+        let svc = LogService::new(LogLevel::Info);
+        assert_eq!(svc.average_message_length(), 0);
+    }
+
+    #[test]
+    fn longest_message_found() {
+        let mut svc = LogService::new(LogLevel::Info);
+        svc.info("short");
+        svc.info("a longer message here");
+        assert_eq!(svc.longest_message().unwrap().message, "a longer message here");
+    }
+
+    #[test]
+    fn filter_is_empty_when_no_criteria() {
+        let f = LogFilter::new();
+        assert!(f.is_empty_filter());
+    }
+
+    #[test]
+    fn filter_is_not_empty_with_level() {
+        let f = LogFilter::new().with_level(LogLevel::Error);
+        assert!(!f.is_empty_filter());
+    }
+
+    #[test]
+    fn filter_describe_no_criteria() {
+        let f = LogFilter::new();
+        assert_eq!(f.describe(), "no filters");
+    }
+
+    #[test]
+    fn filter_describe_with_criteria() {
+        let f = LogFilter::new()
+            .with_level(LogLevel::Error)
+            .with_source("db".to_string());
+        let desc = f.describe();
+        assert!(desc.contains("level="));
+        assert!(desc.contains("source=db"));
+    }
+
+    #[test]
+    fn count_by_source_groups() {
+        let entries = vec![
+            LogEntry {
+                level: LogLevel::Info,
+                message: "a".into(),
+                source: Some("db".into()),
+                timestamp: 0,
+            },
+            LogEntry {
+                level: LogLevel::Info,
+                message: "b".into(),
+                source: Some("db".into()),
+                timestamp: 1,
+            },
+            LogEntry {
+                level: LogLevel::Error,
+                message: "c".into(),
+                source: Some("api".into()),
+                timestamp: 2,
+            },
+        ];
+        let counts = count_by_source(&entries);
+        assert_eq!(counts[0], ("db".into(), 2));
+        assert_eq!(counts[1], ("api".into(), 1));
+    }
+
+    #[test]
+    fn count_by_source_empty() {
+        let counts = count_by_source(&[]);
+        assert!(counts.is_empty());
     }
 }

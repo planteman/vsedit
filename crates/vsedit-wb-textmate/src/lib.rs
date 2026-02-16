@@ -926,6 +926,74 @@ impl GrammarRegistry {
     }
 }
 
+/// Merge two `HighlightedLine` values by concatenating their segments.
+pub fn merge_highlighted_lines(a: &HighlightedLine, b: &HighlightedLine) -> HighlightedLine {
+    let mut segs = a.segments.clone();
+    segs.extend_from_slice(&b.segments);
+    HighlightedLine { segments: segs }
+}
+
+/// Return segments from a `HighlightedLine` that are not whitespace-only.
+pub fn non_whitespace_segments(line: &HighlightedLine) -> Vec<&HighlightedSegment> {
+    line.segments.iter().filter(|s| !s.is_whitespace()).collect()
+}
+
+/// Total character count across all segments in a line.
+pub fn total_char_count(line: &HighlightedLine) -> usize {
+    line.segments.iter().map(|s| s.len()).sum()
+}
+
+/// Extract distinct foreground colors used in a highlighted line.
+pub fn distinct_colors(line: &HighlightedLine) -> Vec<(u8, u8, u8)> {
+    let mut colors = Vec::new();
+    for seg in &line.segments {
+        if !colors.contains(&seg.fg) {
+            colors.push(seg.fg);
+        }
+    }
+    colors
+}
+
+/// Check if a scope path string matches a simple glob pattern
+/// where `*` matches any single component.
+pub fn scope_glob_match(pattern: &str, scope: &str) -> bool {
+    let pat_parts: Vec<&str> = pattern.split('.').collect();
+    let scope_parts: Vec<&str> = scope.split('.').collect();
+    if pat_parts.len() != scope_parts.len() {
+        return false;
+    }
+    pat_parts
+        .iter()
+        .zip(scope_parts.iter())
+        .all(|(p, s)| *p == "*" || p == s)
+}
+
+/// Count how many segments in a line have a specific foreground color.
+pub fn count_segments_by_color(line: &HighlightedLine, fg: (u8, u8, u8)) -> usize {
+    line.segments.iter().filter(|s| s.fg == fg).count()
+}
+
+/// Split a highlighted line at a given character offset, returning two new lines.
+pub fn split_highlighted_line(line: &HighlightedLine, at_char: usize) -> (HighlightedLine, HighlightedLine) {
+    let mut left = Vec::new();
+    let mut right = Vec::new();
+    let mut consumed = 0usize;
+    for seg in &line.segments {
+        if consumed >= at_char {
+            right.push(seg.clone());
+        } else if consumed + seg.len() <= at_char {
+            left.push(seg.clone());
+        } else {
+            let split_pos = at_char - consumed;
+            let (l, r) = seg.text.split_at(split_pos);
+            left.push(HighlightedSegment { fg: seg.fg, text: l.to_string() });
+            right.push(HighlightedSegment { fg: seg.fg, text: r.to_string() });
+        }
+        consumed += seg.len();
+    }
+    (HighlightedLine { segments: left }, HighlightedLine { segments: right })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1603,5 +1671,103 @@ mod tests {
 
         reg.clear();
         assert_eq!(reg.distinct_count(), 0);
+    }
+
+    #[test]
+    fn merge_highlighted_lines_concatenates() {
+        let a = HighlightedLine {
+            segments: vec![HighlightedSegment::new((255, 0, 0), "hello")],
+        };
+        let b = HighlightedLine {
+            segments: vec![HighlightedSegment::new((0, 255, 0), " world")],
+        };
+        let merged = merge_highlighted_lines(&a, &b);
+        assert_eq!(merged.segment_count(), 2);
+        assert_eq!(merged.plain_text(), "hello world");
+    }
+
+    #[test]
+    fn non_whitespace_segments_filters() {
+        let line = HighlightedLine {
+            segments: vec![
+                HighlightedSegment::new((255, 255, 255), "  "),
+                HighlightedSegment::new((200, 200, 200), "code"),
+                HighlightedSegment::new((255, 255, 255), "\t"),
+            ],
+        };
+        let nws = non_whitespace_segments(&line);
+        assert_eq!(nws.len(), 1);
+        assert_eq!(nws[0].text, "code");
+    }
+
+    #[test]
+    fn total_char_count_sums_segments() {
+        let line = HighlightedLine {
+            segments: vec![
+                HighlightedSegment::new((0, 0, 0), "abc"),
+                HighlightedSegment::new((0, 0, 0), "de"),
+            ],
+        };
+        assert_eq!(total_char_count(&line), 5);
+        assert_eq!(total_char_count(&HighlightedLine { segments: vec![] }), 0);
+    }
+
+    #[test]
+    fn distinct_colors_unique() {
+        let line = HighlightedLine {
+            segments: vec![
+                HighlightedSegment::new((255, 0, 0), "a"),
+                HighlightedSegment::new((255, 0, 0), "b"),
+                HighlightedSegment::new((0, 0, 255), "c"),
+            ],
+        };
+        let colors = distinct_colors(&line);
+        assert_eq!(colors.len(), 2);
+    }
+
+    #[test]
+    fn scope_glob_match_works() {
+        assert!(scope_glob_match("source.*", "source.rust"));
+        assert!(scope_glob_match("source.rust", "source.rust"));
+        assert!(!scope_glob_match("source.*", "source.rust.macro"));
+        assert!(!scope_glob_match("source.python", "source.rust"));
+        assert!(scope_glob_match("*.*", "source.rust"));
+    }
+
+    #[test]
+    fn count_segments_by_color_counts() {
+        let line = HighlightedLine {
+            segments: vec![
+                HighlightedSegment::new((1, 2, 3), "a"),
+                HighlightedSegment::new((4, 5, 6), "b"),
+                HighlightedSegment::new((1, 2, 3), "c"),
+            ],
+        };
+        assert_eq!(count_segments_by_color(&line, (1, 2, 3)), 2);
+        assert_eq!(count_segments_by_color(&line, (4, 5, 6)), 1);
+        assert_eq!(count_segments_by_color(&line, (0, 0, 0)), 0);
+    }
+
+    #[test]
+    fn split_highlighted_line_at_boundary() {
+        let line = HighlightedLine {
+            segments: vec![
+                HighlightedSegment::new((255, 0, 0), "abc"),
+                HighlightedSegment::new((0, 255, 0), "def"),
+            ],
+        };
+        let (left, right) = split_highlighted_line(&line, 3);
+        assert_eq!(left.plain_text(), "abc");
+        assert_eq!(right.plain_text(), "def");
+    }
+
+    #[test]
+    fn split_highlighted_line_mid_segment() {
+        let line = HighlightedLine {
+            segments: vec![HighlightedSegment::new((100, 100, 100), "abcdef")],
+        };
+        let (left, right) = split_highlighted_line(&line, 2);
+        assert_eq!(left.plain_text(), "ab");
+        assert_eq!(right.plain_text(), "cdef");
     }
 }

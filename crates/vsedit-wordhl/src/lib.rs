@@ -983,6 +983,71 @@ impl WordOccurrenceTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Highlight filtering and analysis utilities
+// ---------------------------------------------------------------------------
+
+/// Filter highlights to only those on a given set of lines.
+pub fn filter_highlights_on_lines(highlights: &[DocumentHighlight], lines: &[u32]) -> Vec<DocumentHighlight> {
+    highlights
+        .iter()
+        .filter(|h| lines.contains(&h.line))
+        .cloned()
+        .collect()
+}
+
+/// Count how many highlights of each kind are present.
+pub fn count_by_kind(highlights: &[DocumentHighlight]) -> (usize, usize, usize) {
+    let mut text = 0;
+    let mut read = 0;
+    let mut write = 0;
+    for h in highlights {
+        match h.kind {
+            DocumentHighlightKind::Text => text += 1,
+            DocumentHighlightKind::Read => read += 1,
+            DocumentHighlightKind::Write => write += 1,
+        }
+    }
+    (text, read, write)
+}
+
+/// Compute the total character span covered by all highlights.
+pub fn total_highlight_span(highlights: &[DocumentHighlight]) -> u32 {
+    highlights.iter().map(|h| h.span()).sum()
+}
+
+/// Find all highlights that contain a given column on a given line.
+pub fn highlights_at_position(highlights: &[DocumentHighlight], line: u32, column: u32) -> Vec<&DocumentHighlight> {
+    highlights
+        .iter()
+        .filter(|h| h.is_on_line(line) && h.contains_column(column))
+        .collect()
+}
+
+/// Check if any two highlights in the set overlap.
+pub fn has_overlapping_highlights(highlights: &[DocumentHighlight]) -> bool {
+    for i in 0..highlights.len() {
+        for j in (i + 1)..highlights.len() {
+            if highlights[i].overlaps(&highlights[j]) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Return the line numbers that have at least one write highlight.
+pub fn lines_with_writes(highlights: &[DocumentHighlight]) -> Vec<u32> {
+    let mut lines: Vec<u32> = highlights
+        .iter()
+        .filter(|h| matches!(h.kind, DocumentHighlightKind::Write))
+        .map(|h| h.line)
+        .collect();
+    lines.sort();
+    lines.dedup();
+    lines
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1619,5 +1684,94 @@ mod tests {
         tracker.track_word(&lines, "hello");
         let word_lines = tracker.lines_with_word("hello");
         assert_eq!(word_lines, vec![0, 2]);
+    }
+
+    #[test]
+    fn filter_highlights_on_lines_basic() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Read),
+            DocumentHighlight::new(3, 1, 5, DocumentHighlightKind::Write),
+        ];
+        let filtered = filter_highlights_on_lines(&hl, &[1, 3]);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].line, 1);
+        assert_eq!(filtered[1].line, 3);
+    }
+
+    #[test]
+    fn filter_highlights_on_lines_empty() {
+        let hl: Vec<DocumentHighlight> = vec![];
+        assert!(filter_highlights_on_lines(&hl, &[1]).is_empty());
+    }
+
+    #[test]
+    fn count_by_kind_mixed() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 6, 10, DocumentHighlightKind::Read),
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Write),
+            DocumentHighlight::new(2, 6, 10, DocumentHighlightKind::Read),
+        ];
+        let (t, r, w) = count_by_kind(&hl);
+        assert_eq!(t, 1);
+        assert_eq!(r, 2);
+        assert_eq!(w, 1);
+    }
+
+    #[test]
+    fn total_highlight_span_computed() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 10, 15, DocumentHighlightKind::Text),
+        ];
+        assert_eq!(total_highlight_span(&hl), 9); // 4 + 5
+    }
+
+    #[test]
+    fn highlights_at_position_finds() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 3, 8, DocumentHighlightKind::Read),
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Write),
+        ];
+        let found = highlights_at_position(&hl, 1, 4);
+        assert_eq!(found.len(), 2);
+    }
+
+    #[test]
+    fn has_overlapping_highlights_true() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 3, 8, DocumentHighlightKind::Read),
+        ];
+        assert!(has_overlapping_highlights(&hl));
+    }
+
+    #[test]
+    fn has_overlapping_highlights_false() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 6, 10, DocumentHighlightKind::Read),
+        ];
+        assert!(!has_overlapping_highlights(&hl));
+    }
+
+    #[test]
+    fn lines_with_writes_returns_sorted() {
+        let hl = vec![
+            DocumentHighlight::new(3, 1, 5, DocumentHighlightKind::Write),
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 6, 10, DocumentHighlightKind::Write),
+        ];
+        assert_eq!(lines_with_writes(&hl), vec![1, 3]);
+    }
+
+    #[test]
+    fn lines_with_writes_empty() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+        ];
+        assert!(lines_with_writes(&hl).is_empty());
     }
 }

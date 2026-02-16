@@ -1036,6 +1036,76 @@ pub fn grid_to_string(grid: &[Vec<char>]) -> String {
         .join("\n")
 }
 
+/// Strip trailing whitespace from every line in a multi-line string.
+pub fn strip_trailing_whitespace(text: &str) -> String {
+    text.lines()
+        .map(|line| line.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Return the index (0-based) of the longest line in a multi-line string.
+pub fn longest_line_index(text: &str, tab_size: u32) -> Option<usize> {
+    text.lines()
+        .enumerate()
+        .max_by_key(|(_, line)| display_width(line, tab_size))
+        .map(|(i, _)| i)
+}
+
+/// Compute the maximum display width across all lines.
+pub fn max_line_width(text: &str, tab_size: u32) -> usize {
+    text.lines()
+        .map(|l| display_width(l, tab_size))
+        .max()
+        .unwrap_or(0)
+}
+
+/// Collapse consecutive blank lines into a single blank line.
+pub fn collapse_blank_lines(text: &str) -> String {
+    let mut result = Vec::new();
+    let mut prev_blank = false;
+    for line in text.lines() {
+        let is_blank = line.trim().is_empty();
+        if is_blank && prev_blank {
+            continue;
+        }
+        result.push(line);
+        prev_blank = is_blank;
+    }
+    result.join("\n")
+}
+
+/// Indent every non-empty line by the given number of spaces.
+pub fn indent_lines(text: &str, spaces: usize) -> String {
+    let prefix = " ".repeat(spaces);
+    text.lines()
+        .map(|line| {
+            if line.trim().is_empty() {
+                line.to_string()
+            } else {
+                format!("{}{}", prefix, line)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Count the number of lines that exceed a given display width.
+pub fn count_overlong_lines(text: &str, max_width: usize, tab_size: u32) -> usize {
+    text.lines()
+        .filter(|l| display_width(l, tab_size) > max_width)
+        .count()
+}
+
+/// Extract lines from a multi-line string by a range of 0-based line indices.
+pub fn extract_line_range(text: &str, start: usize, end: usize) -> String {
+    text.lines()
+        .skip(start)
+        .take(end.saturating_sub(start))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1605,5 +1675,64 @@ mod tests {
             vec!['c', ' ', ' ', ' '],
         ];
         assert_eq!(grid_to_string(&grid), "ab\nc");
+    }
+
+    #[test]
+    fn strip_trailing_whitespace_removes_trailing() {
+        assert_eq!(strip_trailing_whitespace("hello   \nworld  "), "hello\nworld");
+        assert_eq!(strip_trailing_whitespace("no trailing"), "no trailing");
+        assert_eq!(strip_trailing_whitespace(""), "");
+    }
+
+    #[test]
+    fn longest_line_index_finds_longest() {
+        assert_eq!(longest_line_index("short\na longer line\nmed", 4), Some(1));
+        assert_eq!(longest_line_index("only", 4), Some(0));
+    }
+
+    #[test]
+    fn max_line_width_computes_max() {
+        assert_eq!(max_line_width("abc\nabcdef\nab", 4), 6);
+        assert_eq!(max_line_width("", 4), 0);
+        assert_eq!(max_line_width("\t", 4), 4);
+    }
+
+    #[test]
+    fn collapse_blank_lines_collapses() {
+        let input = "a\n\n\nb\n\nc";
+        let result = collapse_blank_lines(input);
+        assert_eq!(result, "a\n\nb\n\nc");
+    }
+
+    #[test]
+    fn collapse_blank_lines_no_blanks() {
+        assert_eq!(collapse_blank_lines("a\nb\nc"), "a\nb\nc");
+    }
+
+    #[test]
+    fn indent_lines_adds_spaces() {
+        let result = indent_lines("hello\nworld", 4);
+        assert_eq!(result, "    hello\n    world");
+    }
+
+    #[test]
+    fn indent_lines_skips_blank() {
+        let result = indent_lines("hello\n\nworld", 2);
+        assert_eq!(result, "  hello\n\n  world");
+    }
+
+    #[test]
+    fn count_overlong_lines_counts() {
+        let text = "short\na very long line indeed\nok";
+        assert_eq!(count_overlong_lines(text, 5, 4), 1);
+        assert_eq!(count_overlong_lines(text, 100, 4), 0);
+    }
+
+    #[test]
+    fn extract_line_range_slices() {
+        let text = "zero\none\ntwo\nthree";
+        assert_eq!(extract_line_range(text, 1, 3), "one\ntwo");
+        assert_eq!(extract_line_range(text, 0, 1), "zero");
+        assert_eq!(extract_line_range(text, 3, 3), "");
     }
 }

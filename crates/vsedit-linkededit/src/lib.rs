@@ -856,6 +856,82 @@ impl LinkedEditGroup {
     }
 }
 
+/// Compute the total character span across all ranges, assuming single-line ranges.
+/// Returns `None` if any range is multi-line.
+pub fn total_span(ranges: &[LinkedEditingRange]) -> Option<u32> {
+    let mut total = 0u32;
+    for r in ranges {
+        if r.start_line != r.end_line {
+            return None;
+        }
+        total += r.end_col.saturating_sub(r.start_col);
+    }
+    Some(total)
+}
+
+/// Return only the ranges that are on a given line.
+pub fn ranges_on_line(ranges: &[LinkedEditingRange], line: u32) -> Vec<LinkedEditingRange> {
+    ranges
+        .iter()
+        .filter(|r| r.start_line <= line && r.end_line >= line)
+        .copied()
+        .collect()
+}
+
+/// Shift all ranges by a line delta (positive = down, wraps at zero for negative).
+pub fn shift_ranges(ranges: &[LinkedEditingRange], line_delta: i32) -> Vec<LinkedEditingRange> {
+    ranges
+        .iter()
+        .map(|r| LinkedEditingRange {
+            start_line: (r.start_line as i64 + line_delta as i64).max(0) as u32,
+            start_col: r.start_col,
+            end_line: (r.end_line as i64 + line_delta as i64).max(0) as u32,
+            end_col: r.end_col,
+        })
+        .collect()
+}
+
+/// Check whether two slices of ranges are identical in position.
+pub fn ranges_equal(a: &[LinkedEditingRange], b: &[LinkedEditingRange]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.iter().zip(b.iter()).all(|(x, y)| x == y)
+}
+
+/// Deduplicate ranges, removing exact duplicates while preserving order.
+pub fn deduplicate_ranges(ranges: &[LinkedEditingRange]) -> Vec<LinkedEditingRange> {
+    let mut seen = Vec::new();
+    for r in ranges {
+        if !seen.contains(r) {
+            seen.push(*r);
+        }
+    }
+    seen
+}
+
+/// Return the smallest bounding range that contains all given ranges.
+pub fn bounding_range(ranges: &[LinkedEditingRange]) -> Option<LinkedEditingRange> {
+    if ranges.is_empty() {
+        return None;
+    }
+    let mut min_line = u32::MAX;
+    let mut min_col = u32::MAX;
+    let mut max_line = 0u32;
+    let mut max_col = 0u32;
+    for r in ranges {
+        if r.start_line < min_line || (r.start_line == min_line && r.start_col < min_col) {
+            min_line = r.start_line;
+            min_col = r.start_col;
+        }
+        if r.end_line > max_line || (r.end_line == max_line && r.end_col > max_col) {
+            max_line = r.end_line;
+            max_col = r.end_col;
+        }
+    }
+    Some(LinkedEditingRange::new(min_line, min_col, max_line, max_col))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1627,5 +1703,115 @@ mod tests {
         assert_eq!(left.len(), 1);
         assert_eq!(right.len(), 2);
         assert_eq!(left.current_text, "foo");
+    }
+
+    #[test]
+    fn total_span_single_line_ranges() {
+        let ranges = vec![
+            LinkedEditingRange::new(0, 0, 0, 5),
+            LinkedEditingRange::new(0, 10, 0, 15),
+        ];
+        assert_eq!(total_span(&ranges), Some(10));
+    }
+
+    #[test]
+    fn total_span_multi_line_returns_none() {
+        let ranges = vec![LinkedEditingRange::new(0, 0, 1, 5)];
+        assert_eq!(total_span(&ranges), None);
+    }
+
+    #[test]
+    fn total_span_empty() {
+        assert_eq!(total_span(&[]), Some(0));
+    }
+
+    #[test]
+    fn ranges_on_line_filters_correctly() {
+        let ranges = vec![
+            LinkedEditingRange::new(0, 0, 0, 5),
+            LinkedEditingRange::new(1, 0, 1, 3),
+            LinkedEditingRange::new(2, 0, 2, 4),
+        ];
+        let on1 = ranges_on_line(&ranges, 1);
+        assert_eq!(on1.len(), 1);
+        assert_eq!(on1[0].start_col, 0);
+        assert_eq!(on1[0].end_col, 3);
+    }
+
+    #[test]
+    fn ranges_on_line_empty_input() {
+        assert!(ranges_on_line(&[], 5).is_empty());
+    }
+
+    #[test]
+    fn shift_ranges_positive_delta() {
+        let ranges = vec![LinkedEditingRange::new(1, 0, 1, 5)];
+        let shifted = shift_ranges(&ranges, 3);
+        assert_eq!(shifted[0].start_line, 4);
+        assert_eq!(shifted[0].end_line, 4);
+    }
+
+    #[test]
+    fn shift_ranges_negative_clamps_to_zero() {
+        let ranges = vec![LinkedEditingRange::new(1, 0, 1, 5)];
+        let shifted = shift_ranges(&ranges, -10);
+        assert_eq!(shifted[0].start_line, 0);
+        assert_eq!(shifted[0].end_line, 0);
+    }
+
+    #[test]
+    fn ranges_equal_identical() {
+        let a = vec![LinkedEditingRange::new(0, 0, 0, 5)];
+        let b = vec![LinkedEditingRange::new(0, 0, 0, 5)];
+        assert!(ranges_equal(&a, &b));
+    }
+
+    #[test]
+    fn ranges_equal_different_lengths() {
+        let a = vec![LinkedEditingRange::new(0, 0, 0, 5)];
+        let b: Vec<LinkedEditingRange> = vec![];
+        assert!(!ranges_equal(&a, &b));
+    }
+
+    #[test]
+    fn deduplicate_ranges_removes_dupes() {
+        let ranges = vec![
+            LinkedEditingRange::new(0, 0, 0, 5),
+            LinkedEditingRange::new(0, 0, 0, 5),
+            LinkedEditingRange::new(1, 0, 1, 3),
+        ];
+        let deduped = deduplicate_ranges(&ranges);
+        assert_eq!(deduped.len(), 2);
+    }
+
+    #[test]
+    fn deduplicate_ranges_empty() {
+        assert!(deduplicate_ranges(&[]).is_empty());
+    }
+
+    #[test]
+    fn bounding_range_single() {
+        let ranges = vec![LinkedEditingRange::new(2, 5, 4, 10)];
+        let b = bounding_range(&ranges).unwrap();
+        assert_eq!(b.start_line, 2);
+        assert_eq!(b.end_line, 4);
+    }
+
+    #[test]
+    fn bounding_range_multiple() {
+        let ranges = vec![
+            LinkedEditingRange::new(0, 3, 0, 8),
+            LinkedEditingRange::new(5, 0, 7, 2),
+        ];
+        let b = bounding_range(&ranges).unwrap();
+        assert_eq!(b.start_line, 0);
+        assert_eq!(b.start_col, 3);
+        assert_eq!(b.end_line, 7);
+        assert_eq!(b.end_col, 2);
+    }
+
+    #[test]
+    fn bounding_range_empty() {
+        assert!(bounding_range(&[]).is_none());
     }
 }

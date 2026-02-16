@@ -965,6 +965,72 @@ pub fn config_validate_value(value: &str, expected_type: ConfigValueType) -> Res
     }
 }
 
+// ---------------------------------------------------------------------------
+// Configuration key path utilities
+// ---------------------------------------------------------------------------
+
+/// Split a dotted configuration key into its segments.
+/// Returns `None` if the key is empty.
+pub fn config_key_segments(key: &str) -> Option<Vec<&str>> {
+    if key.is_empty() {
+        return None;
+    }
+    Some(key.split('.').collect())
+}
+
+/// Return the top-level namespace of a dotted key (everything before the first dot).
+pub fn config_key_namespace(key: &str) -> Option<&str> {
+    key.split('.').next().filter(|s| !s.is_empty())
+}
+
+/// Return the leaf portion of a dotted key (everything after the last dot).
+pub fn config_key_leaf(key: &str) -> Option<&str> {
+    key.rsplit('.').next().filter(|s| !s.is_empty() && key.contains('.'))
+}
+
+/// Count the depth (number of dots + 1) of a configuration key.
+pub fn config_key_depth(key: &str) -> usize {
+    if key.is_empty() {
+        return 0;
+    }
+    key.split('.').count()
+}
+
+/// Check whether `parent_key` is a prefix namespace of `child_key`.
+/// E.g. `"editor"` is a parent of `"editor.fontSize"`.
+pub fn config_key_is_parent(parent_key: &str, child_key: &str) -> bool {
+    if parent_key.is_empty() || child_key.is_empty() {
+        return false;
+    }
+    child_key.starts_with(parent_key) && child_key.as_bytes().get(parent_key.len()) == Some(&b'.')
+}
+
+/// Collect all distinct top-level namespaces from a model.
+pub fn config_namespaces(model: &ConfigurationModel) -> Vec<String> {
+    let mut ns: Vec<String> = model
+        .keys()
+        .iter()
+        .filter_map(|k| config_key_namespace(k))
+        .map(|s| s.to_string())
+        .collect();
+    ns.sort();
+    ns.dedup();
+    ns
+}
+
+/// Group configuration entries by their top-level namespace.
+pub fn config_group_by_namespace<'a>(
+    model: &'a ConfigurationModel,
+) -> HashMap<String, Vec<&'a ConfigurationEntry>> {
+    let mut groups: HashMap<String, Vec<&'a ConfigurationEntry>> = HashMap::new();
+    for entry in model.get_entries_by_prefix("") {
+        if let Some(ns) = config_key_namespace(&entry.key) {
+            groups.entry(ns.to_string()).or_default().push(entry);
+        }
+    }
+    groups
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1611,5 +1677,88 @@ mod tests {
         assert!(output.contains("# The A key"));
         assert!(output.contains("a.key = 1"));
         assert!(output.contains("b.key = 2"));
+    }
+
+    #[test]
+    fn config_key_segments_normal() {
+        let segs = config_key_segments("editor.fontSize").unwrap();
+        assert_eq!(segs, vec!["editor", "fontSize"]);
+    }
+
+    #[test]
+    fn config_key_segments_empty() {
+        assert!(config_key_segments("").is_none());
+    }
+
+    #[test]
+    fn config_key_segments_single() {
+        let segs = config_key_segments("editor").unwrap();
+        assert_eq!(segs, vec!["editor"]);
+    }
+
+    #[test]
+    fn config_key_namespace_extracts_first() {
+        assert_eq!(config_key_namespace("editor.fontSize"), Some("editor"));
+        assert_eq!(config_key_namespace("a.b.c"), Some("a"));
+    }
+
+    #[test]
+    fn config_key_namespace_empty() {
+        assert_eq!(config_key_namespace(""), None);
+    }
+
+    #[test]
+    fn config_key_leaf_extracts_last() {
+        assert_eq!(config_key_leaf("editor.fontSize"), Some("fontSize"));
+        assert_eq!(config_key_leaf("a.b.c"), Some("c"));
+    }
+
+    #[test]
+    fn config_key_leaf_no_dot() {
+        assert_eq!(config_key_leaf("editor"), None);
+    }
+
+    #[test]
+    fn config_key_depth_counts_segments() {
+        assert_eq!(config_key_depth(""), 0);
+        assert_eq!(config_key_depth("editor"), 1);
+        assert_eq!(config_key_depth("editor.fontSize"), 2);
+        assert_eq!(config_key_depth("a.b.c.d"), 4);
+    }
+
+    #[test]
+    fn config_key_is_parent_true() {
+        assert!(config_key_is_parent("editor", "editor.fontSize"));
+        assert!(config_key_is_parent("a", "a.b.c"));
+    }
+
+    #[test]
+    fn config_key_is_parent_false() {
+        assert!(!config_key_is_parent("editor", "editor"));
+        assert!(!config_key_is_parent("editor", "editorConfig.x"));
+        assert!(!config_key_is_parent("", "a.b"));
+    }
+
+    #[test]
+    fn config_namespaces_collects_unique() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        model.set("editor.tabSize".into(), "4".into(), ConfigurationScope::User);
+        model.set("terminal.shell".into(), "bash".into(), ConfigurationScope::User);
+        let ns = config_namespaces(&model);
+        assert_eq!(ns.len(), 2);
+        assert!(ns.contains(&"editor".to_string()));
+        assert!(ns.contains(&"terminal".to_string()));
+    }
+
+    #[test]
+    fn config_group_by_namespace_groups_correctly() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        model.set("editor.tabSize".into(), "4".into(), ConfigurationScope::User);
+        model.set("terminal.shell".into(), "bash".into(), ConfigurationScope::Workspace);
+        let groups = config_group_by_namespace(&model);
+        assert_eq!(groups.get("editor").unwrap().len(), 2);
+        assert_eq!(groups.get("terminal").unwrap().len(), 1);
     }
 }

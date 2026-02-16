@@ -1027,6 +1027,66 @@ impl LogAggregator {
     }
 }
 
+/// Count entries matching a specific log level across a slice of entries.
+pub fn count_at_level(entries: &[LogEntry], level: LogLevel) -> usize {
+    entries.iter().filter(|e| e.level == level).count()
+}
+
+/// Extract unique channel names from a slice of log entries.
+pub fn unique_channels(entries: &[LogEntry]) -> Vec<String> {
+    let mut channels: Vec<String> = entries.iter().map(|e| e.channel.clone()).collect();
+    channels.sort();
+    channels.dedup();
+    channels
+}
+
+/// Filter entries to only those within a time range (inclusive).
+pub fn entries_in_time_range(entries: &[LogEntry], start: u64, end: u64) -> Vec<&LogEntry> {
+    entries
+        .iter()
+        .filter(|e| e.timestamp >= start && e.timestamp <= end)
+        .collect()
+}
+
+/// Find the most recent entry (highest timestamp) in a slice.
+pub fn most_recent_entry(entries: &[LogEntry]) -> Option<&LogEntry> {
+    entries.iter().max_by_key(|e| e.timestamp)
+}
+
+/// Summarize entries: return a tuple (trace, debug, info, warning, error) counts.
+pub fn level_summary(entries: &[LogEntry]) -> (usize, usize, usize, usize, usize) {
+    let trace = count_at_level(entries, LogLevel::Trace);
+    let debug = count_at_level(entries, LogLevel::Debug);
+    let info = count_at_level(entries, LogLevel::Info);
+    let warning = count_at_level(entries, LogLevel::Warning);
+    let error = count_at_level(entries, LogLevel::Error);
+    (trace, debug, info, warning, error)
+}
+
+/// Group entries by channel, returning a map of channel -> entries.
+pub fn group_by_channel(entries: &[LogEntry]) -> HashMap<String, Vec<&LogEntry>> {
+    let mut map: HashMap<String, Vec<&LogEntry>> = HashMap::new();
+    for entry in entries {
+        map.entry(entry.channel.clone()).or_default().push(entry);
+    }
+    map
+}
+
+/// Check if any entry in the slice is an error.
+pub fn has_errors(entries: &[LogEntry]) -> bool {
+    entries.iter().any(|e| e.level == LogLevel::Error)
+}
+
+/// Check if any entry contains a substring in its message.
+pub fn has_message_containing(entries: &[LogEntry], substring: &str) -> bool {
+    entries.iter().any(|e| e.message.contains(substring))
+}
+
+/// Return entries sorted by timestamp (oldest first).
+pub fn sort_by_time(entries: &mut [LogEntry]) {
+    entries.sort_by_key(|e| e.timestamp);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1634,5 +1694,121 @@ mod tests {
 
         let results = viewer.search("user");
         assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn count_at_level_basic() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "ch", "msg1"),
+            LogEntry::new(LogLevel::Error, "ch", "msg2"),
+            LogEntry::new(LogLevel::Info, "ch", "msg3"),
+        ];
+        assert_eq!(count_at_level(&entries, LogLevel::Info), 2);
+        assert_eq!(count_at_level(&entries, LogLevel::Error), 1);
+        assert_eq!(count_at_level(&entries, LogLevel::Warning), 0);
+    }
+
+    #[test]
+    fn unique_channels_deduplicates() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "app", "msg"),
+            LogEntry::new(LogLevel::Info, "db", "msg"),
+            LogEntry::new(LogLevel::Info, "app", "msg2"),
+        ];
+        let channels = unique_channels(&entries);
+        assert_eq!(channels, vec!["app", "db"]);
+    }
+
+    #[test]
+    fn unique_channels_empty() {
+        let entries: Vec<LogEntry> = vec![];
+        assert!(unique_channels(&entries).is_empty());
+    }
+
+    #[test]
+    fn level_summary_counts() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Trace, "ch", "t"),
+            LogEntry::new(LogLevel::Debug, "ch", "d"),
+            LogEntry::new(LogLevel::Info, "ch", "i"),
+            LogEntry::new(LogLevel::Warning, "ch", "w"),
+            LogEntry::new(LogLevel::Error, "ch", "e"),
+        ];
+        let (t, d, i, w, e) = level_summary(&entries);
+        assert_eq!((t, d, i, w, e), (1, 1, 1, 1, 1));
+    }
+
+    #[test]
+    fn has_errors_true() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "ch", "ok"),
+            LogEntry::new(LogLevel::Error, "ch", "bad"),
+        ];
+        assert!(has_errors(&entries));
+    }
+
+    #[test]
+    fn has_errors_false() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "ch", "ok"),
+        ];
+        assert!(!has_errors(&entries));
+    }
+
+    #[test]
+    fn has_message_containing_found() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "ch", "user logged in"),
+            LogEntry::new(LogLevel::Info, "ch", "file saved"),
+        ];
+        assert!(has_message_containing(&entries, "logged"));
+    }
+
+    #[test]
+    fn has_message_containing_not_found() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "ch", "hello"),
+        ];
+        assert!(!has_message_containing(&entries, "goodbye"));
+    }
+
+    #[test]
+    fn group_by_channel_groups() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "app", "msg1"),
+            LogEntry::new(LogLevel::Info, "db", "msg2"),
+            LogEntry::new(LogLevel::Info, "app", "msg3"),
+        ];
+        let groups = group_by_channel(&entries);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups["app"].len(), 2);
+        assert_eq!(groups["db"].len(), 1);
+    }
+
+    #[test]
+    fn sort_by_time_orders_correctly() {
+        let mut entries = vec![
+            LogEntry { level: LogLevel::Info, channel: "ch".into(), message: "late".into(), timestamp: 200, source: None, data: None },
+            LogEntry { level: LogLevel::Info, channel: "ch".into(), message: "early".into(), timestamp: 100, source: None, data: None },
+        ];
+        sort_by_time(&mut entries);
+        assert_eq!(entries[0].message, "early");
+        assert_eq!(entries[1].message, "late");
+    }
+
+    #[test]
+    fn most_recent_entry_finds_latest() {
+        let entries = vec![
+            LogEntry { level: LogLevel::Info, channel: "ch".into(), message: "old".into(), timestamp: 10, source: None, data: None },
+            LogEntry { level: LogLevel::Info, channel: "ch".into(), message: "new".into(), timestamp: 99, source: None, data: None },
+        ];
+        let recent = most_recent_entry(&entries).unwrap();
+        assert_eq!(recent.message, "new");
+    }
+
+    #[test]
+    fn most_recent_entry_empty() {
+        let entries: Vec<LogEntry> = vec![];
+        assert!(most_recent_entry(&entries).is_none());
     }
 }

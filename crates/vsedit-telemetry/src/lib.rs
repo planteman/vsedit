@@ -949,6 +949,68 @@ impl TelemetryAggregator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Telemetry utility functions
+// ---------------------------------------------------------------------------
+
+/// Returns the names of all events in the service, in order.
+pub fn event_names(svc: &TelemetryService) -> Vec<&str> {
+    svc.get_events().iter().map(|e| e.name.as_str()).collect()
+}
+
+/// Returns only the events whose name starts with the given prefix.
+pub fn events_with_prefix<'a>(
+    events: &'a [TelemetryEvent],
+    prefix: &str,
+) -> Vec<&'a TelemetryEvent> {
+    events
+        .iter()
+        .filter(|e| e.name.starts_with(prefix))
+        .collect()
+}
+
+/// Returns the total of a named measurement across all events.
+pub fn sum_measurement(events: &[TelemetryEvent], key: &str) -> f64 {
+    events
+        .iter()
+        .flat_map(|e| &e.measurements)
+        .filter(|(k, _)| k == key)
+        .map(|(_, v)| v)
+        .sum()
+}
+
+/// Returns a de-duplicated sorted list of all property keys across events.
+pub fn all_property_keys(events: &[TelemetryEvent]) -> Vec<String> {
+    let mut keys: Vec<String> = events
+        .iter()
+        .flat_map(|e| e.properties.iter().map(|(k, _)| k.clone()))
+        .collect();
+    keys.sort();
+    keys.dedup();
+    keys
+}
+
+/// Returns `true` if any event has the given property key with the given value.
+pub fn has_property_value(events: &[TelemetryEvent], key: &str, value: &str) -> bool {
+    events
+        .iter()
+        .any(|e| e.properties.iter().any(|(k, v)| k == key && v == value))
+}
+
+/// Returns the count of events per event type.
+pub fn count_by_type(events: &[TelemetryEvent]) -> HashMap<String, usize> {
+    let mut map = HashMap::new();
+    for e in events {
+        *map.entry(format!("{}", e.event_type)).or_insert(0) += 1;
+    }
+    map
+}
+
+/// Returns the most recent event (highest timestamp), or `None` if empty.
+pub fn most_recent_event(events: &[TelemetryEvent]) -> Option<&TelemetryEvent> {
+    events.iter().max_by_key(|e| e.timestamp)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1624,5 +1686,84 @@ mod tests {
             .name("c").build().unwrap());
         assert_eq!(agg.count_with_property("source"), 2);
         assert_eq!(agg.count_with_property("missing"), 0);
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn test_event_names_empty() {
+        let svc = TelemetryService::new(TelemetryLevel::Usage);
+        assert!(event_names(&svc).is_empty());
+    }
+
+    #[test]
+    fn test_event_names_populated() {
+        let mut svc = TelemetryService::new(TelemetryLevel::Usage);
+        svc.log_event("open", vec![], vec![]);
+        svc.log_event("close", vec![], vec![]);
+        assert_eq!(event_names(&svc), vec!["open", "close"]);
+    }
+
+    #[test]
+    fn test_events_with_prefix() {
+        let events = vec![
+            TelemetryEventBuilder::new().name("editor.open").build().unwrap(),
+            TelemetryEventBuilder::new().name("editor.close").build().unwrap(),
+            TelemetryEventBuilder::new().name("terminal.open").build().unwrap(),
+        ];
+        let filtered = events_with_prefix(&events, "editor.");
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn test_sum_measurement() {
+        let events = vec![
+            TelemetryEventBuilder::new().name("a").measurement("dur", 10.0).build().unwrap(),
+            TelemetryEventBuilder::new().name("b").measurement("dur", 20.0).build().unwrap(),
+            TelemetryEventBuilder::new().name("c").measurement("other", 99.0).build().unwrap(),
+        ];
+        assert!((sum_measurement(&events, "dur") - 30.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_sum_measurement_missing() {
+        let events: Vec<TelemetryEvent> = vec![];
+        assert!((sum_measurement(&events, "dur") - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_all_property_keys() {
+        let events = vec![
+            TelemetryEventBuilder::new().name("a").property("src", "ui").build().unwrap(),
+            TelemetryEventBuilder::new().name("b").property("src", "api").property("lang", "en").build().unwrap(),
+        ];
+        let keys = all_property_keys(&events);
+        assert_eq!(keys, vec!["lang", "src"]);
+    }
+
+    #[test]
+    fn test_has_property_value_true() {
+        let events = vec![
+            TelemetryEventBuilder::new().name("x").property("env", "prod").build().unwrap(),
+        ];
+        assert!(has_property_value(&events, "env", "prod"));
+        assert!(!has_property_value(&events, "env", "dev"));
+    }
+
+    #[test]
+    fn test_count_by_type() {
+        let mut svc = TelemetryService::new(TelemetryLevel::Usage);
+        svc.log_event("a", vec![], vec![]);
+        svc.log_error("b", "err", None);
+        svc.log_event("c", vec![], vec![]);
+        let counts = count_by_type(svc.get_events());
+        assert_eq!(counts.get("Event"), Some(&2));
+        assert_eq!(counts.get("Error"), Some(&1));
+    }
+
+    #[test]
+    fn test_most_recent_event() {
+        let events: Vec<TelemetryEvent> = vec![];
+        assert!(most_recent_event(&events).is_none());
     }
 }

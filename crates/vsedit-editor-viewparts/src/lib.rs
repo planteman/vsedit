@@ -890,6 +890,66 @@ pub fn compute_column_layout(
     }
 }
 
+/// Collect all view zone IDs from an EditorViewParts instance.
+pub fn collect_view_zone_ids(parts: &EditorViewParts) -> Vec<u64> {
+    parts.get_view_zones().iter().map(|z| z.id).collect()
+}
+
+/// Compute the total extra height (in lines) contributed by all view zones.
+pub fn total_view_zone_height(parts: &EditorViewParts) -> u32 {
+    parts.get_view_zones().iter().map(|z| z.height_in_lines).sum()
+}
+
+/// Return all overlay widget IDs.
+pub fn overlay_widget_ids(parts: &EditorViewParts) -> Vec<String> {
+    parts.get_visible_overlays().iter().map(|o| o.id.clone()).collect()
+}
+
+/// Find a content widget by its ID, returning a reference if found.
+pub fn find_content_widget<'a>(parts: &'a EditorViewParts, id: &str) -> Option<&'a ContentWidget> {
+    parts.content_widgets.iter().find(|w| w.id == id)
+}
+
+/// Count glyph margin widgets on a specific line.
+pub fn glyph_count_on_line(parts: &EditorViewParts, line: u32) -> usize {
+    parts.glyph_margins.iter().filter(|g| g.line == line).count()
+}
+
+/// Return the set of unique lines that have any view zone after them.
+pub fn view_zone_lines(parts: &EditorViewParts) -> Vec<u32> {
+    let mut lines: Vec<u32> = parts
+        .get_view_zones()
+        .iter()
+        .map(|z| z.after_line)
+        .collect();
+    lines.sort();
+    lines.dedup();
+    lines
+}
+
+/// Determine if a line has any widget (zone, overlay, content, or glyph margin).
+pub fn line_has_widget(parts: &EditorViewParts, line: u32) -> bool {
+    !parts.get_widgets_at_line(line).is_empty()
+}
+
+/// Compute the maximum view zone height across all zones.
+pub fn max_view_zone_height(parts: &EditorViewParts) -> u32 {
+    parts
+        .get_view_zones()
+        .iter()
+        .map(|z| z.height_in_lines)
+        .max()
+        .unwrap_or(0)
+}
+
+/// Return the number of lines that the given line number mode would render
+/// as non-empty for lines 1..=total_lines with current_line.
+pub fn visible_line_number_count(total_lines: u32, current_line: u32, mode: LineNumberMode) -> u32 {
+    (1..=total_lines)
+        .filter(|&line| !format_line_number(line, current_line, mode).is_empty())
+        .count() as u32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1629,5 +1689,109 @@ mod tests {
         assert_eq!(layout.glyph_margin_width, 0);
         assert_eq!(layout.line_number_width, 0);
         assert_eq!(layout.content_left, 0);
+    }
+
+    #[test]
+    fn collect_view_zone_ids_returns_all() {
+        let mut parts = EditorViewParts::new();
+        let id1 = parts.add_view_zone(1, 3);
+        let id2 = parts.add_view_zone(5, 2);
+        let ids = collect_view_zone_ids(&parts);
+        assert_eq!(ids, vec![id1, id2]);
+    }
+
+    #[test]
+    fn total_view_zone_height_sums() {
+        let mut parts = EditorViewParts::new();
+        parts.add_view_zone(1, 3);
+        parts.add_view_zone(5, 2);
+        assert_eq!(total_view_zone_height(&parts), 5);
+    }
+
+    #[test]
+    fn total_view_zone_height_empty() {
+        let parts = EditorViewParts::new();
+        assert_eq!(total_view_zone_height(&parts), 0);
+    }
+
+    #[test]
+    fn overlay_widget_ids_visible_only() {
+        let mut parts = EditorViewParts::new();
+        parts.add_overlay(OverlayWidget {
+            id: "o1".into(), position_top: 0, position_left: 0,
+            content: "hi".into(), visible: true,
+        });
+        parts.add_overlay(OverlayWidget {
+            id: "o2".into(), position_top: 0, position_left: 0,
+            content: "bye".into(), visible: false,
+        });
+        let ids = overlay_widget_ids(&parts);
+        assert_eq!(ids, vec!["o1".to_string()]);
+    }
+
+    #[test]
+    fn find_content_widget_found() {
+        let mut parts = EditorViewParts::new();
+        parts.add_content_widget(ContentWidget {
+            id: "cw1".into(), line: 5, column: 0,
+            content: "note".into(), visible: true,
+        });
+        assert!(find_content_widget(&parts, "cw1").is_some());
+    }
+
+    #[test]
+    fn find_content_widget_not_found() {
+        let parts = EditorViewParts::new();
+        assert!(find_content_widget(&parts, "nope").is_none());
+    }
+
+    #[test]
+    fn glyph_count_on_line_filters() {
+        let mut parts = EditorViewParts::new();
+        parts.add_glyph_margin(GlyphMarginWidget { line: 3, glyph: "●".into(), tooltip: None });
+        parts.add_glyph_margin(GlyphMarginWidget { line: 3, glyph: "▶".into(), tooltip: None });
+        parts.add_glyph_margin(GlyphMarginWidget { line: 5, glyph: "●".into(), tooltip: None });
+        assert_eq!(glyph_count_on_line(&parts, 3), 2);
+        assert_eq!(glyph_count_on_line(&parts, 5), 1);
+        assert_eq!(glyph_count_on_line(&parts, 1), 0);
+    }
+
+    #[test]
+    fn view_zone_lines_unique_sorted() {
+        let mut parts = EditorViewParts::new();
+        parts.add_view_zone(5, 1);
+        parts.add_view_zone(2, 1);
+        parts.add_view_zone(5, 2);
+        let lines = view_zone_lines(&parts);
+        assert_eq!(lines, vec![2, 5]);
+    }
+
+    #[test]
+    fn line_has_widget_true_for_zone() {
+        let mut parts = EditorViewParts::new();
+        parts.add_view_zone(3, 2);
+        assert!(line_has_widget(&parts, 3));
+    }
+
+    #[test]
+    fn max_view_zone_height_picks_largest() {
+        let mut parts = EditorViewParts::new();
+        parts.add_view_zone(1, 3);
+        parts.add_view_zone(2, 7);
+        parts.add_view_zone(3, 1);
+        assert_eq!(max_view_zone_height(&parts), 7);
+    }
+
+    #[test]
+    fn visible_line_number_count_absolute() {
+        let count = visible_line_number_count(10, 5, LineNumberMode::Absolute);
+        assert_eq!(count, 10);
+    }
+
+    #[test]
+    fn visible_line_number_count_interval() {
+        // With interval 5 and current_line=1: lines 1,5,10 are shown
+        let count = visible_line_number_count(10, 1, LineNumberMode::Interval(5));
+        assert_eq!(count, 3); // 1 (current), 5, 10
     }
 }

@@ -1033,6 +1033,74 @@ impl AccessibilityNode {
     }
 }
 
+impl AccessibilityService {
+    /// Return all announcements without draining them.
+    pub fn peek_announcements(&self) -> &[Announcement] {
+        &self.announcements
+    }
+
+    /// Return true if there are any assertive announcements pending.
+    pub fn has_assertive_pending(&self) -> bool {
+        self.announcements
+            .iter()
+            .any(|a| matches!(a.priority, AnnouncementPriority::Assertive))
+    }
+
+    /// Return the total number of characters across all pending announcements.
+    pub fn total_announcement_chars(&self) -> usize {
+        self.announcements.iter().map(|a| a.message.len()).sum()
+    }
+}
+
+impl FocusTracker {
+    /// Return the ids of all tracked elements.
+    pub fn all_ids(&self) -> Vec<&str> {
+        self.focus_chain.iter().map(|s| s.as_str()).collect()
+    }
+
+    /// Return the index of the currently focused element, if any.
+    pub fn focused_index(&self) -> Option<usize> {
+        self.current_index
+    }
+}
+
+impl AnnouncementQueue {
+    /// Return the number of remaining slots before the queue is full.
+    pub fn remaining_capacity(&self) -> usize {
+        self.capacity.saturating_sub(self.len())
+    }
+
+    /// Return all messages as strings without draining.
+    pub fn peek_messages(&self) -> Vec<&str> {
+        self.queue.iter().map(|a| a.message.as_str()).collect()
+    }
+}
+
+impl AccessibilityNode {
+    /// Return the number of direct children.
+    pub fn child_count(&self) -> usize {
+        self.children.len()
+    }
+
+    /// Return true if this node has no children (is a leaf).
+    pub fn is_leaf(&self) -> bool {
+        self.children.is_empty()
+    }
+
+    /// Return the role of this node.
+    pub fn role(&self) -> AriaRole {
+        self.role
+    }
+}
+
+/// Format a summary of focus tracker state for screen readers.
+pub fn format_focus_summary(tracker: &FocusTracker) -> String {
+    match tracker.current_focus() {
+        Some(id) => format!("Focused on {} ({} of {})", id, tracker.focused_index().unwrap_or(0) + 1, tracker.len()),
+        None => "No element focused".to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1616,5 +1684,104 @@ mod tests {
         let path = root.path_to("leaf").unwrap();
         assert_eq!(path, vec!["root", "branch", "leaf"]);
         assert!(root.path_to("missing").is_none());
+    }
+
+    #[test]
+    fn peek_announcements_does_not_drain() {
+        let mut svc = AccessibilityService::new();
+        svc.announce_status("hello");
+        assert_eq!(svc.peek_announcements().len(), 1);
+        assert_eq!(svc.peek_announcements().len(), 1);
+    }
+
+    #[test]
+    fn has_assertive_pending_true() {
+        let mut svc = AccessibilityService::new();
+        svc.announce_alert("critical");
+        assert!(svc.has_assertive_pending());
+    }
+
+    #[test]
+    fn has_assertive_pending_false_when_only_polite() {
+        let mut svc = AccessibilityService::new();
+        svc.announce_status("info");
+        assert!(!svc.has_assertive_pending());
+    }
+
+    #[test]
+    fn total_announcement_chars() {
+        let mut svc = AccessibilityService::new();
+        svc.announce_status("abc");
+        svc.announce_alert("de");
+        assert_eq!(svc.total_announcement_chars(), 5);
+    }
+
+    #[test]
+    fn focus_tracker_all_ids() {
+        let mut ft = FocusTracker::new();
+        ft.push("a".into());
+        ft.push("b".into());
+        assert_eq!(ft.all_ids(), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn focus_tracker_current_index_empty() {
+        let ft = FocusTracker::new();
+        assert!(ft.focused_index().is_none());
+    }
+
+    #[test]
+    fn focus_tracker_current_index_with_items() {
+        let mut ft = FocusTracker::new();
+        ft.push("x".into());
+        assert_eq!(ft.focused_index(), Some(0));
+    }
+
+    #[test]
+    fn announcement_queue_remaining_capacity() {
+        let mut q = AnnouncementQueue::new(3);
+        q.enqueue_polite("a");
+        assert_eq!(q.remaining_capacity(), 2);
+    }
+
+    #[test]
+    fn announcement_queue_peek_messages() {
+        let mut q = AnnouncementQueue::new(10);
+        q.enqueue_polite("hello");
+        q.enqueue_assertive("alert");
+        let msgs = q.peek_messages();
+        assert_eq!(msgs, vec!["hello", "alert"]);
+    }
+
+    #[test]
+    fn node_child_count_and_is_leaf() {
+        let mut node = AccessibilityNode::new("parent", AriaRole::Tree);
+        assert!(node.is_leaf());
+        assert_eq!(node.child_count(), 0);
+        node.add_child(AccessibilityNode::new("child", AriaRole::TreeItem));
+        assert!(!node.is_leaf());
+        assert_eq!(node.child_count(), 1);
+    }
+
+    #[test]
+    fn node_role_accessor() {
+        let node = AccessibilityNode::new("btn", AriaRole::Button);
+        assert_eq!(node.role(), AriaRole::Button);
+    }
+
+    #[test]
+    fn format_focus_summary_empty() {
+        let ft = FocusTracker::new();
+        assert_eq!(format_focus_summary(&ft), "No element focused");
+    }
+
+    #[test]
+    fn format_focus_summary_with_focus() {
+        let mut ft = FocusTracker::new();
+        ft.push("editor".into());
+        ft.push("panel".into());
+        let s = format_focus_summary(&ft);
+        assert!(s.contains("editor"));
+        assert!(s.contains("1 of 2"));
     }
 }

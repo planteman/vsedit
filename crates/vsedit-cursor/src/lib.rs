@@ -883,6 +883,78 @@ pub fn cursor_summary(ctrl: &CursorController) -> CursorSummary {
 }
 
 // ---------------------------------------------------------------------------
+// Cursor distance and grouping utilities
+// ---------------------------------------------------------------------------
+
+/// Compute the Manhattan distance between two cursor positions.
+pub fn cursor_distance(a: &CursorState, b: &CursorState) -> u64 {
+    let pa = a.position();
+    let pb = b.position();
+    let line_diff = (pa.line as i64 - pb.line as i64).unsigned_abs();
+    let col_diff = (pa.column as i64 - pb.column as i64).unsigned_abs();
+    line_diff + col_diff
+}
+
+/// Find the cursor nearest to a given position among a slice of cursors.
+/// Returns `None` if the slice is empty.
+pub fn nearest_cursor(cursors: &[CursorState], target: Position) -> Option<usize> {
+    if cursors.is_empty() {
+        return None;
+    }
+    let target_state = CursorState::from_position(target);
+    let mut best_idx = 0;
+    let mut best_dist = cursor_distance(&cursors[0], &target_state);
+    for (i, c) in cursors.iter().enumerate().skip(1) {
+        let d = cursor_distance(c, &target_state);
+        if d < best_dist {
+            best_dist = d;
+            best_idx = i;
+        }
+    }
+    Some(best_idx)
+}
+
+/// Group cursors by their line number, returning a map from line to cursor indices.
+pub fn group_cursors_by_line(cursors: &[CursorState]) -> std::collections::BTreeMap<u32, Vec<usize>> {
+    let mut map = std::collections::BTreeMap::new();
+    for (i, c) in cursors.iter().enumerate() {
+        map.entry(c.position().line).or_insert_with(Vec::new).push(i);
+    }
+    map
+}
+
+/// Return only cursors that lie within the given line range (inclusive).
+pub fn filter_cursors_in_range(cursors: &[CursorState], start_line: u32, end_line: u32) -> Vec<CursorState> {
+    cursors
+        .iter()
+        .filter(|c| {
+            let line = c.position().line;
+            line >= start_line && line <= end_line
+        })
+        .cloned()
+        .collect()
+}
+
+/// Check if all cursors are on the same line.
+pub fn all_cursors_same_line(cursors: &[CursorState]) -> bool {
+    if cursors.len() <= 1 {
+        return true;
+    }
+    let first_line = cursors[0].position().line;
+    cursors.iter().all(|c| c.position().line == first_line)
+}
+
+/// Return the line span (max_line - min_line + 1) covered by the given cursors.
+pub fn cursor_line_span(cursors: &[CursorState]) -> u32 {
+    if cursors.is_empty() {
+        return 0;
+    }
+    let min = cursors.iter().map(|c| c.position().line).min().unwrap();
+    let max = cursors.iter().map(|c| c.position().line).max().unwrap();
+    max - min + 1
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1618,5 +1690,77 @@ mod tests {
         assert_eq!(s.min_line, 1);
         assert_eq!(s.max_line, 10);
         assert_eq!(s.lines_with_cursors, 3);
+    }
+
+    #[test]
+    fn cursor_distance_same_position() {
+        let a = cursor_at(1, 1);
+        let b = cursor_at(1, 1);
+        assert_eq!(cursor_distance(&a, &b), 0);
+    }
+
+    #[test]
+    fn cursor_distance_different_lines() {
+        let a = cursor_at(1, 1);
+        let b = cursor_at(5, 3);
+        assert_eq!(cursor_distance(&a, &b), 6); // 4 lines + 2 cols
+    }
+
+    #[test]
+    fn nearest_cursor_finds_closest() {
+        let cursors = vec![cursor_at(1, 1), cursor_at(10, 5), cursor_at(3, 2)];
+        let idx = nearest_cursor(&cursors, Position::new(3, 3)).unwrap();
+        assert_eq!(idx, 2);
+    }
+
+    #[test]
+    fn nearest_cursor_empty_returns_none() {
+        assert!(nearest_cursor(&[], Position::new(1, 1)).is_none());
+    }
+
+    #[test]
+    fn group_cursors_by_line_groups_correctly() {
+        let cursors = vec![cursor_at(1, 1), cursor_at(1, 5), cursor_at(3, 2)];
+        let groups = group_cursors_by_line(&cursors);
+        assert_eq!(groups[&1].len(), 2);
+        assert_eq!(groups[&3].len(), 1);
+    }
+
+    #[test]
+    fn filter_cursors_in_range_filters() {
+        let cursors = vec![cursor_at(1, 1), cursor_at(5, 1), cursor_at(10, 1)];
+        let filtered = filter_cursors_in_range(&cursors, 3, 7);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].position().line, 5);
+    }
+
+    #[test]
+    fn all_cursors_same_line_true() {
+        let cursors = vec![cursor_at(3, 1), cursor_at(3, 5), cursor_at(3, 10)];
+        assert!(all_cursors_same_line(&cursors));
+    }
+
+    #[test]
+    fn all_cursors_same_line_false() {
+        let cursors = vec![cursor_at(3, 1), cursor_at(4, 5)];
+        assert!(!all_cursors_same_line(&cursors));
+    }
+
+    #[test]
+    fn cursor_line_span_single() {
+        let cursors = vec![cursor_at(5, 1)];
+        assert_eq!(cursor_line_span(&cursors), 1);
+    }
+
+    #[test]
+    fn cursor_line_span_multiple() {
+        let cursors = vec![cursor_at(2, 1), cursor_at(8, 1), cursor_at(5, 1)];
+        assert_eq!(cursor_line_span(&cursors), 7);
+    }
+
+    #[test]
+    fn cursor_line_span_empty() {
+        let cursors: Vec<CursorState> = vec![];
+        assert_eq!(cursor_line_span(&cursors), 0);
     }
 }

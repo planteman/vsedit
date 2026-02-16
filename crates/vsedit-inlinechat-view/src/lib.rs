@@ -997,6 +997,75 @@ impl StreamSimulator {
     }
 }
 
+// ── Inline chat utilities ───────────────────────────────────────────────
+
+/// Count the total number of edits across all responses in a history.
+pub fn total_history_edits(history: &InlineChatHistory) -> usize {
+    history.entries().iter().map(|e| e.response.edits.len()).sum()
+}
+
+/// Compute the total word count of all response texts in a history.
+pub fn total_history_words(history: &InlineChatHistory) -> usize {
+    history
+        .entries()
+        .iter()
+        .map(|e| e.response.word_count())
+        .sum()
+}
+
+/// Find history entries whose prompts contain a given substring (case-insensitive).
+pub fn search_history_prompts<'a>(history: &'a InlineChatHistory, query: &str) -> Vec<&'a InlineChatHistoryEntry> {
+    let query_lower = query.to_lowercase();
+    history
+        .entries()
+        .iter()
+        .filter(|e| e.request.prompt.to_lowercase().contains(&query_lower))
+        .collect()
+}
+
+/// Return the average number of edits per response in a history.
+pub fn average_edits_per_response(history: &InlineChatHistory) -> f64 {
+    if history.is_empty() {
+        return 0.0;
+    }
+    total_history_edits(history) as f64 / history.len() as f64
+}
+
+/// Collect all unique URIs referenced in history requests.
+pub fn unique_history_uris(history: &InlineChatHistory) -> Vec<String> {
+    let mut uris: Vec<String> = history
+        .entries()
+        .iter()
+        .map(|e| e.request.uri.clone())
+        .collect();
+    uris.sort();
+    uris.dedup();
+    uris
+}
+
+/// Compute the total lines affected across all edits in a response.
+pub fn response_total_lines(response: &InlineChatResponse) -> u32 {
+    response
+        .edits
+        .iter()
+        .map(|e| e.original_line_span())
+        .sum()
+}
+
+/// Check if an edit range overlaps with a given line range.
+pub fn edit_overlaps_range(edit: &InlineChatEdit, start_line: u32, end_line: u32) -> bool {
+    edit.start_line <= end_line && edit.end_line >= start_line
+}
+
+/// Filter edits in a response to only those overlapping a given selection.
+pub fn edits_in_selection(response: &InlineChatResponse, start_line: u32, end_line: u32) -> Vec<&InlineChatEdit> {
+    response
+        .edits
+        .iter()
+        .filter(|e| edit_overlaps_range(e, start_line, end_line))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1637,5 +1706,115 @@ mod tests {
         let rest = stream.collect_remaining();
         assert_eq!(rest, "cdef");
         assert!(stream.is_done());
+    }
+
+    #[test]
+    fn total_history_edits_sums() {
+        let mut history = InlineChatHistory::new();
+        history.push(
+            sample_request(),
+            InlineChatResponse {
+                text: "r1".into(),
+                edits: vec![InlineChatEdit::new(0, 0, 1, 0, "a")],
+            },
+        );
+        history.push(
+            sample_request(),
+            InlineChatResponse {
+                text: "r2".into(),
+                edits: vec![InlineChatEdit::new(0, 0, 0, 5, "b"), InlineChatEdit::new(1, 0, 2, 0, "c")],
+            },
+        );
+        assert_eq!(total_history_edits(&history), 3);
+    }
+
+    #[test]
+    fn total_history_edits_empty() {
+        let history = InlineChatHistory::new();
+        assert_eq!(total_history_edits(&history), 0);
+    }
+
+    #[test]
+    fn total_history_words_sums() {
+        let mut history = InlineChatHistory::new();
+        history.push(
+            sample_request(),
+            InlineChatResponse { text: "one two three".into(), edits: vec![] },
+        );
+        history.push(
+            sample_request(),
+            InlineChatResponse { text: "four five".into(), edits: vec![] },
+        );
+        assert_eq!(total_history_words(&history), 5);
+    }
+
+    #[test]
+    fn search_history_prompts_finds() {
+        let mut history = InlineChatHistory::new();
+        let req1 = InlineChatRequest {
+            prompt: "Refactor this function".into(),
+            selection_start_line: 0,
+            selection_end_line: 5,
+            uri: "file:///a.rs".into(),
+        };
+        let req2 = InlineChatRequest {
+            prompt: "Add tests".into(),
+            selection_start_line: 0,
+            selection_end_line: 10,
+            uri: "file:///b.rs".into(),
+        };
+        history.push(req1, sample_response());
+        history.push(req2, sample_response());
+        assert_eq!(search_history_prompts(&history, "refactor").len(), 1);
+        assert_eq!(search_history_prompts(&history, "TESTS").len(), 1);
+        assert_eq!(search_history_prompts(&history, "delete").len(), 0);
+    }
+
+    #[test]
+    fn average_edits_per_response_computes() {
+        let history = InlineChatHistory::new();
+        assert_eq!(average_edits_per_response(&history), 0.0);
+
+        let mut h2 = InlineChatHistory::new();
+        h2.push(sample_request(), InlineChatResponse { text: "r".into(), edits: vec![InlineChatEdit::new(0, 0, 1, 0, "a"), InlineChatEdit::new(2, 0, 3, 0, "b")] });
+        h2.push(sample_request(), InlineChatResponse { text: "r".into(), edits: vec![] });
+        assert!((average_edits_per_response(&h2) - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn unique_history_uris_deduplicates() {
+        let mut history = InlineChatHistory::new();
+        let req_a = InlineChatRequest { prompt: "p".into(), selection_start_line: 0, selection_end_line: 1, uri: "file:///a.rs".into() };
+        let req_b = InlineChatRequest { prompt: "p".into(), selection_start_line: 0, selection_end_line: 1, uri: "file:///b.rs".into() };
+        let req_a2 = InlineChatRequest { prompt: "p".into(), selection_start_line: 0, selection_end_line: 1, uri: "file:///a.rs".into() };
+        history.push(req_a, sample_response());
+        history.push(req_b, sample_response());
+        history.push(req_a2, sample_response());
+        let uris = unique_history_uris(&history);
+        assert_eq!(uris.len(), 2);
+    }
+
+    #[test]
+    fn edit_overlaps_range_check() {
+        let edit = InlineChatEdit::new(5, 0, 10, 0, "x");
+        assert!(edit_overlaps_range(&edit, 3, 6));
+        assert!(edit_overlaps_range(&edit, 10, 15));
+        assert!(!edit_overlaps_range(&edit, 11, 15));
+        assert!(!edit_overlaps_range(&edit, 0, 4));
+    }
+
+    #[test]
+    fn edits_in_selection_filters() {
+        let response = InlineChatResponse {
+            text: "resp".into(),
+            edits: vec![
+                InlineChatEdit::new(1, 0, 3, 0, "a"),
+                InlineChatEdit::new(5, 0, 7, 0, "b"),
+                InlineChatEdit::new(10, 0, 12, 0, "c"),
+            ],
+        };
+        assert_eq!(edits_in_selection(&response, 4, 8).len(), 1);
+        assert_eq!(edits_in_selection(&response, 0, 100).len(), 3);
+        assert_eq!(edits_in_selection(&response, 13, 20).len(), 0);
     }
 }

@@ -1069,6 +1069,79 @@ pub fn count_lines(text: &str) -> usize {
     normalized.lines().count()
 }
 
+// ── Document query utilities ────────────────────────────────────────────
+
+/// Extract the file extension from a URI (e.g., "file:///foo.rs" → "rs").
+pub fn uri_extension(uri: &str) -> Option<&str> {
+    let path = uri.rsplit('/').next()?;
+    let dot_pos = path.rfind('.')?;
+    Some(&path[dot_pos + 1..])
+}
+
+/// Check if a URI matches a given language based on common extension mappings.
+pub fn uri_matches_language(uri: &str, language_id: &str) -> bool {
+    let ext = match uri_extension(uri) {
+        Some(e) => e,
+        None => return false,
+    };
+    match language_id {
+        "rust" => ext == "rs",
+        "javascript" => ext == "js" || ext == "mjs" || ext == "cjs",
+        "typescript" => ext == "ts" || ext == "mts" || ext == "cts",
+        "python" => ext == "py",
+        "go" => ext == "go",
+        "c" => ext == "c" || ext == "h",
+        "cpp" => ext == "cpp" || ext == "hpp" || ext == "cc",
+        "markdown" => ext == "md",
+        _ => false,
+    }
+}
+
+/// Count the number of edits that are pure insertions.
+pub fn count_insertions(edits: &[TextEdit]) -> usize {
+    edits.iter().filter(|e| e.is_insert()).count()
+}
+
+/// Count the number of edits that are pure deletions.
+pub fn count_deletions(edits: &[TextEdit]) -> usize {
+    edits.iter().filter(|e| e.is_delete()).count()
+}
+
+/// Return the total number of characters inserted across all edits.
+pub fn total_inserted_chars(edits: &[TextEdit]) -> usize {
+    edits.iter().map(|e| e.text.len()).sum()
+}
+
+/// Return the maximum line span across a set of edits.
+pub fn max_edit_span(edits: &[TextEdit]) -> u32 {
+    edits.iter().map(|e| e.span_lines()).max().unwrap_or(0)
+}
+
+/// Filter edits to only those affecting a specific line.
+pub fn edits_on_line(edits: &[TextEdit], line: u32) -> Vec<&TextEdit> {
+    edits
+        .iter()
+        .filter(|e| e.start_line <= line && e.end_line >= line)
+        .collect()
+}
+
+/// Validate all edits in a batch, returning the first error found.
+pub fn validate_edit_batch(edits: &[TextEdit]) -> Result<(), DocumentError> {
+    for edit in edits {
+        edit.validate()?;
+    }
+    Ok(())
+}
+
+/// Sort edits by their start position (line first, then column).
+pub fn sort_edits_by_position(edits: &mut [TextEdit]) {
+    edits.sort_by(|a, b| {
+        a.start_line
+            .cmp(&b.start_line)
+            .then(a.start_col.cmp(&b.start_col))
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1636,5 +1709,103 @@ mod tests {
         assert_eq!(count_lines("hello"), 1);
         assert_eq!(count_lines("a\nb\nc"), 3);
         assert_eq!(count_lines("a\r\nb\r\nc"), 3);
+    }
+
+    #[test]
+    fn uri_extension_extracts_ext() {
+        assert_eq!(uri_extension("file:///foo/bar.rs"), Some("rs"));
+        assert_eq!(uri_extension("file:///foo/bar.tar.gz"), Some("gz"));
+        assert_eq!(uri_extension("file:///noext"), None);
+        assert_eq!(uri_extension(""), None);
+    }
+
+    #[test]
+    fn uri_matches_language_rust() {
+        assert!(uri_matches_language("file:///main.rs", "rust"));
+        assert!(!uri_matches_language("file:///main.py", "rust"));
+        assert!(!uri_matches_language("file:///main.rs", "python"));
+    }
+
+    #[test]
+    fn uri_matches_language_various() {
+        assert!(uri_matches_language("file:///a.js", "javascript"));
+        assert!(uri_matches_language("file:///a.mjs", "javascript"));
+        assert!(uri_matches_language("file:///a.ts", "typescript"));
+        assert!(uri_matches_language("file:///a.py", "python"));
+        assert!(uri_matches_language("file:///a.go", "go"));
+        assert!(uri_matches_language("file:///a.md", "markdown"));
+        assert!(!uri_matches_language("file:///a.rs", "unknown_lang"));
+    }
+
+    #[test]
+    fn count_insertions_and_deletions() {
+        let edits = vec![
+            TextEdit { start_line: 0, start_col: 0, end_line: 0, end_col: 0, text: "hi".into() },
+            TextEdit { start_line: 1, start_col: 0, end_line: 2, end_col: 5, text: "".into() },
+            TextEdit { start_line: 3, start_col: 0, end_line: 3, end_col: 3, text: "new".into() },
+        ];
+        assert_eq!(count_insertions(&edits), 1);
+        assert_eq!(count_deletions(&edits), 1);
+    }
+
+    #[test]
+    fn total_inserted_chars_sums() {
+        let edits = vec![
+            TextEdit { start_line: 0, start_col: 0, end_line: 0, end_col: 0, text: "abc".into() },
+            TextEdit { start_line: 1, start_col: 0, end_line: 1, end_col: 0, text: "de".into() },
+        ];
+        assert_eq!(total_inserted_chars(&edits), 5);
+        assert_eq!(total_inserted_chars(&[]), 0);
+    }
+
+    #[test]
+    fn max_edit_span_finds_max() {
+        let edits = vec![
+            TextEdit { start_line: 0, start_col: 0, end_line: 0, end_col: 5, text: "x".into() },
+            TextEdit { start_line: 1, start_col: 0, end_line: 4, end_col: 0, text: "y".into() },
+        ];
+        assert_eq!(max_edit_span(&edits), 4);
+        assert_eq!(max_edit_span(&[]), 0);
+    }
+
+    #[test]
+    fn edits_on_line_filters() {
+        let edits = vec![
+            TextEdit { start_line: 0, start_col: 0, end_line: 0, end_col: 5, text: "a".into() },
+            TextEdit { start_line: 2, start_col: 0, end_line: 4, end_col: 0, text: "b".into() },
+            TextEdit { start_line: 5, start_col: 0, end_line: 5, end_col: 3, text: "c".into() },
+        ];
+        assert_eq!(edits_on_line(&edits, 0).len(), 1);
+        assert_eq!(edits_on_line(&edits, 3).len(), 1);
+        assert_eq!(edits_on_line(&edits, 1).len(), 0);
+    }
+
+    #[test]
+    fn validate_edit_batch_returns_first_error() {
+        let good = vec![
+            TextEdit { start_line: 0, start_col: 0, end_line: 1, end_col: 0, text: "ok".into() },
+        ];
+        assert!(validate_edit_batch(&good).is_ok());
+        assert!(validate_edit_batch(&[]).is_ok());
+
+        let bad = vec![
+            TextEdit { start_line: 5, start_col: 0, end_line: 2, end_col: 0, text: "bad".into() },
+        ];
+        assert!(validate_edit_batch(&bad).is_err());
+    }
+
+    #[test]
+    fn sort_edits_by_position_orders() {
+        let mut edits = vec![
+            TextEdit { start_line: 5, start_col: 3, end_line: 5, end_col: 10, text: "c".into() },
+            TextEdit { start_line: 1, start_col: 0, end_line: 1, end_col: 5, text: "a".into() },
+            TextEdit { start_line: 1, start_col: 5, end_line: 2, end_col: 0, text: "b".into() },
+        ];
+        sort_edits_by_position(&mut edits);
+        assert_eq!(edits[0].start_line, 1);
+        assert_eq!(edits[0].start_col, 0);
+        assert_eq!(edits[1].start_line, 1);
+        assert_eq!(edits[1].start_col, 5);
+        assert_eq!(edits[2].start_line, 5);
     }
 }

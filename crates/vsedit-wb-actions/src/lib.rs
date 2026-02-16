@@ -925,6 +925,80 @@ impl fmt::Display for ActionHistory {
     }
 }
 
+impl ActionHistory {
+    /// Return the number of failed entries.
+    pub fn failure_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.result.is_failure()).count()
+    }
+
+    /// Return the number of cancelled entries.
+    pub fn cancelled_count(&self) -> usize {
+        self.entries.iter().filter(|e| matches!(e.result, ActionExecutionResult::Cancelled)).count()
+    }
+
+    /// Return the most recently executed action ID, if any.
+    pub fn last_action_id(&self) -> Option<&str> {
+        self.last().map(|e| e.action_id.as_str())
+    }
+
+    /// Return true if the history contains an entry for the given action ID.
+    pub fn contains_action(&self, action_id: &str) -> bool {
+        self.entries.iter().any(|e| e.action_id == action_id)
+    }
+
+    /// Return success rate as a fraction (0.0 to 1.0).
+    pub fn success_rate(&self) -> f64 {
+        if self.entries.is_empty() { return 0.0; }
+        self.success_count() as f64 / self.len() as f64
+    }
+}
+
+impl ActionRegistry {
+    /// Return all action labels as a vector.
+    pub fn action_labels(&self) -> Vec<&str> {
+        self.actions.iter().map(|a| a.label.as_str()).collect()
+    }
+
+    /// Return actions that match a precondition substring (case-insensitive).
+    pub fn find_by_precondition(&self, query: &str) -> Vec<&Action> {
+        let q = query.to_lowercase();
+        self.actions.iter().filter(|a| {
+            a.precondition.as_ref().map_or(false, |p| p.to_lowercase().contains(&q))
+        }).collect()
+    }
+
+    /// Disable all actions in a given category. Returns how many were disabled.
+    pub fn disable_category(&mut self, category: ActionCategory) -> usize {
+        let mut count = 0;
+        for action in &mut self.actions {
+            if action.category == category && action.enabled {
+                action.enabled = false;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Enable all actions in the registry. Returns how many were newly enabled.
+    pub fn enable_all(&mut self) -> usize {
+        let mut count = 0;
+        for action in &mut self.actions {
+            if !action.enabled {
+                action.enabled = true;
+                count += 1;
+            }
+        }
+        count
+    }
+}
+
+/// Filter actions by whether they are enabled.
+pub fn partition_actions(actions: &[Action]) -> (Vec<&Action>, Vec<&Action>) {
+    let enabled: Vec<&Action> = actions.iter().filter(|a| a.enabled).collect();
+    let disabled: Vec<&Action> = actions.iter().filter(|a| !a.enabled).collect();
+    (enabled, disabled)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1601,5 +1675,91 @@ mod tests {
         hist.push("b", ActionExecutionResult::Cancelled);
         hist.clear();
         assert!(hist.is_empty());
+    }
+
+    #[test]
+    fn history_failure_and_cancelled_count() {
+        let mut hist = ActionHistory::new(10);
+        hist.push("a", ActionExecutionResult::Success);
+        hist.push("b", ActionExecutionResult::Failure("err".into()));
+        hist.push("c", ActionExecutionResult::Cancelled);
+        hist.push("d", ActionExecutionResult::Failure("err2".into()));
+        assert_eq!(hist.failure_count(), 2);
+        assert_eq!(hist.cancelled_count(), 1);
+    }
+
+    #[test]
+    fn history_last_action_id() {
+        let mut hist = ActionHistory::new(10);
+        assert_eq!(hist.last_action_id(), None);
+        hist.push("my.action", ActionExecutionResult::Success);
+        assert_eq!(hist.last_action_id(), Some("my.action"));
+    }
+
+    #[test]
+    fn history_contains_action() {
+        let mut hist = ActionHistory::new(10);
+        hist.push("action.a", ActionExecutionResult::Success);
+        assert!(hist.contains_action("action.a"));
+        assert!(!hist.contains_action("action.b"));
+    }
+
+    #[test]
+    fn history_success_rate() {
+        let mut hist = ActionHistory::new(10);
+        hist.push("a", ActionExecutionResult::Success);
+        hist.push("b", ActionExecutionResult::Success);
+        hist.push("c", ActionExecutionResult::Failure("err".into()));
+        hist.push("d", ActionExecutionResult::Cancelled);
+        assert!((hist.success_rate() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn registry_action_labels() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("a", ActionCategory::File));
+        reg.register(make_action("b", ActionCategory::Edit));
+        let labels = reg.action_labels();
+        assert_eq!(labels.len(), 2);
+    }
+
+    #[test]
+    fn registry_find_by_precondition() {
+        let mut reg = ActionRegistry::new();
+        let mut a = make_action("a", ActionCategory::File);
+        a.precondition = Some("editorIsOpen".into());
+        reg.register(a);
+        reg.register(make_action("b", ActionCategory::Edit));
+        let found = reg.find_by_precondition("editor");
+        assert_eq!(found.len(), 1);
+    }
+
+    #[test]
+    fn registry_disable_category_and_enable_all() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("a", ActionCategory::File));
+        reg.register(make_action("b", ActionCategory::File));
+        reg.register(make_action("c", ActionCategory::Edit));
+        let disabled = reg.disable_category(ActionCategory::File);
+        assert_eq!(disabled, 2);
+        assert_eq!(reg.get_disabled_actions().len(), 2);
+        let enabled = reg.enable_all();
+        assert_eq!(enabled, 2);
+        assert_eq!(reg.get_enabled_actions().len(), 3);
+    }
+
+    #[test]
+    fn partition_actions_splits() {
+        let actions = vec![
+            make_action("a", ActionCategory::File),
+            {
+                let mut a = make_action("b", ActionCategory::Edit);
+                a.enabled = false;
+                a
+            },
+        ];
+        let (enabled, disabled) = partition_actions(&actions);
+        assert_eq!(enabled.len(), 1);
+        assert_eq!(disabled.len(), 1);
     }
 }

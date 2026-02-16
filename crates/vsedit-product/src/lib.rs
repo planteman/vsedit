@@ -996,6 +996,75 @@ pub fn product_telemetry_config(config: &ProductConfiguration) -> TelemetryConfi
     }
 }
 
+impl ProductConfiguration {
+    /// Returns a list of all configured URL field names and their values.
+    pub fn configured_urls(&self) -> Vec<(&'static str, &str)> {
+        let mut urls = Vec::new();
+        if let Some(ref u) = self.report_issue_url { urls.push(("report_issue_url", u.as_str())); }
+        if let Some(ref u) = self.documentation_url { urls.push(("documentation_url", u.as_str())); }
+        if let Some(ref u) = self.release_notes_url { urls.push(("release_notes_url", u.as_str())); }
+        if let Some(ref u) = self.update_url { urls.push(("update_url", u.as_str())); }
+        if let Some(ref u) = self.license_url { urls.push(("license_url", u.as_str())); }
+        if let Some(ref u) = self.settings_sync_url { urls.push(("settings_sync_url", u.as_str())); }
+        urls
+    }
+
+    /// Returns a summary string with name, version, and quality.
+    pub fn summary_line(&self) -> String {
+        match &self.quality {
+            Some(q) => format!("{} v{} ({})", self.name_short, self.version, q),
+            None => format!("{} v{}", self.name_short, self.version),
+        }
+    }
+
+    /// Returns true if the product has a commit hash set.
+    pub fn has_commit(&self) -> bool {
+        self.commit.as_ref().map_or(false, |c| !c.is_empty())
+    }
+
+    /// Returns true if the product has a build date set.
+    pub fn has_date(&self) -> bool {
+        self.date.as_ref().map_or(false, |d| !d.is_empty())
+    }
+
+    /// Returns the major version number, or None if unparseable.
+    pub fn major_version(&self) -> Option<u32> {
+        self.version_tuple().map(|(maj, _, _)| maj)
+    }
+
+    /// Returns the minor version number, or None if unparseable.
+    pub fn minor_version(&self) -> Option<u32> {
+        self.version_tuple().map(|(_, min, _)| min)
+    }
+}
+
+/// Compare two version strings, returning the ordering.
+/// Returns None if either version is not parseable.
+pub fn compare_versions(a: &str, b: &str) -> Option<std::cmp::Ordering> {
+    let parse = |s: &str| -> Option<(u32, u32, u32)> {
+        let parts: Vec<&str> = s.split('.').collect();
+        if parts.len() != 3 { return None; }
+        Some((parts[0].parse().ok()?, parts[1].parse().ok()?, parts[2].parse().ok()?))
+    };
+    let va = parse(a)?;
+    let vb = parse(b)?;
+    Some(va.cmp(&vb))
+}
+
+/// Build a product identifier string: "application_name/version".
+pub fn product_identifier(config: &ProductConfiguration) -> String {
+    format!("{}/{}", config.application_name, config.version)
+}
+
+/// Check if two product configurations share the same gallery service URL.
+pub fn same_gallery_service(a: &ProductConfiguration, b: &ProductConfiguration) -> bool {
+    match (&a.extensions_gallery, &b.extensions_gallery) {
+        (Some(ga), Some(gb)) => ga.service_url == gb.service_url,
+        (None, None) => true,
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1597,5 +1666,75 @@ mod tests {
         assert!(!report.compatible);
         assert!(report.has_warnings());
         assert!(report.warnings.iter().any(|w| w.contains("application name")));
+    }
+
+    #[test]
+    fn configured_urls_returns_set_urls() {
+        let mut cfg = ProductConfiguration::default_config();
+        cfg.report_issue_url = Some("https://example.com/issue".into());
+        let urls = cfg.configured_urls();
+        assert_eq!(urls.len(), 1);
+        assert_eq!(urls[0].0, "report_issue_url");
+    }
+
+    #[test]
+    fn summary_line_with_quality() {
+        let cfg = ProductConfiguration::default_config();
+        let summary = cfg.summary_line();
+        assert!(summary.contains("vsedit"));
+        assert!(summary.contains(&cfg.version));
+    }
+
+    #[test]
+    fn summary_line_without_quality() {
+        let mut cfg = ProductConfiguration::default_config();
+        cfg.quality = None;
+        let summary = cfg.summary_line();
+        assert!(!summary.contains('('));
+    }
+
+    #[test]
+    fn has_commit_and_date() {
+        let mut cfg = ProductConfiguration::default_config();
+        assert!(!cfg.has_commit());
+        assert!(!cfg.has_date());
+        cfg.commit = Some("abc123".into());
+        cfg.date = Some("2024-01-01".into());
+        assert!(cfg.has_commit());
+        assert!(cfg.has_date());
+    }
+
+    #[test]
+    fn major_minor_version() {
+        let cfg = ProductConfiguration::default_config();
+        assert!(cfg.major_version().is_some());
+        assert!(cfg.minor_version().is_some());
+    }
+
+    #[test]
+    fn compare_versions_ordering() {
+        assert_eq!(compare_versions("1.0.0", "1.0.0"), Some(std::cmp::Ordering::Equal));
+        assert_eq!(compare_versions("1.0.0", "2.0.0"), Some(std::cmp::Ordering::Less));
+        assert_eq!(compare_versions("2.1.0", "1.9.9"), Some(std::cmp::Ordering::Greater));
+        assert_eq!(compare_versions("bad", "1.0.0"), None);
+    }
+
+    #[test]
+    fn product_identifier_format() {
+        let cfg = ProductConfiguration::default_config();
+        let id = product_identifier(&cfg);
+        assert!(id.contains('/'));
+        assert!(id.starts_with(&cfg.application_name));
+    }
+
+    #[test]
+    fn same_gallery_service_check() {
+        let a = ProductConfiguration::default_config();
+        let b = ProductConfiguration::default_config();
+        assert!(same_gallery_service(&a, &b));
+
+        let mut c = ProductConfiguration::default_config();
+        c.extensions_gallery = None;
+        assert!(!same_gallery_service(&a, &c));
     }
 }

@@ -982,6 +982,79 @@ impl FileTreeNode {
     }
 }
 
+// ---------------------------------------------------------------------------
+// File path analysis utilities
+// ---------------------------------------------------------------------------
+
+/// Return all unique file extensions from a slice of paths.
+pub fn file_unique_extensions(paths: &[&str]) -> Vec<String> {
+    let mut exts: Vec<String> = paths
+        .iter()
+        .filter_map(|p| FilePathUtils::extension(p))
+        .map(|e| e.to_string())
+        .collect();
+    exts.sort();
+    exts.dedup();
+    exts
+}
+
+/// Classify a list of paths into files and directories based on extension heuristic.
+/// Paths with an extension are treated as files, paths without as directories.
+pub fn file_classify_paths(paths: &[&str]) -> (Vec<String>, Vec<String>) {
+    let mut files = Vec::new();
+    let mut dirs = Vec::new();
+    for &p in paths {
+        if FilePathUtils::extension(p).is_some() {
+            files.push(p.to_string());
+        } else {
+            dirs.push(p.to_string());
+        }
+    }
+    (files, dirs)
+}
+
+/// Count how many paths share the same parent directory.
+pub fn file_count_by_parent<'a>(paths: &[&'a str]) -> std::collections::HashMap<&'a str, usize> {
+    let mut counts = std::collections::HashMap::new();
+    for &p in paths {
+        let parent = FilePathUtils::parent(p).unwrap_or("/");
+        *counts.entry(parent).or_insert(0) += 1;
+    }
+    counts
+}
+
+/// Find the longest common prefix among a set of paths.
+pub fn file_common_prefix(paths: &[&str]) -> String {
+    if paths.is_empty() {
+        return String::new();
+    }
+    let first = paths[0];
+    let mut prefix_len = first.len();
+    for p in &paths[1..] {
+        prefix_len = first
+            .chars()
+            .zip(p.chars())
+            .take(prefix_len)
+            .take_while(|(a, b)| a == b)
+            .count();
+    }
+    let prefix = &first[..first.char_indices().nth(prefix_len).map(|(i, _)| i).unwrap_or(first.len())];
+    // Trim to last separator so we return a complete path segment
+    match prefix.rfind('/') {
+        Some(idx) => prefix[..=idx].to_string(),
+        None => String::new(),
+    }
+}
+
+/// Return `true` if the file extension matches any in the given set (case-insensitive).
+pub fn file_has_extension(path: &str, extensions: &[&str]) -> bool {
+    if let Some(ext) = FilePathUtils::extension(path) {
+        extensions.iter().any(|e| e.eq_ignore_ascii_case(ext))
+    } else {
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1611,5 +1684,68 @@ mod tests {
         let removed = root.remove_child("a.txt");
         assert!(removed.is_some());
         assert!(root.find("a.txt").is_none());
+    }
+
+    #[test]
+    fn file_unique_extensions_deduplicates() {
+        let paths = vec!["a.rs", "b.rs", "c.txt", "d.txt", "e.py"];
+        let exts = file_unique_extensions(&paths);
+        assert_eq!(exts, vec!["py", "rs", "txt"]);
+    }
+
+    #[test]
+    fn file_unique_extensions_empty() {
+        let exts = file_unique_extensions(&[]);
+        assert!(exts.is_empty());
+    }
+
+    #[test]
+    fn file_classify_paths_separates() {
+        let paths = vec!["/src/main.rs", "/src", "/lib.rs", "/docs"];
+        let (files, dirs) = file_classify_paths(&paths);
+        assert_eq!(files.len(), 2);
+        assert_eq!(dirs.len(), 2);
+        assert!(files.contains(&"/src/main.rs".to_string()));
+        assert!(dirs.contains(&"/src".to_string()));
+    }
+
+    #[test]
+    fn file_count_by_parent_groups() {
+        let paths = vec!["/src/a.rs", "/src/b.rs", "/tests/t.rs"];
+        let counts = file_count_by_parent(&paths);
+        assert_eq!(counts.get("/src"), Some(&2));
+        assert_eq!(counts.get("/tests"), Some(&1));
+    }
+
+    #[test]
+    fn file_common_prefix_finds_shared() {
+        let paths = vec!["/home/user/project/src/a.rs", "/home/user/project/src/b.rs"];
+        let prefix = file_common_prefix(&paths);
+        assert_eq!(prefix, "/home/user/project/src/");
+    }
+
+    #[test]
+    fn file_common_prefix_empty_input() {
+        let prefix = file_common_prefix(&[]);
+        assert_eq!(prefix, "");
+    }
+
+    #[test]
+    fn file_common_prefix_no_common() {
+        let paths = vec!["abc", "xyz"];
+        let prefix = file_common_prefix(&paths);
+        assert_eq!(prefix, "");
+    }
+
+    #[test]
+    fn file_has_extension_matches_case_insensitive() {
+        assert!(file_has_extension("main.RS", &["rs", "py"]));
+        assert!(file_has_extension("lib.py", &["rs", "py"]));
+        assert!(!file_has_extension("readme.md", &["rs", "py"]));
+    }
+
+    #[test]
+    fn file_has_extension_no_ext() {
+        assert!(!file_has_extension("Makefile", &["rs"]));
     }
 }

@@ -1003,6 +1003,84 @@ impl fmt::Display for ShellInfo {
     }
 }
 
+// ── Platform query utilities ────────────────────────────────────────────
+
+/// Return the platform-appropriate path separator as a string.
+pub fn native_path_separator() -> &'static str {
+    if cfg!(target_os = "windows") { "\\" } else { "/" }
+}
+
+/// Return the platform-appropriate line ending.
+pub fn native_line_ending() -> &'static str {
+    if cfg!(target_os = "windows") { "\r\n" } else { "\n" }
+}
+
+/// Join path segments using the platform-native separator.
+pub fn join_native_path(segments: &[&str]) -> String {
+    segments.join(native_path_separator())
+}
+
+/// Check if a path string looks absolute for the detected platform.
+pub fn is_absolute_path(path: &str) -> bool {
+    if cfg!(target_os = "windows") {
+        path.len() >= 3 && path.as_bytes()[1] == b':' && (path.as_bytes()[2] == b'\\' || path.as_bytes()[2] == b'/')
+    } else {
+        path.starts_with('/')
+    }
+}
+
+/// Normalise a path string by replacing backslashes with forward slashes.
+pub fn normalize_path_separators(path: &str) -> String {
+    path.replace('\\', "/")
+}
+
+/// Return the platform name as a lowercase static string.
+pub fn platform_name() -> &'static str {
+    match Platform::current() {
+        Platform::Windows => "windows",
+        Platform::MacOS => "macos",
+        Platform::Linux => "linux",
+        Platform::FreeBSD => "freebsd",
+        Platform::Unknown => "unknown",
+    }
+}
+
+/// Check if the current platform is a Unix-like system.
+pub fn is_unix_like() -> bool {
+    matches!(Platform::current(), Platform::Linux | Platform::MacOS | Platform::FreeBSD)
+}
+
+/// Return a `PlatformCapabilities` with all features disabled.
+pub fn minimal_capabilities() -> PlatformCapabilities {
+    PlatformCapabilities {
+        true_color: false,
+        unicode: false,
+        mouse: false,
+        sixel: false,
+        kitty_graphics: false,
+        platform: Platform::current(),
+    }
+}
+
+/// Summarise platform capabilities as a human-readable string.
+pub fn capabilities_summary(caps: &PlatformCapabilities) -> String {
+    let features: Vec<&str> = [
+        caps.true_color.then_some("true-color"),
+        caps.unicode.then_some("unicode"),
+        caps.mouse.then_some("mouse"),
+        caps.sixel.then_some("sixel"),
+        caps.kitty_graphics.then_some("kitty-graphics"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if features.is_empty() {
+        format!("{}: no special features", caps.platform)
+    } else {
+        format!("{}: {}", caps.platform, features.join(", "))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1635,6 +1713,90 @@ mod tests {
         assert!(bash.is_posix);
         let cmd = ShellInfo::new("C:\\Windows\\cmd.exe", "cmd.exe", false);
         assert!(!cmd.is_posix);
+    }
+
+    #[test]
+    fn native_path_separator_not_empty() {
+        let sep = native_path_separator();
+        assert!(!sep.is_empty());
+        assert!(sep == "/" || sep == "\\");
+    }
+
+    #[test]
+    fn native_line_ending_valid() {
+        let eol = native_line_ending();
+        assert!(eol == "\n" || eol == "\r\n");
+    }
+
+    #[test]
+    fn join_native_path_segments() {
+        let result = join_native_path(&["home", "user", "file.txt"]);
+        assert!(result.contains("user"));
+        assert!(result.contains("file.txt"));
+        assert_eq!(join_native_path(&[]), "");
+    }
+
+    #[test]
+    fn is_absolute_path_unix() {
+        if cfg!(not(target_os = "windows")) {
+            assert!(is_absolute_path("/home/user"));
+            assert!(!is_absolute_path("relative/path"));
+            assert!(!is_absolute_path(""));
+        }
+    }
+
+    #[test]
+    fn normalize_path_separators_converts() {
+        assert_eq!(normalize_path_separators("a\\b\\c"), "a/b/c");
+        assert_eq!(normalize_path_separators("a/b/c"), "a/b/c");
+        assert_eq!(normalize_path_separators(""), "");
+    }
+
+    #[test]
+    fn platform_name_returns_known() {
+        let name = platform_name();
+        assert!(["windows", "macos", "linux", "freebsd", "unknown"].contains(&name));
+    }
+
+    #[test]
+    fn is_unix_like_consistent() {
+        let unix = is_unix_like();
+        if cfg!(target_os = "linux") || cfg!(target_os = "macos") || cfg!(target_os = "freebsd") {
+            assert!(unix);
+        }
+    }
+
+    #[test]
+    fn minimal_capabilities_all_false() {
+        let caps = minimal_capabilities();
+        assert!(!caps.true_color);
+        assert!(!caps.unicode);
+        assert!(!caps.mouse);
+        assert!(!caps.sixel);
+        assert!(!caps.kitty_graphics);
+    }
+
+    #[test]
+    fn capabilities_summary_no_features() {
+        let caps = minimal_capabilities();
+        let summary = capabilities_summary(&caps);
+        assert!(summary.contains("no special features"));
+    }
+
+    #[test]
+    fn capabilities_summary_with_features() {
+        let caps = PlatformCapabilities {
+            true_color: true,
+            unicode: true,
+            mouse: false,
+            sixel: false,
+            kitty_graphics: false,
+            platform: Platform::Linux,
+        };
+        let summary = capabilities_summary(&caps);
+        assert!(summary.contains("true-color"));
+        assert!(summary.contains("unicode"));
+        assert!(!summary.contains("mouse"));
     }
 
 }

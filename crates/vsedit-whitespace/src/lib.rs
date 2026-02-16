@@ -1089,6 +1089,75 @@ pub fn whitespace_iter(line: &str, tab_size: usize) -> WhitespaceIter<'_> {
     WhitespaceIter::new(line, tab_size)
 }
 
+/// Count the number of leading whitespace characters (spaces and tabs) in a line.
+pub fn leading_whitespace_count(line: &str) -> usize {
+    line.chars().take_while(|c| *c == ' ' || *c == '\t').count()
+}
+
+/// Replace all non-breaking spaces (U+00A0) with regular spaces.
+pub fn normalize_nbsp(text: &str) -> String {
+    text.replace('\u{00A0}', " ")
+}
+
+/// Check if a line consists entirely of whitespace.
+pub fn is_blank_line(line: &str) -> bool {
+    line.chars().all(|c| c.is_whitespace())
+}
+
+/// Count blank lines in a multi-line text.
+pub fn count_blank_lines(text: &str) -> usize {
+    text.lines().filter(|line| is_blank_line(line)).count()
+}
+
+/// Extract the indentation prefix (leading whitespace) from a line.
+pub fn extract_indentation(line: &str) -> &str {
+    let end = line.len() - line.trim_start().len();
+    &line[..end]
+}
+
+/// Compute the visual column width of a string, expanding tabs.
+pub fn visual_width(text: &str, tab_size: usize) -> usize {
+    let mut col = 0;
+    for ch in text.chars() {
+        match ch {
+            '\t' => {
+                col += tab_size - (col % tab_size);
+            }
+            _ => {
+                col += 1;
+            }
+        }
+    }
+    col
+}
+
+/// Return the line with the deepest indentation in the text.
+pub fn max_indentation_line(text: &str, tab_size: usize) -> Option<usize> {
+    text.lines()
+        .enumerate()
+        .max_by_key(|(_, line)| indentation_width(line, tab_size))
+        .map(|(i, _)| i)
+}
+
+/// Detect if a text uses predominantly tabs or spaces for indentation.
+pub fn detect_dominant_indentation(text: &str) -> WhitespaceKind {
+    let mut tab_lines = 0usize;
+    let mut space_lines = 0usize;
+    for line in text.lines() {
+        let first = line.chars().next();
+        match first {
+            Some('\t') => tab_lines += 1,
+            Some(' ') => space_lines += 1,
+            _ => {}
+        }
+    }
+    if tab_lines >= space_lines {
+        WhitespaceKind::Tab
+    } else {
+        WhitespaceKind::Space
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1630,5 +1699,91 @@ mod tests {
         assert_eq!(IndentationStyle::Spaces(2).to_string(), "2 spaces");
         assert_eq!(IndentationStyle::Mixed.to_string(), "mixed");
         assert_eq!(IndentationStyle::Unknown.to_string(), "unknown");
+    }
+
+    #[test]
+    fn leading_whitespace_count_spaces() {
+        assert_eq!(leading_whitespace_count("    hello"), 4);
+    }
+
+    #[test]
+    fn leading_whitespace_count_tabs() {
+        assert_eq!(leading_whitespace_count("\t\thello"), 2);
+    }
+
+    #[test]
+    fn leading_whitespace_count_none() {
+        assert_eq!(leading_whitespace_count("hello"), 0);
+    }
+
+    #[test]
+    fn normalize_nbsp_replaces() {
+        let input = "hello\u{00A0}world";
+        assert_eq!(normalize_nbsp(input), "hello world");
+    }
+
+    #[test]
+    fn normalize_nbsp_no_change() {
+        assert_eq!(normalize_nbsp("hello world"), "hello world");
+    }
+
+    #[test]
+    fn is_blank_line_true() {
+        assert!(is_blank_line("   \t  "));
+        assert!(is_blank_line(""));
+    }
+
+    #[test]
+    fn is_blank_line_false() {
+        assert!(!is_blank_line("  x "));
+    }
+
+    #[test]
+    fn count_blank_lines_basic() {
+        let text = "hello\n\n  \nworld\n";
+        assert_eq!(count_blank_lines(text), 2);
+    }
+
+    #[test]
+    fn extract_indentation_spaces() {
+        assert_eq!(extract_indentation("    foo"), "    ");
+    }
+
+    #[test]
+    fn extract_indentation_none() {
+        assert_eq!(extract_indentation("foo"), "");
+    }
+
+    #[test]
+    fn visual_width_no_tabs() {
+        assert_eq!(visual_width("hello", 4), 5);
+    }
+
+    #[test]
+    fn visual_width_with_tab() {
+        assert_eq!(visual_width("\thello", 4), 9);
+    }
+
+    #[test]
+    fn max_indentation_line_basic() {
+        let text = "no indent\n  two\n    four\n  two";
+        assert_eq!(max_indentation_line(text, 4), Some(2));
+    }
+
+    #[test]
+    fn max_indentation_line_single() {
+        assert_eq!(max_indentation_line("hello", 4), Some(0));
+    }
+
+    #[test]
+    fn detect_dominant_indentation_tabs() {
+        let text = "\tline1\n\tline2\n line3";
+        assert_eq!(detect_dominant_indentation(text), WhitespaceKind::Tab);
+    }
+
+    #[test]
+    fn detect_dominant_indentation_spaces() {
+        let text = "  line1\n  line2\n\tline3";
+        assert_eq!(detect_dominant_indentation(text), WhitespaceKind::Space);
     }
 }

@@ -954,6 +954,74 @@ impl DecorationBridge {
     }
 }
 
+/// Count total decoration ranges across all applied entries for a given type key.
+pub fn count_ranges_for_type(bridge: &DecorationBridge, key: &str) -> usize {
+    bridge
+        .decorations_for_uri("")
+        .iter()
+        .count();
+    // Actually count across all applied
+    let mut total = 0;
+    for (k, _uri, ranges) in &bridge.applied {
+        if k == key {
+            total += ranges.len();
+        }
+    }
+    total
+}
+
+/// Return the set of unique URIs that have decorations applied.
+pub fn decorated_uris(bridge: &DecorationBridge) -> Vec<String> {
+    let mut uris: Vec<String> = bridge
+        .applied
+        .iter()
+        .map(|(_, uri, _)| uri.clone())
+        .collect();
+    uris.sort();
+    uris.dedup();
+    uris
+}
+
+/// Check if a decoration options range covers a specific line.
+pub fn decoration_covers_line(opt: &DecorationOptions, line: u32) -> bool {
+    opt.start_line <= line && opt.end_line >= line
+}
+
+/// Filter decoration options to only those covering a specific line.
+pub fn decorations_at_line(options: &[DecorationOptions], line: u32) -> Vec<&DecorationOptions> {
+    options
+        .iter()
+        .filter(|o| decoration_covers_line(o, line))
+        .collect()
+}
+
+/// Compute a summary of render options: how many style properties are set.
+pub fn render_options_style_count(opts: &DecorationRenderOptions) -> usize {
+    let mut count = 0;
+    if opts.background_color.is_some() { count += 1; }
+    if opts.border.is_some() { count += 1; }
+    if opts.color.is_some() { count += 1; }
+    if opts.font_style.is_some() { count += 1; }
+    if opts.font_weight.is_some() { count += 1; }
+    if opts.is_whole_line { count += 1; }
+    count
+}
+
+/// Merge two DecorationRenderOptions, with `overlay` values taking precedence.
+pub fn merge_render_options(
+    base: &DecorationRenderOptions,
+    overlay: &DecorationRenderOptions,
+) -> DecorationRenderOptions {
+    DecorationRenderOptions {
+        background_color: overlay.background_color.clone().or_else(|| base.background_color.clone()),
+        border: overlay.border.clone().or_else(|| base.border.clone()),
+        color: overlay.color.clone().or_else(|| base.color.clone()),
+        font_style: overlay.font_style.clone().or_else(|| base.font_style.clone()),
+        font_weight: overlay.font_weight.clone().or_else(|| base.font_weight.clone()),
+        is_whole_line: overlay.is_whole_line || base.is_whole_line,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1628,5 +1696,121 @@ mod tests {
         assert_eq!(bridge.applied_count(), 2);
         bridge.clear_uris_batch(&["file:///a.rs", "file:///b.rs"]);
         assert_eq!(bridge.applied_count(), 0);
+    }
+
+    #[test]
+    fn count_ranges_for_type_basic() {
+        let mut bridge = DecorationBridge::new();
+        let opts = RenderOptionsBuilder::new().build();
+        bridge.register_type("hl", opts);
+        let r = DecorationOptions {
+            start_line: 0, start_character: 0,
+            end_line: 0, end_character: 5,
+            hover_message: None,
+        };
+        bridge.set_decorations("hl", "file:///a.rs", vec![r.clone(), r.clone()]);
+        bridge.set_decorations("hl", "file:///b.rs", vec![r]);
+        assert_eq!(count_ranges_for_type(&bridge, "hl"), 3);
+    }
+
+    #[test]
+    fn count_ranges_for_type_unknown_key() {
+        let bridge = DecorationBridge::new();
+        assert_eq!(count_ranges_for_type(&bridge, "nope"), 0);
+    }
+
+    #[test]
+    fn decorated_uris_deduplicates() {
+        let mut bridge = DecorationBridge::new();
+        let opts = RenderOptionsBuilder::new().build();
+        bridge.register_type("a", opts.clone());
+        bridge.register_type("b", opts);
+        let r = DecorationOptions {
+            start_line: 0, start_character: 0,
+            end_line: 0, end_character: 1,
+            hover_message: None,
+        };
+        bridge.set_decorations("a", "file:///x.rs", vec![r.clone()]);
+        bridge.set_decorations("b", "file:///x.rs", vec![r]);
+        let uris = decorated_uris(&bridge);
+        assert_eq!(uris.len(), 1);
+        assert_eq!(uris[0], "file:///x.rs");
+    }
+
+    #[test]
+    fn decorated_uris_empty() {
+        let bridge = DecorationBridge::new();
+        assert!(decorated_uris(&bridge).is_empty());
+    }
+
+    #[test]
+    fn decoration_covers_line_true() {
+        let opt = DecorationOptions {
+            start_line: 2, start_character: 0,
+            end_line: 5, end_character: 10,
+            hover_message: None,
+        };
+        assert!(decoration_covers_line(&opt, 3));
+        assert!(decoration_covers_line(&opt, 2));
+        assert!(decoration_covers_line(&opt, 5));
+    }
+
+    #[test]
+    fn decoration_covers_line_false() {
+        let opt = DecorationOptions {
+            start_line: 2, start_character: 0,
+            end_line: 5, end_character: 10,
+            hover_message: None,
+        };
+        assert!(!decoration_covers_line(&opt, 0));
+        assert!(!decoration_covers_line(&opt, 6));
+    }
+
+    #[test]
+    fn decorations_at_line_filters() {
+        let opts = vec![
+            DecorationOptions { start_line: 0, start_character: 0, end_line: 0, end_character: 5, hover_message: None },
+            DecorationOptions { start_line: 1, start_character: 0, end_line: 3, end_character: 5, hover_message: None },
+            DecorationOptions { start_line: 5, start_character: 0, end_line: 5, end_character: 5, hover_message: None },
+        ];
+        let at1 = decorations_at_line(&opts, 2);
+        assert_eq!(at1.len(), 1);
+        assert_eq!(at1[0].start_line, 1);
+    }
+
+    #[test]
+    fn render_options_style_count_all_set() {
+        let opts = RenderOptionsBuilder::new()
+            .background_color("red")
+            .border("1px solid")
+            .color("blue")
+            .font_style("italic")
+            .font_weight("bold")
+            .whole_line(true)
+            .build();
+        assert_eq!(render_options_style_count(&opts), 6);
+    }
+
+    #[test]
+    fn render_options_style_count_none_set() {
+        let opts = RenderOptionsBuilder::new().build();
+        assert_eq!(render_options_style_count(&opts), 0);
+    }
+
+    #[test]
+    fn merge_render_options_overlay_wins() {
+        let base = RenderOptionsBuilder::new().background_color("red").build();
+        let overlay = RenderOptionsBuilder::new().background_color("blue").color("green").build();
+        let merged = merge_render_options(&base, &overlay);
+        assert_eq!(merged.background_color.as_deref(), Some("blue"));
+        assert_eq!(merged.color.as_deref(), Some("green"));
+    }
+
+    #[test]
+    fn merge_render_options_base_fills_gaps() {
+        let base = RenderOptionsBuilder::new().font_style("italic").build();
+        let overlay = RenderOptionsBuilder::new().build();
+        let merged = merge_render_options(&base, &overlay);
+        assert_eq!(merged.font_style.as_deref(), Some("italic"));
     }
 }

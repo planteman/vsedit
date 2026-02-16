@@ -1030,6 +1030,71 @@ pub fn requires_user_action(error: &VsError) -> bool {
     )
 }
 
+// ---------------------------------------------------------------------------
+// Error categorization and utility helpers
+// ---------------------------------------------------------------------------
+
+/// Classify an error as transient (might succeed on retry) or permanent.
+pub fn is_transient(error: &VsError) -> bool {
+    matches!(error, VsError::Cancelled | VsError::Io(_))
+}
+
+/// Classify an error as a permission-related issue.
+pub fn is_permission_error(error: &VsError) -> bool {
+    matches!(
+        error,
+        VsError::PermissionDenied(_) | VsError::ReadOnly(_)
+    )
+}
+
+/// Extract the inner message string from a VsError variant, if any.
+pub fn error_inner_message(error: &VsError) -> Option<&str> {
+    match error {
+        VsError::Cancelled | VsError::Io(_) | VsError::Other(_) => None,
+        VsError::NotSupported(s)
+        | VsError::NotFound(s)
+        | VsError::NotImplemented(s)
+        | VsError::IllegalArgument(s)
+        | VsError::IllegalState(s)
+        | VsError::ReadOnly(s)
+        | VsError::PermissionDenied(s)
+        | VsError::User(s) => Some(s.as_str()),
+    }
+}
+
+/// Map a VsError to a different variant while preserving the inner message.
+///
+/// For variants without a `String` payload (`Cancelled`, `Io`, `Other`) the
+/// error is returned unchanged.
+pub fn map_error_variant(error: VsError, f: impl FnOnce(String) -> VsError) -> VsError {
+    match error {
+        VsError::Cancelled | VsError::Io(_) | VsError::Other(_) => error,
+        VsError::NotSupported(s)
+        | VsError::NotFound(s)
+        | VsError::NotImplemented(s)
+        | VsError::IllegalArgument(s)
+        | VsError::IllegalState(s)
+        | VsError::ReadOnly(s)
+        | VsError::PermissionDenied(s)
+        | VsError::User(s) => f(s),
+    }
+}
+
+/// Count errors by variant name in an accumulator.
+pub fn count_by_variant(acc: &ErrorAccumulator) -> std::collections::HashMap<&'static str, usize> {
+    let mut counts = std::collections::HashMap::new();
+    for record in acc.records() {
+        let key = record.error.code();
+        *counts.entry(key).or_insert(0) += 1;
+    }
+    counts
+}
+
+/// Return the most recent error record from an accumulator, if any.
+pub fn most_recent_record(acc: &ErrorAccumulator) -> Option<&ErrorRecord> {
+    acc.records().last()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1619,5 +1684,84 @@ mod tests {
         assert!(requires_user_action(&VsError::User("oops".into())));
         assert!(!requires_user_action(&VsError::Cancelled));
         assert!(!requires_user_action(&VsError::IllegalState("bad".into())));
+    }
+
+    #[test]
+    fn is_transient_timeout() {
+        assert!(is_transient(&VsError::Io(std::io::Error::new(
+            std::io::ErrorKind::TimedOut,
+            "slow",
+        ))));
+    }
+
+    #[test]
+    fn is_transient_not_found() {
+        assert!(!is_transient(&VsError::NotFound("x".into())));
+    }
+
+    #[test]
+    fn is_permission_error_denied() {
+        assert!(is_permission_error(&VsError::PermissionDenied("no".into())));
+        assert!(is_permission_error(&VsError::ReadOnly("ro".into())));
+    }
+
+    #[test]
+    fn is_permission_error_other() {
+        assert!(!is_permission_error(&VsError::Cancelled));
+        assert!(!is_permission_error(&VsError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "disk",
+        ))));
+    }
+
+    #[test]
+    fn error_inner_message_some() {
+        let e = VsError::NotFound("file.txt".into());
+        assert_eq!(error_inner_message(&e), Some("file.txt"));
+    }
+
+    #[test]
+    fn error_inner_message_cancelled() {
+        assert_eq!(error_inner_message(&VsError::Cancelled), None);
+    }
+
+    #[test]
+    fn map_error_variant_preserves_message() {
+        let e = VsError::NotFound("disk full".into());
+        let mapped = map_error_variant(e, |s| VsError::User(s));
+        assert_eq!(error_inner_message(&mapped), Some("disk full"));
+    }
+
+    #[test]
+    fn map_error_variant_cancelled_unchanged() {
+        let e = VsError::Cancelled;
+        let mapped = map_error_variant(e, |s| VsError::User(s));
+        assert!(is_cancelled(&mapped));
+    }
+
+    #[test]
+    fn count_by_variant_counts() {
+        let mut acc = ErrorAccumulator::new();
+        acc.push(VsError::NotFound("a".into()));
+        acc.push(VsError::NotFound("b".into()));
+        acc.push(VsError::User("c".into()));
+        let counts = count_by_variant(&acc);
+        assert_eq!(counts["NOT_FOUND"], 2);
+        assert_eq!(counts["USER_ERROR"], 1);
+    }
+
+    #[test]
+    fn most_recent_record_empty() {
+        let acc = ErrorAccumulator::new();
+        assert!(most_recent_record(&acc).is_none());
+    }
+
+    #[test]
+    fn most_recent_record_returns_last() {
+        let mut acc = ErrorAccumulator::new();
+        acc.push(VsError::NotFound("first".into()));
+        acc.push(VsError::User("second".into()));
+        let rec = most_recent_record(&acc).unwrap();
+        assert_eq!(error_inner_message(&rec.error), Some("second"));
     }
 }

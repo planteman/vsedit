@@ -1069,6 +1069,69 @@ impl Default for StorageChangeLog {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Storage utility functions
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if the storage contains any keys that start with `prefix`.
+pub fn has_prefix(store: &Storage, prefix: &str) -> bool {
+    store.keys().iter().any(|k| k.starts_with(prefix))
+}
+
+/// Returns the total byte-length of all values stored in the storage.
+pub fn total_value_bytes(store: &Storage) -> usize {
+    store
+        .get_all()
+        .values()
+        .map(|v| v.len())
+        .sum()
+}
+
+/// Returns keys that have duplicate values in the storage.
+pub fn keys_with_duplicate_values(store: &Storage) -> Vec<String> {
+    let all = store.get_all();
+    let mut value_counts: HashMap<&str, usize> = HashMap::new();
+    for v in all.values() {
+        *value_counts.entry(v.as_str()).or_insert(0) += 1;
+    }
+    let mut dupes: Vec<String> = all
+        .iter()
+        .filter(|(_, v)| value_counts.get(v.as_str()).copied().unwrap_or(0) > 1)
+        .map(|(k, _)| k.clone())
+        .collect();
+    dupes.sort();
+    dupes
+}
+
+/// Copies all entries from `src` to `dst`, overwriting existing keys.
+pub fn copy_all(src: &Storage, dst: &Storage) -> StorageResult<usize> {
+    let entries = src.get_all();
+    for (k, v) in &entries {
+        dst.set(k, v)?;
+    }
+    Ok(entries.len())
+}
+
+/// Returns the keys whose values are valid integers.
+pub fn integer_keys(store: &Storage) -> Vec<String> {
+    store
+        .get_all()
+        .into_iter()
+        .filter(|(_, v)| v.parse::<i64>().is_ok())
+        .map(|(k, _)| k)
+        .collect()
+}
+
+/// Returns the keys whose values are valid booleans ("true" / "false").
+pub fn boolean_keys(store: &Storage) -> Vec<String> {
+    store
+        .get_all()
+        .into_iter()
+        .filter(|(_, v)| v == "true" || v == "false")
+        .map(|(k, _)| k)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1625,5 +1688,81 @@ mod tests {
         let since = log.changes_since(1);
         assert_eq!(since.len(), 2);
         assert_eq!(since[0].key, "b");
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn test_has_prefix_true() {
+        let store = Storage::in_memory().unwrap();
+        store.set("editor.fontSize", "14").unwrap();
+        assert!(has_prefix(&store, "editor."));
+    }
+
+    #[test]
+    fn test_has_prefix_false() {
+        let store = Storage::in_memory().unwrap();
+        store.set("theme", "dark").unwrap();
+        assert!(!has_prefix(&store, "editor."));
+    }
+
+    #[test]
+    fn test_total_value_bytes() {
+        let store = Storage::in_memory().unwrap();
+        store.set("a", "hello").unwrap(); // 5
+        store.set("b", "hi").unwrap(); // 2
+        assert_eq!(total_value_bytes(&store), 7);
+    }
+
+    #[test]
+    fn test_total_value_bytes_empty() {
+        let store = Storage::in_memory().unwrap();
+        assert_eq!(total_value_bytes(&store), 0);
+    }
+
+    #[test]
+    fn test_keys_with_duplicate_values() {
+        let store = Storage::in_memory().unwrap();
+        store.set("a", "same").unwrap();
+        store.set("b", "same").unwrap();
+        store.set("c", "different").unwrap();
+        let dupes = keys_with_duplicate_values(&store);
+        assert!(dupes.contains(&"a".to_string()));
+        assert!(dupes.contains(&"b".to_string()));
+        assert!(!dupes.contains(&"c".to_string()));
+    }
+
+    #[test]
+    fn test_copy_all_between_stores() {
+        let src = Storage::in_memory().unwrap();
+        let dst = Storage::in_memory().unwrap();
+        src.set("x", "1").unwrap();
+        src.set("y", "2").unwrap();
+        let count = copy_all(&src, &dst).unwrap();
+        assert_eq!(count, 2);
+        assert_eq!(dst.get("x"), Some("1".to_string()));
+        assert_eq!(dst.get("y"), Some("2".to_string()));
+    }
+
+    #[test]
+    fn test_integer_keys() {
+        let store = Storage::in_memory().unwrap();
+        store.set("port", "8080").unwrap();
+        store.set("name", "app").unwrap();
+        store.set("count", "-5").unwrap();
+        let mut ik = integer_keys(&store);
+        ik.sort();
+        assert_eq!(ik, vec!["count", "port"]);
+    }
+
+    #[test]
+    fn test_boolean_keys() {
+        let store = Storage::in_memory().unwrap();
+        store.set("enabled", "true").unwrap();
+        store.set("verbose", "false").unwrap();
+        store.set("name", "app").unwrap();
+        let mut bk = boolean_keys(&store);
+        bk.sort();
+        assert_eq!(bk, vec!["enabled", "verbose"]);
     }
 }

@@ -908,6 +908,82 @@ impl OutputExporter {
     }
 }
 
+/// Count total lines across all channels in an `OutputService`.
+pub fn total_line_count(service: &OutputService) -> usize {
+    service.total_lines()
+}
+
+/// Find channels that contain a given pattern (case-insensitive).
+pub fn channels_matching_pattern<'a>(
+    service: &'a OutputService,
+    pattern: &str,
+) -> Vec<&'a OutputChannel> {
+    let lower = pattern.to_lowercase();
+    service
+        .search_all_channels(pattern)
+        .into_iter()
+        .filter(|(_, matches)| !matches.is_empty())
+        .map(|(ch, _)| ch)
+        .collect()
+}
+
+/// Return the names of channels that have at least `min_lines` lines.
+pub fn channels_with_min_lines(service: &OutputService, min_lines: usize) -> Vec<String> {
+    service
+        .channel_names()
+        .into_iter()
+        .filter(|name| {
+            service
+                .find_by_name(name)
+                .map_or(false, |ch| ch.line_count() >= min_lines)
+        })
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Compute the average line length (in chars) of a channel's content.
+pub fn average_line_length(channel: &OutputChannel) -> f64 {
+    let content = channel.get_content();
+    let lines: Vec<&str> = content.lines().collect();
+    if lines.is_empty() {
+        return 0.0;
+    }
+    let total_chars: usize = lines.iter().map(|l| l.len()).sum();
+    total_chars as f64 / lines.len() as f64
+}
+
+/// Deduplicate consecutive identical lines in a channel's output.
+pub fn dedup_consecutive_lines(lines: &[String]) -> Vec<String> {
+    let mut result = Vec::new();
+    for line in lines {
+        if result.last().map_or(true, |prev: &String| prev != line) {
+            result.push(line.clone());
+        }
+    }
+    result
+}
+
+/// Format a line count summary for an `OutputService`.
+pub fn service_summary(service: &OutputService) -> String {
+    let ch_count = service.channel_count();
+    let total = service.total_lines();
+    let visible = service.visible_channels().len();
+    format!(
+        "{} channels ({} visible), {} total lines",
+        ch_count, visible, total
+    )
+}
+
+/// Extract lines from a channel that match a log-level prefix like "[ERROR]" or "[WARN]".
+pub fn extract_log_level_lines(channel: &OutputChannel, level_tag: &str) -> Vec<String> {
+    let content = channel.get_content();
+    content
+        .lines()
+        .filter(|l| l.contains(level_tag))
+        .map(|l| l.to_string())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1606,5 +1682,75 @@ mod tests {
         let exported = OutputExporter::export_service(&svc, ExportFormat::PlainText);
         assert!(exported.contains("=== Build (channel-0) ==="));
         assert!(exported.contains("ok"));
+    }
+
+    #[test]
+    fn total_line_count_sums_channels() {
+        let mut svc = OutputService::new();
+        svc.create_channel("A");
+        svc.create_channel("B");
+        svc.get_channel_mut("channel-0").unwrap().append_line("line1");
+        svc.get_channel_mut("channel-1").unwrap().append_line("line2");
+        svc.get_channel_mut("channel-1").unwrap().append_line("line3");
+        assert_eq!(total_line_count(&svc), 3);
+    }
+
+    #[test]
+    fn channels_with_min_lines_filters() {
+        let mut svc = OutputService::new();
+        svc.create_channel("Big");
+        svc.create_channel("Small");
+        svc.get_channel_mut("channel-0").unwrap().append_line("a");
+        svc.get_channel_mut("channel-0").unwrap().append_line("b");
+        svc.get_channel_mut("channel-1").unwrap().append_line("c");
+        let result = channels_with_min_lines(&svc, 2);
+        assert_eq!(result, vec!["Big"]);
+    }
+
+    #[test]
+    fn average_line_length_computes() {
+        let mut ch = OutputChannel::new("ch", "Test");
+        ch.append_line("abc");
+        ch.append_line("abcdef");
+        let avg = average_line_length(&ch);
+        assert!((avg - 4.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn average_line_length_empty() {
+        let ch = OutputChannel::new("ch", "Empty");
+        assert_eq!(average_line_length(&ch), 0.0);
+    }
+
+    #[test]
+    fn dedup_consecutive_lines_works() {
+        let lines: Vec<String> = vec!["a".into(), "a".into(), "b".into(), "b".into(), "a".into()];
+        let result = dedup_consecutive_lines(&lines);
+        assert_eq!(result, vec!["a", "b", "a"]);
+    }
+
+    #[test]
+    fn dedup_consecutive_lines_empty() {
+        assert!(dedup_consecutive_lines(&[]).is_empty());
+    }
+
+    #[test]
+    fn service_summary_format() {
+        let mut svc = OutputService::new();
+        svc.create_channel("Build");
+        let s = service_summary(&svc);
+        assert!(s.contains("1 channels"));
+        assert!(s.contains("0 total lines"));
+    }
+
+    #[test]
+    fn extract_log_level_lines_filters() {
+        let mut ch = OutputChannel::new("ch", "Log");
+        ch.append_line("[ERROR] something broke");
+        ch.append_line("[INFO] all good");
+        ch.append_line("[ERROR] another error");
+        let errors = extract_log_level_lines(&ch, "[ERROR]");
+        assert_eq!(errors.len(), 2);
+        assert!(errors[0].contains("something broke"));
     }
 }

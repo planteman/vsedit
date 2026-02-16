@@ -976,6 +976,72 @@ pub fn render_line_with_inlay_hints(
     result
 }
 
+// ---------------------------------------------------------------------------
+// Inlay-hint analysis utilities
+// ---------------------------------------------------------------------------
+
+/// Count the total number of label parts across all hints.
+pub fn total_label_parts(hints: &[InlayHint]) -> usize {
+    hints.iter().map(|h| h.label.len()).sum()
+}
+
+/// Return the set of unique lines that have at least one inlay hint.
+pub fn hint_lines(hints: &[InlayHint]) -> Vec<u32> {
+    let mut lines: Vec<u32> = hints.iter().map(|h| h.position_line).collect();
+    lines.sort();
+    lines.dedup();
+    lines
+}
+
+/// Return the maximum number of hints on any single line.
+pub fn max_hints_per_line(hints: &[InlayHint]) -> usize {
+    if hints.is_empty() {
+        return 0;
+    }
+    let mut counts = std::collections::HashMap::<u32, usize>::new();
+    for h in hints {
+        *counts.entry(h.position_line).or_insert(0) += 1;
+    }
+    counts.values().copied().max().unwrap_or(0)
+}
+
+/// Concatenate all label text from a hint into a single string.
+pub fn hint_full_label(hint: &InlayHint) -> String {
+    hint.label.iter().map(|p| p.value.as_str()).collect::<Vec<_>>().join("")
+}
+
+/// Return hints sorted by position (line first, then column).
+pub fn sort_hints_by_position(hints: &mut [InlayHint]) {
+    hints.sort_by(|a, b| {
+        a.position_line
+            .cmp(&b.position_line)
+            .then(a.position_col.cmp(&b.position_col))
+    });
+}
+
+/// Partition hints into type hints and parameter hints.
+pub fn partition_hints_by_kind(hints: &[InlayHint]) -> (Vec<&InlayHint>, Vec<&InlayHint>) {
+    let mut types = Vec::new();
+    let mut params = Vec::new();
+    for h in hints {
+        match h.kind {
+            InlayHintKind::Type => types.push(h),
+            InlayHintKind::Parameter => params.push(h),
+            InlayHintKind::Other => {}
+        }
+    }
+    (types, params)
+}
+
+/// Find all hints whose label contains the given substring.
+pub fn search_hints_by_label<'a>(hints: &'a [InlayHint], query: &str) -> Vec<&'a InlayHint> {
+    let q = query.to_lowercase();
+    hints
+        .iter()
+        .filter(|h| hint_full_label(h).to_lowercase().contains(&q))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1612,5 +1678,94 @@ mod tests {
         assert_eq!(diff.removed.len(), 1);
         assert_eq!(diff.removed[0].label[0].value, "x:");
         assert_eq!(diff.change_count(), 2);
+    }
+
+    #[test]
+    fn total_label_parts_counts() {
+        let hints = vec![
+            InlayHint::simple(0, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(1, 0, "x:", InlayHintKind::Parameter),
+        ];
+        assert_eq!(total_label_parts(&hints), 2);
+    }
+
+    #[test]
+    fn total_label_parts_empty() {
+        assert_eq!(total_label_parts(&[]), 0);
+    }
+
+    #[test]
+    fn hint_lines_unique_sorted() {
+        let hints = vec![
+            InlayHint::simple(5, 0, "a", InlayHintKind::Type),
+            InlayHint::simple(3, 0, "b", InlayHintKind::Type),
+            InlayHint::simple(5, 5, "c", InlayHintKind::Parameter),
+        ];
+        assert_eq!(hint_lines(&hints), vec![3, 5]);
+    }
+
+    #[test]
+    fn max_hints_per_line_calculation() {
+        let hints = vec![
+            InlayHint::simple(1, 0, "a", InlayHintKind::Type),
+            InlayHint::simple(1, 5, "b", InlayHintKind::Type),
+            InlayHint::simple(2, 0, "c", InlayHintKind::Parameter),
+        ];
+        assert_eq!(max_hints_per_line(&hints), 2);
+        assert_eq!(max_hints_per_line(&[]), 0);
+    }
+
+    #[test]
+    fn hint_full_label_concatenates() {
+        let mut hint = InlayHint::simple(0, 0, "x:", InlayHintKind::Parameter);
+        hint.label.push(InlayHintLabelPart {
+            value: " i32".to_string(),
+            tooltip: None,
+            command: None,
+        });
+        assert_eq!(hint_full_label(&hint), "x: i32");
+    }
+
+    #[test]
+    fn sort_hints_by_position_orders() {
+        let mut hints = vec![
+            InlayHint::simple(3, 10, "a", InlayHintKind::Type),
+            InlayHint::simple(1, 5, "b", InlayHintKind::Type),
+            InlayHint::simple(3, 2, "c", InlayHintKind::Type),
+        ];
+        sort_hints_by_position(&mut hints);
+        assert_eq!(hints[0].position_line, 1);
+        assert_eq!(hints[1].position_col, 2);
+        assert_eq!(hints[2].position_col, 10);
+    }
+
+    #[test]
+    fn partition_hints_by_kind_separates() {
+        let hints = vec![
+            InlayHint::simple(0, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(0, 5, "x:", InlayHintKind::Parameter),
+            InlayHint::simple(1, 0, ": bool", InlayHintKind::Type),
+        ];
+        let (types, params) = partition_hints_by_kind(&hints);
+        assert_eq!(types.len(), 2);
+        assert_eq!(params.len(), 1);
+    }
+
+    #[test]
+    fn search_hints_by_label_finds_matches() {
+        let hints = vec![
+            InlayHint::simple(0, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(1, 0, ": String", InlayHintKind::Type),
+            InlayHint::simple(2, 0, "x:", InlayHintKind::Parameter),
+        ];
+        let found = search_hints_by_label(&hints, "string");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].position_line, 1);
+    }
+
+    #[test]
+    fn search_hints_by_label_no_match() {
+        let hints = vec![InlayHint::simple(0, 0, ": i32", InlayHintKind::Type)];
+        assert!(search_hints_by_label(&hints, "nope").is_empty());
     }
 }

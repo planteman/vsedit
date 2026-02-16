@@ -980,6 +980,76 @@ impl TaskTemplate {
     }
 }
 
+// ── Task utilities ──────────────────────────────────────────────────────
+
+/// Filter tasks by source type.
+pub fn tasks_by_source(tasks: &[Task], source: TaskSource) -> Vec<&Task> {
+    tasks.iter().filter(|t| t.source == source).collect()
+}
+
+/// Return all background tasks.
+pub fn background_tasks(tasks: &[Task]) -> Vec<&Task> {
+    tasks.iter().filter(|t| t.is_background).collect()
+}
+
+/// Return all tasks that have a problem matcher configured.
+pub fn tasks_with_problem_matcher(tasks: &[Task]) -> Vec<&Task> {
+    tasks.iter().filter(|t| t.problem_matcher.is_some()).collect()
+}
+
+/// Count the number of successful executions.
+pub fn successful_execution_count(executions: &[TaskExecution]) -> usize {
+    executions.iter().filter(|e| e.is_success()).count()
+}
+
+/// Count the number of failed executions (non-zero exit code, completed).
+pub fn failed_execution_count(executions: &[TaskExecution]) -> usize {
+    executions
+        .iter()
+        .filter(|e| !e.running && e.exit_code.is_some() && e.exit_code != Some(0))
+        .count()
+}
+
+/// Collect unique task group values from a set of tasks.
+pub fn unique_groups(tasks: &[Task]) -> Vec<TaskGroup> {
+    let mut groups = Vec::new();
+    for t in tasks {
+        if !groups.contains(&t.group) {
+            groups.push(t.group.clone());
+        }
+    }
+    groups
+}
+
+/// Compute the full command line for a task, joining command and args.
+pub fn full_command_line(task: &Task) -> String {
+    if task.args.is_empty() {
+        task.command.clone()
+    } else {
+        format!("{} {}", task.command, task.args.join(" "))
+    }
+}
+
+/// Find tasks whose name contains the given substring (case-insensitive).
+pub fn search_tasks_by_name<'a>(tasks: &'a [Task], query: &str) -> Vec<&'a Task> {
+    let query_lower = query.to_lowercase();
+    tasks
+        .iter()
+        .filter(|t| t.name.to_lowercase().contains(&query_lower))
+        .collect()
+}
+
+/// Create a summary string for a task service.
+pub fn task_service_summary(service: &TaskService) -> String {
+    let running = service.running_count();
+    format!(
+        "{} task(s) registered, {} execution(s), {} running",
+        service.task_count(),
+        service.executions.len(),
+        running
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1637,5 +1707,109 @@ mod tests {
         assert_eq!(format!("{}", OutputSeverity::Error), "error");
         assert_eq!(format!("{}", OutputSeverity::Warning), "warning");
         assert_eq!(format!("{}", OutputSeverity::Info), "info");
+    }
+
+    #[test]
+    fn tasks_by_source_filters() {
+        let tasks = vec![
+            make_task("a", TaskGroup::Build),
+            {
+                let mut t = make_task("b", TaskGroup::Test);
+                t.source = TaskSource::Extension;
+                t
+            },
+            make_task("c", TaskGroup::Clean),
+        ];
+        assert_eq!(tasks_by_source(&tasks, TaskSource::Workspace).len(), 2);
+        assert_eq!(tasks_by_source(&tasks, TaskSource::Extension).len(), 1);
+        assert_eq!(tasks_by_source(&tasks, TaskSource::User).len(), 0);
+    }
+
+    #[test]
+    fn background_tasks_filters() {
+        let tasks = vec![
+            make_task("fg", TaskGroup::Build),
+            {
+                let mut t = make_task("bg", TaskGroup::Build);
+                t.is_background = true;
+                t
+            },
+        ];
+        let bg = background_tasks(&tasks);
+        assert_eq!(bg.len(), 1);
+        assert_eq!(bg[0].name, "bg");
+    }
+
+    #[test]
+    fn tasks_with_problem_matcher_filters() {
+        let tasks = vec![
+            make_task("no-pm", TaskGroup::Build),
+            {
+                let mut t = make_task("with-pm", TaskGroup::Build);
+                t.problem_matcher = Some("$tsc".into());
+                t
+            },
+        ];
+        assert_eq!(tasks_with_problem_matcher(&tasks).len(), 1);
+    }
+
+    #[test]
+    fn successful_and_failed_execution_counts() {
+        let executions = vec![
+            TaskExecution { task: make_task("a", TaskGroup::Build), running: false, exit_code: Some(0) },
+            TaskExecution { task: make_task("b", TaskGroup::Build), running: false, exit_code: Some(1) },
+            TaskExecution { task: make_task("c", TaskGroup::Build), running: true, exit_code: None },
+            TaskExecution { task: make_task("d", TaskGroup::Build), running: false, exit_code: Some(0) },
+        ];
+        assert_eq!(successful_execution_count(&executions), 2);
+        assert_eq!(failed_execution_count(&executions), 1);
+    }
+
+    #[test]
+    fn unique_groups_deduplicates() {
+        let tasks = vec![
+            make_task("a", TaskGroup::Build),
+            make_task("b", TaskGroup::Build),
+            make_task("c", TaskGroup::Test),
+            make_task("d", TaskGroup::Clean),
+        ];
+        let groups = unique_groups(&tasks);
+        assert_eq!(groups.len(), 3);
+    }
+
+    #[test]
+    fn full_command_line_formatting() {
+        let t = make_task("build", TaskGroup::Build);
+        assert_eq!(full_command_line(&t), "cargo build");
+
+        let mut t2 = make_task("test", TaskGroup::Test);
+        t2.args = vec!["test".into(), "--release".into()];
+        assert_eq!(full_command_line(&t2), "cargo test --release");
+
+        let mut t3 = make_task("simple", TaskGroup::None);
+        t3.args = vec![];
+        assert_eq!(full_command_line(&t3), "cargo");
+    }
+
+    #[test]
+    fn search_tasks_by_name_finds() {
+        let tasks = vec![
+            make_task("build-project", TaskGroup::Build),
+            make_task("run-tests", TaskGroup::Test),
+            make_task("build-docs", TaskGroup::Build),
+        ];
+        assert_eq!(search_tasks_by_name(&tasks, "build").len(), 2);
+        assert_eq!(search_tasks_by_name(&tasks, "BUILD").len(), 2);
+        assert_eq!(search_tasks_by_name(&tasks, "deploy").len(), 0);
+    }
+
+    #[test]
+    fn task_service_summary_formatting() {
+        let mut service = TaskService::new();
+        service.register_task(make_task("build", TaskGroup::Build));
+        let summary = task_service_summary(&service);
+        assert!(summary.contains("1 task(s) registered"));
+        assert!(summary.contains("0 execution(s)"));
+        assert!(summary.contains("0 running"));
     }
 }

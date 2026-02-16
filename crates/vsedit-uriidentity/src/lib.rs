@@ -1028,6 +1028,72 @@ impl UriComponents {
     }
 }
 
+// ---------------------------------------------------------------------------
+// URI analysis and batch utilities
+// ---------------------------------------------------------------------------
+
+/// Return all unique schemes present in a collection of URIs.
+pub fn uri_unique_schemes(uris: &[ResourceUri]) -> Vec<String> {
+    let mut schemes: Vec<String> = uris.iter().map(|u| u.scheme.clone()).collect();
+    schemes.sort();
+    schemes.dedup();
+    schemes
+}
+
+/// Group URIs by their scheme.
+pub fn uri_group_by_scheme(uris: &[ResourceUri]) -> HashMap<String, Vec<&ResourceUri>> {
+    let mut groups: HashMap<String, Vec<&ResourceUri>> = HashMap::new();
+    for uri in uris {
+        groups.entry(uri.scheme.clone()).or_default().push(uri);
+    }
+    groups
+}
+
+/// Return URIs sorted by path depth (shallowest first).
+pub fn uri_sort_by_depth(uris: &mut [ResourceUri]) {
+    uris.sort_by_key(|u| uri_depth(u));
+}
+
+/// Find all URIs that are children of the given parent URI.
+pub fn uri_find_children<'a>(parent: &ResourceUri, uris: &'a [ResourceUri]) -> Vec<&'a ResourceUri> {
+    uris.iter().filter(|u| uri_is_child(parent, u)).collect()
+}
+
+/// Return the common path prefix among a set of file URIs.
+pub fn uri_common_path(uris: &[ResourceUri]) -> String {
+    if uris.is_empty() {
+        return String::new();
+    }
+    let paths: Vec<&str> = uris.iter().map(|u| u.path.as_str()).collect();
+    let first = paths[0];
+    let mut prefix_len = first.len();
+    for p in &paths[1..] {
+        prefix_len = first
+            .chars()
+            .zip(p.chars())
+            .take(prefix_len)
+            .take_while(|(a, b)| a == b)
+            .count();
+    }
+    let prefix = &first[..first.char_indices().nth(prefix_len).map(|(i, _)| i).unwrap_or(first.len())];
+    match prefix.rfind('/') {
+        Some(idx) => prefix[..=idx].to_string(),
+        None => String::new(),
+    }
+}
+
+/// Return `true` if two URIs share the same scheme and authority.
+pub fn uri_same_origin(a: &ResourceUri, b: &ResourceUri) -> bool {
+    a.scheme == b.scheme && a.authority == b.authority
+}
+
+/// Return `true` if the URI path has the given file extension (case-insensitive).
+pub fn uri_has_extension(uri: &ResourceUri, ext: &str) -> bool {
+    uri.extension()
+        .map(|e| e.eq_ignore_ascii_case(ext))
+        .unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1612,5 +1678,100 @@ mod tests {
         assert_eq!(uri_depth(&uri), 4);
         let root = ResourceUri::file("/");
         assert_eq!(uri_depth(&root), 0);
+    }
+
+    #[test]
+    fn uri_unique_schemes_deduplicates() {
+        let uris = vec![
+            ResourceUri::file("/a"),
+            ResourceUri::new("https", "/b"),
+            ResourceUri::file("/c"),
+        ];
+        let schemes = uri_unique_schemes(&uris);
+        assert_eq!(schemes, vec!["file", "https"]);
+    }
+
+    #[test]
+    fn uri_unique_schemes_empty() {
+        assert!(uri_unique_schemes(&[]).is_empty());
+    }
+
+    #[test]
+    fn uri_group_by_scheme_groups() {
+        let uris = vec![
+            ResourceUri::file("/a"),
+            ResourceUri::new("https", "/b"),
+            ResourceUri::file("/c"),
+        ];
+        let groups = uri_group_by_scheme(&uris);
+        assert_eq!(groups.get("file").unwrap().len(), 2);
+        assert_eq!(groups.get("https").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn uri_sort_by_depth_orders() {
+        let mut uris = vec![
+            ResourceUri::file("/a/b/c"),
+            ResourceUri::file("/a"),
+            ResourceUri::file("/a/b"),
+        ];
+        uri_sort_by_depth(&mut uris);
+        assert_eq!(uris[0].path, "/a");
+        assert_eq!(uris[1].path, "/a/b");
+        assert_eq!(uris[2].path, "/a/b/c");
+    }
+
+    #[test]
+    fn uri_find_children_filters() {
+        let parent = ResourceUri::file("/home/user");
+        let uris = vec![
+            ResourceUri::file("/home/user/file.rs"),
+            ResourceUri::file("/home/other/file.rs"),
+            ResourceUri::file("/home/user/sub/deep.rs"),
+        ];
+        let children = uri_find_children(&parent, &uris);
+        assert_eq!(children.len(), 2);
+    }
+
+    #[test]
+    fn uri_common_path_finds_prefix() {
+        let uris = vec![
+            ResourceUri::file("/home/user/project/src/a.rs"),
+            ResourceUri::file("/home/user/project/src/b.rs"),
+        ];
+        assert_eq!(uri_common_path(&uris), "/home/user/project/src/");
+    }
+
+    #[test]
+    fn uri_common_path_empty() {
+        assert_eq!(uri_common_path(&[]), "");
+    }
+
+    #[test]
+    fn uri_same_origin_true() {
+        let a = ResourceUri::file("/a");
+        let b = ResourceUri::file("/b");
+        assert!(uri_same_origin(&a, &b));
+    }
+
+    #[test]
+    fn uri_same_origin_false() {
+        let a = ResourceUri::file("/a");
+        let b = ResourceUri::new("https", "/a");
+        assert!(!uri_same_origin(&a, &b));
+    }
+
+    #[test]
+    fn uri_has_extension_checks() {
+        let uri = ResourceUri::file("/src/main.rs");
+        assert!(uri_has_extension(&uri, "rs"));
+        assert!(uri_has_extension(&uri, "RS"));
+        assert!(!uri_has_extension(&uri, "py"));
+    }
+
+    #[test]
+    fn uri_has_extension_no_ext() {
+        let uri = ResourceUri::file("/Makefile");
+        assert!(!uri_has_extension(&uri, "rs"));
     }
 }

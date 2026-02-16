@@ -1025,6 +1025,75 @@ impl HoverCache {
     }
 }
 
+// ── Hover utilities ─────────────────────────────────────────────────────
+
+/// Extract plain text from hover contents, discarding formatting.
+pub fn extract_plain_text(hover: &Hover) -> String {
+    hover
+        .contents
+        .iter()
+        .map(|c| match c {
+            HoverContent::Text(t) => t.as_str(),
+            HoverContent::Markdown(m) => m.as_str(),
+            HoverContent::Code { value, .. } => value.as_str(),
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Count the total number of characters across all hover contents.
+pub fn hover_char_count(hover: &Hover) -> usize {
+    hover.contents.iter().map(|c| match c {
+        HoverContent::Text(t) => t.len(),
+        HoverContent::Markdown(m) => m.len(),
+        HoverContent::Code { value, .. } => value.len(),
+    }).sum()
+}
+
+/// Filter hover contents to only code blocks.
+pub fn extract_code_blocks(hover: &Hover) -> Vec<&HoverContent> {
+    hover
+        .contents
+        .iter()
+        .filter(|c| matches!(c, HoverContent::Code { .. }))
+        .collect()
+}
+
+/// Create a hover that wraps each content item with a separator between them.
+pub fn hover_with_separators(hovers: &[Hover], separator: &str) -> Hover {
+    let mut contents = Vec::new();
+    for (i, h) in hovers.iter().enumerate() {
+        if i > 0 && !separator.is_empty() {
+            contents.push(HoverContent::Text(separator.to_string()));
+        }
+        contents.extend(h.contents.iter().cloned());
+    }
+    Hover { contents, range: hovers.first().and_then(|h| h.range) }
+}
+
+/// Check if a hover contains any markdown content.
+pub fn has_markdown(hover: &Hover) -> bool {
+    hover.contents.iter().any(|c| matches!(c, HoverContent::Markdown(_)))
+}
+
+/// Compute the total line count of all hover content when rendered.
+pub fn hover_line_count(hover: &Hover) -> usize {
+    hover.contents.iter().map(|c| {
+        let text = match c {
+            HoverContent::Text(t) => t.as_str(),
+            HoverContent::Markdown(m) => m.as_str(),
+            HoverContent::Code { value, .. } => value.as_str(),
+        };
+        text.lines().count().max(1)
+    }).sum()
+}
+
+/// Create a truncated version of a hover, limiting to `max_items` content blocks.
+pub fn truncate_hover(hover: &Hover, max_items: usize) -> Hover {
+    let contents: Vec<HoverContent> = hover.contents.iter().take(max_items).cloned().collect();
+    Hover { contents, range: hover.range }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1637,5 +1706,84 @@ mod tests {
         assert!(cache.get(2, 0).is_some());
         cache.invalidate_line(2);
         assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn extract_plain_text_joins() {
+        let hover = Hover::from_contents(vec![
+            HoverContent::Text("hello".into()),
+            HoverContent::Code { value: "world".into(), language: Some("rust".into()) },
+        ]);
+        let text = extract_plain_text(&hover);
+        assert!(text.contains("hello"));
+        assert!(text.contains("world"));
+    }
+
+    #[test]
+    fn hover_char_count_sums() {
+        let hover = Hover::from_contents(vec![
+            HoverContent::Text("abc".into()),
+            HoverContent::Markdown("de".into()),
+        ]);
+        assert_eq!(hover_char_count(&hover), 5);
+        let empty = Hover::from_contents(vec![]);
+        assert_eq!(hover_char_count(&empty), 0);
+    }
+
+    #[test]
+    fn extract_code_blocks_filters() {
+        let hover = Hover::from_contents(vec![
+            HoverContent::Text("plain".into()),
+            HoverContent::Code { value: "let x = 1;".into(), language: Some("rust".into()) },
+            HoverContent::Markdown("**bold**".into()),
+            HoverContent::Code { value: "print('hi')".into(), language: Some("python".into()) },
+        ]);
+        let blocks = extract_code_blocks(&hover);
+        assert_eq!(blocks.len(), 2);
+    }
+
+    #[test]
+    fn hover_with_separators_interleaves() {
+        let h1 = Hover::text("first");
+        let h2 = Hover::text("second");
+        let combined = hover_with_separators(&[h1, h2], "---");
+        assert_eq!(combined.contents.len(), 3);
+    }
+
+    #[test]
+    fn hover_with_separators_empty() {
+        let combined = hover_with_separators(&[], "---");
+        assert!(combined.contents.is_empty());
+        assert!(combined.range.is_none());
+    }
+
+    #[test]
+    fn has_markdown_detection() {
+        let md_hover = Hover::markdown("**bold**");
+        assert!(has_markdown(&md_hover));
+        let text_hover = Hover::text("plain");
+        assert!(!has_markdown(&text_hover));
+    }
+
+    #[test]
+    fn hover_line_count_counts() {
+        let hover = Hover::from_contents(vec![
+            HoverContent::Text("line1\nline2\nline3".into()),
+            HoverContent::Text("single".into()),
+        ]);
+        assert_eq!(hover_line_count(&hover), 4);
+    }
+
+    #[test]
+    fn truncate_hover_limits() {
+        let hover = Hover::from_contents(vec![
+            HoverContent::Text("a".into()),
+            HoverContent::Text("b".into()),
+            HoverContent::Text("c".into()),
+        ]);
+        let truncated = truncate_hover(&hover, 2);
+        assert_eq!(truncated.contents.len(), 2);
+        let full = truncate_hover(&hover, 10);
+        assert_eq!(full.contents.len(), 3);
     }
 }

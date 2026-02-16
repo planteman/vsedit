@@ -1055,6 +1055,68 @@ pub fn format_combo_display(combo: &KeyCombo, use_symbols: bool) -> String {
         .join(" ")
 }
 
+impl KeyCodeChord {
+    /// Returns true if the chord uses only Ctrl (no Shift/Alt/Meta).
+    pub fn is_ctrl_only(&self) -> bool {
+        self.ctrl && !self.shift && !self.alt && !self.meta
+    }
+
+    /// Returns true if the chord uses Ctrl+Shift without Alt/Meta.
+    pub fn is_ctrl_shift(&self) -> bool {
+        self.ctrl && self.shift && !self.alt && !self.meta
+    }
+
+    /// Create a chord with the same modifiers but a different key code.
+    pub fn with_key(self, key_code: KeyCode) -> Self {
+        Self { key_code, ..self }
+    }
+
+    /// Returns true if two chords have the same modifier state.
+    pub fn same_modifiers(&self, other: &KeyCodeChord) -> bool {
+        self.ctrl == other.ctrl && self.shift == other.shift
+            && self.alt == other.alt && self.meta == other.meta
+    }
+}
+
+impl KeyCombo {
+    /// Returns the last chord in the combo, if any.
+    pub fn last(&self) -> Option<&KeyCodeChord> {
+        self.chords.last()
+    }
+
+    /// Returns true if any chord in the combo has the given key code.
+    pub fn contains_key(&self, key_code: KeyCode) -> bool {
+        self.chords.iter().any(|c| c.key_code == key_code)
+    }
+
+    /// Returns the total number of modifier keys used across all chords.
+    pub fn total_modifier_count(&self) -> u8 {
+        self.chords.iter().map(|c| c.modifier_count()).sum()
+    }
+}
+
+/// Collect all unique key codes from a slice of chords.
+pub fn unique_key_codes(chords: &[KeyCodeChord]) -> Vec<KeyCode> {
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::new();
+    for chord in chords {
+        if seen.insert(chord.key_code as u16) {
+            result.push(chord.key_code);
+        }
+    }
+    result
+}
+
+/// Returns true if the key code represents a whitespace key (Space, Tab, Enter).
+pub fn is_whitespace_key(key_code: KeyCode) -> bool {
+    matches!(key_code, KeyCode::Space | KeyCode::Tab | KeyCode::Enter)
+}
+
+/// Count how many chords in a slice use the given modifier.
+pub fn count_chords_with_ctrl(chords: &[KeyCodeChord]) -> usize {
+    chords.iter().filter(|c| c.ctrl).count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1600,5 +1662,87 @@ mod tests {
         let chord = KeyCodeChord::just(KeyCode::Escape);
         let s = format_chord_display(&chord, false);
         assert_eq!(s, "Escape");
+    }
+
+    #[test]
+    fn chord_is_ctrl_only() {
+        let chord = KeyCodeChord::new(true, false, false, false, KeyCode::KeyC);
+        assert!(chord.is_ctrl_only());
+        let chord2 = KeyCodeChord::new(true, true, false, false, KeyCode::KeyC);
+        assert!(!chord2.is_ctrl_only());
+    }
+
+    #[test]
+    fn chord_is_ctrl_shift() {
+        let chord = KeyCodeChord::new(true, true, false, false, KeyCode::KeyP);
+        assert!(chord.is_ctrl_shift());
+        let plain = KeyCodeChord::just(KeyCode::KeyP);
+        assert!(!plain.is_ctrl_shift());
+    }
+
+    #[test]
+    fn chord_with_key_changes_key() {
+        let chord = KeyCodeChord::new(true, false, false, false, KeyCode::KeyC);
+        let new_chord = chord.with_key(KeyCode::KeyV);
+        assert_eq!(new_chord.key_code, KeyCode::KeyV);
+        assert!(new_chord.ctrl);
+    }
+
+    #[test]
+    fn chord_same_modifiers() {
+        let a = KeyCodeChord::new(true, true, false, false, KeyCode::KeyA);
+        let b = KeyCodeChord::new(true, true, false, false, KeyCode::KeyB);
+        assert!(a.same_modifiers(&b));
+        let c = KeyCodeChord::just(KeyCode::KeyA);
+        assert!(!a.same_modifiers(&c));
+    }
+
+    #[test]
+    fn combo_last_and_contains_key() {
+        let combo = KeyCombo::new(vec![
+            KeyCodeChord::just(KeyCode::KeyA),
+            KeyCodeChord::just(KeyCode::KeyB),
+        ]);
+        assert_eq!(combo.last().unwrap().key_code, KeyCode::KeyB);
+        assert!(combo.contains_key(KeyCode::KeyA));
+        assert!(!combo.contains_key(KeyCode::KeyC));
+    }
+
+    #[test]
+    fn combo_total_modifier_count() {
+        let combo = KeyCombo::new(vec![
+            KeyCodeChord::new(true, true, false, false, KeyCode::KeyA),
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyB),
+        ]);
+        assert_eq!(combo.total_modifier_count(), 3);
+    }
+
+    #[test]
+    fn unique_key_codes_deduplicates() {
+        let chords = vec![
+            KeyCodeChord::just(KeyCode::KeyA),
+            KeyCodeChord::just(KeyCode::KeyB),
+            KeyCodeChord::just(KeyCode::KeyA),
+        ];
+        let codes = unique_key_codes(&chords);
+        assert_eq!(codes.len(), 2);
+    }
+
+    #[test]
+    fn is_whitespace_key_check() {
+        assert!(is_whitespace_key(KeyCode::Space));
+        assert!(is_whitespace_key(KeyCode::Tab));
+        assert!(is_whitespace_key(KeyCode::Enter));
+        assert!(!is_whitespace_key(KeyCode::KeyA));
+    }
+
+    #[test]
+    fn count_chords_with_ctrl_counts() {
+        let chords = vec![
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyA),
+            KeyCodeChord::just(KeyCode::KeyB),
+            KeyCodeChord::new(true, true, false, false, KeyCode::KeyC),
+        ];
+        assert_eq!(count_chords_with_ctrl(&chords), 2);
     }
 }

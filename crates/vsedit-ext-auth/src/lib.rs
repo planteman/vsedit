@@ -880,6 +880,70 @@ impl RotationSchedule {
     }
 }
 
+/// Count total sessions across all providers in a `SessionStore`.
+pub fn total_session_count(store: &SessionStore) -> usize {
+    store.all_provider_ids().iter().map(|pid| {
+        store.get_sessions(pid, &[]).len()
+    }).sum()
+}
+
+/// Find sessions that have all of the requested scopes.
+pub fn find_sessions_with_scopes<'a>(
+    store: &'a SessionStore,
+    provider_id: &str,
+    required: &[String],
+) -> Vec<&'a AuthSession> {
+    store
+        .get_sessions(provider_id, &[])
+        .into_iter()
+        .filter(|s| scopes_match(required, &s.scopes))
+        .collect()
+}
+
+/// Deduplicate scopes in a session's scope list (preserving order).
+pub fn deduplicate_scopes(scopes: &[String]) -> Vec<String> {
+    let mut seen = Vec::new();
+    for s in scopes {
+        if !seen.contains(s) {
+            seen.push(s.clone());
+        }
+    }
+    seen
+}
+
+/// Check whether a token string looks like a JWT (three dot-separated base64 parts).
+pub fn is_jwt_like(token: &str) -> bool {
+    let parts: Vec<&str> = token.split('.').collect();
+    parts.len() == 3 && parts.iter().all(|p| !p.is_empty())
+}
+
+/// Summarize a `SessionTracker` into a human-readable string.
+pub fn session_tracker_summary(tracker: &SessionTracker, ttl: u64, now: u64) -> String {
+    let active = tracker.active_sessions(ttl, now).len();
+    let expired = tracker.expired_sessions(ttl, now).len();
+    format!(
+        "{} active, {} expired, {} total",
+        active,
+        expired,
+        tracker.len()
+    )
+}
+
+/// Return provider IDs that have at least one session in the store.
+pub fn providers_with_sessions(store: &SessionStore) -> Vec<String> {
+    store
+        .all_provider_ids()
+        .into_iter()
+        .filter(|pid| !store.get_sessions(pid, &[]).is_empty())
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// Validate that all sessions in a tracker are still alive given a TTL.
+pub fn all_sessions_active(tracker: &SessionTracker, ttl: u64, now: u64) -> bool {
+    tracker.expired_sessions(ttl, now).is_empty()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1606,5 +1670,82 @@ mod tests {
         assert!(sched.is_due(5000));
         assert_eq!(sched.seconds_until_due(2000), 2600);
         assert_eq!(sched.seconds_until_due(5000), 0);
+    }
+
+    #[test]
+    fn total_session_count_across_providers() {
+        let mut store = SessionStore::new();
+        store.add_session("gh", AuthSession {
+            id: "s1".into(), access_token: "t".into(), account: AuthAccount { label: "a".into(), id: "1".into() }, scopes: vec![]
+        });
+        store.add_session("gh", AuthSession {
+            id: "s2".into(), access_token: "t".into(), account: AuthAccount { label: "b".into(), id: "2".into() }, scopes: vec![]
+        });
+        store.add_session("ms", AuthSession {
+            id: "s3".into(), access_token: "t".into(), account: AuthAccount { label: "c".into(), id: "3".into() }, scopes: vec![]
+        });
+        assert_eq!(total_session_count(&store), 3);
+    }
+
+    #[test]
+    fn total_session_count_empty_store() {
+        assert_eq!(total_session_count(&SessionStore::new()), 0);
+    }
+
+    #[test]
+    fn deduplicate_scopes_removes_dups() {
+        let scopes = vec!["read".into(), "write".into(), "read".into()];
+        let deduped = deduplicate_scopes(&scopes);
+        assert_eq!(deduped, vec!["read", "write"]);
+    }
+
+    #[test]
+    fn deduplicate_scopes_empty() {
+        assert!(deduplicate_scopes(&[]).is_empty());
+    }
+
+    #[test]
+    fn is_jwt_like_valid() {
+        assert!(is_jwt_like("header.payload.signature"));
+        assert!(!is_jwt_like("not-a-jwt"));
+        assert!(!is_jwt_like("a.b."));
+        assert!(!is_jwt_like("a..c"));
+    }
+
+    #[test]
+    fn session_tracker_summary_format() {
+        let mut tracker = SessionTracker::new();
+        tracker.add(AuthSession {
+            id: "s1".into(), access_token: "t".into(),
+            account: AuthAccount { label: "a".into(), id: "1".into() },
+            scopes: vec![]
+        }, 100);
+        let s = session_tracker_summary(&tracker, 3600, 200);
+        assert!(s.contains("1 active"));
+        assert!(s.contains("0 expired"));
+    }
+
+    #[test]
+    fn all_sessions_active_checks() {
+        let mut tracker = SessionTracker::new();
+        tracker.add(AuthSession {
+            id: "s1".into(), access_token: "t".into(),
+            account: AuthAccount { label: "a".into(), id: "1".into() },
+            scopes: vec![]
+        }, 100);
+        assert!(all_sessions_active(&tracker, 3600, 200));
+        assert!(!all_sessions_active(&tracker, 10, 200));
+    }
+
+    #[test]
+    fn providers_with_sessions_filters() {
+        let mut store = SessionStore::new();
+        store.add_session("gh", AuthSession {
+            id: "s1".into(), access_token: "t".into(),
+            account: AuthAccount { label: "a".into(), id: "1".into() },
+            scopes: vec![]
+        });
+        let pids = providers_with_sessions(&store);
+        assert_eq!(pids, vec!["gh"]);
     }
 }

@@ -1000,6 +1000,85 @@ pub fn sort_labels_by_extension(labels: &mut [ResourceLabel]) {
     labels.sort_by(|a, b| a.cmp_by_extension(b));
 }
 
+/// Filter resource labels that match a given extension (case-insensitive).
+pub fn filter_labels_by_extension<'a>(labels: &'a [ResourceLabel], ext: &str) -> Vec<&'a ResourceLabel> {
+    let ext_lower = ext.to_lowercase();
+    labels.iter().filter(|l| {
+        l.extension().map(|e| e.to_lowercase()) == Some(ext_lower.clone())
+    }).collect()
+}
+
+/// Deduplicate resource labels by path, keeping the first occurrence.
+pub fn dedup_labels_by_path(labels: &mut Vec<ResourceLabel>) {
+    let mut seen = std::collections::HashSet::new();
+    labels.retain(|l| seen.insert(l.path.clone()));
+}
+
+/// Return the longest label name length from a slice.
+pub fn max_label_name_length(labels: &[ResourceLabel]) -> usize {
+    labels.iter().map(|l| l.name.chars().count()).max().unwrap_or(0)
+}
+
+/// Build a mapping from extension to count of labels with that extension.
+pub fn extension_histogram(labels: &[ResourceLabel]) -> std::collections::HashMap<String, usize> {
+    let mut map = std::collections::HashMap::new();
+    for label in labels {
+        let ext = label.extension().unwrap_or("(none)").to_lowercase();
+        *map.entry(ext).or_insert(0) += 1;
+    }
+    map
+}
+
+/// Group resource labels by their parent directory.
+pub fn group_labels_by_dir(labels: &[ResourceLabel]) -> std::collections::HashMap<String, Vec<&ResourceLabel>> {
+    let mut map: std::collections::HashMap<String, Vec<&ResourceLabel>> = std::collections::HashMap::new();
+    for label in labels {
+        let dir = label.parent_dir().to_string();
+        map.entry(dir).or_default().push(label);
+    }
+    map
+}
+
+impl ResourceLabel {
+    /// Return true if the label's path has the given extension (case-insensitive).
+    pub fn has_extension(&self, ext: &str) -> bool {
+        self.extension()
+            .map(|e| e.eq_ignore_ascii_case(ext))
+            .unwrap_or(false)
+    }
+
+    /// Return the file name without extension (stem).
+    pub fn stem(&self) -> &str {
+        extract_stem(&self.name)
+    }
+
+    /// Return a compact display string: "name (dir)".
+    pub fn compact_display(&self) -> String {
+        format!("{} ({})", self.name, self.parent_dir())
+    }
+}
+
+/// Normalize a path by collapsing consecutive separators and removing trailing slashes.
+pub fn normalize_path_separators(path: &str) -> String {
+    let mut result = String::with_capacity(path.len());
+    let mut last_was_slash = false;
+    for ch in path.chars() {
+        if ch == '/' {
+            if !last_was_slash {
+                result.push('/');
+            }
+            last_was_slash = true;
+        } else {
+            result.push(ch);
+            last_was_slash = false;
+        }
+    }
+    if result.len() > 1 && result.ends_with('/') {
+        result.pop();
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1597,5 +1676,83 @@ mod tests {
         assert!(label.matches_query("mycomp"));
         assert!(label.matches_query("COMPONENT"));
         assert!(!label.matches_query("xyz"));
+    }
+
+    #[test]
+    fn filter_labels_by_ext() {
+        let labels = vec![
+            ResourceLabel { name: "a.rs".into(), path: "/a.rs".into(), description: None, icon: None },
+            ResourceLabel { name: "b.ts".into(), path: "/b.ts".into(), description: None, icon: None },
+            ResourceLabel { name: "c.RS".into(), path: "/c.RS".into(), description: None, icon: None },
+        ];
+        let rs = filter_labels_by_extension(&labels, "rs");
+        assert_eq!(rs.len(), 2);
+    }
+
+    #[test]
+    fn dedup_labels_removes_duplicates() {
+        let mut labels = vec![
+            ResourceLabel { name: "a.rs".into(), path: "/a.rs".into(), description: None, icon: None },
+            ResourceLabel { name: "a.rs".into(), path: "/a.rs".into(), description: None, icon: None },
+            ResourceLabel { name: "b.rs".into(), path: "/b.rs".into(), description: None, icon: None },
+        ];
+        dedup_labels_by_path(&mut labels);
+        assert_eq!(labels.len(), 2);
+    }
+
+    #[test]
+    fn max_label_name_length_works() {
+        let labels = vec![
+            ResourceLabel { name: "ab".into(), path: "/ab".into(), description: None, icon: None },
+            ResourceLabel { name: "abcde".into(), path: "/abcde".into(), description: None, icon: None },
+        ];
+        assert_eq!(max_label_name_length(&labels), 5);
+        assert_eq!(max_label_name_length(&[]), 0);
+    }
+
+    #[test]
+    fn extension_histogram_counts() {
+        let labels = vec![
+            ResourceLabel { name: "a.rs".into(), path: "/a.rs".into(), description: None, icon: None },
+            ResourceLabel { name: "b.rs".into(), path: "/b.rs".into(), description: None, icon: None },
+            ResourceLabel { name: "c.ts".into(), path: "/c.ts".into(), description: None, icon: None },
+        ];
+        let hist = extension_histogram(&labels);
+        assert_eq!(hist.get("rs"), Some(&2));
+        assert_eq!(hist.get("ts"), Some(&1));
+    }
+
+    #[test]
+    fn group_labels_by_dir_groups() {
+        let labels = vec![
+            ResourceLabel { name: "a.rs".into(), path: "/src/a.rs".into(), description: None, icon: None },
+            ResourceLabel { name: "b.rs".into(), path: "/src/b.rs".into(), description: None, icon: None },
+            ResourceLabel { name: "c.rs".into(), path: "/lib/c.rs".into(), description: None, icon: None },
+        ];
+        let grouped = group_labels_by_dir(&labels);
+        assert_eq!(grouped.get("/src").unwrap().len(), 2);
+        assert_eq!(grouped.get("/lib").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn resource_label_has_extension() {
+        let label = ResourceLabel { name: "test.RS".into(), path: "/test.RS".into(), description: None, icon: None };
+        assert!(label.has_extension("rs"));
+        assert!(!label.has_extension("ts"));
+    }
+
+    #[test]
+    fn resource_label_stem_and_compact() {
+        let label = ResourceLabel { name: "file.txt".into(), path: "/home/file.txt".into(), description: None, icon: None };
+        assert_eq!(label.stem(), "file");
+        assert_eq!(label.compact_display(), "file.txt (/home)");
+    }
+
+    #[test]
+    fn normalize_path_separators_basic() {
+        assert_eq!(normalize_path_separators("//a///b//"), "/a/b");
+        assert_eq!(normalize_path_separators("/a/b/c"), "/a/b/c");
+        assert_eq!(normalize_path_separators("/"), "/");
+        assert_eq!(normalize_path_separators(""), "");
     }
 }

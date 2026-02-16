@@ -976,6 +976,68 @@ impl Default for RequestDeduplicator {
     }
 }
 
+impl RequestService {
+    /// Return all requests whose method starts with the given prefix.
+    pub fn find_by_method_prefix(&self, prefix: &str) -> Vec<&Request> {
+        self.requests.iter().filter(|r| r.method.starts_with(prefix)).collect()
+    }
+
+    /// Return the IDs of all requests in a given state.
+    pub fn ids_in_state(&self, state: &RequestState) -> Vec<RequestId> {
+        self.requests.iter()
+            .filter(|r| std::mem::discriminant(&r.state) == std::mem::discriminant(state))
+            .map(|r| r.id)
+            .collect()
+    }
+
+    /// Fail all pending requests with the given reason.
+    pub fn fail_all_pending(&mut self, reason: &str) {
+        for req in &mut self.requests {
+            if matches!(req.state, RequestState::Pending) {
+                req.state = RequestState::Failed(reason.to_string());
+            }
+        }
+    }
+
+    /// Return the number of unique methods across all requests.
+    pub fn unique_method_count(&self) -> usize {
+        let set: std::collections::HashSet<&str> = self.requests.iter().map(|r| r.method.as_str()).collect();
+        set.len()
+    }
+
+    /// Return requests sorted by created_at descending.
+    pub fn recent_requests(&self, limit: usize) -> Vec<&Request> {
+        let mut sorted: Vec<&Request> = self.requests.iter().collect();
+        sorted.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        sorted.truncate(limit);
+        sorted
+    }
+}
+
+impl PriorityRequestQueue {
+    /// Return the number of requests with a given priority.
+    pub fn count_by_priority(&self, priority: RequestPriority) -> usize {
+        self.requests.iter().filter(|r| r.priority == priority).count()
+    }
+
+    /// Return true if the queue has any requests in the given priority.
+    pub fn has_priority(&self, priority: RequestPriority) -> bool {
+        self.requests.iter().any(|r| r.priority == priority)
+    }
+}
+
+impl RequestBatch {
+    /// Returns the list of method names in the batch.
+    pub fn methods(&self) -> &[String] {
+        &self.methods
+    }
+
+    /// Returns true if the batch contains a method with the given name.
+    pub fn contains_method(&self, method: &str) -> bool {
+        self.methods.iter().any(|m| m == method)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1600,5 +1662,80 @@ mod tests {
         let policy = RequestRetryPolicy::new(3, 100).with_backoff_factor(2.0);
         // 100 + 200 + 400 = 700
         assert_eq!(policy.total_max_delay(), 700);
+    }
+
+    #[test]
+    fn find_by_method_prefix_filters() {
+        let mut svc = RequestService::new();
+        svc.create_request("textDocument/completion");
+        svc.create_request("textDocument/hover");
+        svc.create_request("workspace/symbol");
+        let td = svc.find_by_method_prefix("textDocument/");
+        assert_eq!(td.len(), 2);
+        let ws = svc.find_by_method_prefix("workspace/");
+        assert_eq!(ws.len(), 1);
+    }
+
+    #[test]
+    fn ids_in_state_returns_correct_ids() {
+        let mut svc = RequestService::new();
+        let id1 = svc.create_request("a");
+        let id2 = svc.create_request("b");
+        svc.start(id1);
+        let pending_ids = svc.ids_in_state(&RequestState::Pending);
+        assert_eq!(pending_ids, vec![id2]);
+    }
+
+    #[test]
+    fn fail_all_pending_fails_only_pending() {
+        let mut svc = RequestService::new();
+        let id1 = svc.create_request("a");
+        let id2 = svc.create_request("b");
+        svc.start(id1);
+        svc.fail_all_pending("timeout");
+        assert!(matches!(svc.get_state(id2), Some(RequestState::Failed(_))));
+        assert!(matches!(svc.get_state(id1), Some(RequestState::InProgress)));
+    }
+
+    #[test]
+    fn unique_method_count_deduplicates() {
+        let mut svc = RequestService::new();
+        svc.create_request("a");
+        svc.create_request("a");
+        svc.create_request("b");
+        assert_eq!(svc.unique_method_count(), 2);
+    }
+
+    #[test]
+    fn recent_requests_returns_sorted() {
+        let mut svc = RequestService::new();
+        RequestBuilder::new("old").created_at(10).build(&mut svc);
+        RequestBuilder::new("new").created_at(50).build(&mut svc);
+        RequestBuilder::new("mid").created_at(30).build(&mut svc);
+        let recent = svc.recent_requests(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].method, "new");
+        assert_eq!(recent[1].method, "mid");
+    }
+
+    #[test]
+    fn priority_queue_count_by_priority() {
+        let mut q = PriorityRequestQueue::new();
+        q.enqueue("a", RequestPriority::High);
+        q.enqueue("b", RequestPriority::Low);
+        q.enqueue("c", RequestPriority::High);
+        assert_eq!(q.count_by_priority(RequestPriority::High), 2);
+        assert_eq!(q.count_by_priority(RequestPriority::Low), 1);
+        assert!(q.has_priority(RequestPriority::High));
+    }
+
+    #[test]
+    fn batch_contains_method_check() {
+        let mut batch = RequestBatch::new();
+        batch.add("textDocument/completion");
+        batch.add("workspace/symbol");
+        assert!(batch.contains_method("textDocument/completion"));
+        assert!(!batch.contains_method("textDocument/hover"));
+        assert_eq!(batch.methods().len(), 2);
     }
 }

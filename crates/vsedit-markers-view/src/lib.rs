@@ -855,6 +855,70 @@ impl MarkersService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Marker analysis and query utilities
+// ---------------------------------------------------------------------------
+
+/// Return the total number of markers per unique URI.
+pub fn marker_count_by_uri(markers: &[Marker]) -> std::collections::HashMap<String, usize> {
+    let mut counts = std::collections::HashMap::new();
+    for m in markers {
+        *counts.entry(m.uri.clone()).or_insert(0) += 1;
+    }
+    counts
+}
+
+/// Return the URI with the most markers, or `None` if empty.
+pub fn most_problematic_uri(markers: &[Marker]) -> Option<String> {
+    let counts = marker_count_by_uri(markers);
+    counts.into_iter().max_by_key(|(_, c)| *c).map(|(uri, _)| uri)
+}
+
+/// Return all markers that have at least one related information entry.
+pub fn markers_with_related_info(markers: &[Marker]) -> Vec<&Marker> {
+    markers
+        .iter()
+        .filter(|m| !m.related_information.is_empty())
+        .collect()
+}
+
+/// Return all unique source identifiers across all markers.
+pub fn marker_unique_sources(markers: &[Marker]) -> Vec<String> {
+    let mut sources: Vec<String> = markers
+        .iter()
+        .filter_map(|m| m.source.clone())
+        .collect();
+    sources.sort();
+    sources.dedup();
+    sources
+}
+
+/// Return markers that span multiple lines (end_line > start_line).
+pub fn multiline_markers(markers: &[Marker]) -> Vec<&Marker> {
+    markers.iter().filter(|m| m.end_line > m.start_line).collect()
+}
+
+/// Return a human-readable one-line description of a marker for tooltip display.
+pub fn marker_tooltip(marker: &Marker) -> String {
+    let sev = match marker.severity {
+        MarkerSeverity::Error => "Error",
+        MarkerSeverity::Warning => "Warning",
+        MarkerSeverity::Info => "Info",
+        MarkerSeverity::Hint => "Hint",
+    };
+    let source_part = marker
+        .source
+        .as_deref()
+        .map(|s| format!(" [{}]", s))
+        .unwrap_or_default();
+    format!("{}{}: {} ({}:{})", sev, source_part, marker.message, marker.start_line, marker.start_col)
+}
+
+/// Return true if a marker has any of the specified tags.
+pub fn marker_has_any_tag(marker: &Marker, tags: &[MarkerTag]) -> bool {
+    marker.tags.iter().any(|t| tags.contains(t))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1612,5 +1676,94 @@ mod tests {
         let removed = svc.remove_matching(&filter);
         assert_eq!(removed, 2);
         assert_eq!(svc.total_count(), 1);
+    }
+
+    #[test]
+    fn marker_count_by_uri_groups() {
+        let markers = vec![
+            make_marker("a.rs", MarkerSeverity::Error, "e1"),
+            make_marker("a.rs", MarkerSeverity::Warning, "w1"),
+            make_marker("b.rs", MarkerSeverity::Info, "i1"),
+        ];
+        let counts = marker_count_by_uri(&markers);
+        assert_eq!(counts.get("a.rs"), Some(&2));
+        assert_eq!(counts.get("b.rs"), Some(&1));
+    }
+
+    #[test]
+    fn most_problematic_uri_finds_max() {
+        let markers = vec![
+            make_marker("a.rs", MarkerSeverity::Error, "e1"),
+            make_marker("a.rs", MarkerSeverity::Error, "e2"),
+            make_marker("b.rs", MarkerSeverity::Error, "e3"),
+        ];
+        assert_eq!(most_problematic_uri(&markers), Some("a.rs".to_string()));
+    }
+
+    #[test]
+    fn most_problematic_uri_empty() {
+        assert!(most_problematic_uri(&[]).is_none());
+    }
+
+    #[test]
+    fn markers_with_related_info_filters() {
+        let mut m1 = make_marker("a.rs", MarkerSeverity::Error, "e1");
+        m1.related_information.push(RelatedInformation {
+            uri: "b.rs".to_string(),
+            message: "related".to_string(),
+            line: 5,
+            col: 0,
+        });
+        let m2 = make_marker("a.rs", MarkerSeverity::Warning, "w1");
+        let markers = vec![m1, m2];
+        let with_related = markers_with_related_info(&markers);
+        assert_eq!(with_related.len(), 1);
+        assert_eq!(with_related[0].message, "e1");
+    }
+
+    #[test]
+    fn marker_unique_sources_deduplicates() {
+        let mut m1 = make_marker("a.rs", MarkerSeverity::Error, "e1");
+        m1.source = Some("rustc".to_string());
+        let mut m2 = make_marker("b.rs", MarkerSeverity::Warning, "w1");
+        m2.source = Some("clippy".to_string());
+        let mut m3 = make_marker("c.rs", MarkerSeverity::Info, "i1");
+        m3.source = Some("rustc".to_string());
+        let sources = marker_unique_sources(&[m1, m2, m3]);
+        assert_eq!(sources, vec!["clippy", "rustc"]);
+    }
+
+    #[test]
+    fn multiline_markers_detects_multiline() {
+        let mut m1 = make_marker("a.rs", MarkerSeverity::Error, "e1");
+        m1.end_line = 5; // start_line is 1 from make_marker
+        let m2 = make_marker("b.rs", MarkerSeverity::Warning, "w1");
+        let markers = vec![m1, m2];
+        let ml = multiline_markers(&markers);
+        assert_eq!(ml.len(), 1);
+    }
+
+    #[test]
+    fn marker_tooltip_formats_correctly() {
+        let mut m = make_marker("a.rs", MarkerSeverity::Error, "expected `;`");
+        m.source = Some("rustc".to_string());
+        let tip = marker_tooltip(&m);
+        assert!(tip.contains("Error"));
+        assert!(tip.contains("[rustc]"));
+        assert!(tip.contains("expected `;`"));
+    }
+
+    #[test]
+    fn marker_has_any_tag_checks() {
+        let mut m = make_marker("a.rs", MarkerSeverity::Warning, "unused");
+        m.tags.push(MarkerTag::Unnecessary);
+        assert!(marker_has_any_tag(&m, &[MarkerTag::Unnecessary]));
+        assert!(!marker_has_any_tag(&m, &[MarkerTag::Deprecated]));
+    }
+
+    #[test]
+    fn marker_has_any_tag_empty_tags() {
+        let m = make_marker("a.rs", MarkerSeverity::Info, "info");
+        assert!(!marker_has_any_tag(&m, &[MarkerTag::Unnecessary]));
     }
 }

@@ -988,6 +988,83 @@ pub fn count_code_blocks(content: &str) -> usize {
     fence_count / 2
 }
 
+/// Compute the average message length (in characters) in a session.
+pub fn average_message_length(session: &ChatSession) -> f64 {
+    let msgs = session.get_messages();
+    if msgs.is_empty() {
+        return 0.0;
+    }
+    let total: usize = msgs.iter().map(|m| m.content.len()).sum();
+    total as f64 / msgs.len() as f64
+}
+
+/// Return the number of distinct roles that appear in a session.
+pub fn distinct_role_count(session: &ChatSession) -> usize {
+    let mut roles = Vec::new();
+    for m in session.get_messages() {
+        if !roles.contains(&m.role) {
+            roles.push(m.role.clone());
+        }
+    }
+    roles.len()
+}
+
+/// Find messages in a session that contain code blocks.
+pub fn messages_with_code(session: &ChatSession) -> Vec<&ChatMessage> {
+    session
+        .get_messages()
+        .iter()
+        .filter(|m| count_code_blocks(&m.content) > 0)
+        .collect()
+}
+
+/// Return the longest message (by content length) in a session.
+pub fn longest_message(session: &ChatSession) -> Option<&ChatMessage> {
+    session
+        .get_messages()
+        .iter()
+        .max_by_key(|m| m.content.len())
+}
+
+/// Summarize a chat session into a human-readable string.
+pub fn session_summary(session: &ChatSession) -> String {
+    let total = session.message_count();
+    let user_count = session.messages_by_role(ChatRole::User).len();
+    let assistant_count = session.messages_by_role(ChatRole::Assistant).len();
+    format!(
+        "{} messages ({} user, {} assistant)",
+        total, user_count, assistant_count
+    )
+}
+
+/// Extract all unique "languages" from code blocks in a session.
+pub fn code_block_languages(session: &ChatSession) -> Vec<String> {
+    let mut langs = Vec::new();
+    for msg in session.get_messages() {
+        for block in ChatCodeBlock::extract_code_blocks(&msg.content) {
+            if let Some(ref lang) = block.language {
+                if !langs.contains(lang) {
+                    langs.push(lang.clone());
+                }
+            }
+        }
+    }
+    langs
+}
+
+/// Count how many messages are in each status.
+pub fn count_by_status(session: &ChatSession) -> Vec<(ChatMessageStatus, usize)> {
+    let mut counts: Vec<(ChatMessageStatus, usize)> = Vec::new();
+    for m in session.get_messages() {
+        if let Some(entry) = counts.iter_mut().find(|(s, _)| *s == m.status) {
+            entry.1 += 1;
+        } else {
+            counts.push((m.status.clone(), 1));
+        }
+    }
+    counts
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1607,5 +1684,88 @@ mod tests {
         assert_eq!(count_code_blocks("```rust\nfn main() {}\n```"), 1);
         assert_eq!(count_code_blocks("no code here"), 0);
         assert_eq!(count_code_blocks("```a```\n```b```"), 2);
+    }
+
+    #[test]
+    fn average_message_length_computes() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::User, "hi", 1);       // 2 chars
+        session.add_message(ChatRole::Assistant, "hello there", 2); // 11 chars
+        let avg = average_message_length(&session);
+        // (2 + 11) / 2 = 6.5
+        assert!((avg - 6.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn average_message_length_empty() {
+        let session = ChatSession::new("s1");
+        assert_eq!(average_message_length(&session), 0.0);
+    }
+
+    #[test]
+    fn distinct_role_count_works() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::User, "hi", 1);
+        session.add_message(ChatRole::User, "again", 2);
+        session.add_message(ChatRole::Assistant, "hello", 3);
+        assert_eq!(distinct_role_count(&session), 2);
+    }
+
+    #[test]
+    fn messages_with_code_finds_code() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::User, "no code here", 1);
+        session.add_message(ChatRole::Assistant, "```rust\nfn main() {}\n```", 2);
+        let with_code = messages_with_code(&session);
+        assert_eq!(with_code.len(), 1);
+        assert!(with_code[0].content.contains("fn main"));
+    }
+
+    #[test]
+    fn longest_message_finds_longest() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::User, "short", 1);
+        session.add_message(ChatRole::Assistant, "a much longer message", 2);
+        let longest = longest_message(&session).unwrap();
+        assert_eq!(longest.content, "a much longer message");
+    }
+
+    #[test]
+    fn longest_message_empty_session() {
+        let session = ChatSession::new("s1");
+        assert!(longest_message(&session).is_none());
+    }
+
+    #[test]
+    fn session_summary_format() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::User, "hi", 1);
+        session.add_message(ChatRole::Assistant, "hello", 2);
+        let s = session_summary(&session);
+        assert!(s.contains("2 messages"));
+        assert!(s.contains("1 user"));
+        assert!(s.contains("1 assistant"));
+    }
+
+    #[test]
+    fn code_block_languages_extracts() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::Assistant, "```rust\ncode\n```\n```python\ncode\n```", 1);
+        session.add_message(ChatRole::Assistant, "```rust\nmore\n```", 2);
+        let langs = code_block_languages(&session);
+        assert!(langs.contains(&"rust".to_string()));
+        assert!(langs.contains(&"python".to_string()));
+        assert_eq!(langs.len(), 2); // rust only counted once
+    }
+
+    #[test]
+    fn count_by_status_tallies() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::User, "hi", 1);
+        session.add_message(ChatRole::Assistant, "hello", 2);
+        let counts = count_by_status(&session);
+        let complete = counts.iter().find(|(s, _)| *s == ChatMessageStatus::Complete);
+        assert!(complete.is_some());
+        assert_eq!(complete.unwrap().1, 2);
     }
 }

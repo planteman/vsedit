@@ -1104,6 +1104,72 @@ impl fmt::Display for DialogStack {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Dialog utilities
+// ---------------------------------------------------------------------------
+
+/// Counts the number of primary buttons in a set of dialog options.
+pub fn count_primary_buttons(options: &DialogOptions) -> usize {
+    options.buttons.iter().filter(|b| b.is_primary).count()
+}
+
+/// Returns the labels of all buttons in a dialog options struct.
+pub fn button_labels(options: &DialogOptions) -> Vec<&str> {
+    options.buttons.iter().map(|b| b.label.as_str()).collect()
+}
+
+/// Returns `true` if the dialog options have a button whose `returns_value`
+/// matches `value`.
+pub fn has_button_value(options: &DialogOptions, value: &str) -> bool {
+    options
+        .buttons
+        .iter()
+        .any(|b| b.returns_value == value)
+}
+
+/// Returns the return-value of the first primary button, if any.
+pub fn primary_button_value(options: &DialogOptions) -> Option<&str> {
+    options
+        .buttons
+        .iter()
+        .find(|b| b.is_primary)
+        .map(|b| b.returns_value.as_str())
+}
+
+/// Builds a simple warning dialog with a single "OK" button.
+pub fn warning_ok(title: impl Into<String>, message: impl Into<String>) -> DialogOptions {
+    DialogOptions {
+        title: title.into(),
+        message: message.into(),
+        kind: DialogKind::Warning,
+        buttons: vec![DialogButton::primary("OK", "ok")],
+        detail: None,
+    }
+}
+
+/// Builds a simple error dialog with a single "Close" button.
+pub fn error_close(title: impl Into<String>, message: impl Into<String>) -> DialogOptions {
+    DialogOptions {
+        title: title.into(),
+        message: message.into(),
+        kind: DialogKind::Error,
+        buttons: vec![DialogButton::primary("Close", "close")],
+        detail: None,
+    }
+}
+
+/// Summarises a `DialogHistory` by counting how many dialogs of each kind
+/// have been recorded.
+pub fn history_kind_counts(history: &DialogHistory) -> HashMap<String, usize> {
+    let mut map = HashMap::new();
+    for entry in history.entries() {
+        *map.entry(format!("{}", entry.kind)).or_insert(0) += 1;
+    }
+    map
+}
+
+use std::collections::HashMap;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1623,5 +1689,90 @@ mod tests {
     fn test_dialog_stack_peek_empty() {
         let stack = DialogStack::new();
         assert!(stack.peek().is_none());
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn test_count_primary_buttons_none() {
+        let opts = DialogOptions {
+            title: "T".into(),
+            message: "M".into(),
+            kind: DialogKind::Info,
+            buttons: vec![DialogButton::new("A", "a"), DialogButton::new("B", "b")],
+            detail: None,
+        };
+        assert_eq!(count_primary_buttons(&opts), 0);
+    }
+
+    #[test]
+    fn test_count_primary_buttons_some() {
+        let opts = DialogOptions::ok_cancel("T", "M");
+        assert_eq!(count_primary_buttons(&opts), 1);
+    }
+
+    #[test]
+    fn test_button_labels_ok_cancel() {
+        let opts = DialogOptions::ok_cancel("T", "M");
+        assert_eq!(button_labels(&opts), vec!["OK", "Cancel"]);
+    }
+
+    #[test]
+    fn test_has_button_value_present() {
+        let opts = DialogOptions::ok_cancel("T", "M");
+        assert!(has_button_value(&opts, "ok"));
+        assert!(has_button_value(&opts, "cancel"));
+        assert!(!has_button_value(&opts, "maybe"));
+    }
+
+    #[test]
+    fn test_primary_button_value_found() {
+        let opts = DialogOptions::ok_cancel("T", "M");
+        assert_eq!(primary_button_value(&opts), Some("ok"));
+    }
+
+    #[test]
+    fn test_primary_button_value_none() {
+        let opts = DialogOptions {
+            title: "T".into(),
+            message: "M".into(),
+            kind: DialogKind::Info,
+            buttons: vec![DialogButton::new("X", "x")],
+            detail: None,
+        };
+        assert_eq!(primary_button_value(&opts), None);
+    }
+
+    #[test]
+    fn test_warning_ok_dialog() {
+        let opts = warning_ok("Warn", "Something happened");
+        assert_eq!(opts.kind, DialogKind::Warning);
+        assert_eq!(opts.buttons.len(), 1);
+        assert!(opts.buttons[0].is_primary);
+    }
+
+    #[test]
+    fn test_error_close_dialog() {
+        let opts = error_close("Err", "Fatal");
+        assert_eq!(opts.kind, DialogKind::Error);
+        assert_eq!(opts.buttons[0].returns_value, "close");
+    }
+
+    #[test]
+    fn test_history_kind_counts_empty() {
+        let history = DialogHistory::new();
+        let counts = history_kind_counts(&history);
+        assert!(counts.is_empty());
+    }
+
+    #[test]
+    fn test_history_kind_counts_mixed() {
+        let mut history = DialogHistory::new();
+        history.record("a", DialogKind::Info, DialogResult::cancelled());
+        history.record("b", DialogKind::Info, DialogResult::selected("ok"));
+        history.record("c", DialogKind::Error, DialogResult::cancelled());
+        let counts = history_kind_counts(&history);
+        assert_eq!(counts.get("Info"), Some(&2));
+        assert_eq!(counts.get("Error"), Some(&1));
     }
 }

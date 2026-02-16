@@ -951,6 +951,70 @@ impl Default for PolicyAuditLog {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Policy utility functions
+// ---------------------------------------------------------------------------
+
+/// Returns the names of all boolean policies that are set to `true`.
+pub fn enabled_feature_names(svc: &PolicyService) -> Vec<String> {
+    svc.list_policies()
+        .into_iter()
+        .filter(|name| svc.get_bool(name) == Some(true))
+        .collect()
+}
+
+/// Returns the names of all boolean policies that are set to `false`.
+pub fn disabled_feature_names(svc: &PolicyService) -> Vec<String> {
+    svc.list_policies()
+        .into_iter()
+        .filter(|name| svc.get_bool(name) == Some(false))
+        .collect()
+}
+
+/// Returns the names of policies whose values are of the `String` variant.
+pub fn string_policy_names(svc: &PolicyService) -> Vec<String> {
+    svc.list_policies()
+        .into_iter()
+        .filter(|name| svc.get_string(name).is_some())
+        .collect()
+}
+
+/// Counts the number of policies grouped by value type.
+pub fn count_by_type(svc: &PolicyService) -> HashMap<&'static str, usize> {
+    let mut map = HashMap::new();
+    for name in svc.list_policies() {
+        if let Some(policy) = svc.get_policy(&name) {
+            let label = match &policy.value {
+                PolicyValue::Bool(_) => "bool",
+                PolicyValue::String(_) => "string",
+                PolicyValue::Number(_) => "number",
+                PolicyValue::StringList(_) => "string_list",
+            };
+            *map.entry(label).or_insert(0) += 1;
+        }
+    }
+    map
+}
+
+/// Returns the names of all policies that match a given prefix.
+pub fn policies_with_prefix(svc: &PolicyService, prefix: &str) -> Vec<String> {
+    svc.list_policies()
+        .into_iter()
+        .filter(|n| n.starts_with(prefix))
+        .collect()
+}
+
+/// Produces a human-readable summary of a `PolicyService`.
+pub fn policy_summary(svc: &PolicyService) -> String {
+    let total = svc.policy_count();
+    let bools = svc
+        .list_policies()
+        .iter()
+        .filter(|n| svc.get_bool(n).is_some())
+        .count();
+    format!("{total} policies ({bools} boolean)")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1626,5 +1690,78 @@ mod tests {
         assert_eq!(AuditAction::Set.to_string(), "SET");
         assert_eq!(AuditAction::Remove.to_string(), "REMOVE");
         assert_eq!(AuditAction::MarkReadOnly.to_string(), "MARK_READ_ONLY");
+    }
+
+    // --- new tests ---
+
+    fn sample_policy_svc() -> PolicyService {
+        let mut svc = PolicyService::new();
+        svc.set_policy("editor.minimap", PolicyValue::Bool(true), None);
+        svc.set_policy("editor.wordWrap", PolicyValue::Bool(false), None);
+        svc.set_policy("editor.theme", PolicyValue::String("dark".into()), None);
+        svc.set_policy("editor.tabSize", PolicyValue::Number(4), None);
+        svc.set_policy("terminal.shell", PolicyValue::String("/bin/bash".into()), None);
+        svc
+    }
+
+    #[test]
+    fn test_enabled_feature_names() {
+        let svc = sample_policy_svc();
+        let enabled = enabled_feature_names(&svc);
+        assert_eq!(enabled, vec!["editor.minimap"]);
+    }
+
+    #[test]
+    fn test_disabled_feature_names() {
+        let svc = sample_policy_svc();
+        let disabled = disabled_feature_names(&svc);
+        assert_eq!(disabled, vec!["editor.wordWrap"]);
+    }
+
+    #[test]
+    fn test_string_policy_names() {
+        let svc = sample_policy_svc();
+        let mut names = string_policy_names(&svc);
+        names.sort();
+        assert_eq!(names, vec!["editor.theme", "terminal.shell"]);
+    }
+
+    #[test]
+    fn test_count_by_type() {
+        let svc = sample_policy_svc();
+        let counts = count_by_type(&svc);
+        assert_eq!(counts.get("bool"), Some(&2));
+        assert_eq!(counts.get("string"), Some(&2));
+        assert_eq!(counts.get("number"), Some(&1));
+    }
+
+    #[test]
+    fn test_policies_with_prefix() {
+        let svc = sample_policy_svc();
+        let editor = policies_with_prefix(&svc, "editor.");
+        assert_eq!(editor.len(), 4);
+        let terminal = policies_with_prefix(&svc, "terminal.");
+        assert_eq!(terminal.len(), 1);
+    }
+
+    #[test]
+    fn test_policies_with_prefix_empty() {
+        let svc = sample_policy_svc();
+        let none = policies_with_prefix(&svc, "nonexistent.");
+        assert!(none.is_empty());
+    }
+
+    #[test]
+    fn test_policy_summary() {
+        let svc = sample_policy_svc();
+        let summary = policy_summary(&svc);
+        assert!(summary.contains("5 policies"));
+        assert!(summary.contains("2 boolean"));
+    }
+
+    #[test]
+    fn test_enabled_feature_names_empty() {
+        let svc = PolicyService::new();
+        assert!(enabled_feature_names(&svc).is_empty());
     }
 }

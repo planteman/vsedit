@@ -1073,6 +1073,75 @@ impl TerminalSessionState {
     pub fn has_activity(&self) -> bool {
         self.command_count > 0
     }
+
+    /// Remove a specific environment variable override.
+    pub fn remove_env(&mut self, key: &str) -> bool {
+        let before = self.env_overrides.len();
+        self.env_overrides.retain(|(k, _)| k != key);
+        self.env_overrides.len() != before
+    }
+
+    /// Return the number of environment variable overrides.
+    pub fn env_count(&self) -> usize {
+        self.env_overrides.len()
+    }
+
+    /// Reset the session state to its initial values (preserving the ID).
+    pub fn reset(&mut self) {
+        self.env_overrides.clear();
+        self.exit_code = None;
+        self.command_count = 0;
+    }
+}
+
+impl TerminalOutput {
+    /// Return all lines as a vector.
+    pub fn lines(&self) -> Vec<&str> {
+        if self.buffer.is_empty() {
+            Vec::new()
+        } else {
+            self.buffer.lines().collect()
+        }
+    }
+
+    /// Return true if the output contains the given substring.
+    pub fn contains(&self, needle: &str) -> bool {
+        self.buffer.contains(needle)
+    }
+
+    /// Return the first N lines from the buffer.
+    pub fn first_n_lines(&self, n: usize) -> Vec<&str> {
+        self.buffer.lines().take(n).collect()
+    }
+}
+
+impl TerminalBridge {
+    /// Return IDs of all terminals.
+    pub fn terminal_ids(&self) -> Vec<&str> {
+        self.terminals.iter().map(|t| t.id.as_str()).collect()
+    }
+
+    /// Return true if a terminal with the given ID exists.
+    pub fn has_terminal(&self, id: &str) -> bool {
+        self.terminals.iter().any(|t| t.id == id)
+    }
+
+    /// Return terminals filtered by active status.
+    pub fn terminals_by_active(&self, active: bool) -> Vec<&Terminal> {
+        self.terminals.iter().filter(|t| t.is_active == active).collect()
+    }
+}
+
+impl TerminalProfileContribution {
+    /// Returns true if the profile has a custom icon set.
+    pub fn has_icon(&self) -> bool {
+        self.icon.is_some()
+    }
+
+    /// Returns the number of environment variables configured.
+    pub fn env_count(&self) -> usize {
+        self.env.len()
+    }
 }
 
 #[cfg(test)]
@@ -1601,5 +1670,93 @@ mod tests {
         assert_eq!(state.get_env("PATH"), Some("/usr/local/bin"));
         assert_eq!(state.env_overrides.len(), 1);
         assert_eq!(state.get_env("MISSING"), None);
+    }
+
+    #[test]
+    fn session_state_remove_env() {
+        let mut state = TerminalSessionState::new("t1", "/home");
+        state.set_env("A", "1");
+        state.set_env("B", "2");
+        assert!(state.remove_env("A"));
+        assert_eq!(state.env_count(), 1);
+        assert!(!state.remove_env("A"));
+        assert_eq!(state.get_env("A"), None);
+    }
+
+    #[test]
+    fn session_state_reset() {
+        let mut state = TerminalSessionState::new("t1", "/home");
+        state.record_command(0);
+        state.set_env("X", "Y");
+        state.reset();
+        assert_eq!(state.command_count, 0);
+        assert_eq!(state.exit_code, None);
+        assert_eq!(state.env_count(), 0);
+    }
+
+    #[test]
+    fn terminal_output_lines_and_contains() {
+        let mut out = TerminalOutput::new("t1");
+        out.append("line1\nline2\nline3\n");
+        assert_eq!(out.lines().len(), 3);
+        assert!(out.contains("line2"));
+        assert!(!out.contains("missing"));
+    }
+
+    #[test]
+    fn terminal_output_first_n_lines() {
+        let mut out = TerminalOutput::new("t1");
+        out.append("a\nb\nc\nd\n");
+        let first2 = out.first_n_lines(2);
+        assert_eq!(first2, vec!["a", "b"]);
+        let all = out.first_n_lines(100);
+        assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn bridge_terminal_ids_and_has() {
+        let mut bridge = TerminalBridge::new();
+        let id = bridge.create_terminal(&test_opts());
+        assert!(bridge.has_terminal(&id));
+        assert!(!bridge.has_terminal("nonexistent"));
+        let ids = bridge.terminal_ids();
+        assert_eq!(ids.len(), 1);
+    }
+
+    #[test]
+    fn bridge_terminals_by_active() {
+        let mut bridge = TerminalBridge::new();
+        let id1 = bridge.create_terminal(&test_opts());
+        let id2 = bridge.create_terminal(&test_opts());
+        // Both start active; deactivate id2
+        bridge.set_active(&id2, false).unwrap();
+        let active = bridge.terminals_by_active(true);
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].id, id1);
+        let inactive = bridge.terminals_by_active(false);
+        assert_eq!(inactive.len(), 1);
+        assert_eq!(inactive[0].id, id2);
+    }
+
+    #[test]
+    fn profile_contribution_has_icon_and_env_count() {
+        let profile = TerminalProfileContribution::new("p1", "Profile 1", "/bin/bash")
+            .with_icon("terminal")
+            .with_env("A", "1")
+            .with_env("B", "2");
+        assert!(profile.has_icon());
+        assert_eq!(profile.env_count(), 2);
+        let plain = TerminalProfileContribution::new("p2", "Profile 2", "/bin/sh");
+        assert!(!plain.has_icon());
+        assert_eq!(plain.env_count(), 0);
+    }
+
+    #[test]
+    fn terminal_output_empty_lines() {
+        let out = TerminalOutput::new("t1");
+        assert!(out.lines().is_empty());
+        assert!(!out.contains("anything"));
+        let first = out.first_n_lines(5);
+        assert!(first.is_empty());
     }
 }

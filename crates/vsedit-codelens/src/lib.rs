@@ -896,6 +896,81 @@ pub fn resolve_click(lenses: &[CodeLens], line: u32) -> Option<LensClickEvent> {
         })
 }
 
+// ---------------------------------------------------------------------------
+// CodeLens analysis and filtering utilities
+// ---------------------------------------------------------------------------
+
+/// Count how many lenses in a slice are resolved (have a command).
+pub fn count_resolved(lenses: &[CodeLens]) -> usize {
+    lenses.iter().filter(|l| l.is_resolved()).count()
+}
+
+/// Count how many lenses are unresolved (no command).
+pub fn count_unresolved(lenses: &[CodeLens]) -> usize {
+    lenses.iter().filter(|l| !l.is_resolved()).count()
+}
+
+/// Return the distinct lines that have at least one code lens.
+pub fn distinct_lens_lines(lenses: &[CodeLens]) -> Vec<u32> {
+    let mut lines: Vec<u32> = lenses.iter().map(|l| l.start_line).collect();
+    lines.sort();
+    lines.dedup();
+    lines
+}
+
+/// Find all lenses whose command title contains a given substring.
+pub fn find_lenses_by_title<'a>(lenses: &'a [CodeLens], substring: &'a str) -> Vec<&'a CodeLens> {
+    lenses
+        .iter()
+        .filter(|l| {
+            l.command
+                .as_ref()
+                .map_or(false, |c| c.title.contains(substring))
+        })
+        .collect()
+}
+
+/// Find all lenses whose command_id matches exactly.
+pub fn find_lenses_by_command_id<'a>(lenses: &'a [CodeLens], command_id: &str) -> Vec<&'a CodeLens> {
+    lenses
+        .iter()
+        .filter(|l| {
+            l.command
+                .as_ref()
+                .map_or(false, |c| c.command_id == command_id)
+        })
+        .collect()
+}
+
+/// Compute the total line span covered by all lenses (non-overlapping union).
+pub fn total_line_coverage(lenses: &[CodeLens]) -> u32 {
+    if lenses.is_empty() {
+        return 0;
+    }
+    let mut intervals: Vec<(u32, u32)> = lenses
+        .iter()
+        .map(|l| (l.start_line, l.start_line + l.line_span()))
+        .collect();
+    intervals.sort();
+    let mut total = 0u32;
+    let mut current_end = 0u32;
+    for (start, end) in intervals {
+        if start >= current_end {
+            total += end - start;
+            current_end = end;
+        } else if end > current_end {
+            total += end - current_end;
+            current_end = end;
+        }
+    }
+    total
+}
+
+/// Check if any lens in the set has non-empty data attached.
+pub fn any_has_data(lenses: &[CodeLens]) -> bool {
+    lenses.iter().any(|l| !l.data.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1623,5 +1698,102 @@ mod tests {
         };
         let lenses = vec![CodeLens::new(5, 0, 5, 10).with_command(cmd)];
         assert!(resolve_click(&lenses, 10).is_none());
+    }
+
+    #[test]
+    fn count_resolved_mixed() {
+        let cmd = Command {
+            title: "T".into(),
+            command_id: "c".into(),
+            tooltip: String::new(),
+            arguments: vec![],
+        };
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 5).with_command(cmd.clone()),
+            CodeLens::new(2, 0, 2, 5),
+            CodeLens::new(3, 0, 3, 5).with_command(cmd),
+        ];
+        assert_eq!(count_resolved(&lenses), 2);
+        assert_eq!(count_unresolved(&lenses), 1);
+    }
+
+    #[test]
+    fn distinct_lens_lines_deduplicates() {
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 5),
+            CodeLens::new(1, 6, 1, 10),
+            CodeLens::new(3, 0, 3, 5),
+        ];
+        assert_eq!(distinct_lens_lines(&lenses), vec![1, 3]);
+    }
+
+    #[test]
+    fn find_lenses_by_title_matches() {
+        let cmd = Command {
+            title: "Run Test".into(),
+            command_id: "test.run".into(),
+            tooltip: String::new(),
+            arguments: vec![],
+        };
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 5).with_command(cmd),
+            CodeLens::new(2, 0, 2, 5),
+        ];
+        let found = find_lenses_by_title(&lenses, "Run");
+        assert_eq!(found.len(), 1);
+    }
+
+    #[test]
+    fn find_lenses_by_command_id_matches() {
+        let cmd = Command {
+            title: "T".into(),
+            command_id: "editor.action.run".into(),
+            tooltip: String::new(),
+            arguments: vec![],
+        };
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 5).with_command(cmd),
+            CodeLens::new(2, 0, 2, 5),
+        ];
+        let found = find_lenses_by_command_id(&lenses, "editor.action.run");
+        assert_eq!(found.len(), 1);
+    }
+
+    #[test]
+    fn total_line_coverage_non_overlapping() {
+        let lenses = vec![
+            CodeLens::new(1, 0, 3, 5),  // lines 1-3, span=3
+            CodeLens::new(5, 0, 7, 5),  // lines 5-7, span=3
+        ];
+        assert_eq!(total_line_coverage(&lenses), 6);
+    }
+
+    #[test]
+    fn total_line_coverage_overlapping() {
+        let lenses = vec![
+            CodeLens::new(1, 0, 3, 5),
+            CodeLens::new(2, 0, 4, 5),
+        ];
+        // union: 1-4, = 4 lines
+        assert_eq!(total_line_coverage(&lenses), 4);
+    }
+
+    #[test]
+    fn total_line_coverage_empty() {
+        assert_eq!(total_line_coverage(&[]), 0);
+    }
+
+    #[test]
+    fn any_has_data_true() {
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 5).with_data("info"),
+        ];
+        assert!(any_has_data(&lenses));
+    }
+
+    #[test]
+    fn any_has_data_false() {
+        let lenses = vec![CodeLens::new(1, 0, 1, 5)];
+        assert!(!any_has_data(&lenses));
     }
 }
