@@ -2,7 +2,7 @@
 //! groups, and drives top-level rendering.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
@@ -13,7 +13,7 @@ use ratatui::Frame;
 
 use vsedit_quickinput::fuzzy_match;
 
-use vsedit_debug_view::DebugView;
+use vsedit_debug_view::{DebugConsoleEntry, DebugView, OutputCategory};
 use vsedit_output::OutputPanel;
 use vsedit_problems::{Problem, ProblemSeverity, ProblemsPanel};
 use vsedit_scm_view::{ScmGroup, ScmView};
@@ -644,6 +644,79 @@ pub struct CommandPaletteItem {
 }
 
 // ---------------------------------------------------------------------------
+// QuickOpenState
+// ---------------------------------------------------------------------------
+
+/// State for the Quick Open file picker overlay.
+#[derive(Debug, Clone)]
+pub struct QuickOpenState {
+    /// Current query typed by the user.
+    pub query: String,
+    /// Filtered file paths matching the query.
+    pub filtered_results: Vec<PathBuf>,
+    /// Currently selected index in the results list.
+    pub selected_index: usize,
+}
+
+impl QuickOpenState {
+    /// Create a new empty Quick Open state.
+    pub fn new() -> Self {
+        Self {
+            query: String::new(),
+            filtered_results: Vec::new(),
+            selected_index: 0,
+        }
+    }
+
+    /// Filter the given workspace files using fuzzy matching against the query.
+    pub fn filter(&mut self, workspace_files: &[PathBuf]) {
+        if self.query.is_empty() {
+            self.filtered_results = workspace_files.to_vec();
+        } else {
+            let mut scored: Vec<(PathBuf, i32)> = workspace_files
+                .iter()
+                .filter_map(|p| {
+                    let name = p.to_string_lossy();
+                    fuzzy_match(&self.query, &name).map(|m| (p.clone(), m.score))
+                })
+                .collect();
+            scored.sort_by(|a, b| b.1.cmp(&a.1));
+            self.filtered_results = scored.into_iter().map(|(p, _)| p).collect();
+        }
+        self.selected_index = 0;
+    }
+
+    /// Move selection up.
+    pub fn select_previous(&mut self) {
+        if !self.filtered_results.is_empty() {
+            if self.selected_index == 0 {
+                self.selected_index = self.filtered_results.len() - 1;
+            } else {
+                self.selected_index -= 1;
+            }
+        }
+    }
+
+    /// Move selection down.
+    pub fn select_next(&mut self) {
+        if !self.filtered_results.is_empty() {
+            self.selected_index = (self.selected_index + 1) % self.filtered_results.len();
+        }
+    }
+
+    /// Get the currently selected file path, if any.
+    pub fn selected_path(&self) -> Option<&PathBuf> {
+        self.filtered_results.get(self.selected_index)
+    }
+}
+
+impl Default for QuickOpenState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // WorkbenchContext — simple IContext for keybinding resolution
 // ---------------------------------------------------------------------------
 
@@ -744,6 +817,12 @@ pub struct Workbench {
     pub viewport_scroll: usize,
     /// Working directory for title bar.
     pub workspace_folder: Option<String>,
+    /// Quick Open file picker state.
+    pub quick_open: QuickOpenState,
+    /// Whether the Quick Open overlay is visible.
+    pub show_quick_open: bool,
+    /// Known workspace file paths for Quick Open filtering.
+    pub workspace_files: Vec<PathBuf>,
 }
 
 impl Workbench {
@@ -1048,6 +1127,9 @@ impl Workbench {
             breadcrumbs: Vec::new(),
             viewport_scroll: 0,
             workspace_folder: None,
+            quick_open: QuickOpenState::new(),
+            show_quick_open: false,
+            workspace_files: Vec::new(),
         }
     }
 
@@ -1379,6 +1461,11 @@ impl Workbench {
         if self.show_command_palette {
             self.render_command_palette(frame, area);
         }
+
+        // Quick Open overlay
+        if self.show_quick_open {
+            self.render_quick_open(frame, area);
+        }
     }
 
     /// Render the command palette overlay.
@@ -1479,11 +1566,53 @@ impl Workbench {
                 self.output_panel.render(content_area, frame.buffer_mut());
             }
             ActivePanelView::DebugConsole => {
-                let stub = Paragraph::new(Span::styled(
-                    "Debug Console (not connected)",
-                    Style::default().fg(Color::DarkGray),
-                ));
-                frame.render_widget(stub, content_area);
+                let entries = self.debug_view.console.entries();
+                if entries.is_empty() {
+                    let empty = Paragraph::new(Span::styled(
+                        "Debug Console (not connected)",
+                        Style::default().fg(Color::DarkGray),
+                    ));
+                    frame.render_widget(empty, content_area);
+                } else {
+                    let max_lines = content_area.height.saturating_sub(1) as usize;
+                    let skip = entries.len().saturating_sub(max_lines);
+                    let lines: Vec<Line> = entries.iter().skip(skip).map(|entry| {
+                        match entry {
+                            DebugConsoleEntry::Input(text) => Line::from(vec![
+                                Span::styled("> ", Style::default().fg(Color::Cyan)),
+                                Span::styled(text.as_str(), Style::default().fg(Color::White)),
+                            ]),
+                            DebugConsoleEntry::Output(text, OutputCategory::Stderr) => {
+                                Line::from(Span::styled(text.as_str(), Style::default().fg(Color::Red)))
+                            }
+                            DebugConsoleEntry::Output(text, OutputCategory::Stdout) => {
+                                Line::from(Span::styled(text.as_str(), Style::default().fg(Color::White)))
+                            }
+                            DebugConsoleEntry::Output(text, _) => {
+                                Line::from(Span::styled(text.as_str(), Style::default().fg(Color::Gray)))
+                            }
+                        }
+                    }).collect();
+                    let output_h = lines.len() as u16;
+                    let output_area = Rect::new(
+                        content_area.x,
+                        content_area.y,
+                        content_area.width,
+                        output_h.min(content_area.height),
+                    );
+                    frame.render_widget(Paragraph::new(lines), output_area);
+                    // Prompt line at bottom
+                    let prompt_y = content_area.y + output_h.min(content_area.height.saturating_sub(1));
+                    if prompt_y < content_area.y + content_area.height {
+                        let prompt_area = Rect::new(
+                            content_area.x, prompt_y, content_area.width, 1,
+                        );
+                        let prompt = Paragraph::new(Line::from(
+                            Span::styled("> ", Style::default().fg(Color::Cyan)),
+                        ));
+                        frame.render_widget(prompt, prompt_area);
+                    }
+                }
             }
         }
     }
@@ -1500,6 +1629,11 @@ impl Workbench {
         // When command palette is focused, handle keys directly.
         if self.focused == FocusedPart::CommandPalette {
             return self.handle_palette_key(key);
+        }
+
+        // When quick open is focused, handle keys directly.
+        if self.focused == FocusedPart::QuickInput {
+            return self.handle_quick_open_key(key);
         }
 
         // When panel is focused, Left/Right switch panel tabs.
@@ -1555,7 +1689,7 @@ impl Workbench {
                 self.open_command_palette();
             }
             "workbench.action.quickOpen" => {
-                self.statusbar.update_item("statusbar.notification", "Quick Open (stub)");
+                self.open_quick_open();
             }
             "workbench.action.files.newUntitledFile" => {
                 self.editor_content = Some(Vec::new());
@@ -1794,6 +1928,135 @@ impl Workbench {
                 WorkbenchAction::None
             }
         }
+    }
+
+    /// Open the Quick Open file picker overlay.
+    pub fn open_quick_open(&mut self) {
+        self.saved_focus = self.focused;
+        self.focused = FocusedPart::QuickInput;
+        self.show_quick_open = true;
+        self.quick_open.query.clear();
+        self.quick_open.filter(&self.workspace_files);
+    }
+
+    /// Close the Quick Open overlay and restore focus.
+    pub fn close_quick_open(&mut self) {
+        self.show_quick_open = false;
+        self.quick_open.query.clear();
+        self.quick_open.filtered_results.clear();
+        self.quick_open.selected_index = 0;
+        self.focused = self.saved_focus;
+    }
+
+    /// Handle a key press while the Quick Open overlay is focused.
+    fn handle_quick_open_key(&mut self, key: KeyInput) -> WorkbenchAction {
+        use vsedit_keycodes::KeyCode as KC;
+
+        match key.key_code {
+            KC::Escape => {
+                self.close_quick_open();
+                WorkbenchAction::None
+            }
+            KC::Enter => {
+                let path = self.quick_open.selected_path().cloned();
+                self.close_quick_open();
+                if let Some(p) = path {
+                    if let Ok(content) = std::fs::read_to_string(&p) {
+                        self.open_file(&p, &content);
+                    }
+                }
+                WorkbenchAction::None
+            }
+            KC::UpArrow => {
+                self.quick_open.select_previous();
+                WorkbenchAction::None
+            }
+            KC::DownArrow => {
+                self.quick_open.select_next();
+                WorkbenchAction::None
+            }
+            KC::Backspace => {
+                self.quick_open.query.pop();
+                let files = self.workspace_files.clone();
+                self.quick_open.filter(&files);
+                WorkbenchAction::None
+            }
+            other => {
+                if !key.ctrl && !key.alt && !key.meta {
+                    if let Some(ch) = key_code_to_char(other, key.shift) {
+                        self.quick_open.query.push(ch);
+                        let files = self.workspace_files.clone();
+                        self.quick_open.filter(&files);
+                    }
+                }
+                WorkbenchAction::None
+            }
+        }
+    }
+
+    /// Render the Quick Open overlay.
+    fn render_quick_open(&self, frame: &mut Frame, area: Rect) {
+        let width = (area.width * 3 / 5).max(20).min(area.width);
+        let height = (area.height * 2 / 5).max(5).min(area.height);
+        let x = area.x + (area.width.saturating_sub(width)) / 2;
+        let y = area.y + 1;
+        let popup_area = Rect::new(x, y, width, height);
+
+        frame.render_widget(Clear, popup_area);
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow))
+            .style(Style::default().bg(Color::DarkGray));
+        let inner = block.inner(popup_area);
+        frame.render_widget(block, popup_area);
+
+        if inner.height == 0 || inner.width == 0 {
+            return;
+        }
+
+        // Input line
+        let input_line = Line::from(vec![
+            Span::styled("🔍 ", Style::default().fg(Color::Yellow)),
+            Span::raw(&self.quick_open.query),
+        ]);
+        let input_area = Rect::new(inner.x, inner.y, inner.width, 1);
+        frame.render_widget(Paragraph::new(input_line), input_area);
+
+        // Results list
+        let list_start_y = inner.y + 1;
+        let list_height = inner.height.saturating_sub(1) as usize;
+
+        for (i, path) in self.quick_open.filtered_results.iter().take(list_height).enumerate() {
+            let filename = path.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let dir = path.parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            let style = if i == self.quick_open.selected_index {
+                Style::default().bg(Color::Blue).fg(Color::White).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+
+            let mut spans = vec![Span::styled(filename, style)];
+            if !dir.is_empty() {
+                spans.push(Span::styled(
+                    format!("  {}", dir),
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+
+            let row_area = Rect::new(inner.x, list_start_y + i as u16, inner.width, 1);
+            frame.render_widget(Paragraph::new(Line::from(spans)), row_area);
+        }
+    }
+
+    /// Set the list of workspace files available for Quick Open.
+    pub fn set_workspace_files(&mut self, files: Vec<PathBuf>) {
+        self.workspace_files = files;
     }
 
     /// Switch the sidebar to the given panel, opening it if hidden.
