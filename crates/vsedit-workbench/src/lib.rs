@@ -19,6 +19,7 @@ use vsedit_keybinding_svc::{
 use vsedit_keycodes::{KeyCode, KeyCodeChord};
 use vsedit_wb_layout::WorkbenchLayout;
 use vsedit_wb_statusbar::{register_default_items, StatusBarService};
+use vsedit_wb_textmate::{syntect_to_ratatui_color, TextMateService};
 use vsedit_wb_views::{register_default_containers, ViewContainerLocation, ViewsRegistry};
 
 // ---------------------------------------------------------------------------
@@ -101,6 +102,10 @@ pub struct Workbench {
     cursor_line: u32,
     /// Current cursor column (1-based).
     cursor_col: u32,
+    /// TextMate syntax highlighting service.
+    textmate: TextMateService,
+    /// Detected syntax name for the current file.
+    syntax_name: Option<String>,
 }
 
 impl Workbench {
@@ -178,6 +183,8 @@ impl Workbench {
             is_modified: false,
             cursor_line: 1,
             cursor_col: 1,
+            textmate: TextMateService::new(),
+            syntax_name: None,
         }
     }
 
@@ -194,7 +201,22 @@ impl Workbench {
     /// Set the editor content and file path for rendering.
     pub fn set_editor_content(&mut self, content: &str, path: Option<String>) {
         self.editor_content = Some(content.lines().map(|l| l.to_string()).collect());
-        self.file_path = path;
+        self.file_path = path.clone();
+        // Detect syntax from file path
+        if let Some(ref p) = path {
+            let file_path = std::path::Path::new(p);
+            if let Some(syntax) = self.textmate.find_syntax_for_file(file_path) {
+                let name = syntax.name.clone();
+                self.statusbar.update_item("statusbar.language", &name);
+                self.syntax_name = Some(name);
+            } else {
+                self.statusbar.update_item("statusbar.language", "Plain Text");
+                self.syntax_name = None;
+            }
+        } else {
+            self.statusbar.update_item("statusbar.language", "Plain Text");
+            self.syntax_name = None;
+        }
     }
 
     /// Update cursor position displayed in the status bar.
@@ -282,17 +304,38 @@ impl Workbench {
                             Style::default().fg(Color::DarkGray),
                         ))]
                     } else {
+                        // Set up syntax highlighter if a syntax is detected
+                        let syntax_ref = self.syntax_name.as_deref().and_then(|name| {
+                            self.textmate.find_syntax_by_name(name)
+                        });
+                        let mut highlighter = syntax_ref.map(|s| self.textmate.create_highlighter(s));
+
                         lines
                             .iter()
                             .enumerate()
                             .map(|(i, line)| {
-                                Line::from(vec![
+                                let mut spans = vec![
                                     Span::styled(
                                         format!(" {:>width$} ", i + 1, width = num_width),
                                         Style::default().fg(Color::DarkGray),
                                     ),
-                                    Span::raw(line.as_str()),
-                                ])
+                                ];
+                                let line_with_nl = format!("{}\n", line);
+                                if let Some(ref mut hl) = highlighter {
+                                    let segments = self.textmate.highlight_line(hl, &line_with_nl);
+                                    for (style, text) in segments {
+                                        let trimmed = text.trim_end_matches('\n').to_string();
+                                        if !trimmed.is_empty() {
+                                            spans.push(Span::styled(
+                                                trimmed,
+                                                Style::default().fg(syntect_to_ratatui_color(style)),
+                                            ));
+                                        }
+                                    }
+                                } else {
+                                    spans.push(Span::raw(line.as_str()));
+                                }
+                                Line::from(spans)
                             })
                             .collect()
                     };

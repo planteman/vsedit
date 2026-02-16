@@ -8,6 +8,8 @@ license.workspace = true
 [dependencies]
 vsedit-commands = { path = "../vsedit-commands" }
 vsedit-contextkey = { path = "../vsedit-contextkey" }
+vsedit-editor-svc = { path = "../vsedit-editor-svc" }
+vsedit-explorer = { path = "../vsedit-explorer" }
 vsedit-input = { path = "../vsedit-input" }
 vsedit-keybinding-svc = { path = "../vsedit-keybinding-svc" }
 vsedit-keybindings = { path = "../vsedit-keybindings" }
@@ -15,6 +17,7 @@ vsedit-keycodes = { path = "../vsedit-keycodes" }
 vsedit-notification = { path = "../vsedit-notification" }
 vsedit-wb-layout = { path = "../vsedit-wb-layout" }
 vsedit-wb-statusbar = { path = "../vsedit-wb-statusbar" }
+vsedit-wb-textmate = { path = "../vsedit-wb-textmate" }
 vsedit-wb-views = { path = "../vsedit-wb-views" }
 ratatui = { workspace = true }
 
