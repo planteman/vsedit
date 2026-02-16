@@ -727,6 +727,159 @@ impl fmt::Display for AuthSession {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Token validation
+// ---------------------------------------------------------------------------
+
+/// Validates the format of a bearer token string.
+///
+/// A valid token must be non-empty, contain only ASCII alphanumeric characters,
+/// hyphens, underscores, or dots, and must not exceed the given max length.
+pub fn validate_token(token: &str, max_length: usize) -> Result<(), AuthError> {
+    if token.is_empty() {
+        return Err(AuthError::SessionExpired);
+    }
+    if token.len() > max_length {
+        return Err(AuthError::NetworkError(format!(
+            "token exceeds max length of {max_length}"
+        )));
+    }
+    if !token.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.') {
+        return Err(AuthError::NetworkError("token contains invalid characters".into()));
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Auth scope parsing
+// ---------------------------------------------------------------------------
+
+/// Parse a space-delimited scope string into individual scopes.
+///
+/// Empty segments are ignored and results are deduplicated.
+pub fn parse_scopes(scope_string: &str) -> Vec<String> {
+    let mut scopes: Vec<String> = scope_string
+        .split_whitespace()
+        .map(|s| s.to_string())
+        .collect();
+    scopes.sort();
+    scopes.dedup();
+    scopes
+}
+
+/// Checks whether `requested` scopes are a subset of `granted` scopes.
+pub fn scopes_satisfied(granted: &[String], requested: &[String]) -> bool {
+    requested.iter().all(|r| granted.contains(r))
+}
+
+// ---------------------------------------------------------------------------
+// Session tracker — in-memory session registry with timestamps
+// ---------------------------------------------------------------------------
+
+/// Tracks active sessions with creation timestamps.
+#[derive(Debug, Clone, Default)]
+pub struct SessionTracker {
+    sessions: Vec<(AuthSession, u64)>,
+}
+
+impl SessionTracker {
+    pub fn new() -> Self {
+        Self { sessions: Vec::new() }
+    }
+
+    /// Register a session with its creation timestamp.
+    pub fn add(&mut self, session: AuthSession, created_at: u64) {
+        self.sessions.push((session, created_at));
+    }
+
+    /// Remove a session by id. Returns `true` if found.
+    pub fn remove(&mut self, session_id: &str) -> bool {
+        let before = self.sessions.len();
+        self.sessions.retain(|(s, _)| s.id != session_id);
+        self.sessions.len() < before
+    }
+
+    /// Return sessions that are still valid given the TTL and current time.
+    pub fn active_sessions(&self, ttl_seconds: u64, now: u64) -> Vec<&AuthSession> {
+        self.sessions
+            .iter()
+            .filter(|(_, created_at)| {
+                if now < *created_at {
+                    true
+                } else {
+                    now - created_at <= ttl_seconds
+                }
+            })
+            .map(|(s, _)| s)
+            .collect()
+    }
+
+    /// Return sessions that have expired.
+    pub fn expired_sessions(&self, ttl_seconds: u64, now: u64) -> Vec<&AuthSession> {
+        self.sessions
+            .iter()
+            .filter(|(_, created_at)| now >= *created_at && now - created_at > ttl_seconds)
+            .map(|(s, _)| s)
+            .collect()
+    }
+
+    /// Total number of tracked sessions.
+    pub fn len(&self) -> usize {
+        self.sessions.len()
+    }
+
+    /// Whether the tracker has no sessions.
+    pub fn is_empty(&self) -> bool {
+        self.sessions.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Credential rotation scheduling
+// ---------------------------------------------------------------------------
+
+/// Determines when credentials should be rotated.
+#[derive(Debug, Clone)]
+pub struct RotationSchedule {
+    /// Rotation interval in seconds.
+    pub interval_seconds: u64,
+    /// Last rotation timestamp.
+    pub last_rotation: Option<u64>,
+}
+
+impl RotationSchedule {
+    pub fn new(interval_seconds: u64) -> Self {
+        Self {
+            interval_seconds,
+            last_rotation: None,
+        }
+    }
+
+    /// Record a rotation at the given timestamp.
+    pub fn record_rotation(&mut self, timestamp: u64) {
+        self.last_rotation = Some(timestamp);
+    }
+
+    /// Whether rotation is due given the current time.
+    pub fn is_due(&self, now: u64) -> bool {
+        match self.last_rotation {
+            None => true,
+            Some(last) => now >= last && now - last >= self.interval_seconds,
+        }
+    }
+
+    /// Seconds until next rotation. Returns 0 if already due.
+    pub fn seconds_until_due(&self, now: u64) -> u64 {
+        match self.last_rotation {
+            None => 0,
+            Some(last) => {
+                let elapsed = now.saturating_sub(last);
+                self.interval_seconds.saturating_sub(elapsed)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1391,5 +1544,67 @@ mod tests {
         r.begin_refresh(200);
         r.begin_refresh(300);
         assert_eq!(r.attempts_remaining(), 0);
+    }
+
+    #[test]
+    fn validate_token_valid() {
+        assert!(validate_token("abc-123_def.ghi", 100).is_ok());
+    }
+
+    #[test]
+    fn validate_token_empty_is_expired() {
+        assert_eq!(validate_token("", 100), Err(AuthError::SessionExpired));
+    }
+
+    #[test]
+    fn validate_token_too_long() {
+        let long = "a".repeat(200);
+        assert!(validate_token(&long, 50).is_err());
+    }
+
+    #[test]
+    fn validate_token_invalid_chars() {
+        assert!(validate_token("abc def", 100).is_err());
+        assert!(validate_token("abc!@#", 100).is_err());
+    }
+
+    #[test]
+    fn parse_scopes_deduplicates_and_sorts() {
+        let scopes = parse_scopes("write read write admin read");
+        assert_eq!(scopes, vec!["admin", "read", "write"]);
+    }
+
+    #[test]
+    fn scopes_satisfied_checks_subset() {
+        let granted = vec!["read".into(), "write".into(), "admin".into()];
+        assert!(scopes_satisfied(&granted, &["read".into(), "write".into()]));
+        assert!(!scopes_satisfied(&granted, &["read".into(), "delete".into()]));
+    }
+
+    #[test]
+    fn session_tracker_active_and_expired() {
+        let mut tracker = SessionTracker::new();
+        let session = AuthSession {
+            id: "s1".into(),
+            access_token: "tok".into(),
+            account: AuthAccount { id: "a1".into(), label: "Alice".into() },
+            scopes: vec![],
+        };
+        tracker.add(session, 100);
+        assert_eq!(tracker.active_sessions(3600, 200).len(), 1);
+        assert_eq!(tracker.expired_sessions(3600, 200).len(), 0);
+        assert_eq!(tracker.active_sessions(50, 200).len(), 0);
+        assert_eq!(tracker.expired_sessions(50, 200).len(), 1);
+    }
+
+    #[test]
+    fn rotation_schedule_is_due() {
+        let mut sched = RotationSchedule::new(3600);
+        assert!(sched.is_due(0)); // never rotated
+        sched.record_rotation(1000);
+        assert!(!sched.is_due(2000));
+        assert!(sched.is_due(5000));
+        assert_eq!(sched.seconds_until_due(2000), 2600);
+        assert_eq!(sched.seconds_until_due(5000), 0);
     }
 }

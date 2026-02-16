@@ -859,6 +859,127 @@ impl Default for ListValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// List filtering / search
+// ---------------------------------------------------------------------------
+
+/// Filter a slice of `ListItem`s, returning only those whose label contains
+/// `query` (case-insensitive). Children are filtered recursively; a parent is
+/// kept if it or any descendant matches.
+pub fn filter_items_by_label(items: &[ListItem], query: &str) -> Vec<ListItem> {
+    if query.is_empty() {
+        return items.to_vec();
+    }
+    let q = query.to_lowercase();
+    items
+        .iter()
+        .filter_map(|item| {
+            let child_matches = filter_items_by_label(&item.children, query);
+            let self_matches = item.label.to_lowercase().contains(&q);
+            if self_matches || !child_matches.is_empty() {
+                let mut clone = item.clone();
+                clone.children = child_matches;
+                Some(clone)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// List sorting
+// ---------------------------------------------------------------------------
+
+/// Sort top-level items alphabetically by label (case-insensitive).
+/// Children within each item are also sorted recursively.
+pub fn sort_items_by_label(items: &mut [ListItem]) {
+    items.sort_by(|a, b| a.label.to_lowercase().cmp(&b.label.to_lowercase()));
+    for item in items.iter_mut() {
+        sort_items_by_label(&mut item.children);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bulk selection by predicate
+// ---------------------------------------------------------------------------
+
+impl ListView {
+    /// Select all items (recursively) whose label satisfies `predicate`.
+    pub fn select_by<F>(&mut self, predicate: F)
+    where
+        F: Fn(&ListItem) -> bool,
+    {
+        fn select_recursive(items: &mut [ListItem], pred: &dyn Fn(&ListItem) -> bool) {
+            for item in items.iter_mut() {
+                if pred(item) {
+                    item.selected = true;
+                }
+                select_recursive(&mut item.children, pred);
+            }
+        }
+        if !self.options.multi_select {
+            deselect_all_recursive(&mut self.items);
+        }
+        select_recursive(&mut self.items, &predicate);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Path (breadcrumb trail) to an item
+// ---------------------------------------------------------------------------
+
+/// Return the breadcrumb path of labels from the root to the item with the
+/// given `id`, or `None` if the item is not found.
+pub fn item_path(items: &[ListItem], id: &str) -> Option<Vec<String>> {
+    for item in items {
+        if item.id == id {
+            return Some(vec![item.label.clone()]);
+        }
+        if let Some(mut trail) = item_path(&item.children, id) {
+            trail.insert(0, item.label.clone());
+            return Some(trail);
+        }
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
+// Flat serialization
+// ---------------------------------------------------------------------------
+
+/// A flat representation of a single list item for serialization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlatListEntry {
+    pub id: String,
+    pub label: String,
+    pub depth: usize,
+    pub selected: bool,
+    pub expanded: bool,
+    pub has_children: bool,
+}
+
+/// Serialize a tree of `ListItem`s into a flat `Vec<FlatListEntry>`,
+/// including all items regardless of expanded state.
+pub fn flatten_all_to_entries(items: &[ListItem]) -> Vec<FlatListEntry> {
+    fn collect(items: &[ListItem], depth: usize, out: &mut Vec<FlatListEntry>) {
+        for item in items {
+            out.push(FlatListEntry {
+                id: item.id.clone(),
+                label: item.label.clone(),
+                depth,
+                selected: item.selected,
+                expanded: item.expanded,
+                has_children: !item.children.is_empty(),
+            });
+            collect(&item.children, depth + 1, out);
+        }
+    }
+    let mut out = Vec::new();
+    collect(items, 0, &mut out);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1352,5 +1473,95 @@ mod tests {
     fn list_is_ascii_printable() {
         assert!(ListValidator::is_ascii_printable("Hello World 123"));
         assert!(!ListValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn filter_items_by_label_matches_parent() {
+        let items = vec![
+            ListItem::new("a", "Alpha"),
+            ListItem::new("b", "Beta"),
+            ListItem::new("c", "Gamma"),
+        ];
+        let result = filter_items_by_label(&items, "alp");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "a");
+    }
+
+    #[test]
+    fn filter_items_by_label_keeps_parent_if_child_matches() {
+        let parent = ListItem::new("p", "Parent")
+            .with_child(ListItem::new("c1", "Target"))
+            .with_child(ListItem::new("c2", "Other"));
+        let items = vec![parent];
+        let result = filter_items_by_label(&items, "target");
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].children.len(), 1);
+        assert_eq!(result[0].children[0].id, "c1");
+    }
+
+    #[test]
+    fn sort_items_by_label_alphabetical() {
+        let mut items = vec![
+            ListItem::new("c", "Gamma"),
+            ListItem::new("a", "Alpha"),
+            ListItem::new("b", "Beta"),
+        ];
+        sort_items_by_label(&mut items);
+        assert_eq!(items[0].label, "Alpha");
+        assert_eq!(items[1].label, "Beta");
+        assert_eq!(items[2].label, "Gamma");
+    }
+
+    #[test]
+    fn select_by_predicate() {
+        let mut lv = ListView::new(ListOptions { multi_select: true, ..Default::default() });
+        lv.add_item(ListItem::new("a", "Apple"));
+        lv.add_item(ListItem::new("b", "Banana"));
+        lv.add_item(ListItem::new("c", "Avocado"));
+        lv.select_by(|item| item.label.starts_with('A'));
+        let sel = lv.selected_ids();
+        assert_eq!(sel.len(), 2);
+        assert!(sel.contains(&"a"));
+        assert!(sel.contains(&"c"));
+    }
+
+    #[test]
+    fn item_path_finds_breadcrumb() {
+        let tree = vec![
+            ListItem::new("root", "Root")
+                .with_child(
+                    ListItem::new("mid", "Middle")
+                        .with_child(ListItem::new("leaf", "Leaf"))
+                ),
+        ];
+        let path = item_path(&tree, "leaf");
+        assert_eq!(path, Some(vec!["Root".to_string(), "Middle".to_string(), "Leaf".to_string()]));
+        assert_eq!(item_path(&tree, "nonexistent"), None);
+    }
+
+    #[test]
+    fn flatten_all_to_entries_depth() {
+        let items = vec![
+            ListItem::new("a", "A")
+                .with_child(ListItem::new("b", "B")),
+            ListItem::new("c", "C"),
+        ];
+        let flat = flatten_all_to_entries(&items);
+        assert_eq!(flat.len(), 3);
+        assert_eq!(flat[0].depth, 0);
+        assert_eq!(flat[0].has_children, true);
+        assert_eq!(flat[1].depth, 1);
+        assert_eq!(flat[1].has_children, false);
+        assert_eq!(flat[2].depth, 0);
+    }
+
+    #[test]
+    fn filter_items_empty_query_returns_all() {
+        let items = vec![
+            ListItem::new("a", "Alpha"),
+            ListItem::new("b", "Beta"),
+        ];
+        let result = filter_items_by_label(&items, "");
+        assert_eq!(result.len(), 2);
     }
 }

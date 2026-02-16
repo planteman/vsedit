@@ -871,6 +871,162 @@ impl ClipboardWatcher {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Content type detection
+// ---------------------------------------------------------------------------
+
+/// Detected content type for clipboard text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClipboardContentType {
+    /// A URL (starts with http://, https://, or ftp://).
+    Url,
+    /// Looks like source code (contains braces, semicolons, or common keywords).
+    Code,
+    /// A file path (starts with `/`, `./`, `~`, or a Windows drive letter).
+    FilePath,
+    /// An email address.
+    Email,
+    /// Plain text.
+    PlainText,
+}
+
+impl fmt::Display for ClipboardContentType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ClipboardContentType::Url => write!(f, "URL"),
+            ClipboardContentType::Code => write!(f, "Code"),
+            ClipboardContentType::FilePath => write!(f, "File Path"),
+            ClipboardContentType::Email => write!(f, "Email"),
+            ClipboardContentType::PlainText => write!(f, "Plain Text"),
+        }
+    }
+}
+
+/// Detect the content type of clipboard text.
+pub fn detect_content_type(text: &str) -> ClipboardContentType {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return ClipboardContentType::PlainText;
+    }
+    if trimmed.starts_with("http://")
+        || trimmed.starts_with("https://")
+        || trimmed.starts_with("ftp://")
+    {
+        return ClipboardContentType::Url;
+    }
+    // Simple email detection: single line with exactly one @
+    if !trimmed.contains('\n') && trimmed.contains('@') && trimmed.contains('.') {
+        let at_count = trimmed.chars().filter(|&c| c == '@').count();
+        if at_count == 1 && !trimmed.contains(' ') {
+            return ClipboardContentType::Email;
+        }
+    }
+    // File path detection
+    if trimmed.starts_with('/')
+        || trimmed.starts_with("./")
+        || trimmed.starts_with("~/")
+        || (trimmed.len() >= 3 && trimmed.as_bytes()[1] == b':' && trimmed.as_bytes()[2] == b'\\')
+    {
+        if !trimmed.contains('\n') {
+            return ClipboardContentType::FilePath;
+        }
+    }
+    // Code detection heuristics
+    let code_indicators: &[&str] = &["{", "}", ";", "fn ", "let ", "const ", "var ", "def ", "class "];
+    let indicator_count = code_indicators
+        .iter()
+        .filter(|&&ind| trimmed.contains(ind))
+        .count();
+    if indicator_count >= 2 {
+        return ClipboardContentType::Code;
+    }
+    ClipboardContentType::PlainText
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard content transformation
+// ---------------------------------------------------------------------------
+
+/// Normalize whitespace in clipboard content: collapse runs of whitespace to
+/// single spaces and trim leading/trailing whitespace.
+pub fn normalize_clipboard_whitespace(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut prev_ws = false;
+    for c in text.chars() {
+        if c.is_whitespace() {
+            if !prev_ws && !result.is_empty() {
+                result.push(' ');
+            }
+            prev_ws = true;
+        } else {
+            prev_ws = false;
+            result.push(c);
+        }
+    }
+    result.trim_end().to_string()
+}
+
+/// Trim each line of clipboard content individually.
+pub fn trim_clipboard_lines(text: &str) -> String {
+    text.lines()
+        .map(|line| line.trim())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Remove duplicate consecutive lines from clipboard content.
+pub fn dedup_clipboard_lines(text: &str) -> String {
+    let mut result = Vec::new();
+    let mut prev: Option<&str> = None;
+    for line in text.lines() {
+        if prev != Some(line) {
+            result.push(line);
+        }
+        prev = Some(line);
+    }
+    result.join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// Paste format selection
+// ---------------------------------------------------------------------------
+
+/// Strategy for formatting pasted content.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PasteStrategy {
+    /// Paste as-is.
+    Raw,
+    /// Trim whitespace.
+    Trimmed,
+    /// Normalize whitespace.
+    Normalized,
+    /// Escape for use in a string literal.
+    Escaped,
+}
+
+/// Apply a paste strategy to text.
+pub fn apply_paste_strategy(text: &str, strategy: PasteStrategy) -> String {
+    match strategy {
+        PasteStrategy::Raw => text.to_string(),
+        PasteStrategy::Trimmed => text.trim().to_string(),
+        PasteStrategy::Normalized => normalize_clipboard_whitespace(text),
+        PasteStrategy::Escaped => {
+            let mut out = String::with_capacity(text.len());
+            for c in text.chars() {
+                match c {
+                    '"' => out.push_str("\\\""),
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    '\t' => out.push_str("\\t"),
+                    '\r' => out.push_str("\\r"),
+                    _ => out.push(c),
+                }
+            }
+            out
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1360,5 +1516,81 @@ mod tests {
         let h = ClipboardHistory::new(10);
         assert!(h.oldest().is_none());
         assert!(h.newest().is_none());
+    }
+
+    // -- new tests --
+
+    #[test]
+    fn detect_content_type_url() {
+        assert_eq!(detect_content_type("https://example.com"), ClipboardContentType::Url);
+        assert_eq!(detect_content_type("http://foo.bar/baz"), ClipboardContentType::Url);
+        assert_eq!(detect_content_type("ftp://files.example.com"), ClipboardContentType::Url);
+    }
+
+    #[test]
+    fn detect_content_type_email() {
+        assert_eq!(detect_content_type("user@example.com"), ClipboardContentType::Email);
+    }
+
+    #[test]
+    fn detect_content_type_file_path() {
+        assert_eq!(detect_content_type("/usr/bin/bash"), ClipboardContentType::FilePath);
+        assert_eq!(detect_content_type("./src/main.rs"), ClipboardContentType::FilePath);
+        assert_eq!(detect_content_type("~/Documents"), ClipboardContentType::FilePath);
+    }
+
+    #[test]
+    fn detect_content_type_code() {
+        assert_eq!(
+            detect_content_type("fn main() { let x = 42; }"),
+            ClipboardContentType::Code,
+        );
+    }
+
+    #[test]
+    fn detect_content_type_plain_text() {
+        assert_eq!(detect_content_type("hello world"), ClipboardContentType::PlainText);
+        assert_eq!(detect_content_type(""), ClipboardContentType::PlainText);
+    }
+
+    #[test]
+    fn normalize_clipboard_whitespace_collapses() {
+        assert_eq!(normalize_clipboard_whitespace("  hello   world  "), "hello world");
+        assert_eq!(normalize_clipboard_whitespace("a\n\n\nb"), "a b");
+    }
+
+    #[test]
+    fn trim_clipboard_lines_trims_each_line() {
+        assert_eq!(trim_clipboard_lines("  a  \n  b  \n  c  "), "a\nb\nc");
+    }
+
+    #[test]
+    fn dedup_clipboard_lines_removes_consecutive() {
+        assert_eq!(dedup_clipboard_lines("a\na\nb\nb\na"), "a\nb\na");
+    }
+
+    #[test]
+    fn paste_strategy_raw_returns_unchanged() {
+        assert_eq!(apply_paste_strategy("  hi  ", PasteStrategy::Raw), "  hi  ");
+    }
+
+    #[test]
+    fn paste_strategy_trimmed() {
+        assert_eq!(apply_paste_strategy("  hi  ", PasteStrategy::Trimmed), "hi");
+    }
+
+    #[test]
+    fn paste_strategy_escaped() {
+        let result = apply_paste_strategy("line1\nline2\t\"quoted\"", PasteStrategy::Escaped);
+        assert!(result.contains("\\n"));
+        assert!(result.contains("\\t"));
+        assert!(result.contains("\\\""));
+    }
+
+    #[test]
+    fn clipboard_content_type_display() {
+        assert_eq!(ClipboardContentType::Url.to_string(), "URL");
+        assert_eq!(ClipboardContentType::Code.to_string(), "Code");
+        assert_eq!(ClipboardContentType::PlainText.to_string(), "Plain Text");
     }
 }

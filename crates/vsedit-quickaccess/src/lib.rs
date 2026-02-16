@@ -722,6 +722,115 @@ pub fn parse_quick_access_mode(query: &str) -> QuickAccessMode {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Recency-based ranking
+// ---------------------------------------------------------------------------
+
+/// Tracks item usage with timestamps to boost recently-used items.
+pub struct RecencyTracker {
+    /// Maps item ID to the timestamp of last use (arbitrary u64 epoch).
+    last_used: HashMap<String, u64>,
+}
+
+impl RecencyTracker {
+    /// Create a new recency tracker.
+    pub fn new() -> Self {
+        Self {
+            last_used: HashMap::new(),
+        }
+    }
+
+    /// Record that an item was used at the given timestamp.
+    pub fn record(&mut self, item_id: &str, timestamp: u64) {
+        self.last_used.insert(item_id.to_string(), timestamp);
+    }
+
+    /// Get the recency boost for an item. Items used more recently get
+    /// higher scores. Returns 0 if the item has never been used.
+    pub fn boost(&self, item_id: &str, now: u64, decay_seconds: u64) -> i32 {
+        match self.last_used.get(item_id) {
+            Some(&ts) => {
+                let elapsed = now.saturating_sub(ts);
+                if elapsed >= decay_seconds {
+                    0
+                } else {
+                    ((decay_seconds - elapsed) * 10 / decay_seconds) as i32
+                }
+            }
+            None => 0,
+        }
+    }
+
+    /// Number of tracked items.
+    pub fn len(&self) -> usize {
+        self.last_used.len()
+    }
+
+    /// Whether the tracker is empty.
+    pub fn is_empty(&self) -> bool {
+        self.last_used.is_empty()
+    }
+
+    /// Remove entries older than `cutoff` timestamp.
+    pub fn prune_before(&mut self, cutoff: u64) {
+        self.last_used.retain(|_, ts| *ts >= cutoff);
+    }
+}
+
+impl Default for RecencyTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Action categorization
+// ---------------------------------------------------------------------------
+
+/// Category for quick access items, used for grouping in the picker UI.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ActionCategory {
+    File,
+    Symbol,
+    Command,
+    RecentlyUsed,
+    Custom(String),
+}
+
+impl std::fmt::Display for ActionCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::File => write!(f, "Files"),
+            Self::Symbol => write!(f, "Symbols"),
+            Self::Command => write!(f, "Commands"),
+            Self::RecentlyUsed => write!(f, "Recently Used"),
+            Self::Custom(name) => write!(f, "{}", name),
+        }
+    }
+}
+
+/// Group items by their `group` field, returning `(category_name, items)` pairs
+/// sorted by category name. Items without a group are placed in "Other".
+pub fn group_items_by_category(items: &[QuickAccessItem]) -> Vec<(String, Vec<&QuickAccessItem>)> {
+    let mut map: HashMap<String, Vec<&QuickAccessItem>> = HashMap::new();
+    for item in items {
+        let key = item.group.as_deref().unwrap_or("Other").to_string();
+        map.entry(key).or_default().push(item);
+    }
+    let mut groups: Vec<(String, Vec<&QuickAccessItem>)> = map.into_iter().collect();
+    groups.sort_by(|a, b| a.0.cmp(&b.0));
+    groups
+}
+
+/// Deduplicate items by id, keeping the first occurrence.
+pub fn deduplicate_items(items: &[QuickAccessItem]) -> Vec<&QuickAccessItem> {
+    let mut seen = std::collections::HashSet::new();
+    items
+        .iter()
+        .filter(|item| seen.insert(&item.id))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1366,5 +1475,108 @@ mod tests {
             parse_quick_access_mode(">format"),
             QuickAccessMode::Command("format".to_string())
         );
+    }
+
+    // ── Recency tracker ───────────────────────────────────────────
+
+    #[test]
+    fn recency_tracker_boost_recent() {
+        let mut tracker = RecencyTracker::new();
+        tracker.record("file-a", 1000);
+        // Used 100 seconds ago, decay is 600 seconds
+        let boost = tracker.boost("file-a", 1100, 600);
+        // elapsed=100, remaining=500, boost = 500*10/600 = 8
+        assert_eq!(boost, 8);
+    }
+
+    #[test]
+    fn recency_tracker_boost_expired() {
+        let mut tracker = RecencyTracker::new();
+        tracker.record("file-a", 100);
+        // Used 700 seconds ago, decay is 600
+        let boost = tracker.boost("file-a", 800, 600);
+        assert_eq!(boost, 0);
+    }
+
+    #[test]
+    fn recency_tracker_boost_unknown() {
+        let tracker = RecencyTracker::new();
+        assert_eq!(tracker.boost("missing", 1000, 600), 0);
+    }
+
+    #[test]
+    fn recency_tracker_prune() {
+        let mut tracker = RecencyTracker::new();
+        tracker.record("old", 50);
+        tracker.record("new", 200);
+        assert_eq!(tracker.len(), 2);
+        tracker.prune_before(100);
+        assert_eq!(tracker.len(), 1);
+        assert_eq!(tracker.boost("old", 300, 600), 0);
+    }
+
+    // ── Action categorization ─────────────────────────────────────
+
+    #[test]
+    fn group_items_by_category_groups() {
+        let items = vec![
+            QuickAccessItem {
+                id: "a".into(),
+                label: "A".into(),
+                description: None,
+                detail: None,
+                icon: None,
+                group: Some("Files".into()),
+            },
+            QuickAccessItem {
+                id: "b".into(),
+                label: "B".into(),
+                description: None,
+                detail: None,
+                icon: None,
+                group: Some("Commands".into()),
+            },
+            QuickAccessItem {
+                id: "c".into(),
+                label: "C".into(),
+                description: None,
+                detail: None,
+                icon: None,
+                group: Some("Files".into()),
+            },
+            QuickAccessItem {
+                id: "d".into(),
+                label: "D".into(),
+                description: None,
+                detail: None,
+                icon: None,
+                group: None,
+            },
+        ];
+        let groups = group_items_by_category(&items);
+        assert_eq!(groups.len(), 3);
+        let files = groups.iter().find(|(k, _)| k == "Files").unwrap();
+        assert_eq!(files.1.len(), 2);
+        let other = groups.iter().find(|(k, _)| k == "Other").unwrap();
+        assert_eq!(other.1.len(), 1);
+    }
+
+    #[test]
+    fn deduplicate_items_removes_dupes() {
+        let items = vec![
+            make_item("a", "Alpha"),
+            make_item("b", "Beta"),
+            make_item("a", "Alpha Copy"),
+        ];
+        let deduped = deduplicate_items(&items);
+        assert_eq!(deduped.len(), 2);
+        assert_eq!(deduped[0].label, "Alpha");
+        assert_eq!(deduped[1].label, "Beta");
+    }
+
+    #[test]
+    fn action_category_display() {
+        assert_eq!(format!("{}", ActionCategory::File), "Files");
+        assert_eq!(format!("{}", ActionCategory::Custom("Git".into())), "Git");
     }
 }

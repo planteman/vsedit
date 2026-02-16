@@ -830,6 +830,123 @@ impl CodeActionKind {
     pub fn is_source(&self) -> bool {
         CodeActionKind::Source.contains(self)
     }
+
+    /// Returns `true` if this kind is any refactoring variant.
+    pub fn is_refactoring(&self) -> bool {
+        CodeActionKind::Refactor.contains(self)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Code action prioritization
+// ---------------------------------------------------------------------------
+
+/// Priority level for ordering code actions in the UI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CodeActionPriority {
+    /// Urgent: preferred quick fixes.
+    High,
+    /// Normal: regular actions.
+    Normal,
+    /// Low: source-level actions.
+    Low,
+}
+
+/// Assign a priority to a code action based on its properties.
+pub fn action_priority(action: &CodeAction) -> CodeActionPriority {
+    if action.is_preferred && action.kind == CodeActionKind::QuickFix {
+        CodeActionPriority::High
+    } else if action.kind.is_source() {
+        CodeActionPriority::Low
+    } else {
+        CodeActionPriority::Normal
+    }
+}
+
+/// Sort actions by computed priority (High first), then by title.
+pub fn sort_by_priority(actions: &mut [CodeAction]) {
+    actions.sort_by(|a, b| {
+        action_priority(a)
+            .cmp(&action_priority(b))
+            .then_with(|| a.title.cmp(&b.title))
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Code action deduplication
+// ---------------------------------------------------------------------------
+
+/// Remove duplicate code actions. Two actions are duplicates if they have
+/// the same title and kind. Keeps the first occurrence; prefers preferred actions.
+pub fn deduplicate_actions(actions: &[CodeAction]) -> Vec<CodeAction> {
+    let mut seen: std::collections::HashSet<(String, String)> = std::collections::HashSet::new();
+    let mut result = Vec::new();
+    // Sort preferred first so they win
+    let mut sorted: Vec<&CodeAction> = actions.iter().collect();
+    sorted.sort_by(|a, b| b.is_preferred.cmp(&a.is_preferred));
+    for action in sorted {
+        let key = (action.title.clone(), action.kind.as_str().to_string());
+        if seen.insert(key) {
+            result.push(action.clone());
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Code action applicability checking
+// ---------------------------------------------------------------------------
+
+/// Check if a code action is applicable given the available diagnostics.
+/// An action is applicable if it has no required diagnostics, or at least one
+/// of its diagnostics matches (by message) a diagnostic in `available`.
+pub fn is_action_applicable(action: &CodeAction, available: &[Diagnostic]) -> bool {
+    if action.diagnostics.is_empty() {
+        return true;
+    }
+    action.diagnostics.iter().any(|ad| {
+        available.iter().any(|d| d.message == ad.message)
+    })
+}
+
+/// Filter a set of actions, keeping only those applicable to `available` diagnostics.
+pub fn filter_applicable(actions: &[CodeAction], available: &[Diagnostic]) -> Vec<CodeAction> {
+    actions
+        .iter()
+        .filter(|a| is_action_applicable(a, available))
+        .cloned()
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Code action categorization
+// ---------------------------------------------------------------------------
+
+/// Category grouping for display in a menu.
+#[derive(Debug, Clone)]
+pub struct CodeActionCategory {
+    pub label: String,
+    pub actions: Vec<CodeAction>,
+}
+
+/// Group actions by their kind into labeled categories.
+pub fn categorize_actions(actions: &[CodeAction]) -> Vec<CodeActionCategory> {
+    let mut map: std::collections::HashMap<&str, Vec<CodeAction>> =
+        std::collections::HashMap::new();
+    for action in actions {
+        map.entry(action.kind.as_str())
+            .or_default()
+            .push(action.clone());
+    }
+    let mut categories: Vec<CodeActionCategory> = map
+        .into_iter()
+        .map(|(label, actions)| CodeActionCategory {
+            label: label.to_string(),
+            actions,
+        })
+        .collect();
+    categories.sort_by(|a, b| a.label.cmp(&b.label));
+    categories
 }
 
 #[cfg(test)]
@@ -1381,5 +1498,110 @@ mod tests {
         assert!(CodeActionKind::SourceFixAll.is_source());
         assert!(!CodeActionKind::QuickFix.is_source());
         assert!(!CodeActionKind::Refactor.is_source());
+    }
+
+    #[test]
+    fn code_action_kind_is_refactoring() {
+        assert!(CodeActionKind::Refactor.is_refactoring());
+        assert!(CodeActionKind::RefactorExtract.is_refactoring());
+        assert!(CodeActionKind::RefactorInline.is_refactoring());
+        assert!(!CodeActionKind::QuickFix.is_refactoring());
+        assert!(!CodeActionKind::Source.is_refactoring());
+    }
+
+    #[test]
+    fn action_priority_preferred_quickfix_is_high() {
+        let a = CodeAction::new("Fix", CodeActionKind::QuickFix).preferred();
+        assert_eq!(action_priority(&a), CodeActionPriority::High);
+    }
+
+    #[test]
+    fn action_priority_source_is_low() {
+        let a = CodeAction::new("Organize", CodeActionKind::SourceOrganizeImports);
+        assert_eq!(action_priority(&a), CodeActionPriority::Low);
+    }
+
+    #[test]
+    fn action_priority_regular_is_normal() {
+        let a = CodeAction::new("Extract", CodeActionKind::RefactorExtract);
+        assert_eq!(action_priority(&a), CodeActionPriority::Normal);
+    }
+
+    #[test]
+    fn deduplicate_actions_removes_dupes() {
+        let actions = vec![
+            CodeAction::new("Fix A", CodeActionKind::QuickFix),
+            CodeAction::new("Fix A", CodeActionKind::QuickFix).preferred(),
+            CodeAction::new("Fix B", CodeActionKind::QuickFix),
+        ];
+        let deduped = deduplicate_actions(&actions);
+        assert_eq!(deduped.len(), 2);
+        // The preferred version should win
+        let fix_a = deduped.iter().find(|a| a.title == "Fix A").unwrap();
+        assert!(fix_a.is_preferred);
+    }
+
+    #[test]
+    fn is_action_applicable_no_diagnostics() {
+        let a = CodeAction::new("Fix", CodeActionKind::QuickFix);
+        assert!(is_action_applicable(&a, &[]));
+    }
+
+    #[test]
+    fn is_action_applicable_matching_diag() {
+        let diag = Diagnostic {
+            message: "unused var".into(),
+            severity: DiagnosticSeverity::Warning,
+            line: 1,
+            column: 0,
+        };
+        let a = CodeAction::new("Remove", CodeActionKind::QuickFix)
+            .with_diagnostic(diag.clone());
+        assert!(is_action_applicable(&a, &[diag]));
+    }
+
+    #[test]
+    fn is_action_applicable_no_match() {
+        let diag = Diagnostic {
+            message: "unused var".into(),
+            severity: DiagnosticSeverity::Warning,
+            line: 1,
+            column: 0,
+        };
+        let other = Diagnostic {
+            message: "type error".into(),
+            severity: DiagnosticSeverity::Error,
+            line: 2,
+            column: 0,
+        };
+        let a = CodeAction::new("Remove", CodeActionKind::QuickFix)
+            .with_diagnostic(diag);
+        assert!(!is_action_applicable(&a, &[other]));
+    }
+
+    #[test]
+    fn categorize_actions_groups_by_kind() {
+        let actions = vec![
+            CodeAction::new("Fix A", CodeActionKind::QuickFix),
+            CodeAction::new("Fix B", CodeActionKind::QuickFix),
+            CodeAction::new("Extract", CodeActionKind::RefactorExtract),
+        ];
+        let cats = categorize_actions(&actions);
+        assert_eq!(cats.len(), 2);
+        let qf = cats.iter().find(|c| c.label == "quickfix").unwrap();
+        assert_eq!(qf.actions.len(), 2);
+    }
+
+    #[test]
+    fn sort_by_priority_orders_correctly() {
+        let mut actions = vec![
+            CodeAction::new("Organize", CodeActionKind::SourceOrganizeImports),
+            CodeAction::new("Fix", CodeActionKind::QuickFix).preferred(),
+            CodeAction::new("Extract", CodeActionKind::RefactorExtract),
+        ];
+        sort_by_priority(&mut actions);
+        assert_eq!(actions[0].title, "Fix");
+        assert_eq!(actions[1].title, "Extract");
+        assert_eq!(actions[2].title, "Organize");
     }
 }

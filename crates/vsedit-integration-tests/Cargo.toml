@@ -40,5 +40,15 @@ vsedit-merge-editor = { path = "../vsedit-merge-editor" }
 vsedit-smartselect = { path = "../vsedit-smartselect" }
 vsedit-stickyscroll = { path = "../vsedit-stickyscroll" }
 vsedit-codelens = { path = "../vsedit-codelens" }
+vsedit-inline-complete = { path = "../vsedit-inline-complete" }
+vsedit-label = { path = "../vsedit-label" }
+vsedit-tasks-feature = { path = "../vsedit-tasks-feature" }
+vsedit-wb-langdetect = { path = "../vsedit-wb-langdetect" }
+vsedit-notification-svc = { path = "../vsedit-notification-svc" }
+vsedit-environment = { path = "../vsedit-environment" }
+vsedit-whitespace = { path = "../vsedit-whitespace" }
+vsedit-input = { path = "../vsedit-input" }
+vsedit-storage = { path = "../vsedit-storage" }
+vsedit-state = { path = "../vsedit-state" }
 serde_json.workspace = true
 tempfile.workspace = true

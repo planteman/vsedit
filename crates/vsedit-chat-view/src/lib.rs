@@ -836,6 +836,158 @@ pub fn chat_session_export_markdown(session: &ChatSession) -> Result<String, Cha
     Ok(md)
 }
 
+// ---------------------------------------------------------------------------
+// Message search and filtering
+// ---------------------------------------------------------------------------
+
+/// Search results from scanning chat messages.
+#[derive(Debug, Clone)]
+pub struct ChatSearchResult {
+    /// The message ID that matched.
+    pub message_id: u64,
+    /// Byte offset of the match within the message content.
+    pub offset: usize,
+    /// The matched substring.
+    pub snippet: String,
+}
+
+/// Search messages in a session for a query string (case-insensitive).
+pub fn search_messages(session: &ChatSession, query: &str) -> Vec<ChatSearchResult> {
+    let query_lower = query.to_lowercase();
+    let mut results = Vec::new();
+    for msg in session.get_messages() {
+        let content_lower = msg.content.to_lowercase();
+        for (offset, _) in content_lower.match_indices(&query_lower) {
+            let end = (offset + query.len()).min(msg.content.len());
+            results.push(ChatSearchResult {
+                message_id: msg.id,
+                offset,
+                snippet: msg.content[offset..end].to_string(),
+            });
+        }
+    }
+    results
+}
+
+/// Filter messages by role.
+pub fn filter_messages_by_role(session: &ChatSession, role: ChatRole) -> Vec<&ChatMessage> {
+    session.messages_by_role(role)
+}
+
+/// Filter messages by status.
+pub fn filter_messages_by_status(
+    session: &ChatSession,
+    status: ChatMessageStatus,
+) -> Vec<&ChatMessage> {
+    session
+        .get_messages()
+        .iter()
+        .filter(|m| m.status == status)
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Conversation threading
+// ---------------------------------------------------------------------------
+
+/// A thread of conversation: a user message and its assistant reply.
+#[derive(Debug, Clone)]
+pub struct ConversationThread {
+    /// The user's message.
+    pub user_message: ChatMessage,
+    /// The assistant's reply, if any.
+    pub assistant_reply: Option<ChatMessage>,
+}
+
+/// Extract conversation threads from a session.
+///
+/// Pairs each user message with the immediately following assistant message.
+pub fn extract_threads(session: &ChatSession) -> Vec<ConversationThread> {
+    let messages = session.get_messages();
+    let mut threads = Vec::new();
+    let mut i = 0;
+    while i < messages.len() {
+        if messages[i].role == ChatRole::User {
+            let reply = if i + 1 < messages.len() && messages[i + 1].role == ChatRole::Assistant {
+                Some(messages[i + 1].clone())
+            } else {
+                None
+            };
+            threads.push(ConversationThread {
+                user_message: messages[i].clone(),
+                assistant_reply: reply.clone(),
+            });
+            if reply.is_some() {
+                i += 2;
+            } else {
+                i += 1;
+            }
+        } else {
+            i += 1;
+        }
+    }
+    threads
+}
+
+// ---------------------------------------------------------------------------
+// Message statistics
+// ---------------------------------------------------------------------------
+
+/// Statistics about a chat session's content.
+#[derive(Debug, Clone, Default)]
+pub struct MessageStatistics {
+    pub total_messages: usize,
+    pub user_messages: usize,
+    pub assistant_messages: usize,
+    pub system_messages: usize,
+    pub total_words: usize,
+    pub total_chars: usize,
+    pub avg_message_length: f64,
+}
+
+/// Compute statistics about the messages in a session.
+pub fn compute_message_statistics(session: &ChatSession) -> MessageStatistics {
+    let messages = session.get_messages();
+    let total_messages = messages.len();
+    let mut user_messages = 0;
+    let mut assistant_messages = 0;
+    let mut system_messages = 0;
+    let mut total_words = 0;
+    let mut total_chars: usize = 0;
+
+    for msg in messages {
+        match msg.role {
+            ChatRole::User => user_messages += 1,
+            ChatRole::Assistant => assistant_messages += 1,
+            ChatRole::System => system_messages += 1,
+        }
+        total_words += msg.content.split_whitespace().count();
+        total_chars += msg.content.len();
+    }
+
+    let avg_message_length = if total_messages > 0 {
+        total_chars as f64 / total_messages as f64
+    } else {
+        0.0
+    };
+
+    MessageStatistics {
+        total_messages,
+        user_messages,
+        assistant_messages,
+        system_messages,
+        total_words,
+        total_chars,
+        avg_message_length,
+    }
+}
+
+/// Count code blocks (triple-backtick fenced) in a message.
+pub fn count_code_blocks(content: &str) -> usize {
+    let fence_count = content.matches("```").count();
+    fence_count / 2
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1361,5 +1513,99 @@ mod tests {
     fn chat_view_is_ascii_printable() {
         assert!(ChatViewValidator::is_ascii_printable("Hello World 123"));
         assert!(!ChatViewValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- new tests --
+
+    fn make_session_with_messages() -> ChatSession {
+        let mut s = ChatSession::new("test");
+        s.add_message(ChatRole::User, "Hello, how are you?", 100);
+        s.add_message(ChatRole::Assistant, "I'm doing well, thank you!", 101);
+        s.add_message(ChatRole::User, "Tell me about Rust", 102);
+        s.add_message(ChatRole::Assistant, "Rust is a systems programming language.", 103);
+        s
+    }
+
+    #[test]
+    fn search_messages_finds_matches() {
+        let s = make_session_with_messages();
+        let results = search_messages(&s, "Rust");
+        assert_eq!(results.len(), 2); // "Rust" in user msg and assistant reply
+        assert_eq!(results[0].snippet, "Rust");
+    }
+
+    #[test]
+    fn search_messages_case_insensitive() {
+        let s = make_session_with_messages();
+        let results = search_messages(&s, "rust");
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn search_messages_no_match() {
+        let s = make_session_with_messages();
+        let results = search_messages(&s, "Python");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn filter_messages_by_role_user() {
+        let s = make_session_with_messages();
+        let user_msgs = filter_messages_by_role(&s, ChatRole::User);
+        assert_eq!(user_msgs.len(), 2);
+        assert!(user_msgs.iter().all(|m| m.role == ChatRole::User));
+    }
+
+    #[test]
+    fn filter_messages_by_status_complete() {
+        let s = make_session_with_messages();
+        let complete = filter_messages_by_status(&s, ChatMessageStatus::Complete);
+        assert_eq!(complete.len(), 4);
+    }
+
+    #[test]
+    fn extract_threads_pairs_user_and_assistant() {
+        let s = make_session_with_messages();
+        let threads = extract_threads(&s);
+        assert_eq!(threads.len(), 2);
+        assert!(threads[0].assistant_reply.is_some());
+        assert!(threads[1].assistant_reply.is_some());
+        assert_eq!(threads[0].user_message.role, ChatRole::User);
+    }
+
+    #[test]
+    fn extract_threads_user_without_reply() {
+        let mut s = ChatSession::new("test2");
+        s.add_message(ChatRole::User, "Hello?", 100);
+        let threads = extract_threads(&s);
+        assert_eq!(threads.len(), 1);
+        assert!(threads[0].assistant_reply.is_none());
+    }
+
+    #[test]
+    fn compute_message_statistics_basic() {
+        let s = make_session_with_messages();
+        let stats = compute_message_statistics(&s);
+        assert_eq!(stats.total_messages, 4);
+        assert_eq!(stats.user_messages, 2);
+        assert_eq!(stats.assistant_messages, 2);
+        assert_eq!(stats.system_messages, 0);
+        assert!(stats.total_words > 0);
+        assert!(stats.avg_message_length > 0.0);
+    }
+
+    #[test]
+    fn compute_message_statistics_empty() {
+        let s = ChatSession::new("empty");
+        let stats = compute_message_statistics(&s);
+        assert_eq!(stats.total_messages, 0);
+        assert_eq!(stats.avg_message_length, 0.0);
+    }
+
+    #[test]
+    fn count_code_blocks_counts_fenced() {
+        assert_eq!(count_code_blocks("```rust\nfn main() {}\n```"), 1);
+        assert_eq!(count_code_blocks("no code here"), 0);
+        assert_eq!(count_code_blocks("```a```\n```b```"), 2);
     }
 }

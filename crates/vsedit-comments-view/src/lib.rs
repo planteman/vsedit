@@ -575,6 +575,11 @@ impl CommentSearch {
         self
     }
 
+    /// Search and return owned clones of matching threads (useful for serialization).
+    pub fn search_cloned(&self, threads: &[CommentThread]) -> Vec<CommentThread> {
+        self.search(threads).into_iter().cloned().collect()
+    }
+
     pub fn search<'a>(&self, threads: &'a [CommentThread]) -> Vec<&'a CommentThread> {
         threads
             .iter()
@@ -602,6 +607,113 @@ impl CommentSearch {
             })
             .collect()
     }
+}
+
+// ---------------------------------------------------------------------------
+// Comment age classification
+// ---------------------------------------------------------------------------
+
+/// Classifies a comment's age relative to a reference timestamp.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommentAge {
+    /// Created in the last hour.
+    Recent,
+    /// Created in the last 24 hours.
+    Today,
+    /// Created in the last 7 days.
+    ThisWeek,
+    /// Older than 7 days.
+    Older,
+}
+
+impl fmt::Display for CommentAge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Recent => write!(f, "Recent"),
+            Self::Today => write!(f, "Today"),
+            Self::ThisWeek => write!(f, "This Week"),
+            Self::Older => write!(f, "Older"),
+        }
+    }
+}
+
+/// Classify a comment's age given the current time in seconds since epoch.
+pub fn classify_comment_age(comment_timestamp: u64, now: u64) -> CommentAge {
+    let elapsed = now.saturating_sub(comment_timestamp);
+    const HOUR: u64 = 3600;
+    const DAY: u64 = 86400;
+    const WEEK: u64 = 604800;
+    if elapsed < HOUR {
+        CommentAge::Recent
+    } else if elapsed < DAY {
+        CommentAge::Today
+    } else if elapsed < WEEK {
+        CommentAge::ThisWeek
+    } else {
+        CommentAge::Older
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Author statistics
+// ---------------------------------------------------------------------------
+
+/// Per-author statistics gathered from a set of comment threads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthorStats {
+    pub author: String,
+    pub comment_count: u32,
+    pub thread_count: u32,
+    pub total_reactions_received: u32,
+}
+
+/// Collect author statistics from a slice of threads.
+pub fn gather_author_stats(threads: &[CommentThread]) -> Vec<AuthorStats> {
+    let mut map: HashMap<String, (u32, std::collections::HashSet<String>, u32)> = HashMap::new();
+    for thread in threads {
+        for comment in &thread.comments {
+            let entry = map
+                .entry(comment.author.clone())
+                .or_insert_with(|| (0, std::collections::HashSet::new(), 0));
+            entry.0 += 1;
+            entry.1.insert(thread.id.clone());
+            entry.2 += comment.reactions.iter().map(|r| r.count).sum::<u32>();
+        }
+    }
+    let mut stats: Vec<AuthorStats> = map
+        .into_iter()
+        .map(|(author, (comment_count, threads_set, reactions))| AuthorStats {
+            author,
+            comment_count,
+            thread_count: threads_set.len() as u32,
+            total_reactions_received: reactions,
+        })
+        .collect();
+    stats.sort_by(|a, b| b.comment_count.cmp(&a.comment_count));
+    stats
+}
+
+// ---------------------------------------------------------------------------
+// Thread grouping by URI
+// ---------------------------------------------------------------------------
+
+/// Groups threads by their URI, returning a sorted list of (uri, thread_count) pairs.
+pub fn group_threads_by_uri(threads: &[CommentThread]) -> Vec<(String, usize)> {
+    let mut map: HashMap<String, usize> = HashMap::new();
+    for t in threads {
+        *map.entry(t.uri.clone()).or_insert(0) += 1;
+    }
+    let mut groups: Vec<(String, usize)> = map.into_iter().collect();
+    groups.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    groups
+}
+
+/// Return only threads that have at least one comment newer than `since`.
+pub fn threads_with_recent_activity(threads: &[CommentThread], since: u64) -> Vec<&CommentThread> {
+    threads
+        .iter()
+        .filter(|t| t.comments.iter().any(|c| c.timestamp >= since))
+        .collect()
 }
 
 #[cfg(test)]
@@ -1365,5 +1477,90 @@ mod tests {
         let threads = [t1, t2];
         let results = CommentSearch::new().search(&threads);
         assert_eq!(results.len(), 2);
+    }
+
+    // ── Comment age classification ────────────────────────────────
+
+    #[test]
+    fn classify_age_recent() {
+        let now = 100_000;
+        assert_eq!(classify_comment_age(now - 60, now), CommentAge::Recent);
+        assert_eq!(classify_comment_age(now - 3599, now), CommentAge::Recent);
+    }
+
+    #[test]
+    fn classify_age_today() {
+        let now = 100_000;
+        assert_eq!(classify_comment_age(now - 3600, now), CommentAge::Today);
+        assert_eq!(classify_comment_age(now - 86399, now), CommentAge::Today);
+    }
+
+    #[test]
+    fn classify_age_this_week() {
+        let now = 700_000;
+        assert_eq!(classify_comment_age(now - 86400, now), CommentAge::ThisWeek);
+        assert_eq!(classify_comment_age(now - 604799, now), CommentAge::ThisWeek);
+    }
+
+    #[test]
+    fn classify_age_older() {
+        let now = 1_000_000;
+        assert_eq!(classify_comment_age(now - 604800, now), CommentAge::Older);
+    }
+
+    // ── Author statistics ─────────────────────────────────────────
+
+    #[test]
+    fn gather_author_stats_counts() {
+        let mut t1 = make_thread("t1", "a.rs", 1);
+        t1.comments.push(make_comment(1, "alice", "hi", 1));
+        t1.comments.push(make_comment(2, "alice", "fix", 2));
+        let mut t2 = make_thread("t2", "b.rs", 2);
+        t2.comments.push(make_comment(3, "bob", "ok", 3));
+
+        let stats = gather_author_stats(&[t1, t2]);
+        assert_eq!(stats.len(), 2);
+        let alice = stats.iter().find(|s| s.author == "alice").unwrap();
+        assert_eq!(alice.comment_count, 2);
+        assert_eq!(alice.thread_count, 1);
+        let bob = stats.iter().find(|s| s.author == "bob").unwrap();
+        assert_eq!(bob.comment_count, 1);
+    }
+
+    // ── Thread grouping ───────────────────────────────────────────
+
+    #[test]
+    fn group_threads_by_uri_sorts_desc() {
+        let mut t1 = make_thread("t1", "a.rs", 1);
+        t1.comments.push(make_comment(1, "x", "a", 1));
+        let mut t2 = make_thread("t2", "b.rs", 2);
+        t2.comments.push(make_comment(2, "x", "a", 1));
+        let mut t3 = make_thread("t3", "a.rs", 5);
+        t3.comments.push(make_comment(3, "x", "a", 1));
+
+        let groups = group_threads_by_uri(&[t1, t2, t3]);
+        assert_eq!(groups[0], ("a.rs".to_string(), 2));
+        assert_eq!(groups[1], ("b.rs".to_string(), 1));
+    }
+
+    // ── Recent activity ───────────────────────────────────────────
+
+    #[test]
+    fn threads_with_recent_activity_filters() {
+        let mut t1 = make_thread("t1", "a.rs", 1);
+        t1.comments.push(make_comment(1, "x", "old", 100));
+        let mut t2 = make_thread("t2", "b.rs", 2);
+        t2.comments.push(make_comment(2, "y", "new", 500));
+
+        let threads = [t1, t2];
+        let recent = threads_with_recent_activity(&threads, 400);
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].id, "t2");
+    }
+
+    #[test]
+    fn comment_age_display() {
+        assert_eq!(format!("{}", CommentAge::Recent), "Recent");
+        assert_eq!(format!("{}", CommentAge::Older), "Older");
     }
 }

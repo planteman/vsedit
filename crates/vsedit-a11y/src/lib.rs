@@ -872,6 +872,167 @@ impl FocusTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ARIA role mapping to HTML element semantics
+// ---------------------------------------------------------------------------
+
+/// Maps an [`AriaRole`] to its corresponding default HTML element name.
+///
+/// Returns `None` for roles that have no single canonical HTML element.
+pub fn role_to_html_element(role: AriaRole) -> Option<&'static str> {
+    match role {
+        AriaRole::Button => Some("button"),
+        AriaRole::Checkbox => Some("input[type=checkbox]"),
+        AriaRole::TextBox => Some("input[type=text]"),
+        AriaRole::List => Some("ul"),
+        AriaRole::ListItem => Some("li"),
+        AriaRole::Menu => Some("menu"),
+        AriaRole::Dialog => Some("dialog"),
+        AriaRole::Alert => Some("div[role=alert]"),
+        _ => None,
+    }
+}
+
+/// Returns whether the given role should be focusable by default.
+pub fn is_default_focusable(role: AriaRole) -> bool {
+    matches!(
+        role,
+        AriaRole::Button
+            | AriaRole::Checkbox
+            | AriaRole::TextBox
+            | AriaRole::MenuItem
+            | AriaRole::Tab
+            | AriaRole::TreeItem
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Screen reader announcement formatting
+// ---------------------------------------------------------------------------
+
+/// Formats a screen reader announcement string with context breadcrumbs.
+///
+/// Produces output like: `"[Editor > File > main.rs] Cursor moved to line 42"`
+pub fn format_announcement_with_context(context_path: &[&str], message: &str) -> String {
+    if context_path.is_empty() {
+        return message.to_string();
+    }
+    format!("[{}] {}", context_path.join(" > "), message)
+}
+
+/// Formats a count announcement (e.g., "3 errors", "1 warning", "No results").
+pub fn format_count_announcement(label: &str, count: usize) -> String {
+    match count {
+        0 => format!("No {label}s"),
+        1 => format!("1 {label}"),
+        n => format!("{n} {label}s"),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Contrast ratio calculation (WCAG 2.1)
+// ---------------------------------------------------------------------------
+
+/// Compute the relative luminance of an sRGB colour channel (0–255).
+fn channel_luminance(c: u8) -> f64 {
+    let s = c as f64 / 255.0;
+    if s <= 0.03928 {
+        s / 12.92
+    } else {
+        ((s + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+/// Compute the relative luminance of an sRGB colour (each channel 0–255).
+pub fn relative_luminance(r: u8, g: u8, b: u8) -> f64 {
+    0.2126 * channel_luminance(r) + 0.7152 * channel_luminance(g) + 0.0722 * channel_luminance(b)
+}
+
+/// Compute the WCAG 2.1 contrast ratio between two colours.
+///
+/// Returns a value in the range [1.0, 21.0].
+pub fn contrast_ratio(r1: u8, g1: u8, b1: u8, r2: u8, g2: u8, b2: u8) -> f64 {
+    let l1 = relative_luminance(r1, g1, b1);
+    let l2 = relative_luminance(r2, g2, b2);
+    let (lighter, darker) = if l1 > l2 { (l1, l2) } else { (l2, l1) };
+    (lighter + 0.05) / (darker + 0.05)
+}
+
+/// WCAG conformance level for a contrast ratio.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WcagConformance {
+    /// Fails both AA and AAA.
+    Fail,
+    /// Passes AA for normal text (≥ 4.5:1).
+    AA,
+    /// Passes AAA for normal text (≥ 7:1).
+    AAA,
+}
+
+/// Evaluate the WCAG conformance level for a given contrast ratio.
+pub fn evaluate_contrast(ratio: f64) -> WcagConformance {
+    if ratio >= 7.0 {
+        WcagConformance::AAA
+    } else if ratio >= 4.5 {
+        WcagConformance::AA
+    } else {
+        WcagConformance::Fail
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Accessibility tree traversal
+// ---------------------------------------------------------------------------
+
+impl AccessibilityNode {
+    /// Collect all nodes matching a predicate in depth-first order.
+    pub fn find_all<F>(&self, predicate: F) -> Vec<&AccessibilityNode>
+    where
+        F: Fn(&AccessibilityNode) -> bool,
+    {
+        let mut result = Vec::new();
+        self.collect_matching(&predicate, &mut result);
+        result
+    }
+
+    fn collect_matching<'a, F>(&'a self, predicate: &F, out: &mut Vec<&'a AccessibilityNode>)
+    where
+        F: Fn(&AccessibilityNode) -> bool,
+    {
+        if predicate(self) {
+            out.push(self);
+        }
+        for child in &self.children {
+            child.collect_matching(predicate, out);
+        }
+    }
+
+    /// Compute the path (list of labels) from the root to the first node
+    /// matching the given label. Returns `None` if not found.
+    pub fn path_to(&self, target_label: &str) -> Option<Vec<String>> {
+        let mut path = Vec::new();
+        if self.path_to_inner(target_label, &mut path) {
+            Some(path)
+        } else {
+            None
+        }
+    }
+
+    fn path_to_inner(&self, target: &str, path: &mut Vec<String>) -> bool {
+        path.push(self.label.clone());
+        if self.label == target {
+            return true;
+        }
+        for child in &self.children {
+            if child.path_to_inner(target, path) {
+                return true;
+            }
+        }
+        path.pop();
+        false
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1388,5 +1549,72 @@ mod tests {
         assert!(ft.focus_by_id("beta"));
         assert_eq!(ft.current_focus(), Some("beta"));
         assert!(!ft.focus_by_id("delta"));
+    }
+
+    #[test]
+    fn role_to_html_element_maps_button() {
+        assert_eq!(role_to_html_element(AriaRole::Button), Some("button"));
+        assert_eq!(role_to_html_element(AriaRole::List), Some("ul"));
+        assert_eq!(role_to_html_element(AriaRole::Tab), None);
+    }
+
+    #[test]
+    fn is_default_focusable_for_interactive_roles() {
+        assert!(is_default_focusable(AriaRole::Button));
+        assert!(is_default_focusable(AriaRole::TextBox));
+        assert!(!is_default_focusable(AriaRole::List));
+        assert!(!is_default_focusable(AriaRole::Dialog));
+    }
+
+    #[test]
+    fn format_announcement_with_context_breadcrumbs() {
+        let msg = format_announcement_with_context(&["Editor", "File"], "Saved");
+        assert_eq!(msg, "[Editor > File] Saved");
+
+        let msg_empty = format_announcement_with_context(&[], "Saved");
+        assert_eq!(msg_empty, "Saved");
+    }
+
+    #[test]
+    fn format_count_announcement_pluralization() {
+        assert_eq!(format_count_announcement("error", 0), "No errors");
+        assert_eq!(format_count_announcement("error", 1), "1 error");
+        assert_eq!(format_count_announcement("warning", 5), "5 warnings");
+    }
+
+    #[test]
+    fn contrast_ratio_black_white() {
+        let ratio = contrast_ratio(0, 0, 0, 255, 255, 255);
+        assert!(ratio > 20.9 && ratio < 21.1);
+        assert_eq!(evaluate_contrast(ratio), WcagConformance::AAA);
+    }
+
+    #[test]
+    fn contrast_ratio_same_colour_is_one() {
+        let ratio = contrast_ratio(128, 128, 128, 128, 128, 128);
+        assert!((ratio - 1.0).abs() < 0.001);
+        assert_eq!(evaluate_contrast(ratio), WcagConformance::Fail);
+    }
+
+    #[test]
+    fn accessibility_node_find_all_by_role() {
+        let mut root = AccessibilityNode::new("root", AriaRole::Tree);
+        root.add_child(AccessibilityNode::new("btn1", AriaRole::Button));
+        let mut sub = AccessibilityNode::new("menu", AriaRole::Menu);
+        sub.add_child(AccessibilityNode::new("btn2", AriaRole::Button));
+        root.add_child(sub);
+        let buttons = root.find_all(|n| n.role == AriaRole::Button);
+        assert_eq!(buttons.len(), 2);
+    }
+
+    #[test]
+    fn accessibility_node_path_to_label() {
+        let mut root = AccessibilityNode::new("root", AriaRole::Tree);
+        let mut child = AccessibilityNode::new("branch", AriaRole::TreeItem);
+        child.add_child(AccessibilityNode::new("leaf", AriaRole::TreeItem));
+        root.add_child(child);
+        let path = root.path_to("leaf").unwrap();
+        assert_eq!(path, vec!["root", "branch", "leaf"]);
+        assert!(root.path_to("missing").is_none());
     }
 }

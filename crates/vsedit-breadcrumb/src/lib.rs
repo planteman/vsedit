@@ -780,6 +780,126 @@ impl BreadcrumbItem {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Breadcrumb truncation
+// ---------------------------------------------------------------------------
+
+/// Truncate a breadcrumb path for display when it exceeds `max_segments`.
+/// Keeps the first and last segments, replacing the middle with "…".
+pub fn truncate_breadcrumb_path(path: &BreadcrumbPath, max_segments: usize) -> String {
+    if max_segments < 2 || path.len() <= max_segments {
+        return path.to_path_string();
+    }
+    let keep_start = 1;
+    let keep_end = max_segments - 1;
+    let labels: Vec<&str> = path.elements.iter().map(|e| e.label.as_str()).collect();
+    let mut parts: Vec<&str> = Vec::with_capacity(max_segments + 1);
+    for l in &labels[..keep_start] {
+        parts.push(l);
+    }
+    parts.push("…");
+    let end_start = labels.len().saturating_sub(keep_end);
+    for l in &labels[end_start..] {
+        parts.push(l);
+    }
+    parts.join(" > ")
+}
+
+// ---------------------------------------------------------------------------
+// Breadcrumb comparison
+// ---------------------------------------------------------------------------
+
+impl BreadcrumbPath {
+    /// Returns `true` if this path starts with the same elements as `prefix`.
+    pub fn starts_with(&self, prefix: &BreadcrumbPath) -> bool {
+        if prefix.len() > self.len() {
+            return false;
+        }
+        self.elements[..prefix.len()]
+            .iter()
+            .zip(prefix.elements.iter())
+            .all(|(a, b)| a.label == b.label && a.kind == b.kind)
+    }
+
+    /// Returns the common prefix of two paths.
+    pub fn common_prefix(&self, other: &BreadcrumbPath) -> BreadcrumbPath {
+        let mut result = BreadcrumbPath::new();
+        for (a, b) in self.elements.iter().zip(other.elements.iter()) {
+            if a.label == b.label && a.kind == b.kind {
+                result.push(a.clone());
+            } else {
+                break;
+            }
+        }
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Breadcrumb serialization
+// ---------------------------------------------------------------------------
+
+impl BreadcrumbPath {
+    /// Serialize to a simple colon-separated format: `kind:label;kind:label;...`
+    pub fn serialize(&self) -> String {
+        self.elements
+            .iter()
+            .map(|e| format!("{}:{}", kind_to_tag(&e.kind), e.label))
+            .collect::<Vec<_>>()
+            .join(";")
+    }
+
+    /// Deserialize from the format produced by [`serialize`](Self::serialize).
+    pub fn deserialize(s: &str) -> Option<Self> {
+        if s.is_empty() {
+            return Some(BreadcrumbPath::new());
+        }
+        let mut path = BreadcrumbPath::new();
+        for segment in s.split(';') {
+            let (tag, label) = segment.split_once(':')?;
+            let kind = tag_to_kind(tag)?;
+            path.push(BreadcrumbElement {
+                label: label.to_string(),
+                kind,
+                uri: None,
+                range_start_line: None,
+            });
+        }
+        Some(path)
+    }
+}
+
+fn kind_to_tag(kind: &BreadcrumbKind) -> &'static str {
+    match kind {
+        BreadcrumbKind::File => "file",
+        BreadcrumbKind::Folder => "folder",
+        BreadcrumbKind::Symbol => "sym",
+        BreadcrumbKind::Class => "class",
+        BreadcrumbKind::Function => "fn",
+        BreadcrumbKind::Method => "method",
+        BreadcrumbKind::Property => "prop",
+        BreadcrumbKind::Enum => "enum",
+        BreadcrumbKind::Interface => "iface",
+        BreadcrumbKind::Module => "mod",
+    }
+}
+
+fn tag_to_kind(tag: &str) -> Option<BreadcrumbKind> {
+    match tag {
+        "file" => Some(BreadcrumbKind::File),
+        "folder" => Some(BreadcrumbKind::Folder),
+        "sym" => Some(BreadcrumbKind::Symbol),
+        "class" => Some(BreadcrumbKind::Class),
+        "fn" => Some(BreadcrumbKind::Function),
+        "method" => Some(BreadcrumbKind::Method),
+        "prop" => Some(BreadcrumbKind::Property),
+        "enum" => Some(BreadcrumbKind::Enum),
+        "iface" => Some(BreadcrumbKind::Interface),
+        "mod" => Some(BreadcrumbKind::Module),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1381,5 +1501,84 @@ mod tests {
         let elem = sample_element("func", BreadcrumbKind::Function)
             .with_uri("file:///a.rs");
         assert_eq!(elem.uri.as_deref(), Some("file:///a.rs"));
+    }
+
+    #[test]
+    fn truncate_breadcrumb_short_path_unchanged() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("src", BreadcrumbKind::Folder));
+        path.push(sample_element("main.rs", BreadcrumbKind::File));
+        assert_eq!(truncate_breadcrumb_path(&path, 5), "src > main.rs");
+    }
+
+    #[test]
+    fn truncate_breadcrumb_long_path() {
+        let mut path = BreadcrumbPath::new();
+        for name in &["a", "b", "c", "d", "e", "f"] {
+            path.push(sample_element(name, BreadcrumbKind::Folder));
+        }
+        let truncated = truncate_breadcrumb_path(&path, 3);
+        assert!(truncated.contains("…"));
+        assert!(truncated.starts_with("a"));
+        assert!(truncated.ends_with("f"));
+    }
+
+    #[test]
+    fn breadcrumb_starts_with_prefix() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("src", BreadcrumbKind::Folder));
+        path.push(sample_element("lib.rs", BreadcrumbKind::File));
+        path.push(sample_element("MyFn", BreadcrumbKind::Function));
+
+        let mut prefix = BreadcrumbPath::new();
+        prefix.push(sample_element("src", BreadcrumbKind::Folder));
+        prefix.push(sample_element("lib.rs", BreadcrumbKind::File));
+
+        assert!(path.starts_with(&prefix));
+        assert!(!prefix.starts_with(&path));
+    }
+
+    #[test]
+    fn breadcrumb_common_prefix() {
+        let mut a = BreadcrumbPath::new();
+        a.push(sample_element("src", BreadcrumbKind::Folder));
+        a.push(sample_element("lib.rs", BreadcrumbKind::File));
+        a.push(sample_element("FnA", BreadcrumbKind::Function));
+
+        let mut b = BreadcrumbPath::new();
+        b.push(sample_element("src", BreadcrumbKind::Folder));
+        b.push(sample_element("lib.rs", BreadcrumbKind::File));
+        b.push(sample_element("FnB", BreadcrumbKind::Function));
+
+        let common = a.common_prefix(&b);
+        assert_eq!(common.len(), 2);
+        assert_eq!(common.to_path_string(), "src > lib.rs");
+    }
+
+    #[test]
+    fn breadcrumb_serialize_roundtrip() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("src", BreadcrumbKind::Folder));
+        path.push(sample_element("main.rs", BreadcrumbKind::File));
+        path.push(sample_element("run", BreadcrumbKind::Function));
+        let serialized = path.serialize();
+        let deserialized = BreadcrumbPath::deserialize(&serialized).unwrap();
+        assert_eq!(deserialized.len(), 3);
+        assert_eq!(deserialized.to_path_string(), path.to_path_string());
+    }
+
+    #[test]
+    fn breadcrumb_serialize_empty() {
+        let path = BreadcrumbPath::new();
+        let serialized = path.serialize();
+        assert_eq!(serialized, "");
+        let deserialized = BreadcrumbPath::deserialize("").unwrap();
+        assert!(deserialized.is_empty());
+    }
+
+    #[test]
+    fn breadcrumb_deserialize_invalid_returns_none() {
+        assert!(BreadcrumbPath::deserialize("no_colon").is_none());
+        assert!(BreadcrumbPath::deserialize("badtag:label").is_none());
     }
 }

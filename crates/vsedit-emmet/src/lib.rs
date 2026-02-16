@@ -797,6 +797,214 @@ pub fn count_elements_in_expansion(expanded: &str) -> usize {
     count
 }
 
+// ---------------------------------------------------------------------------
+// Sibling combinator expansion
+// ---------------------------------------------------------------------------
+
+/// Expand an abbreviation containing sibling combinators (`+`).
+///
+/// For example, `"h1+p+footer"` expands to `<h1></h1>\n<p></p>\n<footer></footer>`.
+pub fn expand_sibling_abbreviation(input: &str) -> Option<String> {
+    if input.is_empty() || !input.contains('+') {
+        return expand_abbreviation(input);
+    }
+    let parts: Vec<&str> = input.split('+').collect();
+    let mut result = Vec::new();
+    for part in &parts {
+        let trimmed = part.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        result.push(expand_abbreviation(trimmed)?);
+    }
+    Some(result.join("\n"))
+}
+
+/// Expand an abbreviation containing grouping with parentheses.
+///
+/// Groups are treated as sub-expressions: `"div>(h1+p)"` expands the group
+/// inside the parent element.
+pub fn expand_grouped_abbreviation(input: &str) -> Option<String> {
+    if input.is_empty() {
+        return None;
+    }
+    // Simple case: no grouping
+    if !input.contains('(') {
+        return expand_sibling_abbreviation(input);
+    }
+    let open = input.find('(')?;
+    let close = input.rfind(')')?;
+    if close <= open {
+        return None;
+    }
+    let parent_part = &input[..open];
+    let group_part = &input[open + 1..close];
+
+    let parent_abbr = parent_part.trim_end_matches('>');
+    if parent_abbr.is_empty() {
+        return expand_sibling_abbreviation(group_part);
+    }
+
+    let parent_expanded = expand_abbreviation(parent_abbr)?;
+    let group_expanded = expand_sibling_abbreviation(group_part)?;
+
+    // Insert group inside parent tag
+    let close_tag = format!("</{parent_abbr}>");
+    if let Some(idx) = parent_expanded.find(&close_tag) {
+        let indented = group_expanded
+            .lines()
+            .map(|l| format!("  {l}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut result = parent_expanded[..idx].to_string();
+        result.push('\n');
+        result.push_str(&indented);
+        result.push('\n');
+        result.push_str(&parent_expanded[idx..]);
+        Some(result)
+    } else {
+        Some(format!("{parent_expanded}\n{group_expanded}"))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Abbreviation validation
+// ---------------------------------------------------------------------------
+
+/// Errors returned by abbreviation validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AbbreviationError {
+    /// The abbreviation is empty.
+    Empty,
+    /// The abbreviation contains invalid characters.
+    InvalidChar(char),
+    /// Parentheses are unbalanced.
+    UnbalancedParens,
+    /// The abbreviation exceeds the maximum allowed length.
+    TooLong { max: usize, actual: usize },
+}
+
+impl fmt::Display for AbbreviationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AbbreviationError::Empty => write!(f, "abbreviation is empty"),
+            AbbreviationError::InvalidChar(c) => write!(f, "invalid character: '{c}'"),
+            AbbreviationError::UnbalancedParens => write!(f, "unbalanced parentheses"),
+            AbbreviationError::TooLong { max, actual } => {
+                write!(f, "abbreviation length {actual} exceeds maximum {max}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for AbbreviationError {}
+
+/// Validate an Emmet abbreviation for well-formedness.
+///
+/// Checks that the abbreviation is non-empty, contains only valid characters,
+/// has balanced parentheses, and does not exceed `max_len`.
+pub fn validate_abbreviation(input: &str, max_len: usize) -> Result<(), AbbreviationError> {
+    if input.is_empty() {
+        return Err(AbbreviationError::Empty);
+    }
+    if input.len() > max_len {
+        return Err(AbbreviationError::TooLong {
+            max: max_len,
+            actual: input.len(),
+        });
+    }
+    let allowed = |c: char| {
+        c.is_alphanumeric()
+            || matches!(c, '>' | '+' | '^' | '*' | '(' | ')' | '#' | '.' | '[' | ']' | '{' | '}' | '-' | '_' | ':' | '$' | '@' | '!' | '=' | '"' | '\'' | ' ')
+    };
+    let mut depth: i32 = 0;
+    for c in input.chars() {
+        if !allowed(c) {
+            return Err(AbbreviationError::InvalidChar(c));
+        }
+        if c == '(' {
+            depth += 1;
+        } else if c == ')' {
+            depth -= 1;
+            if depth < 0 {
+                return Err(AbbreviationError::UnbalancedParens);
+            }
+        }
+    }
+    if depth != 0 {
+        return Err(AbbreviationError::UnbalancedParens);
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Expansion statistics (aggregate)
+// ---------------------------------------------------------------------------
+
+/// Accumulated statistics across multiple Emmet expansions.
+#[derive(Debug, Clone)]
+pub struct ExpansionSummary {
+    pub total_expansions: u64,
+    pub total_failures: u64,
+    pub unique_tags: Vec<String>,
+}
+
+impl ExpansionSummary {
+    /// Create a new empty summary.
+    pub fn new() -> Self {
+        Self {
+            total_expansions: 0,
+            total_failures: 0,
+            unique_tags: Vec::new(),
+        }
+    }
+
+    /// Record a successful expansion, tracking the tag name.
+    pub fn record_expansion(&mut self, tag: &str) {
+        self.total_expansions += 1;
+        if !self.unique_tags.iter().any(|t| t == tag) {
+            self.unique_tags.push(tag.to_string());
+        }
+    }
+
+    /// Record a failed expansion attempt.
+    pub fn record_failure(&mut self) {
+        self.total_failures += 1;
+    }
+
+    /// Success rate as a fraction in [0.0, 1.0].
+    pub fn success_rate(&self) -> f64 {
+        let total = self.total_expansions + self.total_failures;
+        if total == 0 {
+            return 0.0;
+        }
+        self.total_expansions as f64 / total as f64
+    }
+
+    /// Number of distinct tags expanded.
+    pub fn unique_tag_count(&self) -> usize {
+        self.unique_tags.len()
+    }
+}
+
+impl Default for ExpansionSummary {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ExpansionSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} expansions, {} failures, {} unique tags",
+            self.total_expansions,
+            self.total_failures,
+            self.unique_tags.len(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1359,5 +1567,118 @@ mod tests {
         assert!(ShowExpanded::Always.is_always());
         assert!(!ShowExpanded::Never.is_always());
         assert!(!ShowExpanded::InMarkupAndStylesheetFilesOnly.is_always());
+    }
+
+    // -- new tests --
+
+    #[test]
+    fn expand_sibling_h1_plus_p() {
+        let result = expand_sibling_abbreviation("h1+p").unwrap();
+        assert!(result.contains("<h1></h1>"));
+        assert!(result.contains("<p></p>"));
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines.len(), 2);
+    }
+
+    #[test]
+    fn expand_sibling_three_tags() {
+        let result = expand_sibling_abbreviation("h1+p+footer").unwrap();
+        assert!(result.contains("<h1></h1>"));
+        assert!(result.contains("<p></p>"));
+        assert!(result.contains("<footer></footer>"));
+    }
+
+    #[test]
+    fn expand_sibling_single_tag_falls_back() {
+        let result = expand_sibling_abbreviation("div").unwrap();
+        assert_eq!(result, "<div></div>");
+    }
+
+    #[test]
+    fn expand_sibling_empty_part_returns_none() {
+        assert!(expand_sibling_abbreviation("div+").is_none());
+    }
+
+    #[test]
+    fn expand_grouped_abbreviation_basic() {
+        let result = expand_grouped_abbreviation("div>(h1+p)").unwrap();
+        assert!(result.contains("<div>"));
+        assert!(result.contains("<h1></h1>"));
+        assert!(result.contains("<p></p>"));
+        assert!(result.contains("</div>"));
+    }
+
+    #[test]
+    fn expand_grouped_no_parens_delegates() {
+        let result = expand_grouped_abbreviation("span").unwrap();
+        assert_eq!(result, "<span></span>");
+    }
+
+    #[test]
+    fn validate_abbreviation_ok() {
+        assert!(validate_abbreviation("div>p+span", 100).is_ok());
+        assert!(validate_abbreviation("ul>li*3", 100).is_ok());
+    }
+
+    #[test]
+    fn validate_abbreviation_empty() {
+        assert_eq!(validate_abbreviation("", 100), Err(AbbreviationError::Empty));
+    }
+
+    #[test]
+    fn validate_abbreviation_too_long() {
+        let long = "a".repeat(101);
+        match validate_abbreviation(&long, 100) {
+            Err(AbbreviationError::TooLong { max: 100, actual: 101 }) => {}
+            other => panic!("expected TooLong, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn validate_abbreviation_unbalanced_parens() {
+        assert_eq!(
+            validate_abbreviation("div>(p", 100),
+            Err(AbbreviationError::UnbalancedParens),
+        );
+        assert_eq!(
+            validate_abbreviation("div>p)", 100),
+            Err(AbbreviationError::UnbalancedParens),
+        );
+    }
+
+    #[test]
+    fn expansion_summary_tracks_tags() {
+        let mut s = ExpansionSummary::new();
+        s.record_expansion("div");
+        s.record_expansion("p");
+        s.record_expansion("div");
+        assert_eq!(s.total_expansions, 3);
+        assert_eq!(s.unique_tag_count(), 2);
+        assert!((s.success_rate() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn expansion_summary_with_failures() {
+        let mut s = ExpansionSummary::new();
+        s.record_expansion("div");
+        s.record_failure();
+        assert_eq!(s.total_failures, 1);
+        assert!((s.success_rate() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn expansion_summary_display() {
+        let s = ExpansionSummary::new();
+        let text = format!("{s}");
+        assert!(text.contains("0 expansions"));
+    }
+
+    #[test]
+    fn abbreviation_error_display() {
+        assert_eq!(
+            AbbreviationError::Empty.to_string(),
+            "abbreviation is empty",
+        );
+        assert!(AbbreviationError::InvalidChar('~').to_string().contains('~'));
     }
 }

@@ -782,6 +782,125 @@ pub fn validate_quick_pick_items(items: &[QuickPickItem]) -> Vec<String> {
     errors
 }
 
+// ---------------------------------------------------------------------------
+// Input history
+// ---------------------------------------------------------------------------
+
+/// Tracks a bounded history of user inputs for recall (e.g. up-arrow).
+#[derive(Debug, Clone)]
+pub struct InputHistory {
+    entries: Vec<String>,
+    max_entries: usize,
+    cursor: Option<usize>,
+}
+
+impl InputHistory {
+    /// Create a new history with the given capacity.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+            cursor: None,
+        }
+    }
+
+    /// Push a new entry. Duplicates of the most-recent entry are ignored.
+    pub fn push(&mut self, value: impl Into<String>) {
+        let value = value.into();
+        if value.trim().is_empty() {
+            return;
+        }
+        if self.entries.last().map(|s| s.as_str()) == Some(value.as_str()) {
+            return;
+        }
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(value);
+        self.cursor = None;
+    }
+
+    /// Move backward (older) in history, returning the entry if available.
+    pub fn prev(&mut self) -> Option<&str> {
+        if self.entries.is_empty() {
+            return None;
+        }
+        let idx = match self.cursor {
+            Some(0) => 0,
+            Some(c) => c - 1,
+            None => self.entries.len() - 1,
+        };
+        self.cursor = Some(idx);
+        Some(&self.entries[idx])
+    }
+
+    /// Move forward (newer) in history, returning the entry if available.
+    pub fn next(&mut self) -> Option<&str> {
+        let c = self.cursor?;
+        if c + 1 >= self.entries.len() {
+            self.cursor = None;
+            return None;
+        }
+        self.cursor = Some(c + 1);
+        Some(&self.entries[c + 1])
+    }
+
+    /// Number of stored entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Get all entries oldest-first.
+    pub fn entries(&self) -> &[String] {
+        &self.entries
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Input transformation pipeline
+// ---------------------------------------------------------------------------
+
+/// A transformation step applied to user input text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InputTransform {
+    /// Remove leading and trailing whitespace.
+    Trim,
+    /// Convert to lowercase.
+    Lowercase,
+    /// Convert to uppercase.
+    Uppercase,
+    /// Replace all occurrences of `from` with `to`.
+    Replace { from: String, to: String },
+    /// Truncate to at most `max` characters.
+    Truncate(usize),
+}
+
+/// Apply a pipeline of transforms to `input` in order.
+pub fn apply_transforms(input: &str, transforms: &[InputTransform]) -> String {
+    let mut s = input.to_string();
+    for t in transforms {
+        s = match t {
+            InputTransform::Trim => s.trim().to_string(),
+            InputTransform::Lowercase => s.to_lowercase(),
+            InputTransform::Uppercase => s.to_uppercase(),
+            InputTransform::Replace { from, to } => s.replace(from.as_str(), to.as_str()),
+            InputTransform::Truncate(max) => {
+                if s.chars().count() > *max {
+                    s.chars().take(*max).collect()
+                } else {
+                    s
+                }
+            }
+        };
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1352,5 +1471,73 @@ mod tests {
     fn quickinput_svc_is_ascii_printable() {
         assert!(QuickinputSvcValidator::is_ascii_printable("Hello World 123"));
         assert!(!QuickinputSvcValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn input_history_push_and_prev() {
+        let mut h = InputHistory::new(5);
+        h.push("first");
+        h.push("second");
+        h.push("third");
+        assert_eq!(h.prev(), Some("third"));
+        assert_eq!(h.prev(), Some("second"));
+        assert_eq!(h.prev(), Some("first"));
+        assert_eq!(h.prev(), Some("first")); // stays at oldest
+    }
+
+    #[test]
+    fn input_history_ignores_blank_and_consecutive_dupes() {
+        let mut h = InputHistory::new(10);
+        h.push("   ");
+        assert!(h.is_empty());
+        h.push("hello");
+        h.push("hello");
+        assert_eq!(h.len(), 1);
+    }
+
+    #[test]
+    fn input_history_respects_max_entries() {
+        let mut h = InputHistory::new(3);
+        h.push("a");
+        h.push("b");
+        h.push("c");
+        h.push("d");
+        assert_eq!(h.len(), 3);
+        assert_eq!(h.entries()[0], "b");
+    }
+
+    #[test]
+    fn input_history_next_navigates_forward() {
+        let mut h = InputHistory::new(10);
+        h.push("x");
+        h.push("y");
+        h.push("z");
+        h.prev(); // z
+        h.prev(); // y
+        assert_eq!(h.next(), Some("z"));
+        assert_eq!(h.next(), None); // past end
+    }
+
+    #[test]
+    fn apply_transforms_pipeline() {
+        let transforms = vec![
+            InputTransform::Trim,
+            InputTransform::Lowercase,
+            InputTransform::Replace { from: " ".into(), to: "_".into() },
+        ];
+        assert_eq!(apply_transforms("  Hello World  ", &transforms), "hello_world");
+    }
+
+    #[test]
+    fn apply_transforms_truncate() {
+        let transforms = vec![InputTransform::Truncate(5)];
+        assert_eq!(apply_transforms("Hello, World!", &transforms), "Hello");
+        assert_eq!(apply_transforms("Hi", &transforms), "Hi");
+    }
+
+    #[test]
+    fn apply_transforms_uppercase() {
+        let transforms = vec![InputTransform::Uppercase];
+        assert_eq!(apply_transforms("hello", &transforms), "HELLO");
     }
 }

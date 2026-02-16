@@ -839,6 +839,145 @@ impl NetworkCache {
     }
 }
 
+// ---------------------------------------------------------------------------
+// URL normalization helpers
+// ---------------------------------------------------------------------------
+
+/// Normalize a URL by lowercasing scheme and host, removing default ports
+/// (80 for http, 443 for https), and stripping trailing slashes from the path.
+pub fn normalize_network_url(url: &str) -> String {
+    let parts = match parse_url(url) {
+        Some(p) => p,
+        None => return url.to_string(),
+    };
+    let scheme = parts.scheme.to_lowercase();
+    let host = parts.host.to_lowercase();
+    let skip_port = match (scheme.as_str(), parts.port) {
+        ("http", Some(80)) | ("https", Some(443)) => true,
+        _ => false,
+    };
+    let authority = if skip_port || parts.port.is_none() {
+        host.clone()
+    } else {
+        format!("{}:{}", host, parts.port.unwrap())
+    };
+    let path = if parts.path.len() > 1 {
+        parts.path.trim_end_matches('/').to_string()
+    } else {
+        parts.path.clone()
+    };
+    format!("{scheme}://{authority}{path}")
+}
+
+// ---------------------------------------------------------------------------
+// Hostname validation
+// ---------------------------------------------------------------------------
+
+/// Validate a hostname (RFC 952 / RFC 1123 style).
+///
+/// Returns `Ok(())` if the hostname is syntactically valid.
+pub fn validate_hostname(host: &str) -> Result<(), String> {
+    if host.is_empty() {
+        return Err("hostname is empty".into());
+    }
+    if host.len() > 253 {
+        return Err("hostname exceeds 253 characters".into());
+    }
+    for label in host.split('.') {
+        if label.is_empty() {
+            return Err("hostname contains empty label".into());
+        }
+        if label.len() > 63 {
+            return Err("hostname label exceeds 63 characters".into());
+        }
+        if label.starts_with('-') || label.ends_with('-') {
+            return Err(format!("label '{}' starts or ends with hyphen", label));
+        }
+        if !label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+            return Err(format!("label '{}' contains invalid characters", label));
+        }
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Port range validation
+// ---------------------------------------------------------------------------
+
+/// Validate that a port number is within the valid range (1–65535).
+pub fn validate_port(port: u16) -> Result<(), String> {
+    if port == 0 {
+        Err("port 0 is not valid".into())
+    } else {
+        Ok(())
+    }
+}
+
+/// Validate that a port number falls within a custom inclusive range.
+pub fn validate_port_range(port: u16, min: u16, max: u16) -> Result<(), String> {
+    if port < min || port > max {
+        Err(format!("port {} is outside range [{}, {}]", port, min, max))
+    } else {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Network address formatting
+// ---------------------------------------------------------------------------
+
+/// Format a host and optional port into a network address string.
+pub fn format_address(host: &str, port: Option<u16>) -> String {
+    match port {
+        Some(p) => format!("{host}:{p}"),
+        None => host.to_string(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Connection state tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks the state of a network connection with transition history.
+#[derive(Debug, Clone)]
+pub struct ConnectionTracker {
+    current: NetworkStatus,
+    transitions: Vec<(NetworkStatus, NetworkStatus)>,
+}
+
+impl ConnectionTracker {
+    /// Create a new tracker starting in the given state.
+    pub fn new(initial: NetworkStatus) -> Self {
+        Self {
+            current: initial,
+            transitions: Vec::new(),
+        }
+    }
+
+    /// Transition to a new state, recording the change.
+    pub fn transition(&mut self, new_state: NetworkStatus) {
+        if new_state != self.current {
+            self.transitions.push((self.current, new_state));
+            self.current = new_state;
+        }
+    }
+
+    /// Current state.
+    pub fn current(&self) -> NetworkStatus {
+        self.current
+    }
+
+    /// Number of state transitions recorded.
+    pub fn transition_count(&self) -> usize {
+        self.transitions.len()
+    }
+
+    /// Get the full transition log.
+    pub fn transitions(&self) -> &[(NetworkStatus, NetworkStatus)] {
+        &self.transitions
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1353,5 +1492,66 @@ mod tests {
         assert_eq!(cache.len(), 1);
         cache.clear();
         assert_eq!(cache.len(), 0);
+    }
+
+    #[test]
+    fn normalize_network_url_strips_default_port() {
+        assert_eq!(
+            normalize_network_url("HTTP://EXAMPLE.COM:80/path/"),
+            "http://example.com/path"
+        );
+        assert_eq!(
+            normalize_network_url("https://Example.com:443/"),
+            "https://example.com/"
+        );
+    }
+
+    #[test]
+    fn normalize_network_url_keeps_non_default_port() {
+        assert_eq!(
+            normalize_network_url("http://example.com:8080/api"),
+            "http://example.com:8080/api"
+        );
+    }
+
+    #[test]
+    fn validate_hostname_valid() {
+        assert!(validate_hostname("example.com").is_ok());
+        assert!(validate_hostname("sub.domain.example.com").is_ok());
+        assert!(validate_hostname("my-host").is_ok());
+    }
+
+    #[test]
+    fn validate_hostname_invalid() {
+        assert!(validate_hostname("").is_err());
+        assert!(validate_hostname("-bad.com").is_err());
+        assert!(validate_hostname("bad-.com").is_err());
+        assert!(validate_hostname("inv@lid.com").is_err());
+    }
+
+    #[test]
+    fn validate_port_and_range() {
+        assert!(validate_port(80).is_ok());
+        assert!(validate_port(0).is_err());
+        assert!(validate_port_range(8080, 1024, 65535).is_ok());
+        assert!(validate_port_range(80, 1024, 65535).is_err());
+    }
+
+    #[test]
+    fn format_address_with_and_without_port() {
+        assert_eq!(format_address("example.com", Some(443)), "example.com:443");
+        assert_eq!(format_address("localhost", None), "localhost");
+    }
+
+    #[test]
+    fn connection_tracker_records_transitions() {
+        let mut tracker = ConnectionTracker::new(NetworkStatus::Online);
+        assert_eq!(tracker.current(), NetworkStatus::Online);
+        tracker.transition(NetworkStatus::Offline);
+        tracker.transition(NetworkStatus::Offline); // no-op
+        tracker.transition(NetworkStatus::Limited);
+        assert_eq!(tracker.current(), NetworkStatus::Limited);
+        assert_eq!(tracker.transition_count(), 2);
+        assert_eq!(tracker.transitions()[0], (NetworkStatus::Online, NetworkStatus::Offline));
     }
 }

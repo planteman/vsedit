@@ -736,6 +736,160 @@ impl GutterDecorationType {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Gutter width computation
+// ---------------------------------------------------------------------------
+
+/// Compute the width in characters needed to display line numbers up to `max_line`.
+pub fn line_number_width(max_line: u32) -> u32 {
+    if max_line == 0 {
+        return 1;
+    }
+    let mut digits = 0u32;
+    let mut n = max_line;
+    while n > 0 {
+        digits += 1;
+        n /= 10;
+    }
+    digits
+}
+
+/// Compute the total gutter width in characters, combining line-number width
+/// and glyph-margin width.
+pub fn compute_gutter_width(max_line: u32, glyph_margin: &GlyphMarginConfig) -> u32 {
+    let ln_width = line_number_width(max_line);
+    let glyph_width = if glyph_margin.enabled { glyph_margin.width_chars } else { 0 };
+    ln_width + glyph_width
+}
+
+// ---------------------------------------------------------------------------
+// Minimap scaling helpers
+// ---------------------------------------------------------------------------
+
+impl Minimap {
+    /// Compute the scaled column width for the minimap.
+    pub fn scaled_max_column(&self) -> u32 {
+        (self.max_column as f64 * self.scale).round() as u32
+    }
+
+    /// Compute how many source lines fit in a minimap of the given pixel height,
+    /// using the provided line height (in pixels) and scale factor.
+    pub fn visible_lines(&self, viewport_height_px: u32, line_height_px: u32) -> u32 {
+        if !self.enabled || line_height_px == 0 {
+            return 0;
+        }
+        let scaled_line = (line_height_px as f64 * self.scale).max(1.0);
+        (viewport_height_px as f64 / scaled_line).floor() as u32
+    }
+
+    /// Map a document line number to a minimap y-pixel offset.
+    pub fn line_to_y(&self, line: u32, first_visible_line: u32, line_height_px: u32) -> u32 {
+        let relative = line.saturating_sub(first_visible_line);
+        let scaled_line = (line_height_px as f64 * self.scale).max(1.0);
+        (relative as f64 * scaled_line).round() as u32
+    }
+}
+
+// ---------------------------------------------------------------------------
+// View part visibility toggles
+// ---------------------------------------------------------------------------
+
+/// Tracks the visibility state of standard editor view parts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewPartVisibility {
+    pub line_numbers: bool,
+    pub glyph_margin: bool,
+    pub minimap: bool,
+    pub breadcrumbs: bool,
+    pub indent_guides: bool,
+}
+
+impl Default for ViewPartVisibility {
+    fn default() -> Self {
+        Self {
+            line_numbers: true,
+            glyph_margin: true,
+            minimap: true,
+            breadcrumbs: true,
+            indent_guides: true,
+        }
+    }
+}
+
+impl ViewPartVisibility {
+    /// Create a new visibility state with all parts visible.
+    pub fn all_visible() -> Self {
+        Self::default()
+    }
+
+    /// Create a visibility state with all parts hidden.
+    pub fn all_hidden() -> Self {
+        Self {
+            line_numbers: false,
+            glyph_margin: false,
+            minimap: false,
+            breadcrumbs: false,
+            indent_guides: false,
+        }
+    }
+
+    /// Count how many parts are currently visible.
+    pub fn visible_count(&self) -> usize {
+        [self.line_numbers, self.glyph_margin, self.minimap, self.breadcrumbs, self.indent_guides]
+            .iter()
+            .filter(|&&v| v)
+            .count()
+    }
+
+    /// Toggle a specific part by name. Returns `true` if the name was recognized.
+    pub fn toggle(&mut self, name: &str) -> bool {
+        match name {
+            "line_numbers" => { self.line_numbers = !self.line_numbers; true }
+            "glyph_margin" => { self.glyph_margin = !self.glyph_margin; true }
+            "minimap" => { self.minimap = !self.minimap; true }
+            "breadcrumbs" => { self.breadcrumbs = !self.breadcrumbs; true }
+            "indent_guides" => { self.indent_guides = !self.indent_guides; true }
+            _ => false,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Layout calculation for view part columns
+// ---------------------------------------------------------------------------
+
+/// Describes the horizontal layout of the editor's left-side columns.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EditorColumnLayout {
+    pub glyph_margin_width: u32,
+    pub line_number_width: u32,
+    pub content_left: u32,
+}
+
+/// Compute the horizontal column layout given editor configuration.
+pub fn compute_column_layout(
+    max_line: u32,
+    glyph_config: &GlyphMarginConfig,
+    char_width: u32,
+    visibility: &ViewPartVisibility,
+) -> EditorColumnLayout {
+    let glyph_w = if visibility.glyph_margin {
+        glyph_config.effective_width(char_width)
+    } else {
+        0
+    };
+    let ln_w = if visibility.line_numbers {
+        line_number_width(max_line) * char_width
+    } else {
+        0
+    };
+    EditorColumnLayout {
+        glyph_margin_width: glyph_w,
+        line_number_width: ln_w,
+        content_left: glyph_w + ln_w,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1376,5 +1530,104 @@ mod tests {
         assert!(GutterDecorationType::Info.is_diagnostic());
         assert!(!GutterDecorationType::Breakpoint.is_diagnostic());
         assert!(!GutterDecorationType::Bookmark.is_diagnostic());
+    }
+
+    #[test]
+    fn line_number_width_single_digit() {
+        assert_eq!(line_number_width(0), 1);
+        assert_eq!(line_number_width(1), 1);
+        assert_eq!(line_number_width(9), 1);
+    }
+
+    #[test]
+    fn line_number_width_multi_digit() {
+        assert_eq!(line_number_width(10), 2);
+        assert_eq!(line_number_width(99), 2);
+        assert_eq!(line_number_width(100), 3);
+        assert_eq!(line_number_width(9999), 4);
+        assert_eq!(line_number_width(10000), 5);
+    }
+
+    #[test]
+    fn compute_gutter_width_with_and_without_margin() {
+        let with_margin = GlyphMarginConfig { enabled: true, width_chars: 2, decorations_enabled: true };
+        assert_eq!(compute_gutter_width(99, &with_margin), 4); // 2 digits + 2 glyph
+        let without_margin = GlyphMarginConfig { enabled: false, width_chars: 2, decorations_enabled: true };
+        assert_eq!(compute_gutter_width(99, &without_margin), 2); // 2 digits + 0 glyph
+    }
+
+    #[test]
+    fn minimap_scaled_max_column() {
+        let mut m = Minimap::default();
+        assert_eq!(m.scaled_max_column(), 120);
+        m.scale = 0.5;
+        assert_eq!(m.scaled_max_column(), 60);
+        m.scale = 2.0;
+        assert_eq!(m.scaled_max_column(), 240);
+    }
+
+    #[test]
+    fn minimap_visible_lines_disabled() {
+        let m = Minimap { enabled: false, ..Minimap::default() };
+        assert_eq!(m.visible_lines(1000, 20), 0);
+    }
+
+    #[test]
+    fn minimap_visible_lines_basic() {
+        let m = Minimap::default(); // scale=1.0
+        assert_eq!(m.visible_lines(200, 20), 10);
+    }
+
+    #[test]
+    fn minimap_line_to_y_basic() {
+        let m = Minimap::default();
+        assert_eq!(m.line_to_y(10, 5, 20), 100); // (10-5)*20 = 100
+        assert_eq!(m.line_to_y(5, 5, 20), 0);
+    }
+
+    #[test]
+    fn view_part_visibility_defaults_all_visible() {
+        let v = ViewPartVisibility::default();
+        assert_eq!(v.visible_count(), 5);
+        assert!(v.line_numbers);
+        assert!(v.minimap);
+    }
+
+    #[test]
+    fn view_part_visibility_all_hidden() {
+        let v = ViewPartVisibility::all_hidden();
+        assert_eq!(v.visible_count(), 0);
+    }
+
+    #[test]
+    fn view_part_visibility_toggle() {
+        let mut v = ViewPartVisibility::default();
+        assert!(v.toggle("minimap"));
+        assert!(!v.minimap);
+        assert_eq!(v.visible_count(), 4);
+        assert!(v.toggle("minimap"));
+        assert!(v.minimap);
+        assert!(!v.toggle("nonexistent"));
+    }
+
+    #[test]
+    fn compute_column_layout_basic() {
+        let glyph = GlyphMarginConfig::default();
+        let vis = ViewPartVisibility::default();
+        let layout = compute_column_layout(100, &glyph, 8, &vis);
+        // line_number_width(100)=3, glyph=2*8=16, ln=3*8=24
+        assert_eq!(layout.glyph_margin_width, 16);
+        assert_eq!(layout.line_number_width, 24);
+        assert_eq!(layout.content_left, 40);
+    }
+
+    #[test]
+    fn compute_column_layout_hidden_parts() {
+        let glyph = GlyphMarginConfig::default();
+        let vis = ViewPartVisibility::all_hidden();
+        let layout = compute_column_layout(100, &glyph, 8, &vis);
+        assert_eq!(layout.glyph_margin_width, 0);
+        assert_eq!(layout.line_number_width, 0);
+        assert_eq!(layout.content_left, 0);
     }
 }

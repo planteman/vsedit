@@ -910,6 +910,149 @@ pub fn title_case(s: &str) -> String {
     result
 }
 
+// ---------------------------------------------------------------------------
+// Levenshtein distance
+// ---------------------------------------------------------------------------
+
+/// Compute the Levenshtein edit distance between two strings.
+///
+/// This counts the minimum number of single-character insertions, deletions,
+/// or substitutions needed to transform `a` into `b`.
+pub fn levenshtein_distance(a: &str, b: &str) -> usize {
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let m = a_chars.len();
+    let n = b_chars.len();
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
+    let mut prev = (0..=n).collect::<Vec<_>>();
+    let mut curr = vec![0; n + 1];
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1)
+                .min(curr[j - 1] + 1)
+                .min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
+}
+
+// ---------------------------------------------------------------------------
+// Common prefix/suffix extraction
+// ---------------------------------------------------------------------------
+
+/// Extract the longest common prefix of two strings.
+pub fn common_prefix<'a>(a: &'a str, b: &str) -> &'a str {
+    let len = common_prefix_length(a, b);
+    &a[..len]
+}
+
+/// Extract the longest common suffix of two strings.
+pub fn common_suffix<'a>(a: &'a str, b: &str) -> &'a str {
+    let count = common_suffix_length(a, b);
+    if count == 0 {
+        return "";
+    }
+    // Find the byte offset for the last `count` chars
+    let byte_start = a
+        .char_indices()
+        .rev()
+        .nth(count - 1)
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+    &a[byte_start..]
+}
+
+// ---------------------------------------------------------------------------
+// Word boundary detection
+// ---------------------------------------------------------------------------
+
+/// Find all word boundary byte offsets in a string.
+///
+/// A word boundary is at the start or end of a contiguous sequence of
+/// alphanumeric (or underscore) characters.
+pub fn find_word_boundaries(s: &str) -> Vec<usize> {
+    let mut boundaries = Vec::new();
+    let chars: Vec<(usize, char)> = s.char_indices().collect();
+    if chars.is_empty() {
+        return boundaries;
+    }
+    let is_word = |c: char| c.is_alphanumeric() || c == '_';
+    // Start of first word
+    if is_word(chars[0].1) {
+        boundaries.push(0);
+    }
+    for window in chars.windows(2) {
+        let (i0, c0) = window[0];
+        let (i1, c1) = window[1];
+        if !is_word(c0) && is_word(c1) {
+            boundaries.push(i1);
+        } else if is_word(c0) && !is_word(c1) {
+            boundaries.push(i0 + c0.len_utf8());
+        }
+    }
+    // End of last word
+    if let Some(&(i, c)) = chars.last() {
+        if is_word(c) {
+            boundaries.push(i + c.len_utf8());
+        }
+    }
+    boundaries
+}
+
+// ---------------------------------------------------------------------------
+// String normalization
+// ---------------------------------------------------------------------------
+
+/// Collapse all whitespace sequences (including newlines, tabs) into single
+/// spaces and trim the result.
+pub fn normalize_whitespace_full(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut prev_ws = false;
+    for c in s.chars() {
+        if c.is_whitespace() {
+            if !prev_ws && !result.is_empty() {
+                result.push(' ');
+            }
+            prev_ws = true;
+        } else {
+            result.push(c);
+            prev_ws = false;
+        }
+    }
+    if result.ends_with(' ') {
+        result.pop();
+    }
+    result
+}
+
+/// Remove all diacritical marks (combining characters) from a string.
+///
+/// This performs a basic ASCII-folding by stripping characters in the
+/// Unicode combining diacritical marks block (U+0300..U+036F).
+pub fn strip_diacritics(s: &str) -> String {
+    s.chars()
+        .filter(|c| !('\u{0300}'..='\u{036F}').contains(c))
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Title case (already exists above), kebab-case conversion
+// ---------------------------------------------------------------------------
+
+/// Convert a string to kebab-case.
+pub fn to_kebab_case(s: &str) -> String {
+    let snake = to_snake_case(s);
+    snake.replace('_', "-")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1361,5 +1504,71 @@ mod tests {
         let empty = MeasuredString::new("");
         assert!(empty.is_ascii());
         assert_eq!(empty.char_count(), 0);
+    }
+
+    // -- new tests --
+
+    #[test]
+    fn test_levenshtein_distance_identical() {
+        assert_eq!(levenshtein_distance("hello", "hello"), 0);
+    }
+
+    #[test]
+    fn test_levenshtein_distance_one_edit() {
+        assert_eq!(levenshtein_distance("kitten", "sitten"), 1);
+        assert_eq!(levenshtein_distance("", "abc"), 3);
+        assert_eq!(levenshtein_distance("abc", ""), 3);
+    }
+
+    #[test]
+    fn test_levenshtein_distance_multiple_edits() {
+        assert_eq!(levenshtein_distance("kitten", "sitting"), 3);
+    }
+
+    #[test]
+    fn test_common_prefix_extraction() {
+        assert_eq!(common_prefix("foobar", "foobaz"), "fooba");
+        assert_eq!(common_prefix("abc", "xyz"), "");
+        assert_eq!(common_prefix("abc", "abc"), "abc");
+    }
+
+    #[test]
+    fn test_common_suffix_extraction() {
+        assert_eq!(common_suffix("testing", "running"), "ing");
+        assert_eq!(common_suffix("abc", "xyz"), "");
+        assert_eq!(common_suffix("abc", "abc"), "abc");
+    }
+
+    #[test]
+    fn test_find_word_boundaries() {
+        let boundaries = find_word_boundaries("hello world");
+        // Boundaries: 0 (start "hello"), 5 (end "hello"), 6 (start "world"), 11 (end "world")
+        assert_eq!(boundaries, vec![0, 5, 6, 11]);
+    }
+
+    #[test]
+    fn test_find_word_boundaries_empty() {
+        assert!(find_word_boundaries("").is_empty());
+    }
+
+    #[test]
+    fn test_normalize_whitespace_full() {
+        assert_eq!(normalize_whitespace_full("  hello   world  "), "hello world");
+        assert_eq!(normalize_whitespace_full("a\t\nb"), "a b");
+    }
+
+    #[test]
+    fn test_strip_diacritics() {
+        // Precomposed chars won't be stripped, but combining marks will be
+        let s = "e\u{0301}"; // e + combining acute accent
+        let stripped = strip_diacritics(s);
+        assert_eq!(stripped, "e");
+    }
+
+    #[test]
+    fn test_to_kebab_case() {
+        assert_eq!(to_kebab_case("camelCase"), "camel-case");
+        assert_eq!(to_kebab_case("PascalCase"), "pascal-case");
+        assert_eq!(to_kebab_case("already_snake"), "already-snake");
     }
 }

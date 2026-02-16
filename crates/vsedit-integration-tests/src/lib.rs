@@ -4044,3 +4044,693 @@ mod code_lens {
         assert!(bad.is_err());
     }
 }
+
+// ─── Inline Completion ──────────────────────────────────────────────────
+
+#[cfg(test)]
+mod inline_completion {
+    use vsedit_inline_complete::{
+        InlineCompletionGhost, GhostTextPosition,
+        InlineCompletionSession, InlineCompletionItem,
+        InlineCompletionList, InlineCompletionContext,
+        InlineCompletionTriggerKind, accept_inline_completion,
+    };
+
+    fn make_item(text: &str) -> InlineCompletionItem {
+        InlineCompletionItem {
+            insert_text: text.to_string(),
+            range_start_line: 1,
+            range_start_col: 1,
+            range_end_line: 1,
+            range_end_col: 1,
+            filter_text: None,
+            command: None,
+        }
+    }
+
+    #[test]
+    fn test_integration_inline_ghost_show_hide() {
+        let mut ghost = InlineCompletionGhost::new("console.log()", 1, 1);
+        assert!(ghost.is_visible());
+        ghost.hide();
+        assert!(!ghost.is_visible());
+        ghost.show();
+        assert!(ghost.is_visible());
+        assert_eq!(ghost.position(), GhostTextPosition::AfterCursor);
+    }
+
+    #[test]
+    fn test_integration_ghost_text_positions() {
+        let mut ghost = InlineCompletionGhost::new("line1\nline2", 1, 1);
+        assert_eq!(ghost.position(), GhostTextPosition::NextLine);
+        ghost.set_position(GhostTextPosition::AfterCursor);
+        assert_eq!(ghost.position(), GhostTextPosition::AfterCursor);
+        ghost.set_position(GhostTextPosition::BelowCursor);
+        assert_eq!(ghost.position(), GhostTextPosition::BelowCursor);
+        assert_eq!(ghost.line_count(), 2);
+    }
+
+    #[test]
+    fn test_integration_inline_session_cycle() {
+        let items = vec![make_item("alpha"), make_item("beta"), make_item("gamma")];
+        let list = InlineCompletionList { items };
+        let mut session = InlineCompletionSession::new(list);
+        assert_eq!(session.len(), 3);
+        assert_eq!(session.current().unwrap().insert_text, "alpha");
+        session.next();
+        assert_eq!(session.current().unwrap().insert_text, "beta");
+        session.next();
+        assert_eq!(session.current().unwrap().insert_text, "gamma");
+        session.previous();
+        assert_eq!(session.current().unwrap().insert_text, "beta");
+    }
+
+    #[test]
+    fn test_integration_accept_inline_completion() {
+        let items = vec![make_item("world")];
+        let list = InlineCompletionList { items };
+        let session = InlineCompletionSession::new(list);
+        let result = accept_inline_completion(&session, "hello ", 0, 6);
+        assert!(result.is_some());
+        let r = result.unwrap();
+        assert!(r.new_text.contains("world"));
+    }
+
+    #[test]
+    fn test_integration_inline_empty_session() {
+        let list = InlineCompletionList { items: vec![] };
+        let session = InlineCompletionSession::new(list);
+        assert!(session.is_empty());
+        assert_eq!(session.len(), 0);
+        assert!(session.current().is_none());
+        let result = accept_inline_completion(&session, "hello", 1, 6);
+        assert!(result.is_none());
+    }
+}
+
+// ─── Label Rendering ────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod label_rendering {
+    use vsedit_label::{
+        IconLabel, LabelHighlight, label_ellipsis,
+        highlight_label, format_file_label, LabelDetail,
+        ResourceLabel, label_ellipsis_middle,
+    };
+
+    #[test]
+    fn test_integration_icon_label_display() {
+        let label = IconLabel {
+            text: "main.rs".to_string(),
+            icon: Some("rust".to_string()),
+            description: Some("src/main.rs".to_string()),
+        };
+        assert!(label.has_icon());
+        let display = label.display_string();
+        assert!(display.contains("main.rs"));
+    }
+
+    #[test]
+    fn test_integration_label_highlight_from_query() {
+        let hl = LabelHighlight::from_query("Hello World", "world");
+        assert!(hl.has_match());
+        assert!(hl.highlight_count() > 0);
+        let plain = hl.plain_text();
+        assert_eq!(plain, "Hello World");
+    }
+
+    #[test]
+    fn test_integration_label_ellipsis_truncation() {
+        let short = label_ellipsis("hi", 10);
+        assert_eq!(short, "hi");
+        let long = label_ellipsis("a very long label text here", 10);
+        assert!(long.len() <= 13); // includes ellipsis chars
+        assert!(long.contains("…") || long.len() <= 10);
+    }
+
+    #[test]
+    fn test_integration_label_ellipsis_middle() {
+        let result = label_ellipsis_middle("src/components/very/deep/path/file.tsx", 20);
+        assert!(result.len() <= 23);
+        assert!(result.contains("…") || result.len() <= 20);
+    }
+
+    #[test]
+    fn test_integration_highlight_label_segments() {
+        let segments = highlight_label("CommandPalette", "cmd");
+        let has_highlight = segments.iter().any(|s| s.highlighted);
+        assert!(has_highlight);
+        let combined: String = segments.iter().map(|s| s.text.as_str()).collect();
+        assert_eq!(combined, "CommandPalette");
+    }
+}
+
+// ─── Tasks ──────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tasks {
+    use vsedit_tasks_feature::{
+        TaskDefinition, TaskBuilder, TaskSource, TaskGroup,
+        TaskService, detect_from_package_json, detect_from_cargo_toml,
+    };
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_integration_task_definition_creation() {
+        let mut props = HashMap::new();
+        props.insert("type".to_string(), "shell".to_string());
+        props.insert("command".to_string(), "echo hello".to_string());
+        let def = TaskDefinition {
+            task_type: "shell".to_string(),
+            properties: props,
+        };
+        assert_eq!(def.task_type, "shell");
+        assert_eq!(def.properties.len(), 2);
+    }
+
+    #[test]
+    fn test_integration_task_presentation_builder() {
+        let task = TaskBuilder::new("build", "cargo build")
+            .source(TaskSource::Workspace)
+            .group(TaskGroup::Build)
+            .args(vec!["--release".to_string()])
+            .background(false)
+            .build();
+        assert_eq!(task.name, "build");
+        assert_eq!(task.command, "cargo build");
+        assert!(!task.is_background);
+    }
+
+    #[test]
+    fn test_integration_task_auto_detect_package_json() {
+        let content = r#"{
+            "scripts": {
+                "build": "tsc",
+                "test": "jest",
+                "lint": "eslint ."
+            }
+        }"#;
+        let detected = detect_from_package_json(content);
+        assert!(detected.len() >= 3);
+        assert!(detected.iter().any(|t| t.name.contains("build")));
+        assert!(detected.iter().any(|t| t.name.contains("test")));
+    }
+
+    #[test]
+    fn test_integration_task_auto_detect_cargo_toml() {
+        let content = r#"
+[package]
+name = "my-app"
+version = "0.1.0"
+
+[[bin]]
+name = "my-app"
+path = "src/main.rs"
+"#;
+        let detected = detect_from_cargo_toml(content);
+        assert!(!detected.is_empty());
+    }
+
+    #[test]
+    fn test_integration_task_service_run_and_stop() {
+        let mut svc = TaskService::new();
+        let task = TaskBuilder::new("test-task", "echo ok")
+            .source(TaskSource::User)
+            .group(TaskGroup::Test)
+            .build();
+        svc.register_task(task);
+        assert_eq!(svc.task_count(), 1);
+        let idx = svc.run_task("test-task");
+        assert!(idx.is_some());
+        assert_eq!(svc.running_count(), 1);
+        let stop = svc.stop_task(idx.unwrap(), 0);
+        assert!(stop.is_ok());
+    }
+}
+
+// ─── Language Detection ─────────────────────────────────────────────────
+
+#[cfg(test)]
+mod lang_detection {
+    use vsedit_wb_langdetect::{
+        LanguageDetectionService, detect_by_extension,
+        detect_by_shebang, detect_by_content,
+        FirstLineDetector, ContentSniffDetector,
+    };
+
+    #[test]
+    fn test_integration_lang_detect_by_extension() {
+        assert_eq!(detect_by_extension("main.rs"), Some("rust".to_string()));
+        assert_eq!(detect_by_extension("index.ts"), Some("typescript".to_string()));
+        assert_eq!(detect_by_extension("style.css"), Some("css".to_string()));
+        assert!(detect_by_extension("unknown.zzz").is_none());
+    }
+
+    #[test]
+    fn test_integration_shebang_detection() {
+        assert_eq!(detect_by_shebang("#!/usr/bin/env python3"), Some("python".to_string()));
+        assert_eq!(detect_by_shebang("#!/bin/bash"), Some("shellscript".to_string()));
+        assert_eq!(detect_by_shebang("#!/usr/bin/env node"), Some("javascript".to_string()));
+        assert!(detect_by_shebang("no shebang here").is_none());
+    }
+
+    #[test]
+    fn test_integration_content_sniffing() {
+        let results = detect_by_content("fn main() {\n    println!(\"hello\");\n}");
+        assert!(!results.is_empty());
+        assert!(results.iter().any(|r| r.language_id() == "rust"));
+    }
+
+    #[test]
+    fn test_integration_first_line_detector() {
+        let result = FirstLineDetector::detect("#!/usr/bin/env ruby");
+        assert!(result.is_some());
+        let r = result.unwrap();
+        assert_eq!(r.language_id, "ruby");
+    }
+
+    #[test]
+    fn test_integration_lang_detection_service() {
+        let svc = LanguageDetectionService::new();
+        let result = svc.detect("script.py", "");
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "python");
+
+        let all = svc.detect_all("const x = 42;");
+        assert!(!all.is_empty());
+    }
+}
+
+// ─── Notification ───────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod notification {
+    use vsedit_notification_svc::{
+        NotificationService, NotificationSeverity, NotificationPriority,
+        NotificationGroup, notification_group,
+        Notification,
+    };
+
+    #[test]
+    fn test_integration_notification_stack_ordering() {
+        let mut svc = NotificationService::new();
+        let id1 = svc.info("First message");
+        let id2 = svc.warn("Second message");
+        let id3 = svc.error("Third message");
+        assert_eq!(svc.notification_count(), 3);
+        assert!(svc.first_notification().is_some());
+        assert!(svc.last_notification().is_some());
+        assert_ne!(id1, id2);
+        assert_ne!(id2, id3);
+    }
+
+    #[test]
+    fn test_integration_notification_throttle_dedup() {
+        let mut svc = NotificationService::new();
+        svc.info("Duplicate message");
+        svc.info("Duplicate message");
+        svc.info("Duplicate message");
+        assert!(svc.has_duplicate("Duplicate message"));
+        let removed = svc.dedup_by_message();
+        assert!(removed >= 2);
+    }
+
+    #[test]
+    fn test_integration_notification_group_by_severity() {
+        let notifications = vec![
+            Notification { id: 1, message: "same error".into(), severity: NotificationSeverity::Error, source: Some("ext".into()), actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 2, message: "same error".into(), severity: NotificationSeverity::Error, source: Some("ext".into()), actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 3, message: "info1".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+        ];
+        let groups = notification_group(&notifications);
+        assert!(!groups.is_empty());
+        let error_group = groups.iter().find(|g| g.representative == "same error");
+        assert!(error_group.is_some());
+        assert!(error_group.unwrap().count >= 2);
+    }
+
+    #[test]
+    fn test_integration_notification_dismiss_all() {
+        let mut svc = NotificationService::new();
+        svc.info("one");
+        svc.warn("two");
+        svc.error("three");
+        assert_eq!(svc.notification_count(), 3);
+        svc.dismiss_all();
+        let active = svc.get_active();
+        assert!(active.is_empty());
+    }
+
+    #[test]
+    fn test_integration_notification_priority() {
+        let mut svc = NotificationService::new();
+        svc.add_with_priority("urgent", NotificationSeverity::Error, NotificationPriority::Urgent);
+        svc.add_with_priority("low", NotificationSeverity::Info, NotificationPriority::Low);
+        let urgent = svc.get_by_priority(NotificationPriority::Urgent);
+        assert_eq!(urgent.len(), 1);
+        let highest = svc.highest_priority_active();
+        assert!(highest.is_some());
+        assert!(highest.unwrap().is_urgent());
+    }
+}
+
+// ─── Environment ────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod environment {
+    use vsedit_environment::{
+        resolve_env_variables, ShellEnvironment,
+        env_path_list, CliArgsBuilder, EnvPathManager,
+    };
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_integration_resolve_env_variables_basic() {
+        let getter = |key: &str| -> Option<String> {
+            match key {
+                "HOME" => Some("/home/user".to_string()),
+                "USER" => Some("testuser".to_string()),
+                _ => None,
+            }
+        };
+        let result = resolve_env_variables("Hello ${env:USER} at ${env:HOME}", &getter);
+        assert!(result.contains("testuser"));
+        assert!(result.contains("/home/user"));
+    }
+
+    #[test]
+    fn test_integration_shell_environment_crud() {
+        let mut env = ShellEnvironment::new();
+        assert!(env.is_empty());
+        env.set("MY_VAR", "hello");
+        env.set("OTHER", "world");
+        assert_eq!(env.len(), 2);
+        assert_eq!(env.get("MY_VAR"), Some("hello"));
+        assert!(env.remove("MY_VAR"));
+        assert!(env.get("MY_VAR").is_none());
+        assert_eq!(env.len(), 1);
+    }
+
+    #[test]
+    fn test_integration_env_path_list_parsing() {
+        let paths = env_path_list("/usr/bin:/usr/local/bin:/home/user/.cargo/bin");
+        assert_eq!(paths.len(), 3);
+        assert_eq!(paths[0], PathBuf::from("/usr/bin"));
+        assert_eq!(paths[2], PathBuf::from("/home/user/.cargo/bin"));
+    }
+
+    #[test]
+    fn test_integration_env_path_manager_operations() {
+        let mut mgr = EnvPathManager::from_path_string("/usr/bin:/usr/local/bin");
+        assert_eq!(mgr.len(), 2);
+        mgr.prepend(PathBuf::from("/opt/bin"));
+        assert_eq!(mgr.len(), 3);
+        assert!(mgr.contains(std::path::Path::new("/opt/bin")));
+        let path_str = mgr.to_path_string();
+        assert!(path_str.starts_with("/opt/bin"));
+    }
+
+    #[test]
+    fn test_integration_cli_args_builder_validate() {
+        let args = CliArgsBuilder::new()
+            .path("/tmp/test.rs")
+            .goto(10, 5)
+            .verbose(true)
+            .build();
+        assert!(args.is_ok());
+        let a = args.unwrap();
+        assert_eq!(a.goto, Some((10, 5)));
+        assert!(a.verbose);
+        assert_eq!(a.path_count(), 1);
+    }
+}
+
+// ─── Whitespace ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod whitespace {
+    use vsedit_whitespace::{
+        whitespace_normalize, NormalizeTarget,
+        trim_trailing_whitespace, tabs_to_spaces,
+        spaces_to_tabs, detect_indentation, IndentationStyle,
+    };
+
+    #[test]
+    fn test_integration_whitespace_normalize_to_spaces() {
+        let input = "fn main() {\n\tprintln!(\"hello\");\n}";
+        let result = whitespace_normalize(input, NormalizeTarget::Spaces(4));
+        assert!(!result.contains('\t'));
+        assert!(result.contains("    "));
+    }
+
+    #[test]
+    fn test_integration_whitespace_normalize_to_tabs() {
+        let input = "fn main() {\n    println!(\"hello\");\n}";
+        let result = whitespace_normalize(input, NormalizeTarget::Tabs);
+        assert!(result.contains('\t'));
+    }
+
+    #[test]
+    fn test_integration_trim_trailing_whitespace() {
+        let input = "hello   \nworld  \nclean";
+        let result = trim_trailing_whitespace(input);
+        assert_eq!(result, "hello\nworld\nclean");
+    }
+
+    #[test]
+    fn test_integration_tabs_spaces_roundtrip() {
+        let original = "    line1\n        line2\n    line3";
+        let tabbed = spaces_to_tabs(original, 4);
+        let spaced = tabs_to_spaces(&tabbed, 4);
+        assert_eq!(spaced, original);
+    }
+
+    #[test]
+    fn test_integration_detect_indentation_style() {
+        let tab_lines: Vec<&str> = vec!["\tfoo", "\t\tbar", "\tbaz"];
+        assert!(matches!(detect_indentation(&tab_lines), IndentationStyle::Tab));
+        let space_lines: Vec<&str> = vec!["    foo", "        bar", "    baz"];
+        assert!(matches!(detect_indentation(&space_lines), IndentationStyle::Spaces(_)));
+    }
+}
+
+// ─── Input Handling ─────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod input_handling {
+    use vsedit_input::{
+        GestureRecognizer, Gesture,
+        InputEventBatcher, KeyInput, MouseButton,
+    };
+    use vsedit_keycodes::KeyCode;
+
+    #[test]
+    fn test_integration_gesture_recognizer_single_click() {
+        let mut recognizer = GestureRecognizer::new(300, 5);
+        let gesture = recognizer.on_mouse_down(10, 10, 1000);
+        assert!(matches!(gesture, Gesture::SingleClick));
+    }
+
+    #[test]
+    fn test_integration_gesture_recognizer_double_click() {
+        let mut recognizer = GestureRecognizer::new(300, 5);
+        recognizer.on_mouse_down(10, 10, 1000);
+        let gesture = recognizer.on_mouse_down(10, 10, 1100);
+        assert!(matches!(gesture, Gesture::DoubleClick));
+    }
+
+    #[test]
+    fn test_integration_gesture_recognizer_triple_click() {
+        let mut recognizer = GestureRecognizer::new(300, 5);
+        recognizer.on_mouse_down(10, 10, 1000);
+        recognizer.on_mouse_down(10, 10, 1100);
+        let gesture = recognizer.on_mouse_down(10, 10, 1200);
+        assert!(matches!(gesture, Gesture::TripleClick));
+    }
+
+    #[test]
+    fn test_integration_input_event_batcher_flush() {
+        let mut batcher = InputEventBatcher::new(50);
+        let key = KeyInput {
+            key_code: KeyCode::KeyA,
+            ctrl: false,
+            shift: false,
+            alt: false,
+            meta: false,
+        };
+        batcher.push(key.clone(), 100);
+        batcher.push(key.clone(), 110);
+        assert_eq!(batcher.pending_count(), 2);
+        let flushed = batcher.flush();
+        assert_eq!(flushed.len(), 2);
+        assert!(batcher.is_empty());
+    }
+
+    #[test]
+    fn test_integration_input_event_batcher_window() {
+        let mut batcher = InputEventBatcher::new(50);
+        let key = KeyInput {
+            key_code: KeyCode::KeyB,
+            ctrl: false,
+            shift: false,
+            alt: false,
+            meta: false,
+        };
+        let result1 = batcher.push(key.clone(), 100);
+        assert!(result1.is_none());
+        // Push beyond the batch window to trigger a flush
+        let result2 = batcher.push(key.clone(), 200);
+        assert!(result2.is_some());
+        let batch = result2.unwrap();
+        assert!(!batch.is_empty());
+    }
+}
+
+// ─── Storage ────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod storage {
+    use vsedit_storage::{
+        StorageDatabase, storage_namespace, storage_migrate,
+        StorageQuota, StorageExporter,
+    };
+
+    #[test]
+    fn test_integration_storage_database_crud() {
+        let mut db = StorageDatabase::new();
+        assert!(db.is_empty());
+        db.set("key1", "value1");
+        db.set("key2", "value2");
+        assert_eq!(db.len(), 2);
+        assert_eq!(db.get("key1"), Some("value1"));
+        assert!(db.has("key2"));
+        db.remove("key1");
+        assert!(!db.has("key1"));
+        assert_eq!(db.len(), 1);
+    }
+
+    #[test]
+    fn test_integration_storage_namespace_isolation() {
+        let mut db = StorageDatabase::new();
+        {
+            let mut ns_a = storage_namespace(&mut db, "moduleA");
+            ns_a.set("setting", "valueA");
+        }
+        {
+            let mut ns_b = storage_namespace(&mut db, "moduleB");
+            ns_b.set("setting", "valueB");
+        }
+        let ns_a = storage_namespace(&mut db, "moduleA");
+        assert_eq!(ns_a.get("setting"), Some("valueA"));
+        let ns_b = storage_namespace(&mut db, "moduleB");
+        assert_eq!(ns_b.get("setting"), Some("valueB"));
+    }
+
+    #[test]
+    fn test_integration_storage_migrate_renames() {
+        let mut db = StorageDatabase::new();
+        db.set("old.key", "data");
+        let migrations = storage_migrate(&mut db, 2, &[
+            (2, "old.key", "new.key"),
+        ]);
+        assert!(!migrations.is_empty());
+        assert_eq!(db.get("new.key"), Some("data"));
+        assert!(db.version() >= 2);
+    }
+
+    #[test]
+    fn test_integration_storage_quota_tracking() {
+        let mut db = StorageDatabase::new();
+        db.set("k1", "short");
+        db.set("k2", "a longer value here");
+        let mut quota = StorageQuota::new(100, 4096);
+        quota.compute_usage(&db);
+        assert_eq!(quota.current_keys(), 2);
+        assert!(quota.current_bytes() > 0);
+        assert!(!quota.would_exceed(5, 10));
+        assert!(quota.remaining_keys() > 0);
+    }
+
+    #[test]
+    fn test_integration_storage_export_import() {
+        let mut db = StorageDatabase::new();
+        db.set("alpha", "1");
+        db.set("beta", "2");
+        db.set("gamma", "3");
+        let map = StorageExporter::to_map(&db);
+        assert_eq!(map.len(), 3);
+        let restored = StorageExporter::from_map(&map);
+        assert_eq!(restored.len(), 3);
+        assert_eq!(restored.get("beta"), Some("2"));
+    }
+}
+
+// ─── State Management ───────────────────────────────────────────────────
+
+#[cfg(test)]
+mod state_management {
+    use vsedit_state::{
+        WorkspaceState, GlobalState, StateService, StateScope,
+        state_migration, migration_needed,
+    };
+
+    #[test]
+    fn test_integration_workspace_state_crud() {
+        let mut ws = WorkspaceState::new("project-1");
+        assert_eq!(ws.workspace_id, "project-1");
+        ws.set("editor.fontSize", "14");
+        ws.set("editor.tabSize", "4");
+        assert_eq!(ws.get("editor.fontSize"), Some("14"));
+        let exported = ws.export();
+        assert_eq!(exported.len(), 2);
+        ws.remove("editor.fontSize");
+        assert!(ws.get("editor.fontSize").is_none());
+    }
+
+    #[test]
+    fn test_integration_global_state_versioned() {
+        let mut gs = GlobalState::with_version(1);
+        assert_eq!(gs.version(), 1);
+        gs.set("theme", "dark");
+        gs.set("locale", "en-US");
+        assert_eq!(gs.get("theme"), Some("dark"));
+        let keys = gs.keys();
+        assert_eq!(keys.len(), 2);
+    }
+
+    #[test]
+    fn test_integration_state_migration_renames() {
+        let mut gs = GlobalState::new();
+        gs.set("old.setting", "value");
+        let result = state_migration(
+            &mut gs,
+            &[("old.setting", "new.setting")],
+            &[],
+            2,
+        );
+        assert!(result.keys_renamed > 0);
+        assert_eq!(gs.get("new.setting"), Some("value"));
+        assert!(gs.get("old.setting").is_none());
+    }
+
+    #[test]
+    fn test_integration_migration_needed_check() {
+        assert!(migration_needed(1, 3));
+        assert!(!migration_needed(3, 3));
+        assert!(!migration_needed(5, 3));
+    }
+
+    #[test]
+    fn test_integration_state_service_scopes() {
+        let mut svc = StateService::new();
+        svc.set("key1", "global_val", StateScope::Global);
+        svc.set("key2", "ws_val", StateScope::Workspace);
+        let global_entries = svc.get_by_scope(StateScope::Global);
+        let ws_entries = svc.get_by_scope(StateScope::Workspace);
+        assert!(global_entries.iter().any(|(k, _)| *k == "key1"));
+        assert!(ws_entries.iter().any(|(k, _)| *k == "key2"));
+        svc.clear_scope(StateScope::Workspace);
+        assert!(svc.get_by_scope(StateScope::Workspace).is_empty());
+        assert!(!svc.get_by_scope(StateScope::Global).is_empty());
+    }
+}

@@ -702,6 +702,167 @@ impl LogFilter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Log level filtering with timestamp range
+// ---------------------------------------------------------------------------
+
+/// Filter log entries by a combination of level, source, and timestamp range.
+pub fn filter_entries<'a>(
+    entries: &'a [LogEntry],
+    min_level: Option<&LogLevel>,
+    source: Option<&str>,
+    after_timestamp: Option<u64>,
+    before_timestamp: Option<u64>,
+) -> Vec<&'a LogEntry> {
+    entries
+        .iter()
+        .filter(|e| {
+            if let Some(ml) = min_level {
+                if e.level < *ml {
+                    return false;
+                }
+            }
+            if let Some(src) = source {
+                if e.source.as_deref() != Some(src) {
+                    return false;
+                }
+            }
+            if let Some(after) = after_timestamp {
+                if e.timestamp < after {
+                    return false;
+                }
+            }
+            if let Some(before) = before_timestamp {
+                if e.timestamp > before {
+                    return false;
+                }
+            }
+            true
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Log message formatting templates
+// ---------------------------------------------------------------------------
+
+/// Format a log entry with a custom template.
+///
+/// Supported placeholders: `{level}`, `{message}`, `{source}`, `{timestamp}`.
+pub fn format_with_template(entry: &LogEntry, template: &str) -> String {
+    let src = entry.source.as_deref().unwrap_or("");
+    template
+        .replace("{level}", &entry.level.to_string())
+        .replace("{message}", &entry.message)
+        .replace("{source}", src)
+        .replace("{timestamp}", &entry.timestamp.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Log rotation tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks the history of log rotations.
+#[derive(Debug, Clone, Default)]
+pub struct RotationTracker {
+    rotations: Vec<RotationRecord>,
+}
+
+/// Record of a single log rotation event.
+#[derive(Debug, Clone)]
+pub struct RotationRecord {
+    pub timestamp: u64,
+    pub entries_dropped: usize,
+    pub entries_retained: usize,
+}
+
+impl RotationTracker {
+    pub fn new() -> Self {
+        Self { rotations: Vec::new() }
+    }
+
+    /// Record a rotation event.
+    pub fn record(&mut self, timestamp: u64, entries_dropped: usize, entries_retained: usize) {
+        self.rotations.push(RotationRecord {
+            timestamp,
+            entries_dropped,
+            entries_retained,
+        });
+    }
+
+    /// Total number of entries dropped across all rotations.
+    pub fn total_dropped(&self) -> usize {
+        self.rotations.iter().map(|r| r.entries_dropped).sum()
+    }
+
+    /// Number of rotations that have occurred.
+    pub fn rotation_count(&self) -> usize {
+        self.rotations.len()
+    }
+
+    /// Most recent rotation, if any.
+    pub fn last_rotation(&self) -> Option<&RotationRecord> {
+        self.rotations.last()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Structured log field extraction
+// ---------------------------------------------------------------------------
+
+/// Extract key=value fields from a structured log message.
+///
+/// Scans for patterns like `key=value` or `key="quoted value"` in the message.
+pub fn extract_fields(message: &str) -> Vec<(String, String)> {
+    let mut fields = Vec::new();
+    let chars: Vec<char> = message.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        // look for key=
+        if let Some(eq) = chars[i..].iter().position(|&c| c == '=') {
+            let key_start = {
+                let mut s = i + eq;
+                while s > i && !chars[s - 1].is_whitespace() {
+                    s -= 1;
+                }
+                s
+            };
+            let key: String = chars[key_start..i + eq].iter().collect();
+            if key.is_empty() || !key.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '.') {
+                i = i + eq + 1;
+                continue;
+            }
+            let val_start = i + eq + 1;
+            if val_start >= chars.len() {
+                break;
+            }
+            let value;
+            if chars[val_start] == '"' {
+                // quoted value
+                let end = chars[val_start + 1..]
+                    .iter()
+                    .position(|&c| c == '"')
+                    .map(|p| val_start + 1 + p)
+                    .unwrap_or(chars.len());
+                value = chars[val_start + 1..end].iter().collect();
+                i = end + 1;
+            } else {
+                let end = chars[val_start..]
+                    .iter()
+                    .position(|&c| c.is_whitespace())
+                    .map(|p| val_start + p)
+                    .unwrap_or(chars.len());
+                value = chars[val_start..end].iter().collect();
+                i = end;
+            }
+            fields.push((key, value));
+        } else {
+            break;
+        }
+    }
+    fields
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1392,5 +1553,68 @@ mod tests {
         assert!(f.is_empty());
         let f2 = LogFilter::new().with_level(LogLevel::Error);
         assert!(!f2.is_empty());
+    }
+
+    #[test]
+    fn filter_entries_by_level_and_timestamp() {
+        let entries = vec![
+            LogEntry { level: LogLevel::Info, message: "a".into(), source: Some("s1".into()), timestamp: 100 },
+            LogEntry { level: LogLevel::Error, message: "b".into(), source: Some("s1".into()), timestamp: 200 },
+            LogEntry { level: LogLevel::Warning, message: "c".into(), source: Some("s2".into()), timestamp: 300 },
+        ];
+        let result = filter_entries(&entries, Some(&LogLevel::Warning), None, Some(150), None);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].message, "b");
+        assert_eq!(result[1].message, "c");
+    }
+
+    #[test]
+    fn filter_entries_by_source() {
+        let entries = vec![
+            LogEntry { level: LogLevel::Info, message: "x".into(), source: Some("app".into()), timestamp: 0 },
+            LogEntry { level: LogLevel::Info, message: "y".into(), source: Some("db".into()), timestamp: 0 },
+        ];
+        let result = filter_entries(&entries, None, Some("db"), None, None);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message, "y");
+    }
+
+    #[test]
+    fn format_with_template_replaces_placeholders() {
+        let entry = LogEntry {
+            level: LogLevel::Error,
+            message: "disk full".into(),
+            source: Some("storage".into()),
+            timestamp: 42,
+        };
+        let result = format_with_template(&entry, "{level}: {message} ({source}) @{timestamp}");
+        assert_eq!(result, "ERROR: disk full (storage) @42");
+    }
+
+    #[test]
+    fn rotation_tracker_records_events() {
+        let mut tracker = RotationTracker::new();
+        tracker.record(100, 500, 1000);
+        tracker.record(200, 300, 1000);
+        assert_eq!(tracker.rotation_count(), 2);
+        assert_eq!(tracker.total_dropped(), 800);
+        assert_eq!(tracker.last_rotation().unwrap().entries_dropped, 300);
+    }
+
+    #[test]
+    fn extract_fields_simple() {
+        let fields = extract_fields("user=alice status=200 path=/api");
+        assert_eq!(fields.len(), 3);
+        assert_eq!(fields[0], ("user".into(), "alice".into()));
+        assert_eq!(fields[1], ("status".into(), "200".into()));
+        assert_eq!(fields[2], ("path".into(), "/api".into()));
+    }
+
+    #[test]
+    fn extract_fields_quoted_value() {
+        let fields = extract_fields(r#"msg="hello world" code=42"#);
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0], ("msg".into(), "hello world".into()));
+        assert_eq!(fields[1], ("code".into(), "42".into()));
     }
 }

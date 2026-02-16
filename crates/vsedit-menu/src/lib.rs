@@ -851,6 +851,162 @@ impl MenuItem {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Menu item searching
+// ---------------------------------------------------------------------------
+
+/// Search all menu items (recursively) matching a query string (case-insensitive).
+pub fn search_menu_items<'a>(items: &'a [MenuItem], query: &str) -> Vec<&'a MenuItem> {
+    let query_lower = query.to_ascii_lowercase();
+    let mut results = Vec::new();
+    fn collect<'a>(items: &'a [MenuItem], query: &str, out: &mut Vec<&'a MenuItem>) {
+        for item in items {
+            if item.kind != MenuItemKind::Separator
+                && item.label.to_ascii_lowercase().contains(query)
+            {
+                out.push(item);
+            }
+            collect(&item.children, query, out);
+        }
+    }
+    collect(items, &query_lower, &mut results);
+    results
+}
+
+// ---------------------------------------------------------------------------
+// Submenu flattening
+// ---------------------------------------------------------------------------
+
+/// Flatten a menu hierarchy into a list of `(path, item)` pairs where path
+/// describes the breadcrumb trail to reach the item.
+pub fn flatten_menu<'a>(items: &'a [MenuItem], prefix: &str) -> Vec<(String, &'a MenuItem)> {
+    let mut result = Vec::new();
+    for item in items {
+        let path = if prefix.is_empty() {
+            item.label.clone()
+        } else {
+            format!("{} > {}", prefix, item.label)
+        };
+        if item.kind == MenuItemKind::Action {
+            result.push((path.clone(), item));
+        }
+        if !item.children.is_empty() {
+            result.extend(flatten_menu(&item.children, &path));
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Menu path resolution
+// ---------------------------------------------------------------------------
+
+/// Resolve a dot-separated path (e.g. "File.Save") to a menu item.
+pub fn resolve_menu_path<'a>(items: &'a [MenuItem], path: &str) -> Option<&'a MenuItem> {
+    let parts: Vec<&str> = path.split('.').collect();
+    let mut current = items;
+    for (i, part) in parts.iter().enumerate() {
+        let found = current.iter().find(|item| item.id == *part);
+        match found {
+            Some(item) if i == parts.len() - 1 => return Some(item),
+            Some(item) => current = &item.children,
+            None => return None,
+        }
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
+// Menu keyboard navigation state
+// ---------------------------------------------------------------------------
+
+/// Tracks keyboard navigation state for a menu bar.
+#[derive(Debug, Clone)]
+pub struct MenuNavigationState {
+    /// Index of the currently focused top-level menu (-1 = none).
+    pub focused_menu: Option<usize>,
+    /// Index of the focused item within the open menu.
+    pub focused_item: Option<usize>,
+    /// Whether a menu is currently open.
+    pub is_open: bool,
+    /// Total number of top-level menus.
+    menu_count: usize,
+}
+
+impl MenuNavigationState {
+    /// Create a new navigation state for a menu bar with `menu_count` menus.
+    pub fn new(menu_count: usize) -> Self {
+        Self {
+            focused_menu: None,
+            focused_item: None,
+            is_open: false,
+            menu_count,
+        }
+    }
+
+    /// Move focus to the next top-level menu.
+    pub fn move_right(&mut self) {
+        if self.menu_count == 0 {
+            return;
+        }
+        self.focused_menu = Some(match self.focused_menu {
+            Some(i) => (i + 1) % self.menu_count,
+            None => 0,
+        });
+        self.focused_item = None;
+    }
+
+    /// Move focus to the previous top-level menu.
+    pub fn move_left(&mut self) {
+        if self.menu_count == 0 {
+            return;
+        }
+        self.focused_menu = Some(match self.focused_menu {
+            Some(0) => self.menu_count - 1,
+            Some(i) => i - 1,
+            None => self.menu_count - 1,
+        });
+        self.focused_item = None;
+    }
+
+    /// Move focus down within the open menu.
+    pub fn move_down(&mut self, item_count: usize) {
+        if item_count == 0 {
+            return;
+        }
+        self.focused_item = Some(match self.focused_item {
+            Some(i) => (i + 1) % item_count,
+            None => 0,
+        });
+    }
+
+    /// Move focus up within the open menu.
+    pub fn move_up(&mut self, item_count: usize) {
+        if item_count == 0 {
+            return;
+        }
+        self.focused_item = Some(match self.focused_item {
+            Some(0) => item_count - 1,
+            Some(i) => i - 1,
+            None => item_count - 1,
+        });
+    }
+
+    /// Toggle the open state of the focused menu.
+    pub fn toggle_open(&mut self) {
+        self.is_open = !self.is_open;
+        if !self.is_open {
+            self.focused_item = None;
+        }
+    }
+
+    /// Close the menu and reset item focus.
+    pub fn close(&mut self) {
+        self.is_open = false;
+        self.focused_item = None;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1375,5 +1531,119 @@ mod tests {
             .with_enabled(false);
         assert_eq!(item.keybinding.as_deref(), Some("Ctrl+S"));
         assert!(!item.enabled);
+    }
+
+    // ── Menu item searching ───────────────────────────────────────
+
+    #[test]
+    fn search_menu_items_finds_nested() {
+        let mut file_menu = MenuItem::submenu("file", "File");
+        file_menu.children.push(MenuItem::action("save", "Save File"));
+        file_menu.children.push(MenuItem::action("open", "Open File"));
+        let mut edit_menu = MenuItem::submenu("edit", "Edit");
+        edit_menu.children.push(MenuItem::action("undo", "Undo"));
+
+        let items = vec![file_menu, edit_menu];
+        let results = search_menu_items(&items, "file");
+        assert_eq!(results.len(), 3); // File, Save File, Open File
+    }
+
+    #[test]
+    fn search_menu_items_case_insensitive() {
+        let items = vec![MenuItem::action("a", "Save All")];
+        let results = search_menu_items(&items, "SAVE");
+        assert_eq!(results.len(), 1);
+    }
+
+    // ── Submenu flattening ────────────────────────────────────────
+
+    #[test]
+    fn flatten_menu_produces_breadcrumbs() {
+        let mut file_menu = MenuItem::submenu("file", "File");
+        file_menu.children.push(MenuItem::action("save", "Save"));
+        file_menu.children.push(MenuItem::action("open", "Open"));
+        let mut edit_menu = MenuItem::submenu("edit", "Edit");
+        edit_menu.children.push(MenuItem::action("undo", "Undo"));
+
+        let menus = [file_menu, edit_menu];
+        let flat = flatten_menu(&menus, "");
+        assert_eq!(flat.len(), 3);
+        assert_eq!(flat[0].0, "File > Save");
+        assert_eq!(flat[1].0, "File > Open");
+        assert_eq!(flat[2].0, "Edit > Undo");
+    }
+
+    #[test]
+    fn flatten_empty_menu() {
+        let flat = flatten_menu(&[], "");
+        assert!(flat.is_empty());
+    }
+
+    // ── Menu path resolution ──────────────────────────────────────
+
+    #[test]
+    fn resolve_menu_path_finds_nested() {
+        let mut file_menu = MenuItem::submenu("file", "File");
+        file_menu.children.push(MenuItem::action("save", "Save"));
+        let items = vec![file_menu];
+        let found = resolve_menu_path(&items, "file.save");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().label, "Save");
+    }
+
+    #[test]
+    fn resolve_menu_path_returns_none_for_missing() {
+        let items = vec![MenuItem::action("a", "A")];
+        assert!(resolve_menu_path(&items, "b").is_none());
+        assert!(resolve_menu_path(&items, "a.b").is_none());
+    }
+
+    // ── Keyboard navigation ───────────────────────────────────────
+
+    #[test]
+    fn navigation_move_right_wraps() {
+        let mut nav = MenuNavigationState::new(3);
+        nav.move_right();
+        assert_eq!(nav.focused_menu, Some(0));
+        nav.move_right();
+        assert_eq!(nav.focused_menu, Some(1));
+        nav.move_right();
+        nav.move_right();
+        assert_eq!(nav.focused_menu, Some(0)); // wraps
+    }
+
+    #[test]
+    fn navigation_move_left_wraps() {
+        let mut nav = MenuNavigationState::new(3);
+        nav.move_left();
+        assert_eq!(nav.focused_menu, Some(2));
+        nav.move_left();
+        assert_eq!(nav.focused_menu, Some(1));
+    }
+
+    #[test]
+    fn navigation_move_down_up() {
+        let mut nav = MenuNavigationState::new(2);
+        nav.move_down(4);
+        assert_eq!(nav.focused_item, Some(0));
+        nav.move_down(4);
+        assert_eq!(nav.focused_item, Some(1));
+        nav.move_up(4);
+        assert_eq!(nav.focused_item, Some(0));
+        nav.move_up(4);
+        assert_eq!(nav.focused_item, Some(3)); // wraps
+    }
+
+    #[test]
+    fn navigation_toggle_open_close() {
+        let mut nav = MenuNavigationState::new(2);
+        assert!(!nav.is_open);
+        nav.toggle_open();
+        assert!(nav.is_open);
+        nav.move_down(3);
+        assert_eq!(nav.focused_item, Some(0));
+        nav.close();
+        assert!(!nav.is_open);
+        assert_eq!(nav.focused_item, None);
     }
 }

@@ -935,6 +935,126 @@ impl KeyCategory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Modifier mask operations
+// ---------------------------------------------------------------------------
+
+/// A bitmask representation of modifier keys.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ModifierMask(u8);
+
+impl ModifierMask {
+    pub const NONE: Self = Self(0);
+    pub const CTRL: Self = Self(1 << 0);
+    pub const SHIFT: Self = Self(1 << 1);
+    pub const ALT: Self = Self(1 << 2);
+    pub const META: Self = Self(1 << 3);
+
+    /// Create a mask from a chord's modifiers.
+    pub fn from_chord(chord: &KeyCodeChord) -> Self {
+        let mut mask = 0u8;
+        if chord.ctrl { mask |= 1 << 0; }
+        if chord.shift { mask |= 1 << 1; }
+        if chord.alt { mask |= 1 << 2; }
+        if chord.meta { mask |= 1 << 3; }
+        Self(mask)
+    }
+
+    /// Check if this mask contains all modifiers of `other`.
+    pub fn contains(self, other: Self) -> bool {
+        self.0 & other.0 == other.0
+    }
+
+    /// Combine two masks (union).
+    pub fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+
+    /// Intersect two masks.
+    pub fn intersection(self, other: Self) -> Self {
+        Self(self.0 & other.0)
+    }
+
+    /// Number of active modifier bits.
+    pub fn count(self) -> u8 {
+        self.0.count_ones() as u8
+    }
+
+    /// Whether no modifiers are active.
+    pub fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+}
+
+impl std::fmt::Display for ModifierMask {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut parts = Vec::new();
+        if self.contains(Self::CTRL) { parts.push("Ctrl"); }
+        if self.contains(Self::SHIFT) { parts.push("Shift"); }
+        if self.contains(Self::ALT) { parts.push("Alt"); }
+        if self.contains(Self::META) { parts.push("Meta"); }
+        if parts.is_empty() {
+            write!(f, "(none)")
+        } else {
+            write!(f, "{}", parts.join("+"))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Key sequence matching
+// ---------------------------------------------------------------------------
+
+impl KeyCombo {
+    /// Check if this combo matches a prefix of `input` chords.
+    /// Returns `true` if all chords in `self` match the corresponding chords
+    /// at the beginning of `input`.
+    pub fn is_prefix_of(&self, input: &[KeyCodeChord]) -> bool {
+        if self.chords.len() > input.len() {
+            return false;
+        }
+        self.chords.iter().zip(input.iter()).all(|(a, b)| a == b)
+    }
+
+    /// Check if this combo exactly matches the given chord slice.
+    pub fn matches(&self, input: &[KeyCodeChord]) -> bool {
+        self.chords.len() == input.len() && self.is_prefix_of(input)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Key combination display formatting
+// ---------------------------------------------------------------------------
+
+/// Format a key chord for display using platform-specific modifier symbols.
+pub fn format_chord_display(chord: &KeyCodeChord, use_symbols: bool) -> String {
+    let mut parts = Vec::new();
+    if chord.ctrl {
+        parts.push(if use_symbols { "⌃" } else { "Ctrl" });
+    }
+    if chord.shift {
+        parts.push(if use_symbols { "⇧" } else { "Shift" });
+    }
+    if chord.alt {
+        parts.push(if use_symbols { "⌥" } else { "Alt" });
+    }
+    if chord.meta {
+        parts.push(if use_symbols { "⌘" } else { "Meta" });
+    }
+    parts.push(chord.key_code.display_name());
+    parts.join(if use_symbols { "" } else { "+" })
+}
+
+/// Format a key combo for display.
+pub fn format_combo_display(combo: &KeyCombo, use_symbols: bool) -> String {
+    combo
+        .chords
+        .iter()
+        .map(|c| format_chord_display(c, use_symbols))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1385,5 +1505,100 @@ mod tests {
         assert!(KeyCategory::Navigation.is_navigation());
         assert!(!KeyCategory::Letter.is_navigation());
         assert!(!KeyCategory::Modifier.is_navigation());
+    }
+
+    #[test]
+    fn modifier_mask_from_chord() {
+        let chord = KeyCodeChord::just(KeyCode::KeyA).with_ctrl().with_shift();
+        let mask = ModifierMask::from_chord(&chord);
+        assert!(mask.contains(ModifierMask::CTRL));
+        assert!(mask.contains(ModifierMask::SHIFT));
+        assert!(!mask.contains(ModifierMask::ALT));
+        assert_eq!(mask.count(), 2);
+    }
+
+    #[test]
+    fn modifier_mask_union_and_intersection() {
+        let a = ModifierMask::CTRL.union(ModifierMask::SHIFT);
+        let b = ModifierMask::SHIFT.union(ModifierMask::ALT);
+        let union = a.union(b);
+        assert_eq!(union.count(), 3);
+        let inter = a.intersection(b);
+        assert!(inter.contains(ModifierMask::SHIFT));
+        assert!(!inter.contains(ModifierMask::CTRL));
+    }
+
+    #[test]
+    fn modifier_mask_display() {
+        let mask = ModifierMask::CTRL.union(ModifierMask::ALT);
+        let s = format!("{}", mask);
+        assert!(s.contains("Ctrl"));
+        assert!(s.contains("Alt"));
+        assert_eq!(format!("{}", ModifierMask::NONE), "(none)");
+    }
+
+    #[test]
+    fn key_combo_matches_exact() {
+        let combo = KeyCombo::new(vec![
+            KeyCodeChord::just(KeyCode::KeyK).with_ctrl(),
+            KeyCodeChord::just(KeyCode::KeyC).with_ctrl(),
+        ]);
+        let input = vec![
+            KeyCodeChord::just(KeyCode::KeyK).with_ctrl(),
+            KeyCodeChord::just(KeyCode::KeyC).with_ctrl(),
+        ];
+        assert!(combo.matches(&input));
+    }
+
+    #[test]
+    fn key_combo_is_prefix() {
+        let combo = KeyCombo::single(KeyCodeChord::just(KeyCode::KeyK).with_ctrl());
+        let input = vec![
+            KeyCodeChord::just(KeyCode::KeyK).with_ctrl(),
+            KeyCodeChord::just(KeyCode::KeyC).with_ctrl(),
+        ];
+        assert!(combo.is_prefix_of(&input));
+        assert!(!combo.matches(&input));
+    }
+
+    #[test]
+    fn key_combo_no_match() {
+        let combo = KeyCombo::single(KeyCodeChord::just(KeyCode::KeyA));
+        let input = vec![KeyCodeChord::just(KeyCode::KeyB)];
+        assert!(!combo.matches(&input));
+    }
+
+    #[test]
+    fn format_chord_display_text() {
+        let chord = KeyCodeChord::just(KeyCode::KeyP).with_ctrl().with_shift();
+        let s = format_chord_display(&chord, false);
+        assert_eq!(s, "Ctrl+Shift+P");
+    }
+
+    #[test]
+    fn format_chord_display_symbols() {
+        let chord = KeyCodeChord::just(KeyCode::KeyP).with_ctrl().with_shift();
+        let s = format_chord_display(&chord, true);
+        assert!(s.contains('⌃'));
+        assert!(s.contains('⇧'));
+        assert!(s.contains('P'));
+    }
+
+    #[test]
+    fn format_combo_display_multi_chord() {
+        let combo = KeyCombo::new(vec![
+            KeyCodeChord::just(KeyCode::KeyK).with_ctrl(),
+            KeyCodeChord::just(KeyCode::KeyC).with_ctrl(),
+        ]);
+        let s = format_combo_display(&combo, false);
+        assert!(s.contains("Ctrl+K"));
+        assert!(s.contains("Ctrl+C"));
+    }
+
+    #[test]
+    fn format_chord_plain_key() {
+        let chord = KeyCodeChord::just(KeyCode::Escape);
+        let s = format_chord_display(&chord, false);
+        assert_eq!(s, "Escape");
     }
 }

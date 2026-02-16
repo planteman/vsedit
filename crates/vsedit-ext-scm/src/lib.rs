@@ -850,6 +850,192 @@ impl ScmResource {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Change grouping by directory
+// ---------------------------------------------------------------------------
+
+/// Groups SCM resources by their parent directory path.
+///
+/// The directory is extracted from the URI by stripping the last path segment.
+pub fn group_resources_by_directory(resources: &[ScmResource]) -> HashMap<String, Vec<&ScmResource>> {
+    let mut map: HashMap<String, Vec<&ScmResource>> = HashMap::new();
+    for res in resources {
+        let dir = directory_from_uri(&res.uri);
+        map.entry(dir).or_default().push(res);
+    }
+    map
+}
+
+use std::collections::HashMap;
+
+/// Extract the directory portion from a URI string.
+fn directory_from_uri(uri: &str) -> String {
+    match uri.rfind('/') {
+        Some(pos) if pos > 0 => uri[..pos].to_string(),
+        _ => "/".to_string(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Diff statistics
+// ---------------------------------------------------------------------------
+
+/// Statistics about a textual diff.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DiffStats {
+    /// Number of lines added.
+    pub additions: usize,
+    /// Number of lines removed.
+    pub deletions: usize,
+    /// Number of files changed.
+    pub files_changed: usize,
+}
+
+impl DiffStats {
+    pub fn new(additions: usize, deletions: usize, files_changed: usize) -> Self {
+        Self { additions, deletions, files_changed }
+    }
+
+    /// Total number of lines changed (additions + deletions).
+    pub fn total_changes(&self) -> usize {
+        self.additions + self.deletions
+    }
+
+    /// Whether no changes were recorded.
+    pub fn is_empty(&self) -> bool {
+        self.additions == 0 && self.deletions == 0 && self.files_changed == 0
+    }
+
+    /// Compute a diff summary from a unified diff string.
+    ///
+    /// Counts lines beginning with `+` (excluding `+++`) as additions
+    /// and lines beginning with `-` (excluding `---`) as deletions.
+    pub fn from_unified_diff(diff: &str) -> Self {
+        let mut additions = 0;
+        let mut deletions = 0;
+        let mut files = std::collections::HashSet::new();
+        for line in diff.lines() {
+            if line.starts_with("--- ") {
+                // header, skip
+            } else if line.starts_with("+++ ") {
+                if let Some(path) = line.strip_prefix("+++ ") {
+                    files.insert(path.trim().to_string());
+                }
+            } else if line.starts_with('+') {
+                additions += 1;
+            } else if line.starts_with('-') {
+                deletions += 1;
+            }
+        }
+        Self { additions, deletions, files_changed: files.len().max(if additions > 0 || deletions > 0 { 1 } else { 0 }) }
+    }
+}
+
+impl fmt::Display for DiffStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} file(s) changed, {} insertion(s), {} deletion(s)",
+            self.files_changed, self.additions, self.deletions
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Commit message validation
+// ---------------------------------------------------------------------------
+
+/// Validates a commit message according to common conventions.
+#[derive(Debug, Clone)]
+pub struct CommitMessageValidator {
+    /// Max length for the subject (first line).
+    pub max_subject_length: usize,
+    /// Max length for any body line.
+    pub max_body_line_length: usize,
+}
+
+impl CommitMessageValidator {
+    pub fn new() -> Self {
+        Self {
+            max_subject_length: 72,
+            max_body_line_length: 100,
+        }
+    }
+
+    /// Validate a commit message, returning a list of warnings.
+    pub fn validate(&self, message: &str) -> Vec<String> {
+        let mut warnings = Vec::new();
+        if message.trim().is_empty() {
+            warnings.push("commit message must not be empty".into());
+            return warnings;
+        }
+        let mut lines = message.lines();
+        if let Some(subject) = lines.next() {
+            if subject.len() > self.max_subject_length {
+                warnings.push(format!(
+                    "subject line is {} chars (max {})",
+                    subject.len(),
+                    self.max_subject_length
+                ));
+            }
+            if subject.ends_with('.') {
+                warnings.push("subject line should not end with a period".into());
+            }
+        }
+        // Check if second line is blank (conventional)
+        let second = lines.next();
+        if let Some(line) = second {
+            if !line.trim().is_empty() {
+                warnings.push("second line should be blank to separate subject from body".into());
+            }
+        }
+        for line in lines {
+            if line.len() > self.max_body_line_length {
+                warnings.push(format!(
+                    "body line exceeds {} chars: \"{}...\"",
+                    self.max_body_line_length,
+                    &line[..40.min(line.len())]
+                ));
+                break; // report only first offending line
+            }
+        }
+        warnings
+    }
+}
+
+impl Default for CommitMessageValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Branch name validation
+// ---------------------------------------------------------------------------
+
+/// Validates branch names according to Git conventions.
+pub fn validate_branch_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("branch name must not be empty".into());
+    }
+    if name.starts_with('-') {
+        return Err("branch name must not start with a hyphen".into());
+    }
+    if name.contains("..") {
+        return Err("branch name must not contain '..'".into());
+    }
+    if name.contains(' ') || name.contains('~') || name.contains('^') || name.contains(':') {
+        return Err("branch name contains invalid characters".into());
+    }
+    if name.ends_with('/') || name.ends_with('.') {
+        return Err("branch name must not end with '/' or '.'".into());
+    }
+    if name.contains("@{") {
+        return Err("branch name must not contain '@{'".into());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1391,5 +1577,80 @@ mod tests {
     fn scm_resource_extension_multi_dot() {
         let r = ScmResource::plain("file:///archive.tar.gz");
         assert_eq!(r.extension(), Some("gz"));
+    }
+
+    #[test]
+    fn group_resources_by_directory_groups_correctly() {
+        let resources = vec![
+            ScmResource::plain("file:///src/main.rs"),
+            ScmResource::plain("file:///src/lib.rs"),
+            ScmResource::plain("file:///tests/test1.rs"),
+        ];
+        let groups = group_resources_by_directory(&resources);
+        assert_eq!(groups.get("file:///src").unwrap().len(), 2);
+        assert_eq!(groups.get("file:///tests").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn diff_stats_from_unified_diff() {
+        let diff = "\
+--- a/file.rs
++++ b/file.rs
+@@ -1,3 +1,4 @@
+ line1
+-old_line
++new_line
++added_line
+ line3
+";
+        let stats = DiffStats::from_unified_diff(diff);
+        assert_eq!(stats.additions, 2);
+        assert_eq!(stats.deletions, 1);
+        assert_eq!(stats.total_changes(), 3);
+        assert!(!stats.is_empty());
+    }
+
+    #[test]
+    fn diff_stats_empty_diff() {
+        let stats = DiffStats::from_unified_diff("");
+        assert!(stats.is_empty());
+    }
+
+    #[test]
+    fn commit_message_validator_valid_message() {
+        let v = CommitMessageValidator::new();
+        let warnings = v.validate("Fix a bug\n\nThis fixes issue #42.");
+        assert!(warnings.is_empty());
+    }
+
+    #[test]
+    fn commit_message_validator_long_subject() {
+        let v = CommitMessageValidator::new();
+        let long_subject = "x".repeat(80);
+        let warnings = v.validate(&long_subject);
+        assert!(warnings.iter().any(|w| w.contains("subject line")));
+    }
+
+    #[test]
+    fn commit_message_validator_trailing_period() {
+        let v = CommitMessageValidator::new();
+        let warnings = v.validate("Fix a bug.");
+        assert!(warnings.iter().any(|w| w.contains("period")));
+    }
+
+    #[test]
+    fn validate_branch_name_valid() {
+        assert!(validate_branch_name("feature/my-branch").is_ok());
+        assert!(validate_branch_name("main").is_ok());
+    }
+
+    #[test]
+    fn validate_branch_name_invalid() {
+        assert!(validate_branch_name("").is_err());
+        assert!(validate_branch_name("-bad").is_err());
+        assert!(validate_branch_name("a..b").is_err());
+        assert!(validate_branch_name("a b").is_err());
+        assert!(validate_branch_name("foo/").is_err());
+        assert!(validate_branch_name("ref@{1}").is_err());
     }
 }

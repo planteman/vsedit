@@ -715,6 +715,90 @@ impl CompletionItemKind {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Suggestion deduplication
+// ---------------------------------------------------------------------------
+
+/// Deduplicate completion items by label, keeping the first occurrence.
+pub fn dedup_completions(items: &[CompletionItem]) -> Vec<CompletionItem> {
+    let mut seen = std::collections::HashSet::new();
+    items
+        .iter()
+        .filter(|item| seen.insert(item.label.clone()))
+        .cloned()
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Suggestion grouping by kind
+// ---------------------------------------------------------------------------
+
+/// A group of completion items sharing the same kind.
+#[derive(Debug, Clone)]
+pub struct CompletionGroup {
+    pub kind: CompletionItemKind,
+    pub items: Vec<CompletionItem>,
+}
+
+/// Group completion items by their kind, preserving insertion order of kinds.
+pub fn group_by_kind(items: &[CompletionItem]) -> Vec<CompletionGroup> {
+    let mut groups: Vec<CompletionGroup> = Vec::new();
+    for item in items {
+        if let Some(group) = groups.iter_mut().find(|g| g.kind == item.kind) {
+            group.items.push(item.clone());
+        } else {
+            groups.push(CompletionGroup {
+                kind: item.kind,
+                items: vec![item.clone()],
+            });
+        }
+    }
+    groups
+}
+
+// ---------------------------------------------------------------------------
+// Prefix-based filtering
+// ---------------------------------------------------------------------------
+
+/// Filter completion items to only those whose filter text starts with `prefix`
+/// (case-insensitive). This is faster than full fuzzy matching for the common
+/// case of typing from the start of an identifier.
+pub fn filter_by_prefix(items: &[CompletionItem], prefix: &str) -> Vec<CompletionItem> {
+    let p = prefix.to_lowercase();
+    items
+        .iter()
+        .filter(|item| item.get_filter_text().to_lowercase().starts_with(&p))
+        .cloned()
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Ranking improvements
+// ---------------------------------------------------------------------------
+
+/// Rank completion items by fuzzy score against `query`, returning the top `limit` results.
+/// Preselected items are boosted to the top. Deprecated items are penalized.
+pub fn rank_completions(items: &[CompletionItem], query: &str, limit: usize) -> Vec<ScoredCompletion> {
+    let mut scored: Vec<ScoredCompletion> = items
+        .iter()
+        .filter_map(|item| {
+            let text = item.get_filter_text();
+            fuzzy_score(query, text).map(|mut s| {
+                if item.preselect {
+                    s += 1000;
+                }
+                if item.deprecated {
+                    s -= 500;
+                }
+                ScoredCompletion::new(item.clone(), s)
+            })
+        })
+        .collect();
+    scored.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.item.label.cmp(&b.item.label)));
+    scored.truncate(limit);
+    scored
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1352,5 +1436,80 @@ mod tests {
         assert!(CompletionItemKind::Snippet.is_text_like());
         assert!(!CompletionItemKind::Function.is_text_like());
         assert!(!CompletionItemKind::Class.is_text_like());
+    }
+
+    #[test]
+    fn dedup_completions_removes_label_duplicates() {
+        let items = vec![
+            CompletionItem::new("foo", CompletionItemKind::Function),
+            CompletionItem::new("bar", CompletionItemKind::Variable),
+            CompletionItem::new("foo", CompletionItemKind::Method),
+        ];
+        let deduped = dedup_completions(&items);
+        assert_eq!(deduped.len(), 2);
+        assert_eq!(deduped[0].label, "foo");
+        assert_eq!(deduped[0].kind, CompletionItemKind::Function);
+        assert_eq!(deduped[1].label, "bar");
+    }
+
+    #[test]
+    fn group_by_kind_groups_correctly() {
+        let items = vec![
+            CompletionItem::new("a", CompletionItemKind::Function),
+            CompletionItem::new("b", CompletionItemKind::Variable),
+            CompletionItem::new("c", CompletionItemKind::Function),
+        ];
+        let groups = group_by_kind(&items);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].kind, CompletionItemKind::Function);
+        assert_eq!(groups[0].items.len(), 2);
+        assert_eq!(groups[1].kind, CompletionItemKind::Variable);
+        assert_eq!(groups[1].items.len(), 1);
+    }
+
+    #[test]
+    fn filter_by_prefix_case_insensitive() {
+        let items = vec![
+            CompletionItem::new("getString", CompletionItemKind::Method),
+            CompletionItem::new("getValue", CompletionItemKind::Method),
+            CompletionItem::new("setValue", CompletionItemKind::Method),
+        ];
+        let filtered = filter_by_prefix(&items, "get");
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].label, "getString");
+        assert_eq!(filtered[1].label, "getValue");
+    }
+
+    #[test]
+    fn rank_completions_boosts_preselect() {
+        let items = vec![
+            CompletionItem::new("apple", CompletionItemKind::Variable),
+            CompletionItem::new("apply", CompletionItemKind::Function).with_preselect(),
+        ];
+        let ranked = rank_completions(&items, "app", 10);
+        assert_eq!(ranked.len(), 2);
+        assert_eq!(ranked[0].item.label, "apply"); // preselect boosted
+    }
+
+    #[test]
+    fn rank_completions_penalizes_deprecated() {
+        let items = vec![
+            CompletionItem::new("oldFunc", CompletionItemKind::Function).with_deprecated(),
+            CompletionItem::new("newFunc", CompletionItemKind::Function),
+        ];
+        let ranked = rank_completions(&items, "Func", 10);
+        assert_eq!(ranked.len(), 2);
+        assert_eq!(ranked[0].item.label, "newFunc");
+    }
+
+    #[test]
+    fn rank_completions_respects_limit() {
+        let items = vec![
+            CompletionItem::new("a", CompletionItemKind::Variable),
+            CompletionItem::new("ab", CompletionItemKind::Variable),
+            CompletionItem::new("abc", CompletionItemKind::Variable),
+        ];
+        let ranked = rank_completions(&items, "a", 2);
+        assert_eq!(ranked.len(), 2);
     }
 }

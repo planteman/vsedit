@@ -780,6 +780,132 @@ impl ConnectionHistory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Connection pool tracking
+// ---------------------------------------------------------------------------
+
+/// A pool of remote connections with a configurable maximum size.
+#[derive(Debug)]
+pub struct ConnectionPool {
+    connections: Vec<RemoteConnection>,
+    max_size: usize,
+}
+
+impl ConnectionPool {
+    /// Create a new pool with the given maximum capacity.
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            connections: Vec::new(),
+            max_size,
+        }
+    }
+
+    /// Add a connection to the pool. Returns `Err` if the pool is full.
+    pub fn add(&mut self, conn: RemoteConnection) -> Result<(), RemoteError> {
+        if self.connections.len() >= self.max_size {
+            return Err(RemoteError::ConnectionFailed("pool is full".into()));
+        }
+        self.connections.push(conn);
+        Ok(())
+    }
+
+    /// Remove and return the connection at `index`.
+    pub fn remove(&mut self, index: usize) -> Option<RemoteConnection> {
+        if index < self.connections.len() {
+            Some(self.connections.remove(index))
+        } else {
+            None
+        }
+    }
+
+    /// Number of connections in the pool.
+    pub fn len(&self) -> usize {
+        self.connections.len()
+    }
+
+    /// Whether the pool is empty.
+    pub fn is_empty(&self) -> bool {
+        self.connections.is_empty()
+    }
+
+    /// Whether the pool is at capacity.
+    pub fn is_full(&self) -> bool {
+        self.connections.len() >= self.max_size
+    }
+
+    /// Available slots remaining.
+    pub fn available(&self) -> usize {
+        self.max_size.saturating_sub(self.connections.len())
+    }
+
+    /// Drain all disconnected connections from the pool, returning them.
+    pub fn drain_disconnected(&mut self) -> Vec<RemoteConnection> {
+        let mut drained = Vec::new();
+        self.connections.retain(|c| {
+            if c.status == ConnectionStatus::Disconnected {
+                drained.push(c.clone());
+                false
+            } else {
+                true
+            }
+        });
+        drained
+    }
+
+    /// Get a reference to the pool's connections.
+    pub fn connections(&self) -> &[RemoteConnection] {
+        &self.connections
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Connection health monitoring
+// ---------------------------------------------------------------------------
+
+/// Health status derived from latency and error rate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HealthStatus {
+    /// Healthy – low latency and low error rate.
+    Healthy,
+    /// Degraded – elevated latency or moderate error rate.
+    Degraded,
+    /// Unhealthy – high latency or high error rate.
+    Unhealthy,
+}
+
+impl fmt::Display for HealthStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HealthStatus::Healthy => write!(f, "Healthy"),
+            HealthStatus::Degraded => write!(f, "Degraded"),
+            HealthStatus::Unhealthy => write!(f, "Unhealthy"),
+        }
+    }
+}
+
+/// Assess connection health based on latency tracker and connection history.
+///
+/// Thresholds:
+/// - Unhealthy if avg latency > `unhealthy_ms` or success rate < 50%
+/// - Degraded if avg latency > `degraded_ms` or success rate < 80%
+/// - Healthy otherwise
+pub fn assess_health(
+    latency: &LatencyTracker,
+    history: &ConnectionHistory,
+    degraded_ms: u64,
+    unhealthy_ms: u64,
+) -> HealthStatus {
+    let avg = latency.average_ms();
+    let rate = history.success_rate();
+    if avg > unhealthy_ms || rate < 50.0 {
+        HealthStatus::Unhealthy
+    } else if avg > degraded_ms || rate < 80.0 {
+        HealthStatus::Degraded
+    } else {
+        HealthStatus::Healthy
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1354,5 +1480,78 @@ mod tests {
         svc.add_connection(sample_conn());
         let hosts = svc.all_hosts();
         assert_eq!(hosts, vec!["example.com"]);
+    }
+
+    #[test]
+    fn connection_pool_add_and_full() {
+        let mut pool = ConnectionPool::new(2);
+        assert!(pool.is_empty());
+        assert_eq!(pool.available(), 2);
+        assert!(pool.add(sample_conn()).is_ok());
+        assert!(pool.add(sample_conn()).is_ok());
+        assert!(pool.is_full());
+        assert!(pool.add(sample_conn()).is_err());
+    }
+
+    #[test]
+    fn connection_pool_drain_disconnected() {
+        let mut pool = ConnectionPool::new(5);
+        let mut c1 = sample_conn();
+        c1.status = ConnectionStatus::Connected;
+        let c2 = sample_conn(); // Disconnected
+        pool.add(c1).unwrap();
+        pool.add(c2).unwrap();
+        let drained = pool.drain_disconnected();
+        assert_eq!(drained.len(), 1);
+        assert_eq!(pool.len(), 1);
+    }
+
+    #[test]
+    fn connection_pool_remove() {
+        let mut pool = ConnectionPool::new(5);
+        pool.add(sample_conn()).unwrap();
+        assert!(pool.remove(0).is_some());
+        assert!(pool.remove(0).is_none());
+        assert!(pool.is_empty());
+    }
+
+    #[test]
+    fn assess_health_healthy() {
+        let mut latency = LatencyTracker::new();
+        latency.record(10);
+        latency.record(20);
+        let mut history = ConnectionHistory::new();
+        history.record("h", true, "ok");
+        history.record("h", true, "ok");
+        assert_eq!(assess_health(&latency, &history, 100, 500), HealthStatus::Healthy);
+    }
+
+    #[test]
+    fn assess_health_degraded() {
+        let mut latency = LatencyTracker::new();
+        latency.record(200);
+        let mut history = ConnectionHistory::new();
+        history.record("h", true, "ok");
+        assert_eq!(assess_health(&latency, &history, 100, 500), HealthStatus::Degraded);
+    }
+
+    #[test]
+    fn assess_health_unhealthy_latency() {
+        let mut latency = LatencyTracker::new();
+        latency.record(1000);
+        let mut history = ConnectionHistory::new();
+        history.record("h", true, "ok");
+        assert_eq!(assess_health(&latency, &history, 100, 500), HealthStatus::Unhealthy);
+    }
+
+    #[test]
+    fn assess_health_unhealthy_error_rate() {
+        let latency = LatencyTracker::new();
+        let mut history = ConnectionHistory::new();
+        history.record("h", false, "err");
+        history.record("h", false, "err");
+        history.record("h", true, "ok");
+        // 33% success rate < 50%
+        assert_eq!(assess_health(&latency, &history, 100, 500), HealthStatus::Unhealthy);
     }
 }

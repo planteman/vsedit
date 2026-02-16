@@ -758,6 +758,144 @@ impl CodeLensFilter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Lens resolution caching
+// ---------------------------------------------------------------------------
+
+/// A simple cache for resolved code lens commands, keyed by `(uri, data)`.
+pub struct LensCache {
+    entries: std::collections::HashMap<(String, String), Command>,
+}
+
+impl LensCache {
+    /// Create a new empty cache.
+    pub fn new() -> Self {
+        Self {
+            entries: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Store a resolved command for the given URI and lens data.
+    pub fn insert(&mut self, uri: &str, data: &str, command: Command) {
+        self.entries.insert((uri.to_string(), data.to_string()), command);
+    }
+
+    /// Look up a cached resolution.
+    pub fn get(&self, uri: &str, data: &str) -> Option<&Command> {
+        self.entries.get(&(uri.to_string(), data.to_string()))
+    }
+
+    /// Remove all entries for a given URI (e.g., when the document changes).
+    pub fn invalidate_uri(&mut self, uri: &str) {
+        self.entries.retain(|(u, _), _| u != uri);
+    }
+
+    /// Clear the entire cache.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Number of cached entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl Default for LensCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Lens visibility management
+// ---------------------------------------------------------------------------
+
+/// Manages which lines have their code lenses visible or collapsed.
+pub struct LensVisibility {
+    /// Lines where lenses are hidden (collapsed).
+    hidden_lines: std::collections::HashSet<u32>,
+    /// Global visibility toggle.
+    pub enabled: bool,
+}
+
+impl LensVisibility {
+    /// Create with all lenses visible.
+    pub fn new() -> Self {
+        Self {
+            hidden_lines: std::collections::HashSet::new(),
+            enabled: true,
+        }
+    }
+
+    /// Hide lenses on a specific line.
+    pub fn hide_line(&mut self, line: u32) {
+        self.hidden_lines.insert(line);
+    }
+
+    /// Show lenses on a specific line.
+    pub fn show_line(&mut self, line: u32) {
+        self.hidden_lines.remove(&line);
+    }
+
+    /// Toggle visibility of lenses on a specific line.
+    pub fn toggle_line(&mut self, line: u32) {
+        if self.hidden_lines.contains(&line) {
+            self.hidden_lines.remove(&line);
+        } else {
+            self.hidden_lines.insert(line);
+        }
+    }
+
+    /// Check if lenses on a given line should be displayed.
+    pub fn is_visible(&self, line: u32) -> bool {
+        self.enabled && !self.hidden_lines.contains(&line)
+    }
+
+    /// Filter lenses, keeping only those on visible lines.
+    pub fn filter_visible<'a>(&self, lenses: &'a [CodeLens]) -> Vec<&'a CodeLens> {
+        lenses.iter().filter(|l| self.is_visible(l.start_line)).collect()
+    }
+}
+
+impl Default for LensVisibility {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Lens click handling
+// ---------------------------------------------------------------------------
+
+/// Represents a click event on a code lens.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LensClickEvent {
+    pub line: u32,
+    pub command_id: String,
+    pub arguments: Vec<String>,
+}
+
+/// Find the code lens at a given line and resolve its click event.
+/// Returns `None` if no resolved lens exists at that line.
+pub fn resolve_click(lenses: &[CodeLens], line: u32) -> Option<LensClickEvent> {
+    lenses
+        .iter()
+        .find(|l| l.start_line == line && l.is_resolved())
+        .and_then(|l| {
+            l.command.as_ref().map(|cmd| LensClickEvent {
+                line,
+                command_id: cmd.command_id.clone(),
+                arguments: cmd.arguments.clone(),
+            })
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1381,5 +1519,109 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].start_line, 5);
         assert_eq!(result[1].start_line, 10);
+    }
+
+    #[test]
+    fn lens_cache_insert_and_get() {
+        let mut cache = LensCache::new();
+        assert!(cache.is_empty());
+        let cmd = Command {
+            title: "Run".into(),
+            command_id: "run".into(),
+            tooltip: String::new(),
+            arguments: vec![],
+        };
+        cache.insert("file:///a.rs", "test_data", cmd.clone());
+        assert_eq!(cache.len(), 1);
+        let found = cache.get("file:///a.rs", "test_data").unwrap();
+        assert_eq!(found.title, "Run");
+        assert!(cache.get("file:///a.rs", "other").is_none());
+    }
+
+    #[test]
+    fn lens_cache_invalidate_uri() {
+        let mut cache = LensCache::new();
+        let cmd = Command {
+            title: "T".into(),
+            command_id: "c".into(),
+            tooltip: String::new(),
+            arguments: vec![],
+        };
+        cache.insert("file:///a.rs", "d1", cmd.clone());
+        cache.insert("file:///a.rs", "d2", cmd.clone());
+        cache.insert("file:///b.rs", "d1", cmd);
+        assert_eq!(cache.len(), 3);
+        cache.invalidate_uri("file:///a.rs");
+        assert_eq!(cache.len(), 1);
+        assert!(cache.get("file:///b.rs", "d1").is_some());
+    }
+
+    #[test]
+    fn lens_visibility_toggle() {
+        let mut vis = LensVisibility::new();
+        assert!(vis.is_visible(10));
+        vis.hide_line(10);
+        assert!(!vis.is_visible(10));
+        vis.toggle_line(10);
+        assert!(vis.is_visible(10));
+    }
+
+    #[test]
+    fn lens_visibility_global_disable() {
+        let mut vis = LensVisibility::new();
+        vis.enabled = false;
+        assert!(!vis.is_visible(1));
+        assert!(!vis.is_visible(100));
+    }
+
+    #[test]
+    fn lens_visibility_filter() {
+        let mut vis = LensVisibility::new();
+        vis.hide_line(5);
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 10),
+            CodeLens::new(5, 0, 5, 10),
+            CodeLens::new(10, 0, 10, 10),
+        ];
+        let visible = vis.filter_visible(&lenses);
+        assert_eq!(visible.len(), 2);
+        assert_eq!(visible[0].start_line, 1);
+        assert_eq!(visible[1].start_line, 10);
+    }
+
+    #[test]
+    fn resolve_click_found() {
+        let cmd = Command {
+            title: "Run Tests".into(),
+            command_id: "test.run".into(),
+            tooltip: String::new(),
+            arguments: vec!["arg1".into()],
+        };
+        let lenses = vec![
+            CodeLens::new(5, 0, 5, 10).with_command(cmd),
+            CodeLens::new(10, 0, 10, 10),
+        ];
+        let event = resolve_click(&lenses, 5).unwrap();
+        assert_eq!(event.command_id, "test.run");
+        assert_eq!(event.arguments, vec!["arg1"]);
+        assert_eq!(event.line, 5);
+    }
+
+    #[test]
+    fn resolve_click_unresolved_returns_none() {
+        let lenses = vec![CodeLens::new(5, 0, 5, 10)];
+        assert!(resolve_click(&lenses, 5).is_none());
+    }
+
+    #[test]
+    fn resolve_click_wrong_line_returns_none() {
+        let cmd = Command {
+            title: "T".into(),
+            command_id: "c".into(),
+            tooltip: String::new(),
+            arguments: vec![],
+        };
+        let lenses = vec![CodeLens::new(5, 0, 5, 10).with_command(cmd)];
+        assert!(resolve_click(&lenses, 10).is_none());
     }
 }

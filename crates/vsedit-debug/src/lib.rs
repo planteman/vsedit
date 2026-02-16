@@ -865,6 +865,162 @@ impl DebugAdapterMessageCodec {
 }
 
 // ---------------------------------------------------------------------------
+// DAP message parsing helpers
+// ---------------------------------------------------------------------------
+
+/// Extract the command name from a raw DAP JSON string.
+pub fn extract_command_from_json(json_str: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(json_str).ok()?;
+    v.get("command")
+        .or_else(|| v.get("event"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
+/// Extract the sequence number from a raw DAP JSON string.
+pub fn extract_seq_from_json(json_str: &str) -> Option<u64> {
+    let v: serde_json::Value = serde_json::from_str(json_str).ok()?;
+    v.get("seq").and_then(|v| v.as_u64())
+}
+
+/// Check if a DAP JSON message is a success response.
+pub fn is_success_response(json_str: &str) -> bool {
+    let v: serde_json::Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    v.get("type").and_then(|t| t.as_str()) == Some("response")
+        && v.get("success").and_then(|s| s.as_bool()) == Some(true)
+}
+
+// ---------------------------------------------------------------------------
+// Breakpoint management utilities
+// ---------------------------------------------------------------------------
+
+/// A managed collection of breakpoints indexed by file path.
+#[derive(Debug, Clone, Default)]
+pub struct BreakpointManager {
+    breakpoints: std::collections::HashMap<String, Vec<u32>>,
+}
+
+impl BreakpointManager {
+    /// Create an empty breakpoint manager.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Toggle a breakpoint at the given file and line.
+    ///
+    /// If a breakpoint already exists at that location, it is removed.
+    /// Otherwise, a new breakpoint is added.
+    pub fn toggle(&mut self, file: &str, line: u32) -> bool {
+        let lines = self.breakpoints.entry(file.to_string()).or_default();
+        if let Some(pos) = lines.iter().position(|&l| l == line) {
+            lines.remove(pos);
+            false // removed
+        } else {
+            lines.push(line);
+            lines.sort_unstable();
+            true // added
+        }
+    }
+
+    /// Get all breakpoint lines for a file.
+    pub fn get_lines(&self, file: &str) -> &[u32] {
+        self.breakpoints.get(file).map_or(&[], |v| v.as_slice())
+    }
+
+    /// Check if a breakpoint exists at the given file and line.
+    pub fn has_breakpoint(&self, file: &str, line: u32) -> bool {
+        self.breakpoints
+            .get(file)
+            .map_or(false, |lines| lines.contains(&line))
+    }
+
+    /// Total number of breakpoints across all files.
+    pub fn total_count(&self) -> usize {
+        self.breakpoints.values().map(|v| v.len()).sum()
+    }
+
+    /// Number of files that have breakpoints.
+    pub fn file_count(&self) -> usize {
+        self.breakpoints.values().filter(|v| !v.is_empty()).count()
+    }
+
+    /// Clear all breakpoints.
+    pub fn clear(&mut self) {
+        self.breakpoints.clear();
+    }
+
+    /// Remove all breakpoints for a specific file.
+    pub fn clear_file(&mut self, file: &str) {
+        self.breakpoints.remove(file);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Variable formatting
+// ---------------------------------------------------------------------------
+
+/// Format a variable for display in the debug variables panel.
+pub fn format_variable_value(name: &str, value: &str, type_name: Option<&str>) -> String {
+    match type_name {
+        Some(tn) => format!("{name}: {tn} = {value}"),
+        None => format!("{name} = {value}"),
+    }
+}
+
+/// Truncate a variable value for display, adding "…" if truncated.
+pub fn truncate_variable_value(value: &str, max_len: usize) -> String {
+    if value.len() <= max_len {
+        return value.to_string();
+    }
+    if max_len <= 1 {
+        return "…".to_string();
+    }
+    let mut s: String = value.chars().take(max_len - 1).collect();
+    s.push('…');
+    s
+}
+
+/// Format a collection of variables as a multi-line summary.
+pub fn format_variables_summary(vars: &[(String, String, Option<String>)]) -> String {
+    let mut lines = Vec::with_capacity(vars.len());
+    for (name, value, type_name) in vars {
+        lines.push(format_variable_value(name, value, type_name.as_deref()));
+    }
+    lines.join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// Stack frame navigation helpers
+// ---------------------------------------------------------------------------
+
+/// Navigate up in a stack trace, returning the index of the previous frame.
+pub fn navigate_stack_up(current_index: usize, total_frames: usize) -> usize {
+    if total_frames == 0 || current_index == 0 {
+        return current_index;
+    }
+    current_index - 1
+}
+
+/// Navigate down in a stack trace, returning the index of the next frame.
+pub fn navigate_stack_down(current_index: usize, total_frames: usize) -> usize {
+    if total_frames == 0 || current_index >= total_frames - 1 {
+        return current_index;
+    }
+    current_index + 1
+}
+
+/// Find a frame in the stack by function name prefix.
+pub fn find_frame_by_function(
+    frames: &[ParsedStackFrame],
+    function_prefix: &str,
+) -> Option<usize> {
+    frames.iter().position(|f| f.function_name.starts_with(function_prefix))
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1363,5 +1519,138 @@ mod tests {
         // Missing Content-Length prefix
         let result = DebugAdapterMessageCodec::decode("X-Custom: 5\r\n\r\n{}");
         assert!(result.is_err());
+    }
+
+    // -- new tests --
+
+    #[test]
+    fn extract_command_from_json_request() {
+        let json = r#"{"seq":1,"type":"request","command":"initialize"}"#;
+        assert_eq!(extract_command_from_json(json), Some("initialize".into()));
+    }
+
+    #[test]
+    fn extract_command_from_json_event() {
+        let json = r#"{"seq":5,"type":"event","event":"stopped"}"#;
+        assert_eq!(extract_command_from_json(json), Some("stopped".into()));
+    }
+
+    #[test]
+    fn extract_seq_from_json_valid() {
+        let json = r#"{"seq":42,"type":"request","command":"launch"}"#;
+        assert_eq!(extract_seq_from_json(json), Some(42));
+    }
+
+    #[test]
+    fn extract_seq_from_json_invalid() {
+        assert_eq!(extract_seq_from_json("not json"), None);
+    }
+
+    #[test]
+    fn is_success_response_true() {
+        let json = r#"{"seq":1,"type":"response","success":true,"command":"initialize"}"#;
+        assert!(is_success_response(json));
+    }
+
+    #[test]
+    fn is_success_response_false_on_failure() {
+        let json = r#"{"seq":1,"type":"response","success":false,"command":"launch"}"#;
+        assert!(!is_success_response(json));
+    }
+
+    #[test]
+    fn breakpoint_manager_toggle_add_remove() {
+        let mut mgr = BreakpointManager::new();
+        assert!(mgr.toggle("main.rs", 10)); // added
+        assert!(mgr.has_breakpoint("main.rs", 10));
+        assert_eq!(mgr.total_count(), 1);
+        assert!(!mgr.toggle("main.rs", 10)); // removed
+        assert!(!mgr.has_breakpoint("main.rs", 10));
+        assert_eq!(mgr.total_count(), 0);
+    }
+
+    #[test]
+    fn breakpoint_manager_multiple_files() {
+        let mut mgr = BreakpointManager::new();
+        mgr.toggle("a.rs", 1);
+        mgr.toggle("a.rs", 5);
+        mgr.toggle("b.rs", 10);
+        assert_eq!(mgr.total_count(), 3);
+        assert_eq!(mgr.file_count(), 2);
+        assert_eq!(mgr.get_lines("a.rs"), &[1, 5]);
+    }
+
+    #[test]
+    fn breakpoint_manager_clear_file() {
+        let mut mgr = BreakpointManager::new();
+        mgr.toggle("a.rs", 1);
+        mgr.toggle("a.rs", 5);
+        mgr.clear_file("a.rs");
+        assert_eq!(mgr.total_count(), 0);
+    }
+
+    #[test]
+    fn format_variable_value_with_type() {
+        assert_eq!(
+            format_variable_value("x", "42", Some("i32")),
+            "x: i32 = 42",
+        );
+    }
+
+    #[test]
+    fn format_variable_value_without_type() {
+        assert_eq!(format_variable_value("x", "42", None), "x = 42");
+    }
+
+    #[test]
+    fn truncate_variable_value_long() {
+        let result = truncate_variable_value("hello world this is long", 10);
+        assert!(result.ends_with('…'));
+        assert!(result.chars().count() <= 10);
+    }
+
+    #[test]
+    fn truncate_variable_value_short_enough() {
+        assert_eq!(truncate_variable_value("short", 10), "short");
+    }
+
+    #[test]
+    fn navigate_stack_up_and_down() {
+        assert_eq!(navigate_stack_up(2, 5), 1);
+        assert_eq!(navigate_stack_up(0, 5), 0);
+        assert_eq!(navigate_stack_down(2, 5), 3);
+        assert_eq!(navigate_stack_down(4, 5), 4);
+    }
+
+    #[test]
+    fn find_frame_by_function_prefix() {
+        let frames = vec![
+            ParsedStackFrame {
+                frame_number: Some(0),
+                function_name: "main".into(),
+                file_path: Some("main.rs".into()),
+                line: Some(10),
+            },
+            ParsedStackFrame {
+                frame_number: Some(1),
+                function_name: "std::rt::lang_start".into(),
+                file_path: None,
+                line: None,
+            },
+        ];
+        assert_eq!(find_frame_by_function(&frames, "std::rt"), Some(1));
+        assert_eq!(find_frame_by_function(&frames, "nonexistent"), None);
+    }
+
+    #[test]
+    fn format_variables_summary_multiline() {
+        let vars = vec![
+            ("x".into(), "42".into(), Some("i32".into())),
+            ("name".into(), "hello".into(), None),
+        ];
+        let summary = format_variables_summary(&vars);
+        assert!(summary.contains("x: i32 = 42"));
+        assert!(summary.contains("name = hello"));
+        assert_eq!(summary.lines().count(), 2);
     }
 }

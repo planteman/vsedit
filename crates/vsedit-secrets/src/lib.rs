@@ -843,6 +843,201 @@ impl Default for SecretsValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Secret masking
+// ---------------------------------------------------------------------------
+
+/// Masks known secret values in arbitrary text output.
+pub struct SecretMasker {
+    patterns: Vec<(String, String)>,
+}
+
+impl SecretMasker {
+    /// Create a new masker. Each pattern is `(secret_value, replacement)`.
+    pub fn new() -> Self {
+        Self {
+            patterns: Vec::new(),
+        }
+    }
+
+    /// Register a secret value to be masked.
+    pub fn add_secret(&mut self, value: &str) {
+        if !value.is_empty() {
+            self.patterns.push((value.to_string(), "***".to_string()));
+        }
+    }
+
+    /// Register a secret with a custom replacement label.
+    pub fn add_secret_with_label(&mut self, value: &str, label: &str) {
+        if !value.is_empty() {
+            self.patterns
+                .push((value.to_string(), format!("[{}]", label)));
+        }
+    }
+
+    /// Mask all registered secrets in the given text.
+    pub fn mask(&self, text: &str) -> String {
+        let mut result = text.to_string();
+        for (secret, replacement) in &self.patterns {
+            result = result.replace(secret.as_str(), replacement);
+        }
+        result
+    }
+
+    /// Number of registered secrets.
+    pub fn secret_count(&self) -> usize {
+        self.patterns.len()
+    }
+}
+
+impl Default for SecretMasker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Secret expiration tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks when secrets expire so they can be rotated.
+#[derive(Debug, Clone)]
+pub struct SecretExpiration {
+    pub key: String,
+    /// Expiration timestamp (seconds since epoch).
+    pub expires_at: u64,
+}
+
+/// Manages a collection of secret expiration records.
+#[derive(Debug, Clone, Default)]
+pub struct ExpirationTracker {
+    records: Vec<SecretExpiration>,
+}
+
+impl ExpirationTracker {
+    /// Create a new tracker.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the expiration for a secret key.
+    pub fn set_expiration(&mut self, key: &str, expires_at: u64) {
+        if let Some(rec) = self.records.iter_mut().find(|r| r.key == key) {
+            rec.expires_at = expires_at;
+        } else {
+            self.records.push(SecretExpiration {
+                key: key.to_string(),
+                expires_at,
+            });
+        }
+    }
+
+    /// Remove expiration tracking for a key.
+    pub fn remove(&mut self, key: &str) {
+        self.records.retain(|r| r.key != key);
+    }
+
+    /// Get all secrets that have expired as of `now`.
+    pub fn expired_keys(&self, now: u64) -> Vec<&str> {
+        self.records
+            .iter()
+            .filter(|r| r.expires_at <= now)
+            .map(|r| r.key.as_str())
+            .collect()
+    }
+
+    /// Get all secrets expiring within `window` seconds of `now`.
+    pub fn expiring_soon(&self, now: u64, window: u64) -> Vec<&str> {
+        self.records
+            .iter()
+            .filter(|r| r.expires_at > now && r.expires_at <= now + window)
+            .map(|r| r.key.as_str())
+            .collect()
+    }
+
+    /// Number of tracked expirations.
+    pub fn count(&self) -> usize {
+        self.records.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Secret access auditing
+// ---------------------------------------------------------------------------
+
+/// Records an access event for auditing purposes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecretAccessEvent {
+    pub key: String,
+    pub action: SecretAccessAction,
+    pub timestamp: u64,
+    pub caller: String,
+}
+
+/// The kind of access performed on a secret.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SecretAccessAction {
+    Read,
+    Write,
+    Delete,
+}
+
+impl fmt::Display for SecretAccessAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Read => write!(f, "read"),
+            Self::Write => write!(f, "write"),
+            Self::Delete => write!(f, "delete"),
+        }
+    }
+}
+
+/// Collects secret access events for auditing.
+#[derive(Debug, Clone, Default)]
+pub struct SecretAuditLog {
+    events: Vec<SecretAccessEvent>,
+}
+
+impl SecretAuditLog {
+    /// Create a new empty audit log.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record an access event.
+    pub fn record(&mut self, key: &str, action: SecretAccessAction, timestamp: u64, caller: &str) {
+        self.events.push(SecretAccessEvent {
+            key: key.to_string(),
+            action,
+            timestamp,
+            caller: caller.to_string(),
+        });
+    }
+
+    /// Get all events for a specific key.
+    pub fn events_for_key(&self, key: &str) -> Vec<&SecretAccessEvent> {
+        self.events.iter().filter(|e| e.key == key).collect()
+    }
+
+    /// Get the most recent access event for a key.
+    pub fn last_access(&self, key: &str) -> Option<&SecretAccessEvent> {
+        self.events.iter().rev().find(|e| e.key == key)
+    }
+
+    /// Total number of events recorded.
+    pub fn event_count(&self) -> usize {
+        self.events.len()
+    }
+
+    /// Get all unique keys that have been accessed.
+    pub fn accessed_keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.events.iter().map(|e| e.key.as_str()).collect();
+        keys.sort();
+        keys.dedup();
+        keys
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1366,5 +1561,95 @@ mod tests {
         let encoded = base64_encode(original);
         let decoded = base64_decode(&encoded).unwrap();
         assert_eq!(decoded, original);
+    }
+
+    // ── Secret masking ────────────────────────────────────────────
+
+    #[test]
+    fn masker_masks_secrets_in_text() {
+        let mut masker = SecretMasker::new();
+        masker.add_secret("s3cr3t_token");
+        let output = masker.mask("Authorization: Bearer s3cr3t_token");
+        assert_eq!(output, "Authorization: Bearer ***");
+        assert!(!output.contains("s3cr3t_token"));
+    }
+
+    #[test]
+    fn masker_with_label() {
+        let mut masker = SecretMasker::new();
+        masker.add_secret_with_label("abc123", "API_KEY");
+        let output = masker.mask("key=abc123");
+        assert_eq!(output, "key=[API_KEY]");
+    }
+
+    #[test]
+    fn masker_empty_secret_ignored() {
+        let mut masker = SecretMasker::new();
+        masker.add_secret("");
+        assert_eq!(masker.secret_count(), 0);
+    }
+
+    // ── Expiration tracking ───────────────────────────────────────
+
+    #[test]
+    fn expiration_tracker_expired_keys() {
+        let mut tracker = ExpirationTracker::new();
+        tracker.set_expiration("token-a", 1000);
+        tracker.set_expiration("token-b", 2000);
+        tracker.set_expiration("token-c", 3000);
+
+        let expired = tracker.expired_keys(1500);
+        assert_eq!(expired, vec!["token-a"]);
+    }
+
+    #[test]
+    fn expiration_tracker_expiring_soon() {
+        let mut tracker = ExpirationTracker::new();
+        tracker.set_expiration("token-a", 1100);
+        tracker.set_expiration("token-b", 2000);
+
+        let soon = tracker.expiring_soon(1000, 200);
+        assert_eq!(soon, vec!["token-a"]);
+        assert_eq!(tracker.count(), 2);
+    }
+
+    #[test]
+    fn expiration_tracker_remove() {
+        let mut tracker = ExpirationTracker::new();
+        tracker.set_expiration("k", 100);
+        assert_eq!(tracker.count(), 1);
+        tracker.remove("k");
+        assert_eq!(tracker.count(), 0);
+    }
+
+    // ── Audit log ─────────────────────────────────────────────────
+
+    #[test]
+    fn audit_log_records_and_queries() {
+        let mut log = SecretAuditLog::new();
+        log.record("api-key", SecretAccessAction::Read, 100, "extension-a");
+        log.record("api-key", SecretAccessAction::Write, 200, "extension-b");
+        log.record("db-pass", SecretAccessAction::Read, 150, "extension-a");
+
+        assert_eq!(log.event_count(), 3);
+        assert_eq!(log.events_for_key("api-key").len(), 2);
+        let last = log.last_access("api-key").unwrap();
+        assert_eq!(last.action, SecretAccessAction::Write);
+        assert_eq!(last.timestamp, 200);
+    }
+
+    #[test]
+    fn audit_log_accessed_keys() {
+        let mut log = SecretAuditLog::new();
+        log.record("b-key", SecretAccessAction::Read, 1, "ext");
+        log.record("a-key", SecretAccessAction::Write, 2, "ext");
+        let keys = log.accessed_keys();
+        assert_eq!(keys, vec!["a-key", "b-key"]);
+    }
+
+    #[test]
+    fn secret_access_action_display() {
+        assert_eq!(format!("{}", SecretAccessAction::Read), "read");
+        assert_eq!(format!("{}", SecretAccessAction::Delete), "delete");
     }
 }

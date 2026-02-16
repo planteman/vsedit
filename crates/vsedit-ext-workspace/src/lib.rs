@@ -850,6 +850,143 @@ impl MultiFileEditBuilder {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Configuration management
+// ---------------------------------------------------------------------------
+
+/// In-memory workspace configuration store.
+#[derive(Debug, Clone)]
+pub struct WorkspaceConfigStore {
+    sections: HashMap<String, Value>,
+}
+
+impl WorkspaceConfigStore {
+    /// Create an empty configuration store.
+    pub fn new() -> Self {
+        Self {
+            sections: HashMap::new(),
+        }
+    }
+
+    /// Set a configuration value for a section.
+    pub fn set(&mut self, section: impl Into<String>, value: Value) {
+        self.sections.insert(section.into(), value);
+    }
+
+    /// Get a configuration value by section name.
+    pub fn get(&self, section: &str) -> Option<&Value> {
+        self.sections.get(section)
+    }
+
+    /// Remove a configuration section. Returns the old value if present.
+    pub fn remove(&mut self, section: &str) -> Option<Value> {
+        self.sections.remove(section)
+    }
+
+    /// List all section names.
+    pub fn sections(&self) -> Vec<&str> {
+        self.sections.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Number of configuration sections.
+    pub fn section_count(&self) -> usize {
+        self.sections.len()
+    }
+
+    /// Check if a section exists.
+    pub fn has_section(&self, section: &str) -> bool {
+        self.sections.contains_key(section)
+    }
+
+    /// Merge another config store into this one (overwrites on conflict).
+    pub fn merge(&mut self, other: &WorkspaceConfigStore) {
+        for (k, v) in &other.sections {
+            self.sections.insert(k.clone(), v.clone());
+        }
+    }
+}
+
+impl Default for WorkspaceConfigStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Workspace edit analysis
+// ---------------------------------------------------------------------------
+
+/// Summary of a workspace edit.
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceEditSummary {
+    pub files_modified: usize,
+    pub total_text_edits: usize,
+    pub renames: usize,
+    pub creates: usize,
+    pub deletes: usize,
+}
+
+impl fmt::Display for WorkspaceEditSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} files modified, {} edits, {} renames, {} creates, {} deletes",
+            self.files_modified,
+            self.total_text_edits,
+            self.renames,
+            self.creates,
+            self.deletes,
+        )
+    }
+}
+
+/// Compute a summary of a workspace edit.
+pub fn summarize_workspace_edit(edit: &WorkspaceEdit) -> WorkspaceEditSummary {
+    WorkspaceEditSummary {
+        files_modified: edit.text_edits.len(),
+        total_text_edits: edit.text_edits.values().map(|v| v.len()).sum(),
+        renames: edit.renames.len(),
+        creates: edit.creates.len(),
+        deletes: edit.deletes.len(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// URI utilities
+// ---------------------------------------------------------------------------
+
+/// Extract the file extension from a workspace URI.
+pub fn uri_extension(uri: &str) -> Option<&str> {
+    let path = uri.strip_prefix("file://")?;
+    let last_segment = path.rsplit('/').next()?;
+    let dot_pos = last_segment.rfind('.')?;
+    Some(&last_segment[dot_pos + 1..])
+}
+
+/// Extract the file name (last segment) from a workspace URI.
+pub fn uri_filename(uri: &str) -> Option<&str> {
+    let path = if let Some(stripped) = uri.strip_prefix("file://") {
+        stripped
+    } else {
+        uri
+    };
+    path.rsplit('/').next()
+}
+
+/// Check if a URI matches a simple glob pattern (supports `*` wildcard only).
+pub fn uri_matches_glob(uri: &str, pattern: &str) -> bool {
+    if pattern == "*" {
+        return true;
+    }
+    if let Some(ext) = pattern.strip_prefix("*.") {
+        return uri.ends_with(&format!(".{ext}"));
+    }
+    if let Some(prefix) = pattern.strip_suffix("/*") {
+        return uri.starts_with(prefix);
+    }
+    uri == pattern
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1362,5 +1499,97 @@ mod tests {
     fn ext_workspace_is_ascii_printable() {
         assert!(ExtWorkspaceValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtWorkspaceValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- new tests --
+
+    #[test]
+    fn config_store_set_and_get() {
+        let mut store = WorkspaceConfigStore::new();
+        store.set("editor.fontSize", serde_json::json!(14));
+        assert_eq!(store.get("editor.fontSize"), Some(&serde_json::json!(14)));
+        assert!(store.has_section("editor.fontSize"));
+        assert_eq!(store.section_count(), 1);
+    }
+
+    #[test]
+    fn config_store_remove() {
+        let mut store = WorkspaceConfigStore::new();
+        store.set("a", serde_json::json!("value"));
+        assert!(store.remove("a").is_some());
+        assert!(store.get("a").is_none());
+        assert!(store.remove("nonexistent").is_none());
+    }
+
+    #[test]
+    fn config_store_merge() {
+        let mut s1 = WorkspaceConfigStore::new();
+        s1.set("a", serde_json::json!(1));
+        let mut s2 = WorkspaceConfigStore::new();
+        s2.set("b", serde_json::json!(2));
+        s2.set("a", serde_json::json!(99));
+        s1.merge(&s2);
+        assert_eq!(s1.section_count(), 2);
+        assert_eq!(s1.get("a"), Some(&serde_json::json!(99)));
+    }
+
+    #[test]
+    fn summarize_workspace_edit_counts() {
+        let edit = WorkspaceEditBuilder::new()
+            .text_edit("file:///a.rs", TextEditEntry::single_line(1, 1, 5, "hello"))
+            .create("file:///new.rs")
+            .delete("file:///old.rs")
+            .rename("file:///a.rs", "file:///b.rs")
+            .build()
+            .unwrap();
+        let summary = summarize_workspace_edit(&edit);
+        assert_eq!(summary.files_modified, 1);
+        assert_eq!(summary.total_text_edits, 1);
+        assert_eq!(summary.creates, 1);
+        assert_eq!(summary.deletes, 1);
+        assert_eq!(summary.renames, 1);
+    }
+
+    #[test]
+    fn workspace_edit_summary_display() {
+        let s = WorkspaceEditSummary {
+            files_modified: 2,
+            total_text_edits: 5,
+            renames: 1,
+            creates: 0,
+            deletes: 0,
+        };
+        let text = format!("{s}");
+        assert!(text.contains("2 files modified"));
+        assert!(text.contains("5 edits"));
+    }
+
+    #[test]
+    fn uri_extension_extracts() {
+        assert_eq!(uri_extension("file:///src/main.rs"), Some("rs"));
+        assert_eq!(uri_extension("file:///README"), None);
+    }
+
+    #[test]
+    fn uri_filename_extracts() {
+        assert_eq!(uri_filename("file:///src/main.rs"), Some("main.rs"));
+        assert_eq!(uri_filename("/a/b/c.txt"), Some("c.txt"));
+    }
+
+    #[test]
+    fn uri_matches_glob_wildcard_ext() {
+        assert!(uri_matches_glob("file:///src/main.rs", "*.rs"));
+        assert!(!uri_matches_glob("file:///src/main.ts", "*.rs"));
+    }
+
+    #[test]
+    fn uri_matches_glob_star() {
+        assert!(uri_matches_glob("anything", "*"));
+    }
+
+    #[test]
+    fn uri_matches_glob_prefix() {
+        assert!(uri_matches_glob("file:///src/lib.rs", "file:///src/*"));
+        assert!(!uri_matches_glob("file:///other/lib.rs", "file:///src/*"));
     }
 }

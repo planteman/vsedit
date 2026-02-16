@@ -725,6 +725,164 @@ pub fn select_word_at(
 }
 
 // ---------------------------------------------------------------------------
+// Cursor sorting
+// ---------------------------------------------------------------------------
+
+/// Sort cursors by position (line first, then column).
+pub fn sort_cursors(cursors: &mut [CursorState]) {
+    cursors.sort_by(|a, b| {
+        let pa = a.position();
+        let pb = b.position();
+        pa.line.cmp(&pb.line).then(pa.column.cmp(&pb.column))
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Cursor column alignment
+// ---------------------------------------------------------------------------
+
+/// Align all cursors to a specific column.
+pub fn align_cursors_to_column(cursors: &mut [CursorState], column: u32) {
+    for cursor in cursors.iter_mut() {
+        let pos = cursor.position();
+        let new_pos = Position::new(pos.line, column);
+        *cursor = CursorState::from_position(new_pos);
+    }
+}
+
+/// Align all cursors to the maximum column among them.
+pub fn align_cursors_to_max_column(cursors: &mut [CursorState]) {
+    let max_col = cursors.iter().map(|c| c.position().column).max().unwrap_or(1);
+    align_cursors_to_column(cursors, max_col);
+}
+
+// ---------------------------------------------------------------------------
+// Cursor serialization
+// ---------------------------------------------------------------------------
+
+/// Serialize cursor positions to a compact string format.
+///
+/// Each cursor is represented as `line:column` separated by semicolons.
+pub fn serialize_cursors(cursors: &[CursorState]) -> String {
+    cursors
+        .iter()
+        .map(|c| {
+            let p = c.position();
+            format!("{}:{}", p.line, p.column)
+        })
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
+/// Deserialize cursor positions from the compact string format.
+///
+/// Returns `None` if the input is malformed.
+pub fn deserialize_cursors(input: &str) -> Option<Vec<CursorState>> {
+    if input.is_empty() {
+        return Some(Vec::new());
+    }
+    let mut cursors = Vec::new();
+    for part in input.split(';') {
+        let mut parts = part.split(':');
+        let line: u32 = parts.next()?.parse().ok()?;
+        let column: u32 = parts.next()?.parse().ok()?;
+        if parts.next().is_some() {
+            return None;
+        }
+        cursors.push(CursorState::from_position(Position::new(line, column)));
+    }
+    Some(cursors)
+}
+
+// ---------------------------------------------------------------------------
+// Cursor movement patterns
+// ---------------------------------------------------------------------------
+
+/// Move a cursor to the beginning of the current word, or to the previous
+/// word boundary if already at one.
+pub fn move_to_word_start(cursor: &CursorState, model: &dyn ITextModel) -> CursorState {
+    let pos = cursor.position();
+    let line_content = model.get_line_content(pos.line);
+    let col_idx = (pos.column as usize).saturating_sub(1);
+    let bytes = line_content.as_bytes();
+
+    // Skip whitespace going left
+    let mut i = col_idx;
+    while i > 0 && bytes.get(i - 1).map_or(false, |b| b.is_ascii_whitespace()) {
+        i -= 1;
+    }
+    // Skip word chars going left
+    while i > 0 && bytes.get(i - 1).map_or(false, |b| b.is_ascii_alphanumeric() || *b == b'_') {
+        i -= 1;
+    }
+
+    CursorState::from_position(Position::new(pos.line, (i as u32) + 1))
+}
+
+/// Move a cursor to the end of the current word, or to the next
+/// word boundary if already at one.
+pub fn move_to_word_end(cursor: &CursorState, model: &dyn ITextModel) -> CursorState {
+    let pos = cursor.position();
+    let line_content = model.get_line_content(pos.line);
+    let col_idx = (pos.column as usize).saturating_sub(1);
+    let len = line_content.len();
+    let bytes = line_content.as_bytes();
+
+    let mut i = col_idx;
+    // Skip word chars going right
+    while i < len && bytes.get(i).map_or(false, |b| b.is_ascii_alphanumeric() || *b == b'_') {
+        i += 1;
+    }
+    // Skip whitespace going right
+    while i < len && bytes.get(i).map_or(false, |b| b.is_ascii_whitespace()) {
+        i += 1;
+    }
+
+    CursorState::from_position(Position::new(pos.line, (i as u32) + 1))
+}
+
+/// Check if two cursor states overlap (same position or intersecting selections).
+pub fn cursors_overlap(a: &CursorState, b: &CursorState) -> bool {
+    if !a.is_selection() && !b.is_selection() {
+        return a.position() == b.position();
+    }
+    let a_start = std::cmp::min(a.selection.anchor, a.selection.active);
+    let a_end = std::cmp::max(a.selection.anchor, a.selection.active);
+    let b_start = std::cmp::min(b.selection.anchor, b.selection.active);
+    let b_end = std::cmp::max(b.selection.anchor, b.selection.active);
+    a_start <= b_end && b_start <= a_end
+}
+
+/// Compute a summary of cursor positions.
+#[derive(Debug, Clone)]
+pub struct CursorSummary {
+    pub count: usize,
+    pub min_line: u32,
+    pub max_line: u32,
+    pub lines_with_cursors: usize,
+}
+
+/// Summarize the cursor positions in a controller.
+pub fn cursor_summary(ctrl: &CursorController) -> CursorSummary {
+    let cursors = ctrl.get_all();
+    let mut lines = std::collections::BTreeSet::new();
+    let mut min_line = u32::MAX;
+    let mut max_line = 0;
+    for c in cursors {
+        let l = c.position().line;
+        lines.insert(l);
+        min_line = min_line.min(l);
+        max_line = max_line.max(l);
+    }
+    CursorSummary {
+        count: cursors.len(),
+        min_line,
+        max_line,
+        lines_with_cursors: lines.len(),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1362,5 +1520,103 @@ mod tests {
         ctrl.add_cursor(Position::new(2, 1));
         ctrl.add_cursor(Position::new(3, 1));
         assert_eq!(format!("{ctrl}"), "3 cursors");
+    }
+
+    // -- new tests --
+
+    #[test]
+    fn sort_cursors_orders_by_line_then_column() {
+        let mut cursors = vec![
+            cursor_at(5, 3),
+            cursor_at(1, 10),
+            cursor_at(1, 1),
+            cursor_at(3, 5),
+        ];
+        sort_cursors(&mut cursors);
+        assert_eq!(cursors[0].position(), Position::new(1, 1));
+        assert_eq!(cursors[1].position(), Position::new(1, 10));
+        assert_eq!(cursors[2].position(), Position::new(3, 5));
+        assert_eq!(cursors[3].position(), Position::new(5, 3));
+    }
+
+    #[test]
+    fn align_cursors_to_column_sets_all() {
+        let mut cursors = vec![cursor_at(1, 5), cursor_at(2, 10), cursor_at(3, 1)];
+        align_cursors_to_column(&mut cursors, 7);
+        for c in &cursors {
+            assert_eq!(c.position().column, 7);
+        }
+    }
+
+    #[test]
+    fn align_cursors_to_max_column_uses_max() {
+        let mut cursors = vec![cursor_at(1, 5), cursor_at(2, 10), cursor_at(3, 1)];
+        align_cursors_to_max_column(&mut cursors);
+        for c in &cursors {
+            assert_eq!(c.position().column, 10);
+        }
+    }
+
+    #[test]
+    fn serialize_and_deserialize_roundtrip() {
+        let cursors = vec![cursor_at(1, 1), cursor_at(5, 10), cursor_at(100, 42)];
+        let serialized = serialize_cursors(&cursors);
+        assert_eq!(serialized, "1:1;5:10;100:42");
+        let deserialized = deserialize_cursors(&serialized).unwrap();
+        assert_eq!(deserialized.len(), 3);
+        assert_eq!(deserialized[0].position(), Position::new(1, 1));
+        assert_eq!(deserialized[2].position(), Position::new(100, 42));
+    }
+
+    #[test]
+    fn deserialize_cursors_empty_string() {
+        let result = deserialize_cursors("").unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn deserialize_cursors_malformed_returns_none() {
+        assert!(deserialize_cursors("abc").is_none());
+        assert!(deserialize_cursors("1:2:3").is_none());
+    }
+
+    #[test]
+    fn move_to_word_start_from_middle() {
+        let model = SimpleModel::new("hello world");
+        let cursor = cursor_at(1, 8); // in the middle of "world"
+        let result = move_to_word_start(&cursor, &model);
+        assert_eq!(result.position(), Position::new(1, 7)); // start of "world"
+    }
+
+    #[test]
+    fn move_to_word_end_from_middle() {
+        let model = SimpleModel::new("hello world");
+        let cursor = cursor_at(1, 2); // in the middle of "hello"
+        let result = move_to_word_end(&cursor, &model);
+        // Should move past "ello" and the space to "world" start
+        assert_eq!(result.position().line, 1);
+        assert!(result.position().column > 2);
+    }
+
+    #[test]
+    fn cursors_overlap_same_position() {
+        assert!(cursors_overlap(&cursor_at(1, 1), &cursor_at(1, 1)));
+    }
+
+    #[test]
+    fn cursors_overlap_different_positions() {
+        assert!(!cursors_overlap(&cursor_at(1, 1), &cursor_at(2, 1)));
+    }
+
+    #[test]
+    fn cursor_summary_basic() {
+        let mut ctrl = CursorController::new();
+        ctrl.add_cursor(Position::new(5, 1));
+        ctrl.add_cursor(Position::new(10, 1));
+        let s = cursor_summary(&ctrl);
+        assert_eq!(s.count, 3);
+        assert_eq!(s.min_line, 1);
+        assert_eq!(s.max_line, 10);
+        assert_eq!(s.lines_with_cursors, 3);
     }
 }

@@ -887,6 +887,145 @@ impl ActivationEvent {
     }
 }
 
+// ---------------------------------------------------------------------------
+// API versioning helpers
+// ---------------------------------------------------------------------------
+
+/// Parsed semver version for API compatibility checks.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SemVer {
+    pub major: u32,
+    pub minor: u32,
+    pub patch: u32,
+}
+
+impl SemVer {
+    /// Parse a "major.minor.patch" string.
+    pub fn parse(s: &str) -> Option<Self> {
+        let (major, minor, patch) = parse_semver(s)?;
+        Some(Self { major, minor, patch })
+    }
+
+    /// Check if `self` satisfies a `^required` constraint (same major, >= required).
+    pub fn satisfies_caret(&self, required: &SemVer) -> bool {
+        if self.major != required.major {
+            return false;
+        }
+        (self.minor, self.patch) >= (required.minor, required.patch)
+    }
+
+    /// Format as a version string.
+    pub fn to_string(&self) -> String {
+        format!("{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
+impl fmt::Display for SemVer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Capability enumeration
+// ---------------------------------------------------------------------------
+
+/// Enumerate all capability names and their current values.
+pub fn enumerate_capabilities(caps: &ApiCapabilities) -> Vec<(&'static str, bool)> {
+    vec![
+        ("proposedApi", caps.supports_proposed_api),
+        ("webview", caps.supports_webview),
+        ("terminal", caps.supports_terminal),
+        ("debug", caps.supports_debug),
+        ("notebook", caps.supports_notebook),
+        ("chat", caps.supports_chat),
+        ("languageModels", caps.supports_language_models),
+        ("testing", caps.supports_testing),
+        ("authentication", caps.supports_authentication),
+        ("customEditors", caps.supports_custom_editors),
+    ]
+}
+
+/// Count the number of enabled capabilities.
+pub fn count_enabled_capabilities(caps: &ApiCapabilities) -> usize {
+    enumerate_capabilities(caps)
+        .iter()
+        .filter(|(_, v)| *v)
+        .count()
+}
+
+// ---------------------------------------------------------------------------
+// Extension metadata validation
+// ---------------------------------------------------------------------------
+
+/// Errors that can occur when validating extension metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExtensionMetadataError {
+    /// The extension ID is empty or invalid.
+    InvalidId(String),
+    /// The display name is empty.
+    EmptyDisplayName,
+    /// The engine version constraint is not satisfied.
+    IncompatibleEngine { required: String, current: String },
+    /// An activation event string is not recognized.
+    InvalidActivationEvent(String),
+}
+
+impl fmt::Display for ExtensionMetadataError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidId(id) => write!(f, "invalid extension id: '{id}'"),
+            Self::EmptyDisplayName => write!(f, "display name must not be empty"),
+            Self::IncompatibleEngine { required, current } =>
+                write!(f, "engine {current} does not satisfy {required}"),
+            Self::InvalidActivationEvent(ev) =>
+                write!(f, "unrecognized activation event: '{ev}'"),
+        }
+    }
+}
+
+/// Metadata for a VS Code extension (subset of package.json fields).
+#[derive(Debug, Clone)]
+pub struct ExtensionMetadata {
+    pub id: String,
+    pub display_name: String,
+    pub version: String,
+    pub engine_version: String,
+    pub activation_events: Vec<String>,
+}
+
+/// Validate extension metadata, returning all errors found.
+pub fn validate_extension_metadata(meta: &ExtensionMetadata) -> Vec<ExtensionMetadataError> {
+    let mut errors = Vec::new();
+
+    // ID must be "publisher.name" format
+    if meta.id.is_empty() || !meta.id.contains('.') {
+        errors.push(ExtensionMetadataError::InvalidId(meta.id.clone()));
+    }
+
+    if meta.display_name.trim().is_empty() {
+        errors.push(ExtensionMetadataError::EmptyDisplayName);
+    }
+
+    // Check engine compatibility
+    let check = ApiVersionCheck::new(API_VERSION);
+    if !check.is_compatible(&meta.engine_version) {
+        errors.push(ExtensionMetadataError::IncompatibleEngine {
+            required: meta.engine_version.clone(),
+            current: API_VERSION.to_string(),
+        });
+    }
+
+    // Validate activation events
+    for ev in &meta.activation_events {
+        if ActivationEvent::parse(ev).is_none() {
+            errors.push(ExtensionMetadataError::InvalidActivationEvent(ev.clone()));
+        }
+    }
+
+    errors
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1358,5 +1497,88 @@ mod tests {
         let s = caps.to_string();
         assert!(s.contains("terminal"));
         assert!(s.contains("debug"));
+    }
+
+    #[test]
+    fn semver_parse_and_display() {
+        let v = SemVer::parse("1.70.3").unwrap();
+        assert_eq!(v.major, 1);
+        assert_eq!(v.minor, 70);
+        assert_eq!(v.patch, 3);
+        assert_eq!(v.to_string(), "1.70.3");
+        assert!(SemVer::parse("bad").is_none());
+    }
+
+    #[test]
+    fn semver_satisfies_caret() {
+        let current = SemVer::parse("1.110.0").unwrap();
+        let req = SemVer::parse("1.70.0").unwrap();
+        assert!(current.satisfies_caret(&req));
+        let req_higher = SemVer::parse("1.120.0").unwrap();
+        assert!(!current.satisfies_caret(&req_higher));
+        // Different major
+        let v2 = SemVer::parse("2.0.0").unwrap();
+        assert!(!v2.satisfies_caret(&req));
+    }
+
+    #[test]
+    fn enumerate_capabilities_returns_all() {
+        let caps = ApiCapabilities::default();
+        let all = enumerate_capabilities(&caps);
+        assert_eq!(all.len(), 10);
+        let enabled = count_enabled_capabilities(&caps);
+        assert!(enabled >= 4); // terminal, debug, testing, authentication
+    }
+
+    #[test]
+    fn validate_extension_metadata_valid() {
+        let meta = ExtensionMetadata {
+            id: "publisher.my-ext".into(),
+            display_name: "My Extension".into(),
+            version: "0.1.0".into(),
+            engine_version: "1.70.0".into(),
+            activation_events: vec!["onLanguage:rust".into(), "*".into()],
+        };
+        let errors = validate_extension_metadata(&meta);
+        assert!(errors.is_empty(), "expected no errors, got: {:?}", errors);
+    }
+
+    #[test]
+    fn validate_extension_metadata_invalid_id() {
+        let meta = ExtensionMetadata {
+            id: "no-dot".into(),
+            display_name: "Name".into(),
+            version: "0.1.0".into(),
+            engine_version: "1.70.0".into(),
+            activation_events: vec![],
+        };
+        let errors = validate_extension_metadata(&meta);
+        assert!(errors.iter().any(|e| matches!(e, ExtensionMetadataError::InvalidId(_))));
+    }
+
+    #[test]
+    fn validate_extension_metadata_bad_activation_event() {
+        let meta = ExtensionMetadata {
+            id: "pub.ext".into(),
+            display_name: "Name".into(),
+            version: "0.1.0".into(),
+            engine_version: "1.70.0".into(),
+            activation_events: vec!["badPrefix:value".into()],
+        };
+        let errors = validate_extension_metadata(&meta);
+        assert!(errors.iter().any(|e| matches!(e, ExtensionMetadataError::InvalidActivationEvent(_))));
+    }
+
+    #[test]
+    fn validate_extension_metadata_empty_display_name() {
+        let meta = ExtensionMetadata {
+            id: "pub.ext".into(),
+            display_name: "   ".into(),
+            version: "0.1.0".into(),
+            engine_version: "1.70.0".into(),
+            activation_events: vec![],
+        };
+        let errors = validate_extension_metadata(&meta);
+        assert!(errors.iter().any(|e| matches!(e, ExtensionMetadataError::EmptyDisplayName)));
     }
 }

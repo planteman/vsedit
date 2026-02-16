@@ -776,6 +776,132 @@ pub fn compute_diff_hash(old_content: &str, new_content: &str) -> DiffHashResult
     }
 }
 
+// ---------------------------------------------------------------------------
+// CRC32 string convenience and incremental hashing
+// ---------------------------------------------------------------------------
+
+/// Compute CRC32 of a string (convenience wrapper).
+pub fn crc32_str(s: &str) -> u32 {
+    crc32(s.as_bytes())
+}
+
+/// Incremental hasher that feeds data in chunks and produces a final SHA-256 digest.
+pub struct IncrementalHasher {
+    hasher: Sha256,
+    bytes_fed: usize,
+}
+
+impl IncrementalHasher {
+    /// Create a new incremental hasher.
+    pub fn new() -> Self {
+        Self {
+            hasher: Sha256::new(),
+            bytes_fed: 0,
+        }
+    }
+
+    /// Feed a chunk of data into the hasher.
+    pub fn update(&mut self, data: &[u8]) {
+        self.hasher.update(data);
+        self.bytes_fed += data.len();
+    }
+
+    /// Feed a string into the hasher.
+    pub fn update_str(&mut self, s: &str) {
+        self.update(s.as_bytes());
+    }
+
+    /// Return the total number of bytes fed so far.
+    pub fn bytes_fed(&self) -> usize {
+        self.bytes_fed
+    }
+
+    /// Finalize and return the hex-encoded SHA-256 digest.
+    /// Consumes the hasher.
+    pub fn finalize(self) -> String {
+        let result = self.hasher.finalize();
+        hex_encode(&result)
+    }
+}
+
+impl Default for IncrementalHasher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hash-based content deduplication
+// ---------------------------------------------------------------------------
+
+/// A deduplication store that tracks content by its SHA-256 hash.
+/// Returns whether content was already seen.
+pub struct ContentDedup {
+    seen: std::collections::HashSet<String>,
+}
+
+impl ContentDedup {
+    /// Create a new empty dedup store.
+    pub fn new() -> Self {
+        Self {
+            seen: std::collections::HashSet::new(),
+        }
+    }
+
+    /// Insert content. Returns `true` if the content is new (not a duplicate),
+    /// `false` if it was already present.
+    pub fn insert(&mut self, content: &str) -> bool {
+        let hash = sha256_string(content);
+        self.seen.insert(hash)
+    }
+
+    /// Check if content has already been seen.
+    pub fn contains(&self, content: &str) -> bool {
+        let hash = sha256_string(content);
+        self.seen.contains(&hash)
+    }
+
+    /// Number of unique items tracked.
+    pub fn len(&self) -> usize {
+        self.seen.len()
+    }
+
+    /// Returns `true` if no items have been inserted.
+    pub fn is_empty(&self) -> bool {
+        self.seen.is_empty()
+    }
+}
+
+impl Default for ContentDedup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hash comparison utilities
+// ---------------------------------------------------------------------------
+
+/// Compare two hex digest strings in constant time (to avoid timing attacks).
+/// Both must be the same length; returns `false` if lengths differ.
+pub fn constant_time_eq(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut result: u8 = 0;
+    for (x, y) in a.bytes().zip(b.bytes()) {
+        result |= x ^ y;
+    }
+    result == 0
+}
+
+/// Extract the version field from a UUID v4 string.
+/// Returns `Some(4)` for valid v4 UUIDs.
+pub fn uuid_version(uuid_str: &str) -> Option<u8> {
+    let parsed = uuid::Uuid::parse_str(uuid_str).ok()?;
+    Some(parsed.get_version_num() as u8)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1376,5 +1502,79 @@ mod tests {
         assert!(upper.chars().all(|c| c.is_ascii_hexdigit()));
         // Spot-check that it actually contains uppercase letters
         assert!(upper.chars().any(|c| c.is_ascii_uppercase()));
+    }
+
+    #[test]
+    fn crc32_str_deterministic() {
+        let a = crc32_str("hello world");
+        let b = crc32_str("hello world");
+        assert_eq!(a, b);
+        assert_ne!(crc32_str("hello"), crc32_str("world"));
+    }
+
+    #[test]
+    fn crc32_empty_input() {
+        // CRC32 of empty input should be a known constant (0x00000000)
+        let c = crc32(b"");
+        assert_eq!(c, 0x0000_0000);
+    }
+
+    #[test]
+    fn incremental_hasher_matches_oneshot() {
+        let oneshot = sha256_hex(b"hello world");
+        let mut inc = IncrementalHasher::new();
+        inc.update(b"hello ");
+        inc.update(b"world");
+        assert_eq!(inc.bytes_fed(), 11);
+        assert_eq!(inc.finalize(), oneshot);
+    }
+
+    #[test]
+    fn incremental_hasher_empty() {
+        let inc = IncrementalHasher::new();
+        assert_eq!(inc.bytes_fed(), 0);
+        let digest = inc.finalize();
+        assert_eq!(digest, sha256_hex(b""));
+    }
+
+    #[test]
+    fn content_dedup_tracks_unique() {
+        let mut dedup = ContentDedup::new();
+        assert!(dedup.is_empty());
+        assert!(dedup.insert("hello"));
+        assert!(!dedup.insert("hello")); // duplicate
+        assert!(dedup.insert("world"));
+        assert_eq!(dedup.len(), 2);
+        assert!(dedup.contains("hello"));
+        assert!(!dedup.contains("unknown"));
+    }
+
+    #[test]
+    fn constant_time_eq_same() {
+        let a = sha256_string("test");
+        assert!(constant_time_eq(&a, &a));
+    }
+
+    #[test]
+    fn constant_time_eq_different() {
+        let a = sha256_string("test1");
+        let b = sha256_string("test2");
+        assert!(!constant_time_eq(&a, &b));
+    }
+
+    #[test]
+    fn constant_time_eq_different_length() {
+        assert!(!constant_time_eq("abc", "abcd"));
+    }
+
+    #[test]
+    fn uuid_version_v4() {
+        let id = generate_uuid();
+        assert_eq!(uuid_version(&id), Some(4));
+    }
+
+    #[test]
+    fn uuid_version_invalid() {
+        assert_eq!(uuid_version("not-a-uuid"), None);
     }
 }

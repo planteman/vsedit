@@ -859,6 +859,177 @@ impl ErrorClassifier {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Error chain formatting
+// ---------------------------------------------------------------------------
+
+/// Format an error chain as a multi-line string with indentation.
+pub fn format_error_chain(chain: &ErrorChain) -> String {
+    let mut out = String::new();
+    for (i, (ctx, error)) in chain.errors.iter().enumerate() {
+        let indent = "  ".repeat(i);
+        if ctx.is_empty() {
+            out.push_str(&format!("{indent}[{}] {error}\n", error.code()));
+        } else {
+            out.push_str(&format!("{indent}[{}] {ctx}: {error}\n", error.code()));
+        }
+    }
+    out
+}
+
+/// Format an error chain as a single-line summary (suitable for logs).
+pub fn format_error_chain_oneline(chain: &ErrorChain) -> String {
+    chain
+        .errors
+        .iter()
+        .map(|(ctx, error)| {
+            if ctx.is_empty() {
+                error.to_string()
+            } else {
+                format!("{ctx}: {error}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" -> ")
+}
+
+// ---------------------------------------------------------------------------
+// Error rate tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks error rates over a sliding window of time buckets.
+#[derive(Debug, Clone)]
+pub struct ErrorRateTracker {
+    /// Each bucket counts errors in a time window.
+    buckets: Vec<u64>,
+    /// Duration of each bucket in seconds.
+    bucket_duration: u64,
+    /// Index of the current bucket.
+    current_bucket: usize,
+    /// Timestamp when the current bucket started.
+    current_bucket_start: u64,
+}
+
+impl ErrorRateTracker {
+    /// Create a new tracker with the given number of buckets and bucket duration.
+    pub fn new(num_buckets: usize, bucket_duration: u64) -> Self {
+        Self {
+            buckets: vec![0; num_buckets.max(1)],
+            bucket_duration: bucket_duration.max(1),
+            current_bucket: 0,
+            current_bucket_start: 0,
+        }
+    }
+
+    /// Record an error at the given timestamp.
+    pub fn record_error(&mut self, timestamp: u64) {
+        self.advance_to(timestamp);
+        self.buckets[self.current_bucket] += 1;
+    }
+
+    /// Advance time, zeroing out any buckets that have been skipped.
+    fn advance_to(&mut self, timestamp: u64) {
+        if timestamp < self.current_bucket_start {
+            return;
+        }
+        let elapsed = timestamp - self.current_bucket_start;
+        let buckets_to_advance = (elapsed / self.bucket_duration) as usize;
+        if buckets_to_advance == 0 {
+            return;
+        }
+        let n = self.buckets.len();
+        for i in 1..=buckets_to_advance.min(n) {
+            let idx = (self.current_bucket + i) % n;
+            self.buckets[idx] = 0;
+        }
+        self.current_bucket = (self.current_bucket + buckets_to_advance) % n;
+        self.current_bucket_start += buckets_to_advance as u64 * self.bucket_duration;
+    }
+
+    /// Total errors across all buckets.
+    pub fn total_errors(&self) -> u64 {
+        self.buckets.iter().sum()
+    }
+
+    /// Average errors per bucket.
+    pub fn average_rate(&self) -> f64 {
+        self.total_errors() as f64 / self.buckets.len() as f64
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Error context enrichment
+// ---------------------------------------------------------------------------
+
+/// Enriches a `VsError` with additional context key-value pairs.
+#[derive(Debug)]
+pub struct EnrichedError {
+    pub error: VsError,
+    pub context: Vec<(String, String)>,
+}
+
+impl EnrichedError {
+    /// Wrap an error with no initial context.
+    pub fn new(error: VsError) -> Self {
+        Self { error, context: Vec::new() }
+    }
+
+    /// Add a key-value context pair.
+    pub fn with(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.context.push((key.into(), value.into()));
+        self
+    }
+
+    /// Format the enriched error for display.
+    pub fn format(&self) -> String {
+        let mut out = self.error.to_string();
+        if !self.context.is_empty() {
+            let ctx: Vec<String> = self.context.iter().map(|(k, v)| format!("{k}={v}")).collect();
+            out.push_str(&format!(" [{}]", ctx.join(", ")));
+        }
+        out
+    }
+}
+
+impl fmt::Display for EnrichedError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.format())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Error recovery suggestions
+// ---------------------------------------------------------------------------
+
+/// Returns a user-facing recovery suggestion for the given error.
+pub fn recovery_suggestion(error: &VsError) -> &'static str {
+    match error {
+        VsError::Cancelled => "The operation was cancelled. You can try again.",
+        VsError::NotFound(_) => "The requested resource was not found. Check the path or name.",
+        VsError::PermissionDenied(_) => "Permission was denied. Check file permissions or authentication.",
+        VsError::ReadOnly(_) => "The resource is read-only. Open it in a writable mode.",
+        VsError::NotImplemented(_) => "This feature is not yet implemented. Check for updates.",
+        VsError::NotSupported(_) => "This operation is not supported in the current environment.",
+        VsError::IllegalArgument(_) => "An invalid argument was provided. Check the input values.",
+        VsError::IllegalState(_) => "The system is in an unexpected state. Try restarting.",
+        VsError::User(_) => "Please review the error message and correct the issue.",
+        VsError::Io(_) => "A system I/O error occurred. Check disk space and connectivity.",
+        VsError::Other(_) => "An unexpected error occurred. Check the logs for details.",
+    }
+}
+
+/// Returns `true` if the error typically requires user intervention to resolve.
+pub fn requires_user_action(error: &VsError) -> bool {
+    matches!(
+        error,
+        VsError::User(_)
+            | VsError::IllegalArgument(_)
+            | VsError::NotFound(_)
+            | VsError::PermissionDenied(_)
+            | VsError::ReadOnly(_)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1393,5 +1564,60 @@ mod tests {
         assert!(!ErrorClassifier::is_retriable(&VsError::NotFound(
             "x".into()
         )));
+    }
+
+    #[test]
+    fn format_error_chain_multiline() {
+        let chain = ErrorChain::new(VsError::NotFound("file.txt".into()))
+            .with_context("loading config", VsError::IllegalState("missing config".into()));
+        let formatted = format_error_chain(&chain);
+        assert!(formatted.contains("NOT_FOUND"));
+        assert!(formatted.contains("loading config"));
+        assert!(formatted.lines().count() >= 2);
+    }
+
+    #[test]
+    fn format_error_chain_oneline_joins() {
+        let chain = ErrorChain::new(VsError::Cancelled)
+            .with_context("retry", VsError::Cancelled);
+        let oneline = format_error_chain_oneline(&chain);
+        assert!(oneline.contains(" -> "));
+    }
+
+    #[test]
+    fn error_rate_tracker_records_and_counts() {
+        let mut tracker = ErrorRateTracker::new(5, 10);
+        tracker.record_error(0);
+        tracker.record_error(5);
+        tracker.record_error(15);
+        assert_eq!(tracker.total_errors(), 3);
+        assert!((tracker.average_rate() - 0.6).abs() < 0.01);
+    }
+
+    #[test]
+    fn enriched_error_format_with_context() {
+        let enriched = EnrichedError::new(VsError::NotFound("data.json".into()))
+            .with("component", "loader")
+            .with("attempt", "3");
+        let out = enriched.format();
+        assert!(out.contains("Not found: data.json"));
+        assert!(out.contains("component=loader"));
+        assert!(out.contains("attempt=3"));
+    }
+
+    #[test]
+    fn recovery_suggestion_gives_advice() {
+        let suggestion = recovery_suggestion(&VsError::PermissionDenied("secret".into()));
+        assert!(suggestion.contains("Permission"));
+        let suggestion2 = recovery_suggestion(&VsError::Cancelled);
+        assert!(suggestion2.contains("try again"));
+    }
+
+    #[test]
+    fn requires_user_action_classifies_correctly() {
+        assert!(requires_user_action(&VsError::NotFound("x".into())));
+        assert!(requires_user_action(&VsError::User("oops".into())));
+        assert!(!requires_user_action(&VsError::Cancelled));
+        assert!(!requires_user_action(&VsError::IllegalState("bad".into())));
     }
 }

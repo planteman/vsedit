@@ -726,6 +726,149 @@ impl LinkValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Link normalization
+// ---------------------------------------------------------------------------
+
+/// Normalize a URL by lowercasing the scheme and host, and removing trailing slashes
+/// from the path (unless the path is exactly "/").
+pub fn normalize_url(url: &str) -> String {
+    let (scheme, rest) = match url.split_once("://") {
+        Some(pair) => pair,
+        None => return url.to_string(),
+    };
+    let scheme_lower = scheme.to_lowercase();
+    let (authority, path) = match rest.find('/') {
+        Some(i) => (&rest[..i], &rest[i..]),
+        None => (rest, ""),
+    };
+    let authority_lower = authority.to_lowercase();
+    let trimmed_path = if path.len() > 1 {
+        path.trim_end_matches('/')
+    } else {
+        path
+    };
+    if trimmed_path.is_empty() {
+        format!("{scheme_lower}://{authority_lower}")
+    } else {
+        format!("{scheme_lower}://{authority_lower}{trimmed_path}")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Link deduplication
+// ---------------------------------------------------------------------------
+
+/// Deduplicate classified links by their normalized text, keeping the first occurrence.
+pub fn dedup_links(links: &[ClassifiedLink]) -> Vec<ClassifiedLink> {
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::new();
+    for link in links {
+        let key = normalize_url(&link.text);
+        if seen.insert(key) {
+            result.push(link.clone());
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Link sorting
+// ---------------------------------------------------------------------------
+
+/// Sort classified links alphabetically by their text (case-insensitive).
+pub fn sort_links_by_text(links: &mut [ClassifiedLink]) {
+    links.sort_by(|a, b| {
+        a.text
+            .to_lowercase()
+            .cmp(&b.text.to_lowercase())
+    });
+}
+
+/// Sort classified links by their byte start position.
+pub fn sort_links_by_position(links: &mut [ClassifiedLink]) {
+    links.sort_by_key(|l| l.start);
+}
+
+// ---------------------------------------------------------------------------
+// Batch link validation
+// ---------------------------------------------------------------------------
+
+/// Result of validating a single link within a batch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkValidationResult {
+    pub text: String,
+    pub valid: bool,
+    pub error: Option<String>,
+}
+
+/// Validate a batch of classified links, returning a result per link.
+pub fn validate_links_batch(links: &[ClassifiedLink]) -> Vec<LinkValidationResult> {
+    let validator = LinkValidator::new();
+    links
+        .iter()
+        .map(|link| {
+            let result = match link.classification {
+                LinkClassification::Url => validator.validate_url(&link.text),
+                LinkClassification::FilePath => validator.validate_file_path(&link.text),
+                LinkClassification::Email => validator.validate_email(&link.text),
+                LinkClassification::Custom(_) => Ok(()),
+            };
+            LinkValidationResult {
+                text: link.text.clone(),
+                valid: result.is_ok(),
+                error: result.err().map(|e| e.to_string()),
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Link statistics
+// ---------------------------------------------------------------------------
+
+/// Aggregated statistics about a collection of classified links.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LinkStatistics {
+    pub total: usize,
+    pub url_count: usize,
+    pub file_count: usize,
+    pub email_count: usize,
+    pub custom_count: usize,
+    pub unique_domains: usize,
+}
+
+/// Compute aggregated statistics for a set of classified links.
+pub fn link_statistics(links: &[ClassifiedLink]) -> LinkStatistics {
+    let mut url_count = 0usize;
+    let mut file_count = 0usize;
+    let mut email_count = 0usize;
+    let mut custom_count = 0usize;
+    let mut domains = std::collections::HashSet::new();
+
+    for link in links {
+        match &link.classification {
+            LinkClassification::Url => {
+                url_count += 1;
+                if let Some(d) = extract_domain(&link.text) {
+                    domains.insert(d.to_lowercase());
+                }
+            }
+            LinkClassification::FilePath => file_count += 1,
+            LinkClassification::Email => email_count += 1,
+            LinkClassification::Custom(_) => custom_count += 1,
+        }
+    }
+    LinkStatistics {
+        total: links.len(),
+        url_count,
+        file_count,
+        email_count,
+        custom_count,
+        unique_domains: domains.len(),
+    }
+}
+
 /// Count classified links by type, returning `(url_count, file_count, email_count)`.
 pub fn count_links_by_type(links: &[ClassifiedLink]) -> (usize, usize, usize) {
     let mut urls = 0usize;
@@ -1350,5 +1493,90 @@ mod tests {
             ClassifiedLink { start: 10, end: 11, text: "a@d.com".into(), classification: LinkClassification::Email },
         ];
         assert_eq!(count_links_by_type(&links), (2, 1, 3));
+    }
+
+    #[test]
+    fn normalize_url_lowercases_scheme_and_host() {
+        assert_eq!(normalize_url("HTTPS://EXAMPLE.COM/Path"), "https://example.com/Path");
+        assert_eq!(normalize_url("HTTP://Foo.Bar"), "http://foo.bar");
+    }
+
+    #[test]
+    fn normalize_url_strips_trailing_slashes() {
+        assert_eq!(normalize_url("https://example.com/foo/"), "https://example.com/foo");
+        assert_eq!(normalize_url("https://example.com/foo///"), "https://example.com/foo");
+        // Root path preserved
+        assert_eq!(normalize_url("https://example.com/"), "https://example.com/");
+    }
+
+    #[test]
+    fn dedup_links_removes_duplicates_by_normalized_text() {
+        let links = vec![
+            ClassifiedLink { start: 0, end: 5, text: "https://A.com/path/".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 10, end: 20, text: "https://a.com/path".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 30, end: 40, text: "./file.rs".into(), classification: LinkClassification::FilePath },
+        ];
+        let deduped = dedup_links(&links);
+        assert_eq!(deduped.len(), 2);
+        assert_eq!(deduped[0].text, "https://A.com/path/");
+        assert_eq!(deduped[1].text, "./file.rs");
+    }
+
+    #[test]
+    fn sort_links_by_text_alphabetical() {
+        let mut links = vec![
+            ClassifiedLink { start: 0, end: 1, text: "https://zoo.com".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 2, end: 3, text: "https://alpha.com".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 4, end: 5, text: "https://mid.com".into(), classification: LinkClassification::Url },
+        ];
+        sort_links_by_text(&mut links);
+        assert_eq!(links[0].text, "https://alpha.com");
+        assert_eq!(links[1].text, "https://mid.com");
+        assert_eq!(links[2].text, "https://zoo.com");
+    }
+
+    #[test]
+    fn validate_links_batch_mixed() {
+        let links = vec![
+            ClassifiedLink { start: 0, end: 1, text: "https://valid.com".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 2, end: 3, text: "not-a-url".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 4, end: 5, text: "user@example.com".into(), classification: LinkClassification::Email },
+        ];
+        let results = validate_links_batch(&links);
+        assert_eq!(results.len(), 3);
+        assert!(results[0].valid);
+        assert!(!results[1].valid);
+        assert!(results[1].error.is_some());
+        assert!(results[2].valid);
+    }
+
+    #[test]
+    fn link_statistics_aggregation() {
+        let links = vec![
+            ClassifiedLink { start: 0, end: 1, text: "https://a.com/x".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 2, end: 3, text: "https://a.com/y".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 4, end: 5, text: "https://b.org".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 6, end: 7, text: "./file.rs".into(), classification: LinkClassification::FilePath },
+            ClassifiedLink { start: 8, end: 9, text: "x@y.com".into(), classification: LinkClassification::Email },
+        ];
+        let stats = link_statistics(&links);
+        assert_eq!(stats.total, 5);
+        assert_eq!(stats.url_count, 3);
+        assert_eq!(stats.file_count, 1);
+        assert_eq!(stats.email_count, 1);
+        assert_eq!(stats.unique_domains, 2);
+    }
+
+    #[test]
+    fn sort_links_by_position_orders_correctly() {
+        let mut links = vec![
+            ClassifiedLink { start: 50, end: 60, text: "z".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 10, end: 20, text: "a".into(), classification: LinkClassification::Url },
+            ClassifiedLink { start: 30, end: 40, text: "m".into(), classification: LinkClassification::Url },
+        ];
+        sort_links_by_position(&mut links);
+        assert_eq!(links[0].start, 10);
+        assert_eq!(links[1].start, 30);
+        assert_eq!(links[2].start, 50);
     }
 }

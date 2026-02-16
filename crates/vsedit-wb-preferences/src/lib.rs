@@ -737,6 +737,183 @@ impl ValidationRule {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Preference schema validation
+// ---------------------------------------------------------------------------
+
+/// Validate a value against its preference descriptor's type.
+///
+/// Returns `Ok(())` if the value is compatible with the descriptor's type,
+/// or an error describing the mismatch.
+pub fn validate_value_type(descriptor: &PreferenceDescriptor, value: &str) -> Result<(), PreferenceError> {
+    match descriptor.preference_type {
+        PreferenceType::Boolean => {
+            if value != "true" && value != "false" {
+                return Err(PreferenceError::TypeMismatch(format!(
+                    "expected boolean, got '{value}'"
+                )));
+            }
+        }
+        PreferenceType::Number => {
+            if value.parse::<f64>().is_err() {
+                return Err(PreferenceError::TypeMismatch(format!(
+                    "expected number, got '{value}'"
+                )));
+            }
+        }
+        PreferenceType::Enum => {
+            if !descriptor.enum_values.iter().any(|v| v == value) {
+                return Err(PreferenceError::InvalidValue(format!(
+                    "'{value}' is not one of {:?}",
+                    descriptor.enum_values
+                )));
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Preference migration
+// ---------------------------------------------------------------------------
+
+/// A migration rule that renames a preference key.
+#[derive(Debug, Clone)]
+pub struct PreferenceMigration {
+    pub old_key: String,
+    pub new_key: String,
+    /// Optional value transformer. If `None`, the value is kept as-is.
+    pub transform: Option<fn(&str) -> String>,
+}
+
+impl PreferenceMigration {
+    /// Create a simple key rename migration.
+    pub fn rename(old_key: impl Into<String>, new_key: impl Into<String>) -> Self {
+        Self {
+            old_key: old_key.into(),
+            new_key: new_key.into(),
+            transform: None,
+        }
+    }
+
+    /// Create a migration that also transforms the value.
+    pub fn rename_and_transform(
+        old_key: impl Into<String>,
+        new_key: impl Into<String>,
+        transform: fn(&str) -> String,
+    ) -> Self {
+        Self {
+            old_key: old_key.into(),
+            new_key: new_key.into(),
+            transform: Some(transform),
+        }
+    }
+}
+
+/// Apply a list of migrations to a preferences service.
+///
+/// For each migration, if the old key has an override, it is moved to the new
+/// key (with optional value transformation). Returns the number of migrations applied.
+pub fn apply_migrations(service: &mut PreferencesService, migrations: &[PreferenceMigration]) -> usize {
+    let mut applied = 0;
+    for migration in migrations {
+        if service.has_override(&migration.old_key) {
+            let old_value = service.try_get_value(&migration.old_key)
+                .unwrap_or_default()
+                .to_string();
+            let new_value = match &migration.transform {
+                Some(f) => f(&old_value),
+                None => old_value,
+            };
+            service.reset(&migration.old_key);
+            service.set_override(&migration.new_key, new_value);
+            applied += 1;
+        }
+    }
+    applied
+}
+
+// ---------------------------------------------------------------------------
+// Preference diff computation
+// ---------------------------------------------------------------------------
+
+/// Represents a difference between two preference snapshots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PreferenceDiff {
+    /// A key was added (not in `before`, present in `after`).
+    Added { key: String, value: String },
+    /// A key was removed (present in `before`, not in `after`).
+    Removed { key: String, value: String },
+    /// A key's value changed.
+    Changed { key: String, old_value: String, new_value: String },
+}
+
+/// Compute the diff between two override snapshots.
+pub fn compute_preference_diff(
+    before: &HashMap<String, String>,
+    after: &HashMap<String, String>,
+) -> Vec<PreferenceDiff> {
+    let mut diffs = Vec::new();
+    for (key, val) in after {
+        match before.get(key) {
+            Some(old_val) if old_val != val => {
+                diffs.push(PreferenceDiff::Changed {
+                    key: key.clone(),
+                    old_value: old_val.clone(),
+                    new_value: val.clone(),
+                });
+            }
+            None => {
+                diffs.push(PreferenceDiff::Added {
+                    key: key.clone(),
+                    value: val.clone(),
+                });
+            }
+            _ => {}
+        }
+    }
+    for (key, val) in before {
+        if !after.contains_key(key) {
+            diffs.push(PreferenceDiff::Removed {
+                key: key.clone(),
+                value: val.clone(),
+            });
+        }
+    }
+    diffs.sort_by(|a, b| {
+        let key_a = match a {
+            PreferenceDiff::Added { key, .. }
+            | PreferenceDiff::Removed { key, .. }
+            | PreferenceDiff::Changed { key, .. } => key,
+        };
+        let key_b = match b {
+            PreferenceDiff::Added { key, .. }
+            | PreferenceDiff::Removed { key, .. }
+            | PreferenceDiff::Changed { key, .. } => key,
+        };
+        key_a.cmp(key_b)
+    });
+    diffs
+}
+
+// ---------------------------------------------------------------------------
+// Preference inheritance (layered scopes)
+// ---------------------------------------------------------------------------
+
+/// Resolves a preference value across layered scopes.
+///
+/// Values in layers with higher indices override those in lower indices.
+/// Each layer is a `HashMap<String, String>` of overrides.
+pub fn resolve_layered(key: &str, layers: &[&HashMap<String, String>], default: &str) -> String {
+    for layer in layers.iter().rev() {
+        if let Some(val) = layer.get(key) {
+            return val.clone();
+        }
+    }
+    default.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1392,5 +1569,74 @@ mod tests {
             ValidationRule::NumericRange(0.0, 100.0).description(),
             "value must be within the numeric range"
         );
+    }
+
+    #[test]
+    fn validate_value_type_boolean() {
+        let d = desc("flag", "true", PreferenceScope::Application);
+        let mut d = d;
+        d.preference_type = PreferenceType::Boolean;
+        assert!(validate_value_type(&d, "true").is_ok());
+        assert!(validate_value_type(&d, "false").is_ok());
+        assert!(validate_value_type(&d, "yes").is_err());
+    }
+
+    #[test]
+    fn validate_value_type_number() {
+        let mut d = desc("size", "12", PreferenceScope::Application);
+        d.preference_type = PreferenceType::Number;
+        assert!(validate_value_type(&d, "42").is_ok());
+        assert!(validate_value_type(&d, "3.14").is_ok());
+        assert!(validate_value_type(&d, "abc").is_err());
+    }
+
+    #[test]
+    fn validate_value_type_enum() {
+        let mut d = desc("theme", "dark", PreferenceScope::Application);
+        d.preference_type = PreferenceType::Enum;
+        d.enum_values = vec!["dark".into(), "light".into()];
+        assert!(validate_value_type(&d, "dark").is_ok());
+        assert!(validate_value_type(&d, "blue").is_err());
+    }
+
+    #[test]
+    fn apply_migrations_renames_key() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("old.key", "default", PreferenceScope::Application));
+        svc.register(desc("new.key", "default", PreferenceScope::Application));
+        svc.set_override("old.key", "custom_value");
+        let migrations = vec![PreferenceMigration::rename("old.key", "new.key")];
+        let count = apply_migrations(&mut svc, &migrations);
+        assert_eq!(count, 1);
+        assert!(!svc.has_override("old.key"));
+        assert!(svc.has_override("new.key"));
+        assert_eq!(svc.get_value("new.key"), "custom_value");
+    }
+
+    #[test]
+    fn compute_preference_diff_detects_changes() {
+        let mut before = HashMap::new();
+        before.insert("a".into(), "1".into());
+        before.insert("b".into(), "2".into());
+        let mut after = HashMap::new();
+        after.insert("a".into(), "1".into()); // unchanged
+        after.insert("b".into(), "3".into()); // changed
+        after.insert("c".into(), "4".into()); // added
+        let diffs = compute_preference_diff(&before, &after);
+        assert_eq!(diffs.len(), 2); // changed + added (no removed since 'a' still present)
+        assert!(diffs.iter().any(|d| matches!(d, PreferenceDiff::Changed { key, .. } if key == "b")));
+        assert!(diffs.iter().any(|d| matches!(d, PreferenceDiff::Added { key, .. } if key == "c")));
+    }
+
+    #[test]
+    fn resolve_layered_uses_highest_priority() {
+        let mut global = HashMap::new();
+        global.insert("theme".into(), "dark".into());
+        let mut workspace = HashMap::new();
+        workspace.insert("theme".into(), "light".into());
+        let result = resolve_layered("theme", &[&global, &workspace], "default");
+        assert_eq!(result, "light");
+        let result_missing = resolve_layered("font", &[&global, &workspace], "monospace");
+        assert_eq!(result_missing, "monospace");
     }
 }

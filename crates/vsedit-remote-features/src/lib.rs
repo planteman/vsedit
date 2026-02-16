@@ -808,6 +808,171 @@ impl Default for RemotePortForwardTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Feature capability matrix
+// ---------------------------------------------------------------------------
+
+/// Describes the capability level of a remote feature.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CapabilityLevel {
+    /// Feature is fully supported.
+    Full,
+    /// Feature works but with reduced functionality.
+    Partial,
+    /// Feature is not available.
+    None,
+}
+
+impl fmt::Display for CapabilityLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Full => write!(f, "Full"),
+            Self::Partial => write!(f, "Partial"),
+            Self::None => write!(f, "None"),
+        }
+    }
+}
+
+/// A matrix describing the capability level of each feature for a given
+/// connection type.
+#[derive(Debug, Clone)]
+pub struct CapabilityMatrix {
+    entries: Vec<(ConnectionType, RemoteFeature, CapabilityLevel)>,
+}
+
+impl CapabilityMatrix {
+    /// Create a new empty capability matrix.
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Create a default matrix with sensible defaults for each connection type.
+    pub fn with_defaults() -> Self {
+        let mut m = Self::new();
+        // SSH supports everything
+        for feat in &[
+            RemoteFeature::FileSystem,
+            RemoteFeature::Terminal,
+            RemoteFeature::Debugging,
+            RemoteFeature::Extensions,
+            RemoteFeature::PortForwarding,
+        ] {
+            m.set(ConnectionType::Ssh, feat.clone(), CapabilityLevel::Full);
+        }
+        // WSL: full except port forwarding is partial
+        for feat in &[
+            RemoteFeature::FileSystem,
+            RemoteFeature::Terminal,
+            RemoteFeature::Debugging,
+            RemoteFeature::Extensions,
+        ] {
+            m.set(ConnectionType::Wsl, feat.clone(), CapabilityLevel::Full);
+        }
+        m.set(ConnectionType::Wsl, RemoteFeature::PortForwarding, CapabilityLevel::Partial);
+        // Container: no debugging, partial extensions
+        m.set(ConnectionType::Container, RemoteFeature::FileSystem, CapabilityLevel::Full);
+        m.set(ConnectionType::Container, RemoteFeature::Terminal, CapabilityLevel::Full);
+        m.set(ConnectionType::Container, RemoteFeature::Debugging, CapabilityLevel::None);
+        m.set(ConnectionType::Container, RemoteFeature::Extensions, CapabilityLevel::Partial);
+        m.set(ConnectionType::Container, RemoteFeature::PortForwarding, CapabilityLevel::Full);
+        // Tunnel: partial debugging, partial extensions
+        m.set(ConnectionType::Tunnel, RemoteFeature::FileSystem, CapabilityLevel::Full);
+        m.set(ConnectionType::Tunnel, RemoteFeature::Terminal, CapabilityLevel::Full);
+        m.set(ConnectionType::Tunnel, RemoteFeature::Debugging, CapabilityLevel::Partial);
+        m.set(ConnectionType::Tunnel, RemoteFeature::Extensions, CapabilityLevel::Partial);
+        m.set(ConnectionType::Tunnel, RemoteFeature::PortForwarding, CapabilityLevel::Full);
+        m
+    }
+
+    /// Set the capability level for a (connection_type, feature) pair.
+    pub fn set(&mut self, conn: ConnectionType, feature: RemoteFeature, level: CapabilityLevel) {
+        if let Some(entry) = self
+            .entries
+            .iter_mut()
+            .find(|(c, f, _)| *c == conn && *f == feature)
+        {
+            entry.2 = level;
+        } else {
+            self.entries.push((conn, feature, level));
+        }
+    }
+
+    /// Look up the capability level for a specific connection type and feature.
+    pub fn get(&self, conn: &ConnectionType, feature: &RemoteFeature) -> CapabilityLevel {
+        self.entries
+            .iter()
+            .find(|(c, f, _)| c == conn && f == feature)
+            .map(|(_, _, l)| *l)
+            .unwrap_or(CapabilityLevel::None)
+    }
+
+    /// Return all features that have at least `Partial` support for a
+    /// connection type.
+    pub fn supported_features(&self, conn: &ConnectionType) -> Vec<&RemoteFeature> {
+        self.entries
+            .iter()
+            .filter(|(c, _, l)| c == conn && *l != CapabilityLevel::None)
+            .map(|(_, f, _)| f)
+            .collect()
+    }
+
+    /// Return all features with `Full` support for a connection type.
+    pub fn fully_supported_features(&self, conn: &ConnectionType) -> Vec<&RemoteFeature> {
+        self.entries
+            .iter()
+            .filter(|(c, _, l)| c == conn && *l == CapabilityLevel::Full)
+            .map(|(_, f, _)| f)
+            .collect()
+    }
+
+    /// Total number of entries in the matrix.
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+impl Default for CapabilityMatrix {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Feature version requirements
+// ---------------------------------------------------------------------------
+
+/// Maps a feature to the minimum server version required to use it.
+#[derive(Debug, Clone)]
+pub struct FeatureVersionRequirement {
+    pub feature: RemoteFeature,
+    pub min_version: (u32, u32, u32),
+}
+
+/// Check which features from `requirements` are available given
+/// `server_version`.
+pub fn available_features_for_version(
+    server_version: (u32, u32, u32),
+    requirements: &[FeatureVersionRequirement],
+) -> Vec<RemoteFeature> {
+    requirements
+        .iter()
+        .filter(|r| is_version_compatible(server_version, r.min_version))
+        .map(|r| r.feature.clone())
+        .collect()
+}
+
+/// Return features that are NOT available for a given server version.
+pub fn unavailable_features_for_version(
+    server_version: (u32, u32, u32),
+    requirements: &[FeatureVersionRequirement],
+) -> Vec<(RemoteFeature, (u32, u32, u32))> {
+    requirements
+        .iter()
+        .filter(|r| !is_version_compatible(server_version, r.min_version))
+        .map(|r| (r.feature.clone(), r.min_version))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1364,5 +1529,111 @@ mod tests {
         assert_eq!(tracker.active_count(), 0);
         let t = tracker.get_by_port(4000).unwrap();
         assert_eq!(t.status, PortForwardStatus::Error("timeout".into()));
+    }
+
+    // ── CapabilityMatrix ──────────────────────────────────────────
+
+    #[test]
+    fn capability_matrix_defaults_ssh_full() {
+        let m = CapabilityMatrix::with_defaults();
+        assert_eq!(
+            m.get(&ConnectionType::Ssh, &RemoteFeature::FileSystem),
+            CapabilityLevel::Full
+        );
+        assert_eq!(
+            m.get(&ConnectionType::Ssh, &RemoteFeature::Debugging),
+            CapabilityLevel::Full
+        );
+    }
+
+    #[test]
+    fn capability_matrix_container_no_debugging() {
+        let m = CapabilityMatrix::with_defaults();
+        assert_eq!(
+            m.get(&ConnectionType::Container, &RemoteFeature::Debugging),
+            CapabilityLevel::None
+        );
+    }
+
+    #[test]
+    fn capability_matrix_supported_features() {
+        let m = CapabilityMatrix::with_defaults();
+        let supported = m.supported_features(&ConnectionType::Container);
+        // Container has 4 supported (FileSystem, Terminal, Extensions partial, PortForwarding)
+        assert_eq!(supported.len(), 4);
+        let full = m.fully_supported_features(&ConnectionType::Container);
+        // Full: FileSystem, Terminal, PortForwarding
+        assert_eq!(full.len(), 3);
+    }
+
+    #[test]
+    fn capability_matrix_set_override() {
+        let mut m = CapabilityMatrix::new();
+        m.set(ConnectionType::Ssh, RemoteFeature::Terminal, CapabilityLevel::None);
+        assert_eq!(
+            m.get(&ConnectionType::Ssh, &RemoteFeature::Terminal),
+            CapabilityLevel::None
+        );
+        m.set(ConnectionType::Ssh, RemoteFeature::Terminal, CapabilityLevel::Full);
+        assert_eq!(
+            m.get(&ConnectionType::Ssh, &RemoteFeature::Terminal),
+            CapabilityLevel::Full
+        );
+        assert_eq!(m.entry_count(), 1);
+    }
+
+    #[test]
+    fn capability_matrix_unknown_returns_none() {
+        let m = CapabilityMatrix::new();
+        assert_eq!(
+            m.get(&ConnectionType::Wsl, &RemoteFeature::Extensions),
+            CapabilityLevel::None
+        );
+    }
+
+    // ── Feature version requirements ──────────────────────────────
+
+    #[test]
+    fn available_features_filters_by_version() {
+        let reqs = vec![
+            FeatureVersionRequirement {
+                feature: RemoteFeature::FileSystem,
+                min_version: (1, 0, 0),
+            },
+            FeatureVersionRequirement {
+                feature: RemoteFeature::Debugging,
+                min_version: (2, 0, 0),
+            },
+            FeatureVersionRequirement {
+                feature: RemoteFeature::PortForwarding,
+                min_version: (1, 5, 0),
+            },
+        ];
+        let available = available_features_for_version((1, 5, 0), &reqs);
+        assert_eq!(available.len(), 2);
+        assert!(available.contains(&RemoteFeature::FileSystem));
+        assert!(available.contains(&RemoteFeature::PortForwarding));
+        assert!(!available.contains(&RemoteFeature::Debugging));
+    }
+
+    #[test]
+    fn unavailable_features_returns_missing() {
+        let reqs = vec![
+            FeatureVersionRequirement {
+                feature: RemoteFeature::Terminal,
+                min_version: (3, 0, 0),
+            },
+        ];
+        let unavailable = unavailable_features_for_version((2, 9, 9), &reqs);
+        assert_eq!(unavailable.len(), 1);
+        assert_eq!(unavailable[0].0, RemoteFeature::Terminal);
+        assert_eq!(unavailable[0].1, (3, 0, 0));
+    }
+
+    #[test]
+    fn capability_level_display() {
+        assert_eq!(format!("{}", CapabilityLevel::Full), "Full");
+        assert_eq!(format!("{}", CapabilityLevel::Partial), "Partial");
+        assert_eq!(format!("{}", CapabilityLevel::None), "None");
     }
 }

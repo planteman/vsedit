@@ -526,6 +526,151 @@ impl<'a> DiffNavigator<'a> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Diff statistics aggregation
+// ---------------------------------------------------------------------------
+
+/// Per-file diff statistics with additions, deletions, and modifications.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileDiffStats {
+    pub path: String,
+    pub additions: usize,
+    pub deletions: usize,
+    pub modifications: usize,
+}
+
+impl FileDiffStats {
+    /// Compute stats for a single `FileDiff`.
+    pub fn from_diff(diff: &FileDiff) -> Self {
+        let mut additions = 0usize;
+        let mut deletions = 0usize;
+        for hunk in &diff.hunks {
+            additions += hunk.added_lines();
+            deletions += hunk.removed_lines();
+        }
+        let modifications = additions.min(deletions);
+        Self {
+            path: diff.display_path().to_string(),
+            additions: additions.saturating_sub(modifications),
+            deletions: deletions.saturating_sub(modifications),
+            modifications,
+        }
+    }
+
+    /// Total number of changed lines (additions + deletions + modifications).
+    pub fn total_changes(&self) -> usize {
+        self.additions + self.deletions + self.modifications
+    }
+}
+
+/// Compute per-file stats for an entire [`MultiDiffModel`].
+pub fn compute_per_file_stats(model: &MultiDiffModel) -> Vec<FileDiffStats> {
+    model.diffs.iter().map(|d| FileDiffStats::from_diff(d)).collect()
+}
+
+// ---------------------------------------------------------------------------
+// Hunk range intersection
+// ---------------------------------------------------------------------------
+
+/// A line range `[start, end)` (half-open, 1-indexed).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LineRange {
+    pub start: u32,
+    pub end: u32,
+}
+
+impl LineRange {
+    /// Create a new line range.
+    pub fn new(start: u32, end: u32) -> Self {
+        Self { start, end }
+    }
+
+    /// Length of the range.
+    pub fn len(&self) -> u32 {
+        self.end.saturating_sub(self.start)
+    }
+
+    /// Whether the range is empty.
+    pub fn is_empty(&self) -> bool {
+        self.end <= self.start
+    }
+
+    /// Whether this range overlaps with another.
+    pub fn overlaps(&self, other: &LineRange) -> bool {
+        self.start < other.end && other.start < self.end
+    }
+
+    /// Compute the intersection with another range, or `None` if disjoint.
+    pub fn intersect(&self, other: &LineRange) -> Option<LineRange> {
+        let start = self.start.max(other.start);
+        let end = self.end.min(other.end);
+        if start < end {
+            Some(LineRange { start, end })
+        } else {
+            None
+        }
+    }
+}
+
+/// Get the original-side line range of a hunk.
+pub fn hunk_original_range(hunk: &DiffHunk) -> LineRange {
+    LineRange::new(hunk.original_start, hunk.original_start + hunk.original_length)
+}
+
+/// Get the modified-side line range of a hunk.
+pub fn hunk_modified_range(hunk: &DiffHunk) -> LineRange {
+    LineRange::new(hunk.modified_start, hunk.modified_start + hunk.modified_length)
+}
+
+// ---------------------------------------------------------------------------
+// Hunk merging
+// ---------------------------------------------------------------------------
+
+/// Merge adjacent hunks that are within `max_gap` lines of each other.
+/// Hunks must be sorted by `original_start`.
+pub fn merge_adjacent_hunks(hunks: &[DiffHunk], max_gap: u32) -> Vec<DiffHunk> {
+    if hunks.is_empty() {
+        return Vec::new();
+    }
+    let mut result: Vec<DiffHunk> = vec![hunks[0].clone()];
+    for hunk in &hunks[1..] {
+        let last = result.last_mut().unwrap();
+        let last_end = last.original_start + last.original_length;
+        if hunk.original_start <= last_end + max_gap {
+            // Merge: extend the last hunk to cover both
+            let new_end = (hunk.original_start + hunk.original_length).max(last_end);
+            last.original_length = new_end - last.original_start;
+            let mod_end = (hunk.modified_start + hunk.modified_length)
+                .max(last.modified_start + last.modified_length);
+            last.modified_length = mod_end - last.modified_start;
+            last.lines.extend(hunk.lines.iter().cloned());
+        } else {
+            result.push(hunk.clone());
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Diff navigation helpers
+// ---------------------------------------------------------------------------
+
+impl<'a> DiffNavigator<'a> {
+    /// Total number of hunks across all files.
+    pub fn total_hunks(&self) -> usize {
+        self.model.total_hunks()
+    }
+
+    /// Returns a flat index of the current hunk among all hunks across all files.
+    pub fn flat_hunk_index(&self) -> usize {
+        let mut idx = 0;
+        for fi in 0..self.file_index {
+            idx += self.model.diffs[fi].hunks.len();
+        }
+        idx + self.hunk_index
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1030,6 +1175,156 @@ mod tests {
         assert!(!nav.next_hunk());
         assert!(!nav.prev_hunk());
         assert!(nav.current_hunk().is_none());
+    }
+
+    #[test]
+    fn file_diff_stats_pure_additions() {
+        let diff = FileDiff {
+            original_uri: None,
+            modified_uri: Some("new.txt".into()),
+            kind: DiffKind::Added,
+            hunks: vec![DiffHunk {
+                original_start: 1, original_length: 0,
+                modified_start: 1, modified_length: 3,
+                lines: vec![
+                    DiffLine { content: "+a".into(), kind: DiffLineKind::Added },
+                    DiffLine { content: "+b".into(), kind: DiffLineKind::Added },
+                    DiffLine { content: "+c".into(), kind: DiffLineKind::Added },
+                ],
+            }],
+        };
+        let stats = FileDiffStats::from_diff(&diff);
+        assert_eq!(stats.additions, 3);
+        assert_eq!(stats.deletions, 0);
+        assert_eq!(stats.modifications, 0);
+        assert_eq!(stats.total_changes(), 3);
+    }
+
+    #[test]
+    fn file_diff_stats_mixed_changes() {
+        let diff = FileDiff {
+            original_uri: Some("a.txt".into()),
+            modified_uri: Some("a.txt".into()),
+            kind: DiffKind::Modified,
+            hunks: vec![DiffHunk {
+                original_start: 1, original_length: 2,
+                modified_start: 1, modified_length: 3,
+                lines: vec![
+                    DiffLine { content: "-old".into(), kind: DiffLineKind::Removed },
+                    DiffLine { content: "+new1".into(), kind: DiffLineKind::Added },
+                    DiffLine { content: "+new2".into(), kind: DiffLineKind::Added },
+                ],
+            }],
+        };
+        let stats = FileDiffStats::from_diff(&diff);
+        assert_eq!(stats.modifications, 1);
+        assert_eq!(stats.additions, 1);
+        assert_eq!(stats.deletions, 0);
+    }
+
+    #[test]
+    fn line_range_overlap_and_intersect() {
+        let a = LineRange::new(1, 5);
+        let b = LineRange::new(3, 8);
+        assert!(a.overlaps(&b));
+        let inter = a.intersect(&b).unwrap();
+        assert_eq!(inter.start, 3);
+        assert_eq!(inter.end, 5);
+        assert_eq!(inter.len(), 2);
+    }
+
+    #[test]
+    fn line_range_no_overlap() {
+        let a = LineRange::new(1, 3);
+        let b = LineRange::new(5, 8);
+        assert!(!a.overlaps(&b));
+        assert!(a.intersect(&b).is_none());
+    }
+
+    #[test]
+    fn line_range_empty() {
+        let r = LineRange::new(5, 5);
+        assert!(r.is_empty());
+        assert_eq!(r.len(), 0);
+    }
+
+    #[test]
+    fn hunk_range_accessors() {
+        let hunk = DiffHunk {
+            original_start: 10, original_length: 5,
+            modified_start: 12, modified_length: 3,
+            lines: vec![],
+        };
+        let orig = hunk_original_range(&hunk);
+        assert_eq!(orig, LineRange::new(10, 15));
+        let modif = hunk_modified_range(&hunk);
+        assert_eq!(modif, LineRange::new(12, 15));
+    }
+
+    #[test]
+    fn merge_adjacent_hunks_basic() {
+        let hunks = vec![
+            DiffHunk {
+                original_start: 1, original_length: 3,
+                modified_start: 1, modified_length: 3,
+                lines: vec![],
+            },
+            DiffHunk {
+                original_start: 5, original_length: 2,
+                modified_start: 5, modified_length: 2,
+                lines: vec![],
+            },
+            DiffHunk {
+                original_start: 20, original_length: 1,
+                modified_start: 20, modified_length: 1,
+                lines: vec![],
+            },
+        ];
+        let merged = merge_adjacent_hunks(&hunks, 1);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].original_start, 1);
+        assert_eq!(merged[0].original_length, 6);
+    }
+
+    #[test]
+    fn merge_adjacent_hunks_empty() {
+        let merged = merge_adjacent_hunks(&[], 5);
+        assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn navigator_flat_hunk_index() {
+        let mut model = MultiDiffModel::new();
+        model.add_diff(make_diff(DiffKind::Modified, 3));
+        model.add_diff(make_diff(DiffKind::Modified, 2));
+        let mut nav = DiffNavigator::new(&model);
+        assert_eq!(nav.flat_hunk_index(), 0);
+        nav.next_hunk();
+        assert_eq!(nav.flat_hunk_index(), 1);
+        nav.next_hunk();
+        nav.next_hunk();
+        assert_eq!(nav.flat_hunk_index(), 3);
+    }
+
+    #[test]
+    fn compute_per_file_stats_works() {
+        let mut model = MultiDiffModel::new();
+        model.add_diff(FileDiff {
+            original_uri: Some("a.rs".into()),
+            modified_uri: Some("a.rs".into()),
+            kind: DiffKind::Modified,
+            hunks: vec![DiffHunk {
+                original_start: 1, original_length: 1,
+                modified_start: 1, modified_length: 1,
+                lines: vec![
+                    DiffLine { content: "-x".into(), kind: DiffLineKind::Removed },
+                    DiffLine { content: "+y".into(), kind: DiffLineKind::Added },
+                ],
+            }],
+        });
+        let stats = compute_per_file_stats(&model);
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0].modifications, 1);
     }
 }
 

@@ -831,6 +831,198 @@ impl TunnelHealthCheck {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tunnel address resolution
+// ---------------------------------------------------------------------------
+
+/// Represents a resolved tunnel address with host and port.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TunnelAddress {
+    pub host: String,
+    pub port: u16,
+    pub scheme: String,
+}
+
+impl TunnelAddress {
+    /// Parse a URI-like string into a TunnelAddress.
+    /// Accepted formats: `scheme://host:port`, `host:port`, `host`.
+    pub fn parse(uri: &str) -> Option<Self> {
+        let (scheme, rest) = if let Some(idx) = uri.find("://") {
+            (uri[..idx].to_string(), &uri[idx + 3..])
+        } else {
+            ("https".to_string(), uri)
+        };
+        let (host, port) = if let Some(idx) = rest.rfind(':') {
+            let port_str = &rest[idx + 1..];
+            match port_str.parse::<u16>() {
+                Ok(p) if p > 0 => (rest[..idx].to_string(), p),
+                _ => return None,
+            }
+        } else {
+            let default_port = match scheme.as_str() {
+                "http" => 80,
+                "https" => 443,
+                "ssh" => 22,
+                _ => return None,
+            };
+            (rest.to_string(), default_port)
+        };
+        if host.is_empty() {
+            return None;
+        }
+        Some(TunnelAddress { host, port, scheme })
+    }
+
+    /// Reconstruct the address as a URI string.
+    pub fn to_uri(&self) -> String {
+        format!("{}://{}:{}", self.scheme, self.host, self.port)
+    }
+
+    /// Returns true if using a secure scheme (https, ssh, tls).
+    pub fn is_secure(&self) -> bool {
+        matches!(self.scheme.as_str(), "https" | "ssh" | "tls")
+    }
+}
+
+impl fmt::Display for TunnelAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_uri())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tunnel connection log
+// ---------------------------------------------------------------------------
+
+/// Records tunnel connection events for diagnostics.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TunnelConnectionEvent {
+    pub tunnel_id: String,
+    pub event_type: TunnelEventType,
+    pub timestamp: u64,
+    pub message: Option<String>,
+}
+
+/// Type of tunnel connection event.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TunnelEventType {
+    Connected,
+    Disconnected,
+    Reconnecting,
+    Error,
+}
+
+impl fmt::Display for TunnelEventType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Connected => write!(f, "connected"),
+            Self::Disconnected => write!(f, "disconnected"),
+            Self::Reconnecting => write!(f, "reconnecting"),
+            Self::Error => write!(f, "error"),
+        }
+    }
+}
+
+/// Collects connection events for all tunnels.
+#[derive(Debug, Clone, Default)]
+pub struct TunnelConnectionLog {
+    events: Vec<TunnelConnectionEvent>,
+}
+
+impl TunnelConnectionLog {
+    /// Create a new empty log.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a connection event.
+    pub fn record(
+        &mut self,
+        tunnel_id: &str,
+        event_type: TunnelEventType,
+        timestamp: u64,
+        message: Option<&str>,
+    ) {
+        self.events.push(TunnelConnectionEvent {
+            tunnel_id: tunnel_id.to_string(),
+            event_type,
+            timestamp,
+            message: message.map(|s| s.to_string()),
+        });
+    }
+
+    /// Get all events for a specific tunnel, ordered by timestamp.
+    pub fn events_for_tunnel(&self, tunnel_id: &str) -> Vec<&TunnelConnectionEvent> {
+        self.events
+            .iter()
+            .filter(|e| e.tunnel_id == tunnel_id)
+            .collect()
+    }
+
+    /// Get the last event for a tunnel.
+    pub fn last_event(&self, tunnel_id: &str) -> Option<&TunnelConnectionEvent> {
+        self.events.iter().rev().find(|e| e.tunnel_id == tunnel_id)
+    }
+
+    /// Count total events.
+    pub fn total_events(&self) -> usize {
+        self.events.len()
+    }
+
+    /// Count error events.
+    pub fn error_count(&self) -> usize {
+        self.events
+            .iter()
+            .filter(|e| e.event_type == TunnelEventType::Error)
+            .count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tunnel bandwidth statistics
+// ---------------------------------------------------------------------------
+
+/// Accumulates bytes transferred per tunnel for bandwidth reporting.
+#[derive(Debug, Clone, Default)]
+pub struct TunnelBandwidthStats {
+    bytes_in: std::collections::HashMap<String, u64>,
+    bytes_out: std::collections::HashMap<String, u64>,
+}
+
+impl TunnelBandwidthStats {
+    /// Create a new stats accumulator.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record inbound bytes for a tunnel.
+    pub fn record_inbound(&mut self, tunnel_id: &str, bytes: u64) {
+        *self.bytes_in.entry(tunnel_id.to_string()).or_insert(0) += bytes;
+    }
+
+    /// Record outbound bytes for a tunnel.
+    pub fn record_outbound(&mut self, tunnel_id: &str, bytes: u64) {
+        *self.bytes_out.entry(tunnel_id.to_string()).or_insert(0) += bytes;
+    }
+
+    /// Get total inbound bytes for a tunnel.
+    pub fn inbound(&self, tunnel_id: &str) -> u64 {
+        self.bytes_in.get(tunnel_id).copied().unwrap_or(0)
+    }
+
+    /// Get total outbound bytes for a tunnel.
+    pub fn outbound(&self, tunnel_id: &str) -> u64 {
+        self.bytes_out.get(tunnel_id).copied().unwrap_or(0)
+    }
+
+    /// Total bytes (in + out) across all tunnels.
+    pub fn total_bytes(&self) -> u64 {
+        let total_in: u64 = self.bytes_in.values().sum();
+        let total_out: u64 = self.bytes_out.values().sum();
+        total_in + total_out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1367,5 +1559,88 @@ mod tests {
         assert!(!svc.has_errors());
         svc.set_error(&id, "boom".to_string());
         assert!(svc.has_errors());
+    }
+
+    // ── Tunnel address resolution ─────────────────────────────────
+
+    #[test]
+    fn tunnel_address_parse_full_uri() {
+        let addr = TunnelAddress::parse("https://example.com:8080").unwrap();
+        assert_eq!(addr.host, "example.com");
+        assert_eq!(addr.port, 8080);
+        assert_eq!(addr.scheme, "https");
+        assert!(addr.is_secure());
+    }
+
+    #[test]
+    fn tunnel_address_parse_host_port() {
+        let addr = TunnelAddress::parse("localhost:3000").unwrap();
+        assert_eq!(addr.host, "localhost");
+        assert_eq!(addr.port, 3000);
+        assert_eq!(addr.scheme, "https");
+    }
+
+    #[test]
+    fn tunnel_address_parse_host_only() {
+        let addr = TunnelAddress::parse("http://myhost").unwrap();
+        assert_eq!(addr.host, "myhost");
+        assert_eq!(addr.port, 80);
+        assert!(!addr.is_secure());
+    }
+
+    #[test]
+    fn tunnel_address_to_uri() {
+        let addr = TunnelAddress::parse("ssh://server:22").unwrap();
+        assert_eq!(addr.to_uri(), "ssh://server:22");
+        assert_eq!(format!("{}", addr), "ssh://server:22");
+    }
+
+    #[test]
+    fn tunnel_address_parse_empty_returns_none() {
+        assert!(TunnelAddress::parse("").is_none());
+        assert!(TunnelAddress::parse("://host").is_none());
+    }
+
+    // ── Connection log ────────────────────────────────────────────
+
+    #[test]
+    fn connection_log_records_and_queries() {
+        let mut log = TunnelConnectionLog::new();
+        log.record("t1", TunnelEventType::Connected, 100, None);
+        log.record("t1", TunnelEventType::Error, 200, Some("timeout"));
+        log.record("t2", TunnelEventType::Connected, 150, None);
+
+        assert_eq!(log.total_events(), 3);
+        assert_eq!(log.error_count(), 1);
+        assert_eq!(log.events_for_tunnel("t1").len(), 2);
+        let last = log.last_event("t1").unwrap();
+        assert_eq!(last.event_type, TunnelEventType::Error);
+        assert_eq!(last.message.as_deref(), Some("timeout"));
+    }
+
+    #[test]
+    fn tunnel_event_type_display() {
+        assert_eq!(format!("{}", TunnelEventType::Connected), "connected");
+        assert_eq!(format!("{}", TunnelEventType::Reconnecting), "reconnecting");
+    }
+
+    // ── Bandwidth stats ───────────────────────────────────────────
+
+    #[test]
+    fn bandwidth_stats_accumulates() {
+        let mut stats = TunnelBandwidthStats::new();
+        stats.record_inbound("t1", 1000);
+        stats.record_inbound("t1", 500);
+        stats.record_outbound("t1", 200);
+        assert_eq!(stats.inbound("t1"), 1500);
+        assert_eq!(stats.outbound("t1"), 200);
+        assert_eq!(stats.total_bytes(), 1700);
+    }
+
+    #[test]
+    fn bandwidth_stats_unknown_tunnel_zero() {
+        let stats = TunnelBandwidthStats::new();
+        assert_eq!(stats.inbound("missing"), 0);
+        assert_eq!(stats.outbound("missing"), 0);
     }
 }

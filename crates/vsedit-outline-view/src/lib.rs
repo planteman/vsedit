@@ -744,6 +744,96 @@ impl OutlineKind {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Symbol filtering by kind (multiple kinds)
+// ---------------------------------------------------------------------------
+
+impl OutlineModel {
+    /// Return all elements matching any of the given kinds.
+    pub fn filter_by_kinds(&self, kinds: &[OutlineKind]) -> Vec<&OutlineElement> {
+        self.flatten()
+            .into_iter()
+            .filter(|e| kinds.contains(&e.kind))
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Outline flattening with depth info
+// ---------------------------------------------------------------------------
+
+/// A flattened outline entry carrying its nesting depth.
+#[derive(Debug, Clone)]
+pub struct FlatOutlineEntry<'a> {
+    /// Reference to the original element.
+    pub element: &'a OutlineElement,
+    /// Nesting depth (0 for top-level).
+    pub depth: usize,
+}
+
+/// Flatten an outline model, attaching depth information to each entry.
+pub fn flatten_with_depth(model: &OutlineModel) -> Vec<FlatOutlineEntry<'_>> {
+    let mut result = Vec::new();
+    fn collect<'a>(elems: &'a [OutlineElement], depth: usize, out: &mut Vec<FlatOutlineEntry<'a>>) {
+        for e in elems {
+            out.push(FlatOutlineEntry { element: e, depth });
+            collect(&e.children, depth + 1, out);
+        }
+    }
+    collect(&model.elements, 0, &mut result);
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Outline path computation (breadcrumb)
+// ---------------------------------------------------------------------------
+
+impl OutlineModel {
+    /// Compute the path of labels from root to the element containing the
+    /// given line. Returns an empty vec if no element spans that line.
+    pub fn path_at_line(&self, line: u32) -> Vec<String> {
+        let mut path = Vec::new();
+        fn search(elems: &[OutlineElement], line: u32, path: &mut Vec<String>) -> bool {
+            for e in elems {
+                if line >= e.range_start_line && line <= e.range_end_line {
+                    path.push(e.label.clone());
+                    search(&e.children, line, path);
+                    return true;
+                }
+            }
+            false
+        }
+        search(&self.elements, line, &mut path);
+        path
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Symbol range overlap detection
+// ---------------------------------------------------------------------------
+
+impl OutlineElement {
+    /// Returns `true` if this element's line range overlaps with another's.
+    pub fn overlaps(&self, other: &OutlineElement) -> bool {
+        self.range_start_line <= other.range_end_line && other.range_start_line <= self.range_end_line
+    }
+
+    /// Returns `true` if this element fully contains `other`.
+    pub fn contains_element(&self, other: &OutlineElement) -> bool {
+        self.range_start_line <= other.range_start_line
+            && self.range_end_line >= other.range_end_line
+    }
+
+    /// Line span of this element (inclusive).
+    pub fn line_span(&self) -> u32 {
+        if self.range_end_line >= self.range_start_line {
+            self.range_end_line - self.range_start_line + 1
+        } else {
+            0
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1392,5 +1482,77 @@ mod tests {
         assert!(OutlineKind::Constructor.is_callable());
         assert!(!OutlineKind::Class.is_callable());
         assert!(!OutlineKind::Field.is_callable());
+    }
+
+    #[test]
+    fn filter_by_kind_returns_matching() {
+        let mut model = OutlineModel::new("test.rs");
+        model.add_element(elem("main", OutlineKind::Function, 1, 10));
+        model.add_element(elem("Foo", OutlineKind::Class, 12, 30)
+            .with_child(elem("bar", OutlineKind::Method, 13, 20))
+            .with_child(elem("x", OutlineKind::Field, 22, 22)));
+        let funcs = model.filter_by_kind(OutlineKind::Function);
+        assert_eq!(funcs.len(), 1);
+        assert_eq!(funcs[0].label, "main");
+        let methods = model.filter_by_kind(OutlineKind::Method);
+        assert_eq!(methods.len(), 1);
+    }
+
+    #[test]
+    fn flatten_with_depth_assigns_correct_depths() {
+        let mut model = OutlineModel::new("test.rs");
+        model.add_element(
+            elem("Foo", OutlineKind::Class, 1, 50)
+                .with_child(elem("bar", OutlineKind::Method, 2, 10))
+        );
+        let flat = flatten_with_depth(&model);
+        assert_eq!(flat.len(), 2);
+        assert_eq!(flat[0].depth, 0);
+        assert_eq!(flat[0].element.label, "Foo");
+        assert_eq!(flat[1].depth, 1);
+        assert_eq!(flat[1].element.label, "bar");
+    }
+
+    #[test]
+    fn search_case_insensitive_matches_all() {
+        let mut model = OutlineModel::new("test.rs");
+        model.add_element(elem("MyFunction", OutlineKind::Function, 1, 5));
+        model.add_element(elem("my_var", OutlineKind::Variable, 7, 7));
+        let results = model.search("my");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn path_at_line_computes_breadcrumb() {
+        let mut model = OutlineModel::new("test.rs");
+        model.add_element(
+            elem("Foo", OutlineKind::Class, 1, 50)
+                .with_child(elem("bar", OutlineKind::Method, 10, 20))
+        );
+        let path = model.path_at_line(15);
+        assert_eq!(path, vec!["Foo", "bar"]);
+        let path_root = model.path_at_line(5);
+        assert_eq!(path_root, vec!["Foo"]);
+        let path_none = model.path_at_line(100);
+        assert!(path_none.is_empty());
+    }
+
+    #[test]
+    fn element_overlaps_and_contains() {
+        let a = elem("a", OutlineKind::Class, 1, 50);
+        let b = elem("b", OutlineKind::Method, 10, 20);
+        let c = elem("c", OutlineKind::Function, 60, 70);
+        assert!(a.overlaps(&b));
+        assert!(a.contains_element(&b));
+        assert!(!a.overlaps(&c));
+        assert!(!b.contains_element(&a));
+    }
+
+    #[test]
+    fn element_line_span() {
+        let e = elem("x", OutlineKind::Variable, 5, 5);
+        assert_eq!(e.line_span(), 1);
+        let e2 = elem("y", OutlineKind::Function, 1, 10);
+        assert_eq!(e2.line_span(), 10);
     }
 }

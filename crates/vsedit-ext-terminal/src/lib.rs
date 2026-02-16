@@ -915,6 +915,166 @@ impl TerminalOutput {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Terminal command parsing
+// ---------------------------------------------------------------------------
+
+/// A parsed terminal command with its arguments.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParsedCommand {
+    pub program: String,
+    pub args: Vec<String>,
+    pub background: bool,
+}
+
+impl fmt::Display for ParsedCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let suffix = if self.background { " &" } else { "" };
+        if self.args.is_empty() {
+            write!(f, "{}{}", self.program, suffix)
+        } else {
+            write!(f, "{} {}{}", self.program, self.args.join(" "), suffix)
+        }
+    }
+}
+
+/// Parse a simple command line string into program and arguments.
+/// Supports double-quoted arguments and background `&` suffix.
+pub fn parse_command_line(input: &str) -> Option<ParsedCommand> {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let (line, background) = if trimmed.ends_with('&') {
+        (trimmed[..trimmed.len() - 1].trim(), true)
+    } else {
+        (trimmed, false)
+    };
+
+    let mut tokens: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+
+    for ch in line.chars() {
+        match ch {
+            '"' => in_quotes = !in_quotes,
+            ' ' if !in_quotes => {
+                if !current.is_empty() {
+                    tokens.push(std::mem::take(&mut current));
+                }
+            }
+            _ => current.push(ch),
+        }
+    }
+    if !current.is_empty() {
+        tokens.push(current);
+    }
+    if tokens.is_empty() {
+        return None;
+    }
+    let program = tokens.remove(0);
+    Some(ParsedCommand {
+        program,
+        args: tokens,
+        background,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// ANSI escape sequence stripping
+// ---------------------------------------------------------------------------
+
+/// Strip ANSI escape sequences from terminal output text.
+pub fn strip_ansi_escapes(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '\x1b' {
+            // CSI sequence: ESC [ ... final_byte
+            if chars.peek() == Some(&'[') {
+                chars.next(); // consume '['
+                // consume until we hit a letter (0x40–0x7E)
+                while let Some(&c) = chars.peek() {
+                    chars.next();
+                    if c.is_ascii_alphabetic() || c == '~' {
+                        break;
+                    }
+                }
+            }
+            // else: bare ESC, skip it
+        } else {
+            output.push(ch);
+        }
+    }
+    output
+}
+
+// ---------------------------------------------------------------------------
+// Terminal session state
+// ---------------------------------------------------------------------------
+
+/// Tracks the state of an active terminal session including working directory
+/// and environment variable overrides.
+#[derive(Debug, Clone)]
+pub struct TerminalSessionState {
+    pub terminal_id: String,
+    pub cwd: String,
+    pub env_overrides: Vec<(String, String)>,
+    pub exit_code: Option<i32>,
+    pub command_count: u32,
+}
+
+impl TerminalSessionState {
+    /// Create a new session state for the given terminal.
+    pub fn new(terminal_id: &str, initial_cwd: &str) -> Self {
+        Self {
+            terminal_id: terminal_id.to_string(),
+            cwd: initial_cwd.to_string(),
+            env_overrides: Vec::new(),
+            exit_code: None,
+            command_count: 0,
+        }
+    }
+
+    /// Record a command execution.
+    pub fn record_command(&mut self, exit_code: i32) {
+        self.command_count += 1;
+        self.exit_code = Some(exit_code);
+    }
+
+    /// Change the working directory.
+    pub fn set_cwd(&mut self, cwd: &str) {
+        self.cwd = cwd.to_string();
+    }
+
+    /// Set an environment variable override.
+    pub fn set_env(&mut self, key: &str, value: &str) {
+        if let Some(entry) = self.env_overrides.iter_mut().find(|(k, _)| k == key) {
+            entry.1 = value.to_string();
+        } else {
+            self.env_overrides.push((key.to_string(), value.to_string()));
+        }
+    }
+
+    /// Get an environment variable override, if set.
+    pub fn get_env(&self, key: &str) -> Option<&str> {
+        self.env_overrides
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// Returns true if the last command succeeded (exit code 0).
+    pub fn last_command_succeeded(&self) -> bool {
+        self.exit_code == Some(0)
+    }
+
+    /// Returns true if any commands have been executed.
+    pub fn has_activity(&self) -> bool {
+        self.command_count > 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1366,5 +1526,80 @@ mod tests {
         out.clear();
         assert_eq!(out.total_bytes(), 0);
         assert_eq!(out.line_count(), 0);
+    }
+
+    // ── Command parsing ───────────────────────────────────────────
+
+    #[test]
+    fn parse_simple_command() {
+        let cmd = parse_command_line("ls -la /tmp").unwrap();
+        assert_eq!(cmd.program, "ls");
+        assert_eq!(cmd.args, vec!["-la", "/tmp"]);
+        assert!(!cmd.background);
+    }
+
+    #[test]
+    fn parse_command_with_quotes() {
+        let cmd = parse_command_line(r#"echo "hello world" done"#).unwrap();
+        assert_eq!(cmd.program, "echo");
+        assert_eq!(cmd.args, vec!["hello world", "done"]);
+    }
+
+    #[test]
+    fn parse_background_command() {
+        let cmd = parse_command_line("sleep 10 &").unwrap();
+        assert_eq!(cmd.program, "sleep");
+        assert_eq!(cmd.args, vec!["10"]);
+        assert!(cmd.background);
+    }
+
+    #[test]
+    fn parse_empty_returns_none() {
+        assert!(parse_command_line("").is_none());
+        assert!(parse_command_line("   ").is_none());
+    }
+
+    #[test]
+    fn parsed_command_display() {
+        let cmd = parse_command_line("git commit -m msg &").unwrap();
+        assert_eq!(format!("{}", cmd), "git commit -m msg &");
+    }
+
+    // ── ANSI escape stripping ─────────────────────────────────────
+
+    #[test]
+    fn strip_ansi_color_codes() {
+        let input = "\x1b[31mERROR\x1b[0m: something failed";
+        assert_eq!(strip_ansi_escapes(input), "ERROR: something failed");
+    }
+
+    #[test]
+    fn strip_ansi_preserves_plain_text() {
+        assert_eq!(strip_ansi_escapes("hello world"), "hello world");
+    }
+
+    // ── Terminal session state ────────────────────────────────────
+
+    #[test]
+    fn session_state_tracks_commands() {
+        let mut state = TerminalSessionState::new("t1", "/home");
+        assert!(!state.has_activity());
+        state.record_command(0);
+        assert!(state.has_activity());
+        assert!(state.last_command_succeeded());
+        state.record_command(1);
+        assert!(!state.last_command_succeeded());
+        assert_eq!(state.command_count, 2);
+    }
+
+    #[test]
+    fn session_state_env_overrides() {
+        let mut state = TerminalSessionState::new("t1", "/home");
+        state.set_env("PATH", "/usr/bin");
+        assert_eq!(state.get_env("PATH"), Some("/usr/bin"));
+        state.set_env("PATH", "/usr/local/bin");
+        assert_eq!(state.get_env("PATH"), Some("/usr/local/bin"));
+        assert_eq!(state.env_overrides.len(), 1);
+        assert_eq!(state.get_env("MISSING"), None);
     }
 }
