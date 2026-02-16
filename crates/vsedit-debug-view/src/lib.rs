@@ -1,13 +1,17 @@
 //! Debug view and features.
 //!
 //! Provides a debug sidebar with variables, call stack, breakpoints,
-//! and watch expressions — rendered via ratatui.
+//! and watch expressions — rendered via ratatui. Integrates with the
+//! `vsedit-debug` DAP client for real debugging data.
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Widget;
+
+pub use vsedit_debug::console::{DebugConsole, DebugConsoleEntry, OutputCategory};
+pub use vsedit_debug::types::{Scope, Variable as DapVariable};
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -38,6 +42,9 @@ pub struct DebugVariable {
     pub value: String,
     pub var_type: String,
     pub children: Vec<DebugVariable>,
+    /// DAP variables_reference for lazy-loading children.
+    pub variables_reference: u64,
+    pub expanded: bool,
 }
 
 impl DebugVariable {
@@ -47,12 +54,31 @@ impl DebugVariable {
             value: value.into(),
             var_type: var_type.into(),
             children: Vec::new(),
+            variables_reference: 0,
+            expanded: false,
         }
     }
 
     pub fn with_children(mut self, children: Vec<DebugVariable>) -> Self {
         self.children = children;
         self
+    }
+
+    /// Create from a DAP variable.
+    pub fn from_dap(var: &DapVariable) -> Self {
+        Self {
+            name: var.name.clone(),
+            value: var.value.clone(),
+            var_type: var.type_name.clone().unwrap_or_default(),
+            children: Vec::new(),
+            variables_reference: var.variables_reference,
+            expanded: false,
+        }
+    }
+
+    /// Returns true if this variable can be expanded.
+    pub fn has_children(&self) -> bool {
+        self.variables_reference > 0 || !self.children.is_empty()
     }
 }
 
@@ -74,6 +100,17 @@ impl StackFrame {
             source_path: source_path.into(),
             line,
             column,
+        }
+    }
+
+    /// Create from a DAP stack frame.
+    pub fn from_dap(frame: &vsedit_debug::types::StackFrame) -> Self {
+        Self {
+            id: frame.id,
+            name: frame.name.clone(),
+            source_path: frame.source_path.clone().unwrap_or_default(),
+            line: frame.line,
+            column: frame.column,
         }
     }
 }
@@ -102,6 +139,41 @@ impl Breakpoint {
     }
 }
 
+/// Debug toolbar action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DebugAction {
+    Continue,
+    StepOver,
+    StepIn,
+    StepOut,
+    Restart,
+    Stop,
+}
+
+impl DebugAction {
+    pub fn label(self) -> &'static str {
+        match self {
+            DebugAction::Continue => "▶ Continue",
+            DebugAction::StepOver => "⤵ Step Over",
+            DebugAction::StepIn => "↓ Step In",
+            DebugAction::StepOut => "↑ Step Out",
+            DebugAction::Restart => "⟳ Restart",
+            DebugAction::Stop => "⏹ Stop",
+        }
+    }
+
+    pub fn short_label(self) -> &'static str {
+        match self {
+            DebugAction::Continue => "F5",
+            DebugAction::StepOver => "F10",
+            DebugAction::StepIn => "F11",
+            DebugAction::StepOut => "⇧F11",
+            DebugAction::Restart => "⇧⌘F5",
+            DebugAction::Stop => "⇧F5",
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // DebugView
 // ---------------------------------------------------------------------------
@@ -116,6 +188,10 @@ pub struct DebugView {
     pub watches: Vec<String>,
     pub selected_section: DebugSection,
     pub selected_index: usize,
+    pub console: DebugConsole,
+    pub show_console: bool,
+    /// Scopes for the selected stack frame.
+    pub scopes: Vec<Scope>,
 }
 
 impl DebugView {
@@ -128,6 +204,9 @@ impl DebugView {
             watches: Vec::new(),
             selected_section: DebugSection::Variables,
             selected_index: 0,
+            console: DebugConsole::new(),
+            show_console: false,
+            scopes: Vec::new(),
         }
     }
 
@@ -175,6 +254,33 @@ impl DebugView {
         }
     }
 
+    /// Toggle expand/collapse of a variable at the given index.
+    pub fn toggle_variable_expand(&mut self, index: usize) {
+        if let Some(var) = self.variables.get_mut(index) {
+            var.expanded = !var.expanded;
+        }
+    }
+
+    /// Update variables from DAP variables.
+    pub fn set_variables_from_dap(&mut self, vars: &[DapVariable]) {
+        self.variables = vars.iter().map(|v| DebugVariable::from_dap(v)).collect();
+    }
+
+    /// Update call stack from DAP stack frames.
+    pub fn set_call_stack_from_dap(&mut self, frames: &[vsedit_debug::types::StackFrame]) {
+        self.call_stack = frames.iter().map(|f| StackFrame::from_dap(f)).collect();
+    }
+
+    /// Render a status bar segment for debug state.
+    pub fn status_bar_text(&self) -> &'static str {
+        match self.state {
+            DebugState::Inactive => "",
+            DebugState::Running => "🐛 Debugging",
+            DebugState::Paused => "🐛 Paused",
+            DebugState::Stopped => "🐛 Stopped",
+        }
+    }
+
     /// Render the debug sidebar.
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
         if area.height < 3 || area.width < 10 {
@@ -191,7 +297,25 @@ impl DebugView {
             height: area.height.saturating_sub(1),
             ..area
         };
-        self.render_sections(content_area, buf);
+
+        if self.show_console {
+            // Split: top half sections, bottom half console
+            let half = content_area.height / 2;
+            let sections_area = Rect {
+                height: half,
+                ..content_area
+            };
+            self.render_sections(sections_area, buf);
+
+            let console_area = Rect {
+                y: content_area.y + half,
+                height: content_area.height.saturating_sub(half),
+                ..content_area
+            };
+            self.render_console(console_area, buf);
+        } else {
+            self.render_sections(content_area, buf);
+        }
     }
 
     fn render_toolbar(&self, area: Rect, buf: &mut Buffer) {
@@ -206,10 +330,31 @@ impl DebugView {
             DebugState::Paused => Color::Yellow,
             _ => Color::Gray,
         };
-        let line = Line::from(vec![Span::styled(
+
+        let mut spans = vec![Span::styled(
             state_label,
             Style::default().fg(color).add_modifier(Modifier::BOLD),
-        )]);
+        )];
+
+        // Show toolbar actions when paused
+        if self.state == DebugState::Paused {
+            let actions = [
+                DebugAction::Continue,
+                DebugAction::StepOver,
+                DebugAction::StepIn,
+                DebugAction::StepOut,
+                DebugAction::Stop,
+            ];
+            for action in &actions {
+                spans.push(Span::raw(" "));
+                spans.push(Span::styled(
+                    action.short_label(),
+                    Style::default().fg(Color::DarkGray),
+                ));
+            }
+        }
+
+        let line = Line::from(spans);
         line.render(area, buf);
     }
 
@@ -268,7 +413,14 @@ impl DebugView {
             DebugSection::Variables => self
                 .variables
                 .iter()
-                .map(|v| format!("{}: {} = {}", v.var_type, v.name, v.value))
+                .map(|v| {
+                    let expand_icon = if v.has_children() {
+                        if v.expanded { "▼ " } else { "▶ " }
+                    } else {
+                        "  "
+                    };
+                    format!("{}{}: {} = {}", expand_icon, v.var_type, v.name, v.value)
+                })
                 .collect(),
             DebugSection::CallStack => self
                 .call_stack
@@ -280,7 +432,10 @@ impl DebugView {
                 .iter()
                 .map(|bp| {
                     let icon = if bp.enabled { "●" } else { "○" };
-                    format!("{} {}:{}", icon, bp.file_path, bp.line)
+                    match &bp.condition {
+                        Some(cond) => format!("{} {}:{} when {}", icon, bp.file_path, bp.line, cond),
+                        None => format!("{} {}:{}", icon, bp.file_path, bp.line),
+                    }
                 })
                 .collect(),
             DebugSection::Watch => self.watches.clone(),
@@ -304,6 +459,55 @@ impl DebugView {
                 y: area.y + i as u16,
                 height: 1,
                 ..area
+            };
+            line.render(row, buf);
+        }
+    }
+
+    fn render_console(&self, area: Rect, buf: &mut Buffer) {
+        if area.height == 0 {
+            return;
+        }
+
+        // Header
+        let header = Line::from(vec![Span::styled(
+            "DEBUG CONSOLE",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )]);
+        let header_area = Rect {
+            height: 1,
+            ..area
+        };
+        header.render(header_area, buf);
+
+        // Entries
+        let entries_area = Rect {
+            y: area.y + 1,
+            height: area.height.saturating_sub(1),
+            ..area
+        };
+        let entries = self.console.entries();
+        let visible_count = entries_area.height as usize;
+        let start = entries.len().saturating_sub(visible_count);
+
+        for (i, entry) in entries[start..].iter().enumerate() {
+            if i as u16 >= entries_area.height {
+                break;
+            }
+            let (prefix, color) = match entry {
+                DebugConsoleEntry::Input(_) => ("> ", Color::Cyan),
+                DebugConsoleEntry::Output(_, OutputCategory::Stderr) => ("", Color::Red),
+                DebugConsoleEntry::Output(_, OutputCategory::Stdout) => ("", Color::White),
+                DebugConsoleEntry::Output(_, _) => ("", Color::Gray),
+            };
+            let text = format!("{}{}", prefix, entry.text().trim_end());
+            let line = Line::from(vec![Span::styled(text, Style::default().fg(color))]);
+            let row = Rect {
+                y: entries_area.y + i as u16,
+                height: 1,
+                ..entries_area
             };
             line.render(row, buf);
         }
@@ -529,92 +733,120 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn debug_action_labels() {
+        assert_eq!(DebugAction::Continue.label(), "▶ Continue");
+        assert_eq!(DebugAction::StepOver.short_label(), "F10");
+        assert_eq!(DebugAction::Stop.short_label(), "⇧F5");
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn status_bar_text() {
+        let mut v = DebugView::new();
+        assert_eq!(v.status_bar_text(), "");
+        v.state = DebugState::Running;
+        assert_eq!(v.status_bar_text(), "🐛 Debugging");
+        v.state = DebugState::Paused;
+        assert_eq!(v.status_bar_text(), "🐛 Paused");
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn variable_from_dap() {
+        let dap_var = DapVariable::new("x", "42").with_type("i32");
+        let view_var = DebugVariable::from_dap(&dap_var);
+        assert_eq!(view_var.name, "x");
+        assert_eq!(view_var.value, "42");
+        assert_eq!(view_var.var_type, "i32");
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn variable_expand_toggle() {
+        let mut v = DebugView::new();
+        let mut var = DebugVariable::new("obj", "{...}", "Object");
+        var.variables_reference = 10;
+        v.variables.push(var);
+        assert!(!v.variables[0].expanded);
+        v.toggle_variable_expand(0);
+        assert!(v.variables[0].expanded);
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn set_variables_from_dap() {
+        let mut v = DebugView::new();
+        let dap_vars = vec![
+            DapVariable::new("x", "1"),
+            DapVariable::new("y", "2"),
+        ];
+        v.set_variables_from_dap(&dap_vars);
+        assert_eq!(v.variables.len(), 2);
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn set_call_stack_from_dap() {
+        let mut v = DebugView::new();
+        let frames = vec![
+            vsedit_debug::types::StackFrame::new(1, "main", 10, 1)
+                .with_source("/app/main.rs"),
+        ];
+        v.set_call_stack_from_dap(&frames);
+        assert_eq!(v.call_stack.len(), 1);
+        assert_eq!(v.call_stack[0].name, "main");
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn render_with_console() {
+        let mut v = DebugView::new();
+        v.show_console = true;
+        v.console.add_input("x + 1");
+        v.console.add_output("42", OutputCategory::Console);
+        v.console.add_output("error msg", OutputCategory::Stderr);
+        let area = Rect::new(0, 0, 60, 30);
+        let mut buf = Buffer::empty(area);
+        v.render(area, &mut buf);
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn render_conditional_breakpoint_display() {
+        let mut v = DebugView::new();
+        let mut bp = Breakpoint::new(1, "main.rs", 10);
+        bp.condition = Some("x > 5".into());
+        v.breakpoints.push(bp);
+        v.selected_section = DebugSection::Breakpoints;
+        let area = Rect::new(0, 0, 60, 20);
+        let mut buf = Buffer::empty(area);
+        v.render(area, &mut buf);
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn render_paused_with_toolbar_actions() {
+        let mut v = DebugView::new();
+        v.state = DebugState::Paused;
+        let area = Rect::new(0, 0, 80, 20);
+        let mut buf = Buffer::empty(area);
+        v.render(area, &mut buf);
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn variable_has_children_check() {
+        let simple = DebugVariable::new("x", "42", "i32");
+        assert!(!simple.has_children());
+
+        let mut with_ref = DebugVariable::new("obj", "{...}", "Struct");
+        with_ref.variables_reference = 10;
+        assert!(with_ref.has_children());
+
+        let with_kids = DebugVariable::new("arr", "[...]", "Vec")
+            .with_children(vec![DebugVariable::new("0", "1", "i32")]);
+        assert!(with_kids.has_children());
     }
 
     #[test]
-    fn behavior_check_10() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        let _svc = DebugView::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn stack_frame_from_dap_conversion() {
+        let dap_frame = vsedit_debug::types::StackFrame::new(5, "foo", 100, 3)
+            .with_source("/src/foo.rs");
+        let view_frame = StackFrame::from_dap(&dap_frame);
+        assert_eq!(view_frame.id, 5);
+        assert_eq!(view_frame.name, "foo");
+        assert_eq!(view_frame.source_path, "/src/foo.rs");
+        assert_eq!(view_frame.line, 100);
     }
 }

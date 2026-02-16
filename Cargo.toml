@@ -25,6 +25,7 @@ members = [
     "crates/vsedit-contextkey",
     "crates/vsedit-core",
     "crates/vsedit-cursor",
+    "crates/vsedit-debug",
     "crates/vsedit-debug-view",
     "crates/vsedit-di",
     "crates/vsedit-dialog",

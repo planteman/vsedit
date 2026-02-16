@@ -2696,10 +2696,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "vsedit-debug"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "vsedit-debug-view"
 version = "0.1.0"
 dependencies = [
  "ratatui",
+ "vsedit-debug",
 ]
 
 [[package]]
@@ -2862,6 +2874,7 @@ version = "0.1.0"
 name = "vsedit-explorer"
 version = "0.1.0"
 dependencies = [
+ "crossterm",
  "ratatui",
  "tempfile",
  "vsedit-files",
@@ -4009,6 +4022,11 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-wb-search"
 version = "0.1.0"
+dependencies = [
+ "globset",
+ "regex",
+ "walkdir",
+]
 
 [[package]]
 name = "vsedit-wb-statusbar"

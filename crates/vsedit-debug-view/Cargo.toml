@@ -7,4 +7,5 @@ license.workspace = true
 
 [dependencies]
 ratatui = { workspace = true }
+vsedit-debug = { path = "../vsedit-debug" }
 

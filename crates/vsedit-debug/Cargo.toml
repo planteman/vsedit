@@ -1,0 +1,16 @@
+[package]
+name = "vsedit-debug"
+description = "Debug Adapter Protocol (DAP) client and debugging support"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { version = "1", features = ["process", "io-util", "sync", "rt", "macros"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
