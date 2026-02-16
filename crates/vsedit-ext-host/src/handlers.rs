@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use serde_json::{json, Value};
-use tracing::info;
+use tracing::{debug, info};
 
 type HandlerFn = Box<dyn Fn(Value) -> Value + Send + Sync>;
 
@@ -147,7 +147,23 @@ impl MainThreadHandlers {
 
         self.register("mainThread/getConfiguration", |params| {
             let section = params.get("section").and_then(|v| v.as_str()).unwrap_or("");
-            info!(section, "mainThread/getConfiguration (stub)");
+            info!(section, "mainThread/getConfiguration");
+            let config_path = dirs::config_dir()
+                .unwrap_or_default()
+                .join("vsedit")
+                .join("settings.json");
+            if config_path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&config_path) {
+                    if let Ok(val) = serde_json::from_str::<Value>(&content) {
+                        if section.is_empty() {
+                            return val;
+                        }
+                        if let Some(sub) = val.get(section) {
+                            return sub.clone();
+                        }
+                    }
+                }
+            }
             json!({})
         });
 
@@ -291,44 +307,127 @@ impl MainThreadHandlers {
 
         // -- File system --
 
-        self.register("mainThread/fsReadFile", |_params| {
-            info!("mainThread/fsReadFile (stub)");
-            json!("")
+        self.register("mainThread/fsReadFile", |params| {
+            if let Some(path) = params.get("path").and_then(|p| p.as_str()) {
+                match std::fs::read_to_string(path) {
+                    Ok(content) => return json!({ "content": content }),
+                    Err(e) => return json!({ "error": e.to_string() }),
+                }
+            }
+            json!({ "error": "missing path" })
         });
 
-        self.register("mainThread/fsWriteFile", |_params| {
-            info!("mainThread/fsWriteFile (stub)");
-            Value::Null
+        self.register("mainThread/fsWriteFile", |params| {
+            let path = match params.get("path").and_then(|p| p.as_str()) {
+                Some(p) => p,
+                None => return json!({ "error": "missing path" }),
+            };
+            let content = params.get("content").and_then(|c| c.as_str()).unwrap_or("");
+            match std::fs::write(path, content) {
+                Ok(()) => Value::Null,
+                Err(e) => json!({ "error": e.to_string() }),
+            }
         });
 
-        self.register("mainThread/fsStat", |_params| {
-            info!("mainThread/fsStat (stub)");
-            json!({ "type": 1, "size": 0, "ctime": 0, "mtime": 0 })
+        self.register("mainThread/fsStat", |params| {
+            let path = match params.get("path").and_then(|p| p.as_str()) {
+                Some(p) => p,
+                None => return json!({ "error": "missing path" }),
+            };
+            match std::fs::metadata(path) {
+                Ok(meta) => {
+                    let file_type = if meta.is_dir() { "directory" } else { "file" };
+                    let mtime = meta
+                        .modified()
+                        .ok()
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| d.as_millis() as u64)
+                        .unwrap_or(0);
+                    json!({ "type": file_type, "size": meta.len(), "mtime": mtime })
+                }
+                Err(e) => json!({ "error": e.to_string() }),
+            }
         });
 
-        self.register("mainThread/fsReadDir", |_params| {
-            info!("mainThread/fsReadDir (stub)");
-            json!([])
+        self.register("mainThread/fsReadDir", |params| {
+            let path = match params.get("path").and_then(|p| p.as_str()) {
+                Some(p) => p,
+                None => return json!({ "error": "missing path" }),
+            };
+            match std::fs::read_dir(path) {
+                Ok(entries) => {
+                    let items: Vec<Value> = entries
+                        .filter_map(|e| e.ok())
+                        .map(|e| {
+                            let ft = if e.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                                "directory"
+                            } else {
+                                "file"
+                            };
+                            json!({ "name": e.file_name().to_string_lossy(), "type": ft })
+                        })
+                        .collect();
+                    json!(items)
+                }
+                Err(e) => json!({ "error": e.to_string() }),
+            }
         });
 
-        self.register("mainThread/fsCreateDir", |_params| {
-            info!("mainThread/fsCreateDir (stub)");
-            Value::Null
+        self.register("mainThread/fsCreateDir", |params| {
+            let path = match params.get("path").and_then(|p| p.as_str()) {
+                Some(p) => p,
+                None => return json!({ "error": "missing path" }),
+            };
+            match std::fs::create_dir_all(path) {
+                Ok(()) => Value::Null,
+                Err(e) => json!({ "error": e.to_string() }),
+            }
         });
 
-        self.register("mainThread/fsDelete", |_params| {
-            info!("mainThread/fsDelete (stub)");
-            Value::Null
+        self.register("mainThread/fsDelete", |params| {
+            let path = match params.get("path").and_then(|p| p.as_str()) {
+                Some(p) => p,
+                None => return json!({ "error": "missing path" }),
+            };
+            let result = if std::path::Path::new(path).is_dir() {
+                std::fs::remove_dir_all(path)
+            } else {
+                std::fs::remove_file(path)
+            };
+            match result {
+                Ok(()) => Value::Null,
+                Err(e) => json!({ "error": e.to_string() }),
+            }
         });
 
-        self.register("mainThread/fsRename", |_params| {
-            info!("mainThread/fsRename (stub)");
-            Value::Null
+        self.register("mainThread/fsRename", |params| {
+            let old = match params.get("oldPath").and_then(|p| p.as_str()) {
+                Some(p) => p,
+                None => return json!({ "error": "missing oldPath" }),
+            };
+            let new_path = match params.get("newPath").and_then(|p| p.as_str()) {
+                Some(p) => p,
+                None => return json!({ "error": "missing newPath" }),
+            };
+            match std::fs::rename(old, new_path) {
+                Ok(()) => Value::Null,
+                Err(e) => json!({ "error": e.to_string() }),
+            }
         });
 
-        self.register("mainThread/fsCopy", |_params| {
-            info!("mainThread/fsCopy (stub)");
-            Value::Null
+        self.register("mainThread/fsCopy", |params| {
+            let src = match params.get("source").and_then(|p| p.as_str()) {
+                Some(p) => p,
+                None => return json!({ "error": "missing source" }),
+            };
+            let dest = match params.get("destination").and_then(|p| p.as_str()) {
+                Some(p) => p,
+                None => return json!({ "error": "missing destination" }),
+            };
+            match std::fs::copy(src, dest) {
+                Ok(_) => Value::Null,
+                Err(e) => json!({ "error": e.to_string() }),
+            }
         });
 
         // -- Language feature providers --
@@ -399,6 +498,66 @@ impl MainThreadHandlers {
             info!("mainThread/outputDispose (stub)");
             Value::Null
         });
+
+        // -- Language --
+
+        self.register("mainThread/setLanguage", |params| {
+            if let Some(lang) = params.get("languageId").and_then(|l| l.as_str()) {
+                info!(lang, "mainThread/setLanguage");
+            }
+            Value::Null
+        });
+
+        self.register("mainThread/getLanguages", |_params| {
+            json!([
+                "rust", "python", "javascript", "typescript", "json", "yaml", "toml",
+                "markdown", "html", "css", "c", "cpp", "java", "go", "ruby", "php",
+                "shell", "sql", "xml", "plaintext"
+            ])
+        });
+
+        // -- External --
+
+        self.register("mainThread/openExternal", |params| {
+            if let Some(uri) = params.get("uri").and_then(|u| u.as_str()) {
+                info!(uri, "mainThread/openExternal");
+                #[cfg(target_os = "linux")]
+                {
+                    let _ = std::process::Command::new("xdg-open").arg(uri).spawn();
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    let _ = std::process::Command::new("open").arg(uri).spawn();
+                }
+            }
+            json!(true)
+        });
+
+        // -- Secrets --
+
+        self.register("mainThread/secretGet", |_params| Value::Null);
+
+        self.register("mainThread/secretStore", |params| {
+            debug!("mainThread/secretStore: {:?}", params.get("key"));
+            json!(true)
+        });
+
+        self.register("mainThread/secretDelete", |_params| json!(true));
+
+        // -- Memento --
+
+        self.register("mainThread/mementoUpdate", |_params| json!(true));
+
+        // -- Source control --
+
+        self.register("mainThread/registerSourceControl", |params| {
+            if let Some(id) = params.get("id").and_then(|i| i.as_str()) {
+                info!(id, "mainThread/registerSourceControl");
+            }
+            json!({ "handle": 1 })
+        });
+
+        self.register("mainThread/unregisterSourceControl", |_params| Value::Null);
     }
 }
 
