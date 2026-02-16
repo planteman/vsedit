@@ -13,8 +13,11 @@ vsedit-commands = { path = "../vsedit-commands" }
 vsedit-events = { path = "../vsedit-events" }
 vsedit-di = { path = "../vsedit-di" }
 vsedit-languages = { path = "../vsedit-languages" }
+vsedit-collections = { path = "../vsedit-collections" }
 vsedit-diff = { path = "../vsedit-diff" }
 vsedit-explorer = { path = "../vsedit-explorer" }
+vsedit-glob = { path = "../vsedit-glob" }
+vsedit-path = { path = "../vsedit-path" }
 vsedit-ext-host = { path = "../vsedit-ext-host" }
 vsedit-snippet = { path = "../vsedit-snippet" }
 vsedit-suggest = { path = "../vsedit-suggest" }

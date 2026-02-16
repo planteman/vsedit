@@ -609,6 +609,12 @@ pub fn register_default_keybindings(resolver: &mut KeybindingResolver) {
             "editor.unfoldAll",
             Some("editorTextFocus"),
         ),
+        // Ctrl+K Ctrl+W → Close all editors
+        default_rule(
+            &[ctrl(KeyK), ctrl(KeyW)],
+            "workbench.action.closeAllEditors",
+            None,
+        ),
     ];
 
     for rule in defaults {

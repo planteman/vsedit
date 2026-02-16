@@ -3095,3 +3095,239 @@ mod di_extended {
         assert!(col.has::<AlphaService>());
     }
 }
+
+// ─── Diff ───────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod diff_hunks {
+    use vsedit_diff::{compute_diff_hunks, unified_diff_format, diff_apply, DiffHunkType};
+
+    #[test]
+    fn test_integration_diff_hunks_detect_addition() {
+        let hunks = compute_diff_hunks("line1\n", "line1\nline2\n");
+        assert_eq!(hunks.len(), 1);
+        assert_eq!(hunks[0].change_type, DiffHunkType::Add);
+        assert_eq!(hunks[0].modified_lines.len(), 1);
+    }
+
+    #[test]
+    fn test_integration_diff_hunks_detect_deletion() {
+        let hunks = compute_diff_hunks("aaa\nbbb\n", "aaa\n");
+        assert_eq!(hunks.len(), 1);
+        assert_eq!(hunks[0].change_type, DiffHunkType::Delete);
+        assert_eq!(hunks[0].original_lines.len(), 1);
+    }
+
+    #[test]
+    fn test_integration_diff_hunks_detect_modification() {
+        let hunks = compute_diff_hunks("old line\n", "new line\n");
+        assert_eq!(hunks.len(), 1);
+        assert_eq!(hunks[0].change_type, DiffHunkType::Modify);
+    }
+
+    #[test]
+    fn test_integration_diff_unified_format_contains_header() {
+        let hunks = compute_diff_hunks("a\n", "b\n");
+        let text = unified_diff_format(&hunks, 3);
+        assert!(text.contains("@@"));
+        assert!(text.contains("-a"));
+        assert!(text.contains("+b"));
+    }
+
+    #[test]
+    fn test_integration_diff_apply_roundtrip() {
+        let original = "first\nsecond\nthird\n";
+        let modified = "first\nchanged\nthird\nextra\n";
+        let hunks = compute_diff_hunks(original, modified);
+        let result = diff_apply(original, &hunks).expect("apply should succeed");
+        assert_eq!(result.trim(), modified.trim());
+    }
+}
+
+// ─── Glob ───────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod glob_tests {
+    use vsedit_glob::{GlobPattern, GlobPatternSet, parse_exclude_patterns};
+
+    #[test]
+    fn test_integration_glob_pattern_match() {
+        let pat = GlobPattern::new("*.rs").unwrap();
+        assert!(pat.matches("main.rs"));
+        assert!(!pat.matches("main.py"));
+    }
+
+    #[test]
+    fn test_integration_glob_recursive_star() {
+        let pat = GlobPattern::new("**/*.txt").unwrap();
+        assert!(pat.matches("a/b/c/file.txt"));
+        assert!(!pat.matches("a/b/c/file.rs"));
+    }
+
+    #[test]
+    fn test_integration_glob_negation_helpers() {
+        assert!(GlobPattern::is_negated("!*.log"));
+        assert!(!GlobPattern::is_negated("*.log"));
+        assert_eq!(GlobPattern::strip_negation("!*.log"), "*.log");
+    }
+
+    #[test]
+    fn test_integration_glob_pattern_set_matches_any() {
+        let set = GlobPatternSet::new(&["*.rs", "*.toml"]).unwrap();
+        assert!(set.matches_any("lib.rs"));
+        assert!(set.matches_any("Cargo.toml"));
+        assert!(!set.matches_any("readme.md"));
+    }
+
+    #[test]
+    fn test_integration_glob_parse_exclude_patterns() {
+        let (excludes, includes) = parse_exclude_patterns(&["*.log", "!important.log", "*.tmp"]);
+        assert_eq!(excludes, vec!["*.log", "*.tmp"]);
+        assert_eq!(includes, vec!["important.log"]);
+    }
+}
+
+// ─── Collections ────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod collections {
+    use vsedit_collections::{LruCache, PriorityQueue};
+
+    #[test]
+    fn test_integration_lru_cache_evicts_oldest() {
+        let mut cache = LruCache::new(2);
+        cache.set("a", 1);
+        cache.set("b", 2);
+        let evicted = cache.set("c", 3);
+        assert_eq!(evicted, Some(("a", 1)));
+        assert!(cache.get(&"a").is_none());
+        assert_eq!(*cache.get(&"b").unwrap(), 2);
+    }
+
+    #[test]
+    fn test_integration_lru_cache_get_promotes() {
+        let mut cache = LruCache::new(2);
+        cache.set("a", 1);
+        cache.set("b", 2);
+        cache.get(&"a"); // promote "a"
+        cache.set("c", 3); // should evict "b", not "a"
+        assert!(cache.get(&"b").is_none());
+        assert!(cache.get(&"a").is_some());
+    }
+
+    #[test]
+    fn test_integration_lru_cache_remove() {
+        let mut cache = LruCache::new(3);
+        cache.set("x", 10);
+        cache.set("y", 20);
+        assert_eq!(cache.remove(&"x"), Some(10));
+        assert_eq!(cache.len(), 1);
+        assert!(!cache.contains_key(&"x"));
+    }
+
+    #[test]
+    fn test_integration_priority_queue_min_order() {
+        let mut pq = PriorityQueue::new();
+        pq.push(5);
+        pq.push(1);
+        pq.push(3);
+        assert_eq!(pq.pop(), Some(1));
+        assert_eq!(pq.pop(), Some(3));
+        assert_eq!(pq.pop(), Some(5));
+        assert!(pq.is_empty());
+    }
+
+    #[test]
+    fn test_integration_priority_queue_peek() {
+        let mut pq = PriorityQueue::new();
+        pq.push(10);
+        pq.push(2);
+        assert_eq!(*pq.peek().unwrap(), 2);
+        assert_eq!(pq.len(), 2);
+    }
+}
+
+// ─── Path Utilities ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod path_utils {
+    use vsedit_path::{path_normalize, path_common_prefix, relative_to};
+
+    #[test]
+    fn test_integration_path_normalize_dot_segments() {
+        assert_eq!(path_normalize("/a/b/../c/./d"), "/a/c/d");
+    }
+
+    #[test]
+    fn test_integration_path_normalize_collapses_slashes() {
+        assert_eq!(path_normalize("/a//b///c"), "/a/b/c");
+    }
+
+    #[test]
+    fn test_integration_path_normalize_removes_trailing_slash() {
+        assert_eq!(path_normalize("/a/b/c/"), "/a/b/c");
+    }
+
+    #[test]
+    fn test_integration_path_common_prefix_shared() {
+        let prefix = path_common_prefix(&["/home/user/project/src", "/home/user/project/tests"]);
+        assert_eq!(prefix, "/home/user/project");
+    }
+
+    #[test]
+    fn test_integration_path_relative_to() {
+        let rel = relative_to("/home/user/src", "/home/user/docs/readme.md").unwrap();
+        assert_eq!(rel, "../docs/readme.md");
+    }
+}
+
+// ─── JSON Utilities ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod json_utils {
+    use vsedit_json::{JsonPath, json_merge, parse_jsonc};
+    use serde_json::json;
+
+    #[test]
+    fn test_integration_json_path_get() {
+        let data = json!({"a": {"b": {"c": 42}}});
+        let path = JsonPath::parse("a.b.c");
+        assert_eq!(path.get(&data), Some(&json!(42)));
+    }
+
+    #[test]
+    fn test_integration_json_path_set() {
+        let mut data = json!({"x": 1});
+        let path = JsonPath::parse("y.z");
+        path.set(&mut data, json!(99));
+        assert_eq!(data, json!({"x": 1, "y": {"z": 99}}));
+    }
+
+    #[test]
+    fn test_integration_json_path_remove() {
+        let mut data = json!({"keep": 1, "drop": 2});
+        let path = JsonPath::parse("drop");
+        assert!(path.remove(&mut data));
+        assert_eq!(data, json!({"keep": 1}));
+    }
+
+    #[test]
+    fn test_integration_json_merge_deep() {
+        let base = json!({"a": 1, "b": {"c": 2, "d": 3}});
+        let patch = json!({"b": {"c": 99}, "e": 5});
+        let merged = json_merge(&base, &patch);
+        assert_eq!(merged, json!({"a": 1, "b": {"c": 99, "d": 3}, "e": 5}));
+    }
+
+    #[test]
+    fn test_integration_jsonc_parse_with_comments() {
+        let input = r#"{
+            // line comment
+            "key": "value", /* block */
+            "num": 42,
+        }"#;
+        let val = parse_jsonc(input).expect("JSONC should parse");
+        assert_eq!(val["key"], json!("value"));
+        assert_eq!(val["num"], json!(42));
+    }
+}

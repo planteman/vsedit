@@ -54,7 +54,7 @@ use vsedit_wb_clipboard::ClipboardService;
 use vsedit_theme::dark_plus;
 use vsedit_tui::{restore_terminal, setup_terminal};
 use vsedit_userdatasync::{SyncResource, SyncService};
-use vsedit_workbench::{ActivePanelView, FocusedPart, Workbench, WorkbenchAction};
+use vsedit_workbench::{ActivePanelView, ActiveSidebarPanel, FocusedPart, Workbench, WorkbenchAction};
 use vsedit_workspace::Workspace;
 use vsedit_lsp::{DiagnosticCollection, Severity as LspSeverity};
 use vsedit_debug::BreakpointStore;
@@ -753,6 +753,11 @@ fn register_builtin_commands(registry: &CommandRegistry) {
         ("editor.action.peekDefinition", log_cmd("editor.action.peekDefinition")),
         ("editor.action.rename", log_cmd("editor.action.rename")),
         ("editor.debug.toggleBreakpoint", log_cmd("editor.debug.toggleBreakpoint")),
+        ("workbench.action.findInFiles", log_cmd("workbench.action.findInFiles")),
+        ("workbench.action.replaceInFiles", log_cmd("workbench.action.replaceInFiles")),
+        ("workbench.action.closeAllEditors", log_cmd("workbench.action.closeAllEditors")),
+        ("editor.fold", log_cmd("editor.fold")),
+        ("editor.unfold", log_cmd("editor.unfold")),
     ];
     vsedit_commands::register_builtin_commands(registry, cmds);
 }
@@ -1139,6 +1144,26 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
             KeyCode::Char('b') | KeyCode::Char('B') if has_shift => {
                 return dispatch_command("workbench.action.tasks.build", app);
             }
+            // Ctrl+Shift+P → Command palette
+            KeyCode::Char('p') | KeyCode::Char('P') if has_shift => {
+                return dispatch_command("workbench.action.showCommands", app);
+            }
+            // Ctrl+Shift+F → Find in files
+            KeyCode::Char('f') | KeyCode::Char('F') if has_shift => {
+                return dispatch_command("workbench.action.findInFiles", app);
+            }
+            // Ctrl+Shift+H → Replace in files
+            KeyCode::Char('h') | KeyCode::Char('H') if has_shift => {
+                return dispatch_command("workbench.action.replaceInFiles", app);
+            }
+            // Ctrl+Shift+[ → Fold region
+            KeyCode::Char('{') if has_shift => {
+                return dispatch_command("editor.fold", app);
+            }
+            // Ctrl+Shift+] → Unfold region
+            KeyCode::Char('}') if has_shift => {
+                return dispatch_command("editor.unfold", app);
+            }
 
             // -- Ctrl-only combos --
             KeyCode::Char('p') => {
@@ -1273,6 +1298,14 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
                 sync_state(app);
                 return false;
             }
+            KeyCode::Char('b') => {
+                // Ctrl+B → Toggle sidebar visibility
+                return dispatch_command("workbench.action.toggleSidebarVisibility", app);
+            }
+            KeyCode::Char(' ') => {
+                // Ctrl+Space → Trigger suggest
+                return dispatch_command("editor.action.triggerSuggest", app);
+            }
             KeyCode::Home => {
                 app.controller.execute_action(EditorAction::MoveCursorDocumentStart);
                 sync_state(app);
@@ -1290,6 +1323,11 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
                 return handle_workbench_action(&action, app);
             }
         }
+    }
+
+    // ── F2 → Rename symbol ─────────────────────────────────────────
+    if key_event.code == KeyCode::F(2) && !has_ctrl && !has_alt {
+        return dispatch_command("editor.action.rename", app);
     }
 
     // ── F9 → Toggle breakpoint ───────────────────────────────────────
@@ -1505,6 +1543,35 @@ fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
         }
         "editor.debug.toggleBreakpoint" => {
             toggle_breakpoint(app);
+        }
+        "workbench.action.findInFiles" => {
+            tracing::info!("Find in files triggered");
+            app.workbench.set_active_sidebar(ActiveSidebarPanel::Search);
+            app.workbench.layout.set_part_visible(vsedit_wb_layout::Part::Sidebar, true);
+            app.context_keys
+                .set_context("sideBarVisible", ContextKeyValue::Bool(true));
+        }
+        "workbench.action.replaceInFiles" => {
+            tracing::info!("Replace in files triggered");
+            app.workbench.set_active_sidebar(ActiveSidebarPanel::Search);
+            app.workbench.layout.set_part_visible(vsedit_wb_layout::Part::Sidebar, true);
+            app.context_keys
+                .set_context("sideBarVisible", ContextKeyValue::Bool(true));
+        }
+        "workbench.action.closeAllEditors" => {
+            let ids: Vec<usize> = app.workbench.tab_service.get_tabs().iter().map(|t| t.id).collect();
+            for id in ids {
+                app.workbench.tab_service.close_tab(id);
+            }
+            load_active_tab_into_controller(app);
+        }
+        "editor.fold" => {
+            tracing::info!("Fold region triggered");
+            app.workbench.execute_command(cmd);
+        }
+        "editor.unfold" => {
+            tracing::info!("Unfold region triggered");
+            app.workbench.execute_command(cmd);
         }
         _ if cmd.starts_with("__gotoLine:") => {
             if let Some(line_str) = cmd.strip_prefix("__gotoLine:") {
