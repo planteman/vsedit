@@ -578,6 +578,96 @@ impl Default for RefsViewValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ReferenceService — aggregates multiple reference providers
+// ---------------------------------------------------------------------------
+
+/// Trait for providing references.
+pub trait ReferenceProvider: Send + Sync {
+    fn find_references(
+        &self,
+        uri: &str,
+        line: u32,
+        col: u32,
+        include_declaration: bool,
+    ) -> Vec<ReferenceItem>;
+}
+
+/// Aggregates reference providers and returns merged results.
+pub struct ReferenceService {
+    providers: Vec<Box<dyn ReferenceProvider>>,
+}
+
+impl ReferenceService {
+    pub fn new() -> Self {
+        Self { providers: Vec::new() }
+    }
+
+    pub fn register(&mut self, provider: Box<dyn ReferenceProvider>) {
+        self.providers.push(provider);
+    }
+
+    pub fn provider_count(&self) -> usize {
+        self.providers.len()
+    }
+
+    /// Query all providers and merge into a `ReferencesModel`.
+    pub fn find_references(
+        &self,
+        symbol_name: &str,
+        uri: &str,
+        line: u32,
+        col: u32,
+        include_declaration: bool,
+    ) -> ReferencesModel {
+        let base = Location::new(uri, line, col, line, col);
+        let mut model = ReferencesModel::new(symbol_name, base);
+        for provider in &self.providers {
+            let refs = provider.find_references(uri, line, col, include_declaration);
+            for r in refs {
+                model.add_reference(r);
+            }
+        }
+        model.sort_by_location();
+        model
+    }
+
+    /// Build a complete `ReferenceSearchResult` with timing placeholder.
+    pub fn search(
+        &self,
+        symbol_name: &str,
+        uri: &str,
+        line: u32,
+        col: u32,
+        include_declaration: bool,
+    ) -> ReferenceSearchResult {
+        let model = self.find_references(symbol_name, uri, line, col, include_declaration);
+        let mut result = ReferenceSearchResult::new(symbol_name, model, 0);
+        if !include_declaration {
+            result = result.without_declaration();
+        }
+        result
+    }
+}
+
+impl Default for ReferenceService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Convenience function: find all references at a position.
+pub fn find_references_at(
+    service: &ReferenceService,
+    symbol_name: &str,
+    uri: &str,
+    line: u32,
+    col: u32,
+    include_declaration: bool,
+) -> ReferencesModel {
+    service.find_references(symbol_name, uri, line, col, include_declaration)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1005,5 +1095,85 @@ mod tests {
     fn refs_view_is_ascii_printable() {
         assert!(RefsViewValidator::is_ascii_printable("Hello World 123"));
         assert!(!RefsViewValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // --- ReferenceService tests ---
+
+    struct DummyRefProvider {
+        refs: Vec<ReferenceItem>,
+    }
+
+    impl ReferenceProvider for DummyRefProvider {
+        fn find_references(&self, _uri: &str, _line: u32, _col: u32, _incl: bool) -> Vec<ReferenceItem> {
+            self.refs.clone()
+        }
+    }
+
+    fn make_ref_item(uri: &str, line: u32) -> ReferenceItem {
+        ReferenceItem {
+            location: Location::new(uri, line, 0, line, 10),
+            context_before: None,
+            context_line: format!("line {line}"),
+            context_after: None,
+        }
+    }
+
+    #[test]
+    fn reference_service_empty() {
+        let svc = ReferenceService::new();
+        assert_eq!(svc.provider_count(), 0);
+        let model = svc.find_references("sym", "f.rs", 1, 0, true);
+        assert!(model.is_empty());
+    }
+
+    #[test]
+    fn reference_service_single_provider() {
+        let mut svc = ReferenceService::new();
+        svc.register(Box::new(DummyRefProvider {
+            refs: vec![make_ref_item("a.rs", 5), make_ref_item("b.rs", 10)],
+        }));
+        assert_eq!(svc.provider_count(), 1);
+        let model = svc.find_references("foo", "a.rs", 5, 0, true);
+        assert_eq!(model.total_count(), 2);
+        assert_eq!(model.file_count(), 2);
+    }
+
+    #[test]
+    fn reference_service_multiple_providers() {
+        let mut svc = ReferenceService::new();
+        svc.register(Box::new(DummyRefProvider {
+            refs: vec![make_ref_item("a.rs", 1)],
+        }));
+        svc.register(Box::new(DummyRefProvider {
+            refs: vec![make_ref_item("b.rs", 2)],
+        }));
+        let model = svc.find_references("sym", "f", 0, 0, true);
+        assert_eq!(model.total_count(), 2);
+    }
+
+    #[test]
+    fn reference_service_search() {
+        let mut svc = ReferenceService::new();
+        svc.register(Box::new(DummyRefProvider {
+            refs: vec![make_ref_item("x.rs", 3)],
+        }));
+        let result = svc.search("myfn", "x.rs", 3, 0, true);
+        assert_eq!(result.symbol_name, "myfn");
+        assert!(result.include_declaration);
+        assert_eq!(result.model.total_count(), 1);
+    }
+
+    #[test]
+    fn reference_service_search_no_decl() {
+        let svc = ReferenceService::default();
+        let result = svc.search("sym", "f", 0, 0, false);
+        assert!(!result.include_declaration);
+    }
+
+    #[test]
+    fn find_references_at_convenience() {
+        let svc = ReferenceService::new();
+        let model = find_references_at(&svc, "sym", "f", 0, 0, true);
+        assert!(model.is_empty());
     }
 }

@@ -455,6 +455,170 @@ impl Default for WbHistoryValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ViewState — saved editor state for navigation history
+// ---------------------------------------------------------------------------
+
+/// Captured editor view state for restoring after navigation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ViewState {
+    pub scroll_top: u32,
+    pub cursor_line: u32,
+    pub cursor_column: u32,
+    pub selections: Vec<(u32, u32, u32, u32)>,
+}
+
+impl ViewState {
+    pub fn new(scroll_top: u32, cursor_line: u32, cursor_column: u32) -> Self {
+        Self {
+            scroll_top,
+            cursor_line,
+            cursor_column,
+            selections: Vec::new(),
+        }
+    }
+
+    pub fn with_selection(mut self, start_line: u32, start_col: u32, end_line: u32, end_col: u32) -> Self {
+        self.selections.push((start_line, start_col, end_line, end_col));
+        self
+    }
+}
+
+/// An extended navigation entry that includes view state.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NavigationEntry {
+    pub uri: String,
+    pub line: u32,
+    pub column: u32,
+    pub label: Option<String>,
+    pub view_state: Option<ViewState>,
+}
+
+impl NavigationEntry {
+    pub fn new(uri: impl Into<String>, line: u32, column: u32) -> Self {
+        Self {
+            uri: uri.into(),
+            line,
+            column,
+            label: None,
+            view_state: None,
+        }
+    }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    pub fn with_view_state(mut self, vs: ViewState) -> Self {
+        self.view_state = Some(vs);
+        self
+    }
+}
+
+impl fmt::Display for NavigationEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}:{}", self.uri, self.line, self.column)
+    }
+}
+
+/// Navigation history service with back/forward stacks and push-on-jump.
+pub struct NavigationHistoryService {
+    back_stack: Vec<NavigationEntry>,
+    forward_stack: Vec<NavigationEntry>,
+    current: Option<NavigationEntry>,
+    max_size: usize,
+}
+
+impl NavigationHistoryService {
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            back_stack: Vec::new(),
+            forward_stack: Vec::new(),
+            current: None,
+            max_size,
+        }
+    }
+
+    /// Push a new entry (called on every definition/reference jump).
+    pub fn push_navigation(&mut self, entry: NavigationEntry) {
+        if let Some(cur) = self.current.take() {
+            self.back_stack.push(cur);
+            while self.back_stack.len() > self.max_size {
+                self.back_stack.remove(0);
+            }
+        }
+        self.forward_stack.clear();
+        self.current = Some(entry);
+    }
+
+    /// Navigate back (Alt+Left).
+    pub fn navigate_back(&mut self) -> Option<&NavigationEntry> {
+        if let Some(cur) = self.current.take() {
+            self.forward_stack.push(cur);
+        }
+        if let Some(prev) = self.back_stack.pop() {
+            self.current = Some(prev);
+            self.current.as_ref()
+        } else {
+            // Restore current from forward stack if back is empty
+            if let Some(fwd) = self.forward_stack.pop() {
+                self.current = Some(fwd);
+            }
+            None
+        }
+    }
+
+    /// Navigate forward (Alt+Right).
+    pub fn navigate_forward(&mut self) -> Option<&NavigationEntry> {
+        if let Some(cur) = self.current.take() {
+            self.back_stack.push(cur);
+        }
+        if let Some(next) = self.forward_stack.pop() {
+            self.current = Some(next);
+            self.current.as_ref()
+        } else {
+            // Restore current from back stack if forward is empty
+            if let Some(back) = self.back_stack.pop() {
+                self.current = Some(back);
+            }
+            None
+        }
+    }
+
+    pub fn can_go_back(&self) -> bool {
+        !self.back_stack.is_empty()
+    }
+
+    pub fn can_go_forward(&self) -> bool {
+        !self.forward_stack.is_empty()
+    }
+
+    pub fn current(&self) -> Option<&NavigationEntry> {
+        self.current.as_ref()
+    }
+
+    pub fn back_stack_size(&self) -> usize {
+        self.back_stack.len()
+    }
+
+    pub fn forward_stack_size(&self) -> usize {
+        self.forward_stack.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.back_stack.clear();
+        self.forward_stack.clear();
+        self.current = None;
+    }
+}
+
+impl Default for NavigationHistoryService {
+    fn default() -> Self {
+        Self::new(100)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -991,5 +1155,123 @@ mod tests {
     fn wb_history_is_ascii_printable() {
         assert!(WbHistoryValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbHistoryValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // --- ViewState tests ---
+
+    #[test]
+    fn view_state_creation() {
+        let vs = ViewState::new(10, 20, 5);
+        assert_eq!(vs.scroll_top, 10);
+        assert_eq!(vs.cursor_line, 20);
+        assert_eq!(vs.cursor_column, 5);
+        assert!(vs.selections.is_empty());
+    }
+
+    #[test]
+    fn view_state_with_selection() {
+        let vs = ViewState::new(0, 5, 0).with_selection(5, 0, 5, 10);
+        assert_eq!(vs.selections.len(), 1);
+        assert_eq!(vs.selections[0], (5, 0, 5, 10));
+    }
+
+    // --- NavigationEntry tests ---
+
+    #[test]
+    fn navigation_entry_display() {
+        let e = NavigationEntry::new("main.rs", 42, 7);
+        assert_eq!(format!("{e}"), "main.rs:42:7");
+    }
+
+    #[test]
+    fn navigation_entry_with_view_state() {
+        let e = NavigationEntry::new("lib.rs", 1, 0)
+            .with_label("fn main")
+            .with_view_state(ViewState::new(0, 1, 0));
+        assert_eq!(e.label.as_deref(), Some("fn main"));
+        assert!(e.view_state.is_some());
+    }
+
+    // --- NavigationHistoryService tests ---
+
+    #[test]
+    fn nav_service_push_and_current() {
+        let mut svc = NavigationHistoryService::new(10);
+        assert!(svc.current().is_none());
+        svc.push_navigation(NavigationEntry::new("a.rs", 1, 0));
+        assert_eq!(svc.current().unwrap().uri, "a.rs");
+    }
+
+    #[test]
+    fn nav_service_back_forward() {
+        let mut svc = NavigationHistoryService::new(10);
+        svc.push_navigation(NavigationEntry::new("a.rs", 1, 0));
+        svc.push_navigation(NavigationEntry::new("b.rs", 2, 0));
+        svc.push_navigation(NavigationEntry::new("c.rs", 3, 0));
+
+        assert_eq!(svc.current().unwrap().uri, "c.rs");
+        assert!(svc.can_go_back());
+        assert!(!svc.can_go_forward());
+
+        let back = svc.navigate_back().unwrap();
+        assert_eq!(back.uri, "b.rs");
+        assert!(svc.can_go_forward());
+
+        let fwd = svc.navigate_forward().unwrap();
+        assert_eq!(fwd.uri, "c.rs");
+    }
+
+    #[test]
+    fn nav_service_push_clears_forward() {
+        let mut svc = NavigationHistoryService::new(10);
+        svc.push_navigation(NavigationEntry::new("a.rs", 1, 0));
+        svc.push_navigation(NavigationEntry::new("b.rs", 2, 0));
+        svc.navigate_back();
+
+        svc.push_navigation(NavigationEntry::new("d.rs", 4, 0));
+        assert!(!svc.can_go_forward());
+        assert_eq!(svc.current().unwrap().uri, "d.rs");
+    }
+
+    #[test]
+    fn nav_service_max_size() {
+        let mut svc = NavigationHistoryService::new(2);
+        svc.push_navigation(NavigationEntry::new("a.rs", 1, 0));
+        svc.push_navigation(NavigationEntry::new("b.rs", 2, 0));
+        svc.push_navigation(NavigationEntry::new("c.rs", 3, 0));
+        svc.push_navigation(NavigationEntry::new("d.rs", 4, 0));
+        // Back stack should be capped at 2
+        assert_eq!(svc.back_stack_size(), 2);
+    }
+
+    #[test]
+    fn nav_service_clear() {
+        let mut svc = NavigationHistoryService::new(10);
+        svc.push_navigation(NavigationEntry::new("a.rs", 1, 0));
+        svc.push_navigation(NavigationEntry::new("b.rs", 2, 0));
+        svc.clear();
+        assert!(svc.current().is_none());
+        assert!(!svc.can_go_back());
+        assert!(!svc.can_go_forward());
+    }
+
+    #[test]
+    fn nav_service_empty_back() {
+        let mut svc = NavigationHistoryService::new(10);
+        svc.push_navigation(NavigationEntry::new("a.rs", 1, 0));
+        assert!(svc.navigate_back().is_none());
+    }
+
+    #[test]
+    fn nav_service_stack_sizes() {
+        let mut svc = NavigationHistoryService::new(10);
+        svc.push_navigation(NavigationEntry::new("a.rs", 1, 0));
+        svc.push_navigation(NavigationEntry::new("b.rs", 2, 0));
+        svc.push_navigation(NavigationEntry::new("c.rs", 3, 0));
+        assert_eq!(svc.back_stack_size(), 2);
+        assert_eq!(svc.forward_stack_size(), 0);
+        svc.navigate_back();
+        assert_eq!(svc.back_stack_size(), 1);
+        assert_eq!(svc.forward_stack_size(), 1);
     }
 }

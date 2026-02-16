@@ -500,6 +500,228 @@ impl Default for QuickaccessValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Go To Symbol (Ctrl+Shift+O) — document symbol support
+// ---------------------------------------------------------------------------
+
+/// The kind of a document symbol, matching LSP SymbolKind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SymbolKind {
+    File,
+    Module,
+    Namespace,
+    Package,
+    Class,
+    Method,
+    Property,
+    Field,
+    Constructor,
+    Enum,
+    Interface,
+    Function,
+    Variable,
+    Constant,
+    String,
+    Number,
+    Boolean,
+    Array,
+    Object,
+    Key,
+    Null,
+    EnumMember,
+    Struct,
+    Event,
+    Operator,
+    TypeParameter,
+}
+
+impl SymbolKind {
+    /// Icon character for TUI display.
+    pub fn icon(&self) -> char {
+        match self {
+            Self::Function | Self::Method | Self::Constructor => 'ƒ',
+            Self::Class | Self::Struct | Self::Interface => '◆',
+            Self::Enum | Self::EnumMember => '◇',
+            Self::Variable | Self::Field | Self::Property => '◈',
+            Self::Constant => '◉',
+            Self::Module | Self::Namespace | Self::Package => '▸',
+            _ => '○',
+        }
+    }
+}
+
+impl fmt::Display for SymbolKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::File => "file",
+            Self::Module => "module",
+            Self::Namespace => "namespace",
+            Self::Package => "package",
+            Self::Class => "class",
+            Self::Method => "method",
+            Self::Property => "property",
+            Self::Field => "field",
+            Self::Constructor => "constructor",
+            Self::Enum => "enum",
+            Self::Interface => "interface",
+            Self::Function => "function",
+            Self::Variable => "variable",
+            Self::Constant => "constant",
+            Self::String => "string",
+            Self::Number => "number",
+            Self::Boolean => "boolean",
+            Self::Array => "array",
+            Self::Object => "object",
+            Self::Key => "key",
+            Self::Null => "null",
+            Self::EnumMember => "enum member",
+            Self::Struct => "struct",
+            Self::Event => "event",
+            Self::Operator => "operator",
+            Self::TypeParameter => "type parameter",
+        };
+        write!(f, "{name}")
+    }
+}
+
+/// A document symbol returned by a language server or provider.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DocumentSymbol {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: SymbolKind,
+    pub range_start_line: u32,
+    pub range_end_line: u32,
+    pub children: Vec<DocumentSymbol>,
+}
+
+impl DocumentSymbol {
+    pub fn new(name: impl Into<String>, kind: SymbolKind, start_line: u32, end_line: u32) -> Self {
+        Self {
+            name: name.into(),
+            detail: None,
+            kind,
+            range_start_line: start_line,
+            range_end_line: end_line,
+            children: Vec::new(),
+        }
+    }
+
+    pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    pub fn with_child(mut self, child: DocumentSymbol) -> Self {
+        self.children.push(child);
+        self
+    }
+
+    /// Flatten into a list of (depth, symbol) pairs for display.
+    pub fn flatten(&self, depth: usize) -> Vec<(usize, &DocumentSymbol)> {
+        let mut out = vec![(depth, self)];
+        for child in &self.children {
+            out.extend(child.flatten(depth + 1));
+        }
+        out
+    }
+}
+
+/// Trait for providing document symbols.
+pub trait DocumentSymbolProvider: Send + Sync {
+    fn document_symbols(&self, uri: &str) -> Vec<DocumentSymbol>;
+}
+
+/// Parse a go-to-symbol query, handling `@:` prefix for kind filtering.
+/// Returns `(kind_filter, text_filter)`.
+pub fn parse_symbol_query(query: &str) -> (Option<String>, String) {
+    let stripped = query.strip_prefix('@').unwrap_or(query);
+    if let Some(rest) = stripped.strip_prefix(':') {
+        // "@:function myFn" → kind="function", text="myFn"
+        let parts: Vec<&str> = rest.splitn(2, ' ').collect();
+        let kind = parts[0].to_lowercase();
+        let text = parts.get(1).unwrap_or(&"").to_string();
+        (Some(kind), text)
+    } else {
+        (None, stripped.to_string())
+    }
+}
+
+/// Filter document symbols by an optional kind and a fuzzy text query.
+pub fn filter_symbols<'a>(
+    symbols: &'a [DocumentSymbol],
+    kind_filter: Option<&str>,
+    text_query: &str,
+) -> Vec<&'a DocumentSymbol> {
+    symbols
+        .iter()
+        .filter(|s| {
+            if let Some(kind) = kind_filter {
+                if !s.kind.to_string().contains(kind) {
+                    return false;
+                }
+            }
+            if text_query.is_empty() {
+                return true;
+            }
+            fuzzy_match_score(text_query, &s.name).is_some()
+        })
+        .collect()
+}
+
+/// Convert a list of `DocumentSymbol` into `QuickAccessItem`s for the picker.
+pub fn symbols_to_quick_access_items(symbols: &[DocumentSymbol]) -> Vec<QuickAccessItem> {
+    symbols
+        .iter()
+        .enumerate()
+        .map(|(i, s)| QuickAccessItem {
+            id: format!("symbol-{i}"),
+            label: s.name.clone(),
+            description: s.detail.clone(),
+            detail: Some(format!("line {}", s.range_start_line)),
+            icon: Some(s.kind.icon().to_string()),
+            group: Some(s.kind.to_string()),
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Quick access prefix routing
+// ---------------------------------------------------------------------------
+
+/// Identifies the quick-access mode from a query string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QuickAccessMode {
+    /// Default file search (Ctrl+P with no prefix).
+    File,
+    /// Go to line (`:` prefix).
+    GoToLine(u32),
+    /// Go to symbol in file (`@` prefix).
+    GoToSymbol(String),
+    /// Go to symbol in workspace (`#` prefix).
+    WorkspaceSymbol(String),
+    /// Command palette (`>` prefix).
+    Command(String),
+}
+
+/// Parse a raw quick-access query into its mode.
+pub fn parse_quick_access_mode(query: &str) -> QuickAccessMode {
+    if let Some(rest) = query.strip_prefix(':') {
+        match rest.trim().parse::<u32>() {
+            Ok(line) => QuickAccessMode::GoToLine(line),
+            Err(_) => QuickAccessMode::File,
+        }
+    } else if let Some(rest) = query.strip_prefix('@') {
+        QuickAccessMode::GoToSymbol(rest.to_string())
+    } else if let Some(rest) = query.strip_prefix('#') {
+        QuickAccessMode::WorkspaceSymbol(rest.to_string())
+    } else if let Some(rest) = query.strip_prefix('>') {
+        QuickAccessMode::Command(rest.trim().to_string())
+    } else {
+        QuickAccessMode::File
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -988,5 +1210,161 @@ mod tests {
     fn quickaccess_is_ascii_printable() {
         assert!(QuickaccessValidator::is_ascii_printable("Hello World 123"));
         assert!(!QuickaccessValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // --- SymbolKind tests ---
+
+    #[test]
+    fn symbol_kind_icon() {
+        assert_eq!(SymbolKind::Function.icon(), 'ƒ');
+        assert_eq!(SymbolKind::Class.icon(), '◆');
+        assert_eq!(SymbolKind::Enum.icon(), '◇');
+        assert_eq!(SymbolKind::Variable.icon(), '◈');
+        assert_eq!(SymbolKind::Constant.icon(), '◉');
+        assert_eq!(SymbolKind::Module.icon(), '▸');
+        assert_eq!(SymbolKind::File.icon(), '○');
+    }
+
+    #[test]
+    fn symbol_kind_display() {
+        assert_eq!(SymbolKind::Function.to_string(), "function");
+        assert_eq!(SymbolKind::Class.to_string(), "class");
+        assert_eq!(SymbolKind::Struct.to_string(), "struct");
+    }
+
+    // --- DocumentSymbol tests ---
+
+    #[test]
+    fn document_symbol_creation() {
+        let sym = DocumentSymbol::new("main", SymbolKind::Function, 1, 10)
+            .with_detail("fn main()");
+        assert_eq!(sym.name, "main");
+        assert_eq!(sym.kind, SymbolKind::Function);
+        assert_eq!(sym.detail.as_deref(), Some("fn main()"));
+    }
+
+    #[test]
+    fn document_symbol_flatten() {
+        let sym = DocumentSymbol::new("Foo", SymbolKind::Class, 1, 50)
+            .with_child(DocumentSymbol::new("bar", SymbolKind::Method, 5, 10))
+            .with_child(DocumentSymbol::new("baz", SymbolKind::Method, 12, 20));
+        let flat = sym.flatten(0);
+        assert_eq!(flat.len(), 3);
+        assert_eq!(flat[0].0, 0); // depth 0
+        assert_eq!(flat[1].0, 1); // depth 1
+        assert_eq!(flat[1].1.name, "bar");
+    }
+
+    // --- parse_symbol_query tests ---
+
+    #[test]
+    fn parse_symbol_query_plain() {
+        let (kind, text) = parse_symbol_query("myFunc");
+        assert!(kind.is_none());
+        assert_eq!(text, "myFunc");
+    }
+
+    #[test]
+    fn parse_symbol_query_at_prefix() {
+        let (kind, text) = parse_symbol_query("@myFunc");
+        assert!(kind.is_none());
+        assert_eq!(text, "myFunc");
+    }
+
+    #[test]
+    fn parse_symbol_query_kind_filter() {
+        let (kind, text) = parse_symbol_query("@:function myFunc");
+        assert_eq!(kind.as_deref(), Some("function"));
+        assert_eq!(text, "myFunc");
+    }
+
+    #[test]
+    fn parse_symbol_query_kind_only() {
+        let (kind, text) = parse_symbol_query("@:class");
+        assert_eq!(kind.as_deref(), Some("class"));
+        assert_eq!(text, "");
+    }
+
+    // --- filter_symbols tests ---
+
+    #[test]
+    fn filter_symbols_no_filter() {
+        let symbols = vec![
+            DocumentSymbol::new("foo", SymbolKind::Function, 1, 5),
+            DocumentSymbol::new("Bar", SymbolKind::Class, 10, 20),
+        ];
+        let filtered = filter_symbols(&symbols, None, "");
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn filter_symbols_by_kind() {
+        let symbols = vec![
+            DocumentSymbol::new("foo", SymbolKind::Function, 1, 5),
+            DocumentSymbol::new("Bar", SymbolKind::Class, 10, 20),
+        ];
+        let filtered = filter_symbols(&symbols, Some("function"), "");
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].name, "foo");
+    }
+
+    #[test]
+    fn filter_symbols_by_text() {
+        let symbols = vec![
+            DocumentSymbol::new("process_data", SymbolKind::Function, 1, 5),
+            DocumentSymbol::new("validate", SymbolKind::Function, 10, 20),
+        ];
+        let filtered = filter_symbols(&symbols, None, "proc");
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].name, "process_data");
+    }
+
+    // --- symbols_to_quick_access_items ---
+
+    #[test]
+    fn symbols_to_items() {
+        let symbols = vec![
+            DocumentSymbol::new("main", SymbolKind::Function, 1, 10),
+        ];
+        let items = symbols_to_quick_access_items(&symbols);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].label, "main");
+        assert_eq!(items[0].icon.as_deref(), Some("ƒ"));
+    }
+
+    // --- QuickAccessMode tests ---
+
+    #[test]
+    fn parse_quick_access_mode_file() {
+        assert_eq!(parse_quick_access_mode("hello"), QuickAccessMode::File);
+    }
+
+    #[test]
+    fn parse_quick_access_mode_goto_line() {
+        assert_eq!(parse_quick_access_mode(":42"), QuickAccessMode::GoToLine(42));
+    }
+
+    #[test]
+    fn parse_quick_access_mode_symbol() {
+        assert_eq!(
+            parse_quick_access_mode("@myFunc"),
+            QuickAccessMode::GoToSymbol("myFunc".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_quick_access_mode_workspace_symbol() {
+        assert_eq!(
+            parse_quick_access_mode("#Config"),
+            QuickAccessMode::WorkspaceSymbol("Config".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_quick_access_mode_command() {
+        assert_eq!(
+            parse_quick_access_mode(">format"),
+            QuickAccessMode::Command("format".to_string())
+        );
     }
 }

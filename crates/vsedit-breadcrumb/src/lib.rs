@@ -607,6 +607,85 @@ impl Default for BreadcrumbValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// BreadcrumbDropdown — sibling navigation at each level
+// ---------------------------------------------------------------------------
+
+/// A dropdown showing sibling items at a particular breadcrumb level.
+#[derive(Debug, Clone)]
+pub struct BreadcrumbDropdown {
+    /// The breadcrumb index this dropdown is anchored to.
+    pub anchor_index: usize,
+    /// Sibling items at this level.
+    pub siblings: Vec<BreadcrumbElement>,
+    /// Currently highlighted sibling.
+    pub selected_index: usize,
+    /// Whether the dropdown is visible.
+    pub visible: bool,
+}
+
+impl BreadcrumbDropdown {
+    pub fn new(anchor_index: usize, siblings: Vec<BreadcrumbElement>) -> Self {
+        Self {
+            anchor_index,
+            siblings,
+            selected_index: 0,
+            visible: true,
+        }
+    }
+
+    pub fn selected(&self) -> Option<&BreadcrumbElement> {
+        self.siblings.get(self.selected_index)
+    }
+
+    pub fn select_next(&mut self) {
+        if !self.siblings.is_empty() {
+            self.selected_index = (self.selected_index + 1) % self.siblings.len();
+        }
+    }
+
+    pub fn select_previous(&mut self) {
+        if !self.siblings.is_empty() {
+            if self.selected_index == 0 {
+                self.selected_index = self.siblings.len() - 1;
+            } else {
+                self.selected_index -= 1;
+            }
+        }
+    }
+
+    pub fn accept(&self) -> Option<&BreadcrumbElement> {
+        self.selected()
+    }
+
+    pub fn close(&mut self) {
+        self.visible = false;
+    }
+
+    pub fn sibling_count(&self) -> usize {
+        self.siblings.len()
+    }
+}
+
+/// Update a `BreadcrumbPath` when the cursor moves to a new symbol.
+///
+/// `symbol_path` is the symbol hierarchy at the cursor position
+/// (e.g. `["src", "main.rs", "MyStruct", "my_method"]`).
+pub fn update_breadcrumbs_for_cursor(
+    current: &mut BreadcrumbPath,
+    symbol_path: &[(String, BreadcrumbKind)],
+) {
+    current.elements.clear();
+    for (label, kind) in symbol_path {
+        current.push(BreadcrumbElement {
+            label: label.clone(),
+            kind: kind.clone(),
+            uri: None,
+            range_start_line: None,
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1068,5 +1147,77 @@ mod tests {
     fn breadcrumb_is_ascii_printable() {
         assert!(BreadcrumbValidator::is_ascii_printable("Hello World 123"));
         assert!(!BreadcrumbValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // --- BreadcrumbDropdown tests ---
+
+    #[test]
+    fn dropdown_creation() {
+        let siblings = vec![
+            sample_element("foo", BreadcrumbKind::Function),
+            sample_element("bar", BreadcrumbKind::Function),
+            sample_element("baz", BreadcrumbKind::Function),
+        ];
+        let dd = BreadcrumbDropdown::new(2, siblings);
+        assert!(dd.visible);
+        assert_eq!(dd.sibling_count(), 3);
+        assert_eq!(dd.anchor_index, 2);
+        assert_eq!(dd.selected().unwrap().label, "foo");
+    }
+
+    #[test]
+    fn dropdown_navigation() {
+        let siblings = vec![
+            sample_element("a", BreadcrumbKind::Function),
+            sample_element("b", BreadcrumbKind::Function),
+        ];
+        let mut dd = BreadcrumbDropdown::new(0, siblings);
+        dd.select_next();
+        assert_eq!(dd.selected().unwrap().label, "b");
+        dd.select_next(); // wraps
+        assert_eq!(dd.selected().unwrap().label, "a");
+        dd.select_previous(); // wraps back
+        assert_eq!(dd.selected().unwrap().label, "b");
+    }
+
+    #[test]
+    fn dropdown_accept() {
+        let siblings = vec![sample_element("target", BreadcrumbKind::Method)];
+        let dd = BreadcrumbDropdown::new(0, siblings);
+        assert_eq!(dd.accept().unwrap().label, "target");
+    }
+
+    #[test]
+    fn dropdown_close() {
+        let mut dd = BreadcrumbDropdown::new(0, vec![]);
+        assert!(dd.visible);
+        dd.close();
+        assert!(!dd.visible);
+    }
+
+    // --- update_breadcrumbs_for_cursor tests ---
+
+    #[test]
+    fn update_breadcrumbs_for_cursor_replaces_path() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("old", BreadcrumbKind::File));
+
+        update_breadcrumbs_for_cursor(&mut path, &[
+            ("src".to_string(), BreadcrumbKind::Folder),
+            ("main.rs".to_string(), BreadcrumbKind::File),
+            ("MyStruct".to_string(), BreadcrumbKind::Class),
+        ]);
+
+        assert_eq!(path.len(), 3);
+        assert_eq!(path.elements[0].label, "src");
+        assert_eq!(path.elements[2].label, "MyStruct");
+    }
+
+    #[test]
+    fn update_breadcrumbs_for_cursor_empty() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("old", BreadcrumbKind::File));
+        update_breadcrumbs_for_cursor(&mut path, &[]);
+        assert!(path.is_empty());
     }
 }

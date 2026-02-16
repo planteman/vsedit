@@ -398,6 +398,211 @@ impl Default for GotoHistory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// GoToAction — the kind of navigation requested
+// ---------------------------------------------------------------------------
+
+/// Which go-to variant the user invoked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GoToAction {
+    Definition,
+    Declaration,
+    TypeDefinition,
+    Implementation,
+    References,
+}
+
+impl fmt::Display for GoToAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Definition => write!(f, "Go to Definition"),
+            Self::Declaration => write!(f, "Go to Declaration"),
+            Self::TypeDefinition => write!(f, "Go to Type Definition"),
+            Self::Implementation => write!(f, "Go to Implementation"),
+            Self::References => write!(f, "Find All References"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DefinitionService — convenience wrapper around GotoService
+// ---------------------------------------------------------------------------
+
+/// High-level service for resolving definitions that handles single vs
+/// multiple-result logic.
+pub struct DefinitionService {
+    inner: GotoService,
+}
+
+impl DefinitionService {
+    pub fn new() -> Self {
+        Self { inner: GotoService::new() }
+    }
+
+    pub fn register(&mut self, provider: Box<dyn GotoProvider>) {
+        self.inner.register(provider);
+    }
+
+    /// Resolve a go-to action. Returns the merged, deduplicated result.
+    pub fn resolve(&self, action: GoToAction, uri: &str, line: u32, col: u32) -> GotoResult {
+        let result = match action {
+            GoToAction::Definition => self.inner.definition(uri, line, col),
+            GoToAction::Declaration => self.inner.declaration(uri, line, col),
+            GoToAction::TypeDefinition => self.inner.type_definition(uri, line, col),
+            GoToAction::Implementation => self.inner.implementation(uri, line, col),
+            GoToAction::References => {
+                let links = self.inner.references(uri, line, col, true);
+                match links.len() {
+                    0 => GotoResult::None,
+                    1 => GotoResult::Single(links.into_iter().next().unwrap()),
+                    _ => GotoResult::Multiple(links),
+                }
+            }
+        };
+        result.deduplicate()
+    }
+
+    /// Returns `true` when exactly one result was found (navigate directly).
+    pub fn should_navigate(&self, result: &GotoResult) -> bool {
+        result.len() == 1
+    }
+
+    /// Returns `true` when multiple results were found (show peek/picker).
+    pub fn should_peek(&self, result: &GotoResult) -> bool {
+        result.len() > 1
+    }
+}
+
+impl Default for DefinitionService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Convenience: resolve a definition for a given position.
+pub fn goto_definition(service: &GotoService, uri: &str, line: u32, col: u32) -> GotoResult {
+    service.definition(uri, line, col).deduplicate()
+}
+
+/// Convenience: resolve references for a given position.
+pub fn find_references(
+    service: &GotoService,
+    uri: &str,
+    line: u32,
+    col: u32,
+    include_declaration: bool,
+) -> Vec<LocationLink> {
+    service.references(uri, line, col, include_declaration)
+}
+
+// ---------------------------------------------------------------------------
+// PeekState — model for the inline peek widget
+// ---------------------------------------------------------------------------
+
+/// State for an inline peek view showing code at another location.
+#[derive(Debug, Clone)]
+pub struct PeekState {
+    /// All results to display in the peek widget.
+    pub results: Vec<LocationLink>,
+    /// Index of the currently selected result.
+    pub selected_index: usize,
+    /// Whether the peek widget is visible.
+    pub visible: bool,
+    /// Title displayed in the peek title bar.
+    pub title: String,
+}
+
+impl PeekState {
+    pub fn new(title: impl Into<String>, results: Vec<LocationLink>) -> Self {
+        Self {
+            results,
+            selected_index: 0,
+            visible: true,
+            title: title.into(),
+        }
+    }
+
+    /// The currently selected result, if any.
+    pub fn selected(&self) -> Option<&LocationLink> {
+        self.results.get(self.selected_index)
+    }
+
+    /// Select the next result, wrapping around.
+    pub fn select_next(&mut self) {
+        if !self.results.is_empty() {
+            self.selected_index = (self.selected_index + 1) % self.results.len();
+        }
+    }
+
+    /// Select the previous result, wrapping around.
+    pub fn select_previous(&mut self) {
+        if !self.results.is_empty() {
+            if self.selected_index == 0 {
+                self.selected_index = self.results.len() - 1;
+            } else {
+                self.selected_index -= 1;
+            }
+        }
+    }
+
+    /// Close the peek widget.
+    pub fn close(&mut self) {
+        self.visible = false;
+    }
+
+    /// Open the peek widget.
+    pub fn open(&mut self) {
+        self.visible = true;
+    }
+
+    /// Number of results.
+    pub fn result_count(&self) -> usize {
+        self.results.len()
+    }
+
+    /// Label for the selected result (e.g. "2 of 5").
+    pub fn selection_label(&self) -> String {
+        if self.results.is_empty() {
+            "No results".to_string()
+        } else {
+            format!("{} of {}", self.selected_index + 1, self.results.len())
+        }
+    }
+
+    /// Navigate to the selected result (returns it and closes the peek).
+    pub fn accept(&mut self) -> Option<LocationLink> {
+        let result = self.selected().cloned();
+        self.close();
+        result
+    }
+
+    /// Group results by target URI.
+    pub fn results_by_file(&self) -> Vec<(&str, Vec<&LocationLink>)> {
+        let mut files: Vec<&str> = self.results.iter().map(|r| r.target_uri.as_str()).collect();
+        files.sort_unstable();
+        files.dedup();
+        files
+            .into_iter()
+            .map(|uri| {
+                let links: Vec<&LocationLink> =
+                    self.results.iter().filter(|r| r.target_uri == uri).collect();
+                (uri, links)
+            })
+            .collect()
+    }
+}
+
+impl Default for PeekState {
+    fn default() -> Self {
+        Self {
+            results: Vec::new(),
+            selected_index: 0,
+            visible: false,
+            title: String::new(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -714,5 +919,155 @@ mod tests {
         assert!(!hist.can_go_back());
         assert!(!hist.can_go_forward());
         assert!(hist.go_back().is_none());
+    }
+
+    // --- GoToAction tests ---
+
+    #[test]
+    fn goto_action_display() {
+        assert_eq!(GoToAction::Definition.to_string(), "Go to Definition");
+        assert_eq!(GoToAction::Declaration.to_string(), "Go to Declaration");
+        assert_eq!(GoToAction::TypeDefinition.to_string(), "Go to Type Definition");
+        assert_eq!(GoToAction::Implementation.to_string(), "Go to Implementation");
+        assert_eq!(GoToAction::References.to_string(), "Find All References");
+    }
+
+    #[test]
+    fn goto_action_eq() {
+        assert_eq!(GoToAction::Definition, GoToAction::Definition);
+        assert_ne!(GoToAction::Definition, GoToAction::Declaration);
+    }
+
+    // --- DefinitionService tests ---
+
+    #[test]
+    fn definition_service_resolve_definition() {
+        let mut svc = DefinitionService::new();
+        svc.register(Box::new(TestProvider {
+            result: GotoResult::Single(LocationLink::new("x", (0,0,0,0), (1,0,1,5))),
+        }));
+        let result = svc.resolve(GoToAction::Definition, "f", 1, 1);
+        assert_eq!(result.len(), 1);
+        assert!(svc.should_navigate(&result));
+        assert!(!svc.should_peek(&result));
+    }
+
+    #[test]
+    fn definition_service_resolve_multiple() {
+        let mut svc = DefinitionService::new();
+        svc.register(Box::new(TestProvider {
+            result: GotoResult::Multiple(vec![
+                LocationLink::new("a", (0,0,0,0), (0,0,0,0)),
+                LocationLink::new("b", (0,0,0,0), (0,0,0,0)),
+            ]),
+        }));
+        let result = svc.resolve(GoToAction::Definition, "f", 1, 1);
+        assert_eq!(result.len(), 2);
+        assert!(!svc.should_navigate(&result));
+        assert!(svc.should_peek(&result));
+    }
+
+    #[test]
+    fn definition_service_resolve_none() {
+        let svc = DefinitionService::default();
+        let result = svc.resolve(GoToAction::Definition, "f", 1, 1);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn goto_definition_convenience() {
+        let mut svc = GotoService::new();
+        svc.register(Box::new(TestProvider {
+            result: GotoResult::Single(LocationLink::new("x", (0,0,0,0), (1,0,1,5))),
+        }));
+        let result = goto_definition(&svc, "f", 1, 1);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn find_references_convenience() {
+        let svc = GotoService::new();
+        let refs = find_references(&svc, "f", 1, 1, true);
+        assert!(refs.is_empty());
+    }
+
+    // --- PeekState tests ---
+
+    #[test]
+    fn peek_state_new() {
+        let links = vec![
+            LocationLink::new("a.rs", (0,0,10,0), (5,0,5,10)),
+            LocationLink::new("b.rs", (0,0,20,0), (8,0,8,15)),
+        ];
+        let peek = PeekState::new("Definition", links);
+        assert!(peek.visible);
+        assert_eq!(peek.result_count(), 2);
+        assert_eq!(peek.selected_index, 0);
+        assert_eq!(peek.selected().unwrap().target_uri, "a.rs");
+    }
+
+    #[test]
+    fn peek_state_navigation() {
+        let links = vec![
+            LocationLink::new("a", (0,0,0,0), (0,0,0,0)),
+            LocationLink::new("b", (0,0,0,0), (0,0,0,0)),
+            LocationLink::new("c", (0,0,0,0), (0,0,0,0)),
+        ];
+        let mut peek = PeekState::new("Test", links);
+
+        peek.select_next();
+        assert_eq!(peek.selected().unwrap().target_uri, "b");
+
+        peek.select_next();
+        assert_eq!(peek.selected().unwrap().target_uri, "c");
+
+        peek.select_next(); // wraps
+        assert_eq!(peek.selected().unwrap().target_uri, "a");
+
+        peek.select_previous(); // wraps back
+        assert_eq!(peek.selected().unwrap().target_uri, "c");
+    }
+
+    #[test]
+    fn peek_state_selection_label() {
+        let peek = PeekState::new("T", vec![
+            LocationLink::new("a", (0,0,0,0), (0,0,0,0)),
+            LocationLink::new("b", (0,0,0,0), (0,0,0,0)),
+        ]);
+        assert_eq!(peek.selection_label(), "1 of 2");
+
+        let empty = PeekState::default();
+        assert_eq!(empty.selection_label(), "No results");
+    }
+
+    #[test]
+    fn peek_state_accept() {
+        let mut peek = PeekState::new("T", vec![
+            LocationLink::new("x", (0,0,0,0), (1,2,1,5)),
+        ]);
+        let accepted = peek.accept();
+        assert_eq!(accepted.unwrap().target_uri, "x");
+        assert!(!peek.visible);
+    }
+
+    #[test]
+    fn peek_state_close_open() {
+        let mut peek = PeekState::new("T", vec![]);
+        assert!(peek.visible);
+        peek.close();
+        assert!(!peek.visible);
+        peek.open();
+        assert!(peek.visible);
+    }
+
+    #[test]
+    fn peek_state_results_by_file() {
+        let peek = PeekState::new("T", vec![
+            LocationLink::new("a.rs", (0,0,0,0), (1,0,1,5)),
+            LocationLink::new("b.rs", (0,0,0,0), (2,0,2,5)),
+            LocationLink::new("a.rs", (0,0,0,0), (3,0,3,5)),
+        ]);
+        let grouped = peek.results_by_file();
+        assert_eq!(grouped.len(), 2);
     }
 }
