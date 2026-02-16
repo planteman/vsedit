@@ -3,9 +3,11 @@
 //! Equivalent to VS Code's `vs/platform/log/common/log.ts`.
 //! Wraps the `tracing` crate to provide VS Code-compatible log levels and output channels.
 
-use std::fmt;
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Log levels matching VS Code's LogLevel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -129,12 +131,15 @@ pub struct BufferedLogger {
     entries: std::sync::Mutex<Vec<LogEntry>>,
 }
 
-/// A log entry.
+/// A log entry with structured metadata.
 #[derive(Debug, Clone)]
 pub struct LogEntry {
     pub level: LogLevel,
     pub message: String,
     pub channel: String,
+    pub timestamp: u64,
+    pub source: Option<String>,
+    pub data: Option<HashMap<String, String>>,
 }
 
 impl BufferedLogger {
@@ -165,6 +170,9 @@ impl ILogger for BufferedLogger {
             level,
             message: message.to_string(),
             channel: self.channel.clone(),
+            timestamp: now_epoch_ms(),
+            source: None,
+            data: None,
         });
     }
 
@@ -222,6 +230,18 @@ impl LogLevel {
 // --- LogEntry helpers ---
 
 impl LogEntry {
+    /// Create a new `LogEntry` with the given level, channel, and message. Timestamp is set to now.
+    pub fn new(level: LogLevel, channel: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            level,
+            message: message.into(),
+            channel: channel.into(),
+            timestamp: now_epoch_ms(),
+            source: None,
+            data: None,
+        }
+    }
+
     /// Returns true if this entry is an error.
     pub fn is_error(&self) -> bool {
         self.level == LogLevel::Error
@@ -523,8 +543,55 @@ impl BufferedLogger {
     }
 }
 
-/// Initialize tracing subscriber (call once at startup).
-pub fn init_tracing(level: LogLevel) {
+fn now_epoch_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64)
+}
+
+/// Configuration for file-based logging with rotation.
+#[derive(Debug, Clone)]
+pub struct LogFileConfig {
+    pub log_dir: PathBuf,
+    pub file_name: String,
+    /// Number of rotated log files to keep (default: 5).
+    pub max_rotated_files: usize,
+}
+
+impl LogFileConfig {
+    pub fn new(log_dir: impl Into<PathBuf>, file_name: impl Into<String>) -> Self {
+        Self {
+            log_dir: log_dir.into(),
+            file_name: file_name.into(),
+            max_rotated_files: 5,
+        }
+    }
+
+    /// Default config: `~/.config/vsedit/logs/main.log`, keep 5 rotated files.
+    pub fn default_config() -> Self {
+        let log_dir = dirs::config_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("vsedit")
+            .join("logs");
+        Self::new(log_dir, "main.log")
+    }
+
+    pub fn log_file_path(&self) -> PathBuf {
+        self.log_dir.join(&self.file_name)
+    }
+
+    /// Returns paths for rotated log files: main.log.1, main.log.2, etc.
+    pub fn rotated_paths(&self) -> Vec<PathBuf> {
+        (1..=self.max_rotated_files)
+            .map(|i| self.log_dir.join(format!("{}.{}", self.file_name, i)))
+            .collect()
+    }
+}
+
+/// Initialize global logging with tracing subscriber.
+///
+/// Configures tracing output to stderr. Call once at startup.
+pub fn init_logging(level: LogLevel, _log_file: Option<&LogFileConfig>) {
     use tracing_subscriber::fmt;
     use tracing_subscriber::EnvFilter;
 
@@ -541,6 +608,160 @@ pub fn init_tracing(level: LogLevel) {
         .with_env_filter(EnvFilter::new(filter))
         .with_target(false)
         .try_init();
+}
+
+/// Initialize tracing subscriber (call once at startup).
+pub fn init_tracing(level: LogLevel) {
+    init_logging(level, None);
+}
+
+/// Change the runtime log level for a `LogService`.
+pub fn set_log_level(service: &LogService, level: LogLevel) {
+    service.set_default_level(level);
+}
+
+// --- Log file rotation ---
+
+/// Manages log file rotation on disk.
+pub struct LogFileRotator {
+    config: LogFileConfig,
+}
+
+impl LogFileRotator {
+    pub fn new(config: LogFileConfig) -> Self {
+        Self { config }
+    }
+
+    /// Rotate log files: main.log -> main.log.1, main.log.1 -> main.log.2, etc.
+    /// Removes files beyond `max_rotated_files`.
+    pub fn rotate(&self) -> std::io::Result<()> {
+        let base = self.config.log_file_path();
+        // Remove the oldest if it exists
+        let oldest = self.config.log_dir.join(format!(
+            "{}.{}",
+            self.config.file_name, self.config.max_rotated_files
+        ));
+        if oldest.exists() {
+            std::fs::remove_file(&oldest)?;
+        }
+        // Shift existing rotated files
+        for i in (1..self.config.max_rotated_files).rev() {
+            let from = self
+                .config
+                .log_dir
+                .join(format!("{}.{}", self.config.file_name, i));
+            let to = self
+                .config
+                .log_dir
+                .join(format!("{}.{}", self.config.file_name, i + 1));
+            if from.exists() {
+                std::fs::rename(&from, &to)?;
+            }
+        }
+        // Move current log to .1
+        if base.exists() {
+            let first_rotated = self
+                .config
+                .log_dir
+                .join(format!("{}.1", self.config.file_name));
+            std::fs::rename(&base, &first_rotated)?;
+        }
+        Ok(())
+    }
+
+    /// Returns the number of existing rotated log files.
+    pub fn rotated_file_count(&self) -> usize {
+        self.config
+            .rotated_paths()
+            .iter()
+            .filter(|p| p.exists())
+            .count()
+    }
+
+    pub fn config(&self) -> &LogFileConfig {
+        &self.config
+    }
+}
+
+// --- Developer log viewer ---
+
+/// Represents a developer-facing log output panel (e.g., "Log (Main)").
+pub struct LogViewer {
+    channel_name: String,
+    entries: Vec<LogEntry>,
+    max_entries: usize,
+}
+
+impl LogViewer {
+    pub fn new(channel_name: impl Into<String>) -> Self {
+        Self {
+            channel_name: channel_name.into(),
+            entries: Vec::new(),
+            max_entries: 10_000,
+        }
+    }
+
+    /// Add a log entry to the viewer.
+    pub fn push(&mut self, entry: LogEntry) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(entry);
+    }
+
+    /// Filter entries by level, source substring, and time range.
+    pub fn filter(
+        &self,
+        min_level: Option<LogLevel>,
+        source_pattern: Option<&str>,
+        time_start: Option<u64>,
+        time_end: Option<u64>,
+    ) -> Vec<&LogEntry> {
+        self.entries
+            .iter()
+            .filter(|e| {
+                if let Some(min) = min_level {
+                    if e.level < min {
+                        return false;
+                    }
+                }
+                if let Some(pat) = source_pattern {
+                    match &e.source {
+                        Some(src) if src.contains(pat) => {}
+                        None if e.channel.contains(pat) => {}
+                        _ => return false,
+                    }
+                }
+                if let Some(start) = time_start {
+                    if e.timestamp < start {
+                        return false;
+                    }
+                }
+                if let Some(end) = time_end {
+                    if e.timestamp > end {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect()
+    }
+
+    pub fn entries(&self) -> &[LogEntry] {
+        &self.entries
+    }
+
+    pub fn channel_name(&self) -> &str {
+        &self.channel_name
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
 }
 
 #[cfg(test)]
@@ -614,63 +835,35 @@ mod tests {
 
     #[test]
     fn log_entry_is_error() {
-        let entry = LogEntry {
-            level: LogLevel::Error,
-            message: "bad".into(),
-            channel: "ch".into(),
-        };
+        let entry = LogEntry::new(LogLevel::Error, "ch", "bad");
         assert!(entry.is_error());
         assert!(!entry.is_warning());
     }
 
     #[test]
     fn log_entry_is_warning() {
-        let entry = LogEntry {
-            level: LogLevel::Warning,
-            message: "careful".into(),
-            channel: "ch".into(),
-        };
+        let entry = LogEntry::new(LogLevel::Warning, "ch", "careful");
         assert!(entry.is_warning());
         assert!(!entry.is_error());
     }
 
     #[test]
     fn log_entry_formatted() {
-        let entry = LogEntry {
-            level: LogLevel::Info,
-            message: "hello".into(),
-            channel: "editor".into(),
-        };
+        let entry = LogEntry::new(LogLevel::Info, "editor", "hello");
         assert_eq!(entry.formatted(), "[INFO] editor: hello");
     }
 
     #[test]
     fn log_entry_display() {
-        let entry = LogEntry {
-            level: LogLevel::Error,
-            message: "fail".into(),
-            channel: "core".into(),
-        };
+        let entry = LogEntry::new(LogLevel::Error, "core", "fail");
         assert_eq!(entry.to_string(), "[ERROR] core: fail");
     }
 
     #[test]
     fn log_entry_partial_eq() {
-        let a = LogEntry {
-            level: LogLevel::Info,
-            message: "msg".into(),
-            channel: "ch".into(),
-        };
-        let b = LogEntry {
-            level: LogLevel::Info,
-            message: "msg".into(),
-            channel: "ch".into(),
-        };
-        let c = LogEntry {
-            level: LogLevel::Error,
-            message: "msg".into(),
-            channel: "ch".into(),
-        };
+        let a = LogEntry::new(LogLevel::Info, "ch", "msg");
+        let b = LogEntry::new(LogLevel::Info, "ch", "msg");
+        let c = LogEntry::new(LogLevel::Error, "ch", "msg");
         assert_eq!(a, b);
         assert_ne!(a, c);
     }
@@ -678,27 +871,15 @@ mod tests {
     #[test]
     fn log_filter_matches_all() {
         let filter = LogFilter::new();
-        let entry = LogEntry {
-            level: LogLevel::Trace,
-            message: "anything".into(),
-            channel: "any".into(),
-        };
+        let entry = LogEntry::new(LogLevel::Trace, "any", "anything");
         assert!(filter.matches(&entry));
     }
 
     #[test]
     fn log_filter_by_level() {
         let filter = LogFilter::new().with_level(LogLevel::Warning);
-        let info_entry = LogEntry {
-            level: LogLevel::Info,
-            message: "lo".into(),
-            channel: "ch".into(),
-        };
-        let warn_entry = LogEntry {
-            level: LogLevel::Warning,
-            message: "hi".into(),
-            channel: "ch".into(),
-        };
+        let info_entry = LogEntry::new(LogLevel::Info, "ch", "lo");
+        let warn_entry = LogEntry::new(LogLevel::Warning, "ch", "hi");
         assert!(!filter.matches(&info_entry));
         assert!(filter.matches(&warn_entry));
     }
@@ -708,16 +889,8 @@ mod tests {
         let filter = LogFilter::new()
             .with_channel("editor")
             .with_message("save");
-        let entry_match = LogEntry {
-            level: LogLevel::Info,
-            message: "file save ok".into(),
-            channel: "editor.core".into(),
-        };
-        let entry_no_match = LogEntry {
-            level: LogLevel::Info,
-            message: "file save ok".into(),
-            channel: "terminal".into(),
-        };
+        let entry_match = LogEntry::new(LogLevel::Info, "editor.core", "file save ok");
+        let entry_no_match = LogEntry::new(LogLevel::Info, "terminal", "file save ok");
         assert!(filter.matches(&entry_match));
         assert!(!filter.matches(&entry_no_match));
     }
@@ -821,22 +994,14 @@ mod tests {
     #[test]
     fn simple_formatter_output() {
         let fmt = SimpleFormatter;
-        let entry = LogEntry {
-            level: LogLevel::Debug,
-            message: "test msg".into(),
-            channel: "fmt_ch".into(),
-        };
+        let entry = LogEntry::new(LogLevel::Debug, "fmt_ch", "test msg");
         assert_eq!(fmt.format(&entry), "[DEBUG] fmt_ch: test msg");
     }
 
     #[test]
     fn json_formatter_output() {
         let fmt = JsonFormatter;
-        let entry = LogEntry {
-            level: LogLevel::Info,
-            message: "hello".into(),
-            channel: "app".into(),
-        };
+        let entry = LogEntry::new(LogLevel::Info, "app", "hello");
         let json = fmt.format(&entry);
         assert_eq!(json, r#"{"level":"info","channel":"app","message":"hello"}"#);
     }
@@ -844,11 +1009,7 @@ mod tests {
     #[test]
     fn json_formatter_escapes_quotes() {
         let fmt = JsonFormatter;
-        let entry = LogEntry {
-            level: LogLevel::Error,
-            message: r#"say "hi""#.into(),
-            channel: "ch".into(),
-        };
+        let entry = LogEntry::new(LogLevel::Error, "ch", r#"say "hi""#);
         let json = fmt.format(&entry);
         assert!(json.contains(r#"say \"hi\""#));
     }
@@ -871,9 +1032,9 @@ mod tests {
     #[test]
     fn log_stats_from_entries() {
         let entries = vec![
-            LogEntry { level: LogLevel::Info, message: "a".into(), channel: "c".into() },
-            LogEntry { level: LogLevel::Info, message: "b".into(), channel: "c".into() },
-            LogEntry { level: LogLevel::Error, message: "e".into(), channel: "c".into() },
+            LogEntry::new(LogLevel::Info, "c", "a"),
+            LogEntry::new(LogLevel::Info, "c", "b"),
+            LogEntry::new(LogLevel::Error, "c", "e"),
         ];
         let stats = LogStats::from_entries(&entries);
         assert_eq!(stats.info_count, 2);
@@ -887,5 +1048,142 @@ mod tests {
         let stats = LogStats::new();
         assert_eq!(stats.total(), 0);
         assert_eq!(stats, LogStats::default());
+    }
+
+    // --- New feature tests ---
+
+    #[test]
+    fn log_entry_new_has_timestamp() {
+        let entry = LogEntry::new(LogLevel::Info, "ch", "msg");
+        assert!(entry.timestamp > 0);
+        assert!(entry.source.is_none());
+        assert!(entry.data.is_none());
+    }
+
+    #[test]
+    fn log_entry_with_source_and_data() {
+        let mut entry = LogEntry::new(LogLevel::Debug, "editor", "file opened");
+        entry.source = Some("editor.core".to_string());
+        let mut data = HashMap::new();
+        data.insert("path".to_string(), "/tmp/test.rs".to_string());
+        entry.data = Some(data);
+        assert_eq!(entry.source.as_deref(), Some("editor.core"));
+        assert_eq!(entry.data.as_ref().unwrap().get("path").unwrap(), "/tmp/test.rs");
+    }
+
+    #[test]
+    fn log_file_config_default() {
+        let cfg = LogFileConfig::default_config();
+        assert!(cfg.log_file_path().to_string_lossy().contains("vsedit"));
+        assert_eq!(cfg.file_name, "main.log");
+        assert_eq!(cfg.max_rotated_files, 5);
+    }
+
+    #[test]
+    fn log_file_config_rotated_paths() {
+        let cfg = LogFileConfig::new("/tmp/logs", "app.log");
+        let paths = cfg.rotated_paths();
+        assert_eq!(paths.len(), 5);
+        assert!(paths[0].to_string_lossy().contains("app.log.1"));
+        assert!(paths[4].to_string_lossy().contains("app.log.5"));
+    }
+
+    #[test]
+    fn log_file_rotator_rotate() {
+        let dir = std::env::temp_dir().join("vsedit-log-test-rotate");
+        let _ = std::fs::create_dir_all(&dir);
+        let cfg = LogFileConfig::new(&dir, "test.log");
+        let main_path = cfg.log_file_path();
+        std::fs::write(&main_path, "log content").unwrap();
+
+        let rotator = LogFileRotator::new(cfg);
+        rotator.rotate().unwrap();
+
+        assert!(!main_path.exists());
+        assert!(dir.join("test.log.1").exists());
+        assert_eq!(rotator.rotated_file_count(), 1);
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn log_viewer_push_and_filter() {
+        let mut viewer = LogViewer::new("Log (Main)");
+        viewer.push(LogEntry::new(LogLevel::Info, "editor", "opened file"));
+        viewer.push(LogEntry::new(LogLevel::Error, "editor", "save failed"));
+        viewer.push(LogEntry::new(LogLevel::Debug, "terminal", "resize"));
+
+        assert_eq!(viewer.entry_count(), 3);
+        assert_eq!(viewer.channel_name(), "Log (Main)");
+
+        // Filter by level
+        let errors = viewer.filter(Some(LogLevel::Error), None, None, None);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].message, "save failed");
+
+        // Filter by source
+        let editor_entries = viewer.filter(None, Some("editor"), None, None);
+        assert_eq!(editor_entries.len(), 2);
+    }
+
+    #[test]
+    fn log_viewer_max_entries() {
+        let mut viewer = LogViewer::new("test");
+        viewer.max_entries = 3;
+        for i in 0..5 {
+            viewer.push(LogEntry::new(LogLevel::Info, "ch", format!("msg{i}")));
+        }
+        assert_eq!(viewer.entry_count(), 3);
+        assert_eq!(viewer.entries()[0].message, "msg2");
+    }
+
+    #[test]
+    fn log_viewer_clear() {
+        let mut viewer = LogViewer::new("test");
+        viewer.push(LogEntry::new(LogLevel::Info, "ch", "msg"));
+        viewer.clear();
+        assert_eq!(viewer.entry_count(), 0);
+    }
+
+    #[test]
+    fn init_logging_does_not_panic() {
+        // Just verify it doesn't panic (tracing can only be initialized once)
+        init_logging(LogLevel::Info, None);
+    }
+
+    #[test]
+    fn set_log_level_changes_default() {
+        let svc = LogService::new(LogLevel::Info);
+        set_log_level(&svc, LogLevel::Debug);
+        let logger = svc.get_logger("test-channel");
+        assert_eq!(logger.get_level(), LogLevel::Debug);
+    }
+
+    #[test]
+    fn buffered_logger_entries_have_timestamps() {
+        let logger = BufferedLogger::new("ts-test");
+        logger.info("hello");
+        let entries = logger.entries();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].timestamp > 0);
+    }
+
+    #[test]
+    fn log_viewer_filter_by_time_range() {
+        let mut viewer = LogViewer::new("time-test");
+        let mut e1 = LogEntry::new(LogLevel::Info, "ch", "early");
+        e1.timestamp = 100;
+        let mut e2 = LogEntry::new(LogLevel::Info, "ch", "middle");
+        e2.timestamp = 200;
+        let mut e3 = LogEntry::new(LogLevel::Info, "ch", "late");
+        e3.timestamp = 300;
+        viewer.push(e1);
+        viewer.push(e2);
+        viewer.push(e3);
+
+        let results = viewer.filter(None, None, Some(150), Some(250));
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].message, "middle");
     }
 }

@@ -567,6 +567,304 @@ impl Default for PerfValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Built-in mark names
+// ---------------------------------------------------------------------------
+
+/// Well-known performance mark names for startup phases.
+pub mod marks {
+    pub const APP_START: &str = "app.start";
+    pub const WINDOW_LOAD: &str = "window.load";
+    pub const EDITOR_READY: &str = "editor.ready";
+    pub const EXTENSIONS_LOADED: &str = "extensions.loaded";
+    pub const WORKSPACE_READY: &str = "workspace.ready";
+}
+
+// ---------------------------------------------------------------------------
+// Startup performance
+// ---------------------------------------------------------------------------
+
+/// Tracks startup phase durations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StartupMetrics {
+    pub total_time_ms: f64,
+    pub init_time_ms: f64,
+    pub load_time_ms: f64,
+    pub extension_time_ms: f64,
+    pub render_time_ms: f64,
+}
+
+impl StartupMetrics {
+    pub fn new() -> Self {
+        Self {
+            total_time_ms: 0.0,
+            init_time_ms: 0.0,
+            load_time_ms: 0.0,
+            extension_time_ms: 0.0,
+            render_time_ms: 0.0,
+        }
+    }
+
+    /// Build startup metrics from a `PerfService` that has recorded the standard marks.
+    pub fn from_perf_service(svc: &PerfService) -> Self {
+        let get_dur = |name: &str| -> f64 {
+            svc.get_entries_by_name(name)
+                .last()
+                .map(|e| e.duration_ms)
+                .unwrap_or(0.0)
+        };
+        Self {
+            total_time_ms: get_dur(marks::WORKSPACE_READY),
+            init_time_ms: get_dur(marks::APP_START),
+            load_time_ms: get_dur(marks::WINDOW_LOAD),
+            extension_time_ms: get_dur(marks::EXTENSIONS_LOADED),
+            render_time_ms: get_dur(marks::EDITOR_READY),
+        }
+    }
+
+    /// Returns a formatted startup timeline string for developer tools.
+    pub fn timeline(&self) -> String {
+        format!(
+            "Startup Timeline:\n  Init:       {:.1}ms\n  Load:       {:.1}ms\n  Extensions: {:.1}ms\n  Render:     {:.1}ms\n  Total:      {:.1}ms",
+            self.init_time_ms,
+            self.load_time_ms,
+            self.extension_time_ms,
+            self.render_time_ms,
+            self.total_time_ms,
+        )
+    }
+}
+
+impl Default for StartupMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for StartupMetrics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "StartupMetrics(total={:.1}ms)", self.total_time_ms)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keystroke latency tracking
+// ---------------------------------------------------------------------------
+
+/// Aggregated keystroke latency metrics.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeystrokeMetrics {
+    pub count: usize,
+    pub min_ms: f64,
+    pub max_ms: f64,
+    pub avg_ms: f64,
+    pub p50_ms: f64,
+    pub p95_ms: f64,
+    pub p99_ms: f64,
+}
+
+impl KeystrokeMetrics {
+    /// Compute keystroke metrics from a sorted list of latency samples (ms).
+    pub fn from_samples(samples: &[f64]) -> Option<Self> {
+        if samples.is_empty() {
+            return None;
+        }
+        let mut sorted = samples.to_vec();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let count = sorted.len();
+        let min_ms = sorted[0];
+        let max_ms = sorted[count - 1];
+        let avg_ms: f64 = sorted.iter().sum::<f64>() / count as f64;
+        let p50_ms = percentile_of_sorted(&sorted, 50.0);
+        let p95_ms = percentile_of_sorted(&sorted, 95.0);
+        let p99_ms = percentile_of_sorted(&sorted, 99.0);
+        Some(Self {
+            count,
+            min_ms,
+            max_ms,
+            avg_ms,
+            p50_ms,
+            p95_ms,
+            p99_ms,
+        })
+    }
+
+    /// Returns true if p95 latency exceeds the given threshold (ms).
+    pub fn is_high_latency(&self, threshold_ms: f64) -> bool {
+        self.p95_ms > threshold_ms
+    }
+}
+
+impl fmt::Display for KeystrokeMetrics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "KeystrokeMetrics(n={}, p50={:.1}ms, p95={:.1}ms, p99={:.1}ms)",
+            self.count, self.p50_ms, self.p95_ms, self.p99_ms
+        )
+    }
+}
+
+/// Tracks individual keystroke latencies and computes metrics.
+#[derive(Debug)]
+pub struct KeystrokeTracker {
+    samples: Vec<f64>,
+    alert_threshold_ms: f64,
+}
+
+impl KeystrokeTracker {
+    pub fn new() -> Self {
+        Self {
+            samples: Vec::new(),
+            alert_threshold_ms: 100.0,
+        }
+    }
+
+    /// Record a keystroke latency from `input_received` to `frame_rendered`.
+    pub fn record(&mut self, latency_ms: f64) {
+        self.samples.push(latency_ms);
+    }
+
+    /// Compute current metrics.
+    pub fn metrics(&self) -> Option<KeystrokeMetrics> {
+        KeystrokeMetrics::from_samples(&self.samples)
+    }
+
+    /// Returns true if sustained high latency is detected (p95 > threshold).
+    pub fn is_alerting(&self) -> bool {
+        self.metrics()
+            .map(|m| m.is_high_latency(self.alert_threshold_ms))
+            .unwrap_or(false)
+    }
+
+    pub fn set_alert_threshold(&mut self, threshold_ms: f64) {
+        self.alert_threshold_ms = threshold_ms;
+    }
+
+    pub fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.samples.clear();
+    }
+}
+
+impl Default for KeystrokeTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Memory tracking
+// ---------------------------------------------------------------------------
+
+/// Memory usage snapshot.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MemoryMetrics {
+    /// Resident set size in bytes.
+    pub rss: u64,
+    /// Heap memory in bytes.
+    pub heap: u64,
+    /// Buffer/cache memory in bytes.
+    pub buffers: u64,
+    /// Extension host memory in bytes.
+    pub extension_host: u64,
+    /// Timestamp of measurement (epoch ms).
+    pub timestamp_ms: u64,
+}
+
+impl MemoryMetrics {
+    pub fn new(rss: u64, heap: u64, buffers: u64, extension_host: u64) -> Self {
+        Self {
+            rss,
+            heap,
+            buffers,
+            extension_host,
+            timestamp_ms: now_ns() / 1_000_000,
+        }
+    }
+
+    /// Total tracked memory.
+    pub fn total(&self) -> u64 {
+        self.rss
+    }
+}
+
+impl fmt::Display for MemoryMetrics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "MemoryMetrics(rss={}MB, heap={}MB)",
+            self.rss / (1024 * 1024),
+            self.heap / (1024 * 1024)
+        )
+    }
+}
+
+/// Tracks memory samples over time and detects excessive growth.
+#[derive(Debug)]
+pub struct MemoryTracker {
+    samples: Vec<MemoryMetrics>,
+    /// Sampling interval in seconds.
+    pub sample_interval_secs: u64,
+    /// Alert if RSS grows by more than this factor between first and last sample.
+    pub growth_alert_factor: f64,
+}
+
+impl MemoryTracker {
+    pub fn new() -> Self {
+        Self {
+            samples: Vec::new(),
+            sample_interval_secs: 30,
+            growth_alert_factor: 2.0,
+        }
+    }
+
+    /// Record a memory snapshot.
+    pub fn record(&mut self, metrics: MemoryMetrics) {
+        self.samples.push(metrics);
+    }
+
+    /// Returns the latest memory snapshot.
+    pub fn latest(&self) -> Option<&MemoryMetrics> {
+        self.samples.last()
+    }
+
+    /// Returns all recorded samples.
+    pub fn samples(&self) -> &[MemoryMetrics] {
+        &self.samples
+    }
+
+    /// Returns true if memory has grown excessively.
+    pub fn is_alerting(&self) -> bool {
+        if self.samples.len() < 2 {
+            return false;
+        }
+        let first_rss = self.samples.first().unwrap().rss;
+        let last_rss = self.samples.last().unwrap().rss;
+        if first_rss == 0 {
+            return false;
+        }
+        (last_rss as f64 / first_rss as f64) > self.growth_alert_factor
+    }
+
+    pub fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.samples.clear();
+    }
+}
+
+impl Default for MemoryTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -991,5 +1289,133 @@ mod tests {
     fn perf_is_ascii_printable() {
         assert!(PerfValidator::is_ascii_printable("Hello World 123"));
         assert!(!PerfValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // --- New feature tests ---
+
+    #[test]
+    fn builtin_mark_constants() {
+        assert_eq!(marks::APP_START, "app.start");
+        assert_eq!(marks::WINDOW_LOAD, "window.load");
+        assert_eq!(marks::EDITOR_READY, "editor.ready");
+        assert_eq!(marks::EXTENSIONS_LOADED, "extensions.loaded");
+        assert_eq!(marks::WORKSPACE_READY, "workspace.ready");
+    }
+
+    #[test]
+    fn startup_metrics_default() {
+        let m = StartupMetrics::new();
+        assert!((m.total_time_ms).abs() < f64::EPSILON);
+        assert_eq!(m.to_string(), "StartupMetrics(total=0.0ms)");
+    }
+
+    #[test]
+    fn startup_metrics_from_perf_service() {
+        let mut svc = PerfService::new();
+        svc.add_entry(marks::APP_START, 50.0);
+        svc.add_entry(marks::WINDOW_LOAD, 100.0);
+        svc.add_entry(marks::EDITOR_READY, 30.0);
+        svc.add_entry(marks::EXTENSIONS_LOADED, 200.0);
+        svc.add_entry(marks::WORKSPACE_READY, 400.0);
+
+        let metrics = StartupMetrics::from_perf_service(&svc);
+        assert!((metrics.init_time_ms - 50.0).abs() < f64::EPSILON);
+        assert!((metrics.load_time_ms - 100.0).abs() < f64::EPSILON);
+        assert!((metrics.extension_time_ms - 200.0).abs() < f64::EPSILON);
+        assert!((metrics.total_time_ms - 400.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn startup_metrics_timeline() {
+        let mut m = StartupMetrics::new();
+        m.init_time_ms = 10.0;
+        m.total_time_ms = 100.0;
+        let timeline = m.timeline();
+        assert!(timeline.contains("Init:"));
+        assert!(timeline.contains("Total:"));
+    }
+
+    #[test]
+    fn keystroke_metrics_from_samples() {
+        let samples = vec![5.0, 10.0, 15.0, 20.0, 25.0];
+        let m = KeystrokeMetrics::from_samples(&samples).unwrap();
+        assert_eq!(m.count, 5);
+        assert!((m.min_ms - 5.0).abs() < f64::EPSILON);
+        assert!((m.max_ms - 25.0).abs() < f64::EPSILON);
+        assert!((m.avg_ms - 15.0).abs() < f64::EPSILON);
+        assert!(!m.is_high_latency(100.0));
+    }
+
+    #[test]
+    fn keystroke_metrics_empty() {
+        assert!(KeystrokeMetrics::from_samples(&[]).is_none());
+    }
+
+    #[test]
+    fn keystroke_tracker_records_and_alerts() {
+        let mut tracker = KeystrokeTracker::new();
+        tracker.set_alert_threshold(50.0);
+        for _ in 0..10 {
+            tracker.record(30.0);
+        }
+        assert!(!tracker.is_alerting());
+        assert_eq!(tracker.sample_count(), 10);
+
+        tracker.clear();
+        for _ in 0..20 {
+            tracker.record(120.0);
+        }
+        assert!(tracker.is_alerting());
+    }
+
+    #[test]
+    fn keystroke_metrics_display() {
+        let m = KeystrokeMetrics::from_samples(&[10.0, 20.0, 30.0]).unwrap();
+        let s = m.to_string();
+        assert!(s.contains("KeystrokeMetrics"));
+        assert!(s.contains("p50="));
+        assert!(s.contains("p95="));
+    }
+
+    #[test]
+    fn memory_metrics_new() {
+        let m = MemoryMetrics::new(100 * 1024 * 1024, 50 * 1024 * 1024, 10 * 1024 * 1024, 5 * 1024 * 1024);
+        assert_eq!(m.total(), 100 * 1024 * 1024);
+        assert!(m.timestamp_ms > 0);
+        let s = m.to_string();
+        assert!(s.contains("rss=100MB"));
+    }
+
+    #[test]
+    fn memory_tracker_growth_alert() {
+        let mut tracker = MemoryTracker::new();
+        tracker.growth_alert_factor = 2.0;
+        tracker.record(MemoryMetrics::new(100, 50, 10, 5));
+        assert!(!tracker.is_alerting()); // Need >= 2 samples
+
+        tracker.record(MemoryMetrics::new(150, 80, 15, 8));
+        assert!(!tracker.is_alerting()); // 1.5x < 2.0x
+
+        tracker.record(MemoryMetrics::new(250, 120, 20, 10));
+        assert!(tracker.is_alerting()); // 2.5x > 2.0x
+    }
+
+    #[test]
+    fn memory_tracker_latest() {
+        let mut tracker = MemoryTracker::new();
+        assert!(tracker.latest().is_none());
+        tracker.record(MemoryMetrics::new(100, 50, 10, 5));
+        tracker.record(MemoryMetrics::new(200, 100, 20, 10));
+        assert_eq!(tracker.latest().unwrap().rss, 200);
+        assert_eq!(tracker.sample_count(), 2);
+    }
+
+    #[test]
+    fn memory_tracker_clear() {
+        let mut tracker = MemoryTracker::new();
+        tracker.record(MemoryMetrics::new(100, 50, 10, 5));
+        tracker.clear();
+        assert_eq!(tracker.sample_count(), 0);
+        assert!(tracker.latest().is_none());
     }
 }

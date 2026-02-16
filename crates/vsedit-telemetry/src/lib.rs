@@ -2,13 +2,22 @@
 
 use std::fmt;
 use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TelemetryLevel {
     Off,
     Crash,
     Error,
+    /// All telemetry events (also known as "Usage" level).
     Usage,
+}
+
+impl TelemetryLevel {
+    /// Alias for `Usage` matching the VS Code "All" telemetry level.
+    pub fn all() -> Self {
+        Self::Usage
+    }
 }
 
 impl fmt::Display for TelemetryLevel {
@@ -80,7 +89,7 @@ impl TelemetryService {
             event_type: TelemetryEventType::Event,
             properties,
             measurements,
-            timestamp: 0,
+            timestamp: now_epoch_ms(),
         });
     }
 
@@ -102,7 +111,7 @@ impl TelemetryService {
             event_type: TelemetryEventType::Error,
             properties,
             measurements: vec![],
-            timestamp: 0,
+            timestamp: now_epoch_ms(),
         });
     }
 
@@ -120,7 +129,7 @@ impl TelemetryService {
             event_type: TelemetryEventType::Exception,
             properties,
             measurements: vec![],
-            timestamp: 0,
+            timestamp: now_epoch_ms(),
         });
     }
 
@@ -133,7 +142,7 @@ impl TelemetryService {
             event_type: TelemetryEventType::Metric,
             properties: vec![],
             measurements: vec![("value".to_string(), value)],
-            timestamp: 0,
+            timestamp: now_epoch_ms(),
         });
     }
 
@@ -462,6 +471,93 @@ impl fmt::Display for TelemetryService {
     }
 }
 
+fn now_epoch_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64)
+}
+
+// --- get_events_since ---
+
+impl TelemetryService {
+    /// Returns events recorded since the given timestamp (milliseconds since epoch).
+    pub fn get_events_since(&self, since_ms: u64) -> Vec<&TelemetryEvent> {
+        self.events
+            .iter()
+            .filter(|e| e.timestamp >= since_ms)
+            .collect()
+    }
+}
+
+// --- ErrorTelemetry ---
+
+/// Aggregated error telemetry entry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ErrorTelemetry {
+    pub error_name: String,
+    pub message: String,
+    pub stack: Option<String>,
+    pub count: usize,
+    pub first_seen: u64,
+    pub last_seen: u64,
+}
+
+impl fmt::Display for ErrorTelemetry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ErrorTelemetry({}: {} x{})",
+            self.error_name, self.message, self.count
+        )
+    }
+}
+
+impl TelemetryService {
+    /// Aggregate error events by name, returning a summary of each distinct error.
+    pub fn get_error_summary(&self) -> Vec<ErrorTelemetry> {
+        let mut map: HashMap<String, ErrorTelemetry> = HashMap::new();
+
+        for event in &self.events {
+            if event.event_type != TelemetryEventType::Error
+                && event.event_type != TelemetryEventType::Exception
+            {
+                continue;
+            }
+            let message = event
+                .properties
+                .iter()
+                .find(|(k, _)| k == "message")
+                .map(|(_, v)| v.clone())
+                .unwrap_or_default();
+            let stack = event
+                .properties
+                .iter()
+                .find(|(k, _)| k == "stack_trace")
+                .map(|(_, v)| v.clone());
+
+            let entry = map.entry(event.name.clone()).or_insert_with(|| ErrorTelemetry {
+                error_name: event.name.clone(),
+                message: message.clone(),
+                stack: stack.clone(),
+                count: 0,
+                first_seen: event.timestamp,
+                last_seen: event.timestamp,
+            });
+            entry.count += 1;
+            if event.timestamp < entry.first_seen {
+                entry.first_seen = event.timestamp;
+            }
+            if event.timestamp > entry.last_seen {
+                entry.last_seen = event.timestamp;
+            }
+        }
+
+        let mut result: Vec<ErrorTelemetry> = map.into_values().collect();
+        result.sort_by(|a, b| b.count.cmp(&a.count));
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -743,5 +839,92 @@ mod tests {
     fn level_accessor() {
         let svc = TelemetryService::new(TelemetryLevel::Error);
         assert_eq!(*svc.level(), TelemetryLevel::Error);
+    }
+
+    // --- New feature tests ---
+
+    #[test]
+    fn telemetry_level_all_alias() {
+        assert_eq!(TelemetryLevel::all(), TelemetryLevel::Usage);
+    }
+
+    #[test]
+    fn events_have_timestamps() {
+        let mut svc = TelemetryService::new(TelemetryLevel::Usage);
+        svc.log_event("evt", vec![], vec![]);
+        assert!(svc.get_events()[0].timestamp > 0);
+    }
+
+    #[test]
+    fn get_events_since_filters_by_time() {
+        let mut svc = TelemetryService::new(TelemetryLevel::Usage);
+        svc.log_event("evt1", vec![], vec![]);
+        let after_first = now_epoch_ms() + 1;
+        // Manually push an event with a future timestamp
+        svc.events.push(TelemetryEvent {
+            name: "evt2".to_string(),
+            event_type: TelemetryEventType::Event,
+            properties: vec![],
+            measurements: vec![],
+            timestamp: after_first + 1000,
+        });
+        let recent = svc.get_events_since(after_first);
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].name, "evt2");
+    }
+
+    #[test]
+    fn get_error_summary_aggregates() {
+        let mut svc = TelemetryService::new(TelemetryLevel::Usage);
+        svc.log_error("io_error", "file not found", None);
+        svc.log_error("io_error", "file not found", None);
+        svc.log_error("parse_error", "invalid syntax", Some("at line 5".to_string()));
+        svc.log_event("normal_event", vec![], vec![]);
+
+        let summary = svc.get_error_summary();
+        assert_eq!(summary.len(), 2);
+        // io_error has count 2, should be first (sorted by count desc)
+        assert_eq!(summary[0].error_name, "io_error");
+        assert_eq!(summary[0].count, 2);
+        assert_eq!(summary[1].error_name, "parse_error");
+        assert_eq!(summary[1].count, 1);
+        assert_eq!(summary[1].stack.as_deref(), Some("at line 5"));
+    }
+
+    #[test]
+    fn error_telemetry_display() {
+        let et = ErrorTelemetry {
+            error_name: "test_err".to_string(),
+            message: "oops".to_string(),
+            stack: None,
+            count: 3,
+            first_seen: 100,
+            last_seen: 300,
+        };
+        let s = et.to_string();
+        assert!(s.contains("test_err"));
+        assert!(s.contains("x3"));
+    }
+
+    #[test]
+    fn error_summary_includes_exceptions() {
+        let mut svc = TelemetryService::new(TelemetryLevel::Usage);
+        svc.log_exception("panic", "index out of bounds");
+        let summary = svc.get_error_summary();
+        assert_eq!(summary.len(), 1);
+        assert_eq!(summary[0].error_name, "panic");
+    }
+
+    #[test]
+    fn get_events_since_empty() {
+        let svc = TelemetryService::new(TelemetryLevel::Usage);
+        assert!(svc.get_events_since(0).is_empty());
+    }
+
+    #[test]
+    fn error_summary_empty_when_no_errors() {
+        let mut svc = TelemetryService::new(TelemetryLevel::Usage);
+        svc.log_event("click", vec![], vec![]);
+        assert!(svc.get_error_summary().is_empty());
     }
 }
