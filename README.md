@@ -14,10 +14,10 @@ A full-fidelity terminal port of [Visual Studio Code](https://github.com/microso
 | Metric | Value |
 |--------|-------|
 | Workspace crates | 242 |
-| Lines of Rust | 323,000+ |
-| Tests | 13,100+ (all passing) |
+| Lines of Rust | 330,000+ |
+| Tests | 13,400+ (all passing) |
 | Lines of JS (extension host shim) | 1,200+ |
-| Minimum crate size | 1,040+ lines |
+| Minimum crate size | 1,100+ lines |
 
 All crates compile (`cargo check --workspace` ✅) and all tests pass (`cargo test --workspace` ✅).
 
@@ -48,7 +48,7 @@ All crates compile (`cargo check --workspace` ✅) and all tests pass (`cargo te
 └─────────────────────────────────────────────────────────┘
 ```
 
-239 Rust crates organized in 7 layers:
+239 Rust crates + 3 cross-cutting crates organized in 7 layers:
 
 | Layer | Count | Description |
 |-------|-------|-------------|
@@ -129,9 +129,9 @@ All crates compile (`cargo check --workspace` ✅) and all tests pass (`cargo te
 
 ```bash
 # Prerequisites: Rust 1.85+ (edition 2024)
-cargo check --workspace      # Type check all 239 crates
+cargo check --workspace      # Type check all 242 crates
 cargo build --release         # Build optimized binary
-cargo test --workspace        # Run all 11,300+ tests
+cargo test --workspace        # Run all 13,400+ tests
 cargo run -- [file/folder]    # Run vsedit
 ```
 
@@ -150,7 +150,7 @@ vsedit --log-level debug      # Set log level
 
 ```
 vsedit/
-├── Cargo.toml              # Workspace root (239 members)
+├── Cargo.toml              # Workspace root (242 members)
 ├── crates/
 │   ├── vsedit-core/        # Main binary entry point
 │   ├── vsedit-events/      # Event system (Emitter<T>)
