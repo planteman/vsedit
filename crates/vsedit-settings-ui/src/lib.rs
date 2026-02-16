@@ -1,5 +1,8 @@
 //! Settings editor UI.
 
+use std::collections::HashMap;
+use std::fmt;
+
 /// The data type of a setting value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SettingType {
@@ -11,13 +14,55 @@ pub enum SettingType {
     Object,
 }
 
+impl fmt::Display for SettingType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SettingType::String => write!(f, "string"),
+            SettingType::Number => write!(f, "number"),
+            SettingType::Boolean => write!(f, "boolean"),
+            SettingType::Enum => write!(f, "enum"),
+            SettingType::Array => write!(f, "array"),
+            SettingType::Object => write!(f, "object"),
+        }
+    }
+}
+
 /// Scope at which a setting applies.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SettingScope {
     User,
     Workspace,
     WorkspaceFolder,
     Language,
+}
+
+impl fmt::Display for SettingScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SettingScope::User => write!(f, "User"),
+            SettingScope::Workspace => write!(f, "Workspace"),
+            SettingScope::WorkspaceFolder => write!(f, "Workspace Folder"),
+            SettingScope::Language => write!(f, "Language"),
+        }
+    }
+}
+
+/// Errors that can occur when manipulating settings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SettingsError {
+    SettingNotFound(String),
+    InvalidValue(String),
+    ReadOnly(String),
+}
+
+impl fmt::Display for SettingsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SettingsError::SettingNotFound(key) => write!(f, "setting not found: {key}"),
+            SettingsError::InvalidValue(msg) => write!(f, "invalid value: {msg}"),
+            SettingsError::ReadOnly(key) => write!(f, "setting is read-only: {key}"),
+        }
+    }
 }
 
 /// A single setting displayed in the settings editor.
@@ -33,12 +78,214 @@ pub struct SettingItem {
     pub scope: SettingScope,
 }
 
+impl SettingItem {
+    /// Returns `true` if the current value differs from the default.
+    pub fn is_modified(&self) -> bool {
+        match &self.current_value {
+            Some(v) => v != &self.default_value,
+            None => false,
+        }
+    }
+
+    /// Resets the setting to its default by clearing the current value.
+    pub fn reset(&mut self) {
+        self.current_value = None;
+    }
+
+    /// Validates and sets the current value.
+    ///
+    /// For `Enum` settings the value must be one of the allowed `enum_values`.
+    /// For `Boolean` settings the value must be `"true"` or `"false"`.
+    /// For `Number` settings the value must parse as an `f64`.
+    pub fn set_value(&mut self, value: String) -> Result<(), SettingsError> {
+        match &self.setting_type {
+            SettingType::Enum => {
+                if !self.enum_values.contains(&value) {
+                    return Err(SettingsError::InvalidValue(format!(
+                        "'{value}' is not one of {:?}",
+                        self.enum_values
+                    )));
+                }
+            }
+            SettingType::Boolean => {
+                if value != "true" && value != "false" {
+                    return Err(SettingsError::InvalidValue(format!(
+                        "expected 'true' or 'false', got '{value}'"
+                    )));
+                }
+            }
+            SettingType::Number => {
+                if value.parse::<f64>().is_err() {
+                    return Err(SettingsError::InvalidValue(format!(
+                        "'{value}' is not a valid number"
+                    )));
+                }
+            }
+            _ => {}
+        }
+        self.current_value = Some(value);
+        Ok(())
+    }
+}
+
+/// Builder for constructing [`SettingItem`] instances.
+#[derive(Debug)]
+pub struct SettingItemBuilder {
+    key: String,
+    label: String,
+    description: String,
+    setting_type: SettingType,
+    default_value: String,
+    current_value: Option<String>,
+    enum_values: Vec<String>,
+    scope: SettingScope,
+}
+
+impl SettingItemBuilder {
+    pub fn new(key: impl Into<String>, setting_type: SettingType) -> Self {
+        let key = key.into();
+        Self {
+            label: key.clone(),
+            key,
+            description: String::new(),
+            setting_type,
+            default_value: String::new(),
+            current_value: None,
+            enum_values: Vec::new(),
+            scope: SettingScope::User,
+        }
+    }
+
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.label = label.into();
+        self
+    }
+
+    pub fn description(mut self, desc: impl Into<String>) -> Self {
+        self.description = desc.into();
+        self
+    }
+
+    pub fn default_value(mut self, val: impl Into<String>) -> Self {
+        self.default_value = val.into();
+        self
+    }
+
+    pub fn current_value(mut self, val: impl Into<String>) -> Self {
+        self.current_value = Some(val.into());
+        self
+    }
+
+    pub fn enum_values(mut self, vals: Vec<String>) -> Self {
+        self.enum_values = vals;
+        self
+    }
+
+    pub fn scope(mut self, scope: SettingScope) -> Self {
+        self.scope = scope;
+        self
+    }
+
+    pub fn build(self) -> SettingItem {
+        SettingItem {
+            key: self.key,
+            label: self.label,
+            description: self.description,
+            setting_type: self.setting_type,
+            default_value: self.default_value,
+            current_value: self.current_value,
+            enum_values: self.enum_values,
+            scope: self.scope,
+        }
+    }
+}
+
+/// A registry that owns and manages a collection of settings.
+#[derive(Debug, Default)]
+pub struct SettingsRegistry {
+    items: Vec<SettingItem>,
+}
+
+impl SettingsRegistry {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    /// Adds a setting to the registry.
+    pub fn add(&mut self, item: SettingItem) {
+        self.items.push(item);
+    }
+
+    /// Returns a reference to a setting by key.
+    pub fn get(&self, key: &str) -> Result<&SettingItem, SettingsError> {
+        self.items
+            .iter()
+            .find(|s| s.key == key)
+            .ok_or_else(|| SettingsError::SettingNotFound(key.to_string()))
+    }
+
+    /// Sets the value of a setting by key.
+    pub fn set(&mut self, key: &str, value: String) -> Result<(), SettingsError> {
+        let item = self
+            .items
+            .iter_mut()
+            .find(|s| s.key == key)
+            .ok_or_else(|| SettingsError::SettingNotFound(key.to_string()))?;
+        item.set_value(value)
+    }
+
+    /// Resets a setting to its default by key.
+    pub fn reset(&mut self, key: &str) -> Result<(), SettingsError> {
+        let item = self
+            .items
+            .iter_mut()
+            .find(|s| s.key == key)
+            .ok_or_else(|| SettingsError::SettingNotFound(key.to_string()))?;
+        item.reset();
+        Ok(())
+    }
+
+    /// Returns keys of all modified settings.
+    pub fn list_modified(&self) -> Vec<&str> {
+        self.items
+            .iter()
+            .filter(|s| s.is_modified())
+            .map(|s| s.key.as_str())
+            .collect()
+    }
+
+    /// Returns a slice of all settings.
+    pub fn all(&self) -> &[SettingItem] {
+        &self.items
+    }
+}
+
 /// Filter criteria for searching settings.
 #[derive(Debug, Clone)]
 pub struct SettingsFilter {
     pub query: String,
     pub scope: Option<SettingScope>,
     pub modified_only: bool,
+}
+
+impl SettingsFilter {
+    /// Creates an empty filter that matches everything.
+    pub fn empty() -> Self {
+        Self {
+            query: String::new(),
+            scope: None,
+            modified_only: false,
+        }
+    }
+}
+
+/// Group settings by their scope, returning a map from scope to indices.
+pub fn group_settings_by_scope(settings: &[SettingItem]) -> HashMap<SettingScope, Vec<usize>> {
+    let mut map: HashMap<SettingScope, Vec<usize>> = HashMap::new();
+    for (i, item) in settings.iter().enumerate() {
+        map.entry(item.scope).or_default().push(i);
+    }
+    map
 }
 
 /// Return indices of settings matching the given filter.
@@ -135,5 +382,128 @@ mod tests {
         };
         let result = filter_settings(&settings, &filter);
         assert_eq!(result, vec![1]);
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn setting_type_display() {
+        assert_eq!(SettingType::String.to_string(), "string");
+        assert_eq!(SettingType::Number.to_string(), "number");
+        assert_eq!(SettingType::Boolean.to_string(), "boolean");
+        assert_eq!(SettingType::Object.to_string(), "object");
+    }
+
+    #[test]
+    fn setting_scope_display() {
+        assert_eq!(SettingScope::User.to_string(), "User");
+        assert_eq!(SettingScope::WorkspaceFolder.to_string(), "Workspace Folder");
+        assert_eq!(SettingScope::Language.to_string(), "Language");
+    }
+
+    #[test]
+    fn settings_error_display() {
+        let e = SettingsError::SettingNotFound("foo".into());
+        assert_eq!(e.to_string(), "setting not found: foo");
+        let e = SettingsError::InvalidValue("bad".into());
+        assert_eq!(e.to_string(), "invalid value: bad");
+        let e = SettingsError::ReadOnly("bar".into());
+        assert_eq!(e.to_string(), "setting is read-only: bar");
+    }
+
+    #[test]
+    fn is_modified_and_reset() {
+        let mut item = sample_settings().remove(0);
+        assert!(item.is_modified());
+        item.reset();
+        assert!(!item.is_modified());
+        assert!(item.current_value.is_none());
+    }
+
+    #[test]
+    fn set_value_valid_enum() {
+        let mut item = sample_settings().remove(2);
+        assert!(item.set_value("onWindowChange".into()).is_ok());
+        assert_eq!(item.current_value.as_deref(), Some("onWindowChange"));
+    }
+
+    #[test]
+    fn set_value_invalid_enum() {
+        let mut item = sample_settings().remove(2);
+        let err = item.set_value("never".into()).unwrap_err();
+        assert!(matches!(err, SettingsError::InvalidValue(_)));
+    }
+
+    #[test]
+    fn set_value_invalid_number() {
+        let mut item = sample_settings().remove(0);
+        let err = item.set_value("abc".into()).unwrap_err();
+        assert!(matches!(err, SettingsError::InvalidValue(_)));
+    }
+
+    #[test]
+    fn set_value_boolean_validation() {
+        let mut item = SettingItemBuilder::new("x", SettingType::Boolean)
+            .default_value("true")
+            .build();
+        assert!(item.set_value("false".into()).is_ok());
+        assert!(item.set_value("yes".into()).is_err());
+    }
+
+    #[test]
+    fn builder_defaults() {
+        let item = SettingItemBuilder::new("editor.wrap", SettingType::Boolean)
+            .label("Word Wrap")
+            .description("Toggle word wrap")
+            .default_value("false")
+            .scope(SettingScope::Workspace)
+            .build();
+        assert_eq!(item.key, "editor.wrap");
+        assert_eq!(item.label, "Word Wrap");
+        assert_eq!(item.scope, SettingScope::Workspace);
+        assert!(item.current_value.is_none());
+    }
+
+    #[test]
+    fn registry_add_get_set_reset() {
+        let mut reg = SettingsRegistry::new();
+        reg.add(sample_settings().remove(0));
+        assert!(reg.get("editor.fontSize").is_ok());
+        assert!(reg.get("missing").is_err());
+
+        reg.set("editor.fontSize", "20".into()).unwrap();
+        assert_eq!(reg.get("editor.fontSize").unwrap().current_value.as_deref(), Some("20"));
+
+        reg.reset("editor.fontSize").unwrap();
+        assert!(reg.get("editor.fontSize").unwrap().current_value.is_none());
+    }
+
+    #[test]
+    fn registry_list_modified() {
+        let mut reg = SettingsRegistry::new();
+        for item in sample_settings() {
+            reg.add(item);
+        }
+        let modified = reg.list_modified();
+        assert_eq!(modified, vec!["editor.fontSize", "files.autoSave"]);
+    }
+
+    #[test]
+    fn settings_filter_empty() {
+        let f = SettingsFilter::empty();
+        assert!(f.query.is_empty());
+        assert!(f.scope.is_none());
+        assert!(!f.modified_only);
+        let settings = sample_settings();
+        assert_eq!(filter_settings(&settings, &f).len(), 3);
+    }
+
+    #[test]
+    fn group_by_scope() {
+        let settings = sample_settings();
+        let groups = group_settings_by_scope(&settings);
+        assert_eq!(groups[&SettingScope::User], vec![0, 2]);
+        assert_eq!(groups[&SettingScope::Workspace], vec![1]);
+        assert!(!groups.contains_key(&SettingScope::Language));
     }
 }
