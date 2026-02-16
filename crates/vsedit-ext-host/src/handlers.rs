@@ -31,6 +31,11 @@ static TREE_VIEWS: LazyLock<Mutex<Vec<String>>> =
 static OUTPUT_CHANNELS: LazyLock<Mutex<HashMap<u64, Vec<String>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// Named output lines accumulated from `appendOutputChannel` / `outputAppend`.
+/// Each entry is `(channel_name, line_text)`.
+static NAMED_OUTPUT_LINES: LazyLock<Mutex<Vec<(String, String)>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
+
 /// Registered content provider schemes keyed by scheme → handle.
 static CONTENT_PROVIDERS: LazyLock<Mutex<HashMap<String, u64>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -499,6 +504,11 @@ impl MainThreadHandlers {
             let name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
             let value = params.get("value").and_then(|v| v.as_str()).unwrap_or("");
             debug!("Output[{}]: {}", name, value.chars().take(100).collect::<String>());
+            if !name.is_empty() && !value.is_empty() {
+                for line in value.lines() {
+                    NAMED_OUTPUT_LINES.lock().unwrap().push((name.to_string(), line.to_string()));
+                }
+            }
             Value::Null
         });
 
@@ -1002,6 +1012,11 @@ impl MainThreadHandlers {
             let channel = params.get("channelId").and_then(|c| c.as_str()).unwrap_or("");
             let text = params.get("value").and_then(|v| v.as_str()).unwrap_or("");
             debug!("Output[{}]: {}", channel, text.chars().take(100).collect::<String>());
+            if !channel.is_empty() && !text.is_empty() {
+                for line in text.lines() {
+                    NAMED_OUTPUT_LINES.lock().unwrap().push((channel.to_string(), line.to_string()));
+                }
+            }
             Value::Null
         });
 
@@ -1102,6 +1117,16 @@ impl Default for MainThreadHandlers {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Drain all accumulated named output lines from ext-host handlers.
+///
+/// Returns `(channel_name, line_text)` pairs that were pushed by
+/// `mainThread/appendOutputChannel` and `mainThread/outputAppend`.
+/// The internal buffer is cleared after each call.
+pub fn get_output_lines() -> Vec<(String, String)> {
+    let mut lines = NAMED_OUTPUT_LINES.lock().unwrap();
+    std::mem::take(&mut *lines)
 }
 
 #[cfg(test)]

@@ -846,6 +846,10 @@ pub struct Workbench {
     pub diagnostics: Vec<(String, String, String, u32)>,
     /// Output panel view.
     pub output_panel: OutputPanel,
+    /// Output channels: `(channel_name, lines)` for programmatic access.
+    pub output_channels: Vec<(String, Vec<String>)>,
+    /// Debug console lines: `(kind, text)` where kind is "input", "output", or "error".
+    pub debug_console_lines: Vec<(String, String)>,
     /// Editor group manager for split editors.
     pub editor_groups: EditorGroupManager,
     /// Activity bar items with badge support.
@@ -1203,6 +1207,8 @@ impl Workbench {
             problems_panel: ProblemsPanel::new(),
             diagnostics: Vec::new(),
             output_panel: OutputPanel::new(),
+            output_channels: Vec::new(),
+            debug_console_lines: Vec::new(),
             editor_groups: EditorGroupManager::new(),
             activity_bar_items: default_activity_bar_items(),
             breadcrumbs: Vec::new(),
@@ -2864,6 +2870,53 @@ impl Workbench {
             self.workspace_folder.as_deref(),
             self.is_modified,
         )
+    }
+
+    /// Append a line to a named output channel, creating the channel if needed.
+    pub fn add_output_line(&mut self, channel: &str, line: &str) {
+        // Update the output_channels bookkeeping field.
+        if let Some(entry) = self.output_channels.iter_mut().find(|(n, _)| n == channel) {
+            entry.1.push(line.to_string());
+        } else {
+            self.output_channels.push((channel.to_string(), vec![line.to_string()]));
+        }
+        // Keep the OutputPanel widget in sync.
+        let idx = if let Some(i) = self.output_panel.find_channel(channel) {
+            i
+        } else {
+            self.output_panel.create_channel(channel)
+        };
+        self.output_panel.append_line(idx, line);
+    }
+
+    /// Clear all lines in the named output channel.
+    pub fn clear_output(&mut self, channel: &str) {
+        if let Some(entry) = self.output_channels.iter_mut().find(|(n, _)| n == channel) {
+            entry.1.clear();
+        }
+        if let Some(idx) = self.output_panel.find_channel(channel) {
+            self.output_panel.clear_channel(idx);
+        }
+    }
+
+    /// Write an entry to the debug console.
+    ///
+    /// `kind` must be `"input"`, `"output"`, or `"error"`.
+    pub fn debug_console_write(&mut self, kind: &str, text: &str) {
+        self.debug_console_lines.push((kind.to_string(), text.to_string()));
+        match kind {
+            "input" => self.debug_view.console.add_input(text),
+            "error" => self.debug_view.console.add_output(text, OutputCategory::Stderr),
+            _ => self.debug_view.console.add_output(text, OutputCategory::Stdout),
+        }
+    }
+
+    /// Return all lines from the currently selected output channel.
+    pub fn get_output_lines(&self) -> Vec<String> {
+        self.output_panel
+            .active_channel()
+            .map(|ch| ch.content.clone())
+            .unwrap_or_default()
     }
 }
 

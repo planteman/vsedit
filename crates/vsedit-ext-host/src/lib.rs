@@ -18,6 +18,7 @@ use vsedit_events::{Emitter, Event};
 use vsedit_uri::VsUri;
 
 pub use handlers::MainThreadHandlers;
+pub use handlers::get_output_lines;
 pub use process::{ExtensionHostConfig, ExtensionHostProcess, ExtensionRuntime};
 pub use scanner::scan_extensions;
 pub use transport::RpcTransport;
