@@ -3491,6 +3491,7 @@ dependencies = [
 name = "vsedit-ext-view"
 version = "0.1.0"
 dependencies = [
+ "ratatui",
  "serde",
  "serde_json",
  "vsedit-ext-mgmt",
@@ -3855,6 +3856,10 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-multidiff"
 version = "0.1.0"
+dependencies = [
+ "ratatui",
+ "vsedit-diff",
+]
 
 [[package]]
 name = "vsedit-network"

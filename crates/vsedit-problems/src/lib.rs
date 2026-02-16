@@ -610,6 +610,45 @@ impl ProblemsPanel {
     }
 }
 
+impl ProblemsPanel {
+    /// Add a diagnostic to the panel by individual fields.
+    pub fn add_diagnostic(
+        &mut self,
+        file: impl Into<String>,
+        line: u32,
+        column: u32,
+        severity: ProblemSeverity,
+        message: impl Into<String>,
+    ) {
+        self.problems.push(Problem {
+            severity,
+            message: message.into(),
+            source: String::new(),
+            file_path: file.into(),
+            line,
+            column,
+            code: None,
+        });
+    }
+
+    /// Clear all diagnostics for a specific file path.
+    pub fn clear_file_diagnostics(&mut self, file: &str) -> usize {
+        let before = self.problems.len();
+        self.problems.retain(|p| p.file_path != file);
+        before - self.problems.len()
+    }
+
+    /// Return the number of error-severity problems.
+    pub fn error_count(&self) -> usize {
+        self.count_by_severity(ProblemSeverity::Error)
+    }
+
+    /// Return the number of warning-severity problems.
+    pub fn warning_count(&self) -> usize {
+        self.count_by_severity(ProblemSeverity::Warning)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1011,5 +1050,73 @@ mod tests {
         p.filter.show_errors = false;
         let fixes = p.suggest_fixes();
         assert!(fixes.is_empty());
+    }
+
+    // -- add_diagnostic tests -----------------------------------------------
+
+    #[test]
+    fn add_diagnostic_basic() {
+        let mut p = ProblemsPanel::new();
+        p.add_diagnostic("src/main.rs", 10, 5, ProblemSeverity::Error, "unused variable");
+        assert_eq!(p.total_count(), 1);
+        assert_eq!(p.problems[0].file_path, "src/main.rs");
+        assert_eq!(p.problems[0].line, 10);
+        assert_eq!(p.problems[0].column, 5);
+        assert_eq!(p.problems[0].severity, ProblemSeverity::Error);
+        assert_eq!(p.problems[0].message, "unused variable");
+    }
+
+    #[test]
+    fn add_diagnostic_multiple() {
+        let mut p = ProblemsPanel::new();
+        p.add_diagnostic("a.rs", 1, 1, ProblemSeverity::Error, "err");
+        p.add_diagnostic("b.rs", 2, 3, ProblemSeverity::Warning, "warn");
+        p.add_diagnostic("c.rs", 5, 1, ProblemSeverity::Info, "info");
+        assert_eq!(p.total_count(), 3);
+        assert_eq!(p.error_count(), 1);
+        assert_eq!(p.warning_count(), 1);
+    }
+
+    // -- clear_file_diagnostics tests ---------------------------------------
+
+    #[test]
+    fn clear_file_diagnostics_removes_matching() {
+        let mut p = ProblemsPanel::new();
+        p.add_diagnostic("a.rs", 1, 1, ProblemSeverity::Error, "e1");
+        p.add_diagnostic("a.rs", 2, 1, ProblemSeverity::Warning, "w1");
+        p.add_diagnostic("b.rs", 1, 1, ProblemSeverity::Error, "e2");
+        let removed = p.clear_file_diagnostics("a.rs");
+        assert_eq!(removed, 2);
+        assert_eq!(p.total_count(), 1);
+        assert_eq!(p.problems[0].file_path, "b.rs");
+    }
+
+    #[test]
+    fn clear_file_diagnostics_no_match() {
+        let mut p = ProblemsPanel::new();
+        p.add_diagnostic("a.rs", 1, 1, ProblemSeverity::Error, "e1");
+        let removed = p.clear_file_diagnostics("nonexistent.rs");
+        assert_eq!(removed, 0);
+        assert_eq!(p.total_count(), 1);
+    }
+
+    // -- error_count / warning_count tests ----------------------------------
+
+    #[test]
+    fn error_and_warning_counts() {
+        let mut p = ProblemsPanel::new();
+        p.add_diagnostic("a.rs", 1, 1, ProblemSeverity::Error, "e1");
+        p.add_diagnostic("a.rs", 2, 1, ProblemSeverity::Error, "e2");
+        p.add_diagnostic("b.rs", 1, 1, ProblemSeverity::Warning, "w1");
+        p.add_diagnostic("c.rs", 1, 1, ProblemSeverity::Info, "i1");
+        assert_eq!(p.error_count(), 2);
+        assert_eq!(p.warning_count(), 1);
+    }
+
+    #[test]
+    fn error_count_empty() {
+        let p = ProblemsPanel::new();
+        assert_eq!(p.error_count(), 0);
+        assert_eq!(p.warning_count(), 0);
     }
 }

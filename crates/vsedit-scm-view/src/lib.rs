@@ -745,6 +745,31 @@ impl ScmProvider for GitScmProvider {
 }
 
 // ---------------------------------------------------------------------------
+// ScmEntry (flat entry for populate_from_git)
+// ---------------------------------------------------------------------------
+
+/// A single entry in the SCM view populated from git status data.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScmEntry {
+    pub path: PathBuf,
+    pub status: FileStatus,
+    pub staged: bool,
+}
+
+/// Populate the SCM view from git status output.
+pub fn populate_from_git(view: &mut ScmView, status_output: &[(PathBuf, FileStatus)]) {
+    view.entries.clear();
+    for (path, status) in status_output {
+        view.entries.push(ScmEntry {
+            path: path.clone(),
+            status: *status,
+            staged: matches!(status, FileStatus::Added | FileStatus::Renamed | FileStatus::Copied),
+        });
+    }
+    view.entries.sort_by(|a, b| a.path.cmp(&b.path));
+}
+
+// ---------------------------------------------------------------------------
 // ScmView (UI state + rendering)
 // ---------------------------------------------------------------------------
 
@@ -753,6 +778,7 @@ pub struct ScmView {
     pub commit_message: String,
     pub selected_index: usize,
     pub scroll_offset: usize,
+    pub entries: Vec<ScmEntry>,
 }
 
 impl ScmView {
@@ -761,6 +787,7 @@ impl ScmView {
             commit_message: String::new(),
             selected_index: 0,
             scroll_offset: 0,
+            entries: Vec::new(),
         }
     }
 
@@ -931,6 +958,56 @@ impl ScmView {
                     flat_index += 1;
                 }
             }
+        }
+    }
+
+    /// Render the SCM entries view with a "SOURCE CONTROL" title bar.
+    pub fn render_entries(&self, area: Rect, buf: &mut Buffer) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+
+        let mut y = area.y;
+
+        // Title bar: "SOURCE CONTROL" with change count.
+        if y < area.y + area.height {
+            let title = format!("SOURCE CONTROL ({})", self.entries.len());
+            let style = Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD);
+            self.put_line(buf, area.x, y, area.width, &title, style);
+            y += 1;
+        }
+
+        // Render each entry.
+        for entry in &self.entries {
+            if y >= area.y + area.height {
+                break;
+            }
+            let icon = match entry.status {
+                FileStatus::Modified => 'M',
+                FileStatus::Added => 'A',
+                FileStatus::Deleted => 'D',
+                FileStatus::Untracked => 'U',
+                FileStatus::Renamed => 'R',
+                FileStatus::Copied => 'C',
+                FileStatus::Unmerged => '!',
+            };
+            let color = match entry.status {
+                FileStatus::Added | FileStatus::Copied => Color::Green,
+                FileStatus::Deleted => Color::Red,
+                FileStatus::Modified | FileStatus::Renamed => Color::Yellow,
+                FileStatus::Untracked => Color::Gray,
+                FileStatus::Unmerged => Color::Red,
+            };
+            let prefix = if entry.staged { "✓ " } else { "  " };
+            let label = format!(
+                "{prefix}{icon} {}",
+                entry.path.display()
+            );
+            let style = Style::default().fg(color);
+            self.put_line(buf, area.x, y, area.width, &label, style);
+            y += 1;
         }
     }
 
@@ -1569,5 +1646,156 @@ index abc..def 100644
         assert!(!staged.is_empty(), "should have staged files");
         assert!(!unstaged.is_empty(), "should have unstaged files");
         assert!(!untracked.is_empty(), "should have untracked files");
+    }
+
+    // -- populate_from_git tests -------------------------------------------
+
+    #[test]
+    fn populate_from_git_basic() {
+        let mut view = ScmView::new();
+        let status_output = vec![
+            (PathBuf::from("src/main.rs"), FileStatus::Modified),
+            (PathBuf::from("src/lib.rs"), FileStatus::Added),
+        ];
+        populate_from_git(&mut view, &status_output);
+        assert_eq!(view.entries.len(), 2);
+        // Sorted by path: lib.rs < main.rs
+        assert_eq!(view.entries[0].path, PathBuf::from("src/lib.rs"));
+        assert_eq!(view.entries[1].path, PathBuf::from("src/main.rs"));
+    }
+
+    #[test]
+    fn populate_from_git_staged_flag() {
+        let mut view = ScmView::new();
+        let status_output = vec![
+            (PathBuf::from("added.rs"), FileStatus::Added),
+            (PathBuf::from("modified.rs"), FileStatus::Modified),
+            (PathBuf::from("deleted.rs"), FileStatus::Deleted),
+            (PathBuf::from("untracked.rs"), FileStatus::Untracked),
+        ];
+        populate_from_git(&mut view, &status_output);
+        // Added gets staged=true
+        let added = view.entries.iter().find(|e| e.path == PathBuf::from("added.rs")).unwrap();
+        assert!(added.staged);
+        // Modified does not
+        let modified = view.entries.iter().find(|e| e.path == PathBuf::from("modified.rs")).unwrap();
+        assert!(!modified.staged);
+        // Deleted does not
+        let deleted = view.entries.iter().find(|e| e.path == PathBuf::from("deleted.rs")).unwrap();
+        assert!(!deleted.staged);
+    }
+
+    #[test]
+    fn populate_from_git_clears_previous() {
+        let mut view = ScmView::new();
+        view.entries.push(ScmEntry {
+            path: PathBuf::from("old.rs"),
+            status: FileStatus::Modified,
+            staged: false,
+        });
+        let status_output = vec![
+            (PathBuf::from("new.rs"), FileStatus::Added),
+        ];
+        populate_from_git(&mut view, &status_output);
+        assert_eq!(view.entries.len(), 1);
+        assert_eq!(view.entries[0].path, PathBuf::from("new.rs"));
+    }
+
+    #[test]
+    fn populate_from_git_empty() {
+        let mut view = ScmView::new();
+        populate_from_git(&mut view, &[]);
+        assert!(view.entries.is_empty());
+    }
+
+    #[test]
+    fn populate_from_git_sorts_entries() {
+        let mut view = ScmView::new();
+        let status_output = vec![
+            (PathBuf::from("z.rs"), FileStatus::Modified),
+            (PathBuf::from("a.rs"), FileStatus::Added),
+            (PathBuf::from("m.rs"), FileStatus::Deleted),
+        ];
+        populate_from_git(&mut view, &status_output);
+        let paths: Vec<_> = view.entries.iter().map(|e| e.path.clone()).collect();
+        assert_eq!(paths, vec![
+            PathBuf::from("a.rs"),
+            PathBuf::from("m.rs"),
+            PathBuf::from("z.rs"),
+        ]);
+    }
+
+    // -- render_entries tests -----------------------------------------------
+
+    #[test]
+    fn render_entries_title_bar() {
+        let mut view = ScmView::new();
+        populate_from_git(&mut view, &[
+            (PathBuf::from("a.rs"), FileStatus::Modified),
+            (PathBuf::from("b.rs"), FileStatus::Added),
+        ]);
+        let area = Rect::new(0, 0, 40, 10);
+        let mut buf = Buffer::empty(area);
+        view.render_entries(area, &mut buf);
+        let first_line: String = (0..area.width)
+            .map(|x| buf[(x, 0)].symbol().to_string())
+            .collect();
+        assert!(first_line.contains("SOURCE CONTROL"));
+        assert!(first_line.contains("(2)"));
+    }
+
+    #[test]
+    fn render_entries_shows_staged_checkmark() {
+        let mut view = ScmView::new();
+        populate_from_git(&mut view, &[
+            (PathBuf::from("staged.rs"), FileStatus::Added),
+        ]);
+        let area = Rect::new(0, 0, 40, 10);
+        let mut buf = Buffer::empty(area);
+        view.render_entries(area, &mut buf);
+        // Second row (y=1) should contain the checkmark for a staged entry
+        let second_line: String = (0..area.width)
+            .map(|x| buf[(x, 1)].symbol().to_string())
+            .collect();
+        assert!(second_line.contains("✓"));
+    }
+
+    #[test]
+    fn render_entries_shows_status_icon() {
+        let mut view = ScmView::new();
+        populate_from_git(&mut view, &[
+            (PathBuf::from("mod.rs"), FileStatus::Modified),
+        ]);
+        let area = Rect::new(0, 0, 40, 10);
+        let mut buf = Buffer::empty(area);
+        view.render_entries(area, &mut buf);
+        let second_line: String = (0..area.width)
+            .map(|x| buf[(x, 1)].symbol().to_string())
+            .collect();
+        assert!(second_line.contains("M"));
+        assert!(second_line.contains("mod.rs"));
+    }
+
+    #[test]
+    fn render_entries_empty_no_panic() {
+        let view = ScmView::new();
+        let area = Rect::new(0, 0, 40, 10);
+        let mut buf = Buffer::empty(area);
+        view.render_entries(area, &mut buf);
+        let first_line: String = (0..area.width)
+            .map(|x| buf[(x, 0)].symbol().to_string())
+            .collect();
+        assert!(first_line.contains("SOURCE CONTROL (0)"));
+    }
+
+    #[test]
+    fn render_entries_zero_area_no_panic() {
+        let mut view = ScmView::new();
+        populate_from_git(&mut view, &[
+            (PathBuf::from("a.rs"), FileStatus::Modified),
+        ]);
+        let area = Rect::new(0, 0, 0, 0);
+        let mut buf = Buffer::empty(area);
+        view.render_entries(area, &mut buf);
     }
 }

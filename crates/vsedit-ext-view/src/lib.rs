@@ -724,6 +724,157 @@ impl Default for ExtensionsViewState {
     }
 }
 
+// ── Extension Browser View (ratatui) ──
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Widget};
+
+/// Active tab in the extension browser.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExtensionTab {
+    Installed,
+    Search,
+}
+
+/// Information about a single extension.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtensionInfo {
+    pub id: String,
+    pub name: String,
+    pub publisher: String,
+    pub description: String,
+    pub version: String,
+    pub installed: bool,
+    pub enabled: bool,
+}
+
+/// A browsable extension list rendered with ratatui widgets.
+pub struct ExtensionBrowserView {
+    /// Currently installed extensions.
+    pub installed: Vec<ExtensionInfo>,
+    /// Search results from marketplace.
+    pub search_results: Vec<ExtensionInfo>,
+    /// Current search query.
+    pub search_query: String,
+    /// Selected index in the list.
+    pub selected: usize,
+    /// Active tab: installed vs search.
+    pub active_tab: ExtensionTab,
+}
+
+impl ExtensionBrowserView {
+    pub fn new() -> Self {
+        Self {
+            installed: Vec::new(),
+            search_results: Vec::new(),
+            search_query: String::new(),
+            selected: 0,
+            active_tab: ExtensionTab::Installed,
+        }
+    }
+
+    /// The list currently displayed based on the active tab.
+    pub fn active_list(&self) -> &[ExtensionInfo] {
+        match self.active_tab {
+            ExtensionTab::Installed => &self.installed,
+            ExtensionTab::Search => &self.search_results,
+        }
+    }
+
+    pub fn add_installed(&mut self, ext: ExtensionInfo) {
+        self.installed.push(ext);
+    }
+
+    pub fn set_search_results(&mut self, results: Vec<ExtensionInfo>) {
+        self.search_results = results;
+        self.active_tab = ExtensionTab::Search;
+        self.selected = 0;
+    }
+
+    pub fn move_selection_up(&mut self) {
+        if self.selected > 0 {
+            self.selected -= 1;
+        }
+    }
+
+    pub fn move_selection_down(&mut self) {
+        let len = self.active_list().len();
+        if len > 0 && self.selected < len - 1 {
+            self.selected += 1;
+        }
+    }
+
+    /// Render the extension browser view into the given area.
+    pub fn render(&self, area: Rect, buf: &mut Buffer) {
+        let chunks = Layout::vertical([
+            Constraint::Length(2), // tabs
+            Constraint::Length(3), // search input
+            Constraint::Min(1),   // list
+        ])
+        .split(area);
+
+        // Tab bar
+        let tab_titles: Vec<Line<'_>> = vec![
+            Line::from("INSTALLED"),
+            Line::from("SEARCH"),
+        ];
+        let selected_tab = match self.active_tab {
+            ExtensionTab::Installed => 0,
+            ExtensionTab::Search => 1,
+        };
+        let tabs = Tabs::new(tab_titles)
+            .select(selected_tab)
+            .highlight_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+        Widget::render(tabs, chunks[0], buf);
+
+        // Search input
+        let search_text = if self.search_query.is_empty() {
+            "Type to search extensions...".to_string()
+        } else {
+            self.search_query.clone()
+        };
+        let search = Paragraph::new(search_text)
+            .block(Block::default().borders(Borders::ALL).title("Search"));
+        Widget::render(search, chunks[1], buf);
+
+        // Extension list
+        let items: Vec<ListItem<'_>> = self
+            .active_list()
+            .iter()
+            .enumerate()
+            .map(|(i, ext)| {
+                let status = if ext.installed {
+                    if ext.enabled { "[Installed]" } else { "[Disabled]" }
+                } else {
+                    "[Install]"
+                };
+                let line = format!(
+                    "{} {} — {} v{}: {}",
+                    status, ext.name, ext.publisher, ext.version, ext.description
+                );
+                let style = if i == self.selected {
+                    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                };
+                ListItem::new(Span::styled(line, style))
+            })
+            .collect();
+        let list = List::new(items)
+            .block(Block::default().borders(Borders::ALL).title("Extensions"));
+        Widget::render(list, chunks[2], buf);
+    }
+}
+
+impl Default for ExtensionBrowserView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1186,5 +1337,123 @@ mod tests {
         let json = serde_json::to_string(&detail).unwrap();
         let back: ExtensionDetailView = serde_json::from_str(&json).unwrap();
         assert_eq!(detail, back);
+    }
+
+    // ── ExtensionBrowserView tests ──
+
+    fn make_ext_info(name: &str, installed: bool, enabled: bool) -> ExtensionInfo {
+        ExtensionInfo {
+            id: format!("pub.{}", name.to_lowercase().replace(' ', "-")),
+            name: name.into(),
+            publisher: "test-pub".into(),
+            description: format!("Desc of {name}"),
+            version: "1.0.0".into(),
+            installed,
+            enabled,
+        }
+    }
+
+    #[test]
+    fn browser_view_new_defaults() {
+        let view = ExtensionBrowserView::new();
+        assert!(view.installed.is_empty());
+        assert!(view.search_results.is_empty());
+        assert!(view.search_query.is_empty());
+        assert_eq!(view.selected, 0);
+        assert_eq!(view.active_tab, ExtensionTab::Installed);
+    }
+
+    #[test]
+    fn browser_view_add_installed() {
+        let mut view = ExtensionBrowserView::new();
+        view.add_installed(make_ext_info("Rust Analyzer", true, true));
+        view.add_installed(make_ext_info("Prettier", true, false));
+        assert_eq!(view.installed.len(), 2);
+        assert_eq!(view.active_list().len(), 2);
+    }
+
+    #[test]
+    fn browser_view_set_search_results() {
+        let mut view = ExtensionBrowserView::new();
+        let results = vec![
+            make_ext_info("Theme A", false, false),
+            make_ext_info("Theme B", false, false),
+        ];
+        view.set_search_results(results);
+        assert_eq!(view.active_tab, ExtensionTab::Search);
+        assert_eq!(view.search_results.len(), 2);
+        assert_eq!(view.selected, 0);
+    }
+
+    #[test]
+    fn browser_view_move_selection_down_and_up() {
+        let mut view = ExtensionBrowserView::new();
+        view.add_installed(make_ext_info("A", true, true));
+        view.add_installed(make_ext_info("B", true, true));
+        view.add_installed(make_ext_info("C", true, true));
+
+        assert_eq!(view.selected, 0);
+        view.move_selection_down();
+        assert_eq!(view.selected, 1);
+        view.move_selection_down();
+        assert_eq!(view.selected, 2);
+        view.move_selection_down(); // at end, stays
+        assert_eq!(view.selected, 2);
+
+        view.move_selection_up();
+        assert_eq!(view.selected, 1);
+        view.move_selection_up();
+        assert_eq!(view.selected, 0);
+        view.move_selection_up(); // at start, stays
+        assert_eq!(view.selected, 0);
+    }
+
+    #[test]
+    fn browser_view_active_list_switches_with_tab() {
+        let mut view = ExtensionBrowserView::new();
+        view.add_installed(make_ext_info("Inst", true, true));
+        let results = vec![make_ext_info("Search1", false, false)];
+        view.set_search_results(results);
+
+        assert_eq!(view.active_tab, ExtensionTab::Search);
+        assert_eq!(view.active_list().len(), 1);
+        assert_eq!(view.active_list()[0].name, "Search1");
+
+        view.active_tab = ExtensionTab::Installed;
+        assert_eq!(view.active_list().len(), 1);
+        assert_eq!(view.active_list()[0].name, "Inst");
+    }
+
+    #[test]
+    fn browser_view_render_does_not_panic() {
+        let mut view = ExtensionBrowserView::new();
+        view.add_installed(make_ext_info("MyExt", true, true));
+        view.search_query = "test".into();
+        let area = Rect::new(0, 0, 80, 24);
+        let mut buf = Buffer::empty(area);
+        view.render(area, &mut buf);
+    }
+
+    #[test]
+    fn browser_view_render_empty_does_not_panic() {
+        let view = ExtensionBrowserView::new();
+        let area = Rect::new(0, 0, 60, 20);
+        let mut buf = Buffer::empty(area);
+        view.render(area, &mut buf);
+    }
+
+    #[test]
+    fn browser_view_selection_on_empty_list() {
+        let mut view = ExtensionBrowserView::new();
+        view.move_selection_down();
+        assert_eq!(view.selected, 0);
+        view.move_selection_up();
+        assert_eq!(view.selected, 0);
+    }
+
+    #[test]
+    fn browser_view_default_impl() {
+        let view = ExtensionBrowserView::default();
+        assert_eq!(view.active_tab, ExtensionTab::Installed);
     }
 }

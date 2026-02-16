@@ -1032,3 +1032,350 @@ mod tests {
         assert!(nav.current_hunk().is_none());
     }
 }
+
+// ── Side-by-side Diff View (ratatui) ──
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::style::{Color, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, Paragraph, Widget};
+
+/// Kind of line in the diff view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiffViewLineKind {
+    Unchanged,
+    Added,
+    Deleted,
+    Modified,
+    /// Padding for alignment.
+    Empty,
+}
+
+/// A single line in one side of the diff view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffViewLine {
+    pub content: String,
+    pub line_number: Option<usize>,
+    pub kind: DiffViewLineKind,
+}
+
+/// Renders a side-by-side diff view of two texts.
+pub struct DiffView {
+    pub left_lines: Vec<DiffViewLine>,
+    pub right_lines: Vec<DiffViewLine>,
+    pub scroll_offset: usize,
+    pub title_left: String,
+    pub title_right: String,
+}
+
+impl DiffView {
+    /// Create a diff view from two texts.
+    pub fn from_texts(left: &str, right: &str, title_left: &str, title_right: &str) -> Self {
+        let diff = vsedit_diff::compute_line_diff(left, right);
+        let left_src: Vec<&str> = left.lines().collect();
+        let right_src: Vec<&str> = right.lines().collect();
+
+        let mut left_lines = Vec::new();
+        let mut right_lines = Vec::new();
+        let mut left_pos: usize = 0;
+        let mut right_pos: usize = 0;
+
+        for change in &diff.changes {
+            let orig_start = (change.original_start as usize).saturating_sub(1);
+            let mod_start = (change.modified_start as usize).saturating_sub(1);
+
+            // Emit unchanged lines before this change
+            while left_pos < orig_start && left_pos < left_src.len() {
+                left_lines.push(DiffViewLine {
+                    content: left_src[left_pos].to_string(),
+                    line_number: Some(left_pos + 1),
+                    kind: DiffViewLineKind::Unchanged,
+                });
+                right_lines.push(DiffViewLine {
+                    content: right_src[right_pos].to_string(),
+                    line_number: Some(right_pos + 1),
+                    kind: DiffViewLineKind::Unchanged,
+                });
+                left_pos += 1;
+                right_pos += 1;
+            }
+
+            let ol = change.original_length as usize;
+            let ml = change.modified_length as usize;
+
+            match change.kind {
+                vsedit_diff::DiffChangeKind::Delete => {
+                    for i in 0..ol {
+                        let idx = orig_start + i;
+                        left_lines.push(DiffViewLine {
+                            content: left_src.get(idx).unwrap_or(&"").to_string(),
+                            line_number: Some(idx + 1),
+                            kind: DiffViewLineKind::Deleted,
+                        });
+                        right_lines.push(DiffViewLine {
+                            content: String::new(),
+                            line_number: None,
+                            kind: DiffViewLineKind::Empty,
+                        });
+                    }
+                    left_pos = orig_start + ol;
+                }
+                vsedit_diff::DiffChangeKind::Insert => {
+                    for i in 0..ml {
+                        let idx = mod_start + i;
+                        left_lines.push(DiffViewLine {
+                            content: String::new(),
+                            line_number: None,
+                            kind: DiffViewLineKind::Empty,
+                        });
+                        right_lines.push(DiffViewLine {
+                            content: right_src.get(idx).unwrap_or(&"").to_string(),
+                            line_number: Some(idx + 1),
+                            kind: DiffViewLineKind::Added,
+                        });
+                    }
+                    right_pos = mod_start + ml;
+                }
+                vsedit_diff::DiffChangeKind::Change => {
+                    let max = ol.max(ml);
+                    for i in 0..max {
+                        if i < ol {
+                            let idx = orig_start + i;
+                            left_lines.push(DiffViewLine {
+                                content: left_src.get(idx).unwrap_or(&"").to_string(),
+                                line_number: Some(idx + 1),
+                                kind: DiffViewLineKind::Modified,
+                            });
+                        } else {
+                            left_lines.push(DiffViewLine {
+                                content: String::new(),
+                                line_number: None,
+                                kind: DiffViewLineKind::Empty,
+                            });
+                        }
+                        if i < ml {
+                            let idx = mod_start + i;
+                            right_lines.push(DiffViewLine {
+                                content: right_src.get(idx).unwrap_or(&"").to_string(),
+                                line_number: Some(idx + 1),
+                                kind: DiffViewLineKind::Modified,
+                            });
+                        } else {
+                            right_lines.push(DiffViewLine {
+                                content: String::new(),
+                                line_number: None,
+                                kind: DiffViewLineKind::Empty,
+                            });
+                        }
+                    }
+                    left_pos = orig_start + ol;
+                    right_pos = mod_start + ml;
+                }
+            }
+        }
+
+        // Remaining unchanged lines
+        while left_pos < left_src.len() && right_pos < right_src.len() {
+            left_lines.push(DiffViewLine {
+                content: left_src[left_pos].to_string(),
+                line_number: Some(left_pos + 1),
+                kind: DiffViewLineKind::Unchanged,
+            });
+            right_lines.push(DiffViewLine {
+                content: right_src[right_pos].to_string(),
+                line_number: Some(right_pos + 1),
+                kind: DiffViewLineKind::Unchanged,
+            });
+            left_pos += 1;
+            right_pos += 1;
+        }
+
+        Self {
+            left_lines,
+            right_lines,
+            scroll_offset: 0,
+            title_left: title_left.to_string(),
+            title_right: title_right.to_string(),
+        }
+    }
+
+    /// Render the diff view using ratatui.
+    pub fn render(&self, area: Rect, buf: &mut Buffer) {
+        let halves = Layout::horizontal([
+            Constraint::Percentage(50),
+            Constraint::Percentage(50),
+        ])
+        .split(area);
+
+        self.render_panel(&self.left_lines, &self.title_left, halves[0], buf);
+        self.render_panel(&self.right_lines, &self.title_right, halves[1], buf);
+    }
+
+    fn render_panel(&self, lines: &[DiffViewLine], title: &str, area: Rect, buf: &mut Buffer) {
+        let visible_height = area.height.saturating_sub(2) as usize; // borders
+        let start = self.scroll_offset;
+        let end = (start + visible_height).min(lines.len());
+        let visible: Vec<Line<'_>> = lines[start..end]
+            .iter()
+            .map(|dl| {
+                let gutter = match dl.line_number {
+                    Some(n) => format!("{:>4} ", n),
+                    None => "     ".to_string(),
+                };
+                let style = match dl.kind {
+                    DiffViewLineKind::Added => Style::default().bg(Color::Green),
+                    DiffViewLineKind::Deleted => Style::default().bg(Color::Red),
+                    DiffViewLineKind::Modified => Style::default().bg(Color::Yellow),
+                    DiffViewLineKind::Empty => Style::default().bg(Color::DarkGray),
+                    DiffViewLineKind::Unchanged => Style::default(),
+                };
+                Line::from(vec![
+                    Span::raw(gutter),
+                    Span::styled(&dl.content, style),
+                ])
+            })
+            .collect();
+        let paragraph = Paragraph::new(visible)
+            .block(Block::default().borders(Borders::ALL).title(title.to_string()));
+        Widget::render(paragraph, area, buf);
+    }
+
+    pub fn scroll_up(&mut self, n: usize) {
+        self.scroll_offset = self.scroll_offset.saturating_sub(n);
+    }
+
+    pub fn scroll_down(&mut self, n: usize) {
+        let max = self.total_lines();
+        self.scroll_offset = (self.scroll_offset + n).min(max.saturating_sub(1));
+    }
+
+    pub fn total_lines(&self) -> usize {
+        self.left_lines.len().max(self.right_lines.len())
+    }
+}
+
+#[cfg(test)]
+mod diff_view_tests {
+    use super::*;
+
+    #[test]
+    fn diff_view_identical_files() {
+        let text = "line1\nline2\nline3\n";
+        let view = DiffView::from_texts(text, text, "a.txt", "b.txt");
+        assert_eq!(view.total_lines(), 3);
+        for line in &view.left_lines {
+            assert_eq!(line.kind, DiffViewLineKind::Unchanged);
+        }
+        for line in &view.right_lines {
+            assert_eq!(line.kind, DiffViewLineKind::Unchanged);
+        }
+    }
+
+    #[test]
+    fn diff_view_added_lines() {
+        let left = "a\nc\n";
+        let right = "a\nb\nc\n";
+        let view = DiffView::from_texts(left, right, "old", "new");
+        // Should have an Added line on the right and Empty on the left
+        let added = view.right_lines.iter().any(|l| l.kind == DiffViewLineKind::Added);
+        let empty = view.left_lines.iter().any(|l| l.kind == DiffViewLineKind::Empty);
+        assert!(added);
+        assert!(empty);
+    }
+
+    #[test]
+    fn diff_view_deleted_lines() {
+        let left = "a\nb\nc\n";
+        let right = "a\nc\n";
+        let view = DiffView::from_texts(left, right, "old", "new");
+        let deleted = view.left_lines.iter().any(|l| l.kind == DiffViewLineKind::Deleted);
+        let empty = view.right_lines.iter().any(|l| l.kind == DiffViewLineKind::Empty);
+        assert!(deleted);
+        assert!(empty);
+    }
+
+    #[test]
+    fn diff_view_modified_lines() {
+        let left = "a\nb\n";
+        let right = "a\nB\n";
+        let view = DiffView::from_texts(left, right, "old", "new");
+        let left_modified = view.left_lines.iter().any(|l| l.kind == DiffViewLineKind::Modified);
+        let right_modified = view.right_lines.iter().any(|l| l.kind == DiffViewLineKind::Modified);
+        assert!(left_modified);
+        assert!(right_modified);
+    }
+
+    #[test]
+    fn diff_view_empty_files() {
+        let view = DiffView::from_texts("", "", "a", "b");
+        assert_eq!(view.total_lines(), 0);
+        assert!(view.left_lines.is_empty());
+        assert!(view.right_lines.is_empty());
+    }
+
+    #[test]
+    fn diff_view_scroll_up_down() {
+        let left = "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n";
+        let right = "1\n2\nX\n4\n5\n6\n7\n8\n9\n10\n";
+        let mut view = DiffView::from_texts(left, right, "l", "r");
+        assert_eq!(view.scroll_offset, 0);
+
+        view.scroll_down(3);
+        assert_eq!(view.scroll_offset, 3);
+
+        view.scroll_up(2);
+        assert_eq!(view.scroll_offset, 1);
+
+        view.scroll_up(100);
+        assert_eq!(view.scroll_offset, 0);
+    }
+
+    #[test]
+    fn diff_view_scroll_down_clamped() {
+        let view_text = "a\nb\n";
+        let mut view = DiffView::from_texts(view_text, view_text, "l", "r");
+        view.scroll_down(1000);
+        assert!(view.scroll_offset <= view.total_lines());
+    }
+
+    #[test]
+    fn diff_view_render_does_not_panic() {
+        let left = "hello\nworld\n";
+        let right = "hello\nrust\n";
+        let view = DiffView::from_texts(left, right, "original.txt", "modified.txt");
+        let area = Rect::new(0, 0, 80, 24);
+        let mut buf = Buffer::empty(area);
+        view.render(area, &mut buf);
+    }
+
+    #[test]
+    fn diff_view_render_empty_does_not_panic() {
+        let view = DiffView::from_texts("", "", "a", "b");
+        let area = Rect::new(0, 0, 60, 10);
+        let mut buf = Buffer::empty(area);
+        view.render(area, &mut buf);
+    }
+
+    #[test]
+    fn diff_view_line_numbers_correct() {
+        let left = "a\nb\nc\n";
+        let right = "a\nc\n";
+        let view = DiffView::from_texts(left, right, "l", "r");
+        // First line on both sides should be line 1
+        assert_eq!(view.left_lines[0].line_number, Some(1));
+        assert_eq!(view.right_lines[0].line_number, Some(1));
+        // Empty padding lines have no line number
+        let empties: Vec<_> = view.right_lines.iter().filter(|l| l.kind == DiffViewLineKind::Empty).collect();
+        for e in &empties {
+            assert_eq!(e.line_number, None);
+        }
+    }
+
+    #[test]
+    fn diff_view_titles_stored() {
+        let view = DiffView::from_texts("a\n", "a\n", "left.rs", "right.rs");
+        assert_eq!(view.title_left, "left.rs");
+        assert_eq!(view.title_right, "right.rs");
+    }
+}
