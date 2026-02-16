@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/vsedit-a11y",
     "crates/vsedit-a11y-features",
+    "crates/vsedit-accessibility",
     "crates/vsedit-actions",
     "crates/vsedit-async",
     "crates/vsedit-backup",

@@ -1,0 +1,1077 @@
+//! Comprehensive accessibility support for vsedit, matching VS Code's
+//! accessibility features: screen reader integration, high contrast mode,
+//! keyboard navigation, audio cues, accessible editor content, and
+//! color blind support.
+
+use std::collections::HashMap;
+use std::fmt;
+use std::io::Write;
+
+pub use vsedit_a11y::{
+    AccessibilityConfig, AccessibilityError as A11yError, AccessibilityService,
+    AccessibilitySupport, Announcement, AnnouncementPriority, AriaDescription, AriaRole,
+    FocusTracker, KeyboardNavigation, ScreenReaderOptimized, Verbosity,
+};
+pub use vsedit_a11y_features::{
+    AccessibilityFeaturesConfig, AccessibilityFeaturesConfigBuilder, AnnouncementQueue,
+    HighContrastMode, ReducedMotionMode,
+};
+
+// ---------------------------------------------------------------------------
+// 1. Screen reader support
+// ---------------------------------------------------------------------------
+
+/// Extended accessibility roles matching VS Code's widget semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AccessibilityRole {
+    TextBox,
+    Button,
+    Menu,
+    MenuItem,
+    TreeItem,
+    Tab,
+    StatusBar,
+    Dialog,
+    Alert,
+    Progressbar,
+}
+
+impl fmt::Display for AccessibilityRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::TextBox => "textbox",
+            Self::Button => "button",
+            Self::Menu => "menu",
+            Self::MenuItem => "menuitem",
+            Self::TreeItem => "treeitem",
+            Self::Tab => "tab",
+            Self::StatusBar => "statusbar",
+            Self::Dialog => "dialog",
+            Self::Alert => "alert",
+            Self::Progressbar => "progressbar",
+        };
+        write!(f, "{name}")
+    }
+}
+
+/// Screen reader integration using terminal escape sequences.
+///
+/// Uses OSC (Operating System Command) escape sequences to communicate
+/// with terminal-based screen readers, and queues announcements for
+/// consumption by the TUI layer.
+#[derive(Debug)]
+pub struct ScreenReaderSupport {
+    active: bool,
+    labels: HashMap<String, String>,
+    announcements: Vec<String>,
+}
+
+impl ScreenReaderSupport {
+    pub fn new() -> Self {
+        Self {
+            active: false,
+            labels: HashMap::new(),
+            announcements: Vec::new(),
+        }
+    }
+
+    /// Detect screen reader from environment variables.
+    pub fn detect_from_env() -> bool {
+        std::env::var("TERM_PROGRAM")
+            .map(|v| v.contains("accessibility"))
+            .unwrap_or(false)
+            || std::env::var("ACCESSIBILITY_ENABLED")
+                .map(|v| v == "1" || v == "true")
+                .unwrap_or(false)
+    }
+
+    pub fn set_active(&mut self, active: bool) {
+        self.active = active;
+    }
+
+    pub fn is_screen_reader_active(&self) -> bool {
+        self.active
+    }
+
+    /// Send an announcement string. In a real terminal the output would go to
+    /// an attached screen reader via OSC sequences. Here we queue the message
+    /// for the TUI layer to consume.
+    pub fn announce(&mut self, message: impl Into<String>) {
+        let msg = message.into();
+        if !msg.is_empty() {
+            self.announcements.push(msg);
+        }
+    }
+
+    /// Format an OSC escape sequence for screen reader output.
+    pub fn format_osc_announcement(message: &str) -> String {
+        // OSC 99 is used by some terminals for notifications
+        format!("\x1b]99;{message}\x07")
+    }
+
+    /// Write an announcement directly to a writer (e.g. stdout) using
+    /// terminal escape sequences.
+    pub fn write_announcement<W: Write>(
+        writer: &mut W,
+        message: &str,
+    ) -> std::io::Result<()> {
+        write!(writer, "{}", Self::format_osc_announcement(message))
+    }
+
+    /// Set an accessible label for a UI element identified by `id`.
+    pub fn set_aria_label(&mut self, id: impl Into<String>, label: impl Into<String>) {
+        self.labels.insert(id.into(), label.into());
+    }
+
+    /// Get the accessible label for a UI element.
+    pub fn get_aria_label(&self, id: &str) -> Option<&str> {
+        self.labels.get(id).map(|s| s.as_str())
+    }
+
+    /// Remove an accessible label.
+    pub fn remove_aria_label(&mut self, id: &str) -> bool {
+        self.labels.remove(id).is_some()
+    }
+
+    /// Take all pending announcements.
+    pub fn take_announcements(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.announcements)
+    }
+
+    /// Number of pending announcements.
+    pub fn pending_count(&self) -> usize {
+        self.announcements.len()
+    }
+}
+
+impl Default for ScreenReaderSupport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 2. High contrast mode
+// ---------------------------------------------------------------------------
+
+/// High contrast support for terminal UIs. Provides border and separator
+/// styles together with contrast-aware color recommendations.
+#[derive(Debug, Clone)]
+pub struct HighContrastSupport {
+    enabled: bool,
+    mode: HighContrastMode,
+}
+
+impl HighContrastSupport {
+    pub fn new() -> Self {
+        Self {
+            enabled: false,
+            mode: HighContrastMode::None,
+        }
+    }
+
+    /// Auto-detect high contrast from environment.
+    pub fn detect() -> Self {
+        let gtk = std::env::var("GTK_THEME").ok();
+        let mode =
+            AccessibilityFeaturesConfig::detect_high_contrast_from_env(gtk.as_deref());
+        Self {
+            enabled: mode != HighContrastMode::None,
+            mode,
+        }
+    }
+
+    pub fn is_high_contrast(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn mode(&self) -> HighContrastMode {
+        self.mode
+    }
+
+    pub fn set_mode(&mut self, mode: HighContrastMode) {
+        self.mode = mode;
+        self.enabled = mode != HighContrastMode::None;
+    }
+
+    /// Return the bold border character to use in high contrast mode.
+    pub fn border_char(&self) -> char {
+        if self.enabled { '█' } else { '│' }
+    }
+
+    /// Return the thick separator string.
+    pub fn separator(&self, width: usize) -> String {
+        let ch = if self.enabled { '━' } else { '─' };
+        std::iter::repeat(ch).take(width).collect()
+    }
+
+    /// Return foreground/background pair for maximum contrast.
+    /// Returns `(fg, bg)` as ANSI color codes.
+    pub fn contrast_colors(&self) -> (u8, u8) {
+        match self.mode {
+            HighContrastMode::Dark => (15, 0),   // white on black
+            HighContrastMode::Light => (0, 15),   // black on white
+            HighContrastMode::None => (7, 0),     // default
+        }
+    }
+
+    /// Format text with underline for links/interactive elements in high
+    /// contrast mode. Returns an ANSI-escaped string.
+    pub fn underline_interactive(text: &str, high_contrast: bool) -> String {
+        if high_contrast {
+            format!("\x1b[4m{text}\x1b[24m")
+        } else {
+            text.to_string()
+        }
+    }
+}
+
+impl Default for HighContrastSupport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 3. Keyboard navigation / Focus management
+// ---------------------------------------------------------------------------
+
+/// Predefined focus areas matching VS Code's layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FocusArea {
+    Editor,
+    Sidebar,
+    Panel,
+    ActivityBar,
+    StatusBar,
+    Menubar,
+    TitleBar,
+}
+
+impl fmt::Display for FocusArea {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::Editor => "Editor",
+            Self::Sidebar => "Sidebar",
+            Self::Panel => "Panel",
+            Self::ActivityBar => "Activity Bar",
+            Self::StatusBar => "Status Bar",
+            Self::Menubar => "Menu Bar",
+            Self::TitleBar => "Title Bar",
+        };
+        write!(f, "{name}")
+    }
+}
+
+/// Defines the tab order of all UI components.
+#[derive(Debug, Clone)]
+pub struct FocusOrder {
+    areas: Vec<FocusArea>,
+}
+
+impl FocusOrder {
+    /// Default VS Code-style focus order.
+    pub fn default_order() -> Self {
+        Self {
+            areas: vec![
+                FocusArea::Editor,
+                FocusArea::Sidebar,
+                FocusArea::Panel,
+                FocusArea::ActivityBar,
+                FocusArea::StatusBar,
+            ],
+        }
+    }
+
+    pub fn custom(areas: Vec<FocusArea>) -> Self {
+        Self { areas }
+    }
+
+    pub fn areas(&self) -> &[FocusArea] {
+        &self.areas
+    }
+
+    pub fn len(&self) -> usize {
+        self.areas.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.areas.is_empty()
+    }
+}
+
+impl Default for FocusOrder {
+    fn default() -> Self {
+        Self::default_order()
+    }
+}
+
+/// Manages focus state across major UI areas with history.
+#[derive(Debug, Clone)]
+pub struct FocusManager {
+    order: FocusOrder,
+    current_index: usize,
+    focus_history: Vec<FocusArea>,
+    focus_ring_visible: bool,
+}
+
+impl FocusManager {
+    pub fn new(order: FocusOrder) -> Self {
+        Self {
+            order,
+            current_index: 0,
+            focus_history: Vec::new(),
+            focus_ring_visible: true,
+        }
+    }
+
+    /// Current focused area.
+    pub fn current_focus(&self) -> Option<FocusArea> {
+        self.order.areas.get(self.current_index).copied()
+    }
+
+    /// Move focus to the next area (Tab).
+    pub fn move_next(&mut self) -> Option<FocusArea> {
+        if self.order.areas.is_empty() {
+            return None;
+        }
+        if let Some(&area) = self.order.areas.get(self.current_index) {
+            self.focus_history.push(area);
+        }
+        self.current_index = (self.current_index + 1) % self.order.areas.len();
+        self.current_focus()
+    }
+
+    /// Move focus to the previous area (Shift+Tab).
+    pub fn move_prev(&mut self) -> Option<FocusArea> {
+        if self.order.areas.is_empty() {
+            return None;
+        }
+        if let Some(&area) = self.order.areas.get(self.current_index) {
+            self.focus_history.push(area);
+        }
+        if self.current_index == 0 {
+            self.current_index = self.order.areas.len() - 1;
+        } else {
+            self.current_index -= 1;
+        }
+        self.current_focus()
+    }
+
+    /// Jump directly to a specific area.
+    pub fn focus_area(&mut self, area: FocusArea) -> bool {
+        if let Some(idx) = self.order.areas.iter().position(|&a| a == area) {
+            if let Some(&cur) = self.order.areas.get(self.current_index) {
+                self.focus_history.push(cur);
+            }
+            self.current_index = idx;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return to the previous focus area from history.
+    pub fn focus_back(&mut self) -> Option<FocusArea> {
+        let prev = self.focus_history.pop()?;
+        if let Some(idx) = self.order.areas.iter().position(|&a| a == prev) {
+            self.current_index = idx;
+        }
+        Some(prev)
+    }
+
+    pub fn focus_history(&self) -> &[FocusArea] {
+        &self.focus_history
+    }
+
+    /// Whether the focus ring (visual indicator) is visible.
+    pub fn is_focus_ring_visible(&self) -> bool {
+        self.focus_ring_visible
+    }
+
+    pub fn set_focus_ring_visible(&mut self, visible: bool) {
+        self.focus_ring_visible = visible;
+    }
+
+    /// Render a focus indicator string around a label.
+    pub fn focus_indicator(&self, label: &str, focused: bool) -> String {
+        if focused && self.focus_ring_visible {
+            format!("▶ {label} ◀")
+        } else {
+            label.to_string()
+        }
+    }
+}
+
+impl Default for FocusManager {
+    fn default() -> Self {
+        Self::new(FocusOrder::default())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 4. Audio cues
+// ---------------------------------------------------------------------------
+
+/// Audio cue types matching VS Code's accessibility audio cues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AudioCue {
+    Error,
+    Warning,
+    Breakpoint,
+    TaskComplete,
+    FoldingRange,
+    LineHasError,
+    LineHasWarning,
+    TerminalBell,
+    NotebookCellComplete,
+    ChatRequestSent,
+    Clear,
+    Save,
+}
+
+impl fmt::Display for AudioCue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::Error => "error",
+            Self::Warning => "warning",
+            Self::Breakpoint => "breakpoint",
+            Self::TaskComplete => "task-complete",
+            Self::FoldingRange => "folding-range",
+            Self::LineHasError => "line-has-error",
+            Self::LineHasWarning => "line-has-warning",
+            Self::TerminalBell => "terminal-bell",
+            Self::NotebookCellComplete => "notebook-cell-complete",
+            Self::ChatRequestSent => "chat-request-sent",
+            Self::Clear => "clear",
+            Self::Save => "save",
+        };
+        write!(f, "{name}")
+    }
+}
+
+/// Manages audio cue configuration and playback.
+#[derive(Debug, Clone)]
+pub struct AudioCueManager {
+    enabled: HashMap<AudioCue, bool>,
+    global_enabled: bool,
+    played: Vec<AudioCue>,
+}
+
+impl AudioCueManager {
+    pub fn new() -> Self {
+        Self {
+            enabled: HashMap::new(),
+            global_enabled: true,
+            played: Vec::new(),
+        }
+    }
+
+    pub fn set_global_enabled(&mut self, enabled: bool) {
+        self.global_enabled = enabled;
+    }
+
+    pub fn is_global_enabled(&self) -> bool {
+        self.global_enabled
+    }
+
+    /// Enable or disable a specific cue type.
+    pub fn set_cue_enabled(&mut self, cue: AudioCue, enabled: bool) {
+        self.enabled.insert(cue, enabled);
+    }
+
+    /// Check if a specific cue type is enabled.
+    pub fn is_cue_enabled(&self, cue: AudioCue) -> bool {
+        self.global_enabled && *self.enabled.get(&cue).unwrap_or(&true)
+    }
+
+    /// Play an audio cue. Returns the terminal bell sequence if the cue is
+    /// enabled, or `None` if suppressed.
+    pub fn play_audio_cue(&mut self, cue: AudioCue) -> Option<&'static str> {
+        if self.is_cue_enabled(cue) {
+            self.played.push(cue);
+            Some("\x07") // BEL character — terminal bell
+        } else {
+            None
+        }
+    }
+
+    /// Write an audio cue directly to a writer.
+    pub fn write_audio_cue<W: Write>(
+        &mut self,
+        writer: &mut W,
+        cue: AudioCue,
+    ) -> std::io::Result<bool> {
+        if let Some(bell) = self.play_audio_cue(cue) {
+            write!(writer, "{bell}")?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Return the list of cues that have been played (for testing).
+    pub fn played_cues(&self) -> &[AudioCue] {
+        &self.played
+    }
+
+    /// Clear the played cues log.
+    pub fn clear_played(&mut self) {
+        self.played.clear();
+    }
+}
+
+impl Default for AudioCueManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 5. Accessible editor content
+// ---------------------------------------------------------------------------
+
+/// Describes the accessible state of the editor for screen reader
+/// consumption, mirroring VS Code's `IAccessibleViewContent`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccessibleEditorContent {
+    pub current_line_text: String,
+    pub cursor_position_description: String,
+    pub selection_description: String,
+    pub diagnostics_description: String,
+}
+
+impl AccessibleEditorContent {
+    pub fn new() -> Self {
+        Self {
+            current_line_text: String::new(),
+            cursor_position_description: String::new(),
+            selection_description: String::new(),
+            diagnostics_description: String::new(),
+        }
+    }
+
+    /// Build a description from editor state.
+    pub fn from_editor_state(
+        line_text: &str,
+        line: usize,
+        column: usize,
+        selection: Option<(usize, usize, usize, usize)>,
+        diagnostics: &[(&str, &str)],
+    ) -> Self {
+        let cursor_desc = format!("Line {line}, Column {column}");
+
+        let selection_desc = match selection {
+            Some((sl, sc, el, ec)) if sl == el => {
+                format!("Selected columns {sc} to {ec} on line {sl}")
+            }
+            Some((sl, _sc, el, _ec)) => {
+                format!("Selected from line {sl} to line {el}")
+            }
+            None => "No selection".to_string(),
+        };
+
+        let diag_desc = if diagnostics.is_empty() {
+            "No problems".to_string()
+        } else {
+            let parts: Vec<String> = diagnostics
+                .iter()
+                .map(|(severity, msg)| format!("{severity}: {msg}"))
+                .collect();
+            parts.join("; ")
+        };
+
+        Self {
+            current_line_text: line_text.to_string(),
+            cursor_position_description: cursor_desc,
+            selection_description: selection_desc,
+            diagnostics_description: diag_desc,
+        }
+    }
+
+    /// Generate a full screen-reader announcement for the current state.
+    pub fn full_announcement(&self) -> String {
+        format!(
+            "{}. {}. {}. {}",
+            self.cursor_position_description,
+            self.current_line_text,
+            self.selection_description,
+            self.diagnostics_description
+        )
+    }
+
+    /// Announce just the current line (used on cursor move).
+    pub fn line_announcement(&self) -> String {
+        format!(
+            "{}: {}",
+            self.cursor_position_description, self.current_line_text
+        )
+    }
+
+    /// Announce diagnostics only.
+    pub fn diagnostics_announcement(&self) -> String {
+        self.diagnostics_description.clone()
+    }
+}
+
+impl Default for AccessibleEditorContent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for AccessibleEditorContent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.full_announcement())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 6. Color blind support
+// ---------------------------------------------------------------------------
+
+/// Color blind simulation modes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ColorBlindMode {
+    None,
+    Protanopia,
+    Deuteranopia,
+    Tritanopia,
+}
+
+impl fmt::Display for ColorBlindMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::None => "none",
+            Self::Protanopia => "protanopia",
+            Self::Deuteranopia => "deuteranopia",
+            Self::Tritanopia => "tritanopia",
+        };
+        write!(f, "{name}")
+    }
+}
+
+/// An RGB color tuple.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Rgb(pub u8, pub u8, pub u8);
+
+/// Provides alternative color palettes and pattern indicators for users
+/// with color vision deficiency.
+#[derive(Debug, Clone)]
+pub struct ColorBlindSupport {
+    mode: ColorBlindMode,
+}
+
+impl ColorBlindSupport {
+    pub fn new(mode: ColorBlindMode) -> Self {
+        Self { mode }
+    }
+
+    pub fn mode(&self) -> ColorBlindMode {
+        self.mode
+    }
+
+    pub fn set_mode(&mut self, mode: ColorBlindMode) {
+        self.mode = mode;
+    }
+
+    /// Get the adjusted error color for the current color blind mode.
+    pub fn error_color(&self) -> Rgb {
+        match self.mode {
+            ColorBlindMode::None => Rgb(255, 0, 0),
+            // Use orange tones that are distinguishable for red-green deficiency.
+            ColorBlindMode::Protanopia | ColorBlindMode::Deuteranopia => Rgb(255, 128, 0),
+            ColorBlindMode::Tritanopia => Rgb(255, 0, 0),
+        }
+    }
+
+    /// Get the adjusted warning color.
+    pub fn warning_color(&self) -> Rgb {
+        match self.mode {
+            ColorBlindMode::None => Rgb(255, 204, 0),
+            ColorBlindMode::Protanopia | ColorBlindMode::Deuteranopia => Rgb(255, 255, 0),
+            ColorBlindMode::Tritanopia => Rgb(255, 128, 0),
+        }
+    }
+
+    /// Get the adjusted diff-added color.
+    pub fn diff_added_color(&self) -> Rgb {
+        match self.mode {
+            ColorBlindMode::None => Rgb(0, 200, 0),
+            // Blue tones for red-green deficiency.
+            ColorBlindMode::Protanopia | ColorBlindMode::Deuteranopia => Rgb(0, 128, 255),
+            ColorBlindMode::Tritanopia => Rgb(0, 200, 0),
+        }
+    }
+
+    /// Get the adjusted diff-removed color.
+    pub fn diff_removed_color(&self) -> Rgb {
+        match self.mode {
+            ColorBlindMode::None => Rgb(255, 0, 0),
+            ColorBlindMode::Protanopia | ColorBlindMode::Deuteranopia => Rgb(255, 128, 0),
+            ColorBlindMode::Tritanopia => Rgb(255, 0, 128),
+        }
+    }
+
+    /// Return a pattern/shape prefix to use alongside color, providing a
+    /// redundant visual cue.
+    pub fn severity_indicator(&self, severity: &str) -> &'static str {
+        match severity {
+            "error" => "✖",   // cross
+            "warning" => "⚠", // warning sign
+            "info" => "ℹ",    // info
+            "hint" => "💡",   // light bulb
+            _ => "•",
+        }
+    }
+
+    /// Return a diff marker character that doesn't rely solely on color.
+    pub fn diff_marker(&self, kind: &str) -> &'static str {
+        match kind {
+            "added" => "+",
+            "removed" => "-",
+            "modified" => "~",
+            _ => " ",
+        }
+    }
+}
+
+impl Default for ColorBlindSupport {
+    fn default() -> Self {
+        Self::new(ColorBlindMode::None)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- Screen reader --
+
+    #[test]
+    fn screen_reader_default_inactive() {
+        let sr = ScreenReaderSupport::new();
+        assert!(!sr.is_screen_reader_active());
+        assert_eq!(sr.pending_count(), 0);
+    }
+
+    #[test]
+    fn screen_reader_announce_and_drain() {
+        let mut sr = ScreenReaderSupport::new();
+        sr.set_active(true);
+        sr.announce("File opened");
+        sr.announce("Cursor moved to line 5");
+        assert_eq!(sr.pending_count(), 2);
+        let msgs = sr.take_announcements();
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(msgs[0], "File opened");
+        assert_eq!(msgs[1], "Cursor moved to line 5");
+        assert_eq!(sr.pending_count(), 0);
+    }
+
+    #[test]
+    fn screen_reader_empty_announce_ignored() {
+        let mut sr = ScreenReaderSupport::new();
+        sr.announce("");
+        assert_eq!(sr.pending_count(), 0);
+    }
+
+    #[test]
+    fn screen_reader_aria_labels() {
+        let mut sr = ScreenReaderSupport::new();
+        sr.set_aria_label("save-btn", "Save File");
+        assert_eq!(sr.get_aria_label("save-btn"), Some("Save File"));
+        assert_eq!(sr.get_aria_label("missing"), None);
+        assert!(sr.remove_aria_label("save-btn"));
+        assert!(!sr.remove_aria_label("save-btn"));
+    }
+
+    #[test]
+    fn screen_reader_osc_format() {
+        let osc = ScreenReaderSupport::format_osc_announcement("hello");
+        assert!(osc.starts_with("\x1b]99;"));
+        assert!(osc.ends_with("\x07"));
+        assert!(osc.contains("hello"));
+    }
+
+    #[test]
+    fn screen_reader_write_announcement() {
+        let mut buf = Vec::new();
+        ScreenReaderSupport::write_announcement(&mut buf, "test").unwrap();
+        let output = String::from_utf8(buf).unwrap();
+        assert!(output.contains("test"));
+        assert!(output.contains("\x1b]99;"));
+    }
+
+    // -- High contrast --
+
+    #[test]
+    fn high_contrast_default_off() {
+        let hc = HighContrastSupport::new();
+        assert!(!hc.is_high_contrast());
+        assert_eq!(hc.mode(), HighContrastMode::None);
+    }
+
+    #[test]
+    fn high_contrast_set_mode() {
+        let mut hc = HighContrastSupport::new();
+        hc.set_mode(HighContrastMode::Dark);
+        assert!(hc.is_high_contrast());
+        assert_eq!(hc.mode(), HighContrastMode::Dark);
+        assert_eq!(hc.border_char(), '█');
+        let sep = hc.separator(5);
+        assert_eq!(sep, "━━━━━");
+        assert_eq!(hc.contrast_colors(), (15, 0));
+    }
+
+    #[test]
+    fn high_contrast_normal_mode_chars() {
+        let hc = HighContrastSupport::new();
+        assert_eq!(hc.border_char(), '│');
+        assert_eq!(hc.separator(3), "───");
+    }
+
+    #[test]
+    fn high_contrast_underline_interactive() {
+        let u = HighContrastSupport::underline_interactive("Link", true);
+        assert!(u.contains("\x1b[4m"));
+        assert!(u.contains("Link"));
+        let plain = HighContrastSupport::underline_interactive("Link", false);
+        assert_eq!(plain, "Link");
+    }
+
+    #[test]
+    fn high_contrast_light_colors() {
+        let mut hc = HighContrastSupport::new();
+        hc.set_mode(HighContrastMode::Light);
+        assert_eq!(hc.contrast_colors(), (0, 15));
+    }
+
+    // -- Focus management --
+
+    #[test]
+    fn focus_order_default() {
+        let fo = FocusOrder::default();
+        assert_eq!(fo.len(), 5);
+        assert_eq!(fo.areas()[0], FocusArea::Editor);
+    }
+
+    #[test]
+    fn focus_manager_navigation() {
+        let mut fm = FocusManager::default();
+        assert_eq!(fm.current_focus(), Some(FocusArea::Editor));
+
+        let next = fm.move_next();
+        assert_eq!(next, Some(FocusArea::Sidebar));
+
+        let next = fm.move_next();
+        assert_eq!(next, Some(FocusArea::Panel));
+
+        let prev = fm.move_prev();
+        assert_eq!(prev, Some(FocusArea::Sidebar));
+    }
+
+    #[test]
+    fn focus_manager_wraps_around() {
+        let mut fm = FocusManager::new(FocusOrder::custom(vec![
+            FocusArea::Editor,
+            FocusArea::Panel,
+        ]));
+        assert_eq!(fm.current_focus(), Some(FocusArea::Editor));
+        fm.move_next(); // Panel
+        let wrapped = fm.move_next();
+        assert_eq!(wrapped, Some(FocusArea::Editor));
+    }
+
+    #[test]
+    fn focus_manager_prev_wraps() {
+        let mut fm = FocusManager::new(FocusOrder::custom(vec![
+            FocusArea::Editor,
+            FocusArea::Panel,
+        ]));
+        // At index 0, move prev should wrap to last
+        let prev = fm.move_prev();
+        assert_eq!(prev, Some(FocusArea::Panel));
+    }
+
+    #[test]
+    fn focus_manager_direct_jump_and_history() {
+        let mut fm = FocusManager::default();
+        assert!(fm.focus_area(FocusArea::Panel));
+        assert_eq!(fm.current_focus(), Some(FocusArea::Panel));
+
+        let back = fm.focus_back();
+        assert_eq!(back, Some(FocusArea::Editor));
+    }
+
+    #[test]
+    fn focus_manager_indicator() {
+        let fm = FocusManager::default();
+        assert_eq!(fm.focus_indicator("Editor", true), "▶ Editor ◀");
+        assert_eq!(fm.focus_indicator("Editor", false), "Editor");
+    }
+
+    // -- Audio cues --
+
+    #[test]
+    fn audio_cue_play_and_disable() {
+        let mut acm = AudioCueManager::new();
+        assert!(acm.is_cue_enabled(AudioCue::Error));
+        let bell = acm.play_audio_cue(AudioCue::Error);
+        assert_eq!(bell, Some("\x07"));
+        assert_eq!(acm.played_cues().len(), 1);
+
+        acm.set_cue_enabled(AudioCue::Warning, false);
+        assert!(!acm.is_cue_enabled(AudioCue::Warning));
+        assert_eq!(acm.play_audio_cue(AudioCue::Warning), None);
+    }
+
+    #[test]
+    fn audio_cue_global_disable() {
+        let mut acm = AudioCueManager::new();
+        acm.set_global_enabled(false);
+        assert_eq!(acm.play_audio_cue(AudioCue::Error), None);
+        assert!(acm.played_cues().is_empty());
+    }
+
+    #[test]
+    fn audio_cue_write_to_buffer() {
+        let mut acm = AudioCueManager::new();
+        let mut buf = Vec::new();
+        let played = acm
+            .write_audio_cue(&mut buf, AudioCue::TaskComplete)
+            .unwrap();
+        assert!(played);
+        assert_eq!(buf, b"\x07");
+    }
+
+    // -- Accessible editor content --
+
+    #[test]
+    fn accessible_editor_content_from_state() {
+        let content = AccessibleEditorContent::from_editor_state(
+            "let x = 42;",
+            10,
+            5,
+            Some((10, 5, 10, 10)),
+            &[("error", "unused variable")],
+        );
+        assert_eq!(content.current_line_text, "let x = 42;");
+        assert_eq!(content.cursor_position_description, "Line 10, Column 5");
+        assert!(content.selection_description.contains("columns 5 to 10"));
+        assert!(content.diagnostics_description.contains("unused variable"));
+    }
+
+    #[test]
+    fn accessible_editor_no_selection_no_diagnostics() {
+        let content =
+            AccessibleEditorContent::from_editor_state("hello world", 1, 1, None, &[]);
+        assert_eq!(content.selection_description, "No selection");
+        assert_eq!(content.diagnostics_description, "No problems");
+    }
+
+    #[test]
+    fn accessible_editor_multiline_selection() {
+        let content = AccessibleEditorContent::from_editor_state(
+            "line text",
+            5,
+            1,
+            Some((3, 1, 7, 10)),
+            &[],
+        );
+        assert!(content.selection_description.contains("line 3 to line 7"));
+    }
+
+    #[test]
+    fn accessible_editor_line_announcement() {
+        let content =
+            AccessibleEditorContent::from_editor_state("fn main()", 1, 1, None, &[]);
+        let ann = content.line_announcement();
+        assert!(ann.contains("Line 1, Column 1"));
+        assert!(ann.contains("fn main()"));
+    }
+
+    // -- Color blind support --
+
+    #[test]
+    fn color_blind_default_none() {
+        let cbs = ColorBlindSupport::default();
+        assert_eq!(cbs.mode(), ColorBlindMode::None);
+        assert_eq!(cbs.error_color(), Rgb(255, 0, 0));
+    }
+
+    #[test]
+    fn color_blind_protanopia_adjustments() {
+        let cbs = ColorBlindSupport::new(ColorBlindMode::Protanopia);
+        // Error should not be pure red for protanopia
+        assert_ne!(cbs.error_color(), Rgb(255, 0, 0));
+        // Diff added should use blue instead of green
+        assert_eq!(cbs.diff_added_color(), Rgb(0, 128, 255));
+    }
+
+    #[test]
+    fn color_blind_severity_indicators() {
+        let cbs = ColorBlindSupport::default();
+        assert_eq!(cbs.severity_indicator("error"), "✖");
+        assert_eq!(cbs.severity_indicator("warning"), "⚠");
+        assert_eq!(cbs.severity_indicator("info"), "ℹ");
+    }
+
+    #[test]
+    fn color_blind_diff_markers() {
+        let cbs = ColorBlindSupport::default();
+        assert_eq!(cbs.diff_marker("added"), "+");
+        assert_eq!(cbs.diff_marker("removed"), "-");
+        assert_eq!(cbs.diff_marker("modified"), "~");
+    }
+
+    #[test]
+    fn color_blind_mode_set() {
+        let mut cbs = ColorBlindSupport::default();
+        cbs.set_mode(ColorBlindMode::Tritanopia);
+        assert_eq!(cbs.mode(), ColorBlindMode::Tritanopia);
+        // Tritanopia warning uses orange
+        assert_eq!(cbs.warning_color(), Rgb(255, 128, 0));
+    }
+
+    // -- Display impls --
+
+    #[test]
+    fn display_accessibility_role() {
+        assert_eq!(format!("{}", AccessibilityRole::TextBox), "textbox");
+        assert_eq!(format!("{}", AccessibilityRole::StatusBar), "statusbar");
+        assert_eq!(format!("{}", AccessibilityRole::Progressbar), "progressbar");
+    }
+
+    #[test]
+    fn display_audio_cue() {
+        assert_eq!(format!("{}", AudioCue::Error), "error");
+        assert_eq!(format!("{}", AudioCue::TaskComplete), "task-complete");
+        assert_eq!(format!("{}", AudioCue::LineHasError), "line-has-error");
+    }
+
+    #[test]
+    fn display_focus_area() {
+        assert_eq!(format!("{}", FocusArea::Editor), "Editor");
+        assert_eq!(format!("{}", FocusArea::ActivityBar), "Activity Bar");
+    }
+
+    #[test]
+    fn display_color_blind_mode() {
+        assert_eq!(format!("{}", ColorBlindMode::None), "none");
+        assert_eq!(format!("{}", ColorBlindMode::Deuteranopia), "deuteranopia");
+    }
+
+    #[test]
+    fn accessible_editor_content_display() {
+        let content =
+            AccessibleEditorContent::from_editor_state("let x = 1;", 3, 5, None, &[]);
+        let display = format!("{content}");
+        assert!(display.contains("Line 3"));
+        assert!(display.contains("let x = 1;"));
+    }
+}

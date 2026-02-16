@@ -1,0 +1,10 @@
+[package]
+name = "vsedit-accessibility"
+description = "Comprehensive accessibility support: screen reader, high contrast, audio cues, color blind modes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vsedit-a11y = { path = "../vsedit-a11y" }
+vsedit-a11y-features = { path = "../vsedit-a11y-features" }
