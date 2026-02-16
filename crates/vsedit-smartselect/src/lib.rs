@@ -919,7 +919,8 @@ mod tests {
         let chain1 = SelectionRange::new(1, 0, 1, 5)
             .with_parent(SelectionRange::new(1, 0, 1, 40));
         let chain2 = SelectionRange::new(5, 0, 5, 3);
-        let results = expand_multi_cursor(&[chain1, chain2]);
+        let chains = [chain1, chain2];
+        let results = expand_multi_cursor(&chains);
         assert!(results[0].is_some());
         assert!(results[1].is_none());
     }
