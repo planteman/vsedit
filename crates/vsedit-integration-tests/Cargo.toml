@@ -33,5 +33,9 @@ vsedit-keycodes = { path = "../vsedit-keycodes" }
 vsedit-contextkey = { path = "../vsedit-contextkey" }
 vsedit-platform = { path = "../vsedit-platform" }
 vsedit-editor-svc = { path = "../vsedit-editor-svc" }
+vsedit-debug = { path = "../vsedit-debug" }
+vsedit-folding = { path = "../vsedit-folding" }
+vsedit-bracket = { path = "../vsedit-bracket" }
+vsedit-merge-editor = { path = "../vsedit-merge-editor" }
 serde_json.workspace = true
 tempfile.workspace = true

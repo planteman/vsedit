@@ -3331,3 +3331,357 @@ mod json_utils {
         assert_eq!(val["num"], json!(42));
     }
 }
+
+// ─── Multi-cursor ───────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod multi_cursor {
+    use vsedit_cursor::CursorController;
+    use vsedit_text_model::TextModel;
+    use vsedit_editor_types::{ITextModel, Position};
+
+    #[test]
+    fn test_integration_add_cursor_above() {
+        let model = TextModel::new("line1\nline2\nline3");
+        let mut ctrl = CursorController::from_position(Position::new(3, 1));
+        ctrl.add_cursor_above(&model);
+        assert_eq!(ctrl.get_all().len(), 2);
+        assert_eq!(ctrl.get_all()[1].position().line, 2);
+    }
+
+    #[test]
+    fn test_integration_add_cursor_below() {
+        let model = TextModel::new("line1\nline2\nline3");
+        let mut ctrl = CursorController::from_position(Position::new(1, 1));
+        ctrl.add_cursor_below(&model);
+        assert_eq!(ctrl.get_all().len(), 2);
+        assert_eq!(ctrl.get_all()[1].position().line, 2);
+    }
+
+    #[test]
+    fn test_integration_remove_secondary_cursors() {
+        let model = TextModel::new("a\nb\nc\nd");
+        let mut ctrl = CursorController::from_position(Position::new(1, 1));
+        ctrl.add_cursor_below(&model);
+        ctrl.add_cursor_below(&model);
+        assert!(ctrl.has_multiple_cursors());
+        ctrl.remove_secondary_cursors();
+        assert!(!ctrl.has_multiple_cursors());
+        assert_eq!(ctrl.get_all().len(), 1);
+    }
+
+    #[test]
+    fn test_integration_has_multiple_cursors() {
+        let mut ctrl = CursorController::new();
+        assert!(!ctrl.has_multiple_cursors());
+        ctrl.add_cursor(Position::new(2, 1));
+        assert!(ctrl.has_multiple_cursors());
+    }
+
+    #[test]
+    fn test_integration_cursor_undo() {
+        let mut ctrl = CursorController::new();
+        ctrl.add_cursor(Position::new(2, 1));
+        ctrl.add_cursor(Position::new(3, 1));
+        assert_eq!(ctrl.get_all().len(), 3);
+        ctrl.cursor_undo();
+        assert_eq!(ctrl.get_all().len(), 2);
+        ctrl.cursor_undo();
+        assert_eq!(ctrl.get_all().len(), 1);
+        // Undo on single cursor is a no-op
+        ctrl.cursor_undo();
+        assert_eq!(ctrl.get_all().len(), 1);
+    }
+}
+
+// ─── Debug State ────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod debug_state {
+    use vsedit_debug::{
+        DebugSession, DebugSessionState, BreakpointStore,
+        types::StackFrame,
+    };
+
+    #[test]
+    fn test_integration_debug_state_transitions() {
+        let mut session = DebugSession::new("s1", "test", "lldb");
+        assert_eq!(session.state(), DebugSessionState::NotStarted);
+        session.initialize().unwrap();
+        assert_eq!(session.state(), DebugSessionState::Initializing);
+        session.launch(1000).unwrap();
+        assert_eq!(session.state(), DebugSessionState::Running);
+        session.pause().unwrap();
+        assert_eq!(session.state(), DebugSessionState::Paused);
+    }
+
+    #[test]
+    fn test_integration_debug_invalid_transition() {
+        let mut session = DebugSession::new("s2", "test", "lldb");
+        // Cannot launch from NotStarted (must initialize first)
+        let result = session.launch(0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_integration_breakpoint_add_remove() {
+        let mut store = BreakpointStore::new();
+        let added = store.toggle_breakpoint("main.rs", 10);
+        assert!(added);
+        assert_eq!(store.total_count(), 1);
+        let removed = store.toggle_breakpoint("main.rs", 10);
+        assert!(!removed);
+        assert_eq!(store.total_count(), 0);
+    }
+
+    #[test]
+    fn test_integration_breakpoint_toggle_multiple_files() {
+        let mut store = BreakpointStore::new();
+        store.toggle_breakpoint("a.rs", 1);
+        store.toggle_breakpoint("b.rs", 5);
+        store.toggle_breakpoint("a.rs", 20);
+        assert_eq!(store.total_count(), 3);
+        let files = store.files_with_breakpoints();
+        assert!(files.contains(&"a.rs"));
+        assert!(files.contains(&"b.rs"));
+        store.clear_file_breakpoints("a.rs");
+        assert_eq!(store.total_count(), 1);
+    }
+
+    #[test]
+    fn test_integration_stack_frame_construction() {
+        let frame = StackFrame::new(1, "main", 42, 1)
+            .with_source("/src/main.rs");
+        assert_eq!(frame.id, 1);
+        assert_eq!(frame.name, "main");
+        assert_eq!(frame.line, 42);
+        assert_eq!(frame.source_path.as_deref(), Some("/src/main.rs"));
+        assert_eq!(frame.source_name.as_deref(), Some("main.rs"));
+    }
+}
+
+// ─── Folding ────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod folding {
+    use vsedit_folding::{FoldingModel, FoldingRange, FoldingRangeKind};
+
+    #[test]
+    fn test_integration_folding_set_and_get_ranges() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 7, end_line: 10, kind: FoldingRangeKind::Comment, is_collapsed: false },
+        ]);
+        assert_eq!(model.get_ranges().len(), 2);
+        assert_eq!(model.get_ranges()[0].start_line, 1);
+    }
+
+    #[test]
+    fn test_integration_folding_compute_from_indentation() {
+        let lines = vec![
+            "fn main() {",
+            "    let x = 1;",
+            "    if true {",
+            "        println!(\"hi\");",
+            "    }",
+            "}",
+        ];
+        let ranges = FoldingModel::compute_from_indentation(&lines, 4);
+        assert!(!ranges.is_empty());
+        // The outermost range should start at line 1
+        assert!(ranges.iter().any(|r| r.start_line == 1));
+    }
+
+    #[test]
+    fn test_integration_folding_toggle() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        assert!(!model.get_ranges()[0].is_collapsed);
+        model.toggle(1);
+        assert!(model.get_ranges()[0].is_collapsed);
+        model.toggle(1);
+        assert!(!model.get_ranges()[0].is_collapsed);
+    }
+
+    #[test]
+    fn test_integration_folding_fold_unfold_all() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 3, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 5, end_line: 8, kind: FoldingRangeKind::Imports, is_collapsed: false },
+        ]);
+        model.fold_all();
+        assert!(model.get_ranges().iter().all(|r| r.is_collapsed));
+        model.unfold_all();
+        assert!(model.get_ranges().iter().all(|r| !r.is_collapsed));
+    }
+
+    #[test]
+    fn test_integration_folding_is_line_hidden() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 2, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: true },
+        ]);
+        assert!(!model.is_line_hidden(2)); // fold start is visible
+        assert!(model.is_line_hidden(3));
+        assert!(model.is_line_hidden(5));
+        assert!(!model.is_line_hidden(6));
+    }
+}
+
+// ─── Bracket Matching ───────────────────────────────────────────────────
+
+#[cfg(test)]
+mod bracket_matching {
+    use vsedit_bracket::{
+        find_matching_bracket, find_all_brackets, validate_brackets,
+        bracket_color_index, default_bracket_pairs,
+    };
+
+    #[test]
+    fn test_integration_bracket_find_matching() {
+        let lines = vec!["fn main() { }"];
+        let pairs = default_bracket_pairs();
+        // '(' is at col 8
+        let result = find_matching_bracket(&lines, 1, 8, &pairs);
+        assert_eq!(result, Some((1, 9))); // ')' at col 9
+    }
+
+    #[test]
+    fn test_integration_bracket_colorizer_nested() {
+        let lines = vec!["((()))"];
+        let pairs = default_bracket_pairs();
+        let matches = find_all_brackets(&lines, &pairs);
+        // Three bracket pairs at depths 0, 1, 2
+        assert_eq!(matches.len(), 3);
+        let depths: Vec<u32> = matches.iter().map(|m| m.depth).collect();
+        assert!(depths.contains(&0));
+        assert!(depths.contains(&1));
+        assert!(depths.contains(&2));
+    }
+
+    #[test]
+    fn test_integration_bracket_errors_unmatched() {
+        let lines = vec!["(()"];
+        let pairs = default_bracket_pairs();
+        let result = validate_brackets(&lines, &pairs);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_integration_bracket_valid_document() {
+        let lines = vec![
+            "fn foo() {",
+            "    let v = vec![1, 2, 3];",
+            "}",
+        ];
+        let pairs = default_bracket_pairs();
+        let result = validate_brackets(&lines, &pairs);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_integration_bracket_color_index_cycles() {
+        let num_colors = 3;
+        assert_eq!(bracket_color_index(0, num_colors), 0);
+        assert_eq!(bracket_color_index(1, num_colors), 1);
+        assert_eq!(bracket_color_index(2, num_colors), 2);
+        assert_eq!(bracket_color_index(3, num_colors), 0);
+        assert_eq!(bracket_color_index(4, num_colors), 1);
+    }
+}
+
+// ─── Merge Editor ───────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod merge_editor {
+    use vsedit_merge_editor::{
+        MergeConflict, MergeConflictBuilder, MergeEditorWidget,
+        MergeResolution, parse_conflict_markers,
+    };
+
+    #[test]
+    fn test_integration_merge_editor_widget() {
+        let mut widget = MergeEditorWidget::new();
+        let conflict = MergeConflictBuilder::new()
+            .region(1, 5)
+            .current_text("current")
+            .incoming_text("incoming")
+            .base_text("base")
+            .build()
+            .unwrap();
+        widget.add_conflict(conflict);
+        assert_eq!(widget.unresolved_count(), 1);
+        widget.resolve_conflict(0, MergeResolution::AcceptIncoming);
+        assert!(widget.all_resolved());
+        let result = widget.get_merged_result();
+        assert_eq!(result[0], "incoming");
+    }
+
+    #[test]
+    fn test_integration_merge_conflict_regions() {
+        let text = "\
+<<<<<<< HEAD
+current change
+=======
+incoming change
+>>>>>>> branch";
+        let conflicts = parse_conflict_markers(text);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].current_text, "current change");
+        assert_eq!(conflicts[0].incoming_text, "incoming change");
+    }
+
+    #[test]
+    fn test_integration_merge_auto_resolve_trivial() {
+        let mut widget = MergeEditorWidget::new();
+        // Trivial: current == incoming
+        let trivial = MergeConflictBuilder::new()
+            .region(1, 3)
+            .current_text("same")
+            .incoming_text("same")
+            .base_text("old")
+            .build()
+            .unwrap();
+        // Non-trivial: current != incoming
+        let real = MergeConflictBuilder::new()
+            .region(5, 8)
+            .current_text("ours")
+            .incoming_text("theirs")
+            .base_text("base")
+            .build()
+            .unwrap();
+        widget.add_conflict(trivial);
+        widget.add_conflict(real);
+        let auto_count = widget.auto_resolve_trivial();
+        assert_eq!(auto_count, 1);
+        assert_eq!(widget.resolved_count(), 1);
+        assert_eq!(widget.unresolved_count(), 1);
+    }
+
+    #[test]
+    fn test_integration_merge_try_resolve_out_of_range() {
+        let mut widget = MergeEditorWidget::new();
+        let result = widget.try_resolve_conflict(0, MergeResolution::AcceptCurrent);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_integration_merge_accept_both() {
+        let mut widget = MergeEditorWidget::new();
+        let conflict = MergeConflictBuilder::new()
+            .region(1, 3)
+            .current_text("alpha")
+            .incoming_text("beta")
+            .base_text("original")
+            .build()
+            .unwrap();
+        widget.add_conflict(conflict);
+        widget.resolve_conflict(0, MergeResolution::AcceptBoth);
+        let result = widget.get_merged_result();
+        assert_eq!(result[0], "alpha\nbeta");
+    }
+}

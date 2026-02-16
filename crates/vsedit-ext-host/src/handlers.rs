@@ -293,17 +293,35 @@ impl MainThreadHandlers {
         });
 
         self.register("mainThread/showQuickPick", |params| {
-            let items = params.get("items").and_then(|v| v.as_array());
-            info!("mainThread/showQuickPick (stub: returning first item)");
-            match items.and_then(|arr| arr.first()) {
-                Some(item) => item.clone(),
-                None => Value::Null,
+            if let Some(placeholder) = params.get("placeHolder").and_then(|v| v.as_str()) {
+                debug!("QuickPick placeholder: {}", placeholder);
             }
+            let items = params.get("items").and_then(|v| v.as_array());
+            if let Some(items) = items {
+                let picked = items
+                    .iter()
+                    .find(|item| {
+                        item.get("picked")
+                            .and_then(|p| p.as_bool())
+                            .unwrap_or(false)
+                    })
+                    .or_else(|| items.first());
+                if let Some(item) = picked {
+                    return item.clone();
+                }
+            }
+            Value::Null
         });
 
-        self.register("mainThread/showInputBox", |_params| {
-            info!("mainThread/showInputBox (stub: returning empty string)");
-            json!("")
+        self.register("mainThread/showInputBox", |params| {
+            let value = params
+                .get("value")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if let Some(prompt) = params.get("prompt").and_then(|v| v.as_str()) {
+                debug!("InputBox prompt: {}", prompt);
+            }
+            json!(value)
         });
 
         self.register("mainThread/showOpenDialog", |params| {
@@ -353,9 +371,9 @@ impl MainThreadHandlers {
                     let line_count = content.lines().count();
                     json!({ "uri": uri, "content": content, "languageId": "plaintext", "version": 1, "lineCount": line_count })
                 }
-                Err(_) => {
-                    info!(uri, "mainThread/openTextDocument (file not found, returning stub)");
-                    json!({ "uri": uri, "languageId": "plaintext", "version": 1, "lineCount": 0 })
+                Err(e) => {
+                    info!(uri, error = %e, "mainThread/openTextDocument (file not found)");
+                    json!({ "uri": uri, "languageId": "plaintext", "version": 1, "lineCount": 0, "error": e.to_string() })
                 }
             }
         });
@@ -1176,6 +1194,33 @@ mod tests {
         assert_eq!(result, Some(Value::Null));
     }
 
+    #[test]
+    fn quick_pick_returns_picked_item() {
+        let h = handlers_with_defaults();
+        let result = h.handle(
+            "mainThread/showQuickPick",
+            json!({"items": [
+                {"label": "alpha", "picked": false},
+                {"label": "beta", "picked": true},
+                {"label": "gamma"}
+            ]}),
+        );
+        assert_eq!(result, Some(json!({"label": "beta", "picked": true})));
+    }
+
+    #[test]
+    fn quick_pick_no_picked_returns_first() {
+        let h = handlers_with_defaults();
+        let result = h.handle(
+            "mainThread/showQuickPick",
+            json!({"items": [
+                {"label": "alpha"},
+                {"label": "beta"}
+            ], "placeHolder": "Pick one"}),
+        );
+        assert_eq!(result, Some(json!({"label": "alpha"})));
+    }
+
     // ── showInputBox ──
 
     #[test]
@@ -1183,6 +1228,16 @@ mod tests {
         let h = handlers_with_defaults();
         let result = h.handle("mainThread/showInputBox", json!({}));
         assert_eq!(result, Some(json!("")));
+    }
+
+    #[test]
+    fn input_box_returns_default_value() {
+        let h = handlers_with_defaults();
+        let result = h.handle(
+            "mainThread/showInputBox",
+            json!({"value": "hello", "prompt": "Enter name"}),
+        );
+        assert_eq!(result, Some(json!("hello")));
     }
 
     // ── Clipboard ──
