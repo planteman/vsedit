@@ -552,6 +552,122 @@ impl Default for RenderCacheState {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Word wrap
+// ---------------------------------------------------------------------------
+
+/// Word wrap mode for the editor renderer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WordWrapMode {
+    /// No wrapping — lines extend beyond the viewport.
+    Off,
+    /// Wrap at a fixed column (character-based).
+    On(usize),
+    /// Wrap at word boundaries, falling back to character wrap for long words.
+    WordBoundary(usize),
+    /// Wrap at a specific column (alias for `On`).
+    Bounded(usize),
+}
+
+/// A wrapped line that tracks which original document line it came from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WrappedLine {
+    /// The 0-based index of the original document line.
+    pub original_line: usize,
+    /// The content of this wrapped segment.
+    pub content: String,
+    /// Whether this is a continuation of the previous line (not the first
+    /// segment).
+    pub is_continuation: bool,
+}
+
+/// Wrap a single line according to the given mode and maximum width.
+pub fn wrap_line(line: &str, max_width: usize, mode: WordWrapMode) -> Vec<String> {
+    match mode {
+        WordWrapMode::Off => vec![line.to_string()],
+        WordWrapMode::On(w) | WordWrapMode::Bounded(w) => {
+            let width = if w == 0 { max_width } else { w };
+            char_wrap(line, width)
+        }
+        WordWrapMode::WordBoundary(w) => {
+            let width = if w == 0 { max_width } else { w };
+            word_boundary_wrap(line, width)
+        }
+    }
+}
+
+/// Character-based wrapping at `width` columns.
+fn char_wrap(line: &str, width: usize) -> Vec<String> {
+    if width == 0 {
+        return vec![line.to_string()];
+    }
+    if line.is_empty() {
+        return vec![String::new()];
+    }
+    let chars: Vec<char> = line.chars().collect();
+    if chars.len() <= width {
+        return vec![line.to_string()];
+    }
+    let mut result = Vec::new();
+    let mut start = 0;
+    while start < chars.len() {
+        let end = (start + width).min(chars.len());
+        result.push(chars[start..end].iter().collect());
+        start = end;
+    }
+    result
+}
+
+/// Word-boundary-aware wrapping at `width` columns.
+fn word_boundary_wrap(line: &str, width: usize) -> Vec<String> {
+    if width == 0 {
+        return vec![line.to_string()];
+    }
+    if line.is_empty() {
+        return vec![String::new()];
+    }
+    let chars: Vec<char> = line.chars().collect();
+    if chars.len() <= width {
+        return vec![line.to_string()];
+    }
+    let mut result = Vec::new();
+    let mut start = 0;
+    while start < chars.len() {
+        if start + width >= chars.len() {
+            result.push(chars[start..].iter().collect());
+            break;
+        }
+        // Look for the last space within [start..start+width].
+        let segment = &chars[start..start + width];
+        if let Some(space_pos) = segment.iter().rposition(|&c| c == ' ') {
+            // Wrap at the space — include the space in this line.
+            result.push(chars[start..start + space_pos + 1].iter().collect());
+            start += space_pos + 1;
+        } else {
+            // No space found — fall back to hard character wrap.
+            result.push(segment.iter().collect());
+            start += width;
+        }
+    }
+    result
+}
+
+/// Wrap an entire document, returning a flat list of [`WrappedLine`]s.
+pub fn wrap_document(lines: &[&str], width: usize, mode: WordWrapMode) -> Vec<WrappedLine> {
+    let mut result = Vec::new();
+    for (idx, &line) in lines.iter().enumerate() {
+        let segments = wrap_line(line, width, mode);
+        for (seg_idx, seg) in segments.into_iter().enumerate() {
+            result.push(WrappedLine {
+                original_line: idx,
+                content: seg,
+                is_continuation: seg_idx > 0,
+            });
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -958,5 +1074,141 @@ mod tests {
         assert!(LineDecoration::new(0, 1, DecorationKind::GitGutterAdd).is_gutter());
         assert!(!LineDecoration::new(0, 1, DecorationKind::Error).is_gutter());
         assert!(!LineDecoration::new(0, 1, DecorationKind::CodeLens).is_gutter());
+    }
+
+    // -- word wrap tests ----------------------------------------------------
+
+    #[test]
+    fn wrap_off_returns_original() {
+        let result = wrap_line("hello world", 5, WordWrapMode::Off);
+        assert_eq!(result, vec!["hello world"]);
+    }
+
+    #[test]
+    fn wrap_no_wrap_needed() {
+        let result = wrap_line("hello", 10, WordWrapMode::On(10));
+        assert_eq!(result, vec!["hello"]);
+    }
+
+    #[test]
+    fn wrap_on_simple() {
+        let result = wrap_line("abcdefghij", 5, WordWrapMode::On(5));
+        assert_eq!(result, vec!["abcde", "fghij"]);
+    }
+
+    #[test]
+    fn wrap_on_uneven() {
+        let result = wrap_line("abcdefg", 3, WordWrapMode::On(3));
+        assert_eq!(result, vec!["abc", "def", "g"]);
+    }
+
+    #[test]
+    fn wrap_bounded_alias() {
+        let result = wrap_line("abcdefgh", 4, WordWrapMode::Bounded(4));
+        assert_eq!(result, vec!["abcd", "efgh"]);
+    }
+
+    #[test]
+    fn wrap_empty_line() {
+        let result = wrap_line("", 10, WordWrapMode::On(10));
+        assert_eq!(result, vec![""]);
+    }
+
+    #[test]
+    fn wrap_word_boundary_simple() {
+        let result = wrap_line("hello world foo", 12, WordWrapMode::WordBoundary(12));
+        assert_eq!(result, vec!["hello world ", "foo"]);
+    }
+
+    #[test]
+    fn wrap_word_boundary_no_space() {
+        let result = wrap_line("abcdefghij", 5, WordWrapMode::WordBoundary(5));
+        assert_eq!(result, vec!["abcde", "fghij"]);
+    }
+
+    #[test]
+    fn wrap_word_boundary_exact_fit() {
+        let result = wrap_line("hello", 5, WordWrapMode::WordBoundary(5));
+        assert_eq!(result, vec!["hello"]);
+    }
+
+    #[test]
+    fn wrap_word_boundary_multiple_segments() {
+        let result = wrap_line("the quick brown fox jumps over", 10, WordWrapMode::WordBoundary(10));
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], "the quick ");
+        assert_eq!(result[1], "brown fox ");
+        assert_eq!(result[2], "jumps over");
+    }
+
+    #[test]
+    fn wrap_unicode_chars() {
+        let result = wrap_line("héllo wörld", 6, WordWrapMode::On(6));
+        assert_eq!(result, vec!["héllo ", "wörld"]);
+    }
+
+    #[test]
+    fn wrap_unicode_emoji() {
+        let result = wrap_line("a😀b😀c", 3, WordWrapMode::On(3));
+        assert_eq!(result, vec!["a😀b", "😀c"]);
+    }
+
+    #[test]
+    fn wrap_single_char_width() {
+        let result = wrap_line("abc", 1, WordWrapMode::On(1));
+        assert_eq!(result, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn wrap_very_long_word_boundary() {
+        let result = wrap_line("superlongword short", 5, WordWrapMode::WordBoundary(5));
+        assert_eq!(result, vec!["super", "longw", "ord ", "short"]);
+    }
+
+    #[test]
+    fn wrap_document_basic() {
+        let lines = vec!["hello world", "foo"];
+        let result = wrap_document(&lines, 5, WordWrapMode::On(5));
+        assert_eq!(result.len(), 4);
+        assert_eq!(result[0].original_line, 0);
+        assert_eq!(result[0].content, "hello");
+        assert!(!result[0].is_continuation);
+        assert_eq!(result[1].original_line, 0);
+        assert_eq!(result[1].content, " worl");
+        assert!(result[1].is_continuation);
+        assert_eq!(result[2].original_line, 0);
+        assert_eq!(result[2].content, "d");
+        assert!(result[2].is_continuation);
+        assert_eq!(result[3].original_line, 1);
+        assert_eq!(result[3].content, "foo");
+        assert!(!result[3].is_continuation);
+    }
+
+    #[test]
+    fn wrap_document_no_wrap() {
+        let lines = vec!["abc", "def"];
+        let result = wrap_document(&lines, 10, WordWrapMode::On(10));
+        assert_eq!(result.len(), 2);
+        assert!(!result[0].is_continuation);
+        assert!(!result[1].is_continuation);
+    }
+
+    #[test]
+    fn wrap_document_empty_lines() {
+        let lines = vec!["", "hello", ""];
+        let result = wrap_document(&lines, 10, WordWrapMode::On(10));
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].content, "");
+        assert_eq!(result[0].original_line, 0);
+        assert_eq!(result[2].content, "");
+        assert_eq!(result[2].original_line, 2);
+    }
+
+    #[test]
+    fn wrap_document_off_mode() {
+        let lines = vec!["a very long line indeed"];
+        let result = wrap_document(&lines, 5, WordWrapMode::Off);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].content, "a very long line indeed");
     }
 }

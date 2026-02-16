@@ -85,6 +85,9 @@ pub enum EditorAction {
     // -- history --
     Undo,
     Redo,
+
+    // -- auto-close --
+    ToggleAutoClose,
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +101,8 @@ pub struct EditorController {
     pub clipboard: String,
     pub find_results: Vec<(usize, usize)>,
     pub find_index: usize,
+    pub auto_close_pairs: Vec<(char, char)>,
+    pub auto_close_enabled: bool,
 }
 
 impl EditorController {
@@ -109,6 +114,15 @@ impl EditorController {
             clipboard: String::new(),
             find_results: Vec::new(),
             find_index: 0,
+            auto_close_pairs: vec![
+                ('(', ')'),
+                ('[', ']'),
+                ('{', '}'),
+                ('"', '"'),
+                ('\'', '\''),
+                ('`', '`'),
+            ],
+            auto_close_enabled: true,
         }
     }
 
@@ -135,7 +149,18 @@ impl EditorController {
             EditorAction::SelectAll => self.select_all(),
 
             // -- text mutation --------------------------------------------------
-            EditorAction::InsertText(ref text) => self.insert_text(text),
+            EditorAction::InsertText(ref text) => {
+                if self.auto_close_enabled && text.chars().count() == 1 {
+                    let ch = text.chars().next().unwrap();
+                    if let Some(&(_, close)) = self.auto_close_pairs.iter().find(|(open, _)| *open == ch) {
+                        let pair = format!("{}{}", ch, close);
+                        self.insert_text(&pair);
+                        self.move_cursors(|m, c| vsedit_cursor::move_left(m, c, false, 1));
+                        return;
+                    }
+                }
+                self.insert_text(text);
+            }
             EditorAction::DeleteLeft => self.delete_left(),
             EditorAction::DeleteRight => self.delete_right(),
             EditorAction::DeleteWordLeft => self.delete_word_left(),
@@ -194,6 +219,11 @@ impl EditorController {
             // -- history --------------------------------------------------------
             EditorAction::Undo => { self.model.undo(); }
             EditorAction::Redo => { self.model.redo(); }
+
+            // -- auto-close -----------------------------------------------------
+            EditorAction::ToggleAutoClose => {
+                self.auto_close_enabled = !self.auto_close_enabled;
+            }
         }
     }
 
@@ -275,7 +305,11 @@ impl EditorController {
     }
 
     /// Backspace — delete one character (or selection) left of each cursor.
+    /// When auto-close is enabled and cursor sits between a matching pair,
+    /// both characters are removed.
     fn delete_left(&mut self) {
+        let auto_close = self.auto_close_enabled;
+        let pairs = self.auto_close_pairs.clone();
         let mut ranges: Vec<(usize, Range)> = self
             .cursors
             .get_all()
@@ -286,6 +320,23 @@ impl EditorController {
                 if !sel.is_empty() {
                     (i, sel)
                 } else {
+                    let pos = c.position();
+                    // Check for auto-close pair deletion
+                    if auto_close && pos.column > 1 {
+                        let line_content = self.model.get_line_content(pos.line);
+                        let col_idx = (pos.column as usize).saturating_sub(1);
+                        let bytes = line_content.as_bytes();
+                        if col_idx > 0 && col_idx < bytes.len() {
+                            let before = bytes[col_idx - 1] as char;
+                            let after = bytes[col_idx] as char;
+                            if pairs.iter().any(|&(open, close)| open == before && close == after) {
+                                return (
+                                    i,
+                                    Range::new(pos.line, pos.column - 1, pos.line, pos.column + 1),
+                                );
+                            }
+                        }
+                    }
                     let before = vsedit_cursor::move_left(&self.model, c, false, 1);
                     (
                         i,
@@ -1542,5 +1593,107 @@ mod tests {
         c.execute_action(EditorAction::ReplaceAll("hello".into(), "hi".into()));
         assert_eq!(c.model.get_value(), "hi world hi");
         assert!(c.find_results.is_empty());
+    }
+
+    // -- auto-close pair tests ----------------------------------------------
+
+    #[test]
+    fn auto_close_paren() {
+        let mut c = ctrl("");
+        c.execute_action(EditorAction::InsertText("(".into()));
+        assert_eq!(c.model.get_value(), "()");
+        assert_eq!(c.cursors.get_primary().position(), Position::new(1, 2));
+    }
+
+    #[test]
+    fn auto_close_bracket() {
+        let mut c = ctrl("");
+        c.execute_action(EditorAction::InsertText("[".into()));
+        assert_eq!(c.model.get_value(), "[]");
+        assert_eq!(c.cursors.get_primary().position(), Position::new(1, 2));
+    }
+
+    #[test]
+    fn auto_close_brace() {
+        let mut c = ctrl("");
+        c.execute_action(EditorAction::InsertText("{".into()));
+        assert_eq!(c.model.get_value(), "{}");
+        assert_eq!(c.cursors.get_primary().position(), Position::new(1, 2));
+    }
+
+    #[test]
+    fn auto_close_double_quote() {
+        let mut c = ctrl("");
+        c.execute_action(EditorAction::InsertText("\"".into()));
+        assert_eq!(c.model.get_value(), "\"\"");
+        assert_eq!(c.cursors.get_primary().position(), Position::new(1, 2));
+    }
+
+    #[test]
+    fn auto_close_backtick() {
+        let mut c = ctrl("");
+        c.execute_action(EditorAction::InsertText("`".into()));
+        assert_eq!(c.model.get_value(), "``");
+        assert_eq!(c.cursors.get_primary().position(), Position::new(1, 2));
+    }
+
+    #[test]
+    fn auto_close_delete_pair() {
+        let mut c = ctrl("");
+        c.execute_action(EditorAction::InsertText("(".into()));
+        assert_eq!(c.model.get_value(), "()");
+        // Cursor is between ( and )
+        c.execute_action(EditorAction::DeleteLeft);
+        assert_eq!(c.model.get_value(), "");
+    }
+
+    #[test]
+    fn auto_close_delete_brace_pair() {
+        let mut c = ctrl("");
+        c.execute_action(EditorAction::InsertText("{".into()));
+        assert_eq!(c.model.get_value(), "{}");
+        c.execute_action(EditorAction::DeleteLeft);
+        assert_eq!(c.model.get_value(), "");
+    }
+
+    #[test]
+    fn auto_close_no_trigger_on_multichar() {
+        let mut c = ctrl("");
+        c.execute_action(EditorAction::InsertText("ab".into()));
+        assert_eq!(c.model.get_value(), "ab");
+    }
+
+    #[test]
+    fn auto_close_no_trigger_on_non_pair_char() {
+        let mut c = ctrl("");
+        c.execute_action(EditorAction::InsertText("a".into()));
+        assert_eq!(c.model.get_value(), "a");
+    }
+
+    #[test]
+    fn auto_close_toggle_disables() {
+        let mut c = ctrl("");
+        c.execute_action(EditorAction::ToggleAutoClose);
+        assert!(!c.auto_close_enabled);
+        c.execute_action(EditorAction::InsertText("(".into()));
+        assert_eq!(c.model.get_value(), "(");
+    }
+
+    #[test]
+    fn auto_close_toggle_re_enables() {
+        let mut c = ctrl("");
+        c.execute_action(EditorAction::ToggleAutoClose);
+        c.execute_action(EditorAction::ToggleAutoClose);
+        assert!(c.auto_close_enabled);
+        c.execute_action(EditorAction::InsertText("(".into()));
+        assert_eq!(c.model.get_value(), "()");
+    }
+
+    #[test]
+    fn auto_close_normal_backspace_not_between_pair() {
+        let mut c = ctrl("abc");
+        c.cursors.set_state(0, CursorState::from_position(Position::new(1, 3)));
+        c.execute_action(EditorAction::DeleteLeft);
+        assert_eq!(c.model.get_value(), "ac");
     }
 }
