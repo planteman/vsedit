@@ -13,9 +13,9 @@ A full-fidelity terminal port of [Visual Studio Code](https://github.com/microso
 
 | Metric | Value |
 |--------|-------|
-| Workspace crates | 239 |
-| Lines of Rust | 265,000+ |
-| Tests | 11,300+ (all passing) |
+| Workspace crates | 242 |
+| Lines of Rust | 277,000+ |
+| Tests | 11,700+ (all passing) |
 | Lines of JS (extension host shim) | 1,200+ |
 | Minimum crate size | 900+ lines |
 
@@ -76,23 +76,37 @@ All crates compile (`cargo check --workspace` ✅) and all tests pass (`cargo te
 ### Extension System
 - JSON-RPC protocol compatible with VS Code extension host
 - `vscode.*` API namespace shim (JavaScript, 1,200+ lines)
-- Extension activation events, lifecycle management
+- Extension activation events (`*`, `onLanguage`, `onCommand`, `onDebug`, `onView`, `onStartupFinished`)
+- Provider registry tracking 25 language feature kinds (completion, hover, definition, references, etc.)
+- Document sync notifications (didOpen/didChange/didSave/didClose)
 - Extension marketplace client (install, update, uninstall)
 - Language server protocol (LSP) client
 - Debug adapter protocol (DAP) client
 - Content-Length framed JSON message transport
+- Real filesystem operations in RPC handlers
+- In-memory clipboard and secret storage for extensions
+- Workspace edit support (create/delete/rename files)
 
 ### Workbench
 - VS Code-identical layout: activity bar, sidebar, editor area, panel, status bar
 - Command palette with fuzzy matching
 - File explorer with tree view, icons, create/delete/rename
-- Integrated terminal (PTY-based)
+- Integrated terminal (PTY-based with keyboard routing)
+- Quick Open file picker with workspace scanning
+- Go To Line input dialog
 - Search across files with ripgrep
-- Source control (Git) integration
+- Source control (Git) integration with status icons
 - Debug view with breakpoints, call stack, variables
-- Problems panel, output panel, debug console
+- Debug launch sequence (F5 → launch.json → DAP)
+- Problems panel with diagnostic management
+- Output panel, debug console
+- Extensions sidebar with installed extension listing
+- Side-by-side diff viewer
 - Settings UI, keyboard shortcuts editor
 - Multi-root workspace support
+- UI state persistence (cursor, sidebar, panels restored on startup)
+- File encoding detection (UTF-8, UTF-8 BOM, UTF-16LE/BE, Latin1)
+- File watcher for external change detection
 
 ### Configuration
 - Reads/writes `~/.config/vsedit/settings.json` (JSONC with comments)
