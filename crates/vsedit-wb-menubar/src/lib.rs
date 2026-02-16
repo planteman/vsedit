@@ -389,6 +389,247 @@ impl Default for MenuBarService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Menu bar rendering state
+// ---------------------------------------------------------------------------
+
+/// The standard menu order for the top bar.
+pub const MENU_ORDER: &[MenuId] = &[
+    MenuId::File,
+    MenuId::Edit,
+    MenuId::Selection,
+    MenuId::View,
+    MenuId::Go,
+    MenuId::Run,
+    MenuId::Terminal,
+    MenuId::Help,
+];
+
+/// State for rendering the menu bar and its dropdown overlays.
+pub struct MenuBarState {
+    /// Which menu title is focused (None = menu bar not active).
+    pub active_menu: Option<usize>,
+    /// Which item in the dropdown is highlighted.
+    pub selected_item: usize,
+    /// Whether the dropdown is open.
+    pub dropdown_open: bool,
+}
+
+impl MenuBarState {
+    pub fn new() -> Self {
+        Self {
+            active_menu: None,
+            selected_item: 0,
+            dropdown_open: false,
+        }
+    }
+
+    /// Activate the menu bar (e.g. via Alt key), focusing the first menu.
+    pub fn activate(&mut self) {
+        self.active_menu = Some(0);
+        self.selected_item = 0;
+        self.dropdown_open = false;
+    }
+
+    /// Deactivate the menu bar entirely.
+    pub fn deactivate(&mut self) {
+        self.active_menu = None;
+        self.selected_item = 0;
+        self.dropdown_open = false;
+    }
+
+    /// Open the dropdown for the currently active menu.
+    pub fn open_dropdown(&mut self) {
+        self.dropdown_open = true;
+        self.selected_item = 0;
+    }
+
+    /// Close the dropdown but keep the menu bar active.
+    pub fn close_dropdown(&mut self) {
+        self.dropdown_open = false;
+        self.selected_item = 0;
+    }
+
+    /// Move to the next menu (right arrow).
+    pub fn next_menu(&mut self, menu_count: usize) {
+        if let Some(ref mut idx) = self.active_menu {
+            if menu_count > 0 {
+                *idx = (*idx + 1) % menu_count;
+                self.selected_item = 0;
+            }
+        }
+    }
+
+    /// Move to the previous menu (left arrow).
+    pub fn prev_menu(&mut self, menu_count: usize) {
+        if let Some(ref mut idx) = self.active_menu {
+            if menu_count > 0 {
+                *idx = if *idx == 0 { menu_count - 1 } else { *idx - 1 };
+                self.selected_item = 0;
+            }
+        }
+    }
+
+    /// Move selection down within the dropdown.
+    pub fn next_item(&mut self, item_count: usize) {
+        if item_count > 0 {
+            self.selected_item = (self.selected_item + 1) % item_count;
+        }
+    }
+
+    /// Move selection up within the dropdown.
+    pub fn prev_item(&mut self, item_count: usize) {
+        if item_count > 0 {
+            self.selected_item = if self.selected_item == 0 {
+                item_count - 1
+            } else {
+                self.selected_item - 1
+            };
+        }
+    }
+
+    /// Returns whether the menu bar is active (has focus).
+    pub fn is_active(&self) -> bool {
+        self.active_menu.is_some()
+    }
+
+    /// Activate a specific menu by index (e.g., Alt+F → index 0).
+    pub fn activate_menu(&mut self, index: usize) {
+        self.active_menu = Some(index);
+        self.selected_item = 0;
+        self.dropdown_open = true;
+    }
+
+    /// Try to activate a menu by Alt+letter. Returns true if matched.
+    pub fn activate_by_letter(&mut self, letter: char) -> bool {
+        let upper = letter.to_ascii_uppercase();
+        for (i, menu_id) in MENU_ORDER.iter().enumerate() {
+            if menu_id.label().starts_with(upper) {
+                self.activate_menu(i);
+                return true;
+            }
+        }
+        false
+    }
+}
+
+impl Default for MenuBarState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Menu bar render helpers
+// ---------------------------------------------------------------------------
+
+/// A pre-computed layout for a single menu title in the top bar.
+#[derive(Debug, Clone)]
+pub struct MenuTitleLayout {
+    pub label: String,
+    pub x: u16,
+    pub width: u16,
+}
+
+/// Compute the layout of menu titles across the top bar.
+pub fn compute_menu_title_layout(service: &MenuBarService) -> Vec<MenuTitleLayout> {
+    let mut layouts = Vec::new();
+    let mut x: u16 = 1; // 1 char left padding
+
+    for menu_id in MENU_ORDER {
+        let entries = service.get_entries(menu_id);
+        if entries.is_empty() {
+            continue;
+        }
+        let label = menu_id.label().to_string();
+        let width = label.len() as u16 + 2; // 1 char padding each side
+        layouts.push(MenuTitleLayout { label, x, width });
+        x += width + 1; // 1 char gap between menus
+    }
+
+    layouts
+}
+
+/// A pre-computed layout for a dropdown menu overlay.
+#[derive(Debug, Clone)]
+pub struct DropdownLayout {
+    /// The x position of the dropdown (aligned to menu title).
+    pub x: u16,
+    /// Width of the dropdown (max entry width + shortcut + padding).
+    pub width: u16,
+    /// Height of the dropdown (number of entries + borders).
+    pub height: u16,
+    /// The entries to render (title, shortcut, is_separator, is_enabled).
+    pub items: Vec<DropdownItem>,
+}
+
+/// A single item in a dropdown menu.
+#[derive(Debug, Clone)]
+pub struct DropdownItem {
+    pub title: String,
+    pub shortcut: Option<String>,
+    pub is_separator: bool,
+    pub enabled: bool,
+    pub command_id: String,
+}
+
+/// Compute the dropdown layout for a specific menu.
+pub fn compute_dropdown_layout(
+    service: &MenuBarService,
+    menu_id: &MenuId,
+    menu_x: u16,
+) -> DropdownLayout {
+    let entries = service.get_entries(menu_id);
+    let mut items = Vec::new();
+    let mut prev_group: Option<&str> = None;
+
+    for entry in &entries {
+        // Insert separator between groups
+        if let Some(group) = &entry.group {
+            if let Some(prev) = prev_group {
+                if prev != group.as_str() {
+                    items.push(DropdownItem {
+                        title: String::new(),
+                        shortcut: None,
+                        is_separator: true,
+                        enabled: false,
+                        command_id: String::new(),
+                    });
+                }
+            }
+            prev_group = Some(group.as_str());
+        }
+
+        items.push(DropdownItem {
+            title: entry.title.clone(),
+            shortcut: entry.shortcut.clone(),
+            is_separator: false,
+            enabled: entry.enabled,
+            command_id: entry.command_id.clone(),
+        });
+    }
+
+    let max_title: u16 = items.iter()
+        .filter(|i| !i.is_separator)
+        .map(|i| i.title.len() as u16)
+        .max()
+        .unwrap_or(10);
+    let max_shortcut: u16 = items.iter()
+        .filter_map(|i| i.shortcut.as_ref())
+        .map(|s| s.len() as u16)
+        .max()
+        .unwrap_or(0);
+    let width = max_title + max_shortcut + 6; // padding + gap
+    let height = items.len() as u16 + 2; // top + bottom border
+
+    DropdownLayout {
+        x: menu_x,
+        width,
+        height,
+        items,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -760,5 +1001,156 @@ mod tests {
         let flat = svc.flatten_items();
         assert_eq!(flat[0].1.command_id, "a_first");
         assert_eq!(flat[1].1.command_id, "z_last");
+    }
+
+    // --- MenuBarState tests ---
+
+    #[test]
+    fn menu_bar_state_new_inactive() {
+        let state = MenuBarState::new();
+        assert!(!state.is_active());
+        assert!(state.active_menu.is_none());
+        assert!(!state.dropdown_open);
+    }
+
+    #[test]
+    fn menu_bar_state_activate() {
+        let mut state = MenuBarState::new();
+        state.activate();
+        assert!(state.is_active());
+        assert_eq!(state.active_menu, Some(0));
+        assert!(!state.dropdown_open);
+    }
+
+    #[test]
+    fn menu_bar_state_deactivate() {
+        let mut state = MenuBarState::new();
+        state.activate();
+        state.deactivate();
+        assert!(!state.is_active());
+    }
+
+    #[test]
+    fn menu_bar_state_next_prev_menu() {
+        let mut state = MenuBarState::new();
+        state.activate();
+        state.next_menu(4);
+        assert_eq!(state.active_menu, Some(1));
+        state.next_menu(4);
+        assert_eq!(state.active_menu, Some(2));
+        state.prev_menu(4);
+        assert_eq!(state.active_menu, Some(1));
+        // Wrap around
+        state.active_menu = Some(3);
+        state.next_menu(4);
+        assert_eq!(state.active_menu, Some(0));
+        state.prev_menu(4);
+        assert_eq!(state.active_menu, Some(3));
+    }
+
+    #[test]
+    fn menu_bar_state_next_prev_item() {
+        let mut state = MenuBarState::new();
+        state.activate();
+        state.open_dropdown();
+        state.next_item(5);
+        assert_eq!(state.selected_item, 1);
+        state.prev_item(5);
+        assert_eq!(state.selected_item, 0);
+        state.prev_item(5); // wrap
+        assert_eq!(state.selected_item, 4);
+    }
+
+    #[test]
+    fn menu_bar_state_activate_by_letter() {
+        let mut state = MenuBarState::new();
+        assert!(state.activate_by_letter('f'));
+        assert_eq!(state.active_menu, Some(0)); // File
+        assert!(state.dropdown_open);
+
+        assert!(state.activate_by_letter('e'));
+        assert_eq!(state.active_menu, Some(1)); // Edit
+
+        assert!(state.activate_by_letter('h'));
+        assert_eq!(state.active_menu, Some(7)); // Help
+
+        assert!(!state.activate_by_letter('z')); // no match
+    }
+
+    #[test]
+    fn menu_bar_state_open_close_dropdown() {
+        let mut state = MenuBarState::new();
+        state.activate();
+        assert!(!state.dropdown_open);
+        state.open_dropdown();
+        assert!(state.dropdown_open);
+        state.close_dropdown();
+        assert!(!state.dropdown_open);
+        assert!(state.is_active()); // still active
+    }
+
+    #[test]
+    fn menu_bar_state_activate_menu_by_index() {
+        let mut state = MenuBarState::new();
+        state.activate_menu(3);
+        assert_eq!(state.active_menu, Some(3));
+        assert!(state.dropdown_open);
+    }
+
+    // --- Render helper tests ---
+
+    #[test]
+    fn compute_menu_title_layout_default_menus() {
+        let mut svc = MenuBarService::new();
+        svc.create_default_menus();
+        let layouts = compute_menu_title_layout(&svc);
+        // File, Edit, View are populated
+        assert_eq!(layouts.len(), 3);
+        assert_eq!(layouts[0].label, "File");
+        assert!(layouts[0].x >= 1);
+        assert!(layouts[0].width > 0);
+    }
+
+    #[test]
+    fn compute_menu_title_layout_empty() {
+        let svc = MenuBarService::new();
+        let layouts = compute_menu_title_layout(&svc);
+        assert!(layouts.is_empty());
+    }
+
+    #[test]
+    fn compute_dropdown_layout_basic() {
+        let mut svc = MenuBarService::new();
+        svc.create_default_menus();
+        let layout = compute_dropdown_layout(&svc, &MenuId::File, 1);
+        assert!(!layout.items.is_empty());
+        assert!(layout.width > 10);
+        assert!(layout.height >= 3);
+    }
+
+    #[test]
+    fn compute_dropdown_layout_has_separators() {
+        let mut svc = MenuBarService::new();
+        svc.create_default_menus();
+        let layout = compute_dropdown_layout(&svc, &MenuId::File, 1);
+        let sep_count = layout.items.iter().filter(|i| i.is_separator).count();
+        // Separators inserted between group boundaries in sorted order
+        assert!(sep_count > 0);
+    }
+
+    #[test]
+    fn compute_dropdown_layout_items_have_shortcuts() {
+        let mut svc = MenuBarService::new();
+        svc.create_default_menus();
+        let layout = compute_dropdown_layout(&svc, &MenuId::Edit, 1);
+        let with_shortcut = layout.items.iter().filter(|i| i.shortcut.is_some()).count();
+        assert!(with_shortcut > 0);
+    }
+
+    #[test]
+    fn menu_order_has_eight_entries() {
+        assert_eq!(MENU_ORDER.len(), 8);
+        assert_eq!(MENU_ORDER[0], MenuId::File);
+        assert_eq!(MENU_ORDER[7], MenuId::Help);
     }
 }

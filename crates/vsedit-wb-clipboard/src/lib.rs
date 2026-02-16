@@ -343,6 +343,93 @@ impl ClipboardService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Copy/paste action descriptors
+// ---------------------------------------------------------------------------
+
+/// Describes a clipboard action triggered by a keybinding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClipboardAction {
+    /// Ctrl+C — copy selection (or current line if no selection).
+    Copy,
+    /// Ctrl+X — cut selection (or current line if no selection).
+    Cut,
+    /// Ctrl+V — paste.
+    Paste,
+    /// Ctrl+Shift+V — paste plain text (strip formatting).
+    PastePlain,
+}
+
+impl std::fmt::Display for ClipboardAction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ClipboardAction::Copy => write!(f, "Copy"),
+            ClipboardAction::Cut => write!(f, "Cut"),
+            ClipboardAction::Paste => write!(f, "Paste"),
+            ClipboardAction::PastePlain => write!(f, "Paste Plain"),
+        }
+    }
+}
+
+impl ClipboardAction {
+    /// Returns the default keybinding string for the action.
+    pub fn default_keybinding(&self) -> &'static str {
+        match self {
+            ClipboardAction::Copy => "Ctrl+C",
+            ClipboardAction::Cut => "Ctrl+X",
+            ClipboardAction::Paste => "Ctrl+V",
+            ClipboardAction::PastePlain => "Ctrl+Shift+V",
+        }
+    }
+
+    /// Returns the command ID used in the command palette.
+    pub fn command_id(&self) -> &'static str {
+        match self {
+            ClipboardAction::Copy => "editor.action.clipboardCopyAction",
+            ClipboardAction::Cut => "editor.action.clipboardCutAction",
+            ClipboardAction::Paste => "editor.action.clipboardPasteAction",
+            ClipboardAction::PastePlain => "editor.action.clipboardPastePlainAction",
+        }
+    }
+}
+
+/// Handles a copy action: if selections are provided, collect them;
+/// otherwise copy the full line text.
+pub fn handle_copy(
+    svc: &mut ClipboardService,
+    selections: &[&str],
+    full_line: &str,
+    timestamp: u64,
+) -> String {
+    let text = if selections.is_empty() || selections.iter().all(|s| s.is_empty()) {
+        full_line.to_string()
+    } else {
+        MultiCursorClipboard::collect(selections)
+    };
+    svc.write_text(text.clone(), timestamp);
+    text
+}
+
+/// Handles a cut action: same as copy, but returns the text that should be
+/// deleted from the editor.
+pub fn handle_cut(
+    svc: &mut ClipboardService,
+    selections: &[&str],
+    full_line: &str,
+    timestamp: u64,
+) -> String {
+    handle_copy(svc, selections, full_line, timestamp)
+}
+
+/// Handles a paste action: returns the text to insert, distributed across
+/// the given number of cursors.
+pub fn handle_paste(svc: &ClipboardService, cursor_count: usize) -> Vec<String> {
+    match svc.read_text() {
+        Some(text) => MultiCursorClipboard::distribute(text, cursor_count),
+        None => vec![String::new(); cursor_count],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -648,5 +735,84 @@ mod tests {
         assert_eq!(removed, 2);
         assert_eq!(svc.history_count(), 2);
         assert!(!svc.contains_text("remove"));
+    }
+
+    // --- ClipboardAction tests ---
+
+    #[test]
+    fn clipboard_action_display() {
+        assert_eq!(ClipboardAction::Copy.to_string(), "Copy");
+        assert_eq!(ClipboardAction::Cut.to_string(), "Cut");
+        assert_eq!(ClipboardAction::Paste.to_string(), "Paste");
+        assert_eq!(ClipboardAction::PastePlain.to_string(), "Paste Plain");
+    }
+
+    #[test]
+    fn clipboard_action_keybinding() {
+        assert_eq!(ClipboardAction::Copy.default_keybinding(), "Ctrl+C");
+        assert_eq!(ClipboardAction::Cut.default_keybinding(), "Ctrl+X");
+        assert_eq!(ClipboardAction::Paste.default_keybinding(), "Ctrl+V");
+        assert_eq!(ClipboardAction::PastePlain.default_keybinding(), "Ctrl+Shift+V");
+    }
+
+    #[test]
+    fn clipboard_action_command_id() {
+        assert!(ClipboardAction::Copy.command_id().contains("Copy"));
+        assert!(ClipboardAction::Cut.command_id().contains("Cut"));
+        assert!(ClipboardAction::Paste.command_id().contains("Paste"));
+    }
+
+    #[test]
+    fn handle_copy_with_selections() {
+        let mut svc = ClipboardService::new(10);
+        let result = handle_copy(&mut svc, &["foo", "bar"], "whole line\n", 1);
+        assert_eq!(result, "foo\nbar");
+        assert_eq!(svc.read_text(), Some("foo\nbar"));
+    }
+
+    #[test]
+    fn handle_copy_empty_selection_copies_line() {
+        let mut svc = ClipboardService::new(10);
+        let result = handle_copy(&mut svc, &[], "whole line\n", 1);
+        assert_eq!(result, "whole line\n");
+    }
+
+    #[test]
+    fn handle_copy_blank_selections_copies_line() {
+        let mut svc = ClipboardService::new(10);
+        let result = handle_copy(&mut svc, &["", ""], "line text\n", 1);
+        assert_eq!(result, "line text\n");
+    }
+
+    #[test]
+    fn handle_cut_returns_same_as_copy() {
+        let mut svc = ClipboardService::new(10);
+        let result = handle_cut(&mut svc, &["sel"], "line", 1);
+        assert_eq!(result, "sel");
+        assert_eq!(svc.read_text(), Some("sel"));
+    }
+
+    #[test]
+    fn handle_paste_distributes_to_cursors() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_text("a\nb\nc".into(), 1);
+        let result = handle_paste(&svc, 3);
+        assert_eq!(result, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn handle_paste_full_text_when_mismatch() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_text("hello".into(), 1);
+        let result = handle_paste(&svc, 3);
+        assert_eq!(result.len(), 3);
+        assert!(result.iter().all(|s| s == "hello"));
+    }
+
+    #[test]
+    fn handle_paste_empty_clipboard() {
+        let svc = ClipboardService::new(10);
+        let result = handle_paste(&svc, 2);
+        assert_eq!(result, vec!["", ""]);
     }
 }

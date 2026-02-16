@@ -1,10 +1,13 @@
 //! System clipboard via OSC 52.
 //!
 //! Equivalent to VS Code's clipboard service.
-//! Uses OSC 52 escape sequences for terminal clipboard access.
+//! Uses OSC 52 escape sequences for terminal clipboard access, with fallback
+//! to external tools (`xclip`, `xsel`, `pbcopy`/`pbpaste`, `wl-copy`/`wl-paste`)
+//! and an internal buffer.
 
 use std::fmt;
 use std::io::Write;
+use std::process::Command;
 use std::sync::Mutex;
 
 /// Clipboard service trait.
@@ -373,6 +376,270 @@ impl Default for ClipboardWatcher {
     }
 }
 
+// ---------------------------------------------------------------------------
+// External tool clipboard backend
+// ---------------------------------------------------------------------------
+
+/// Available clipboard backends, ordered by preference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClipboardBackend {
+    /// OSC 52 terminal escape sequence (write-only without terminal query).
+    Osc52,
+    /// `xclip` (X11).
+    Xclip,
+    /// `xsel` (X11).
+    Xsel,
+    /// `pbcopy` / `pbpaste` (macOS).
+    PbCopy,
+    /// `wl-copy` / `wl-paste` (Wayland).
+    WlCopy,
+    /// Internal in-memory buffer (always available).
+    Internal,
+}
+
+impl fmt::Display for ClipboardBackend {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ClipboardBackend::Osc52 => write!(f, "OSC 52"),
+            ClipboardBackend::Xclip => write!(f, "xclip"),
+            ClipboardBackend::Xsel => write!(f, "xsel"),
+            ClipboardBackend::PbCopy => write!(f, "pbcopy/pbpaste"),
+            ClipboardBackend::WlCopy => write!(f, "wl-copy/wl-paste"),
+            ClipboardBackend::Internal => write!(f, "internal"),
+        }
+    }
+}
+
+/// Detects which clipboard backends are available on the current system.
+pub fn detect_backends() -> Vec<ClipboardBackend> {
+    let mut backends = Vec::new();
+
+    // OSC 52 is always available for writing (reading requires terminal query)
+    backends.push(ClipboardBackend::Osc52);
+
+    if has_command("pbcopy") && has_command("pbpaste") {
+        backends.push(ClipboardBackend::PbCopy);
+    }
+    if has_command("wl-copy") && has_command("wl-paste") {
+        backends.push(ClipboardBackend::WlCopy);
+    }
+    if has_command("xclip") {
+        backends.push(ClipboardBackend::Xclip);
+    }
+    if has_command("xsel") {
+        backends.push(ClipboardBackend::Xsel);
+    }
+
+    // Internal is always available as final fallback
+    backends.push(ClipboardBackend::Internal);
+    backends
+}
+
+fn has_command(name: &str) -> bool {
+    Command::new("which")
+        .arg(name)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+fn read_via_command(cmd: &str, args: &[&str]) -> Option<String> {
+    Command::new(cmd)
+        .args(args)
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+}
+
+fn write_via_command(cmd: &str, args: &[&str], text: &str) -> bool {
+    let mut child = match Command::new(cmd)
+        .args(args)
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    if let Some(ref mut stdin) = child.stdin {
+        let _ = stdin.write_all(text.as_bytes());
+    }
+    child.wait().map(|s| s.success()).unwrap_or(false)
+}
+
+/// Read text from the system clipboard using an external tool.
+pub fn read_external(backend: ClipboardBackend) -> Option<String> {
+    match backend {
+        ClipboardBackend::PbCopy => read_via_command("pbpaste", &[]),
+        ClipboardBackend::WlCopy => read_via_command("wl-paste", &["--no-newline"]),
+        ClipboardBackend::Xclip => {
+            read_via_command("xclip", &["-selection", "clipboard", "-o"])
+        }
+        ClipboardBackend::Xsel => read_via_command("xsel", &["--clipboard", "--output"]),
+        _ => None,
+    }
+}
+
+/// Write text to the system clipboard using an external tool.
+pub fn write_external(backend: ClipboardBackend, text: &str) -> bool {
+    match backend {
+        ClipboardBackend::PbCopy => write_via_command("pbcopy", &[], text),
+        ClipboardBackend::WlCopy => write_via_command("wl-copy", &[], text),
+        ClipboardBackend::Xclip => {
+            write_via_command("xclip", &["-selection", "clipboard"], text)
+        }
+        ClipboardBackend::Xsel => write_via_command("xsel", &["--clipboard", "--input"], text),
+        _ => false,
+    }
+}
+
+/// Read HTML from the system clipboard using an external tool (if supported).
+pub fn read_html_external(backend: ClipboardBackend) -> Option<String> {
+    match backend {
+        ClipboardBackend::Xclip => {
+            read_via_command("xclip", &["-selection", "clipboard", "-t", "text/html", "-o"])
+        }
+        ClipboardBackend::WlCopy => {
+            read_via_command("wl-paste", &["--no-newline", "--type", "text/html"])
+        }
+        _ => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardService — unified clipboard with auto-detection
+// ---------------------------------------------------------------------------
+
+/// Unified clipboard service that auto-detects the best available backend
+/// and provides read/write with fallback chain.
+pub struct ClipboardService {
+    backends: Vec<ClipboardBackend>,
+    buffer: Mutex<String>,
+    html_buffer: Mutex<String>,
+}
+
+impl ClipboardService {
+    /// Create a new service, auto-detecting available backends.
+    pub fn new() -> Self {
+        Self {
+            backends: detect_backends(),
+            buffer: Mutex::new(String::new()),
+            html_buffer: Mutex::new(String::new()),
+        }
+    }
+
+    /// Create a service with explicit backends (useful for testing).
+    pub fn with_backends(backends: Vec<ClipboardBackend>) -> Self {
+        Self {
+            backends,
+            buffer: Mutex::new(String::new()),
+            html_buffer: Mutex::new(String::new()),
+        }
+    }
+
+    /// Returns the detected backends in priority order.
+    pub fn backends(&self) -> &[ClipboardBackend] {
+        &self.backends
+    }
+
+    /// Returns the primary (preferred) backend.
+    pub fn primary_backend(&self) -> ClipboardBackend {
+        self.backends.first().copied().unwrap_or(ClipboardBackend::Internal)
+    }
+
+    /// Read text from the clipboard, trying external tools then falling back
+    /// to the internal buffer.
+    pub fn read_text(&self) -> Result<String, ClipboardError> {
+        // Try external tools first
+        for &backend in &self.backends {
+            if backend == ClipboardBackend::Osc52 || backend == ClipboardBackend::Internal {
+                continue;
+            }
+            if let Some(text) = read_external(backend) {
+                return Ok(text);
+            }
+        }
+        // Fall back to internal buffer
+        let buf = self.buffer.lock().map_err(|_| ClipboardError::LockPoisoned)?;
+        if buf.is_empty() {
+            Ok(String::new())
+        } else {
+            Ok(buf.clone())
+        }
+    }
+
+    /// Write text to the clipboard, writing to OSC 52, the best external tool,
+    /// and the internal buffer.
+    pub fn write_text(&self, text: &str) -> Result<(), ClipboardError> {
+        // Always update internal buffer
+        {
+            let mut buf = self.buffer.lock().map_err(|_| ClipboardError::LockPoisoned)?;
+            *buf = text.to_string();
+        }
+
+        // Write via OSC 52 if available
+        if self.backends.contains(&ClipboardBackend::Osc52) {
+            write_osc52(text);
+        }
+
+        // Write via best external tool
+        for &backend in &self.backends {
+            if backend == ClipboardBackend::Osc52 || backend == ClipboardBackend::Internal {
+                continue;
+            }
+            if write_external(backend, text) {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Read HTML from clipboard (if supported by the active backend).
+    pub fn read_html(&self) -> Result<String, ClipboardError> {
+        for &backend in &self.backends {
+            if let Some(html) = read_html_external(backend) {
+                return Ok(html);
+            }
+        }
+        // Fall back to internal html buffer
+        let buf = self.html_buffer.lock().map_err(|_| ClipboardError::LockPoisoned)?;
+        Ok(buf.clone())
+    }
+
+    /// Write HTML to the internal HTML buffer.
+    pub fn write_html(&self, html: &str) -> Result<(), ClipboardError> {
+        let mut buf = self.html_buffer.lock().map_err(|_| ClipboardError::LockPoisoned)?;
+        *buf = html.to_string();
+        Ok(())
+    }
+}
+
+impl Default for ClipboardService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IClipboardService for ClipboardService {
+    fn read_text(&self) -> Option<String> {
+        ClipboardService::read_text(self).ok().filter(|s| !s.is_empty())
+    }
+
+    fn write_text(&self, text: &str) {
+        let _ = ClipboardService::write_text(self, text);
+    }
+}
+
+/// Write text via OSC 52 escape sequence.
+fn write_osc52(text: &str) {
+    use base64::Engine;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(text.as_bytes());
+    let seq = format!("\x1b]52;c;{encoded}\x07");
+    let _ = std::io::stdout().write_all(seq.as_bytes());
+    let _ = std::io::stdout().flush();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -635,5 +902,86 @@ mod tests {
     fn test_clipboard_error_is_std_error() {
         let err: Box<dyn std::error::Error> = Box::new(ClipboardError::WriteFailed);
         assert_eq!(err.to_string(), "clipboard write failed");
+    }
+
+    // --- ClipboardService tests ---
+
+    #[test]
+    fn clipboard_service_internal_only() {
+        let svc = ClipboardService::with_backends(vec![ClipboardBackend::Internal]);
+        assert!(svc.write_text("hello").is_ok());
+        let text = svc.read_text().unwrap();
+        assert_eq!(text, "hello");
+    }
+
+    #[test]
+    fn clipboard_service_read_empty() {
+        let svc = ClipboardService::with_backends(vec![ClipboardBackend::Internal]);
+        let text = svc.read_text().unwrap();
+        assert!(text.is_empty());
+    }
+
+    #[test]
+    fn clipboard_service_overwrite() {
+        let svc = ClipboardService::with_backends(vec![ClipboardBackend::Internal]);
+        svc.write_text("first").unwrap();
+        svc.write_text("second").unwrap();
+        assert_eq!(svc.read_text().unwrap(), "second");
+    }
+
+    #[test]
+    fn clipboard_service_html_roundtrip() {
+        let svc = ClipboardService::with_backends(vec![ClipboardBackend::Internal]);
+        svc.write_html("<b>bold</b>").unwrap();
+        assert_eq!(svc.read_html().unwrap(), "<b>bold</b>");
+    }
+
+    #[test]
+    fn clipboard_service_html_empty() {
+        let svc = ClipboardService::with_backends(vec![ClipboardBackend::Internal]);
+        assert!(svc.read_html().unwrap().is_empty());
+    }
+
+    #[test]
+    fn clipboard_service_implements_trait() {
+        let svc = ClipboardService::with_backends(vec![ClipboardBackend::Internal]);
+        let trait_ref: &dyn IClipboardService = &svc;
+        assert!(trait_ref.read_text().is_none());
+        trait_ref.write_text("via trait");
+        assert_eq!(trait_ref.read_text(), Some("via trait".to_string()));
+    }
+
+    #[test]
+    fn clipboard_service_primary_backend() {
+        let svc = ClipboardService::with_backends(vec![
+            ClipboardBackend::Osc52,
+            ClipboardBackend::Internal,
+        ]);
+        assert_eq!(svc.primary_backend(), ClipboardBackend::Osc52);
+    }
+
+    #[test]
+    fn clipboard_service_default_has_backends() {
+        let svc = ClipboardService::default();
+        assert!(!svc.backends().is_empty());
+        // Internal is always the last fallback
+        assert_eq!(*svc.backends().last().unwrap(), ClipboardBackend::Internal);
+    }
+
+    #[test]
+    fn detect_backends_always_has_internal() {
+        let backends = detect_backends();
+        assert!(backends.contains(&ClipboardBackend::Internal));
+        assert!(backends.contains(&ClipboardBackend::Osc52));
+    }
+
+    #[test]
+    fn clipboard_backend_display() {
+        assert_eq!(ClipboardBackend::Osc52.to_string(), "OSC 52");
+        assert_eq!(ClipboardBackend::Xclip.to_string(), "xclip");
+        assert_eq!(ClipboardBackend::Xsel.to_string(), "xsel");
+        assert_eq!(ClipboardBackend::PbCopy.to_string(), "pbcopy/pbpaste");
+        assert_eq!(ClipboardBackend::WlCopy.to_string(), "wl-copy/wl-paste");
+        assert_eq!(ClipboardBackend::Internal.to_string(), "internal");
     }
 }
