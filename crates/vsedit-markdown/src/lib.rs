@@ -121,6 +121,236 @@ pub fn render_to_plain_text(tokens: &[MarkdownToken]) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// Block tokeniser
+// ---------------------------------------------------------------------------
+
+/// Tokenise a multi-line Markdown string into block-level tokens.
+///
+/// Recognises headings (`#`–`######`), list items (`- ` / `* `), fenced code
+/// blocks (`` ``` ``), and paragraphs (separated by blank lines). Inline
+/// formatting within each block is also tokenised.
+pub fn tokenize_block(text: &str) -> Vec<MarkdownToken> {
+    let mut tokens = Vec::new();
+    let lines: Vec<&str> = text.lines().collect();
+    let len = lines.len();
+    let mut i = 0;
+
+    while i < len {
+        let line = lines[i];
+
+        // Blank line → paragraph separator
+        if line.trim().is_empty() {
+            tokens.push(MarkdownToken::Paragraph);
+            i += 1;
+            continue;
+        }
+
+        // Fenced code block
+        if line.trim_start().starts_with("```") {
+            let lang = line.trim_start().trim_start_matches('`').trim();
+            let lang = if lang.is_empty() { None } else { Some(lang.to_string()) };
+            let mut code = String::new();
+            i += 1;
+            while i < len && !lines[i].trim_start().starts_with("```") {
+                if !code.is_empty() {
+                    code.push('\n');
+                }
+                code.push_str(lines[i]);
+                i += 1;
+            }
+            tokens.push(MarkdownToken::CodeBlock(code, lang));
+            i += 1; // skip closing fence
+            continue;
+        }
+
+        // Heading
+        if line.starts_with('#') {
+            let level = line.chars().take_while(|&c| c == '#').count().min(6) as u8;
+            let content = line[level as usize..].trim().to_string();
+            tokens.push(MarkdownToken::Heading(level, content));
+            i += 1;
+            continue;
+        }
+
+        // List item (- or *)
+        let trimmed = line.trim_start();
+        if (trimmed.starts_with("- ") || trimmed.starts_with("* ")) && trimmed.len() > 2 {
+            let content = trimmed[2..].to_string();
+            tokens.push(MarkdownToken::ListItemMd(content));
+            i += 1;
+            continue;
+        }
+
+        // Paragraph text – collect consecutive non-blank, non-special lines
+        let mut para = String::new();
+        while i < len {
+            let l = lines[i];
+            if l.trim().is_empty()
+                || l.starts_with('#')
+                || l.trim_start().starts_with("```")
+                || l.trim_start().starts_with("- ")
+                || l.trim_start().starts_with("* ")
+            {
+                break;
+            }
+            if !para.is_empty() {
+                para.push(' ');
+            }
+            para.push_str(l.trim());
+            i += 1;
+        }
+        let inline_tokens = tokenize_inline(&para);
+        tokens.extend(inline_tokens);
+    }
+
+    tokens
+}
+
+// ---------------------------------------------------------------------------
+// HTML renderer
+// ---------------------------------------------------------------------------
+
+/// Render a slice of tokens to an HTML string.
+pub fn render_to_html(tokens: &[MarkdownToken]) -> String {
+    let mut out = String::new();
+    for token in tokens {
+        match token {
+            MarkdownToken::Text(t) => out.push_str(&html_escape(t)),
+            MarkdownToken::Bold(t) => {
+                out.push_str("<strong>");
+                out.push_str(&html_escape(t));
+                out.push_str("</strong>");
+            }
+            MarkdownToken::Italic(t) => {
+                out.push_str("<em>");
+                out.push_str(&html_escape(t));
+                out.push_str("</em>");
+            }
+            MarkdownToken::Code(t) => {
+                out.push_str("<code>");
+                out.push_str(&html_escape(t));
+                out.push_str("</code>");
+            }
+            MarkdownToken::CodeBlock(t, lang) => {
+                if let Some(l) = lang {
+                    out.push_str(&format!("<pre><code class=\"language-{}\">", html_escape(l)));
+                } else {
+                    out.push_str("<pre><code>");
+                }
+                out.push_str(&html_escape(t));
+                out.push_str("</code></pre>");
+            }
+            MarkdownToken::Link(label, url) => {
+                out.push_str(&format!(
+                    "<a href=\"{}\">{}</a>",
+                    html_escape(url),
+                    html_escape(label)
+                ));
+            }
+            MarkdownToken::Heading(level, t) => {
+                out.push_str(&format!("<h{0}>{1}</h{0}>", level, html_escape(t)));
+            }
+            MarkdownToken::ListItemMd(t) => {
+                out.push_str("<li>");
+                out.push_str(&html_escape(t));
+                out.push_str("</li>");
+            }
+            MarkdownToken::Paragraph => out.push_str("<p></p>"),
+            MarkdownToken::LineBreak => out.push_str("<br>"),
+        }
+    }
+    out
+}
+
+fn html_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
+// ---------------------------------------------------------------------------
+// Convenience & extraction helpers
+// ---------------------------------------------------------------------------
+
+/// Tokenise then render to plain text in one step.
+pub fn strip_markdown(text: &str) -> String {
+    let tokens = tokenize_inline(text);
+    render_to_plain_text(&tokens)
+}
+
+/// Extract all links as `(label, url)` pairs from a token slice.
+pub fn extract_links(tokens: &[MarkdownToken]) -> Vec<(String, String)> {
+    tokens
+        .iter()
+        .filter_map(|t| {
+            if let MarkdownToken::Link(label, url) = t {
+                Some((label.clone(), url.clone()))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// Extract all headings as `(level, text)` pairs from a token slice.
+pub fn extract_headings(tokens: &[MarkdownToken]) -> Vec<(u8, String)> {
+    tokens
+        .iter()
+        .filter_map(|t| {
+            if let MarkdownToken::Heading(level, text) = t {
+                Some((*level, text.clone()))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// Count words across all text-bearing tokens.
+pub fn word_count(tokens: &[MarkdownToken]) -> usize {
+    tokens
+        .iter()
+        .map(|t| {
+            let s = match t {
+                MarkdownToken::Text(s)
+                | MarkdownToken::Bold(s)
+                | MarkdownToken::Italic(s)
+                | MarkdownToken::Code(s)
+                | MarkdownToken::CodeBlock(s, _)
+                | MarkdownToken::ListItemMd(s) => s.as_str(),
+                MarkdownToken::Link(label, _) => label.as_str(),
+                MarkdownToken::Heading(_, s) => s.as_str(),
+                MarkdownToken::Paragraph | MarkdownToken::LineBreak => "",
+            };
+            s.split_whitespace().count()
+        })
+        .sum()
+}
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+
+/// Configuration options for Markdown processing.
+#[derive(Debug, Clone)]
+pub struct MarkdownConfig {
+    /// Treat single newlines as hard line breaks (like GitHub-flavoured Markdown).
+    pub hard_line_breaks: bool,
+    /// Replace straight quotes with curly/smart quotes.
+    pub smart_quotes: bool,
+}
+
+impl Default for MarkdownConfig {
+    fn default() -> Self {
+        Self {
+            hard_line_breaks: false,
+            smart_quotes: false,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -186,5 +416,110 @@ mod tests {
             MarkdownToken::Bold("world".into()),
         ];
         assert_eq!(render_to_plain_text(&tokens), "hello world");
+    }
+
+    #[test]
+    fn block_tokenize_headings() {
+        let tokens = tokenize_block("# Title\n## Subtitle");
+        assert_eq!(tokens[0], MarkdownToken::Heading(1, "Title".into()));
+        assert_eq!(tokens[1], MarkdownToken::Heading(2, "Subtitle".into()));
+    }
+
+    #[test]
+    fn block_tokenize_list_items() {
+        let tokens = tokenize_block("- first\n* second");
+        assert_eq!(tokens[0], MarkdownToken::ListItemMd("first".into()));
+        assert_eq!(tokens[1], MarkdownToken::ListItemMd("second".into()));
+    }
+
+    #[test]
+    fn block_tokenize_code_block() {
+        let input = "```rust\nfn main() {}\n```";
+        let tokens = tokenize_block(input);
+        assert_eq!(
+            tokens[0],
+            MarkdownToken::CodeBlock("fn main() {}".into(), Some("rust".into()))
+        );
+    }
+
+    #[test]
+    fn block_tokenize_code_block_no_lang() {
+        let input = "```\nhello\nworld\n```";
+        let tokens = tokenize_block(input);
+        assert_eq!(
+            tokens[0],
+            MarkdownToken::CodeBlock("hello\nworld".into(), None)
+        );
+    }
+
+    #[test]
+    fn block_tokenize_paragraphs() {
+        let tokens = tokenize_block("first para\n\nsecond para");
+        assert!(tokens.contains(&MarkdownToken::Paragraph));
+        assert!(tokens.contains(&MarkdownToken::Text("first para".into())));
+        assert!(tokens.contains(&MarkdownToken::Text("second para".into())));
+    }
+
+    #[test]
+    fn render_html_basic() {
+        let tokens = vec![
+            MarkdownToken::Bold("hi".into()),
+            MarkdownToken::Italic("there".into()),
+            MarkdownToken::Code("x".into()),
+        ];
+        let html = render_to_html(&tokens);
+        assert_eq!(html, "<strong>hi</strong><em>there</em><code>x</code>");
+    }
+
+    #[test]
+    fn render_html_heading_and_link() {
+        let tokens = vec![
+            MarkdownToken::Heading(2, "Title".into()),
+            MarkdownToken::Link("click".into(), "https://example.com".into()),
+        ];
+        let html = render_to_html(&tokens);
+        assert!(html.contains("<h2>Title</h2>"));
+        assert!(html.contains("<a href=\"https://example.com\">click</a>"));
+    }
+
+    #[test]
+    fn render_html_escapes_entities() {
+        let tokens = vec![MarkdownToken::Text("<script>&".into())];
+        let html = render_to_html(&tokens);
+        assert_eq!(html, "&lt;script&gt;&amp;");
+    }
+
+    #[test]
+    fn extract_links_from_tokens() {
+        let tokens = tokenize_inline("see [a](http://a.com) and [b](http://b.com)");
+        let links = extract_links(&tokens);
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0], ("a".into(), "http://a.com".into()));
+        assert_eq!(links[1], ("b".into(), "http://b.com".into()));
+    }
+
+    #[test]
+    fn extract_headings_from_block() {
+        let tokens = tokenize_block("# One\nsome text\n## Two\n### Three");
+        let headings = extract_headings(&tokens);
+        assert_eq!(headings.len(), 3);
+        assert_eq!(headings[0], (1, "One".into()));
+        assert_eq!(headings[1], (2, "Two".into()));
+        assert_eq!(headings[2], (3, "Three".into()));
+    }
+
+    #[test]
+    fn word_count_across_tokens() {
+        let tokens = vec![
+            MarkdownToken::Text("hello world".into()),
+            MarkdownToken::Bold("one more".into()),
+            MarkdownToken::Paragraph,
+        ];
+        assert_eq!(word_count(&tokens), 4);
+    }
+
+    #[test]
+    fn strip_markdown_convenience() {
+        assert_eq!(strip_markdown("**bold** and *italic*"), "bold and italic");
     }
 }
