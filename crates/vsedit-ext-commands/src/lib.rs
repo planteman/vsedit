@@ -173,6 +173,141 @@ impl CommandHistory {
     pub fn execution_count(&self) -> usize {
         self.entries.len()
     }
+
+    /// The command ID of the most recent execution, if any.
+    pub fn last_execution(&self) -> Option<&str> {
+        self.entries.last().map(|e| e.command_id.as_str())
+    }
+
+    /// Count how many times a specific command was executed.
+    pub fn count_for(&self, command_id: &str) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| e.command_id == command_id)
+            .count()
+    }
+
+    /// Clear all recorded history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+// ── CommandProxy ──
+
+/// High-level proxy for managing extension commands.
+///
+/// Wraps a `CommandBridge` and a `CommandHistory` to provide a unified API
+/// for registering, executing, querying, and tracking commands.
+#[derive(Debug, Default)]
+pub struct CommandProxy {
+    bridge: CommandBridge,
+    history: CommandHistory,
+}
+
+impl CommandProxy {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a command with the given ID and callback proxy handle.
+    pub fn register(&mut self, command_id: &str, callback_proxy_id: &str) {
+        self.bridge.handle(CommandMessage::RegisterCommand {
+            command: CommandRegistration {
+                command_id: command_id.to_string(),
+                callback_proxy_id: callback_proxy_id.to_string(),
+            },
+        });
+    }
+
+    /// Number of currently registered commands.
+    pub fn command_count(&self) -> usize {
+        self.bridge.command_count()
+    }
+
+    /// Check whether a command with the given ID is registered.
+    pub fn has_command(&self, id: &str) -> bool {
+        self.bridge.has_command(id)
+    }
+
+    /// Remove a command by ID. Returns `true` if it was registered.
+    pub fn remove_command(&mut self, id: &str) -> bool {
+        self.bridge.unregister_command(id)
+    }
+
+    /// List all registered command IDs (sorted).
+    pub fn list_commands(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self.bridge.get_all_commands().iter().map(|s| s.to_string()).collect();
+        ids.sort();
+        ids
+    }
+
+    /// Execute a command and return a `CommandProxyResult` with the command ID.
+    pub fn execute_with_result(
+        &mut self,
+        command_id: &str,
+        args: &[Value],
+    ) -> CommandProxyResult {
+        self.history.record_execution(command_id);
+        let inner = self.bridge.execute_with_result(command_id, args);
+        CommandProxyResult {
+            command_id: command_id.to_string(),
+            success: inner.success,
+            result: inner.value,
+            error: inner.error_message,
+        }
+    }
+
+    /// Find all registered command IDs that start with `prefix`.
+    pub fn find_commands(&self, prefix: &str) -> Vec<String> {
+        let mut matches: Vec<String> = self
+            .bridge
+            .get_all_commands()
+            .into_iter()
+            .filter(|id| id.starts_with(prefix))
+            .map(|s| s.to_string())
+            .collect();
+        matches.sort();
+        matches
+    }
+
+    /// Return a snapshot of proxy statistics.
+    pub fn stats(&self) -> CommandStats {
+        let last = self.history.last_execution().map(|s| s.to_string());
+        CommandStats {
+            total_registered: self.bridge.command_count(),
+            total_executed: self.history.execution_count(),
+            last_execution: last,
+        }
+    }
+
+    /// Borrow the underlying command history.
+    pub fn history(&self) -> &CommandHistory {
+        &self.history
+    }
+}
+
+// ── CommandProxyResult ──
+
+/// Structured result returned by `CommandProxy::execute_with_result`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandProxyResult {
+    pub command_id: String,
+    pub success: bool,
+    pub result: Option<Value>,
+    pub error: Option<String>,
+}
+
+// ── CommandStats ──
+
+/// Aggregate statistics about registered and executed commands.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandStats {
+    pub total_registered: usize,
+    pub total_executed: usize,
+    pub last_execution: Option<String>,
 }
 
 /// Initialize the commands extension API bridge.
@@ -362,5 +497,172 @@ mod tests {
         assert_eq!(bridge.command_count(), 3);
         bridge.unregister_command("y");
         assert_eq!(bridge.command_count(), 2);
+    }
+
+    // ── CommandProxy tests ──
+
+    fn make_proxy_with(ids: &[&str]) -> CommandProxy {
+        let mut proxy = CommandProxy::new();
+        for id in ids {
+            proxy.register(id, &format!("proxy-{}", id));
+        }
+        proxy
+    }
+
+    #[test]
+    fn proxy_command_count() {
+        let proxy = make_proxy_with(&["a", "b", "c"]);
+        assert_eq!(proxy.command_count(), 3);
+    }
+
+    #[test]
+    fn proxy_has_command() {
+        let proxy = make_proxy_with(&["editor.format"]);
+        assert!(proxy.has_command("editor.format"));
+        assert!(!proxy.has_command("editor.missing"));
+    }
+
+    #[test]
+    fn proxy_remove_command() {
+        let mut proxy = make_proxy_with(&["a", "b"]);
+        assert!(proxy.remove_command("a"));
+        assert!(!proxy.has_command("a"));
+        assert!(!proxy.remove_command("nonexistent"));
+    }
+
+    #[test]
+    fn proxy_list_commands_sorted() {
+        let proxy = make_proxy_with(&["c", "a", "b"]);
+        assert_eq!(proxy.list_commands(), vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn proxy_execute_with_result_success() {
+        let mut proxy = make_proxy_with(&["run.me"]);
+        let result = proxy.execute_with_result("run.me", &[]);
+        assert_eq!(result.command_id, "run.me");
+        assert!(result.success);
+        assert!(result.error.is_none());
+    }
+
+    #[test]
+    fn proxy_execute_with_result_not_found() {
+        let mut proxy = make_proxy_with(&[]);
+        let result = proxy.execute_with_result("missing", &[]);
+        assert_eq!(result.command_id, "missing");
+        assert!(!result.success);
+        assert!(result.error.as_ref().unwrap().contains("not found"));
+    }
+
+    #[test]
+    fn proxy_execute_records_history() {
+        let mut proxy = make_proxy_with(&["cmd.a"]);
+        proxy.execute_with_result("cmd.a", &[]);
+        proxy.execute_with_result("cmd.a", &[]);
+        assert_eq!(proxy.history().execution_count(), 2);
+    }
+
+    #[test]
+    fn proxy_find_commands_by_prefix() {
+        let proxy = make_proxy_with(&["editor.format", "editor.save", "file.open"]);
+        let found = proxy.find_commands("editor.");
+        assert_eq!(found, vec!["editor.format", "editor.save"]);
+    }
+
+    #[test]
+    fn proxy_find_commands_no_match() {
+        let proxy = make_proxy_with(&["a.x", "b.y"]);
+        assert!(proxy.find_commands("z.").is_empty());
+    }
+
+    #[test]
+    fn proxy_stats_initial() {
+        let proxy = CommandProxy::new();
+        let stats = proxy.stats();
+        assert_eq!(stats.total_registered, 0);
+        assert_eq!(stats.total_executed, 0);
+        assert!(stats.last_execution.is_none());
+    }
+
+    #[test]
+    fn proxy_stats_after_activity() {
+        let mut proxy = make_proxy_with(&["cmd.a", "cmd.b"]);
+        proxy.execute_with_result("cmd.a", &[]);
+        proxy.execute_with_result("cmd.b", &[]);
+        let stats = proxy.stats();
+        assert_eq!(stats.total_registered, 2);
+        assert_eq!(stats.total_executed, 2);
+        assert_eq!(stats.last_execution.as_deref(), Some("cmd.b"));
+    }
+
+    #[test]
+    fn command_proxy_result_serde() {
+        let result = CommandProxyResult {
+            command_id: "test.cmd".into(),
+            success: true,
+            result: Some(Value::String("ok".into())),
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let parsed: CommandProxyResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(result, parsed);
+    }
+
+    #[test]
+    fn command_stats_serde() {
+        let stats = CommandStats {
+            total_registered: 5,
+            total_executed: 12,
+            last_execution: Some("cmd.last".into()),
+        };
+        let json = serde_json::to_string(&stats).unwrap();
+        let parsed: CommandStats = serde_json::from_str(&json).unwrap();
+        assert_eq!(stats, parsed);
+    }
+
+    #[test]
+    fn command_history_count_for() {
+        let mut history = CommandHistory::new();
+        history.record_execution("cmd.a");
+        history.record_execution("cmd.b");
+        history.record_execution("cmd.a");
+        assert_eq!(history.count_for("cmd.a"), 2);
+        assert_eq!(history.count_for("cmd.b"), 1);
+        assert_eq!(history.count_for("cmd.c"), 0);
+    }
+
+    #[test]
+    fn command_history_clear() {
+        let mut history = CommandHistory::new();
+        history.record_execution("cmd.a");
+        history.record_execution("cmd.b");
+        history.clear();
+        assert_eq!(history.execution_count(), 0);
+        assert!(history.last_execution().is_none());
+    }
+
+    #[test]
+    fn command_history_last_execution() {
+        let mut history = CommandHistory::new();
+        assert!(history.last_execution().is_none());
+        history.record_execution("first");
+        history.record_execution("second");
+        assert_eq!(history.last_execution(), Some("second"));
+    }
+
+    #[test]
+    fn proxy_register_overwrites() {
+        let mut proxy = CommandProxy::new();
+        proxy.register("cmd.a", "proxy-1");
+        proxy.register("cmd.a", "proxy-2");
+        assert_eq!(proxy.command_count(), 1);
+    }
+
+    #[test]
+    fn proxy_remove_then_find() {
+        let mut proxy = make_proxy_with(&["ns.a", "ns.b", "ns.c"]);
+        proxy.remove_command("ns.b");
+        let found = proxy.find_commands("ns.");
+        assert_eq!(found, vec!["ns.a", "ns.c"]);
     }
 }
