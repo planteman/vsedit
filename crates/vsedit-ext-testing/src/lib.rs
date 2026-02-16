@@ -852,17 +852,43 @@ impl CargoTestDiscoverer {
     }
 }
 
-/// Discover tests for a given framework (stub — real impl would run commands).
-pub fn discover_tests(framework: TestFramework, _path: &Path) -> Vec<VscTestItem> {
+/// Discover tests for a given framework by running the appropriate command.
+pub fn discover_tests(framework: TestFramework, path: &Path) -> Vec<VscTestItem> {
     match framework {
         TestFramework::CargoTest => {
-            // In production, would run `cargo test -- --list` and parse
+            let output = std::process::Command::new("cargo")
+                .args(["test", "--", "--list"])
+                .current_dir(path)
+                .output();
+            match output {
+                Ok(out) if out.status.success() => {
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    CargoTestDiscoverer::parse_test_list(&stdout)
+                }
+                _ => Vec::new(),
+            }
+        }
+        TestFramework::Jest => {
+            // TODO: Implement Jest discovery (run `npx jest --listTests`)
             Vec::new()
         }
-        TestFramework::Jest => Vec::new(),
-        TestFramework::Pytest => Vec::new(),
-        TestFramework::GoTest => Vec::new(),
+        TestFramework::Pytest => {
+            // TODO: Implement Pytest discovery (run `pytest --collect-only -q`)
+            Vec::new()
+        }
+        TestFramework::GoTest => {
+            // TODO: Implement Go test discovery (run `go test -list .`)
+            Vec::new()
+        }
         TestFramework::Unknown => Vec::new(),
+    }
+}
+
+/// Parse pre-existing command output for the given framework without spawning a process.
+pub fn discover_tests_from_output(framework: TestFramework, output: &str) -> Vec<VscTestItem> {
+    match framework {
+        TestFramework::CargoTest => CargoTestDiscoverer::parse_test_list(output),
+        _ => Vec::new(),
     }
 }
 
@@ -2005,6 +2031,42 @@ ignored_line
     #[test]
     fn discover_tests_returns_empty_for_unknown() {
         let items = discover_tests(TestFramework::Unknown, std::path::Path::new("/tmp"));
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn discover_tests_cargo_parses_output() {
+        let output = "tests::test_one: test\ntests::test_two: test\nother_test: test\n";
+        let items = discover_tests_from_output(TestFramework::CargoTest, output);
+        // Should have module "tests" with 2 children, plus "other_test" at root
+        assert!(items.len() >= 2); // at least module group + root test
+        let module = items.iter().find(|i| i.id == "tests");
+        assert!(module.is_some());
+        assert_eq!(module.unwrap().children.len(), 2);
+    }
+
+    #[test]
+    fn discover_tests_cargo_empty_output() {
+        let items = discover_tests_from_output(TestFramework::CargoTest, "");
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn discover_tests_cargo_skips_non_test_lines() {
+        let output = "running 3 tests\ntests::my_test: test\n\n3 tests total\n";
+        let items = discover_tests_from_output(TestFramework::CargoTest, output);
+        assert_eq!(items.len(), 1); // only the module group
+    }
+
+    #[test]
+    fn discover_tests_jest_stub() {
+        let items = discover_tests_from_output(TestFramework::Jest, "some output");
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn discover_tests_from_output_unknown() {
+        let items = discover_tests_from_output(TestFramework::Unknown, "anything");
         assert!(items.is_empty());
     }
 }

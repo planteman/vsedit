@@ -55,10 +55,10 @@ fn hex_nibble(c: u8) -> Option<u8> {
 pub enum ChecksumKind {
     /// SHA-256 (real, via sha2 crate).
     Sha256,
-    /// MD5-style stub (uses FNV internally, not real MD5).
-    Md5Stub,
-    /// SHA-1–style stub (uses FNV internally, not real SHA-1).
-    Sha1Stub,
+    /// MD5 (RFC 1321).
+    Md5,
+    /// SHA-1 (RFC 3174).
+    Sha1,
     /// Real FNV-1a 64-bit hash.
     Fnv64,
     /// CRC-32 (IEEE 802.3).
@@ -69,8 +69,8 @@ pub enum ChecksumKind {
 pub fn algorithm_name(kind: ChecksumKind) -> &'static str {
     match kind {
         ChecksumKind::Sha256 => "SHA-256",
-        ChecksumKind::Md5Stub => "MD5 (stub)",
-        ChecksumKind::Sha1Stub => "SHA-1 (stub)",
+        ChecksumKind::Md5 => "MD5",
+        ChecksumKind::Sha1 => "SHA-1",
         ChecksumKind::Fnv64 => "FNV-1a 64-bit",
         ChecksumKind::Crc32 => "CRC-32",
     }
@@ -103,25 +103,130 @@ pub fn compute_sha256(data: &[u8]) -> String {
     hex_encode(&hasher.finalize())
 }
 
-/// Compute an MD5-style stub hash (uses FNV-1a internally).
+/// Compute MD5 (RFC 1321) of `data`, returning a lowercase hex string.
 pub fn compute_md5(data: &[u8]) -> String {
-    // Produce a 128-bit-style output by hashing two halves
-    let h1 = simple_hash(data);
-    let h2 = simple_hash(&[data, &[0xff]].concat());
-    hex_encode(&[h1.to_be_bytes(), h2.to_be_bytes()].concat())
+    const S: [u32; 64] = [
+        7,12,17,22, 7,12,17,22, 7,12,17,22, 7,12,17,22,
+        5, 9,14,20, 5, 9,14,20, 5, 9,14,20, 5, 9,14,20,
+        4,11,16,23, 4,11,16,23, 4,11,16,23, 4,11,16,23,
+        6,10,15,21, 6,10,15,21, 6,10,15,21, 6,10,15,21,
+    ];
+    const T: [u32; 64] = [
+        0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee,
+        0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
+        0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
+        0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+        0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa,
+        0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+        0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed,
+        0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
+        0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c,
+        0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+        0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05,
+        0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+        0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039,
+        0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+        0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1,
+        0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
+    ];
+
+    let bit_len = (data.len() as u64).wrapping_mul(8);
+    let mut msg = data.to_vec();
+    msg.push(0x80);
+    while msg.len() % 64 != 56 {
+        msg.push(0);
+    }
+    msg.extend_from_slice(&bit_len.to_le_bytes());
+
+    let (mut a0, mut b0, mut c0, mut d0): (u32, u32, u32, u32) =
+        (0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476);
+
+    for chunk in msg.chunks_exact(64) {
+        let mut m = [0u32; 16];
+        for (i, word) in chunk.chunks_exact(4).enumerate() {
+            m[i] = u32::from_le_bytes([word[0], word[1], word[2], word[3]]);
+        }
+        let (mut a, mut b, mut c, mut d) = (a0, b0, c0, d0);
+        for i in 0..64 {
+            let (f, g) = match i {
+                0..=15  => ((b & c) | (!b & d), i),
+                16..=31 => ((d & b) | (!d & c), (5 * i + 1) % 16),
+                32..=47 => (b ^ c ^ d, (3 * i + 5) % 16),
+                _       => (c ^ (b | !d), (7 * i) % 16),
+            };
+            let temp = a.wrapping_add(f).wrapping_add(T[i]).wrapping_add(m[g]);
+            a = d;
+            d = c;
+            c = b;
+            b = b.wrapping_add(temp.rotate_left(S[i]));
+        }
+        a0 = a0.wrapping_add(a);
+        b0 = b0.wrapping_add(b);
+        c0 = c0.wrapping_add(c);
+        d0 = d0.wrapping_add(d);
+    }
+
+    let mut out = [0u8; 16];
+    out[0..4].copy_from_slice(&a0.to_le_bytes());
+    out[4..8].copy_from_slice(&b0.to_le_bytes());
+    out[8..12].copy_from_slice(&c0.to_le_bytes());
+    out[12..16].copy_from_slice(&d0.to_le_bytes());
+    hex_encode(&out)
 }
 
-/// Compute a SHA-1–style stub hash (uses FNV-1a internally).
+/// Compute SHA-1 (RFC 3174) of `data`, returning a lowercase hex string.
 pub fn compute_sha1(data: &[u8]) -> String {
-    // Produce a 160-bit-style output
-    let h1 = simple_hash(data);
-    let h2 = simple_hash(&[data, &[0xfe]].concat());
-    let h3_data = [data, &[0xfd]].concat();
-    let h3 = simple_hash(&h3_data) & 0xFFFF_FFFF;
-    let mut out = Vec::with_capacity(20);
-    out.extend_from_slice(&h1.to_be_bytes());
-    out.extend_from_slice(&h2.to_be_bytes());
-    out.extend_from_slice(&(h3 as u32).to_be_bytes());
+    let bit_len = (data.len() as u64).wrapping_mul(8);
+    let mut msg = data.to_vec();
+    msg.push(0x80);
+    while msg.len() % 64 != 56 {
+        msg.push(0);
+    }
+    msg.extend_from_slice(&bit_len.to_be_bytes());
+
+    let (mut h0, mut h1, mut h2, mut h3, mut h4): (u32, u32, u32, u32, u32) =
+        (0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0);
+
+    for chunk in msg.chunks_exact(64) {
+        let mut w = [0u32; 80];
+        for (i, word) in chunk.chunks_exact(4).enumerate() {
+            w[i] = u32::from_be_bytes([word[0], word[1], word[2], word[3]]);
+        }
+        for i in 16..80 {
+            w[i] = (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]).rotate_left(1);
+        }
+        let (mut a, mut b, mut c, mut d, mut e) = (h0, h1, h2, h3, h4);
+        for i in 0..80 {
+            let (f, k) = match i {
+                0..=19  => ((b & c) | (!b & d), 0x5A827999u32),
+                20..=39 => (b ^ c ^ d, 0x6ED9EBA1u32),
+                40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1BBCDCu32),
+                _       => (b ^ c ^ d, 0xCA62C1D6u32),
+            };
+            let temp = a.rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(k)
+                .wrapping_add(w[i]);
+            e = d;
+            d = c;
+            c = b.rotate_left(30);
+            b = a;
+            a = temp;
+        }
+        h0 = h0.wrapping_add(a);
+        h1 = h1.wrapping_add(b);
+        h2 = h2.wrapping_add(c);
+        h3 = h3.wrapping_add(d);
+        h4 = h4.wrapping_add(e);
+    }
+
+    let mut out = [0u8; 20];
+    out[0..4].copy_from_slice(&h0.to_be_bytes());
+    out[4..8].copy_from_slice(&h1.to_be_bytes());
+    out[8..12].copy_from_slice(&h2.to_be_bytes());
+    out[12..16].copy_from_slice(&h3.to_be_bytes());
+    out[16..20].copy_from_slice(&h4.to_be_bytes());
     hex_encode(&out)
 }
 
@@ -129,8 +234,8 @@ pub fn compute_sha1(data: &[u8]) -> String {
 pub fn compute_checksum(data: &[u8], kind: ChecksumKind) -> String {
     match kind {
         ChecksumKind::Sha256 => compute_sha256(data),
-        ChecksumKind::Md5Stub => compute_md5(data),
-        ChecksumKind::Sha1Stub => compute_sha1(data),
+        ChecksumKind::Md5 => compute_md5(data),
+        ChecksumKind::Sha1 => compute_sha1(data),
         ChecksumKind::Fnv64 => {
             let h = simple_hash(data);
             hex_encode(&h.to_be_bytes())
@@ -549,7 +654,7 @@ mod tests {
     }
 
     #[test]
-    fn md5_stub_deterministic_and_length() {
+    fn md5_deterministic_and_length() {
         let a = compute_md5(b"data");
         let b = compute_md5(b"data");
         assert_eq!(a, b);
@@ -557,11 +662,47 @@ mod tests {
     }
 
     #[test]
-    fn sha1_stub_deterministic_and_length() {
+    fn sha1_deterministic_and_length() {
         let a = compute_sha1(b"data");
         let b = compute_sha1(b"data");
         assert_eq!(a, b);
         assert_eq!(a.len(), 40); // 160-bit output = 20 bytes = 40 hex
+    }
+
+    #[test]
+    fn md5_known_empty() {
+        assert_eq!(compute_md5(b""), "d41d8cd98f00b204e9800998ecf8427e");
+    }
+
+    #[test]
+    fn md5_known_hello() {
+        assert_eq!(compute_md5(b"hello"), "5d41402abc4b2a76b9719d911017c592");
+    }
+
+    #[test]
+    fn sha1_known_empty() {
+        assert_eq!(compute_sha1(b""), "da39a3ee5e6b4b0d3255bfef95601890afd80709");
+    }
+
+    #[test]
+    fn sha1_known_hello() {
+        assert_eq!(compute_sha1(b"hello"), "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d");
+    }
+
+    #[test]
+    fn verify_md5() {
+        let data = b"verify md5";
+        let checksum = compute_checksum(data, ChecksumKind::Md5);
+        assert!(verify_checksum(data, &checksum, ChecksumKind::Md5));
+        assert!(!verify_checksum(b"other", &checksum, ChecksumKind::Md5));
+    }
+
+    #[test]
+    fn verify_sha1() {
+        let data = b"verify sha1";
+        let checksum = compute_checksum(data, ChecksumKind::Sha1);
+        assert!(verify_checksum(data, &checksum, ChecksumKind::Sha1));
+        assert!(!verify_checksum(b"other", &checksum, ChecksumKind::Sha1));
     }
 
     #[test]
@@ -600,7 +741,7 @@ mod tests {
         let data = b"same data";
         let sha256 = compute_checksum(data, ChecksumKind::Sha256);
         let fnv = compute_checksum(data, ChecksumKind::Fnv64);
-        let md5 = compute_checksum(data, ChecksumKind::Md5Stub);
+        let md5 = compute_checksum(data, ChecksumKind::Md5);
         assert_ne!(sha256, fnv);
         assert_ne!(sha256, md5);
     }
@@ -698,8 +839,8 @@ mod tests {
     #[test]
     fn algorithm_name_values() {
         assert_eq!(algorithm_name(ChecksumKind::Sha256), "SHA-256");
-        assert_eq!(algorithm_name(ChecksumKind::Md5Stub), "MD5 (stub)");
-        assert_eq!(algorithm_name(ChecksumKind::Sha1Stub), "SHA-1 (stub)");
+        assert_eq!(algorithm_name(ChecksumKind::Md5), "MD5");
+        assert_eq!(algorithm_name(ChecksumKind::Sha1), "SHA-1");
         assert_eq!(algorithm_name(ChecksumKind::Fnv64), "FNV-1a 64-bit");
         assert_eq!(algorithm_name(ChecksumKind::Crc32), "CRC-32");
     }
@@ -711,7 +852,7 @@ mod tests {
 
     #[test]
     fn ne_checksumkind_diff() {
-        assert_ne!(ChecksumKind::Sha256, ChecksumKind::Md5Stub);
+        assert_ne!(ChecksumKind::Sha256, ChecksumKind::Md5);
     }
 
     #[test]

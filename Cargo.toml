@@ -176,6 +176,7 @@ members = [
     "crates/vsedit-tasks",
     "crates/vsedit-tasks-feature",
     "crates/vsedit-telemetry",
+    "crates/vsedit-terminal",
     "crates/vsedit-terminal-plat",
     "crates/vsedit-terminal-view",
     "crates/vsedit-test-view",
