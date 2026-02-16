@@ -480,6 +480,327 @@ impl Default for EditorServicesValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// EditorDecorationService
+// ---------------------------------------------------------------------------
+
+/// A text decoration type (e.g., underline, highlight, error squiggly).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DecorationType {
+    Highlight,
+    Underline,
+    ErrorSquiggly,
+    WarningSquiggly,
+    InfoSquiggly,
+    Custom(String),
+}
+
+/// A single decoration applied to a range in an editor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EditorDecoration {
+    pub id: u64,
+    pub decoration_type: DecorationType,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub tooltip: Option<String>,
+}
+
+/// Service for managing decorations across editors.
+pub struct EditorDecorationService {
+    decorations: Vec<EditorDecoration>,
+    next_id: u64,
+}
+
+impl EditorDecorationService {
+    pub fn new() -> Self {
+        Self {
+            decorations: Vec::new(),
+            next_id: 1,
+        }
+    }
+
+    /// Add a decoration and return its assigned ID.
+    pub fn add_decoration(
+        &mut self,
+        decoration_type: DecorationType,
+        start_line: u32,
+        start_col: u32,
+        end_line: u32,
+        end_col: u32,
+    ) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.decorations.push(EditorDecoration {
+            id,
+            decoration_type,
+            start_line,
+            start_col,
+            end_line,
+            end_col,
+            tooltip: None,
+        });
+        id
+    }
+
+    /// Add a decoration with a tooltip.
+    pub fn add_decoration_with_tooltip(
+        &mut self,
+        decoration_type: DecorationType,
+        start_line: u32,
+        start_col: u32,
+        end_line: u32,
+        end_col: u32,
+        tooltip: impl Into<String>,
+    ) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.decorations.push(EditorDecoration {
+            id,
+            decoration_type,
+            start_line,
+            start_col,
+            end_line,
+            end_col,
+            tooltip: Some(tooltip.into()),
+        });
+        id
+    }
+
+    /// Remove a decoration by ID.
+    pub fn remove_decoration(&mut self, id: u64) -> bool {
+        let len = self.decorations.len();
+        self.decorations.retain(|d| d.id != id);
+        self.decorations.len() != len
+    }
+
+    /// Get all decorations on a specific line.
+    pub fn decorations_on_line(&self, line: u32) -> Vec<&EditorDecoration> {
+        self.decorations
+            .iter()
+            .filter(|d| d.start_line <= line && d.end_line >= line)
+            .collect()
+    }
+
+    /// Get all decorations of a specific type.
+    pub fn decorations_of_type(&self, decoration_type: &DecorationType) -> Vec<&EditorDecoration> {
+        self.decorations
+            .iter()
+            .filter(|d| &d.decoration_type == decoration_type)
+            .collect()
+    }
+
+    /// Remove all decorations of a specific type.
+    pub fn clear_type(&mut self, decoration_type: &DecorationType) {
+        self.decorations.retain(|d| &d.decoration_type != decoration_type);
+    }
+
+    /// Total number of active decorations.
+    pub fn count(&self) -> usize {
+        self.decorations.len()
+    }
+
+    /// Remove all decorations.
+    pub fn clear_all(&mut self) {
+        self.decorations.clear();
+    }
+}
+
+impl Default for EditorDecorationService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorSnapshotService
+// ---------------------------------------------------------------------------
+
+/// A snapshot of a document at a point in time.
+#[derive(Debug, Clone)]
+pub struct DocumentSnapshot {
+    pub id: u64,
+    pub uri: String,
+    pub content: String,
+    pub version: u64,
+    pub line_count: usize,
+}
+
+impl DocumentSnapshot {
+    /// Get a specific line from the snapshot (0-based).
+    pub fn get_line(&self, line: usize) -> Option<&str> {
+        self.content.lines().nth(line)
+    }
+
+    /// Compute a simple checksum of the content.
+    pub fn checksum(&self) -> u64 {
+        let mut hash: u64 = 0;
+        for byte in self.content.bytes() {
+            hash = hash.wrapping_mul(31).wrapping_add(byte as u64);
+        }
+        hash
+    }
+}
+
+/// Service for creating and managing document snapshots.
+pub struct EditorSnapshotService {
+    snapshots: Vec<DocumentSnapshot>,
+    next_id: u64,
+}
+
+impl EditorSnapshotService {
+    pub fn new() -> Self {
+        Self {
+            snapshots: Vec::new(),
+            next_id: 1,
+        }
+    }
+
+    /// Create a snapshot of the given content.
+    pub fn create_snapshot(&mut self, uri: &str, content: &str, version: u64) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        let line_count = content.lines().count();
+        self.snapshots.push(DocumentSnapshot {
+            id,
+            uri: uri.to_string(),
+            content: content.to_string(),
+            version,
+            line_count,
+        });
+        id
+    }
+
+    /// Retrieve a snapshot by ID.
+    pub fn get_snapshot(&self, id: u64) -> Option<&DocumentSnapshot> {
+        self.snapshots.iter().find(|s| s.id == id)
+    }
+
+    /// Get the latest snapshot for a given URI.
+    pub fn latest_for_uri(&self, uri: &str) -> Option<&DocumentSnapshot> {
+        self.snapshots
+            .iter()
+            .filter(|s| s.uri == uri)
+            .max_by_key(|s| s.version)
+    }
+
+    /// Remove a snapshot by ID.
+    pub fn remove_snapshot(&mut self, id: u64) -> bool {
+        let len = self.snapshots.len();
+        self.snapshots.retain(|s| s.id != id);
+        self.snapshots.len() != len
+    }
+
+    /// Number of stored snapshots.
+    pub fn count(&self) -> usize {
+        self.snapshots.len()
+    }
+}
+
+impl Default for EditorSnapshotService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorDiffService
+// ---------------------------------------------------------------------------
+
+/// A single diff chunk between two versions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffChunk {
+    Equal(String),
+    Added(String),
+    Removed(String),
+}
+
+/// Compute a line-level diff between two strings.
+pub struct EditorDiffService;
+
+impl EditorDiffService {
+    /// Compute line-by-line diff between `old` and `new` text.
+    /// Uses a simple LCS-based approach.
+    pub fn diff_lines(old: &str, new: &str) -> Vec<DiffChunk> {
+        let old_lines: Vec<&str> = old.lines().collect();
+        let new_lines: Vec<&str> = new.lines().collect();
+
+        let mut chunks = Vec::new();
+        let mut old_idx = 0;
+        let mut new_idx = 0;
+
+        while old_idx < old_lines.len() && new_idx < new_lines.len() {
+            if old_lines[old_idx] == new_lines[new_idx] {
+                chunks.push(DiffChunk::Equal(old_lines[old_idx].to_string()));
+                old_idx += 1;
+                new_idx += 1;
+            } else {
+                // Look ahead for a match in new
+                let new_match = new_lines[new_idx..]
+                    .iter()
+                    .position(|l| old_idx < old_lines.len() && *l == old_lines[old_idx]);
+                let old_match = old_lines[old_idx..]
+                    .iter()
+                    .position(|l| new_idx < new_lines.len() && *l == new_lines[new_idx]);
+
+                match (new_match, old_match) {
+                    (Some(nm), _) if nm > 0 => {
+                        for i in 0..nm {
+                            chunks.push(DiffChunk::Added(new_lines[new_idx + i].to_string()));
+                        }
+                        new_idx += nm;
+                    }
+                    (_, Some(om)) if om > 0 => {
+                        for i in 0..om {
+                            chunks.push(DiffChunk::Removed(old_lines[old_idx + i].to_string()));
+                        }
+                        old_idx += om;
+                    }
+                    _ => {
+                        chunks.push(DiffChunk::Removed(old_lines[old_idx].to_string()));
+                        chunks.push(DiffChunk::Added(new_lines[new_idx].to_string()));
+                        old_idx += 1;
+                        new_idx += 1;
+                    }
+                }
+            }
+        }
+
+        while old_idx < old_lines.len() {
+            chunks.push(DiffChunk::Removed(old_lines[old_idx].to_string()));
+            old_idx += 1;
+        }
+        while new_idx < new_lines.len() {
+            chunks.push(DiffChunk::Added(new_lines[new_idx].to_string()));
+            new_idx += 1;
+        }
+
+        chunks
+    }
+
+    /// Count the number of added lines in a diff.
+    pub fn count_added(chunks: &[DiffChunk]) -> usize {
+        chunks
+            .iter()
+            .filter(|c| matches!(c, DiffChunk::Added(_)))
+            .count()
+    }
+
+    /// Count the number of removed lines in a diff.
+    pub fn count_removed(chunks: &[DiffChunk]) -> usize {
+        chunks
+            .iter()
+            .filter(|c| matches!(c, DiffChunk::Removed(_)))
+            .count()
+    }
+
+    /// Check if two texts are identical.
+    pub fn is_identical(old: &str, new: &str) -> bool {
+        old == new
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -705,147 +1026,165 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn decoration_service_add_and_query() {
+        let mut svc = EditorDecorationService::new();
+        let id = svc.add_decoration(DecorationType::ErrorSquiggly, 5, 0, 5, 10);
+        assert_eq!(svc.count(), 1);
+        let on_line = svc.decorations_on_line(5);
+        assert_eq!(on_line.len(), 1);
+        assert_eq!(on_line[0].id, id);
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn decoration_service_remove() {
+        let mut svc = EditorDecorationService::new();
+        let id = svc.add_decoration(DecorationType::Highlight, 1, 0, 1, 10);
+        assert!(svc.remove_decoration(id));
+        assert_eq!(svc.count(), 0);
+        assert!(!svc.remove_decoration(id));
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn decoration_service_by_type() {
+        let mut svc = EditorDecorationService::new();
+        svc.add_decoration(DecorationType::ErrorSquiggly, 1, 0, 1, 5);
+        svc.add_decoration(DecorationType::Highlight, 2, 0, 2, 5);
+        svc.add_decoration(DecorationType::ErrorSquiggly, 3, 0, 3, 5);
+        assert_eq!(svc.decorations_of_type(&DecorationType::ErrorSquiggly).len(), 2);
+        assert_eq!(svc.decorations_of_type(&DecorationType::Highlight).len(), 1);
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn decoration_service_clear_type() {
+        let mut svc = EditorDecorationService::new();
+        svc.add_decoration(DecorationType::ErrorSquiggly, 1, 0, 1, 5);
+        svc.add_decoration(DecorationType::Highlight, 2, 0, 2, 5);
+        svc.clear_type(&DecorationType::ErrorSquiggly);
+        assert_eq!(svc.count(), 1);
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn decoration_with_tooltip() {
+        let mut svc = EditorDecorationService::new();
+        let id = svc.add_decoration_with_tooltip(
+            DecorationType::WarningSquiggly, 1, 0, 1, 10, "unused variable",
+        );
+        let dec = svc.decorations_on_line(1);
+        assert_eq!(dec[0].tooltip.as_deref(), Some("unused variable"));
+        assert_eq!(dec[0].id, id);
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn decoration_service_clear_all() {
+        let mut svc = EditorDecorationService::new();
+        svc.add_decoration(DecorationType::Highlight, 1, 0, 1, 5);
+        svc.add_decoration(DecorationType::Highlight, 2, 0, 2, 5);
+        svc.clear_all();
+        assert_eq!(svc.count(), 0);
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn decoration_multiline_query() {
+        let mut svc = EditorDecorationService::new();
+        svc.add_decoration(DecorationType::Highlight, 3, 0, 7, 5);
+        assert_eq!(svc.decorations_on_line(5).len(), 1);
+        assert!(svc.decorations_on_line(2).is_empty());
+        assert!(svc.decorations_on_line(8).is_empty());
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn snapshot_create_and_retrieve() {
+        let mut svc = EditorSnapshotService::new();
+        let id = svc.create_snapshot("file:///main.rs", "fn main() {}\n", 1);
+        let snap = svc.get_snapshot(id).unwrap();
+        assert_eq!(snap.uri, "file:///main.rs");
+        assert_eq!(snap.version, 1);
+        assert_eq!(snap.line_count, 1);
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn snapshot_get_line() {
+        let mut svc = EditorSnapshotService::new();
+        let id = svc.create_snapshot("test", "line0\nline1\nline2", 1);
+        let snap = svc.get_snapshot(id).unwrap();
+        assert_eq!(snap.get_line(0), Some("line0"));
+        assert_eq!(snap.get_line(1), Some("line1"));
+        assert_eq!(snap.get_line(2), Some("line2"));
+        assert!(snap.get_line(3).is_none());
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn snapshot_checksum_differs() {
+        let mut svc = EditorSnapshotService::new();
+        let id1 = svc.create_snapshot("a", "hello", 1);
+        let id2 = svc.create_snapshot("b", "world", 1);
+        let c1 = svc.get_snapshot(id1).unwrap().checksum();
+        let c2 = svc.get_snapshot(id2).unwrap().checksum();
+        assert_ne!(c1, c2);
     }
 
     #[test]
-    fn behavior_check_10() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn snapshot_latest_for_uri() {
+        let mut svc = EditorSnapshotService::new();
+        svc.create_snapshot("file:///a.rs", "v1", 1);
+        svc.create_snapshot("file:///a.rs", "v2", 2);
+        svc.create_snapshot("file:///b.rs", "other", 1);
+        let latest = svc.latest_for_uri("file:///a.rs").unwrap();
+        assert_eq!(latest.version, 2);
+        assert_eq!(latest.content, "v2");
     }
 
     #[test]
-    fn behavior_check_11() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn snapshot_remove() {
+        let mut svc = EditorSnapshotService::new();
+        let id = svc.create_snapshot("test", "content", 1);
+        assert!(svc.remove_snapshot(id));
+        assert_eq!(svc.count(), 0);
     }
 
     #[test]
-    fn behavior_check_12() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn diff_identical() {
+        let chunks = EditorDiffService::diff_lines("a\nb\nc", "a\nb\nc");
+        assert!(chunks.iter().all(|c| matches!(c, DiffChunk::Equal(_))));
+        assert!(EditorDiffService::is_identical("a", "a"));
     }
 
     #[test]
-    fn behavior_check_13() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn diff_added_line() {
+        let chunks = EditorDiffService::diff_lines("a\nc", "a\nb\nc");
+        assert_eq!(EditorDiffService::count_added(&chunks), 1);
+        assert_eq!(EditorDiffService::count_removed(&chunks), 0);
     }
 
     #[test]
-    fn behavior_check_14() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn diff_removed_line() {
+        let chunks = EditorDiffService::diff_lines("a\nb\nc", "a\nc");
+        assert_eq!(EditorDiffService::count_removed(&chunks), 1);
+        assert_eq!(EditorDiffService::count_added(&chunks), 0);
     }
 
     #[test]
-    fn behavior_check_15() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn diff_changed_line() {
+        let chunks = EditorDiffService::diff_lines("hello\nworld", "hello\nearth");
+        assert!(EditorDiffService::count_removed(&chunks) >= 1);
+        assert!(EditorDiffService::count_added(&chunks) >= 1);
     }
 
     #[test]
-    fn behavior_check_16() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn diff_empty_to_content() {
+        let chunks = EditorDiffService::diff_lines("", "a\nb");
+        assert_eq!(EditorDiffService::count_added(&chunks), 2);
     }
 
     #[test]
-    fn behavior_check_17() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn diff_content_to_empty() {
+        let chunks = EditorDiffService::diff_lines("a\nb", "");
+        assert_eq!(EditorDiffService::count_removed(&chunks), 2);
     }
 
     #[test]
-    fn behavior_check_18() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        let _svc = EditorService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn diff_not_identical() {
+        assert!(!EditorDiffService::is_identical("a", "b"));
     }
 
     #[test]

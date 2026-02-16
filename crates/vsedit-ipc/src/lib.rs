@@ -124,7 +124,7 @@ impl fmt::Display for MessageKind {
 }
 
 /// Header for an IPC message.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IpcMessageHeader {
     pub kind: MessageKind,
     pub id: u64,
@@ -508,6 +508,235 @@ impl Default for IpcValidator {
     }
 }
 
+/// Buffered queue for batching IPC messages before sending.
+pub struct IpcMessageQueue {
+    queue: Vec<IpcMessage>,
+    max_size: usize,
+}
+
+impl IpcMessageQueue {
+    pub fn new(max_size: usize) -> Self {
+        Self { queue: Vec::new(), max_size }
+    }
+
+    /// Enqueue a message. Returns Err if queue is full.
+    pub fn enqueue(&mut self, msg: IpcMessage) -> Result<(), IpcError> {
+        if self.queue.len() >= self.max_size {
+            return Err(IpcError::MessageTooLarge { size: self.queue.len() + 1, max: self.max_size });
+        }
+        self.queue.push(msg);
+        Ok(())
+    }
+
+    /// Drain all queued messages, returning them in order.
+    pub fn drain(&mut self) -> Vec<IpcMessage> {
+        std::mem::take(&mut self.queue)
+    }
+
+    /// Peek at the next message without removing it.
+    pub fn peek(&self) -> Option<&IpcMessage> {
+        self.queue.first()
+    }
+
+    /// Number of messages currently queued.
+    pub fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    /// Returns true if the queue is at capacity.
+    pub fn is_full(&self) -> bool {
+        self.queue.len() >= self.max_size
+    }
+
+    /// Remove and return the first message, if any.
+    pub fn dequeue(&mut self) -> Option<IpcMessage> {
+        if self.queue.is_empty() { None } else { Some(self.queue.remove(0)) }
+    }
+
+    /// Clear all queued messages without returning them.
+    pub fn clear(&mut self) {
+        self.queue.clear();
+    }
+
+    /// The maximum queue capacity.
+    pub fn capacity(&self) -> usize {
+        self.max_size
+    }
+}
+
+/// Pool of named IPC connections with state tracking.
+pub struct IpcConnectionPool {
+    connections: Vec<IpcConnection>,
+    max_connections: usize,
+}
+
+/// State of a single connection in the pool.
+#[derive(Debug, Clone)]
+pub struct IpcConnection {
+    pub id: String,
+    pub channel: String,
+    pub connected: bool,
+    pub messages_sent: u64,
+    pub messages_received: u64,
+}
+
+impl IpcConnection {
+    pub fn new(id: impl Into<String>, channel: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            channel: channel.into(),
+            connected: true,
+            messages_sent: 0,
+            messages_received: 0,
+        }
+    }
+
+    pub fn total_messages(&self) -> u64 {
+        self.messages_sent + self.messages_received
+    }
+}
+
+impl fmt::Display for IpcConnection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "IpcConnection(id={}, ch={}, connected={})", self.id, self.channel, self.connected)
+    }
+}
+
+impl IpcConnectionPool {
+    pub fn new(max_connections: usize) -> Self {
+        Self { connections: Vec::new(), max_connections }
+    }
+
+    /// Add a connection. Returns error if pool is full or id already exists.
+    pub fn add(&mut self, conn: IpcConnection) -> Result<(), IpcError> {
+        if self.connections.iter().any(|c| c.id == conn.id) {
+            return Err(IpcError::DuplicateChannel(conn.id));
+        }
+        if self.connections.len() >= self.max_connections {
+            return Err(IpcError::MessageTooLarge { size: self.connections.len() + 1, max: self.max_connections });
+        }
+        self.connections.push(conn);
+        Ok(())
+    }
+
+    /// Remove a connection by id.
+    pub fn remove(&mut self, id: &str) -> Result<IpcConnection, IpcError> {
+        let pos = self.connections.iter().position(|c| c.id == id)
+            .ok_or_else(|| IpcError::ChannelNotFound(id.to_string()))?;
+        Ok(self.connections.remove(pos))
+    }
+
+    /// Get a reference to a connection by id.
+    pub fn get(&self, id: &str) -> Option<&IpcConnection> {
+        self.connections.iter().find(|c| c.id == id)
+    }
+
+    /// Get a mutable reference to a connection by id.
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut IpcConnection> {
+        self.connections.iter_mut().find(|c| c.id == id)
+    }
+
+    /// Return all connected connections.
+    pub fn active_connections(&self) -> Vec<&IpcConnection> {
+        self.connections.iter().filter(|c| c.connected).collect()
+    }
+
+    /// Number of connections in the pool.
+    pub fn len(&self) -> usize {
+        self.connections.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.connections.is_empty()
+    }
+
+    /// Disconnect a connection by id.
+    pub fn disconnect(&mut self, id: &str) -> Result<(), IpcError> {
+        let conn = self.connections.iter_mut().find(|c| c.id == id)
+            .ok_or_else(|| IpcError::ChannelNotFound(id.to_string()))?;
+        conn.connected = false;
+        Ok(())
+    }
+
+    /// Reconnect a connection by id.
+    pub fn reconnect(&mut self, id: &str) -> Result<(), IpcError> {
+        let conn = self.connections.iter_mut().find(|c| c.id == id)
+            .ok_or_else(|| IpcError::ChannelNotFound(id.to_string()))?;
+        conn.connected = true;
+        Ok(())
+    }
+
+    /// Record that a message was sent on the given connection.
+    pub fn record_send(&mut self, id: &str) -> Result<(), IpcError> {
+        let conn = self.connections.iter_mut().find(|c| c.id == id)
+            .ok_or_else(|| IpcError::ChannelNotFound(id.to_string()))?;
+        if !conn.connected {
+            return Err(IpcError::ChannelDisconnected(id.to_string()));
+        }
+        conn.messages_sent += 1;
+        Ok(())
+    }
+
+    /// Record that a message was received on the given connection.
+    pub fn record_receive(&mut self, id: &str) -> Result<(), IpcError> {
+        let conn = self.connections.iter_mut().find(|c| c.id == id)
+            .ok_or_else(|| IpcError::ChannelNotFound(id.to_string()))?;
+        conn.messages_received += 1;
+        Ok(())
+    }
+}
+
+/// Serialized envelope wrapping an IPC message with length-prefix framing.
+#[derive(Debug, Clone, PartialEq)]
+pub struct IpcEnvelope {
+    pub header: IpcMessageHeader,
+    pub payload: Vec<u8>,
+    pub total_length: usize,
+}
+
+/// Serialize a message into a length-prefixed envelope.
+/// Format: [4-byte big-endian length][1-byte kind][8-byte big-endian id][payload]
+pub fn ipc_serialize_envelope(kind: MessageKind, id: u64, payload: &[u8]) -> Vec<u8> {
+    let kind_byte: u8 = match kind {
+        MessageKind::Request => 1,
+        MessageKind::Response => 2,
+        MessageKind::Notification => 3,
+    };
+    let content_len = 1 + 8 + payload.len(); // kind + id + payload
+    let total_len = 4 + content_len; // length prefix + content
+    let mut buf = Vec::with_capacity(total_len);
+    buf.extend_from_slice(&(content_len as u32).to_be_bytes());
+    buf.push(kind_byte);
+    buf.extend_from_slice(&id.to_be_bytes());
+    buf.extend_from_slice(payload);
+    buf
+}
+
+/// Deserialize a length-prefixed envelope back into its parts.
+/// Returns `(kind, id, payload)` or an error.
+pub fn ipc_deserialize_envelope(data: &[u8]) -> Result<(MessageKind, u64, Vec<u8>), IpcError> {
+    if data.len() < 13 { // 4 + 1 + 8 minimum
+        return Err(IpcError::MessageTooLarge { size: data.len(), max: 13 });
+    }
+    let content_len = u32::from_be_bytes([data[0], data[1], data[2], data[3]]) as usize;
+    if data.len() < 4 + content_len {
+        return Err(IpcError::MessageTooLarge { size: data.len(), max: 4 + content_len });
+    }
+    let kind = match data[4] {
+        1 => MessageKind::Request,
+        2 => MessageKind::Response,
+        3 => MessageKind::Notification,
+        _ => return Err(IpcError::ChannelNotFound(format!("unknown kind byte: {}", data[4]))),
+    };
+    let id = u64::from_be_bytes([data[5], data[6], data[7], data[8], data[9], data[10], data[11], data[12]]);
+    let payload = data[13..4 + content_len].to_vec();
+    Ok((kind, id, payload))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -735,113 +964,211 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn message_queue_enqueue_and_drain() {
+        let mut q = IpcMessageQueue::new(3);
+        assert!(q.is_empty());
+        q.enqueue(IpcMessageBuilder::new().id(1).channel("a").build()).unwrap();
+        q.enqueue(IpcMessageBuilder::new().id(2).channel("b").build()).unwrap();
+        assert_eq!(q.len(), 2);
+        let drained = q.drain();
+        assert_eq!(drained.len(), 2);
+        assert_eq!(drained[0].id, 1);
+        assert_eq!(drained[1].id, 2);
+        assert!(q.is_empty());
     }
 
     #[test]
-    fn behavior_check_1() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn message_queue_full_rejects() {
+        let mut q = IpcMessageQueue::new(1);
+        q.enqueue(IpcMessageBuilder::new().id(1).channel("a").build()).unwrap();
+        assert!(q.is_full());
+        let err = q.enqueue(IpcMessageBuilder::new().id(2).channel("b").build()).unwrap_err();
+        assert!(matches!(err, IpcError::MessageTooLarge { .. }));
     }
 
     #[test]
-    fn behavior_check_2() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn message_queue_peek_and_dequeue() {
+        let mut q = IpcMessageQueue::new(10);
+        assert!(q.peek().is_none());
+        q.enqueue(IpcMessageBuilder::new().id(42).channel("ch").payload(b"data".to_vec()).build()).unwrap();
+        assert_eq!(q.peek().unwrap().id, 42);
+        let msg = q.dequeue().unwrap();
+        assert_eq!(msg.id, 42);
+        assert!(q.is_empty());
     }
 
     #[test]
-    fn behavior_check_3() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn message_queue_clear() {
+        let mut q = IpcMessageQueue::new(10);
+        q.enqueue(IpcMessageBuilder::new().id(1).channel("a").build()).unwrap();
+        q.enqueue(IpcMessageBuilder::new().id(2).channel("b").build()).unwrap();
+        assert_eq!(q.capacity(), 10);
+        q.clear();
+        assert!(q.is_empty());
     }
 
     #[test]
-    fn behavior_check_4() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_pool_add_and_get() {
+        let mut pool = IpcConnectionPool::new(5);
+        pool.add(IpcConnection::new("c1", "editor")).unwrap();
+        let conn = pool.get("c1").unwrap();
+        assert_eq!(conn.channel, "editor");
+        assert!(conn.connected);
+        assert_eq!(conn.total_messages(), 0);
     }
 
     #[test]
-    fn behavior_check_5() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_pool_duplicate_id_error() {
+        let mut pool = IpcConnectionPool::new(5);
+        pool.add(IpcConnection::new("c1", "editor")).unwrap();
+        let err = pool.add(IpcConnection::new("c1", "other")).unwrap_err();
+        assert!(matches!(err, IpcError::DuplicateChannel(_)));
     }
 
     #[test]
-    fn behavior_check_6() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_pool_full_error() {
+        let mut pool = IpcConnectionPool::new(1);
+        pool.add(IpcConnection::new("c1", "editor")).unwrap();
+        let err = pool.add(IpcConnection::new("c2", "lsp")).unwrap_err();
+        assert!(matches!(err, IpcError::MessageTooLarge { .. }));
     }
 
     #[test]
-    fn behavior_check_7() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_pool_remove() {
+        let mut pool = IpcConnectionPool::new(5);
+        pool.add(IpcConnection::new("c1", "editor")).unwrap();
+        let removed = pool.remove("c1").unwrap();
+        assert_eq!(removed.id, "c1");
+        assert!(pool.is_empty());
+        assert!(pool.remove("c1").is_err());
     }
 
     #[test]
-    fn behavior_check_8() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_pool_disconnect_reconnect() {
+        let mut pool = IpcConnectionPool::new(5);
+        pool.add(IpcConnection::new("c1", "editor")).unwrap();
+        pool.disconnect("c1").unwrap();
+        assert!(!pool.get("c1").unwrap().connected);
+        assert!(pool.active_connections().is_empty());
+        pool.reconnect("c1").unwrap();
+        assert!(pool.get("c1").unwrap().connected);
+        assert_eq!(pool.active_connections().len(), 1);
     }
 
     #[test]
-    fn behavior_check_9() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_pool_record_send_receive() {
+        let mut pool = IpcConnectionPool::new(5);
+        pool.add(IpcConnection::new("c1", "editor")).unwrap();
+        pool.record_send("c1").unwrap();
+        pool.record_send("c1").unwrap();
+        pool.record_receive("c1").unwrap();
+        let conn = pool.get("c1").unwrap();
+        assert_eq!(conn.messages_sent, 2);
+        assert_eq!(conn.messages_received, 1);
+        assert_eq!(conn.total_messages(), 3);
     }
 
     #[test]
-    fn behavior_check_10() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_pool_send_disconnected_error() {
+        let mut pool = IpcConnectionPool::new(5);
+        pool.add(IpcConnection::new("c1", "editor")).unwrap();
+        pool.disconnect("c1").unwrap();
+        let err = pool.record_send("c1").unwrap_err();
+        assert!(matches!(err, IpcError::ChannelDisconnected(_)));
     }
 
     #[test]
-    fn behavior_check_11() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_display() {
+        let conn = IpcConnection::new("c1", "editor");
+        let s = format!("{conn}");
+        assert!(s.contains("c1"));
+        assert!(s.contains("editor"));
+        assert!(s.contains("true"));
     }
 
     #[test]
-    fn behavior_check_12() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn serialize_deserialize_request_envelope() {
+        let payload = b"hello world";
+        let data = ipc_serialize_envelope(MessageKind::Request, 42, payload);
+        let (kind, id, decoded_payload) = ipc_deserialize_envelope(&data).unwrap();
+        assert_eq!(kind, MessageKind::Request);
+        assert_eq!(id, 42);
+        assert_eq!(decoded_payload, payload);
     }
 
     #[test]
-    fn behavior_check_13() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn serialize_deserialize_response_envelope() {
+        let data = ipc_serialize_envelope(MessageKind::Response, 100, b"result");
+        let (kind, id, payload) = ipc_deserialize_envelope(&data).unwrap();
+        assert_eq!(kind, MessageKind::Response);
+        assert_eq!(id, 100);
+        assert_eq!(payload, b"result");
     }
 
     #[test]
-    fn behavior_check_14() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn serialize_deserialize_notification_envelope() {
+        let data = ipc_serialize_envelope(MessageKind::Notification, 0, &[]);
+        let (kind, id, payload) = ipc_deserialize_envelope(&data).unwrap();
+        assert_eq!(kind, MessageKind::Notification);
+        assert_eq!(id, 0);
+        assert!(payload.is_empty());
     }
 
     #[test]
-    fn behavior_check_15() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn deserialize_envelope_too_short() {
+        let data = vec![0u8; 5];
+        assert!(ipc_deserialize_envelope(&data).is_err());
     }
 
     #[test]
-    fn behavior_check_16() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn serialize_envelope_roundtrip_large_payload() {
+        let payload: Vec<u8> = (0..1000).map(|i| (i % 256) as u8).collect();
+        let data = ipc_serialize_envelope(MessageKind::Request, u64::MAX, &payload);
+        let (kind, id, decoded) = ipc_deserialize_envelope(&data).unwrap();
+        assert_eq!(kind, MessageKind::Request);
+        assert_eq!(id, u64::MAX);
+        assert_eq!(decoded, payload);
     }
 
     #[test]
-    fn behavior_check_17() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_pool_active_filters_correctly() {
+        let mut pool = IpcConnectionPool::new(5);
+        pool.add(IpcConnection::new("c1", "a")).unwrap();
+        pool.add(IpcConnection::new("c2", "b")).unwrap();
+        pool.add(IpcConnection::new("c3", "c")).unwrap();
+        pool.disconnect("c2").unwrap();
+        let active = pool.active_connections();
+        assert_eq!(active.len(), 2);
+        assert!(active.iter().all(|c| c.connected));
     }
 
     #[test]
-    fn behavior_check_18() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn message_queue_dequeue_returns_none_when_empty() {
+        let mut q = IpcMessageQueue::new(10);
+        assert!(q.dequeue().is_none());
     }
 
     #[test]
-    fn behavior_check_19() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_pool_get_nonexistent() {
+        let pool = IpcConnectionPool::new(5);
+        assert!(pool.get("nope").is_none());
     }
 
     #[test]
-    fn behavior_check_20() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_pool_record_receive_unknown() {
+        let mut pool = IpcConnectionPool::new(5);
+        assert!(pool.record_receive("unknown").is_err());
     }
 
     #[test]
-    fn behavior_check_21() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn envelope_ipc_envelope_struct() {
+        let env = IpcEnvelope {
+            header: IpcMessageHeader { kind: MessageKind::Request, id: 1, method: Some("test".into()) },
+            payload: vec![1, 2, 3],
+            total_length: 16,
+        };
+        assert_eq!(env.total_length, 16);
+        assert_eq!(env.payload.len(), 3);
     }
 
     #[test]

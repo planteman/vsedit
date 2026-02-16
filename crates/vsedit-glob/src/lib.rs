@@ -607,6 +607,166 @@ impl Default for GlobValidator {
     }
 }
 
+/// A matcher that evaluates a path against multiple categorized glob patterns.
+///
+/// Each pattern can be tagged as include or exclude, and the matcher reports
+/// which categories matched.
+pub struct MultiGlobMatcher {
+    include_patterns: Vec<(String, GlobMatcher)>,
+    exclude_patterns: Vec<(String, GlobMatcher)>,
+}
+
+impl MultiGlobMatcher {
+    /// Build a new matcher from include and exclude pattern strings.
+    pub fn new(includes: &[&str], excludes: &[&str]) -> Result<Self, GlobError> {
+        let mut include_patterns = Vec::new();
+        for pat in includes {
+            if pat.is_empty() {
+                return Err(GlobError::EmptyPattern);
+            }
+            let g = Glob::new(pat)?;
+            include_patterns.push((pat.to_string(), g.compile_matcher()));
+        }
+        let mut exclude_patterns = Vec::new();
+        for pat in excludes {
+            if pat.is_empty() {
+                return Err(GlobError::EmptyPattern);
+            }
+            let g = Glob::new(pat)?;
+            exclude_patterns.push((pat.to_string(), g.compile_matcher()));
+        }
+        Ok(Self {
+            include_patterns,
+            exclude_patterns,
+        })
+    }
+
+    /// Test if a path matches (included and not excluded).
+    pub fn matches(&self, path: &str) -> bool {
+        let included = self.include_patterns.is_empty()
+            || self.include_patterns.iter().any(|(_, m)| m.is_match(path));
+        let excluded = self
+            .exclude_patterns
+            .iter()
+            .any(|(_, m)| m.is_match(path));
+        included && !excluded
+    }
+
+    /// Return patterns that match the given path.
+    pub fn matching_includes(&self, path: &str) -> Vec<&str> {
+        self.include_patterns
+            .iter()
+            .filter(|(_, m)| m.is_match(path))
+            .map(|(p, _)| p.as_str())
+            .collect()
+    }
+
+    /// Return exclude patterns that match the given path.
+    pub fn matching_excludes(&self, path: &str) -> Vec<&str> {
+        self.exclude_patterns
+            .iter()
+            .filter(|(_, m)| m.is_match(path))
+            .map(|(p, _)| p.as_str())
+            .collect()
+    }
+
+    /// Total number of patterns (include + exclude).
+    pub fn pattern_count(&self) -> usize {
+        self.include_patterns.len() + self.exclude_patterns.len()
+    }
+}
+
+impl fmt::Debug for MultiGlobMatcher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MultiGlobMatcher")
+            .field(
+                "includes",
+                &self
+                    .include_patterns
+                    .iter()
+                    .map(|(p, _)| p.as_str())
+                    .collect::<Vec<_>>(),
+            )
+            .field(
+                "excludes",
+                &self
+                    .exclude_patterns
+                    .iter()
+                    .map(|(p, _)| p.as_str())
+                    .collect::<Vec<_>>(),
+            )
+            .finish()
+    }
+}
+
+/// Toggle the negation prefix on a glob pattern.
+///
+/// If the pattern starts with `!`, strip it. Otherwise, prepend `!`.
+pub fn negate_pattern(pattern: &str) -> String {
+    if let Some(stripped) = pattern.strip_prefix('!') {
+        stripped.to_string()
+    } else {
+        format!("!{pattern}")
+    }
+}
+
+/// Apply negation to multiple patterns.
+pub fn negate_patterns(patterns: &[&str]) -> Vec<String> {
+    patterns.iter().map(|p| negate_pattern(p)).collect()
+}
+
+/// Convert a simple glob pattern to an equivalent regex string.
+///
+/// Supports:
+/// - `*` → `[^/]*` (match anything except path separator)
+/// - `**` → `.*` (match anything including path separator)
+/// - `?` → `[^/]` (match single character except path separator)
+/// - `.` → `\\.` (literal dot)
+/// - All other regex metacharacters are escaped.
+pub fn glob_to_regex(pattern: &str) -> String {
+    let mut regex = String::from("^");
+    let chars: Vec<char> = pattern.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        match chars[i] {
+            '*' => {
+                if i + 1 < chars.len() && chars[i + 1] == '*' {
+                    // **
+                    if i + 2 < chars.len() && chars[i + 2] == '/' {
+                        regex.push_str("(.*/)?");
+                        i += 3;
+                    } else {
+                        regex.push_str(".*");
+                        i += 2;
+                    }
+                } else {
+                    regex.push_str("[^/]*");
+                    i += 1;
+                }
+            }
+            '?' => {
+                regex.push_str("[^/]");
+                i += 1;
+            }
+            '.' => {
+                regex.push_str("\\.");
+                i += 1;
+            }
+            c @ ('+' | '(' | ')' | '{' | '}' | '[' | ']' | '^' | '$' | '|' | '\\') => {
+                regex.push('\\');
+                regex.push(c);
+                i += 1;
+            }
+            c => {
+                regex.push(c);
+                i += 1;
+            }
+        }
+    }
+    regex.push('$');
+    regex
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -982,5 +1142,60 @@ mod tests {
     fn glob_is_ascii_printable() {
         assert!(GlobValidator::is_ascii_printable("Hello World 123"));
         assert!(!GlobValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn multi_glob_matcher_basic() {
+        let m = MultiGlobMatcher::new(&["*.rs", "*.toml"], &["test_*"]).unwrap();
+        assert!(m.matches("main.rs"));
+        assert!(!m.matches("test_main.rs"));
+        assert!(!m.matches("readme.md"));
+    }
+
+    #[test]
+    fn multi_glob_matcher_matching_includes() {
+        let m = MultiGlobMatcher::new(&["*.rs", "src/**"], &[]).unwrap();
+        let matched = m.matching_includes("src/lib.rs");
+        assert!(matched.contains(&"*.rs"));
+        assert!(matched.contains(&"src/**"));
+    }
+
+    #[test]
+    fn multi_glob_matcher_matching_excludes() {
+        let m = MultiGlobMatcher::new(&["*.rs"], &["test_*", "bench_*"]).unwrap();
+        let excludes = m.matching_excludes("test_main.rs");
+        assert_eq!(excludes, vec!["test_*"]);
+    }
+
+    #[test]
+    fn multi_glob_matcher_empty_includes_accepts_all() {
+        let m = MultiGlobMatcher::new(&[], &["*.log"]).unwrap();
+        assert!(m.matches("main.rs"));
+        assert!(!m.matches("debug.log"));
+    }
+
+    #[test]
+    fn negate_pattern_toggle() {
+        assert_eq!(negate_pattern("*.rs"), "!*.rs");
+        assert_eq!(negate_pattern("!*.rs"), "*.rs");
+        assert_eq!(negate_pattern("!"), "");
+    }
+
+    #[test]
+    fn negate_patterns_batch() {
+        let negated = negate_patterns(&["*.rs", "!*.toml"]);
+        assert_eq!(negated, vec!["!*.rs", "*.toml"]);
+    }
+
+    #[test]
+    fn glob_to_regex_star() {
+        let re = glob_to_regex("*.rs");
+        assert_eq!(re, "^[^/]*\\.rs$");
+    }
+
+    #[test]
+    fn glob_to_regex_doublestar() {
+        let re = glob_to_regex("src/**/*.rs");
+        assert_eq!(re, "^src/(.*/)?[^/]*\\.rs$");
     }
 }

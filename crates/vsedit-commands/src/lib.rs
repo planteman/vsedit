@@ -577,6 +577,135 @@ impl CommandRegistry {
 }
 
 // ---------------------------------------------------------------------------
+// CommandHistoryTracker
+// ---------------------------------------------------------------------------
+
+/// A ring-buffer-style command history tracker with configurable max size.
+#[derive(Debug)]
+pub struct CommandHistoryTracker {
+    entries: Vec<HistoryEntry>,
+    max_size: usize,
+    frequency: HashMap<String, usize>,
+}
+
+impl CommandHistoryTracker {
+    /// Create a tracker with the given maximum number of entries.
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_size: max_size.max(1),
+            frequency: HashMap::new(),
+        }
+    }
+
+    /// Record a command execution. If at capacity, removes the oldest entry.
+    pub fn record(&mut self, command_id: impl Into<String>, timestamp_ms: u64) {
+        let id = command_id.into();
+        *self.frequency.entry(id.clone()).or_insert(0) += 1;
+        if self.entries.len() >= self.max_size {
+            let removed = self.entries.remove(0);
+            // Decrement frequency for removed entry
+            if let Some(count) = self.frequency.get_mut(&removed.command_id) {
+                *count = count.saturating_sub(1);
+                if *count == 0 {
+                    self.frequency.remove(&removed.command_id);
+                }
+            }
+        }
+        self.entries.push(HistoryEntry { command_id: id, timestamp_ms });
+    }
+
+    /// Return the most recent `n` entries (newest first).
+    pub fn recent(&self, n: usize) -> Vec<&HistoryEntry> {
+        self.entries.iter().rev().take(n).collect()
+    }
+
+    /// Return the unique command IDs in order of most recently used.
+    pub fn recent_unique(&self) -> Vec<&str> {
+        let mut seen = std::collections::HashSet::new();
+        let mut result = Vec::new();
+        for entry in self.entries.iter().rev() {
+            if seen.insert(entry.command_id.as_str()) {
+                result.push(entry.command_id.as_str());
+            }
+        }
+        result
+    }
+
+    /// Return how many times a command has been recorded (within the current buffer).
+    pub fn frequency(&self, command_id: &str) -> usize {
+        self.frequency.get(command_id).copied().unwrap_or(0)
+    }
+
+    /// Return the number of entries currently stored.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return `true` if no entries are stored.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.frequency.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fuzzy search
+// ---------------------------------------------------------------------------
+
+/// Perform a fuzzy search over command IDs, returning matches sorted by relevance.
+///
+/// A command matches if all characters in `query` appear in order in the command ID
+/// (case-insensitive). The score is based on how tightly the characters cluster.
+pub fn command_fuzzy_search(command_ids: &[String], query: &str) -> Vec<(String, u32)> {
+    if query.is_empty() {
+        return command_ids.iter().map(|id| (id.clone(), 0)).collect();
+    }
+    let query_lower: Vec<char> = query.to_lowercase().chars().collect();
+    let mut results: Vec<(String, u32)> = command_ids
+        .iter()
+        .filter_map(|id| {
+            let id_lower: Vec<char> = id.to_lowercase().chars().collect();
+            let score = fuzzy_match_score(&id_lower, &query_lower)?;
+            Some((id.clone(), score))
+        })
+        .collect();
+    results.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+    results
+}
+
+fn fuzzy_match_score(text: &[char], query: &[char]) -> Option<u32> {
+    let mut qi = 0;
+    let mut first_match = None;
+    let mut last_match = 0;
+    for (i, &ch) in text.iter().enumerate() {
+        if qi < query.len() && ch == query[qi] {
+            if first_match.is_none() {
+                first_match = Some(i);
+            }
+            last_match = i;
+            qi += 1;
+        }
+    }
+    if qi != query.len() {
+        return None;
+    }
+    let first = first_match.unwrap_or(0);
+    let span = last_match - first + 1;
+    // Score: shorter span is better, earlier start is better
+    let span_score = 100u32.saturating_sub(span as u32);
+    let position_score = 50u32.saturating_sub(first as u32);
+    // Bonus for exact prefix match
+    let prefix_bonus = if first == 0 { 50 } else { 0 };
+    Some(span_score + position_score + prefix_bonus)
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -973,5 +1102,92 @@ mod tests {
         let a = CommandAlias::new("q", "workbench.action.quit");
         assert_eq!(a.alias, "q");
         assert_eq!(a.command_id, "workbench.action.quit");
+    }
+
+    // -- CommandHistoryTracker -----------------------------------------------
+
+    #[test]
+    fn history_tracker_ring_buffer() {
+        let mut tracker = CommandHistoryTracker::new(3);
+        tracker.record("cmd.a", 1);
+        tracker.record("cmd.b", 2);
+        tracker.record("cmd.c", 3);
+        tracker.record("cmd.d", 4); // should evict cmd.a
+        assert_eq!(tracker.len(), 3);
+        let recent = tracker.recent(10);
+        assert_eq!(recent[0].command_id, "cmd.d");
+        assert_eq!(recent[2].command_id, "cmd.b");
+    }
+
+    #[test]
+    fn history_tracker_frequency() {
+        let mut tracker = CommandHistoryTracker::new(100);
+        tracker.record("cmd.a", 1);
+        tracker.record("cmd.b", 2);
+        tracker.record("cmd.a", 3);
+        assert_eq!(tracker.frequency("cmd.a"), 2);
+        assert_eq!(tracker.frequency("cmd.b"), 1);
+        assert_eq!(tracker.frequency("cmd.c"), 0);
+    }
+
+    #[test]
+    fn history_tracker_frequency_eviction() {
+        let mut tracker = CommandHistoryTracker::new(2);
+        tracker.record("cmd.a", 1);
+        tracker.record("cmd.a", 2);
+        tracker.record("cmd.b", 3); // evicts first cmd.a
+        assert_eq!(tracker.frequency("cmd.a"), 1); // one cmd.a remains
+    }
+
+    #[test]
+    fn history_tracker_recent_unique() {
+        let mut tracker = CommandHistoryTracker::new(100);
+        tracker.record("cmd.a", 1);
+        tracker.record("cmd.b", 2);
+        tracker.record("cmd.a", 3);
+        let unique = tracker.recent_unique();
+        assert_eq!(unique, vec!["cmd.a", "cmd.b"]);
+    }
+
+    #[test]
+    fn history_tracker_clear() {
+        let mut tracker = CommandHistoryTracker::new(100);
+        tracker.record("cmd.a", 1);
+        tracker.clear();
+        assert!(tracker.is_empty());
+        assert_eq!(tracker.frequency("cmd.a"), 0);
+    }
+
+    // -- Fuzzy search --------------------------------------------------------
+
+    #[test]
+    fn fuzzy_search_basic() {
+        let cmds = vec![
+            "editor.action.formatDocument".to_string(),
+            "editor.action.commentLine".to_string(),
+            "workbench.action.openFile".to_string(),
+        ];
+        let results = command_fuzzy_search(&cmds, "format");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "editor.action.formatDocument");
+    }
+
+    #[test]
+    fn fuzzy_search_partial() {
+        let cmds = vec![
+            "editor.action.formatDocument".to_string(),
+            "editor.action.find".to_string(),
+            "file.open".to_string(),
+        ];
+        let results = command_fuzzy_search(&cmds, "eaf");
+        // "editor.action.find" and "editor.action.formatDocument" should match (e, a, f)
+        assert!(results.len() >= 2);
+    }
+
+    #[test]
+    fn fuzzy_search_empty_query() {
+        let cmds = vec!["a".to_string(), "b".to_string()];
+        let results = command_fuzzy_search(&cmds, "");
+        assert_eq!(results.len(), 2);
     }
 }

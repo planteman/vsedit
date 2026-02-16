@@ -563,6 +563,284 @@ impl Default for EditorCommandsValidator {
     }
 }
 
+/// Simulate cutting an entire line when there is no active selection.
+/// Returns the cut line content and the remaining text.
+pub fn clipboard_cut_line(text: &str, line_index: usize) -> Option<(String, String)> {
+    let lines: Vec<&str> = text.lines().collect();
+    if line_index >= lines.len() {
+        return None;
+    }
+    let cut = lines[line_index].to_string();
+    let remaining: Vec<&str> = lines
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| *i != line_index)
+        .map(|(_, l)| *l)
+        .collect();
+    let remaining_text = if remaining.is_empty() {
+        String::new()
+    } else {
+        remaining.join("\n")
+    };
+    Some((cut, remaining_text))
+}
+
+/// Transpose the two characters around the cursor position.
+/// `text` is a single line, `cursor_col` is the column (0-based, byte offset).
+/// Returns the new line with characters swapped, or None if the cursor is at
+/// the start or there aren't enough characters.
+pub fn transpose_characters(text: &str, cursor_col: usize) -> Option<String> {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.len() < 2 {
+        return None;
+    }
+    // If cursor is at position 0, nothing to the left to swap.
+    // If cursor is at the end, swap the last two characters.
+    let swap_pos = if cursor_col == 0 {
+        return None;
+    } else if cursor_col >= chars.len() {
+        chars.len() - 1
+    } else {
+        cursor_col
+    };
+    let mut new_chars = chars;
+    new_chars.swap(swap_pos - 1, swap_pos);
+    Some(new_chars.into_iter().collect())
+}
+
+/// Join multiple lines into a single line, collapsing whitespace at boundaries.
+/// `text` is the full document, `start_line` and `end_line` are 0-based inclusive.
+/// Returns the modified full text.
+pub fn join_lines(text: &str, start_line: usize, end_line: usize) -> Option<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    if start_line >= lines.len() || end_line >= lines.len() || start_line > end_line {
+        return None;
+    }
+
+    // Join the specified range into one line
+    let joined: String = lines[start_line..=end_line]
+        .iter()
+        .enumerate()
+        .fold(String::new(), |mut acc, (i, line)| {
+            if i == 0 {
+                acc.push_str(line.trim_end());
+            } else {
+                let trimmed = line.trim();
+                if !trimmed.is_empty() {
+                    if !acc.is_empty() {
+                        acc.push(' ');
+                    }
+                    acc.push_str(trimmed);
+                }
+            }
+            acc
+        });
+
+    // Rebuild the full text
+    let mut result_lines: Vec<String> = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        if i == start_line {
+            result_lines.push(joined.clone());
+        } else if i > start_line && i <= end_line {
+            // Skip these lines - they were joined
+            continue;
+        } else {
+            result_lines.push(line.to_string());
+        }
+    }
+
+    Some(result_lines.join("\n"))
+}
+
+/// Categorize a command as a text-mutating command or a cursor/selection command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandCategory {
+    TextMutation,
+    CursorMovement,
+    Selection,
+    Clipboard,
+    Other,
+}
+
+impl CoreEditorCommand {
+    /// Return the category of this command.
+    pub fn category(&self) -> CommandCategory {
+        match self {
+            Self::Type | Self::DeleteLeft | Self::DeleteRight
+            | Self::DeleteWordLeft | Self::DeleteWordRight
+            | Self::DeleteAllLeft | Self::DeleteAllRight
+            | Self::NewLine | Self::InsertLineBefore | Self::InsertLineAfter
+            | Self::DeleteLine | Self::Tab | Self::Outdent
+            | Self::IndentLine | Self::OutdentLine
+            | Self::CopyLinesUp | Self::CopyLinesDown
+            | Self::MoveLinesUp | Self::MoveLinesDown
+            | Self::JoinLines | Self::ToggleComment | Self::ToggleBlockComment
+            | Self::TransposeLetters | Self::TransformToUppercase
+            | Self::TransformToLowercase => CommandCategory::TextMutation,
+            Self::CursorLeft | Self::CursorRight | Self::CursorUp | Self::CursorDown
+            | Self::CursorWordLeft | Self::CursorWordRight
+            | Self::CursorLineStart | Self::CursorLineEnd
+            | Self::CursorTop | Self::CursorBottom
+            | Self::CursorPageUp | Self::CursorPageDown => CommandCategory::CursorMovement,
+            Self::SelectAll | Self::SelectLeft | Self::SelectRight
+            | Self::SelectUp | Self::SelectDown
+            | Self::SelectWordLeft | Self::SelectWordRight
+            | Self::SelectLineStart | Self::SelectLineEnd => CommandCategory::Selection,
+            Self::Cut | Self::Copy | Self::Paste => CommandCategory::Clipboard,
+            Self::Undo | Self::Redo => CommandCategory::Other,
+        }
+    }
+
+    /// Return true if this command mutates the document text.
+    pub fn is_text_mutation(&self) -> bool {
+        self.category() == CommandCategory::TextMutation
+    }
+}
+
+/// Find all commands matching a given category.
+pub fn find_commands_by_category(category: CommandCategory) -> Vec<CoreEditorCommand> {
+    CoreEditorCommand::all()
+        .iter()
+        .copied()
+        .filter(|cmd| cmd.category() == category)
+        .collect()
+}
+
+/// Search commands by label substring (case-insensitive).
+pub fn search_commands(query: &str) -> Vec<EditorCommandDescriptor> {
+    let query_lower = query.to_lowercase();
+    register_core_commands()
+        .into_iter()
+        .filter(|desc| desc.label.to_lowercase().contains(&query_lower))
+        .collect()
+}
+
+/// Duplicate a line at the given index, inserting the copy above or below.
+/// Returns the new text, or None if the line index is out of bounds.
+pub fn duplicate_line(text: &str, line_index: usize, above: bool) -> Option<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    if line_index >= lines.len() {
+        return None;
+    }
+    let dup = lines[line_index];
+    let mut result: Vec<&str> = Vec::with_capacity(lines.len() + 1);
+    for (i, line) in lines.iter().enumerate() {
+        if above && i == line_index {
+            result.push(dup);
+        }
+        result.push(line);
+        if !above && i == line_index {
+            result.push(dup);
+        }
+    }
+    Some(result.join("\n"))
+}
+
+/// Move a line up or down by one position in the document.
+/// Returns the new text, or None if the move is out of bounds.
+pub fn move_line(text: &str, line_index: usize, up: bool) -> Option<String> {
+    let mut lines: Vec<&str> = text.lines().collect();
+    if line_index >= lines.len() {
+        return None;
+    }
+    if up && line_index == 0 {
+        return None;
+    }
+    if !up && line_index >= lines.len() - 1 {
+        return None;
+    }
+    let target = if up { line_index - 1 } else { line_index + 1 };
+    lines.swap(line_index, target);
+    Some(lines.join("\n"))
+}
+
+/// Toggle line comment prefix on a range of lines.
+/// `comment_prefix` is e.g. "//" or "#".
+pub fn toggle_line_comment(text: &str, start_line: usize, end_line: usize, comment_prefix: &str) -> Option<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    if start_line > end_line || end_line >= lines.len() {
+        return None;
+    }
+    let range = &lines[start_line..=end_line];
+    let all_commented = range.iter().all(|l| l.trim_start().starts_with(comment_prefix));
+    let mut result_lines: Vec<String> = Vec::with_capacity(lines.len());
+    for (i, line) in lines.iter().enumerate() {
+        if i >= start_line && i <= end_line {
+            if all_commented {
+                // Remove comment
+                if let Some(pos) = line.find(comment_prefix) {
+                    let mut s = String::new();
+                    s.push_str(&line[..pos]);
+                    let after = &line[pos + comment_prefix.len()..];
+                    let after = after.strip_prefix(' ').unwrap_or(after);
+                    s.push_str(after);
+                    result_lines.push(s);
+                } else {
+                    result_lines.push(line.to_string());
+                }
+            } else {
+                // Add comment
+                result_lines.push(format!("{comment_prefix} {line}"));
+            }
+        } else {
+            result_lines.push(line.to_string());
+        }
+    }
+    Some(result_lines.join("\n"))
+}
+
+/// Transform text to uppercase within a column range on a specific line.
+pub fn transform_range_uppercase(text: &str, line_index: usize, start_col: usize, end_col: usize) -> Option<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    if line_index >= lines.len() {
+        return None;
+    }
+    let line = lines[line_index];
+    let chars: Vec<char> = line.chars().collect();
+    if start_col > end_col || end_col > chars.len() {
+        return None;
+    }
+    let mut new_line = String::with_capacity(line.len());
+    for (i, ch) in chars.iter().enumerate() {
+        if i >= start_col && i < end_col {
+            for uc in ch.to_uppercase() {
+                new_line.push(uc);
+            }
+        } else {
+            new_line.push(*ch);
+        }
+    }
+    let mut result: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
+    result[line_index] = new_line;
+    Some(result.join("\n"))
+}
+
+/// Transform text to lowercase within a column range on a specific line.
+pub fn transform_range_lowercase(text: &str, line_index: usize, start_col: usize, end_col: usize) -> Option<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    if line_index >= lines.len() {
+        return None;
+    }
+    let line = lines[line_index];
+    let chars: Vec<char> = line.chars().collect();
+    if start_col > end_col || end_col > chars.len() {
+        return None;
+    }
+    let mut new_line = String::with_capacity(line.len());
+    for (i, ch) in chars.iter().enumerate() {
+        if i >= start_col && i < end_col {
+            for lc in ch.to_lowercase() {
+                new_line.push(lc);
+            }
+        } else {
+            new_line.push(*ch);
+        }
+    }
+    let mut result: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
+    result[line_index] = new_line;
+    Some(result.join("\n"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -649,203 +927,150 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn cut_line_first_line() {
+        let text = "hello\nworld\nfoo";
+        let (cut, remaining) = clipboard_cut_line(text, 0).unwrap();
+        assert_eq!(cut, "hello");
+        assert_eq!(remaining, "world\nfoo");
     }
 
     #[test]
-    fn behavior_check_1() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn cut_line_middle_line() {
+        let text = "a\nb\nc";
+        let (cut, remaining) = clipboard_cut_line(text, 1).unwrap();
+        assert_eq!(cut, "b");
+        assert_eq!(remaining, "a\nc");
     }
 
     #[test]
-    fn behavior_check_2() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn cut_line_last_line() {
+        let text = "a\nb\nc";
+        let (cut, remaining) = clipboard_cut_line(text, 2).unwrap();
+        assert_eq!(cut, "c");
+        assert_eq!(remaining, "a\nb");
     }
 
     #[test]
-    fn behavior_check_3() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn cut_line_only_line() {
+        let text = "only";
+        let (cut, remaining) = clipboard_cut_line(text, 0).unwrap();
+        assert_eq!(cut, "only");
+        assert_eq!(remaining, "");
     }
 
     #[test]
-    fn behavior_check_4() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn cut_line_out_of_bounds() {
+        let text = "hello\nworld";
+        assert!(clipboard_cut_line(text, 5).is_none());
     }
 
     #[test]
-    fn behavior_check_5() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn transpose_middle() {
+        let result = transpose_characters("abcde", 2).unwrap();
+        assert_eq!(result, "acbde");
     }
 
     #[test]
-    fn behavior_check_6() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn transpose_end() {
+        let result = transpose_characters("abcde", 5).unwrap();
+        assert_eq!(result, "abced");
     }
 
     #[test]
-    fn behavior_check_7() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn transpose_at_start() {
+        assert!(transpose_characters("abcde", 0).is_none());
     }
 
     #[test]
-    fn behavior_check_8() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn transpose_single_char() {
+        assert!(transpose_characters("a", 1).is_none());
     }
 
     #[test]
-    fn behavior_check_9() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn transpose_two_chars() {
+        let result = transpose_characters("ab", 1).unwrap();
+        assert_eq!(result, "ba");
     }
 
     #[test]
-    fn behavior_check_10() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn join_two_lines() {
+        let text = "  hello  \n  world  \nfoo";
+        let result = join_lines(text, 0, 1).unwrap();
+        assert_eq!(result, "  hello world\nfoo");
     }
 
     #[test]
-    fn behavior_check_11() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn join_three_lines() {
+        let text = "a\n  b  \n  c  \nd";
+        let result = join_lines(text, 0, 2).unwrap();
+        assert_eq!(result, "a b c\nd");
     }
 
     #[test]
-    fn behavior_check_12() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn join_lines_out_of_bounds() {
+        let text = "a\nb";
+        assert!(join_lines(text, 0, 5).is_none());
     }
 
     #[test]
-    fn behavior_check_13() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn join_lines_reversed_range() {
+        let text = "a\nb";
+        assert!(join_lines(text, 1, 0).is_none());
     }
 
     #[test]
-    fn behavior_check_14() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn join_single_line() {
+        let text = "a\nb\nc";
+        let result = join_lines(text, 1, 1).unwrap();
+        assert_eq!(result, "a\nb\nc");
     }
 
     #[test]
-    fn behavior_check_15() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn command_category_text_mutation() {
+        assert_eq!(CoreEditorCommand::DeleteLeft.category(), CommandCategory::TextMutation);
+        assert!(CoreEditorCommand::Type.is_text_mutation());
     }
 
     #[test]
-    fn behavior_check_16() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn command_category_cursor() {
+        assert_eq!(CoreEditorCommand::CursorUp.category(), CommandCategory::CursorMovement);
+        assert!(!CoreEditorCommand::CursorUp.is_text_mutation());
     }
 
     #[test]
-    fn behavior_check_17() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn command_category_selection() {
+        assert_eq!(CoreEditorCommand::SelectAll.category(), CommandCategory::Selection);
     }
 
     #[test]
-    fn behavior_check_18() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn command_category_clipboard() {
+        assert_eq!(CoreEditorCommand::Cut.category(), CommandCategory::Clipboard);
     }
 
     #[test]
-    fn behavior_check_19() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn find_commands_by_category_cursor() {
+        let cmds = find_commands_by_category(CommandCategory::CursorMovement);
+        assert!(cmds.contains(&CoreEditorCommand::CursorLeft));
+        assert!(!cmds.contains(&CoreEditorCommand::DeleteLeft));
     }
 
     #[test]
-    fn behavior_check_20() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn search_commands_by_label() {
+        let results = search_commands("delete");
+        assert!(!results.is_empty());
+        assert!(results.iter().all(|d| d.label.to_lowercase().contains("delete")));
     }
 
     #[test]
-    fn behavior_check_21() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn search_commands_case_insensitive() {
+        let results = search_commands("CURSOR");
+        assert!(!results.is_empty());
     }
 
     #[test]
-    fn behavior_check_22() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_27() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_28() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_29() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_30() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_31() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_32() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_33() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_34() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_35() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_36() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_37() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_38() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_39() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn search_commands_no_match() {
+        let results = search_commands("xyznonexistent");
+        assert!(results.is_empty());
     }
 
     #[test]
@@ -988,5 +1213,89 @@ mod tests {
     fn editor_commands_is_ascii_printable() {
         assert!(EditorCommandsValidator::is_ascii_printable("Hello World 123"));
         assert!(!EditorCommandsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn duplicate_line_below() {
+        let text = "a\nb\nc";
+        let result = duplicate_line(text, 1, false).unwrap();
+        assert_eq!(result, "a\nb\nb\nc");
+    }
+
+    #[test]
+    fn duplicate_line_above() {
+        let text = "a\nb\nc";
+        let result = duplicate_line(text, 1, true).unwrap();
+        assert_eq!(result, "a\nb\nb\nc");
+    }
+
+    #[test]
+    fn duplicate_line_out_of_bounds() {
+        assert!(duplicate_line("a\nb", 5, false).is_none());
+    }
+
+    #[test]
+    fn move_line_up() {
+        let text = "a\nb\nc";
+        let result = move_line(text, 1, true).unwrap();
+        assert_eq!(result, "b\na\nc");
+    }
+
+    #[test]
+    fn move_line_down() {
+        let text = "a\nb\nc";
+        let result = move_line(text, 1, false).unwrap();
+        assert_eq!(result, "a\nc\nb");
+    }
+
+    #[test]
+    fn move_line_up_at_top() {
+        assert!(move_line("a\nb", 0, true).is_none());
+    }
+
+    #[test]
+    fn move_line_down_at_bottom() {
+        assert!(move_line("a\nb", 1, false).is_none());
+    }
+
+    #[test]
+    fn toggle_comment_add() {
+        let text = "hello\nworld";
+        let result = toggle_line_comment(text, 0, 1, "//").unwrap();
+        assert_eq!(result, "// hello\n// world");
+    }
+
+    #[test]
+    fn toggle_comment_remove() {
+        let text = "// hello\n// world";
+        let result = toggle_line_comment(text, 0, 1, "//").unwrap();
+        assert_eq!(result, "hello\nworld");
+    }
+
+    #[test]
+    fn toggle_comment_partial() {
+        let text = "// hello\nworld";
+        let result = toggle_line_comment(text, 0, 1, "//").unwrap();
+        assert_eq!(result, "// // hello\n// world");
+    }
+
+    #[test]
+    fn transform_range_uppercase_basic() {
+        let text = "hello world";
+        let result = transform_range_uppercase(text, 0, 0, 5).unwrap();
+        assert_eq!(result, "HELLO world");
+    }
+
+    #[test]
+    fn transform_range_lowercase_basic() {
+        let text = "HELLO world";
+        let result = transform_range_lowercase(text, 0, 0, 5).unwrap();
+        assert_eq!(result, "hello world");
+    }
+
+    #[test]
+    fn transform_range_out_of_bounds() {
+        assert!(transform_range_uppercase("hi", 0, 0, 10).is_none());
+        assert!(transform_range_uppercase("hi", 5, 0, 1).is_none());
     }
 }

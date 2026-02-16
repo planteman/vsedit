@@ -531,6 +531,164 @@ impl Default for UriidentityValidator {
     }
 }
 
+/// Normalizer for URI identity comparison, supporting case-insensitive matching.
+#[derive(Debug, Clone)]
+pub struct UriIdentityNormalizer {
+    /// Whether to ignore case when comparing paths (Windows-style).
+    pub ignore_path_case: bool,
+    /// Whether to normalize path separators (backslash to forward slash).
+    pub normalize_separators: bool,
+    /// Whether to remove trailing slashes.
+    pub strip_trailing_slash: bool,
+}
+
+impl UriIdentityNormalizer {
+    pub fn new() -> Self {
+        Self {
+            ignore_path_case: false,
+            normalize_separators: true,
+            strip_trailing_slash: true,
+        }
+    }
+
+    /// Create a normalizer for case-insensitive file systems (Windows).
+    pub fn windows() -> Self {
+        Self {
+            ignore_path_case: true,
+            normalize_separators: true,
+            strip_trailing_slash: true,
+        }
+    }
+
+    /// Create a normalizer for case-sensitive file systems (Linux/macOS).
+    pub fn unix() -> Self {
+        Self {
+            ignore_path_case: false,
+            normalize_separators: false,
+            strip_trailing_slash: true,
+        }
+    }
+
+    /// Normalize a path string according to this normalizer's settings.
+    pub fn normalize_path(&self, path: &str) -> String {
+        let mut result = path.to_string();
+        if self.normalize_separators {
+            result = result.replace('\\', "/");
+        }
+        if self.strip_trailing_slash && result.len() > 1 {
+            result = result.trim_end_matches('/').to_string();
+            if result.is_empty() {
+                result = "/".to_string();
+            }
+        }
+        if self.ignore_path_case {
+            result = result.to_lowercase();
+        }
+        result
+    }
+
+    /// Compare two URIs for identity using this normalizer's settings.
+    pub fn are_equal(&self, a: &ResourceUri, b: &ResourceUri) -> bool {
+        let scheme_eq = a.scheme.eq_ignore_ascii_case(&b.scheme);
+        let auth_eq = a.authority.eq_ignore_ascii_case(&b.authority);
+        let path_a = self.normalize_path(&a.path);
+        let path_b = self.normalize_path(&b.path);
+        scheme_eq && auth_eq && path_a == path_b && a.query == b.query && a.fragment == b.fragment
+    }
+}
+
+impl Default for UriIdentityNormalizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Produce a canonical string representation of a URI.
+/// - Scheme and authority are lowercased.
+/// - Path separators are normalized to forward slashes.
+/// - Trailing slashes are removed (except root "/").
+/// - Percent-encoding is normalized to uppercase hex.
+pub fn uri_canonical_form(uri: &ResourceUri) -> String {
+    let scheme = uri.scheme.to_lowercase();
+    let authority = uri.authority.to_lowercase();
+    let mut path = uri.path.replace('\\', "/");
+    // Remove trailing slash unless it's the root
+    if path.len() > 1 && path.ends_with('/') {
+        path.truncate(path.len() - 1);
+    }
+    // Normalize percent encoding to uppercase
+    path = normalize_percent_encoding(&path);
+    let mut result = format!("{}://{}{}", scheme, authority, path);
+    if let Some(ref q) = uri.query {
+        result.push('?');
+        result.push_str(q);
+    }
+    if let Some(ref f) = uri.fragment {
+        result.push('#');
+        result.push_str(f);
+    }
+    result
+}
+
+/// Normalize percent-encoded characters to uppercase hex digits.
+fn normalize_percent_encoding(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hi = bytes[i + 1];
+            let lo = bytes[i + 2];
+            if hi.is_ascii_hexdigit() && lo.is_ascii_hexdigit() {
+                out.push('%');
+                out.push((hi as char).to_ascii_uppercase());
+                out.push((lo as char).to_ascii_uppercase());
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i] as char);
+        i += 1;
+    }
+    out
+}
+
+/// Compute the relative path from `base` to `target`.
+/// Both URIs must have the same scheme and authority.
+/// Returns `None` if the URIs are not in the same origin.
+pub fn uri_relative_path(base: &ResourceUri, target: &ResourceUri) -> Option<String> {
+    if !base.scheme.eq_ignore_ascii_case(&target.scheme)
+        || !base.authority.eq_ignore_ascii_case(&target.authority)
+    {
+        return None;
+    }
+
+    let base_parts: Vec<&str> = base.path.split('/').filter(|s| !s.is_empty()).collect();
+    let target_parts: Vec<&str> = target.path.split('/').filter(|s| !s.is_empty()).collect();
+
+    // Find common prefix length
+    let common = base_parts
+        .iter()
+        .zip(target_parts.iter())
+        .take_while(|(a, b)| a == b)
+        .count();
+
+    let ups = base_parts.len().saturating_sub(common);
+    let mut parts: Vec<&str> = Vec::new();
+    for _ in 0..ups {
+        parts.push("..");
+    }
+    for part in &target_parts[common..] {
+        parts.push(part);
+    }
+
+    if parts.is_empty() {
+        Some(".".to_string())
+    } else {
+        Some(parts.join("/"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -704,147 +862,133 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn normalizer_unix_case_sensitive() {
+        let norm = UriIdentityNormalizer::unix();
+        let a = ResourceUri::file("/home/user/File.rs");
+        let b = ResourceUri::file("/home/user/file.rs");
+        assert!(!norm.are_equal(&a, &b));
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn normalizer_windows_case_insensitive() {
+        let norm = UriIdentityNormalizer::windows();
+        let a = ResourceUri::file("/C:/Users/File.rs");
+        let b = ResourceUri::file("/C:/users/file.rs");
+        assert!(norm.are_equal(&a, &b));
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn normalizer_strips_trailing_slash() {
+        let norm = UriIdentityNormalizer::new();
+        assert_eq!(norm.normalize_path("/home/user/"), "/home/user");
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn normalizer_preserves_root_slash() {
+        let norm = UriIdentityNormalizer::new();
+        assert_eq!(norm.normalize_path("/"), "/");
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn normalizer_normalizes_separators() {
+        let norm = UriIdentityNormalizer::new();
+        assert_eq!(norm.normalize_path("C:\\Users\\file.rs"), "C:/Users/file.rs");
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn canonical_form_basic() {
+        let uri = ResourceUri::new("FILE", "/Home/User/file.rs");
+        let canonical = uri_canonical_form(&uri);
+        assert_eq!(canonical, "file:///Home/User/file.rs");
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn canonical_form_strips_trailing_slash() {
+        let uri = ResourceUri::new("file", "/home/user/");
+        let canonical = uri_canonical_form(&uri);
+        assert_eq!(canonical, "file:///home/user");
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn canonical_form_with_query_fragment() {
+        let uri = ResourceUri::new("https", "/path")
+            .with_query("key=val")
+            .with_fragment("section");
+        let canonical = uri_canonical_form(&uri);
+        assert!(canonical.ends_with("?key=val#section"));
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn canonical_form_normalizes_percent_encoding() {
+        let uri = ResourceUri::new("file", "/path%2fto%2Ffile");
+        let canonical = uri_canonical_form(&uri);
+        assert!(canonical.contains("%2F"));
+        assert!(!canonical.contains("%2f"));
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn relative_path_same_dir() {
+        let base = ResourceUri::file("/home/user");
+        let target = ResourceUri::file("/home/user");
+        assert_eq!(uri_relative_path(&base, &target), Some(".".to_string()));
     }
 
     #[test]
-    fn behavior_check_10() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn relative_path_child() {
+        let base = ResourceUri::file("/home/user");
+        let target = ResourceUri::file("/home/user/file.rs");
+        assert_eq!(uri_relative_path(&base, &target), Some("file.rs".to_string()));
     }
 
     #[test]
-    fn behavior_check_11() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn relative_path_sibling() {
+        let base = ResourceUri::file("/home/user/a");
+        let target = ResourceUri::file("/home/user/b");
+        assert_eq!(uri_relative_path(&base, &target), Some("../b".to_string()));
     }
 
     #[test]
-    fn behavior_check_12() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn relative_path_parent() {
+        let base = ResourceUri::file("/home/user/sub");
+        let target = ResourceUri::file("/home/user");
+        assert_eq!(uri_relative_path(&base, &target), Some("..".to_string()));
     }
 
     #[test]
-    fn behavior_check_13() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn relative_path_different_scheme() {
+        let base = ResourceUri::new("file", "/path");
+        let target = ResourceUri::new("https", "/path");
+        assert!(uri_relative_path(&base, &target).is_none());
     }
 
     #[test]
-    fn behavior_check_14() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn relative_path_deep() {
+        let base = ResourceUri::file("/a/b/c/d");
+        let target = ResourceUri::file("/a/x/y");
+        assert_eq!(uri_relative_path(&base, &target), Some("../../../x/y".to_string()));
     }
 
     #[test]
-    fn behavior_check_15() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn normalizer_default_settings() {
+        let norm = UriIdentityNormalizer::default();
+        assert!(!norm.ignore_path_case);
+        assert!(norm.normalize_separators);
+        assert!(norm.strip_trailing_slash);
     }
 
     #[test]
-    fn behavior_check_16() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn normalizer_equal_with_backslash_normalization() {
+        let norm = UriIdentityNormalizer::new();
+        let a = ResourceUri::file("/home/user/file.rs");
+        let mut b = ResourceUri::file("/home/user/file.rs");
+        b.path = "\\home\\user\\file.rs".to_string();
+        assert!(norm.are_equal(&a, &b));
     }
 
     #[test]
-    fn behavior_check_17() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        let _svc = UriIdentityService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn normalize_percent_encoding_mixed_case() {
+        let result = normalize_percent_encoding("/path%2fto%2Ffile%3a");
+        assert_eq!(result, "/path%2Fto%2Ffile%3A");
     }
 
     #[test]

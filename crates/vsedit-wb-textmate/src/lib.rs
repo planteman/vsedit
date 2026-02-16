@@ -564,6 +564,139 @@ impl Default for WbTextmateValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Scope selector & theme scope matching
+// ---------------------------------------------------------------------------
+
+/// A TextMate scope selector for matching against scope stacks.
+/// Supports dotted scope names like "source.rust keyword.control".
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScopeSelector {
+    segments: Vec<String>,
+}
+
+impl ScopeSelector {
+    /// Parse a scope selector string (space-separated scope segments).
+    pub fn parse(selector: &str) -> Self {
+        Self {
+            segments: selector.split_whitespace().map(String::from).collect(),
+        }
+    }
+
+    /// Check whether this selector matches a given scope stack.
+    /// Each segment in the selector must be a prefix of some scope in the stack.
+    pub fn matches(&self, scope_stack: &[&str]) -> bool {
+        if self.segments.is_empty() {
+            return true;
+        }
+        let mut stack_idx = 0;
+        for segment in &self.segments {
+            let mut found = false;
+            while stack_idx < scope_stack.len() {
+                if scope_starts_with(scope_stack[stack_idx], segment) {
+                    found = true;
+                    stack_idx += 1;
+                    break;
+                }
+                stack_idx += 1;
+            }
+            if !found {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Number of segments in this selector.
+    pub fn depth(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// Return the raw segments.
+    pub fn segments(&self) -> &[String] {
+        &self.segments
+    }
+
+    /// Check if the selector is empty (matches everything).
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+}
+
+impl fmt::Display for ScopeSelector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.segments.join(" "))
+    }
+}
+
+/// Check if a scope name starts with a given prefix, respecting dot boundaries.
+fn scope_starts_with(scope: &str, prefix: &str) -> bool {
+    if scope == prefix {
+        return true;
+    }
+    scope.starts_with(prefix) && scope.as_bytes().get(prefix.len()) == Some(&b'.')
+}
+
+/// Compare two scope selectors by specificity. Returns an Ordering.
+/// A selector with more segments is more specific.
+/// Ties are broken by total dotted-name depth.
+pub fn scope_specificity(a: &ScopeSelector, b: &ScopeSelector) -> std::cmp::Ordering {
+    let seg_cmp = a.depth().cmp(&b.depth());
+    if seg_cmp != std::cmp::Ordering::Equal {
+        return seg_cmp;
+    }
+    let a_dots: usize = a.segments().iter().map(|s| s.matches('.').count()).sum();
+    let b_dots: usize = b.segments().iter().map(|s| s.matches('.').count()).sum();
+    a_dots.cmp(&b_dots)
+}
+
+/// A theme rule mapping a scope selector to a foreground color.
+#[derive(Debug, Clone)]
+pub struct ThemeScopeRule {
+    pub selector: ScopeSelector,
+    pub foreground: (u8, u8, u8),
+    pub font_style: Option<String>,
+}
+
+impl ThemeScopeRule {
+    pub fn new(selector: &str, fg: (u8, u8, u8)) -> Self {
+        Self {
+            selector: ScopeSelector::parse(selector),
+            foreground: fg,
+            font_style: None,
+        }
+    }
+
+    pub fn with_font_style(mut self, style: impl Into<String>) -> Self {
+        self.font_style = Some(style.into());
+        self
+    }
+}
+
+/// Find the most specific matching theme rule for a given scope stack.
+/// Returns `None` if no rule matches.
+pub fn theme_scope_lookup<'a>(
+    rules: &'a [ThemeScopeRule],
+    scope_stack: &[&str],
+) -> Option<&'a ThemeScopeRule> {
+    let mut best: Option<&ThemeScopeRule> = None;
+    for rule in rules {
+        if rule.selector.matches(scope_stack) {
+            match best {
+                None => best = Some(rule),
+                Some(current_best) => {
+                    if scope_specificity(&rule.selector, &current_best.selector)
+                        == std::cmp::Ordering::Greater
+                    {
+                        best = Some(rule);
+                    }
+                }
+            }
+        }
+    }
+    best
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -984,5 +1117,144 @@ mod tests {
     fn wb_textmate_is_ascii_printable() {
         assert!(WbTextmateValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbTextmateValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ---- scope selector & theme scope tests ----
+
+    #[test]
+    fn scope_selector_parse_simple() {
+        let sel = ScopeSelector::parse("source.rust");
+        assert_eq!(sel.depth(), 1);
+        assert_eq!(sel.segments()[0], "source.rust");
+    }
+
+    #[test]
+    fn scope_selector_parse_multi() {
+        let sel = ScopeSelector::parse("source.rust keyword.control");
+        assert_eq!(sel.depth(), 2);
+        assert_eq!(sel.segments()[0], "source.rust");
+        assert_eq!(sel.segments()[1], "keyword.control");
+    }
+
+    #[test]
+    fn scope_selector_empty_matches_all() {
+        let sel = ScopeSelector::parse("");
+        assert!(sel.is_empty());
+        assert!(sel.matches(&["source.rust", "keyword.control"]));
+    }
+
+    #[test]
+    fn scope_selector_matches_exact() {
+        let sel = ScopeSelector::parse("source.rust");
+        assert!(sel.matches(&["source.rust"]));
+        assert!(!sel.matches(&["source.python"]));
+    }
+
+    #[test]
+    fn scope_selector_matches_prefix() {
+        let sel = ScopeSelector::parse("source");
+        assert!(sel.matches(&["source.rust"]));
+        assert!(sel.matches(&["source.python"]));
+    }
+
+    #[test]
+    fn scope_selector_no_partial_dot_match() {
+        let sel = ScopeSelector::parse("source.r");
+        assert!(!sel.matches(&["source.rust"]));
+    }
+
+    #[test]
+    fn scope_selector_multi_segment_match() {
+        let sel = ScopeSelector::parse("source.rust keyword.control");
+        assert!(sel.matches(&["source.rust", "keyword.control.if"]));
+        assert!(!sel.matches(&["source.rust", "string.quoted"]));
+    }
+
+    #[test]
+    fn scope_selector_display() {
+        let sel = ScopeSelector::parse("source.rust keyword.control");
+        assert_eq!(format!("{sel}"), "source.rust keyword.control");
+    }
+
+    #[test]
+    fn scope_specificity_more_segments_wins() {
+        let a = ScopeSelector::parse("source.rust keyword.control");
+        let b = ScopeSelector::parse("source.rust");
+        assert_eq!(scope_specificity(&a, &b), std::cmp::Ordering::Greater);
+    }
+
+    #[test]
+    fn scope_specificity_equal_segments_more_dots_wins() {
+        let a = ScopeSelector::parse("source.rust.macro");
+        let b = ScopeSelector::parse("source.rust");
+        assert_eq!(scope_specificity(&a, &b), std::cmp::Ordering::Greater);
+    }
+
+    #[test]
+    fn scope_specificity_equal() {
+        let a = ScopeSelector::parse("source.rust");
+        let b = ScopeSelector::parse("source.python");
+        assert_eq!(scope_specificity(&a, &b), std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn theme_scope_rule_new() {
+        let rule = ThemeScopeRule::new("source.rust", (255, 0, 0));
+        assert_eq!(rule.foreground, (255, 0, 0));
+        assert!(rule.font_style.is_none());
+    }
+
+    #[test]
+    fn theme_scope_rule_with_font_style() {
+        let rule = ThemeScopeRule::new("keyword", (0, 255, 0)).with_font_style("bold");
+        assert_eq!(rule.font_style.as_deref(), Some("bold"));
+    }
+
+    #[test]
+    fn theme_scope_lookup_finds_best_match() {
+        let rules = vec![
+            ThemeScopeRule::new("source", (100, 100, 100)),
+            ThemeScopeRule::new("source.rust", (200, 0, 0)),
+            ThemeScopeRule::new("source.rust keyword.control", (0, 200, 0)),
+        ];
+        let stack = &["source.rust", "keyword.control.if"];
+        let best = theme_scope_lookup(&rules, stack).unwrap();
+        assert_eq!(best.foreground, (0, 200, 0));
+    }
+
+    #[test]
+    fn theme_scope_lookup_fallback_to_less_specific() {
+        let rules = vec![
+            ThemeScopeRule::new("source", (100, 100, 100)),
+            ThemeScopeRule::new("source.rust keyword.control", (0, 200, 0)),
+        ];
+        let stack = &["source.rust", "string.quoted"];
+        let best = theme_scope_lookup(&rules, stack).unwrap();
+        assert_eq!(best.foreground, (100, 100, 100));
+    }
+
+    #[test]
+    fn theme_scope_lookup_no_match() {
+        let rules = vec![
+            ThemeScopeRule::new("source.python", (200, 0, 0)),
+        ];
+        let stack = &["source.rust"];
+        assert!(theme_scope_lookup(&rules, stack).is_none());
+    }
+
+    #[test]
+    fn scope_starts_with_respects_dots() {
+        assert!(scope_starts_with("source.rust", "source"));
+        assert!(scope_starts_with("source.rust", "source.rust"));
+        assert!(!scope_starts_with("source.rust", "source.r"));
+        assert!(!scope_starts_with("source.rust", "sourc"));
+    }
+
+    #[test]
+    fn scope_selector_order_matters() {
+        let sel = ScopeSelector::parse("keyword.control source.rust");
+        // keyword.control must come before source.rust in the stack
+        assert!(!sel.matches(&["source.rust", "keyword.control"]));
+        assert!(sel.matches(&["keyword.control", "source.rust"]));
     }
 }

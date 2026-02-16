@@ -497,6 +497,201 @@ impl Default for LazyValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LazySequence
+// ---------------------------------------------------------------------------
+
+/// A chain of deferred computations that are evaluated lazily.
+/// Each step transforms the value from the previous step.
+pub struct LazySequence<T: 'static> {
+    steps: Vec<Box<dyn FnOnce(T) -> T>>,
+    initial: Option<T>,
+}
+
+impl<T: 'static> LazySequence<T> {
+    /// Create a new lazy sequence with an initial value.
+    pub fn new(initial: T) -> Self {
+        Self {
+            steps: Vec::new(),
+            initial: Some(initial),
+        }
+    }
+
+    /// Add a transformation step to the sequence.
+    pub fn then(mut self, f: impl FnOnce(T) -> T + 'static) -> Self {
+        self.steps.push(Box::new(f));
+        self
+    }
+
+    /// Evaluate the entire sequence and return the final value.
+    /// Consumes the sequence.
+    pub fn evaluate(mut self) -> T {
+        let mut value = self.initial.take().expect("sequence already evaluated");
+        for step in self.steps {
+            value = step(value);
+        }
+        value
+    }
+
+    /// Number of transformation steps in the sequence.
+    pub fn step_count(&self) -> usize {
+        self.steps.len()
+    }
+
+    /// Whether the sequence has been evaluated (initial value consumed).
+    pub fn is_consumed(&self) -> bool {
+        self.initial.is_none()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LazyCache
+// ---------------------------------------------------------------------------
+
+/// A cache mapping keys to values with per-entry TTL expiration.
+pub struct LazyCache<K: Eq + std::hash::Hash + Clone, V: Clone> {
+    entries: HashMap<K, LazyCacheEntry<V>>,
+    default_ttl: Duration,
+}
+
+struct LazyCacheEntry<V> {
+    value: V,
+    inserted_at: Instant,
+    ttl: Duration,
+}
+
+impl<V> LazyCacheEntry<V> {
+    fn is_expired(&self) -> bool {
+        self.inserted_at.elapsed() >= self.ttl
+    }
+}
+
+impl<K: Eq + std::hash::Hash + Clone, V: Clone> LazyCache<K, V> {
+    /// Create a new cache with a default TTL.
+    pub fn new(default_ttl: Duration) -> Self {
+        Self {
+            entries: HashMap::new(),
+            default_ttl,
+        }
+    }
+
+    /// Insert a value with the default TTL.
+    pub fn insert(&mut self, key: K, value: V) {
+        self.entries.insert(key, LazyCacheEntry {
+            value,
+            inserted_at: Instant::now(),
+            ttl: self.default_ttl,
+        });
+    }
+
+    /// Insert a value with a custom TTL.
+    pub fn insert_with_ttl(&mut self, key: K, value: V, ttl: Duration) {
+        self.entries.insert(key, LazyCacheEntry {
+            value,
+            inserted_at: Instant::now(),
+            ttl,
+        });
+    }
+
+    /// Get a value, returning None if expired or not present.
+    pub fn get(&self, key: &K) -> Option<&V> {
+        self.entries.get(key).and_then(|entry| {
+            if entry.is_expired() {
+                None
+            } else {
+                Some(&entry.value)
+            }
+        })
+    }
+
+    /// Get a clone of the value.
+    pub fn get_cloned(&self, key: &K) -> Option<V> {
+        self.get(key).cloned()
+    }
+
+    /// Remove an entry.
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        self.entries.remove(key).map(|e| e.value)
+    }
+
+    /// Remove all expired entries.
+    pub fn evict_expired(&mut self) {
+        self.entries.retain(|_, entry| !entry.is_expired());
+    }
+
+    /// Number of entries (including potentially expired ones).
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Number of non-expired entries.
+    pub fn active_count(&self) -> usize {
+        self.entries.values().filter(|e| !e.is_expired()).count()
+    }
+
+    /// Whether the cache has no entries.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Check if a key exists and is not expired.
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.get(key).is_some()
+    }
+
+    /// Get or insert a value using a closure if not present/expired.
+    /// Returns a clone of the value.
+    pub fn get_or_insert_with(&mut self, key: K, f: impl FnOnce() -> V) -> V {
+        if let Some(val) = self.get(&key).cloned() {
+            return val;
+        }
+        let value = f();
+        self.insert(key, value.clone());
+        value
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Free functions
+// ---------------------------------------------------------------------------
+
+/// Evaluate multiple lazy computations and return the first `Some` result.
+pub fn lazy_race<T>(mut computations: Vec<Box<dyn FnOnce() -> Option<T>>>) -> Option<T> {
+    for computation in computations.drain(..) {
+        if let Some(result) = computation() {
+            return Some(result);
+        }
+    }
+    None
+}
+
+/// Evaluate multiple lazy computations and return all `Some` results.
+pub fn lazy_all<T>(mut computations: Vec<Box<dyn FnOnce() -> Option<T>>>) -> Vec<T> {
+    let mut results = Vec::new();
+    for computation in computations.drain(..) {
+        if let Some(result) = computation() {
+            results.push(result);
+        }
+    }
+    results
+}
+
+/// Create a lazy value that maps the result of another lazy value.
+pub fn lazy_map<T: 'static, U: 'static>(
+    mut lazy: Lazy<T>,
+    f: impl FnOnce(&T) -> U + 'static,
+) -> Lazy<U> {
+    Lazy::new(move || {
+        let val = lazy.get();
+        f(val)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -669,183 +864,172 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_sequence_simple() {
+        let seq = LazySequence::new(1)
+            .then(|x| x + 1)
+            .then(|x| x * 3);
+        assert_eq!(seq.step_count(), 2);
+        assert_eq!(seq.evaluate(), 6);
     }
 
     #[test]
-    fn behavior_check_1() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_sequence_no_steps() {
+        let seq = LazySequence::new(42);
+        assert_eq!(seq.step_count(), 0);
+        assert_eq!(seq.evaluate(), 42);
     }
 
     #[test]
-    fn behavior_check_2() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_sequence_string_transform() {
+        let seq = LazySequence::new("hello".to_string())
+            .then(|s| s.to_uppercase())
+            .then(|s| format!("{s}!"));
+        assert_eq!(seq.evaluate(), "HELLO!");
     }
 
     #[test]
-    fn behavior_check_3() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_sequence_consumed_after_evaluate() {
+        let seq = LazySequence::new(1);
+        let seq = seq.then(|x| x + 1);
+        assert!(!seq.is_consumed());
+        let _ = seq.evaluate();
     }
 
     #[test]
-    fn behavior_check_4() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_cache_insert_get() {
+        let mut cache: LazyCache<String, i32> = LazyCache::new(Duration::from_secs(60));
+        cache.insert("key".to_string(), 42);
+        assert_eq!(cache.get(&"key".to_string()), Some(&42));
+        assert!(cache.contains_key(&"key".to_string()));
     }
 
     #[test]
-    fn behavior_check_5() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_cache_missing_key() {
+        let cache: LazyCache<String, i32> = LazyCache::new(Duration::from_secs(60));
+        assert!(cache.get(&"nope".to_string()).is_none());
     }
 
     #[test]
-    fn behavior_check_6() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_cache_remove() {
+        let mut cache: LazyCache<String, i32> = LazyCache::new(Duration::from_secs(60));
+        cache.insert("key".to_string(), 42);
+        let removed = cache.remove(&"key".to_string());
+        assert_eq!(removed, Some(42));
+        assert!(cache.is_empty());
     }
 
     #[test]
-    fn behavior_check_7() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_cache_clear() {
+        let mut cache: LazyCache<String, i32> = LazyCache::new(Duration::from_secs(60));
+        cache.insert("a".to_string(), 1);
+        cache.insert("b".to_string(), 2);
+        cache.clear();
+        assert!(cache.is_empty());
     }
 
     #[test]
-    fn behavior_check_8() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_cache_get_cloned() {
+        let mut cache: LazyCache<String, String> = LazyCache::new(Duration::from_secs(60));
+        cache.insert("k".to_string(), "value".to_string());
+        assert_eq!(cache.get_cloned(&"k".to_string()), Some("value".to_string()));
     }
 
     #[test]
-    fn behavior_check_9() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_cache_get_or_insert_with() {
+        let mut cache: LazyCache<String, i32> = LazyCache::new(Duration::from_secs(60));
+        let val = cache.get_or_insert_with("key".to_string(), || 42);
+        assert_eq!(val, 42);
+        let val2 = cache.get_or_insert_with("key".to_string(), || 99);
+        assert_eq!(val2, 42);
     }
 
     #[test]
-    fn behavior_check_10() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_cache_expired_entry_not_returned() {
+        let mut cache: LazyCache<String, i32> = LazyCache::new(Duration::from_millis(0));
+        cache.insert("key".to_string(), 42);
+        std::thread::sleep(Duration::from_millis(1));
+        assert!(cache.get(&"key".to_string()).is_none());
     }
 
     #[test]
-    fn behavior_check_11() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_cache_evict_expired() {
+        let mut cache: LazyCache<String, i32> = LazyCache::new(Duration::from_millis(0));
+        cache.insert("a".to_string(), 1);
+        cache.insert("b".to_string(), 2);
+        std::thread::sleep(Duration::from_millis(1));
+        cache.evict_expired();
+        assert!(cache.is_empty());
     }
 
     #[test]
-    fn behavior_check_12() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_cache_active_count() {
+        let mut cache: LazyCache<String, i32> = LazyCache::new(Duration::from_secs(60));
+        cache.insert("a".to_string(), 1);
+        cache.insert_with_ttl("b".to_string(), 2, Duration::from_millis(0));
+        std::thread::sleep(Duration::from_millis(1));
+        assert_eq!(cache.len(), 2);
+        assert_eq!(cache.active_count(), 1);
     }
 
     #[test]
-    fn behavior_check_13() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_race_first_wins() {
+        let computations: Vec<Box<dyn FnOnce() -> Option<i32>>> = vec![
+            Box::new(|| None),
+            Box::new(|| Some(42)),
+            Box::new(|| Some(99)),
+        ];
+        assert_eq!(lazy_race(computations), Some(42));
     }
 
     #[test]
-    fn behavior_check_14() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_race_all_none() {
+        let computations: Vec<Box<dyn FnOnce() -> Option<i32>>> = vec![
+            Box::new(|| None),
+            Box::new(|| None),
+        ];
+        assert_eq!(lazy_race(computations), None);
     }
 
     #[test]
-    fn behavior_check_15() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_race_empty() {
+        let computations: Vec<Box<dyn FnOnce() -> Option<i32>>> = vec![];
+        assert_eq!(lazy_race(computations), None);
     }
 
     #[test]
-    fn behavior_check_16() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_all_collects_results() {
+        let computations: Vec<Box<dyn FnOnce() -> Option<i32>>> = vec![
+            Box::new(|| Some(1)),
+            Box::new(|| None),
+            Box::new(|| Some(3)),
+        ];
+        assert_eq!(lazy_all(computations), vec![1, 3]);
     }
 
     #[test]
-    fn behavior_check_17() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_map_transforms() {
+        let lazy = Lazy::new(|| 21);
+        let mut mapped = lazy_map(lazy, |v| v * 2);
+        assert_eq!(*mapped.get(), 42);
     }
 
     #[test]
-    fn behavior_check_18() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_sequence_many_steps() {
+        let mut seq = LazySequence::new(0_i32);
+        for i in 1..=10 {
+            seq = seq.then(move |x| x + i);
+        }
+        assert_eq!(seq.evaluate(), 55);
     }
 
     #[test]
-    fn behavior_check_19() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_27() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_28() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_29() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_30() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_31() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_32() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_33() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_34() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_35() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lazy_cache_custom_ttl() {
+        let mut cache: LazyCache<String, i32> = LazyCache::new(Duration::from_secs(60));
+        cache.insert_with_ttl("short".to_string(), 1, Duration::from_millis(0));
+        cache.insert("long".to_string(), 2);
+        std::thread::sleep(Duration::from_millis(1));
+        assert!(cache.get(&"short".to_string()).is_none());
+        assert_eq!(cache.get(&"long".to_string()), Some(&2));
     }
 
     #[test]

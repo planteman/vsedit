@@ -599,6 +599,139 @@ impl Default for LabelValidator {
     }
 }
 
+/// A label that optionally includes an icon identifier (e.g. codicon name).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IconLabel {
+    pub text: String,
+    pub icon: Option<String>,
+    pub description: Option<String>,
+}
+
+impl IconLabel {
+    /// Create a plain text label with no icon.
+    pub fn text_only(text: impl Into<String>) -> Self {
+        Self { text: text.into(), icon: None, description: None }
+    }
+
+    /// Create a label with an icon.
+    pub fn with_icon(text: impl Into<String>, icon: impl Into<String>) -> Self {
+        Self { text: text.into(), icon: Some(icon.into()), description: None }
+    }
+
+    /// Set the description, consuming self.
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+
+    /// Return the display string, prepending the icon if present.
+    pub fn display_string(&self) -> String {
+        match (&self.icon, &self.description) {
+            (Some(icon), Some(desc)) => format!("$({}) {} — {}", icon, self.text, desc),
+            (Some(icon), None) => format!("$({}) {}", icon, self.text),
+            (None, Some(desc)) => format!("{} — {}", self.text, desc),
+            (None, None) => self.text.clone(),
+        }
+    }
+
+    /// Returns `true` if the label has an icon.
+    pub fn has_icon(&self) -> bool {
+        self.icon.is_some()
+    }
+}
+
+impl fmt::Display for IconLabel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.display_string())
+    }
+}
+
+/// A highlighted label, splitting text into highlighted and non-highlighted ranges.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LabelHighlight {
+    pub segments: Vec<LabelSegment>,
+}
+
+impl LabelHighlight {
+    /// Create a highlight result from a label and a search query using fuzzy matching.
+    pub fn from_query(label: &str, query: &str) -> Self {
+        Self { segments: highlight_label(label, query) }
+    }
+
+    /// Return the fully concatenated text (without highlight info).
+    pub fn plain_text(&self) -> String {
+        self.segments.iter().map(|s| s.text.as_str()).collect()
+    }
+
+    /// Return only the highlighted portions concatenated.
+    pub fn highlighted_text(&self) -> String {
+        self.segments.iter()
+            .filter(|s| s.highlighted)
+            .map(|s| s.text.as_str())
+            .collect()
+    }
+
+    /// Returns `true` if any part of the label is highlighted.
+    pub fn has_match(&self) -> bool {
+        self.segments.iter().any(|s| s.highlighted)
+    }
+
+    /// Count the number of highlighted characters.
+    pub fn highlight_count(&self) -> usize {
+        self.segments.iter()
+            .filter(|s| s.highlighted)
+            .map(|s| s.text.chars().count())
+            .sum()
+    }
+}
+
+impl fmt::Display for LabelHighlight {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for seg in &self.segments {
+            if seg.highlighted {
+                write!(f, "[{}]", seg.text)?;
+            } else {
+                write!(f, "{}", seg.text)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Truncate a label to `max_chars` characters, appending "..." if it was truncated.
+///
+/// Unlike `LabelValidator::truncate` which uses the Unicode ellipsis character,
+/// this uses the ASCII "..." which is 3 characters wide.
+pub fn label_ellipsis(text: &str, max_chars: usize) -> String {
+    let char_count = text.chars().count();
+    if char_count <= max_chars {
+        return text.to_string();
+    }
+    if max_chars <= 3 {
+        return text.chars().take(max_chars).collect();
+    }
+    let take = max_chars - 3;
+    let truncated: String = text.chars().take(take).collect();
+    format!("{}...", truncated)
+}
+
+/// Truncate from the middle, keeping start and end visible with "..." in between.
+pub fn label_ellipsis_middle(text: &str, max_chars: usize) -> String {
+    let char_count = text.chars().count();
+    if char_count <= max_chars {
+        return text.to_string();
+    }
+    if max_chars <= 3 {
+        return text.chars().take(max_chars).collect();
+    }
+    let available = max_chars - 3;
+    let start_len = (available + 1) / 2;
+    let end_len = available / 2;
+    let start: String = text.chars().take(start_len).collect();
+    let end: String = text.chars().rev().take(end_len).collect::<Vec<_>>().into_iter().rev().collect();
+    format!("{}...{}", start, end)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -973,5 +1106,59 @@ mod tests {
     fn label_is_ascii_printable() {
         assert!(LabelValidator::is_ascii_printable("Hello World 123"));
         assert!(!LabelValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn icon_label_text_only() {
+        let label = IconLabel::text_only("main.rs");
+        assert_eq!(label.display_string(), "main.rs");
+        assert!(!label.has_icon());
+    }
+
+    #[test]
+    fn icon_label_with_icon() {
+        let label = IconLabel::with_icon("main.rs", "file-code");
+        assert_eq!(label.display_string(), "$(file-code) main.rs");
+        assert!(label.has_icon());
+    }
+
+    #[test]
+    fn icon_label_with_description() {
+        let label = IconLabel::with_icon("main.rs", "file-code")
+            .with_description("Rust source");
+        assert_eq!(label.display_string(), "$(file-code) main.rs — Rust source");
+    }
+
+    #[test]
+    fn label_highlight_from_query() {
+        let hl = LabelHighlight::from_query("main.rs", "mn");
+        assert!(hl.has_match());
+        assert_eq!(hl.highlighted_text(), "mn");
+        assert_eq!(hl.plain_text(), "main.rs");
+    }
+
+    #[test]
+    fn label_highlight_no_match() {
+        let hl = LabelHighlight::from_query("hello", "xyz");
+        assert!(!hl.has_match());
+        assert_eq!(hl.highlight_count(), 0);
+    }
+
+    #[test]
+    fn label_ellipsis_short() {
+        assert_eq!(label_ellipsis("hello", 10), "hello");
+    }
+
+    #[test]
+    fn label_ellipsis_truncates() {
+        let result = label_ellipsis("hello world foo bar", 10);
+        assert_eq!(result, "hello w...");
+        assert_eq!(result.len(), 10);
+    }
+
+    #[test]
+    fn label_ellipsis_middle_truncates() {
+        let result = label_ellipsis_middle("abcdefghij", 7);
+        assert_eq!(result, "ab...ij");
     }
 }

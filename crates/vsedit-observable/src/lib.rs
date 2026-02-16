@@ -259,6 +259,45 @@ impl<T: Clone + Send + Sync + 'static> ObservableList<T> {
     ) -> DisposableHandle {
         self.on_change.event().on(listener)
     }
+
+    /// Insert an item at a specific index and fire change event.
+    pub fn insert_at(&self, index: usize, item: T) {
+        let snapshot = {
+            let mut items = self.items.lock().unwrap();
+            items.insert(index, item);
+            items.clone()
+        };
+        self.on_change.fire(&snapshot);
+    }
+
+    /// Replace the item at the given index, fire a change event, and return the old value.
+    pub fn set(&self, index: usize, item: T) -> Option<T> {
+        let (old, snapshot) = {
+            let mut items = self.items.lock().unwrap();
+            if index >= items.len() {
+                return None;
+            }
+            let old = std::mem::replace(&mut items[index], item);
+            (Some(old), items.clone())
+        };
+        self.on_change.fire(&snapshot);
+        old
+    }
+
+    /// Return a clone of all items.
+    pub fn to_vec(&self) -> Vec<T> {
+        self.items.lock().unwrap().clone()
+    }
+
+    /// Retain only items matching the predicate. Fires change event.
+    pub fn retain(&self, f: impl Fn(&T) -> bool) {
+        let snapshot = {
+            let mut items = self.items.lock().unwrap();
+            items.retain(|item| f(item));
+            items.clone()
+        };
+        self.on_change.fire(&snapshot);
+    }
 }
 
 impl<T: Clone + Send + Sync + 'static> Default for ObservableList<T> {
@@ -501,6 +540,113 @@ impl Default for ObservableValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ObservableMap
+// ---------------------------------------------------------------------------
+
+/// A reactive key-value map that fires change events on mutations.
+pub struct ObservableMap<K: Clone + Eq + std::hash::Hash + Send + Sync + 'static, V: Clone + Send + Sync + 'static> {
+    entries: Arc<Mutex<std::collections::HashMap<K, V>>>,
+    on_change: Emitter<Vec<(K, V)>>,
+}
+
+impl<K: Clone + Eq + std::hash::Hash + Send + Sync + 'static, V: Clone + Send + Sync + 'static> ObservableMap<K, V> {
+    pub fn new() -> Self {
+        Self {
+            entries: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            on_change: Emitter::new(),
+        }
+    }
+
+    /// Insert or update a key-value pair. Fires change event.
+    pub fn insert(&self, key: K, value: V) {
+        let snapshot = {
+            let mut map = self.entries.lock().unwrap();
+            map.insert(key, value);
+            map.iter().map(|(k, v)| (k.clone(), v.clone())).collect::<Vec<_>>()
+        };
+        self.on_change.fire(&snapshot);
+    }
+
+    /// Remove a key. Fires change event. Returns the removed value.
+    pub fn remove(&self, key: &K) -> Option<V> {
+        let (removed, snapshot) = {
+            let mut map = self.entries.lock().unwrap();
+            let removed = map.remove(key);
+            let snapshot = map.iter().map(|(k, v)| (k.clone(), v.clone())).collect::<Vec<_>>();
+            (removed, snapshot)
+        };
+        if removed.is_some() {
+            self.on_change.fire(&snapshot);
+        }
+        removed
+    }
+
+    /// Get a clone of the value for the given key.
+    pub fn get(&self, key: &K) -> Option<V> {
+        self.entries.lock().unwrap().get(key).cloned()
+    }
+
+    /// Check if the map contains the key.
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.entries.lock().unwrap().contains_key(key)
+    }
+
+    /// Return the number of entries.
+    pub fn len(&self) -> usize {
+        self.entries.lock().unwrap().len()
+    }
+
+    /// Return true if the map is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.lock().unwrap().is_empty()
+    }
+
+    /// Get all keys.
+    pub fn keys(&self) -> Vec<K> {
+        self.entries.lock().unwrap().keys().cloned().collect()
+    }
+
+    /// Clear the map. Fires change event.
+    pub fn clear(&self) {
+        {
+            self.entries.lock().unwrap().clear();
+        }
+        self.on_change.fire(&Vec::new());
+    }
+
+    /// Subscribe to map changes. The listener receives a snapshot of all entries.
+    pub fn on_change(
+        &self,
+        listener: impl Fn(&Vec<(K, V)>) + Send + Sync + 'static,
+    ) -> DisposableHandle {
+        self.on_change.event().on(listener)
+    }
+}
+
+impl<K: Clone + Eq + std::hash::Hash + Send + Sync + 'static, V: Clone + Send + Sync + 'static> Default for ObservableMap<K, V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// derived_from
+// ---------------------------------------------------------------------------
+
+/// Create a derived observable that maps a single observable value through a function.
+/// This is equivalent to `ObservableValue::map` but as a free function.
+pub fn derived_from<T, R>(
+    source: &ObservableValue<T>,
+    f: impl Fn(&T) -> R + Send + Sync + 'static,
+) -> DerivedObservable<R>
+where
+    T: Clone + PartialEq + Send + Sync + 'static,
+    R: Clone + PartialEq + Send + Sync + 'static,
+{
+    source.map(f)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -686,165 +832,149 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_map_insert_and_get() {
+        let map: ObservableMap<String, i32> = ObservableMap::new();
+        map.insert("a".to_string(), 1);
+        map.insert("b".to_string(), 2);
+        assert_eq!(map.get(&"a".to_string()), Some(1));
+        assert_eq!(map.get(&"b".to_string()), Some(2));
+        assert_eq!(map.len(), 2);
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_map_remove() {
+        let map: ObservableMap<String, i32> = ObservableMap::new();
+        map.insert("a".to_string(), 1);
+        let removed = map.remove(&"a".to_string());
+        assert_eq!(removed, Some(1));
+        assert!(map.is_empty());
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_map_contains_key() {
+        let map: ObservableMap<String, i32> = ObservableMap::new();
+        map.insert("x".to_string(), 42);
+        assert!(map.contains_key(&"x".to_string()));
+        assert!(!map.contains_key(&"y".to_string()));
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_map_clear() {
+        let map: ObservableMap<String, i32> = ObservableMap::new();
+        map.insert("a".to_string(), 1);
+        map.insert("b".to_string(), 2);
+        map.clear();
+        assert!(map.is_empty());
+        assert_eq!(map.len(), 0);
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_map_keys() {
+        let map: ObservableMap<String, i32> = ObservableMap::new();
+        map.insert("a".to_string(), 1);
+        map.insert("b".to_string(), 2);
+        let mut keys = map.keys();
+        keys.sort();
+        assert_eq!(keys, vec!["a".to_string(), "b".to_string()]);
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_map_overwrite() {
+        let map: ObservableMap<String, i32> = ObservableMap::new();
+        map.insert("a".to_string(), 1);
+        map.insert("a".to_string(), 99);
+        assert_eq!(map.get(&"a".to_string()), Some(99));
+        assert_eq!(map.len(), 1);
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_map_remove_nonexistent() {
+        let map: ObservableMap<String, i32> = ObservableMap::new();
+        assert!(map.remove(&"nope".to_string()).is_none());
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_list_insert_at() {
+        let list: ObservableList<String> = ObservableList::new();
+        list.push("a".to_string());
+        list.push("c".to_string());
+        list.insert_at(1, "b".to_string());
+        assert_eq!(list.get(0), Some("a".to_string()));
+        assert_eq!(list.get(1), Some("b".to_string()));
+        assert_eq!(list.get(2), Some("c".to_string()));
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_list_set() {
+        let list: ObservableList<i32> = ObservableList::new();
+        list.push(10);
+        list.push(20);
+        let old = list.set(1, 99);
+        assert_eq!(old, Some(20));
+        assert_eq!(list.get(1), Some(99));
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_list_set_out_of_bounds() {
+        let list: ObservableList<i32> = ObservableList::new();
+        list.push(10);
+        assert!(list.set(5, 99).is_none());
     }
 
     #[test]
-    fn behavior_check_10() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_list_to_vec() {
+        let list: ObservableList<i32> = ObservableList::new();
+        list.push(1);
+        list.push(2);
+        list.push(3);
+        assert_eq!(list.to_vec(), vec![1, 2, 3]);
     }
 
     #[test]
-    fn behavior_check_11() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_list_retain() {
+        let list: ObservableList<i32> = ObservableList::new();
+        list.push(1);
+        list.push(2);
+        list.push(3);
+        list.push(4);
+        list.retain(|x| x % 2 == 0);
+        assert_eq!(list.to_vec(), vec![2, 4]);
     }
 
     #[test]
-    fn behavior_check_12() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn derived_from_maps_value() {
+        let source = ObservableValue::new(5_i32);
+        let derived = derived_from(&source, |v| v * 2);
+        assert_eq!(derived.get(), 10);
     }
 
     #[test]
-    fn behavior_check_13() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn derived_from_updates_on_change() {
+        let source = ObservableValue::new(3_i32);
+        let derived = derived_from(&source, |v| format!("val={v}"));
+        assert_eq!(derived.get(), "val=3");
+        source.set(7);
+        assert_eq!(derived.get(), "val=7");
     }
 
     #[test]
-    fn behavior_check_14() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_map_on_change_fires() {
+        let map: ObservableMap<String, i32> = ObservableMap::new();
+        let fired = Arc::new(Mutex::new(0_u32));
+        let f = fired.clone();
+        let _handle = map.on_change(move |_| {
+            *f.lock().unwrap() += 1;
+        });
+        map.insert("a".to_string(), 1);
+        map.insert("b".to_string(), 2);
+        map.remove(&"a".to_string());
+        assert_eq!(*fired.lock().unwrap(), 3);
     }
 
     #[test]
-    fn behavior_check_15() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        let _svc = ObservableList::<i32>::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn observable_map_default() {
+        let map: ObservableMap<String, i32> = ObservableMap::default();
+        assert!(map.is_empty());
     }
 
     #[test]

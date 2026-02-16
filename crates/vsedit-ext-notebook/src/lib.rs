@@ -552,6 +552,164 @@ impl Default for ExecutionTracker {
     }
 }
 
+/// The MIME type of a cell output.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum OutputMimeType {
+    PlainText,
+    Html,
+    Markdown,
+    Image,
+    Error,
+    Custom(String),
+}
+
+impl fmt::Display for OutputMimeType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OutputMimeType::PlainText => write!(f, "text/plain"),
+            OutputMimeType::Html => write!(f, "text/html"),
+            OutputMimeType::Markdown => write!(f, "text/markdown"),
+            OutputMimeType::Image => write!(f, "image/png"),
+            OutputMimeType::Error => write!(f, "application/vnd.code.notebook.error"),
+            OutputMimeType::Custom(mime) => write!(f, "{}", mime),
+        }
+    }
+}
+
+/// Represents the output of a cell execution.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NotebookCellOutput {
+    pub cell_index: u32,
+    pub mime_type: OutputMimeType,
+    pub data: String,
+    pub execution_order: Option<u32>,
+    pub success: bool,
+}
+
+impl NotebookCellOutput {
+    /// Create a successful plain-text output.
+    pub fn text(cell_index: u32, data: impl Into<String>) -> Self {
+        Self {
+            cell_index,
+            mime_type: OutputMimeType::PlainText,
+            data: data.into(),
+            execution_order: None,
+            success: true,
+        }
+    }
+
+    /// Create an error output.
+    pub fn error(cell_index: u32, message: impl Into<String>) -> Self {
+        Self {
+            cell_index,
+            mime_type: OutputMimeType::Error,
+            data: message.into(),
+            execution_order: None,
+            success: false,
+        }
+    }
+
+    /// Set the execution order.
+    pub fn with_order(mut self, order: u32) -> Self {
+        self.execution_order = Some(order);
+        self
+    }
+
+    /// Returns `true` if this is an error output.
+    pub fn is_error(&self) -> bool {
+        !self.success
+    }
+
+    /// Returns the byte length of the output data.
+    pub fn data_size(&self) -> usize {
+        self.data.len()
+    }
+}
+
+impl fmt::Display for NotebookCellOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.success { "ok" } else { "err" };
+        write!(
+            f,
+            "Output[{}] ({}, {}): {} bytes",
+            self.cell_index,
+            self.mime_type,
+            status,
+            self.data.len()
+        )
+    }
+}
+
+/// Picks the best kernel for a given language from a set of available kernels.
+pub struct NotebookKernelPicker;
+
+impl NotebookKernelPicker {
+    /// Find all kernels that support the given language.
+    pub fn kernels_for_language<'a>(
+        kernels: &'a [NotebookKernel],
+        language: &str,
+    ) -> Vec<&'a NotebookKernel> {
+        kernels
+            .iter()
+            .filter(|k| k.supports_language(language))
+            .collect()
+    }
+
+    /// Pick the best kernel for a language. Prefers kernels with fewer supported
+    /// languages (more specialized).
+    pub fn pick_best<'a>(
+        kernels: &'a [NotebookKernel],
+        language: &str,
+    ) -> Option<&'a NotebookKernel> {
+        let mut candidates: Vec<&NotebookKernel> = Self::kernels_for_language(kernels, language);
+        candidates.sort_by_key(|k| k.supported_languages.len());
+        candidates.first().copied()
+    }
+
+    /// Return kernels sorted by relevance for a given language.
+    /// Kernels that support the language come first, sorted by specialization.
+    pub fn ranked_kernels<'a>(
+        kernels: &'a [NotebookKernel],
+        language: &str,
+    ) -> Vec<&'a NotebookKernel> {
+        let mut all: Vec<(&NotebookKernel, bool)> = kernels
+            .iter()
+            .map(|k| (k, k.supports_language(language)))
+            .collect();
+        all.sort_by(|a, b| {
+            b.1.cmp(&a.1) // supporting kernels first
+                .then_with(|| a.0.supported_languages.len().cmp(&b.0.supported_languages.len()))
+        });
+        all.into_iter().map(|(k, _)| k).collect()
+    }
+}
+
+/// Build a mapping from cell index to its execution order number
+/// based on recorded outputs.
+pub fn cell_execution_order(outputs: &[NotebookCellOutput]) -> std::collections::HashMap<u32, u32> {
+    let mut map = std::collections::HashMap::new();
+    let mut counter = 1u32;
+    for output in outputs {
+        let order = output.execution_order.unwrap_or_else(|| {
+            let o = counter;
+            counter += 1;
+            o
+        });
+        map.entry(output.cell_index).or_insert(order);
+    }
+    map
+}
+
+/// Return the total number of successful cell executions.
+pub fn count_successful_executions(outputs: &[NotebookCellOutput]) -> usize {
+    outputs.iter().filter(|o| o.success).count()
+}
+
+/// Return the total number of failed cell executions.
+pub fn count_failed_executions(outputs: &[NotebookCellOutput]) -> usize {
+    outputs.iter().filter(|o| !o.success).count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -974,5 +1132,97 @@ mod tests {
         assert_eq!(cells.len(), 2);
         assert_eq!(cells[0].kind, NotebookCellKind::Code);
         assert_eq!(cells[1].kind, NotebookCellKind::Markup);
+    }
+
+    #[test]
+    fn cell_output_text() {
+        let output = NotebookCellOutput::text(0, "hello world");
+        assert!(output.success);
+        assert_eq!(output.data, "hello world");
+        assert_eq!(output.data_size(), 11);
+        assert!(!output.is_error());
+    }
+
+    #[test]
+    fn cell_output_error() {
+        let output = NotebookCellOutput::error(1, "NameError: x is not defined");
+        assert!(!output.success);
+        assert!(output.is_error());
+        assert_eq!(output.mime_type, OutputMimeType::Error);
+    }
+
+    #[test]
+    fn cell_output_with_order() {
+        let output = NotebookCellOutput::text(0, "result").with_order(5);
+        assert_eq!(output.execution_order, Some(5));
+    }
+
+    #[test]
+    fn cell_output_display() {
+        let output = NotebookCellOutput::text(0, "hello");
+        let s = format!("{}", output);
+        assert!(s.contains("Output[0]"));
+        assert!(s.contains("ok"));
+    }
+
+    #[test]
+    fn kernel_picker_best_most_specialized() {
+        let kernels = vec![
+            NotebookKernel {
+                id: "general".into(),
+                label: "General".into(),
+                supported_languages: vec!["python".into(), "r".into(), "julia".into()],
+            },
+            NotebookKernel {
+                id: "py".into(),
+                label: "Python".into(),
+                supported_languages: vec!["python".into()],
+            },
+        ];
+        let best = NotebookKernelPicker::pick_best(&kernels, "python").unwrap();
+        assert_eq!(best.id, "py");
+    }
+
+    #[test]
+    fn kernel_picker_no_match() {
+        let kernels = vec![NotebookKernel {
+            id: "py".into(),
+            label: "Python".into(),
+            supported_languages: vec!["python".into()],
+        }];
+        assert!(NotebookKernelPicker::pick_best(&kernels, "rust").is_none());
+    }
+
+    #[test]
+    fn kernel_picker_ranked() {
+        let kernels = vec![
+            NotebookKernel {
+                id: "rs".into(),
+                label: "Rust".into(),
+                supported_languages: vec!["rust".into()],
+            },
+            NotebookKernel {
+                id: "py".into(),
+                label: "Python".into(),
+                supported_languages: vec!["python".into()],
+            },
+        ];
+        let ranked = NotebookKernelPicker::ranked_kernels(&kernels, "python");
+        assert_eq!(ranked[0].id, "py");
+    }
+
+    #[test]
+    fn cell_execution_order_tracking() {
+        let outputs = vec![
+            NotebookCellOutput::text(0, "a").with_order(1),
+            NotebookCellOutput::text(2, "b").with_order(2),
+            NotebookCellOutput::error(1, "fail").with_order(3),
+        ];
+        let order = cell_execution_order(&outputs);
+        assert_eq!(order.get(&0), Some(&1));
+        assert_eq!(order.get(&2), Some(&2));
+        assert_eq!(order.get(&1), Some(&3));
+        assert_eq!(count_successful_executions(&outputs), 2);
+        assert_eq!(count_failed_executions(&outputs), 1);
     }
 }

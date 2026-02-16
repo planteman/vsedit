@@ -483,6 +483,123 @@ pub fn summarize_group(markers: &[Marker]) -> MarkerGroupSummary {
     summary
 }
 
+// ---------------------------------------------------------------------------
+// MarkerNavigation
+// ---------------------------------------------------------------------------
+
+/// Navigates markers within a service, supporting next/prev by severity.
+pub struct MarkerNavigation<'a> {
+    service: &'a MarkersService,
+    current_index: Option<usize>,
+}
+
+impl<'a> MarkerNavigation<'a> {
+    pub fn new(service: &'a MarkersService) -> Self {
+        Self {
+            service,
+            current_index: None,
+        }
+    }
+
+    /// Find the next marker with `Error` severity after `current_index`.
+    pub fn next_error(&mut self) -> Option<&'a Marker> {
+        self.next_by_severity(MarkerSeverity::Error)
+    }
+
+    /// Find the previous marker with `Error` severity before `current_index`.
+    pub fn prev_error(&mut self) -> Option<&'a Marker> {
+        self.prev_by_severity(MarkerSeverity::Error)
+    }
+
+    /// Find the next marker with `Warning` severity after `current_index`.
+    pub fn next_warning(&mut self) -> Option<&'a Marker> {
+        self.next_by_severity(MarkerSeverity::Warning)
+    }
+
+    /// Find the next marker matching the given severity after `current_index`.
+    pub fn next_by_severity(&mut self, severity: MarkerSeverity) -> Option<&'a Marker> {
+        let start = match self.current_index {
+            Some(i) => i + 1,
+            None => 0,
+        };
+        for i in start..self.service.markers.len() {
+            if self.service.markers[i].severity == severity {
+                self.current_index = Some(i);
+                return Some(&self.service.markers[i]);
+            }
+        }
+        None
+    }
+
+    /// Find the previous marker matching the given severity before `current_index`.
+    pub fn prev_by_severity(&mut self, severity: MarkerSeverity) -> Option<&'a Marker> {
+        let end = match self.current_index {
+            Some(0) | None => return None,
+            Some(i) => i,
+        };
+        for i in (0..end).rev() {
+            if self.service.markers[i].severity == severity {
+                self.current_index = Some(i);
+                return Some(&self.service.markers[i]);
+            }
+        }
+        None
+    }
+
+    /// Reset navigation to the beginning.
+    pub fn reset(&mut self) {
+        self.current_index = None;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MarkerGrouping
+// ---------------------------------------------------------------------------
+
+/// Groups markers by a chosen criterion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GroupingCriterion {
+    File,
+    Severity,
+    Source,
+}
+
+/// Group markers by the chosen criterion, returning `(group_key, markers)`
+/// pairs sorted by key.
+pub fn group_markers(markers: &[Marker], criterion: GroupingCriterion) -> Vec<(String, Vec<&Marker>)> {
+    let mut map: std::collections::BTreeMap<String, Vec<&Marker>> =
+        std::collections::BTreeMap::new();
+    for m in markers {
+        let key = match criterion {
+            GroupingCriterion::File => m.uri.clone(),
+            GroupingCriterion::Severity => match m.severity {
+                MarkerSeverity::Error => "Error".to_string(),
+                MarkerSeverity::Warning => "Warning".to_string(),
+                MarkerSeverity::Info => "Info".to_string(),
+                MarkerSeverity::Hint => "Hint".to_string(),
+            },
+            GroupingCriterion::Source => {
+                m.source.clone().unwrap_or_else(|| "unknown".to_string())
+            }
+        };
+        map.entry(key).or_default().push(m);
+    }
+    map.into_iter().collect()
+}
+
+// ---------------------------------------------------------------------------
+// marker_summary
+// ---------------------------------------------------------------------------
+
+/// Returns a HashMap of severity -> count for the given markers.
+pub fn marker_summary(markers: &[Marker]) -> std::collections::HashMap<MarkerSeverity, usize> {
+    let mut counts = std::collections::HashMap::new();
+    for m in markers {
+        *counts.entry(m.severity).or_insert(0) += 1;
+    }
+    counts
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -971,5 +1088,110 @@ mod tests {
         let s = summarize_group(&markers);
         assert_eq!(s.hint_count, 2);
         assert_eq!(s.worst_severity(), Some(MarkerSeverity::Hint));
+    }
+
+    #[test]
+    fn navigation_next_error() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Warning, "warn1"));
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "err1"));
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Info, "info1"));
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Error, "err2"));
+        let mut nav = MarkerNavigation::new(&svc);
+        let m = nav.next_error().unwrap();
+        assert_eq!(m.message, "err1");
+        let m2 = nav.next_error().unwrap();
+        assert_eq!(m2.message, "err2");
+        assert!(nav.next_error().is_none());
+    }
+
+    #[test]
+    fn navigation_prev_error() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "err1"));
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Warning, "warn1"));
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Error, "err2"));
+        let mut nav = MarkerNavigation::new(&svc);
+        // Move to end first
+        nav.next_error();
+        nav.next_error();
+        let m = nav.prev_error().unwrap();
+        assert_eq!(m.message, "err1");
+    }
+
+    #[test]
+    fn navigation_next_warning() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "err1"));
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Warning, "warn1"));
+        let mut nav = MarkerNavigation::new(&svc);
+        let m = nav.next_warning().unwrap();
+        assert_eq!(m.message, "warn1");
+    }
+
+    #[test]
+    fn navigation_reset() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "err1"));
+        let mut nav = MarkerNavigation::new(&svc);
+        nav.next_error();
+        assert!(nav.next_error().is_none());
+        nav.reset();
+        assert!(nav.next_error().is_some());
+    }
+
+    #[test]
+    fn group_markers_by_file_criterion() {
+        let markers = vec![
+            make_marker("a.rs", MarkerSeverity::Error, "e1"),
+            make_marker("b.rs", MarkerSeverity::Warning, "w1"),
+            make_marker("a.rs", MarkerSeverity::Warning, "w2"),
+        ];
+        let groups = group_markers(&markers, GroupingCriterion::File);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].0, "a.rs");
+        assert_eq!(groups[0].1.len(), 2);
+        assert_eq!(groups[1].0, "b.rs");
+    }
+
+    #[test]
+    fn group_markers_by_severity_criterion() {
+        let markers = vec![
+            make_marker("a.rs", MarkerSeverity::Error, "e1"),
+            make_marker("b.rs", MarkerSeverity::Error, "e2"),
+            make_marker("a.rs", MarkerSeverity::Warning, "w1"),
+        ];
+        let groups = group_markers(&markers, GroupingCriterion::Severity);
+        assert!(groups.iter().any(|(k, v)| k == "Error" && v.len() == 2));
+        assert!(groups.iter().any(|(k, v)| k == "Warning" && v.len() == 1));
+    }
+
+    #[test]
+    fn group_markers_by_source_criterion() {
+        let mut m1 = make_marker("a.rs", MarkerSeverity::Error, "e1");
+        m1.source = Some("rustc".to_string());
+        let mut m2 = make_marker("b.rs", MarkerSeverity::Warning, "w1");
+        m2.source = Some("clippy".to_string());
+        let mut m3 = make_marker("a.rs", MarkerSeverity::Info, "i1");
+        m3.source = Some("rustc".to_string());
+        let markers = vec![m1, m2, m3];
+        let groups = group_markers(&markers, GroupingCriterion::Source);
+        assert!(groups.iter().any(|(k, v)| k == "rustc" && v.len() == 2));
+        assert!(groups.iter().any(|(k, v)| k == "clippy" && v.len() == 1));
+    }
+
+    #[test]
+    fn marker_summary_counts() {
+        let markers = vec![
+            make_marker("a.rs", MarkerSeverity::Error, "e1"),
+            make_marker("a.rs", MarkerSeverity::Error, "e2"),
+            make_marker("b.rs", MarkerSeverity::Warning, "w1"),
+            make_marker("c.rs", MarkerSeverity::Info, "i1"),
+        ];
+        let summary = marker_summary(&markers);
+        assert_eq!(summary.get(&MarkerSeverity::Error), Some(&2));
+        assert_eq!(summary.get(&MarkerSeverity::Warning), Some(&1));
+        assert_eq!(summary.get(&MarkerSeverity::Info), Some(&1));
+        assert_eq!(summary.get(&MarkerSeverity::Hint), None);
     }
 }

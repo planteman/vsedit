@@ -120,7 +120,7 @@ impl ActivityBarItemBuilder {
 
 /// The activity bar containing sidebar navigation items.
 pub struct ActivityBar {
-    items: Vec<ActivityBarItem>,
+    pub items: Vec<ActivityBarItem>,
     position: ActivityBarPosition,
 }
 
@@ -205,6 +205,12 @@ impl ActivityBar {
         for item in &mut self.items {
             item.badge = None;
         }
+    }
+
+    /// Returns items whose title contains the given substring (case-insensitive).
+    /// Returns a reference to the items slice.
+    pub fn items(&self) -> &[ActivityBarItem] {
+        &self.items
     }
 
     /// Returns items whose title contains the given substring (case-insensitive).
@@ -457,6 +463,184 @@ impl Default for WbActivityValidator {
     }
 }
 
+/// A badge displaying a notification count or dot indicator on an activity bar item.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActivityBarBadge {
+    /// The count to display. If 0, shows a dot indicator instead.
+    pub count: u32,
+    /// Optional tooltip text for the badge.
+    pub tooltip: Option<String>,
+    /// Badge color as a CSS-style string (e.g., "#ff0000").
+    pub color: String,
+}
+
+impl ActivityBarBadge {
+    /// Create a badge with a count.
+    pub fn with_count(count: u32) -> Self {
+        Self {
+            count,
+            tooltip: None,
+            color: "#007acc".to_string(),
+        }
+    }
+
+    /// Create a dot badge (no count).
+    pub fn dot() -> Self {
+        Self {
+            count: 0,
+            tooltip: None,
+            color: "#007acc".to_string(),
+        }
+    }
+
+    pub fn with_tooltip(mut self, tooltip: impl Into<String>) -> Self {
+        self.tooltip = Some(tooltip.into());
+        self
+    }
+
+    pub fn with_color(mut self, color: impl Into<String>) -> Self {
+        self.color = color.into();
+        self
+    }
+
+    /// Returns true if this is a dot badge (count == 0).
+    pub fn is_dot(&self) -> bool {
+        self.count == 0
+    }
+
+    /// Format the badge for display. Counts > 99 show "99+".
+    pub fn display_text(&self) -> String {
+        if self.count == 0 {
+            "●".to_string()
+        } else if self.count > 99 {
+            "99+".to_string()
+        } else {
+            self.count.to_string()
+        }
+    }
+
+    /// Increment the count by one.
+    pub fn increment(&mut self) {
+        self.count = self.count.saturating_add(1);
+    }
+
+    /// Decrement the count by one (minimum 0).
+    pub fn decrement(&mut self) {
+        self.count = self.count.saturating_sub(1);
+    }
+}
+
+impl fmt::Display for ActivityBarBadge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.display_text())
+    }
+}
+
+/// Manages drag-to-reorder operations for activity bar items.
+#[derive(Debug, Clone)]
+pub struct ActivityBarDragReorder {
+    /// ID of the item being dragged.
+    pub dragged_id: String,
+    /// Index of the drop target.
+    pub target_index: Option<usize>,
+    /// Whether the drag is active.
+    pub active: bool,
+}
+
+impl ActivityBarDragReorder {
+    pub fn start(id: impl Into<String>) -> Self {
+        Self {
+            dragged_id: id.into(),
+            target_index: None,
+            active: true,
+        }
+    }
+
+    pub fn update_target(&mut self, index: usize) {
+        self.target_index = Some(index);
+    }
+
+    pub fn cancel(&mut self) {
+        self.active = false;
+        self.target_index = None;
+    }
+
+    /// Apply the reorder to an ActivityBar. Returns the new index, or None if cancelled.
+    pub fn apply(&mut self, bar: &mut ActivityBar) -> Option<usize> {
+        if !self.active {
+            return None;
+        }
+        self.active = false;
+        let target = self.target_index?;
+
+        // Find current position
+        let current_pos = bar.items.iter().position(|i| i.id == self.dragged_id)?;
+        if current_pos == target || target >= bar.items.len() {
+            return Some(current_pos);
+        }
+
+        let item = bar.items.remove(current_pos);
+        let insert_at = target.min(bar.items.len());
+        bar.items.insert(insert_at, item);
+        // Update order fields
+        for (i, item) in bar.items.iter_mut().enumerate() {
+            item.order = i as i32;
+        }
+        Some(insert_at)
+    }
+}
+
+/// Serialized representation of activity bar state.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActivityBarState {
+    pub position: ActivityBarPosition,
+    pub item_order: Vec<String>,
+    pub hidden_items: Vec<String>,
+    pub active_item: Option<String>,
+}
+
+/// Serialize the current activity bar state for persistence.
+pub fn activity_bar_serialize(bar: &ActivityBar) -> ActivityBarState {
+    let item_order: Vec<String> = bar.items.iter().map(|i| i.id.clone()).collect();
+    let hidden_items: Vec<String> = bar.items.iter().filter(|i| !i.visible).map(|i| i.id.clone()).collect();
+    let active_item = bar.get_active().map(|i| i.id.clone());
+    ActivityBarState {
+        position: bar.position(),
+        item_order,
+        hidden_items,
+        active_item,
+    }
+}
+
+/// Restore activity bar order from a serialized state.
+/// Reorders items to match `state.item_order`, sets visibility and active state.
+pub fn activity_bar_restore(bar: &mut ActivityBar, state: &ActivityBarState) {
+    bar.set_position(state.position);
+
+    // Reorder: for each id in state.item_order, find it in bar.items and collect
+    let mut reordered = Vec::new();
+    for id in &state.item_order {
+        if let Some(pos) = bar.items.iter().position(|i| i.id == *id) {
+            reordered.push(bar.items.remove(pos));
+        }
+    }
+    // Append any remaining items not in the saved order
+    reordered.append(&mut bar.items);
+    bar.items = reordered;
+
+    // Set visibility
+    for item in &mut bar.items {
+        if state.hidden_items.contains(&item.id) {
+            item.visible = false;
+        }
+    }
+
+    // Set active
+    if let Some(ref active_id) = state.active_item {
+        bar.activate(active_id);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -678,173 +862,152 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn badge_with_count() {
+        let badge = ActivityBarBadge::with_count(5);
+        assert_eq!(badge.count, 5);
+        assert!(!badge.is_dot());
+        assert_eq!(badge.display_text(), "5");
     }
 
     #[test]
-    fn behavior_check_1() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn badge_dot() {
+        let badge = ActivityBarBadge::dot();
+        assert!(badge.is_dot());
+        assert_eq!(badge.display_text(), "●");
     }
 
     #[test]
-    fn behavior_check_2() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn badge_large_count_shows_99_plus() {
+        let badge = ActivityBarBadge::with_count(150);
+        assert_eq!(badge.display_text(), "99+");
     }
 
     #[test]
-    fn behavior_check_3() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn badge_increment_decrement() {
+        let mut badge = ActivityBarBadge::with_count(5);
+        badge.increment();
+        assert_eq!(badge.count, 6);
+        badge.decrement();
+        badge.decrement();
+        assert_eq!(badge.count, 4);
     }
 
     #[test]
-    fn behavior_check_4() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn badge_decrement_at_zero() {
+        let mut badge = ActivityBarBadge::dot();
+        badge.decrement();
+        assert_eq!(badge.count, 0);
     }
 
     #[test]
-    fn behavior_check_5() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn badge_with_tooltip_and_color() {
+        let badge = ActivityBarBadge::with_count(3)
+            .with_tooltip("3 notifications")
+            .with_color("#ff0000");
+        assert_eq!(badge.tooltip.as_deref(), Some("3 notifications"));
+        assert_eq!(badge.color, "#ff0000");
     }
 
     #[test]
-    fn behavior_check_6() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn badge_display() {
+        let badge = ActivityBarBadge::with_count(42);
+        assert_eq!(format!("{badge}"), "42");
     }
 
     #[test]
-    fn behavior_check_7() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn drag_reorder_start_and_cancel() {
+        let mut drag = ActivityBarDragReorder::start("explorer");
+        assert!(drag.active);
+        drag.cancel();
+        assert!(!drag.active);
+        assert!(drag.target_index.is_none());
     }
 
     #[test]
-    fn behavior_check_8() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn drag_reorder_update_target() {
+        let mut drag = ActivityBarDragReorder::start("explorer");
+        drag.update_target(2);
+        assert_eq!(drag.target_index, Some(2));
     }
 
     #[test]
-    fn behavior_check_9() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn drag_reorder_apply_moves_item() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(ActivityBarItemBuilder::new("a", "A").order(0).build());
+        bar.add_item(ActivityBarItemBuilder::new("b", "B").order(1).build());
+        bar.add_item(ActivityBarItemBuilder::new("c", "C").order(2).build());
+        let mut drag = ActivityBarDragReorder::start("a");
+        drag.update_target(2);
+        let result = drag.apply(&mut bar);
+        assert_eq!(result, Some(2));
+        assert_eq!(bar.items[0].id, "b");
+        assert_eq!(bar.items[1].id, "c");
+        assert_eq!(bar.items[2].id, "a");
     }
 
     #[test]
-    fn behavior_check_10() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn drag_reorder_cancelled_returns_none() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(ActivityBarItemBuilder::new("a", "A").build());
+        let mut drag = ActivityBarDragReorder::start("a");
+        drag.cancel();
+        assert!(drag.apply(&mut bar).is_none());
     }
 
     #[test]
-    fn behavior_check_11() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn serialize_activity_bar() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(ActivityBarItemBuilder::new("explorer", "Explorer").order(0).build());
+        bar.add_item(ActivityBarItemBuilder::new("search", "Search").order(1).visible(false).build());
+        bar.activate("explorer");
+        let state = activity_bar_serialize(&bar);
+        assert_eq!(state.item_order, vec!["explorer", "search"]);
+        assert_eq!(state.hidden_items, vec!["search"]);
+        assert_eq!(state.active_item, Some("explorer".to_string()));
+        assert_eq!(state.position, ActivityBarPosition::Side);
     }
 
     #[test]
-    fn behavior_check_12() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn restore_activity_bar() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(ActivityBarItemBuilder::new("search", "Search").build());
+        bar.add_item(ActivityBarItemBuilder::new("explorer", "Explorer").build());
+        let state = ActivityBarState {
+            position: ActivityBarPosition::Top,
+            item_order: vec!["explorer".to_string(), "search".to_string()],
+            hidden_items: vec!["search".to_string()],
+            active_item: Some("explorer".to_string()),
+        };
+        activity_bar_restore(&mut bar, &state);
+        assert_eq!(bar.position(), ActivityBarPosition::Top);
+        assert_eq!(bar.items[0].id, "explorer");
+        assert_eq!(bar.items[1].id, "search");
+        assert!(!bar.items[1].visible);
+        assert!(bar.get_active().unwrap().id == "explorer");
     }
 
     #[test]
-    fn behavior_check_13() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn serialize_empty_bar() {
+        let bar = ActivityBar::new();
+        let state = activity_bar_serialize(&bar);
+        assert!(state.item_order.is_empty());
+        assert!(state.active_item.is_none());
     }
 
     #[test]
-    fn behavior_check_14() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn drag_reorder_no_target_returns_none() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(ActivityBarItemBuilder::new("a", "A").build());
+        let mut drag = ActivityBarDragReorder::start("a");
+        // No target set
+        assert!(drag.apply(&mut bar).is_none());
     }
 
     #[test]
-    fn behavior_check_15() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_27() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_28() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_29() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_30() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_31() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_32() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_33() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn badge_equality() {
+        let a = ActivityBarBadge::with_count(5);
+        let b = ActivityBarBadge::with_count(5);
+        assert_eq!(a, b);
     }
 
     #[test]

@@ -567,6 +567,169 @@ impl<'a> SettingsFilteredExporter<'a> {
     }
 }
 
+/// The UI control to render for a setting.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SettingControl {
+    /// A checkbox (for boolean settings).
+    Checkbox { checked: bool },
+    /// A text input field.
+    TextInput { placeholder: String },
+    /// A dropdown/select with options.
+    Dropdown {
+        options: Vec<String>,
+        selected: Option<usize>,
+    },
+    /// A numeric spinner with min/max bounds.
+    NumberInput {
+        value: f64,
+        min: f64,
+        max: f64,
+        step: f64,
+    },
+}
+
+impl SettingControl {
+    /// Infer the appropriate control from a `SettingItem`.
+    pub fn from_setting(item: &SettingItem) -> Self {
+        match &item.setting_type {
+            SettingType::Boolean => {
+                let checked = item
+                    .current_value
+                    .as_deref()
+                    .unwrap_or(&item.default_value)
+                    == "true";
+                SettingControl::Checkbox { checked }
+            }
+            SettingType::Enum => {
+                let current = item
+                    .current_value
+                    .as_deref()
+                    .unwrap_or(&item.default_value);
+                let selected = item.enum_values.iter().position(|v| v == current);
+                SettingControl::Dropdown {
+                    options: item.enum_values.clone(),
+                    selected,
+                }
+            }
+            SettingType::Number => {
+                let val: f64 = item
+                    .current_value
+                    .as_deref()
+                    .unwrap_or(&item.default_value)
+                    .parse()
+                    .unwrap_or(0.0);
+                SettingControl::NumberInput {
+                    value: val,
+                    min: 0.0,
+                    max: f64::MAX,
+                    step: 1.0,
+                }
+            }
+            _ => SettingControl::TextInput {
+                placeholder: item.default_value.clone(),
+            },
+        }
+    }
+}
+
+impl fmt::Display for SettingControl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SettingControl::Checkbox { checked } => {
+                write!(f, "[{}]", if *checked { "x" } else { " " })
+            }
+            SettingControl::TextInput { placeholder } => {
+                write!(f, "[____] ({})", placeholder)
+            }
+            SettingControl::Dropdown { options, selected } => {
+                let sel = selected
+                    .map(|i| options[i].as_str())
+                    .unwrap_or("none");
+                write!(f, "[v {}] ({} options)", sel, options.len())
+            }
+            SettingControl::NumberInput { value, .. } => write!(f, "[{}]", value),
+        }
+    }
+}
+
+/// A constraint that can validate setting values.
+#[derive(Debug, Clone)]
+pub enum SettingValidation {
+    /// Value must contain the given substring.
+    Pattern(String),
+    /// Numeric value must be within [min, max].
+    Range { min: f64, max: f64 },
+    /// String length must be within [min_len, max_len].
+    Length { min_len: usize, max_len: usize },
+    /// Value must be one of the listed options.
+    OneOf(Vec<String>),
+}
+
+impl SettingValidation {
+    /// Validate a value string against this constraint.
+    pub fn validate(&self, value: &str) -> Result<(), String> {
+        match self {
+            SettingValidation::Pattern(pattern) => {
+                if !value.contains(pattern.as_str()) {
+                    return Err(format!("value must contain '{}'", pattern));
+                }
+            }
+            SettingValidation::Range { min, max } => {
+                let num: f64 = value
+                    .parse()
+                    .map_err(|_| format!("'{}' is not a number", value))?;
+                if num < *min || num > *max {
+                    return Err(format!("{} is outside range [{}, {}]", num, min, max));
+                }
+            }
+            SettingValidation::Length { min_len, max_len } => {
+                let len = value.len();
+                if len < *min_len || len > *max_len {
+                    return Err(format!(
+                        "length {} is outside [{}, {}]",
+                        len, min_len, max_len
+                    ));
+                }
+            }
+            SettingValidation::OneOf(options) => {
+                if !options.contains(&value.to_string()) {
+                    return Err(format!("'{}' is not one of {:?}", value, options));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Generate a JSON patch showing only settings that differ from defaults.
+///
+/// Returns a JSON string with only the modified key-value pairs.
+pub fn settings_to_json_patch(registry: &SettingsRegistry) -> String {
+    let modified: Vec<&SettingItem> = registry.all().iter().filter(|s| s.is_modified()).collect();
+    if modified.is_empty() {
+        return "{}".to_string();
+    }
+    let mut out = String::from("{\n");
+    for (i, item) in modified.iter().enumerate() {
+        let val = item
+            .current_value
+            .as_deref()
+            .unwrap_or(&item.default_value);
+        out.push_str(&format!("  \"{}\": \"{}\"", item.key, val));
+        if i + 1 < modified.len() {
+            out.push(',');
+        }
+        out.push('\n');
+    }
+    out.push('}');
+    out
+}
+
+/// Compute the number of settings that differ from their defaults.
+pub fn modified_settings_count(registry: &SettingsRegistry) -> usize {
+    registry.all().iter().filter(|s| s.is_modified()).count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -975,5 +1138,100 @@ mod tests {
             .to_json_string();
         assert!(json.contains("editor.fontSize"));
         assert!(!json.contains("terminal.shell"));
+    }
+
+    #[test]
+    fn setting_control_checkbox() {
+        let item = SettingItemBuilder::new("editor.wordWrap", SettingType::Boolean)
+            .default_value("false")
+            .current_value("true")
+            .build();
+        let ctrl = SettingControl::from_setting(&item);
+        assert!(matches!(ctrl, SettingControl::Checkbox { checked: true }));
+    }
+
+    #[test]
+    fn setting_control_dropdown() {
+        let item = SettingItemBuilder::new("editor.tabSize", SettingType::Enum)
+            .default_value("4")
+            .enum_values(vec!["2".into(), "4".into(), "8".into()])
+            .build();
+        let ctrl = SettingControl::from_setting(&item);
+        match ctrl {
+            SettingControl::Dropdown { options, selected } => {
+                assert_eq!(options.len(), 3);
+                assert_eq!(selected, Some(1));
+            }
+            _ => panic!("expected dropdown"),
+        }
+    }
+
+    #[test]
+    fn setting_control_number() {
+        let item = SettingItemBuilder::new("editor.fontSize", SettingType::Number)
+            .default_value("14")
+            .build();
+        let ctrl = SettingControl::from_setting(&item);
+        assert!(
+            matches!(ctrl, SettingControl::NumberInput { value, .. } if (value - 14.0).abs() < f64::EPSILON)
+        );
+    }
+
+    #[test]
+    fn setting_control_text() {
+        let item = SettingItemBuilder::new("editor.fontFamily", SettingType::String)
+            .default_value("Consolas")
+            .build();
+        let ctrl = SettingControl::from_setting(&item);
+        assert!(matches!(ctrl, SettingControl::TextInput { .. }));
+    }
+
+    #[test]
+    fn setting_validation_range_ok() {
+        let v = SettingValidation::Range {
+            min: 8.0,
+            max: 72.0,
+        };
+        assert!(v.validate("14").is_ok());
+        assert!(v.validate("4").is_err());
+        assert!(v.validate("100").is_err());
+    }
+
+    #[test]
+    fn setting_validation_length() {
+        let v = SettingValidation::Length {
+            min_len: 1,
+            max_len: 10,
+        };
+        assert!(v.validate("hello").is_ok());
+        assert!(v.validate("").is_err());
+        assert!(v.validate("a very long string").is_err());
+    }
+
+    #[test]
+    fn setting_validation_one_of() {
+        let v = SettingValidation::OneOf(vec!["on".into(), "off".into(), "auto".into()]);
+        assert!(v.validate("on").is_ok());
+        assert!(v.validate("maybe").is_err());
+    }
+
+    #[test]
+    fn settings_to_json_patch_only_modified() {
+        let mut registry = SettingsRegistry::new();
+        registry.add(
+            SettingItemBuilder::new("a.b", SettingType::String)
+                .default_value("default")
+                .current_value("changed")
+                .build(),
+        );
+        registry.add(
+            SettingItemBuilder::new("c.d", SettingType::String)
+                .default_value("same")
+                .build(),
+        );
+        let patch = settings_to_json_patch(&registry);
+        assert!(patch.contains("a.b"));
+        assert!(!patch.contains("c.d"));
+        assert_eq!(modified_settings_count(&registry), 1);
     }
 }

@@ -210,6 +210,18 @@ impl TimelineBridge {
     }
 }
 
+impl TimelineItemStore {
+    /// Return all provider IDs that have items.
+    pub fn all_provider_ids(&self) -> Vec<&str> {
+        self.items.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Total number of items across all providers.
+    pub fn total_item_count(&self) -> usize {
+        self.items.values().map(|v| v.len()).sum()
+    }
+}
+
 /// Accumulated statistics for ext-timeline operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtTimelineStats {
@@ -444,6 +456,229 @@ impl Default for ExtTimelineValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TimelineEventFilter
+// ---------------------------------------------------------------------------
+
+/// Filter for querying timeline items by various criteria.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TimelineEventFilter {
+    /// Filter by minimum timestamp (inclusive).
+    pub since: Option<u64>,
+    /// Filter by maximum timestamp (inclusive).
+    pub until: Option<u64>,
+    /// Filter by provider IDs (if non-empty, only items from these providers match).
+    pub provider_ids: Vec<String>,
+    /// Filter by label substring (case-insensitive).
+    pub label_contains: Option<String>,
+    /// Maximum number of results.
+    pub limit: Option<usize>,
+}
+
+impl TimelineEventFilter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn since(mut self, ts: u64) -> Self {
+        self.since = Some(ts);
+        self
+    }
+
+    pub fn until(mut self, ts: u64) -> Self {
+        self.until = Some(ts);
+        self
+    }
+
+    pub fn provider(mut self, id: impl Into<String>) -> Self {
+        self.provider_ids.push(id.into());
+        self
+    }
+
+    pub fn label_contains(mut self, query: impl Into<String>) -> Self {
+        self.label_contains = Some(query.into());
+        self
+    }
+
+    pub fn limit(mut self, max: usize) -> Self {
+        self.limit = Some(max);
+        self
+    }
+
+    /// Test whether a single timeline item matches this filter.
+    pub fn matches_item(&self, item: &TimelineItem) -> bool {
+        if let Some(since) = self.since {
+            if item.timestamp < since {
+                return false;
+            }
+        }
+        if let Some(until) = self.until {
+            if item.timestamp > until {
+                return false;
+            }
+        }
+        if let Some(ref query) = self.label_contains {
+            if !item.label.to_lowercase().contains(&query.to_lowercase()) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Apply this filter to a store, returning matching items.
+    pub fn apply(&self, store: &TimelineItemStore) -> Vec<TimelineItem> {
+        let mut results = Vec::new();
+        let provider_ids: Vec<&str> = if self.provider_ids.is_empty() {
+            store.all_provider_ids()
+        } else {
+            self.provider_ids.iter().map(|s| s.as_str()).collect()
+        };
+
+        for pid in provider_ids {
+            let items = store.get_items(pid);
+            for item in items {
+                if self.matches_item(&item) {
+                    results.push(item);
+                }
+            }
+        }
+
+        // Sort by timestamp descending
+        results.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+
+        if let Some(limit) = self.limit {
+            results.truncate(limit);
+        }
+
+        results
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TimelinePaginator
+// ---------------------------------------------------------------------------
+
+/// Paginator for lazy-loading timeline entries.
+#[derive(Debug, Clone)]
+pub struct TimelinePaginator {
+    /// Current page (0-based).
+    pub page: usize,
+    /// Items per page.
+    pub page_size: usize,
+    /// Total items available (may be unknown initially).
+    pub total_items: Option<usize>,
+}
+
+impl TimelinePaginator {
+    pub fn new(page_size: usize) -> Self {
+        Self {
+            page: 0,
+            page_size,
+            total_items: None,
+        }
+    }
+
+    /// Set the total number of items.
+    pub fn set_total(&mut self, total: usize) {
+        self.total_items = Some(total);
+    }
+
+    /// Advance to the next page. Returns false if already at the last page.
+    pub fn next_page(&mut self) -> bool {
+        if let Some(total) = self.total_items {
+            if (self.page + 1) * self.page_size >= total {
+                return false;
+            }
+        }
+        self.page += 1;
+        true
+    }
+
+    /// Go back to the previous page. Returns false if already at page 0.
+    pub fn prev_page(&mut self) -> bool {
+        if self.page == 0 {
+            return false;
+        }
+        self.page -= 1;
+        true
+    }
+
+    /// Reset to the first page.
+    pub fn reset(&mut self) {
+        self.page = 0;
+    }
+
+    /// The starting offset for the current page.
+    pub fn offset(&self) -> usize {
+        self.page * self.page_size
+    }
+
+    /// Total number of pages, or None if total is unknown.
+    pub fn total_pages(&self) -> Option<usize> {
+        self.total_items.map(|total| {
+            if total == 0 { 1 } else { (total + self.page_size - 1) / self.page_size }
+        })
+    }
+
+    /// Whether there are more pages after the current one.
+    pub fn has_next(&self) -> bool {
+        match self.total_items {
+            Some(total) => (self.page + 1) * self.page_size < total,
+            None => true, // assume more when total is unknown
+        }
+    }
+
+    /// Whether there is a previous page.
+    pub fn has_prev(&self) -> bool {
+        self.page > 0
+    }
+
+    /// Apply pagination to a vec of items.
+    pub fn paginate<T: Clone>(&self, items: &[T]) -> Vec<T> {
+        let start = self.offset();
+        let end = (start + self.page_size).min(items.len());
+        if start >= items.len() {
+            Vec::new()
+        } else {
+            items[start..end].to_vec()
+        }
+    }
+}
+
+/// Create a paginator for timeline items.
+pub fn timeline_paginator(page_size: usize) -> TimelinePaginator {
+    TimelinePaginator::new(page_size)
+}
+
+// ---------------------------------------------------------------------------
+// Timeline export / import
+// ---------------------------------------------------------------------------
+
+/// Export timeline items to a JSON string.
+pub fn timeline_export(store: &TimelineItemStore, provider_id: &str) -> String {
+    let items = store.get_items(provider_id);
+    serde_json::to_string_pretty(&items).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// Export all items from all providers to a JSON object.
+pub fn timeline_export_all(store: &TimelineItemStore) -> String {
+    let mut map = serde_json::Map::new();
+    for pid in store.all_provider_ids() {
+        let items = store.get_items(pid);
+        map.insert(pid.to_string(), serde_json::to_value(&items).unwrap_or(serde_json::Value::Array(vec![])));
+    }
+    serde_json::to_string_pretty(&map).unwrap_or_else(|_| "{}".to_string())
+}
+
+/// Import timeline items from a JSON string into a store.
+pub fn timeline_import(store: &mut TimelineItemStore, provider_id: &str, json: &str) -> Result<usize, String> {
+    let items: Vec<TimelineItem> = serde_json::from_str(json)
+        .map_err(|e| format!("failed to parse timeline JSON: {e}"))?;
+    let count = items.len();
+    store.add_items(provider_id, items);
+    Ok(count)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -649,203 +884,192 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn filter_by_timestamp_range() {
+        let mut store = TimelineItemStore::new();
+        store.add_items("git", vec![
+            TimelineItem { id: "1".into(), label: "commit A".into(), description: None, timestamp: 100, icon_id: None, command: None },
+            TimelineItem { id: "2".into(), label: "commit B".into(), description: None, timestamp: 200, icon_id: None, command: None },
+            TimelineItem { id: "3".into(), label: "commit C".into(), description: None, timestamp: 300, icon_id: None, command: None },
+        ]);
+        let filter = TimelineEventFilter::new().since(150).until(250);
+        let results = filter.apply(&store);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "2");
     }
 
     #[test]
-    fn behavior_check_1() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn filter_by_label() {
+        let mut store = TimelineItemStore::new();
+        store.add_items("git", vec![
+            TimelineItem { id: "1".into(), label: "Fix bug".into(), description: None, timestamp: 100, icon_id: None, command: None },
+            TimelineItem { id: "2".into(), label: "Add feature".into(), description: None, timestamp: 200, icon_id: None, command: None },
+        ]);
+        let filter = TimelineEventFilter::new().label_contains("fix");
+        let results = filter.apply(&store);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "1");
     }
 
     #[test]
-    fn behavior_check_2() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn filter_by_provider() {
+        let mut store = TimelineItemStore::new();
+        store.add_items("git", vec![
+            TimelineItem { id: "g1".into(), label: "git commit".into(), description: None, timestamp: 100, icon_id: None, command: None },
+        ]);
+        store.add_items("local", vec![
+            TimelineItem { id: "l1".into(), label: "local save".into(), description: None, timestamp: 200, icon_id: None, command: None },
+        ]);
+        let filter = TimelineEventFilter::new().provider("git");
+        let results = filter.apply(&store);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "g1");
     }
 
     #[test]
-    fn behavior_check_3() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn filter_with_limit() {
+        let mut store = TimelineItemStore::new();
+        store.add_items("git", vec![
+            TimelineItem { id: "1".into(), label: "a".into(), description: None, timestamp: 100, icon_id: None, command: None },
+            TimelineItem { id: "2".into(), label: "b".into(), description: None, timestamp: 200, icon_id: None, command: None },
+            TimelineItem { id: "3".into(), label: "c".into(), description: None, timestamp: 300, icon_id: None, command: None },
+        ]);
+        let filter = TimelineEventFilter::new().limit(2);
+        let results = filter.apply(&store);
+        assert_eq!(results.len(), 2);
     }
 
     #[test]
-    fn behavior_check_4() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn filter_empty_returns_all() {
+        let mut store = TimelineItemStore::new();
+        store.add_items("git", vec![
+            TimelineItem { id: "1".into(), label: "a".into(), description: None, timestamp: 100, icon_id: None, command: None },
+        ]);
+        let filter = TimelineEventFilter::new();
+        assert_eq!(filter.apply(&store).len(), 1);
     }
 
     #[test]
-    fn behavior_check_5() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn paginator_basic() {
+        let pag = timeline_paginator(10);
+        assert_eq!(pag.page, 0);
+        assert_eq!(pag.offset(), 0);
+        assert!(pag.has_next());
+        assert!(!pag.has_prev());
     }
 
     #[test]
-    fn behavior_check_6() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn paginator_next_prev() {
+        let mut pag = timeline_paginator(10);
+        pag.set_total(25);
+        assert!(pag.next_page());
+        assert_eq!(pag.page, 1);
+        assert_eq!(pag.offset(), 10);
+        assert!(pag.has_prev());
+        assert!(pag.next_page()); // page 2
+        assert!(!pag.next_page()); // page 2 is last (items 20-24)
+        assert!(pag.prev_page());
+        assert_eq!(pag.page, 1);
     }
 
     #[test]
-    fn behavior_check_7() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn paginator_total_pages() {
+        let mut pag = timeline_paginator(10);
+        pag.set_total(25);
+        assert_eq!(pag.total_pages(), Some(3));
+        pag.set_total(20);
+        assert_eq!(pag.total_pages(), Some(2));
+        pag.set_total(0);
+        assert_eq!(pag.total_pages(), Some(1));
     }
 
     #[test]
-    fn behavior_check_8() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn paginator_paginate_items() {
+        let pag = timeline_paginator(3);
+        let items = vec![1, 2, 3, 4, 5, 6, 7];
+        assert_eq!(pag.paginate(&items), vec![1, 2, 3]);
     }
 
     #[test]
-    fn behavior_check_9() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn paginator_paginate_page_2() {
+        let mut pag = timeline_paginator(3);
+        pag.set_total(7);
+        pag.next_page();
+        let items = vec![1, 2, 3, 4, 5, 6, 7];
+        assert_eq!(pag.paginate(&items), vec![4, 5, 6]);
     }
 
     #[test]
-    fn behavior_check_10() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn paginator_reset() {
+        let mut pag = timeline_paginator(10);
+        pag.set_total(100);
+        pag.next_page();
+        pag.next_page();
+        pag.reset();
+        assert_eq!(pag.page, 0);
     }
 
     #[test]
-    fn behavior_check_11() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn timeline_export_json() {
+        let mut store = TimelineItemStore::new();
+        store.add_items("git", vec![
+            TimelineItem { id: "1".into(), label: "commit".into(), description: None, timestamp: 100, icon_id: None, command: None },
+        ]);
+        let json = timeline_export(&store, "git");
+        assert!(json.contains("commit"));
+        assert!(json.contains("100"));
     }
 
     #[test]
-    fn behavior_check_12() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn timeline_export_empty_provider() {
+        let store = TimelineItemStore::new();
+        let json = timeline_export(&store, "nope");
+        assert_eq!(json.trim(), "[]");
     }
 
     #[test]
-    fn behavior_check_13() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn timeline_import_roundtrip() {
+        let mut store = TimelineItemStore::new();
+        store.add_items("git", vec![
+            TimelineItem { id: "1".into(), label: "commit".into(), description: Some("desc".into()), timestamp: 100, icon_id: None, command: None },
+        ]);
+        let json = timeline_export(&store, "git");
+        let mut store2 = TimelineItemStore::new();
+        let count = timeline_import(&mut store2, "git", &json).unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(store2.get_items("git")[0].label, "commit");
     }
 
     #[test]
-    fn behavior_check_14() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn timeline_import_invalid_json() {
+        let mut store = TimelineItemStore::new();
+        assert!(timeline_import(&mut store, "git", "not json").is_err());
     }
 
     #[test]
-    fn behavior_check_15() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn total_item_count() {
+        let mut store = TimelineItemStore::new();
+        store.add_items("git", vec![
+            TimelineItem { id: "1".into(), label: "a".into(), description: None, timestamp: 100, icon_id: None, command: None },
+            TimelineItem { id: "2".into(), label: "b".into(), description: None, timestamp: 200, icon_id: None, command: None },
+        ]);
+        store.add_items("local", vec![
+            TimelineItem { id: "3".into(), label: "c".into(), description: None, timestamp: 300, icon_id: None, command: None },
+        ]);
+        assert_eq!(store.total_item_count(), 3);
     }
 
     #[test]
-    fn behavior_check_16() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_27() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_28() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_29() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_30() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_31() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_32() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_33() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_34() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_35() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_36() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_37() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_38() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_39() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn filter_results_sorted_descending() {
+        let mut store = TimelineItemStore::new();
+        store.add_items("git", vec![
+            TimelineItem { id: "1".into(), label: "old".into(), description: None, timestamp: 100, icon_id: None, command: None },
+            TimelineItem { id: "2".into(), label: "new".into(), description: None, timestamp: 300, icon_id: None, command: None },
+            TimelineItem { id: "3".into(), label: "mid".into(), description: None, timestamp: 200, icon_id: None, command: None },
+        ]);
+        let results = TimelineEventFilter::new().apply(&store);
+        assert_eq!(results[0].timestamp, 300);
+        assert_eq!(results[1].timestamp, 200);
+        assert_eq!(results[2].timestamp, 100);
     }
 
     #[test]

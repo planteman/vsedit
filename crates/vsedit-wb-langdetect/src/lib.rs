@@ -619,6 +619,147 @@ impl Default for WbLangdetectValidator {
     }
 }
 
+/// Detects language from the first line via shebang or editor modelines.
+pub struct FirstLineDetector;
+
+impl FirstLineDetector {
+    /// Detect language from first line. Checks shebang first, then vim/emacs modelines.
+    pub fn detect(first_line: &str) -> Option<DetectionResult> {
+        // Try shebang
+        if let Some(lang) = detect_by_shebang(first_line) {
+            return Some(DetectionResult {
+                language_id: lang,
+                confidence: 0.95,
+            });
+        }
+        // Try vim modeline: "# vim: set ft=python :" or "// vim: filetype=rust"
+        Self::detect_vim_modeline(first_line).or_else(|| Self::detect_emacs_modeline(first_line))
+    }
+
+    fn detect_vim_modeline(line: &str) -> Option<DetectionResult> {
+        // Look for "vim:" followed by "ft=" or "filetype="
+        if !line.contains("vim:") {
+            return None;
+        }
+        for segment in line.split_whitespace() {
+            if let Some(ft) = segment
+                .strip_prefix("ft=")
+                .or_else(|| segment.strip_prefix("filetype="))
+            {
+                let ft = ft.trim_end_matches(':');
+                return Some(DetectionResult {
+                    language_id: ft.to_string(),
+                    confidence: 0.9,
+                });
+            }
+        }
+        None
+    }
+
+    fn detect_emacs_modeline(line: &str) -> Option<DetectionResult> {
+        // Look for "-*- mode: python -*-" or "-*- python -*-"
+        let start = line.find("-*-")?;
+        let rest = &line[start + 3..];
+        let end = rest.find("-*-")?;
+        let content = rest[..end].trim();
+        if let Some(mode_val) = content.strip_prefix("mode:") {
+            return Some(DetectionResult {
+                language_id: mode_val.trim().to_string(),
+                confidence: 0.9,
+            });
+        }
+        // Simple form: "-*- python -*-"
+        if !content.contains(':') && !content.is_empty() {
+            return Some(DetectionResult {
+                language_id: content.to_string(),
+                confidence: 0.85,
+            });
+        }
+        None
+    }
+}
+
+/// Heuristic content detector that examines structure, not just keywords.
+pub struct ContentSniffDetector;
+
+impl ContentSniffDetector {
+    /// Detect language by sniffing content structure.
+    pub fn detect(content: &str) -> Option<DetectionResult> {
+        let trimmed = content.trim();
+        // JSON detection
+        if (trimmed.starts_with('{') && trimmed.ends_with('}'))
+            || (trimmed.starts_with('[') && trimmed.ends_with(']'))
+        {
+            return Some(DetectionResult {
+                language_id: "json".into(),
+                confidence: 0.7,
+            });
+        }
+        // XML/HTML detection
+        if trimmed.starts_with("<?xml") {
+            return Some(DetectionResult {
+                language_id: "xml".into(),
+                confidence: 0.9,
+            });
+        }
+        if trimmed.starts_with("<!DOCTYPE html") || trimmed.starts_with("<html") {
+            return Some(DetectionResult {
+                language_id: "html".into(),
+                confidence: 0.85,
+            });
+        }
+        // YAML detection (key: value on first lines)
+        if Self::looks_like_yaml(trimmed) {
+            return Some(DetectionResult {
+                language_id: "yaml".into(),
+                confidence: 0.5,
+            });
+        }
+        // Shell script detection
+        if trimmed.starts_with("#!/") {
+            return detect_by_shebang(trimmed.lines().next().unwrap_or("")).map(|lang| {
+                DetectionResult {
+                    language_id: lang,
+                    confidence: 0.95,
+                }
+            });
+        }
+        None
+    }
+
+    fn looks_like_yaml(content: &str) -> bool {
+        let mut kv_lines = 0;
+        for line in content.lines().take(10) {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            if line.contains(": ") && !line.starts_with('{') {
+                kv_lines += 1;
+            }
+        }
+        kv_lines >= 2
+    }
+}
+
+/// Compute an overall detection confidence by combining multiple detection results.
+/// Uses the maximum confidence from extension, first-line, and content detectors.
+pub fn detection_confidence(filename: &str, content: &str) -> f64 {
+    let mut max_conf = 0.0_f64;
+    if detect_by_extension(filename).is_some() {
+        max_conf = max_conf.max(1.0);
+    }
+    if let Some(first_line) = content.lines().next() {
+        if let Some(result) = FirstLineDetector::detect(first_line) {
+            max_conf = max_conf.max(result.confidence);
+        }
+    }
+    if let Some(result) = ContentSniffDetector::detect(content) {
+        max_conf = max_conf.max(result.confidence);
+    }
+    max_conf
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -972,5 +1113,68 @@ mod tests {
     fn wb_langdetect_is_ascii_printable() {
         assert!(WbLangdetectValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbLangdetectValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn first_line_detector_shebang() {
+        let result = FirstLineDetector::detect("#!/usr/bin/env python3").unwrap();
+        assert_eq!(result.language_id, "python");
+        assert!(result.confidence >= 0.9);
+    }
+
+    #[test]
+    fn first_line_detector_vim_modeline() {
+        let result = FirstLineDetector::detect("# vim: set ft=ruby :").unwrap();
+        assert_eq!(result.language_id, "ruby");
+    }
+
+    #[test]
+    fn first_line_detector_emacs_modeline() {
+        let result = FirstLineDetector::detect("# -*- mode: python -*-").unwrap();
+        assert_eq!(result.language_id, "python");
+    }
+
+    #[test]
+    fn first_line_detector_emacs_simple() {
+        let result = FirstLineDetector::detect("# -*- rust -*-").unwrap();
+        assert_eq!(result.language_id, "rust");
+    }
+
+    #[test]
+    fn content_sniff_json() {
+        let result = ContentSniffDetector::detect("{ \"key\": \"value\" }").unwrap();
+        assert_eq!(result.language_id, "json");
+    }
+
+    #[test]
+    fn content_sniff_xml() {
+        let result =
+            ContentSniffDetector::detect("<?xml version=\"1.0\"?>\n<root/>").unwrap();
+        assert_eq!(result.language_id, "xml");
+    }
+
+    #[test]
+    fn content_sniff_html() {
+        let result =
+            ContentSniffDetector::detect("<!DOCTYPE html>\n<html></html>").unwrap();
+        assert_eq!(result.language_id, "html");
+    }
+
+    #[test]
+    fn content_sniff_yaml() {
+        let yaml = "name: test\nversion: 1.0\ndescription: a thing";
+        let result = ContentSniffDetector::detect(yaml).unwrap();
+        assert_eq!(result.language_id, "yaml");
+    }
+
+    #[test]
+    fn detection_confidence_known_extension() {
+        assert!((detection_confidence("main.rs", "") - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn detection_confidence_content_only() {
+        let conf = detection_confidence("unknown_file", "<?xml version=\"1.0\"?>");
+        assert!(conf >= 0.9);
     }
 }

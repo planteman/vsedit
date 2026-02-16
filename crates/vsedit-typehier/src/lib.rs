@@ -319,6 +319,26 @@ impl TypeTree {
         max_child
     }
 
+    /// Return a reference to the item at `idx`, if it exists.
+    pub fn get_item(&self, idx: usize) -> Option<&TypeHierarchyItem> {
+        self.items.get(idx)
+    }
+
+    /// Find the index of a given item. Returns `None` if not found.
+    pub fn find_index(&self, item: &TypeHierarchyItem) -> Option<usize> {
+        self.items.iter().position(|i| i == item)
+    }
+
+    /// Return references to all items.
+    pub fn all_items(&self) -> Vec<&TypeHierarchyItem> {
+        self.items.iter().collect()
+    }
+
+    /// Return the total number of types in the tree.
+    pub fn type_count(&self) -> usize {
+        self.items.len()
+    }
+
     /// Returns `true` if there is a cycle reachable from `idx` through
     /// supertype edges.
     pub fn has_circular_reference(&self, idx: usize) -> bool {
@@ -576,6 +596,124 @@ impl Default for TypehierValidator {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Renders a type hierarchy tree as indented text for display.
+pub struct TypeHierarchyTree;
+
+impl TypeHierarchyTree {
+    /// Render the subtypes tree rooted at `idx` as an indented string.
+    pub fn render_subtypes(tree: &TypeTree, idx: usize) -> String {
+        let mut out = String::new();
+        if let Some(item) = tree.get_item(idx) {
+            out.push_str(&item.name);
+            out.push('\n');
+            Self::render_subtypes_inner(tree, idx, 1, &mut out, &mut HashSet::new());
+        }
+        out
+    }
+
+    fn render_subtypes_inner(
+        tree: &TypeTree,
+        idx: usize,
+        depth: usize,
+        out: &mut String,
+        visited: &mut HashSet<usize>,
+    ) {
+        visited.insert(idx);
+        let children = tree.get_subtypes(idx);
+        for child in &children {
+            if let Some(child_idx) = tree.find_index(child) {
+                if visited.contains(&child_idx) {
+                    continue;
+                }
+                for _ in 0..depth {
+                    out.push_str("  ");
+                }
+                out.push_str(&child.name);
+                out.push('\n');
+                Self::render_subtypes_inner(tree, child_idx, depth + 1, out, visited);
+            }
+        }
+    }
+
+    /// Render the supertypes chain rooted at `idx` as an indented string.
+    pub fn render_supertypes(tree: &TypeTree, idx: usize) -> String {
+        let mut out = String::new();
+        if let Some(item) = tree.get_item(idx) {
+            out.push_str(&item.name);
+            out.push('\n');
+            Self::render_supertypes_inner(tree, idx, 1, &mut out, &mut HashSet::new());
+        }
+        out
+    }
+
+    fn render_supertypes_inner(
+        tree: &TypeTree,
+        idx: usize,
+        depth: usize,
+        out: &mut String,
+        visited: &mut HashSet<usize>,
+    ) {
+        visited.insert(idx);
+        let parents = tree.get_supertypes(idx);
+        for parent in &parents {
+            if let Some(parent_idx) = tree.find_index(parent) {
+                if visited.contains(&parent_idx) {
+                    continue;
+                }
+                for _ in 0..depth {
+                    out.push_str("  ");
+                }
+                out.push_str(&parent.name);
+                out.push('\n');
+                Self::render_supertypes_inner(tree, parent_idx, depth + 1, out, visited);
+            }
+        }
+    }
+}
+
+/// Walk the supertype chain from `idx` upward, returning items in order from child to root.
+/// Stops if a cycle is detected.
+pub fn resolve_type_chain(tree: &TypeTree, idx: usize) -> Vec<&TypeHierarchyItem> {
+    let mut chain = Vec::new();
+    let mut visited = HashSet::new();
+    let mut current = idx;
+    loop {
+        if !visited.insert(current) {
+            break; // cycle
+        }
+        if let Some(item) = tree.get_item(current) {
+            chain.push(item);
+        }
+        let parents = tree.get_supertypes(current);
+        if parents.is_empty() {
+            break;
+        }
+        // Follow the first supertype (primary inheritance)
+        match tree.find_index(parents[0]) {
+            Some(pidx) => current = pidx,
+            None => break,
+        }
+    }
+    chain
+}
+
+/// Return a flat list of all items in the tree, sorted by name.
+pub fn type_hierarchy_flatten(tree: &TypeTree) -> Vec<&TypeHierarchyItem> {
+    let mut items = tree.all_items();
+    items.sort_by(|a, b| a.name.cmp(&b.name));
+    items
+}
+
+/// Return a flat list of all root types (types with no supertypes).
+pub fn type_hierarchy_roots(tree: &TypeTree) -> Vec<&TypeHierarchyItem> {
+    tree.all_items()
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| tree.get_supertypes(*i).is_empty())
+        .map(|(_, item)| item)
+        .collect()
 }
 
 #[cfg(test)]
@@ -974,5 +1112,94 @@ mod tests {
     fn typehier_is_ascii_printable() {
         assert!(TypehierValidator::is_ascii_printable("Hello World 123"));
         assert!(!TypehierValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn type_tree_get_item() {
+        let mut tree = TypeTree::new();
+        let idx = tree.add_type(make_item("A", SymbolKind::Class));
+        assert_eq!(tree.get_item(idx).unwrap().name, "A");
+        assert!(tree.get_item(999).is_none());
+    }
+
+    #[test]
+    fn type_tree_find_index() {
+        let mut tree = TypeTree::new();
+        let item = make_item("B", SymbolKind::Class);
+        let idx = tree.add_type(item.clone());
+        assert_eq!(tree.find_index(&item), Some(idx));
+    }
+
+    #[test]
+    fn type_tree_all_items() {
+        let mut tree = TypeTree::new();
+        tree.add_type(make_item("A", SymbolKind::Class));
+        tree.add_type(make_item("B", SymbolKind::Class));
+        assert_eq!(tree.all_items().len(), 2);
+        assert_eq!(tree.type_count(), 2);
+    }
+
+    #[test]
+    fn render_subtypes_tree() {
+        let mut tree = TypeTree::new();
+        let a = tree.add_type(make_item("Animal", SymbolKind::Class));
+        let d = tree.add_type(make_item("Dog", SymbolKind::Class));
+        let c = tree.add_type(make_item("Cat", SymbolKind::Class));
+        tree.add_subtype_edge(a, d);
+        tree.add_subtype_edge(a, c);
+        let output = TypeHierarchyTree::render_subtypes(&tree, a);
+        assert!(output.contains("Animal"));
+        assert!(output.contains("  Dog") || output.contains("  Cat"));
+    }
+
+    #[test]
+    fn render_supertypes_tree() {
+        let mut tree = TypeTree::new();
+        let base = tree.add_type(make_item("Object", SymbolKind::Class));
+        let mid = tree.add_type(make_item("Animal", SymbolKind::Class));
+        let leaf = tree.add_type(make_item("Dog", SymbolKind::Class));
+        tree.add_supertype_edge(mid, base);
+        tree.add_supertype_edge(leaf, mid);
+        let output = TypeHierarchyTree::render_supertypes(&tree, leaf);
+        assert!(output.contains("Dog"));
+        assert!(output.contains("  Animal"));
+    }
+
+    #[test]
+    fn resolve_type_chain_linear() {
+        let mut tree = TypeTree::new();
+        let obj = tree.add_type(make_item("Object", SymbolKind::Class));
+        let animal = tree.add_type(make_item("Animal", SymbolKind::Class));
+        let dog = tree.add_type(make_item("Dog", SymbolKind::Class));
+        tree.add_supertype_edge(animal, obj);
+        tree.add_supertype_edge(dog, animal);
+        let chain = resolve_type_chain(&tree, dog);
+        assert_eq!(chain.len(), 3);
+        assert_eq!(chain[0].name, "Dog");
+        assert_eq!(chain[1].name, "Animal");
+        assert_eq!(chain[2].name, "Object");
+    }
+
+    #[test]
+    fn type_hierarchy_flatten_sorted() {
+        let mut tree = TypeTree::new();
+        tree.add_type(make_item("Zebra", SymbolKind::Class));
+        tree.add_type(make_item("Apple", SymbolKind::Class));
+        tree.add_type(make_item("Mango", SymbolKind::Class));
+        let flat = type_hierarchy_flatten(&tree);
+        assert_eq!(flat[0].name, "Apple");
+        assert_eq!(flat[1].name, "Mango");
+        assert_eq!(flat[2].name, "Zebra");
+    }
+
+    #[test]
+    fn type_hierarchy_roots_detection() {
+        let mut tree = TypeTree::new();
+        let root = tree.add_type(make_item("Object", SymbolKind::Class));
+        let child = tree.add_type(make_item("Animal", SymbolKind::Class));
+        tree.add_supertype_edge(child, root);
+        let roots = type_hierarchy_roots(&tree);
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].name, "Object");
     }
 }

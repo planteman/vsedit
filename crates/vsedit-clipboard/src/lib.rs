@@ -640,6 +640,163 @@ fn write_osc52(text: &str) {
     let _ = std::io::stdout().flush();
 }
 
+// ---------------------------------------------------------------------------
+// ClipboardRingBuffer
+// ---------------------------------------------------------------------------
+
+/// A ring-buffer clipboard history that efficiently supports cycling through
+/// past clips. Unlike `ClipboardHistory`, this uses a circular buffer
+/// with O(1) push and constant memory.
+#[derive(Debug)]
+pub struct ClipboardRingBuffer {
+    buffer: Vec<Option<ClipboardItem>>,
+    head: usize,
+    count: usize,
+}
+
+impl ClipboardRingBuffer {
+    /// Create a ring buffer with the given capacity.
+    pub fn new(capacity: usize) -> Self {
+        let capacity = capacity.max(1);
+        Self {
+            buffer: (0..capacity).map(|_| None).collect(),
+            head: 0,
+            count: 0,
+        }
+    }
+
+    /// Push a new item, overwriting the oldest if full.
+    pub fn push(&mut self, item: ClipboardItem) {
+        self.buffer[self.head] = Some(item);
+        self.head = (self.head + 1) % self.buffer.len();
+        if self.count < self.buffer.len() {
+            self.count += 1;
+        }
+    }
+
+    /// Get the Nth most recent item (0 = most recent).
+    pub fn get_recent(&self, n: usize) -> Option<&ClipboardItem> {
+        if n >= self.count {
+            return None;
+        }
+        let idx = (self.head + self.buffer.len() - 1 - n) % self.buffer.len();
+        self.buffer[idx].as_ref()
+    }
+
+    /// Return the most recent item.
+    pub fn most_recent(&self) -> Option<&ClipboardItem> {
+        self.get_recent(0)
+    }
+
+    /// Return all items from most recent to oldest.
+    pub fn all_recent_first(&self) -> Vec<&ClipboardItem> {
+        (0..self.count)
+            .filter_map(|i| self.get_recent(i))
+            .collect()
+    }
+
+    /// Return the number of items stored.
+    pub fn len(&self) -> usize {
+        self.count
+    }
+
+    /// Return `true` if empty.
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+
+    /// Return the capacity.
+    pub fn capacity(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// Clear all items.
+    pub fn clear(&mut self) {
+        for slot in &mut self.buffer {
+            *slot = None;
+        }
+        self.head = 0;
+        self.count = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Paste-as-plain-text helpers
+// ---------------------------------------------------------------------------
+
+/// Strip HTML tags from text, returning plain text content.
+pub fn strip_html_tags(html: &str) -> String {
+    let mut result = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for ch in html.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => result.push(ch),
+            _ => {}
+        }
+    }
+    result
+}
+
+/// Paste-as-plain-text: Given a multi-format item, extract plain text.
+/// If the item is HTML, strips tags. If it's rich text, returns the raw data.
+/// For plain text, returns as-is.
+pub fn clipboard_paste_special(item: &MultiFormatClipboardItem) -> String {
+    match &item.format {
+        ClipboardFormat::Html => strip_html_tags(&item.data),
+        ClipboardFormat::RichText => {
+            // Simple RTF strip: remove RTF control words
+            item.data
+                .chars()
+                .filter(|c| !c.is_control())
+                .collect::<String>()
+                .replace("\\par", "\n")
+        }
+        _ => item.data.clone(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Format detection
+// ---------------------------------------------------------------------------
+
+/// Detect the likely format of clipboard content by inspecting its structure.
+pub fn clipboard_format_detection(content: &str) -> ClipboardFormat {
+    let trimmed = content.trim();
+    // HTML detection
+    if trimmed.starts_with('<') && (trimmed.contains("</") || trimmed.contains("/>")) {
+        if trimmed.starts_with("<!DOCTYPE html")
+            || trimmed.starts_with("<html")
+            || trimmed.contains("<body")
+        {
+            return ClipboardFormat::Html;
+        }
+    }
+    // File path list detection (one path per line)
+    if looks_like_file_paths(trimmed) {
+        return ClipboardFormat::FilePaths;
+    }
+    // RTF detection
+    if trimmed.starts_with("{\\rtf") {
+        return ClipboardFormat::RichText;
+    }
+    ClipboardFormat::PlainText
+}
+
+fn looks_like_file_paths(content: &str) -> bool {
+    let lines: Vec<&str> = content.lines().collect();
+    if lines.is_empty() || lines.len() > 100 {
+        return false;
+    }
+    lines.iter().all(|line| {
+        let l = line.trim();
+        l.starts_with('/')
+            || l.starts_with("file://")
+            || (l.len() > 2 && l.as_bytes()[1] == b':')
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -983,5 +1140,85 @@ mod tests {
         assert_eq!(ClipboardBackend::PbCopy.to_string(), "pbcopy/pbpaste");
         assert_eq!(ClipboardBackend::WlCopy.to_string(), "wl-copy/wl-paste");
         assert_eq!(ClipboardBackend::Internal.to_string(), "internal");
+    }
+
+    #[test]
+    fn ring_buffer_push_and_recent() {
+        let mut rb = ClipboardRingBuffer::new(3);
+        rb.push(ClipboardItem::new("first", 1, None));
+        rb.push(ClipboardItem::new("second", 2, None));
+        rb.push(ClipboardItem::new("third", 3, None));
+        assert_eq!(rb.len(), 3);
+        assert_eq!(rb.most_recent().unwrap().text, "third");
+        assert_eq!(rb.get_recent(1).unwrap().text, "second");
+        assert_eq!(rb.get_recent(2).unwrap().text, "first");
+    }
+
+    #[test]
+    fn ring_buffer_overflow() {
+        let mut rb = ClipboardRingBuffer::new(2);
+        rb.push(ClipboardItem::new("a", 1, None));
+        rb.push(ClipboardItem::new("b", 2, None));
+        rb.push(ClipboardItem::new("c", 3, None)); // overwrites "a"
+        assert_eq!(rb.len(), 2);
+        assert_eq!(rb.most_recent().unwrap().text, "c");
+        assert_eq!(rb.get_recent(1).unwrap().text, "b");
+        assert!(rb.get_recent(2).is_none()); // "a" was evicted
+    }
+
+    #[test]
+    fn ring_buffer_all_recent_first() {
+        let mut rb = ClipboardRingBuffer::new(5);
+        rb.push(ClipboardItem::new("a", 1, None));
+        rb.push(ClipboardItem::new("b", 2, None));
+        let all = rb.all_recent_first();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all[0].text, "b");
+        assert_eq!(all[1].text, "a");
+    }
+
+    #[test]
+    fn ring_buffer_clear() {
+        let mut rb = ClipboardRingBuffer::new(5);
+        rb.push(ClipboardItem::new("x", 1, None));
+        rb.clear();
+        assert!(rb.is_empty());
+        assert!(rb.most_recent().is_none());
+    }
+
+    #[test]
+    fn strip_html_tags_basic() {
+        assert_eq!(strip_html_tags("<b>hello</b> <i>world</i>"), "hello world");
+        assert_eq!(strip_html_tags("no tags here"), "no tags here");
+        assert_eq!(strip_html_tags("<p>paragraph</p>"), "paragraph");
+    }
+
+    #[test]
+    fn clipboard_paste_special_html() {
+        let item = MultiFormatClipboardItem::new(ClipboardFormat::Html, "<b>bold</b> text", 1);
+        assert_eq!(clipboard_paste_special(&item), "bold text");
+    }
+
+    #[test]
+    fn clipboard_paste_special_plain() {
+        let item =
+            MultiFormatClipboardItem::new(ClipboardFormat::PlainText, "hello world", 1);
+        assert_eq!(clipboard_paste_special(&item), "hello world");
+    }
+
+    #[test]
+    fn format_detection_html() {
+        assert_eq!(
+            clipboard_format_detection("<!DOCTYPE html><html></html>"),
+            ClipboardFormat::Html
+        );
+        assert_eq!(
+            clipboard_format_detection("just plain text"),
+            ClipboardFormat::PlainText
+        );
+        assert_eq!(
+            clipboard_format_detection("{\\rtf1 content}"),
+            ClipboardFormat::RichText
+        );
     }
 }

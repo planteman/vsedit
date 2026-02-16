@@ -465,6 +465,204 @@ impl Default for TabbarValidator {
     }
 }
 
+/// Represents a drag-and-drop reorder operation on tabs.
+#[derive(Debug, Clone)]
+pub struct TabDragReorder {
+    /// ID of the tab being dragged.
+    pub dragged_tab_id: String,
+    /// Current x position of the drag (in pixels).
+    pub drag_x: f64,
+    /// Whether the drag is currently active.
+    pub active: bool,
+}
+
+impl TabDragReorder {
+    pub fn start(tab_id: impl Into<String>, x: f64) -> Self {
+        Self {
+            dragged_tab_id: tab_id.into(),
+            drag_x: x,
+            active: true,
+        }
+    }
+
+    pub fn update_position(&mut self, x: f64) {
+        self.drag_x = x;
+    }
+
+    pub fn cancel(&mut self) {
+        self.active = false;
+    }
+
+    /// Calculate the insert index given tab widths and positions.
+    /// `tab_positions` is a slice of (start_x, width) for each tab.
+    pub fn calculate_insert_index(&self, tab_positions: &[(f64, f64)]) -> usize {
+        for (i, &(start, width)) in tab_positions.iter().enumerate() {
+            let mid = start + width / 2.0;
+            if self.drag_x < mid {
+                return i;
+            }
+        }
+        tab_positions.len()
+    }
+
+    /// Finish the drag, applying the reorder to the tab group.
+    /// Returns the new index, or `None` if the drag was cancelled or tab not found.
+    pub fn finish(&mut self, group: &mut TabGroup, tab_positions: &[(f64, f64)]) -> Option<usize> {
+        if !self.active {
+            return None;
+        }
+        self.active = false;
+        let new_idx = self.calculate_insert_index(tab_positions);
+        let target = new_idx.min(group.tab_count().saturating_sub(1));
+        if group.move_tab(&self.dragged_tab_id, target) {
+            Some(target)
+        } else {
+            None
+        }
+    }
+}
+
+/// Manages tab overflow when there are more tabs than visible space allows.
+#[derive(Debug, Clone)]
+pub struct TabOverflow {
+    /// Maximum number of visible tabs.
+    pub max_visible: usize,
+    /// Index of the first visible tab (scroll offset).
+    pub scroll_offset: usize,
+    /// Total tab count (updated externally).
+    pub total_tabs: usize,
+}
+
+impl TabOverflow {
+    pub fn new(max_visible: usize) -> Self {
+        Self {
+            max_visible,
+            scroll_offset: 0,
+            total_tabs: 0,
+        }
+    }
+
+    pub fn update_total(&mut self, total: usize) {
+        self.total_tabs = total;
+        // Clamp scroll_offset
+        if self.total_tabs <= self.max_visible {
+            self.scroll_offset = 0;
+        } else if self.scroll_offset > self.total_tabs - self.max_visible {
+            self.scroll_offset = self.total_tabs - self.max_visible;
+        }
+    }
+
+    /// Returns true if tabs are overflowing.
+    pub fn is_overflowing(&self) -> bool {
+        self.total_tabs > self.max_visible
+    }
+
+    /// Returns the range of visible tab indices.
+    pub fn visible_range(&self) -> std::ops::Range<usize> {
+        let end = (self.scroll_offset + self.max_visible).min(self.total_tabs);
+        self.scroll_offset..end
+    }
+
+    /// Scroll left (decrease offset) by one tab.
+    pub fn scroll_left(&mut self) {
+        self.scroll_offset = self.scroll_offset.saturating_sub(1);
+    }
+
+    /// Scroll right (increase offset) by one tab.
+    pub fn scroll_right(&mut self) {
+        if self.total_tabs > self.max_visible && self.scroll_offset < self.total_tabs - self.max_visible {
+            self.scroll_offset += 1;
+        }
+    }
+
+    /// Scroll to make a specific tab index visible.
+    pub fn ensure_visible(&mut self, index: usize) {
+        if index < self.scroll_offset {
+            self.scroll_offset = index;
+        } else if index >= self.scroll_offset + self.max_visible {
+            self.scroll_offset = index - self.max_visible + 1;
+        }
+    }
+
+    /// Number of tabs hidden to the left.
+    pub fn hidden_left(&self) -> usize {
+        self.scroll_offset
+    }
+
+    /// Number of tabs hidden to the right.
+    pub fn hidden_right(&self) -> usize {
+        if self.total_tabs > self.scroll_offset + self.max_visible {
+            self.total_tabs - self.scroll_offset - self.max_visible
+        } else {
+            0
+        }
+    }
+
+    /// Returns items for a dropdown showing all overflowed tabs.
+    pub fn overflow_menu_indices(&self) -> Vec<usize> {
+        let visible = self.visible_range();
+        (0..self.total_tabs).filter(|i| !visible.contains(i)).collect()
+    }
+}
+
+/// State of a tab close animation.
+#[derive(Debug, Clone)]
+pub struct TabCloseAnimation {
+    pub tab_id: String,
+    pub progress: f64,
+    pub duration_ms: u64,
+    pub started: bool,
+}
+
+impl TabCloseAnimation {
+    pub fn new(tab_id: impl Into<String>, duration_ms: u64) -> Self {
+        Self {
+            tab_id: tab_id.into(),
+            progress: 0.0,
+            duration_ms,
+            started: false,
+        }
+    }
+
+    pub fn start(&mut self) {
+        self.started = true;
+        self.progress = 0.0;
+    }
+
+    /// Advance the animation by `delta_ms` milliseconds. Returns true if complete.
+    pub fn tick(&mut self, delta_ms: u64) -> bool {
+        if !self.started {
+            return false;
+        }
+        self.progress += delta_ms as f64 / self.duration_ms as f64;
+        if self.progress >= 1.0 {
+            self.progress = 1.0;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.progress >= 1.0
+    }
+
+    /// Current opacity (1.0 = fully visible, 0.0 = fully hidden).
+    pub fn opacity(&self) -> f64 {
+        1.0 - self.progress
+    }
+
+    /// Current width scale (1.0 = full width, 0.0 = collapsed).
+    pub fn width_scale(&self) -> f64 {
+        1.0 - self.progress
+    }
+}
+
+/// Create a tab close animation frame state.
+pub fn tab_close_animation(tab_id: &str, duration_ms: u64) -> TabCloseAnimation {
+    TabCloseAnimation::new(tab_id, duration_ms)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -673,177 +871,164 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn drag_reorder_calculate_insert_start() {
+        let drag = TabDragReorder::start("t1", 10.0);
+        let positions = vec![(0.0, 100.0), (100.0, 100.0), (200.0, 100.0)];
+        assert_eq!(drag.calculate_insert_index(&positions), 0);
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn drag_reorder_calculate_insert_middle() {
+        let drag = TabDragReorder::start("t1", 160.0);
+        let positions = vec![(0.0, 100.0), (100.0, 100.0), (200.0, 100.0)];
+        assert_eq!(drag.calculate_insert_index(&positions), 2);
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn drag_reorder_calculate_insert_end() {
+        let drag = TabDragReorder::start("t1", 500.0);
+        let positions = vec![(0.0, 100.0), (100.0, 100.0), (200.0, 100.0)];
+        assert_eq!(drag.calculate_insert_index(&positions), 3);
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn drag_reorder_cancel() {
+        let mut drag = TabDragReorder::start("t1", 50.0);
+        assert!(drag.active);
+        drag.cancel();
+        assert!(!drag.active);
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn drag_reorder_update_position() {
+        let mut drag = TabDragReorder::start("t1", 50.0);
+        drag.update_position(150.0);
+        assert_eq!(drag.drag_x, 150.0);
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn tab_overflow_not_overflowing() {
+        let mut ov = TabOverflow::new(5);
+        ov.update_total(3);
+        assert!(!ov.is_overflowing());
+        assert_eq!(ov.visible_range(), 0..3);
+        assert_eq!(ov.hidden_left(), 0);
+        assert_eq!(ov.hidden_right(), 0);
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn tab_overflow_overflowing() {
+        let mut ov = TabOverflow::new(3);
+        ov.update_total(7);
+        assert!(ov.is_overflowing());
+        assert_eq!(ov.visible_range(), 0..3);
+        assert_eq!(ov.hidden_right(), 4);
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn tab_overflow_scroll_right_and_left() {
+        let mut ov = TabOverflow::new(3);
+        ov.update_total(7);
+        ov.scroll_right();
+        assert_eq!(ov.scroll_offset, 1);
+        assert_eq!(ov.visible_range(), 1..4);
+        assert_eq!(ov.hidden_left(), 1);
+        assert_eq!(ov.hidden_right(), 3);
+        ov.scroll_left();
+        assert_eq!(ov.scroll_offset, 0);
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn tab_overflow_ensure_visible() {
+        let mut ov = TabOverflow::new(3);
+        ov.update_total(10);
+        ov.ensure_visible(5);
+        assert!(ov.visible_range().contains(&5));
+        ov.ensure_visible(1);
+        assert!(ov.visible_range().contains(&1));
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn tab_overflow_menu_indices() {
+        let mut ov = TabOverflow::new(3);
+        ov.update_total(5);
+        let menu = ov.overflow_menu_indices();
+        assert_eq!(menu, vec![3, 4]);
     }
 
     #[test]
-    fn behavior_check_10() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn tab_overflow_clamp_scroll_on_update() {
+        let mut ov = TabOverflow::new(3);
+        ov.update_total(10);
+        ov.scroll_offset = 8;
+        ov.update_total(10); // should clamp to 7
+        assert_eq!(ov.scroll_offset, 7);
+        ov.update_total(2); // less than max_visible
+        assert_eq!(ov.scroll_offset, 0);
     }
 
     #[test]
-    fn behavior_check_11() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn close_animation_tick_progress() {
+        let mut anim = tab_close_animation("tab1", 200);
+        anim.start();
+        assert!(!anim.is_complete());
+        assert_eq!(anim.opacity(), 1.0);
+        let done = anim.tick(100);
+        assert!(!done);
+        assert!((anim.progress - 0.5).abs() < f64::EPSILON);
+        assert!((anim.opacity() - 0.5).abs() < f64::EPSILON);
+        assert!((anim.width_scale() - 0.5).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn behavior_check_12() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn close_animation_completes() {
+        let mut anim = tab_close_animation("tab1", 100);
+        anim.start();
+        let done = anim.tick(100);
+        assert!(done);
+        assert!(anim.is_complete());
+        assert!((anim.opacity()).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn behavior_check_13() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn close_animation_not_started() {
+        let mut anim = tab_close_animation("tab1", 100);
+        assert!(!anim.tick(50));
+        assert!(!anim.is_complete());
     }
 
     #[test]
-    fn behavior_check_14() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn close_animation_overshoot_clamped() {
+        let mut anim = tab_close_animation("tab1", 100);
+        anim.start();
+        anim.tick(200);
+        assert_eq!(anim.progress, 1.0);
+        assert!(anim.is_complete());
     }
 
     #[test]
-    fn behavior_check_15() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn drag_reorder_finish_on_cancelled() {
+        let mut drag = TabDragReorder::start("t1", 50.0);
+        drag.cancel();
+        let mut group = TabGroup::new();
+        let result = drag.finish(&mut group, &[]);
+        assert!(result.is_none());
     }
 
     #[test]
-    fn behavior_check_16() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn tab_overflow_scroll_right_clamped() {
+        let mut ov = TabOverflow::new(3);
+        ov.update_total(3);
+        ov.scroll_right(); // Should not scroll past end
+        assert_eq!(ov.scroll_offset, 0);
     }
 
     #[test]
-    fn behavior_check_17() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_27() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_28() {
-        let _svc = TabBarConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn tab_overflow_scroll_left_clamped() {
+        let mut ov = TabOverflow::new(3);
+        ov.update_total(10);
+        ov.scroll_left(); // Already at 0
+        assert_eq!(ov.scroll_offset, 0);
     }
 
     #[test]

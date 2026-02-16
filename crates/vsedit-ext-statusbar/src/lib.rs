@@ -637,6 +637,109 @@ impl Default for ExtStatusbarValidator {
     }
 }
 
+// ── Priority Sorting ──
+
+/// Sort status bar items by priority (descending), with stable tie-breaking by id.
+pub fn sort_items_by_priority(items: &mut [StatusBarItem]) {
+    items.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+}
+
+/// Return items sorted by priority without modifying the original slice.
+pub fn sorted_by_priority(items: &[StatusBarItem]) -> Vec<&StatusBarItem> {
+    let mut refs: Vec<&StatusBarItem> = items.iter().collect();
+    refs.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+    refs
+}
+
+// ── Visibility Manager ──
+
+/// Manages visibility of status bar items grouped by extension namespace.
+#[derive(Debug, Clone, Default)]
+pub struct StatusBarVisibilityManager {
+    /// Maps extension namespace -> visibility flag
+    hidden_namespaces: std::collections::HashSet<String>,
+}
+
+impl StatusBarVisibilityManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Hide all items belonging to the given extension namespace.
+    pub fn hide_namespace(&mut self, namespace: &str) {
+        self.hidden_namespaces.insert(namespace.to_string());
+    }
+
+    /// Show all items belonging to the given extension namespace.
+    pub fn show_namespace(&mut self, namespace: &str) {
+        self.hidden_namespaces.remove(namespace);
+    }
+
+    /// Returns `true` if the namespace is currently hidden.
+    pub fn is_namespace_hidden(&self, namespace: &str) -> bool {
+        self.hidden_namespaces.contains(namespace)
+    }
+
+    /// Extract the namespace from an item ID (everything before the first '.').
+    pub fn extract_namespace(item_id: &str) -> &str {
+        item_id.split('.').next().unwrap_or(item_id)
+    }
+
+    /// Filter items, removing those whose namespace is hidden.
+    pub fn filter_visible<'a>(&self, items: &'a [StatusBarItem]) -> Vec<&'a StatusBarItem> {
+        items
+            .iter()
+            .filter(|item| {
+                let ns = Self::extract_namespace(&item.id);
+                !self.hidden_namespaces.contains(ns)
+            })
+            .collect()
+    }
+
+    /// Return the number of hidden namespaces.
+    pub fn hidden_count(&self) -> usize {
+        self.hidden_namespaces.len()
+    }
+}
+
+// ── Layout Computation ──
+
+/// Represents the computed layout of the status bar.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StatusBarLayout {
+    /// Items on the left side, sorted by descending priority.
+    pub left_items: Vec<String>,
+    /// Items on the right side, sorted by descending priority.
+    pub right_items: Vec<String>,
+}
+
+/// Compute the layout of visible status bar items.
+///
+/// Visible items are split by alignment and sorted by descending priority.
+/// Items with the same priority are sorted alphabetically by ID.
+pub fn status_bar_layout(items: &[StatusBarItem]) -> StatusBarLayout {
+    let visible: Vec<&StatusBarItem> = items.iter().filter(|i| i.is_visible).collect();
+
+    let mut left: Vec<&StatusBarItem> = visible
+        .iter()
+        .filter(|i| i.alignment == StatusBarAlignment::Left)
+        .copied()
+        .collect();
+    let mut right: Vec<&StatusBarItem> = visible
+        .iter()
+        .filter(|i| i.alignment == StatusBarAlignment::Right)
+        .copied()
+        .collect();
+
+    left.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+    right.sort_by(|a, b| b.priority.cmp(&a.priority).then_with(|| a.id.cmp(&b.id)));
+
+    StatusBarLayout {
+        left_items: left.into_iter().map(|i| i.id.clone()).collect(),
+        right_items: right.into_iter().map(|i| i.id.clone()).collect(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -973,5 +1076,89 @@ mod tests {
     fn ext_statusbar_is_ascii_printable() {
         assert!(ExtStatusbarValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtStatusbarValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn sort_items_by_priority_descending() {
+        let mut items = vec![
+            StatusBarItemBuilder::new().id("a").priority(10).build().unwrap(),
+            StatusBarItemBuilder::new().id("b").priority(50).build().unwrap(),
+            StatusBarItemBuilder::new().id("c").priority(30).build().unwrap(),
+        ];
+        sort_items_by_priority(&mut items);
+        assert_eq!(items[0].id, "b");
+        assert_eq!(items[1].id, "c");
+        assert_eq!(items[2].id, "a");
+    }
+
+    #[test]
+    fn sort_items_by_priority_stable_tie() {
+        let mut items = vec![
+            StatusBarItemBuilder::new().id("beta").priority(10).build().unwrap(),
+            StatusBarItemBuilder::new().id("alpha").priority(10).build().unwrap(),
+        ];
+        sort_items_by_priority(&mut items);
+        assert_eq!(items[0].id, "alpha");
+        assert_eq!(items[1].id, "beta");
+    }
+
+    #[test]
+    fn sorted_by_priority_nonmutating() {
+        let items = vec![
+            StatusBarItemBuilder::new().id("a").priority(5).build().unwrap(),
+            StatusBarItemBuilder::new().id("b").priority(20).build().unwrap(),
+        ];
+        let sorted = sorted_by_priority(&items);
+        assert_eq!(sorted[0].id, "b");
+        assert_eq!(items[0].id, "a"); // original unchanged
+    }
+
+    #[test]
+    fn visibility_manager_hide_show() {
+        let mut mgr = StatusBarVisibilityManager::new();
+        mgr.hide_namespace("git");
+        assert!(mgr.is_namespace_hidden("git"));
+        mgr.show_namespace("git");
+        assert!(!mgr.is_namespace_hidden("git"));
+    }
+
+    #[test]
+    fn visibility_manager_filter() {
+        let mut mgr = StatusBarVisibilityManager::new();
+        mgr.hide_namespace("git");
+        let items = vec![
+            StatusBarItemBuilder::new().id("git.branch").build().unwrap(),
+            StatusBarItemBuilder::new().id("rust.status").build().unwrap(),
+            StatusBarItemBuilder::new().id("git.sync").build().unwrap(),
+        ];
+        let visible = mgr.filter_visible(&items);
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].id, "rust.status");
+    }
+
+    #[test]
+    fn visibility_manager_extract_namespace() {
+        assert_eq!(StatusBarVisibilityManager::extract_namespace("git.branch"), "git");
+        assert_eq!(StatusBarVisibilityManager::extract_namespace("standalone"), "standalone");
+    }
+
+    #[test]
+    fn status_bar_layout_splits_and_sorts() {
+        let items = vec![
+            StatusBarItemBuilder::new().id("l1").alignment(StatusBarAlignment::Left).priority(10).visible(true).build().unwrap(),
+            StatusBarItemBuilder::new().id("r1").alignment(StatusBarAlignment::Right).priority(20).visible(true).build().unwrap(),
+            StatusBarItemBuilder::new().id("l2").alignment(StatusBarAlignment::Left).priority(30).visible(true).build().unwrap(),
+            StatusBarItemBuilder::new().id("hidden").alignment(StatusBarAlignment::Left).priority(100).visible(false).build().unwrap(),
+        ];
+        let layout = status_bar_layout(&items);
+        assert_eq!(layout.left_items, vec!["l2", "l1"]);
+        assert_eq!(layout.right_items, vec!["r1"]);
+    }
+
+    #[test]
+    fn status_bar_layout_empty() {
+        let layout = status_bar_layout(&[]);
+        assert!(layout.left_items.is_empty());
+        assert!(layout.right_items.is_empty());
     }
 }
