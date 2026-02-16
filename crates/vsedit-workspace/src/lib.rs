@@ -3,7 +3,9 @@
 //! Manages workspace folders and multi-root workspaces, equivalent to
 //! VS Code's `vs/platform/workspace/common/workspace.ts`.
 
-use serde::Deserialize;
+use std::path::{Path, PathBuf};
+
+use serde::{Deserialize, Serialize};
 use vsedit_events::{Emitter, Event};
 use vsedit_uri::VsUri;
 
@@ -24,11 +26,23 @@ pub struct WorkspaceFolder {
 // ---------------------------------------------------------------------------
 
 /// The type of the current workspace.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkspaceType {
     Empty,
-    SingleFolder,
-    MultiRoot,
+    SingleFolder(PathBuf),
+    MultiRoot(PathBuf),
+}
+
+// ---------------------------------------------------------------------------
+// WorkspaceTrust
+// ---------------------------------------------------------------------------
+
+/// Trust level for a workspace, mirroring VS Code's workspace trust model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum WorkspaceTrust {
+    Trusted,
+    Untrusted,
+    Unknown,
 }
 
 // ---------------------------------------------------------------------------
@@ -43,18 +57,117 @@ pub struct WorkspaceFoldersChangeEvent {
 }
 
 // ---------------------------------------------------------------------------
-// Workspace file JSON schema
+// WorkspaceOpenEvent
 // ---------------------------------------------------------------------------
 
-#[derive(Deserialize)]
-struct WorkspaceFileData {
-    folders: Vec<WorkspaceFileFolder>,
+/// Fired when a workspace is opened.
+#[derive(Debug, Clone)]
+pub struct WorkspaceOpenEvent {
+    pub workspace_type: WorkspaceType,
 }
 
-#[derive(Deserialize)]
-struct WorkspaceFileFolder {
-    path: String,
-    name: Option<String>,
+// ---------------------------------------------------------------------------
+// .code-workspace file model
+// ---------------------------------------------------------------------------
+
+/// A single folder entry in a `.code-workspace` file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FolderEntry {
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+/// Parsed representation of a `.code-workspace` JSON file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceFile {
+    pub folders: Vec<FolderEntry>,
+    #[serde(default, skip_serializing_if = "serde_json::Value::is_null")]
+    pub settings: serde_json::Value,
+    #[serde(default, skip_serializing_if = "serde_json::Value::is_null")]
+    pub extensions: serde_json::Value,
+    #[serde(default, skip_serializing_if = "serde_json::Value::is_null")]
+    pub launch: serde_json::Value,
+}
+
+/// Parse a `.code-workspace` JSON file from disk.
+pub fn parse_workspace_file(path: &Path) -> Result<WorkspaceFile, String> {
+    let content =
+        std::fs::read_to_string(path).map_err(|e| format!("failed to read workspace file: {e}"))?;
+    serde_json::from_str(&content).map_err(|e| format!("invalid workspace file: {e}"))
+}
+
+/// Save a [`WorkspaceFile`] to disk as JSON.
+pub fn save_workspace_file(workspace: &WorkspaceFile, path: &Path) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(workspace)
+        .map_err(|e| format!("failed to serialize workspace file: {e}"))?;
+    std::fs::write(path, json).map_err(|e| format!("failed to write workspace file: {e}"))
+}
+
+// ---------------------------------------------------------------------------
+// RecentWorkspace
+// ---------------------------------------------------------------------------
+
+/// An entry in the recent workspaces list.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecentWorkspace {
+    pub path: String,
+    pub label: String,
+    pub last_opened: u64,
+}
+
+/// Persistent recent-workspaces storage backed by a JSON file.
+#[derive(Debug)]
+pub struct RecentWorkspaces {
+    state_path: PathBuf,
+    entries: Vec<RecentWorkspace>,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct RecentState {
+    recents: Vec<RecentWorkspace>,
+}
+
+impl RecentWorkspaces {
+    /// Create a new store, loading existing entries from `state_path`.
+    pub fn new(state_path: PathBuf) -> Self {
+        let entries = std::fs::read_to_string(&state_path)
+            .ok()
+            .and_then(|s| serde_json::from_str::<RecentState>(&s).ok())
+            .map(|s| s.recents)
+            .unwrap_or_default();
+        Self {
+            state_path,
+            entries,
+        }
+    }
+
+    /// Add a workspace to the recent list (moves to front if already present).
+    pub fn add_recent(&mut self, workspace: RecentWorkspace) {
+        self.entries.retain(|e| e.path != workspace.path);
+        self.entries.insert(0, workspace);
+        self.persist();
+    }
+
+    /// Return the recent workspaces list (most recent first).
+    pub fn get_recents(&self) -> &[RecentWorkspace] {
+        &self.entries
+    }
+
+    /// Clear all recent workspace entries.
+    pub fn clear_recents(&mut self) {
+        self.entries.clear();
+        self.persist();
+    }
+
+    fn persist(&self) {
+        let state = RecentState {
+            recents: self.entries.clone(),
+        };
+        if let Ok(json) = serde_json::to_string_pretty(&state) {
+            let _ = std::fs::write(&self.state_path, json);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -65,7 +178,12 @@ struct WorkspaceFileFolder {
 pub struct Workspace {
     folders: Vec<WorkspaceFolder>,
     workspace_file: Option<VsUri>,
+    configuration: serde_json::Value,
+    is_untitled: bool,
+    trust: WorkspaceTrust,
     on_did_change_folders: Emitter<WorkspaceFoldersChangeEvent>,
+    on_did_open_workspace: Emitter<WorkspaceOpenEvent>,
+    on_will_delete_folder: Emitter<WorkspaceFolder>,
 }
 
 impl Workspace {
@@ -74,11 +192,16 @@ impl Workspace {
         Self {
             folders: Vec::new(),
             workspace_file: None,
+            configuration: serde_json::Value::Null,
+            is_untitled: true,
+            trust: WorkspaceTrust::Unknown,
             on_did_change_folders: Emitter::new(),
+            on_did_open_workspace: Emitter::new(),
+            on_will_delete_folder: Emitter::new(),
         }
     }
 
-    /// Create a single-folder workspace.
+    /// Create a single-folder workspace (equivalent to `code /path/to/folder`).
     pub fn single_folder(uri: VsUri) -> Self {
         let name = folder_name_from_uri(&uri);
         Self {
@@ -88,22 +211,40 @@ impl Workspace {
                 index: 0,
             }],
             workspace_file: None,
+            configuration: serde_json::Value::Null,
+            is_untitled: false,
+            trust: WorkspaceTrust::Unknown,
             on_did_change_folders: Emitter::new(),
+            on_did_open_workspace: Emitter::new(),
+            on_will_delete_folder: Emitter::new(),
         }
+    }
+
+    /// Open a single folder as a workspace.
+    pub fn open_folder(path: &Path) -> Self {
+        let uri = VsUri::file(&path.to_string_lossy());
+        let mut ws = Self::single_folder(uri);
+        ws.on_did_open_workspace.fire(&WorkspaceOpenEvent {
+            workspace_type: ws.get_workspace_type(),
+        });
+        ws
     }
 
     /// Create a workspace from a `.code-workspace` file URI and its JSON content.
     pub fn from_workspace_file(file_uri: VsUri, content: &str) -> Result<Self, String> {
-        let data: WorkspaceFileData =
+        let data: WorkspaceFile =
             serde_json::from_str(content).map_err(|e| format!("invalid workspace file: {e}"))?;
 
         let folders = data
             .folders
-            .into_iter()
+            .iter()
             .enumerate()
             .map(|(index, f)| {
                 let uri = VsUri::file(&f.path);
-                let name = f.name.unwrap_or_else(|| folder_name_from_uri(&uri));
+                let name = f
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| folder_name_from_uri(&uri));
                 WorkspaceFolder { uri, name, index }
             })
             .collect();
@@ -111,17 +252,38 @@ impl Workspace {
         Ok(Self {
             folders,
             workspace_file: Some(file_uri),
+            configuration: data.settings.clone(),
+            is_untitled: false,
+            trust: WorkspaceTrust::Unknown,
             on_did_change_folders: Emitter::new(),
+            on_did_open_workspace: Emitter::new(),
+            on_will_delete_folder: Emitter::new(),
         })
     }
 
-    /// Returns the workspace type based on the number of folders.
+    /// Returns the workspace type.
     pub fn get_workspace_type(&self) -> WorkspaceType {
         match self.folders.len() {
             0 => WorkspaceType::Empty,
-            1 if self.workspace_file.is_none() => WorkspaceType::SingleFolder,
-            _ => WorkspaceType::MultiRoot,
+            _ if self.workspace_file.is_some() => {
+                let path = self.workspace_file.as_ref().unwrap().fs_path();
+                WorkspaceType::MultiRoot(PathBuf::from(path))
+            }
+            _ => {
+                let path = self.folders[0].uri.fs_path();
+                WorkspaceType::SingleFolder(PathBuf::from(path))
+            }
         }
+    }
+
+    /// Whether this workspace is untitled (not yet saved).
+    pub fn is_untitled(&self) -> bool {
+        self.is_untitled
+    }
+
+    /// Returns workspace-level configuration/settings.
+    pub fn configuration(&self) -> &serde_json::Value {
+        &self.configuration
     }
 
     /// Returns the workspace folders.
@@ -132,6 +294,11 @@ impl Workspace {
     /// Find a workspace folder whose URI exactly matches `uri`.
     pub fn get_folder_by_uri(&self, uri: &VsUri) -> Option<&WorkspaceFolder> {
         self.folders.iter().find(|f| &f.uri == uri)
+    }
+
+    /// Find the workspace folder that contains the given resource URI.
+    pub fn get_workspace_folder(&self, uri: &VsUri) -> Option<&WorkspaceFolder> {
+        self.get_workspace_folder_of_resource(uri)
     }
 
     /// Find the workspace folder that contains the given resource URI.
@@ -157,9 +324,19 @@ impl Workspace {
         best
     }
 
+    /// Get a path relative to the workspace folder that contains `uri`.
+    pub fn relative_path(&self, uri: &VsUri) -> Option<String> {
+        let folder = self.get_workspace_folder_of_resource(uri)?;
+        let folder_path = ensure_trailing_slash(&folder.uri.path);
+        if uri.path.starts_with(&folder_path) {
+            Some(uri.path[folder_path.len()..].to_string())
+        } else {
+            None
+        }
+    }
+
     /// Add a folder to the workspace.
     pub fn add_folder(&mut self, uri: VsUri, name: Option<String>) {
-        // Don't add duplicates.
         if self.folders.iter().any(|f| f.uri == uri) {
             return;
         }
@@ -175,24 +352,102 @@ impl Workspace {
         });
     }
 
+    /// Remove a folder from the workspace by index.
+    pub fn remove_folder_by_index(&mut self, idx: usize) -> Option<WorkspaceFolder> {
+        if idx >= self.folders.len() {
+            return None;
+        }
+        self.on_will_delete_folder
+            .fire(&self.folders[idx].clone());
+        let removed = self.folders.remove(idx);
+        for (i, f) in self.folders.iter_mut().enumerate() {
+            f.index = i;
+        }
+        self.on_did_change_folders.fire(&WorkspaceFoldersChangeEvent {
+            added: vec![],
+            removed: vec![removed.clone()],
+        });
+        Some(removed)
+    }
+
     /// Remove a folder from the workspace by URI.
     pub fn remove_folder(&mut self, uri: &VsUri) {
         if let Some(pos) = self.folders.iter().position(|f| &f.uri == uri) {
-            let removed = self.folders.remove(pos);
-            // Re-index remaining folders.
-            for (i, f) in self.folders.iter_mut().enumerate() {
-                f.index = i;
-            }
-            self.on_did_change_folders.fire(&WorkspaceFoldersChangeEvent {
-                added: vec![],
-                removed: vec![removed],
-            });
+            self.remove_folder_by_index(pos);
         }
     }
+
+    /// Save the current workspace as a `.code-workspace` file.
+    pub fn save_workspace_as(&self, path: &Path) -> Result<(), String> {
+        let wf = WorkspaceFile {
+            folders: self
+                .folders
+                .iter()
+                .map(|f| FolderEntry {
+                    path: f.uri.fs_path(),
+                    name: Some(f.name.clone()),
+                })
+                .collect(),
+            settings: self.configuration.clone(),
+            extensions: serde_json::Value::Null,
+            launch: serde_json::Value::Null,
+        };
+        save_workspace_file(&wf, path)
+    }
+
+    // -- Workspace trust ---------------------------------------------------
+
+    /// Get the current trust level.
+    pub fn trust(&self) -> WorkspaceTrust {
+        self.trust
+    }
+
+    /// Mark the workspace as trusted.
+    pub fn trust_workspace(&mut self) {
+        self.trust = WorkspaceTrust::Trusted;
+    }
+
+    /// Whether the workspace is trusted.
+    pub fn is_trusted(&self) -> bool {
+        self.trust == WorkspaceTrust::Trusted
+    }
+
+    // -- Path resolution ---------------------------------------------------
+
+    /// Resolve a relative path against the first workspace folder root.
+    pub fn resolve_path(&self, relative: &str) -> Option<PathBuf> {
+        self.folders
+            .first()
+            .map(|f| PathBuf::from(f.uri.fs_path()).join(relative))
+    }
+
+    /// Check whether `path` is inside any workspace folder.
+    pub fn is_inside_workspace(&self, path: &Path) -> bool {
+        let p = path.to_string_lossy();
+        let uri = VsUri::file(&p);
+        self.get_workspace_folder_of_resource(&uri).is_some()
+    }
+
+    /// Get the root path of the first workspace folder.
+    pub fn get_workspace_root(&self) -> Option<PathBuf> {
+        self.folders.first().map(|f| PathBuf::from(f.uri.fs_path()))
+    }
+
+    // -- Events ------------------------------------------------------------
 
     /// Subscribe to folder change events.
     pub fn on_did_change_folders(&self) -> Event<WorkspaceFoldersChangeEvent> {
         self.on_did_change_folders.event()
+    }
+
+    /// Subscribe to workspace open events.
+    pub fn on_did_open_workspace(&self) -> Event<WorkspaceOpenEvent> {
+        self.on_did_open_workspace.event()
+    }
+
+    /// Subscribe to folder deletion events (fired before removal).
+    pub fn on_will_delete_workspace_folder(&self) -> Event<WorkspaceFolder> {
+        self.on_will_delete_folder.event()
     }
 }
 
@@ -232,15 +487,17 @@ mod tests {
         let ws = Workspace::empty();
         assert_eq!(ws.get_workspace_type(), WorkspaceType::Empty);
         assert!(ws.get_folders().is_empty());
+        assert!(ws.is_untitled());
     }
 
     #[test]
     fn single_folder_workspace() {
         let ws = Workspace::single_folder(VsUri::file("/home/user/project"));
-        assert_eq!(ws.get_workspace_type(), WorkspaceType::SingleFolder);
+        assert!(matches!(ws.get_workspace_type(), WorkspaceType::SingleFolder(_)));
         assert_eq!(ws.get_folders().len(), 1);
         assert_eq!(ws.get_folders()[0].name, "project");
         assert_eq!(ws.get_folders()[0].index, 0);
+        assert!(!ws.is_untitled());
     }
 
     #[test]
@@ -258,7 +515,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(ws.get_workspace_type(), WorkspaceType::MultiRoot);
+        assert!(matches!(ws.get_workspace_type(), WorkspaceType::MultiRoot(_)));
         assert_eq!(ws.get_folders().len(), 2);
         assert_eq!(ws.get_folders()[0].name, "project1");
         assert_eq!(ws.get_folders()[0].index, 0);
@@ -318,7 +575,6 @@ mod tests {
 
         let resource = VsUri::file("/home/user/project/src/main.rs");
         let folder = ws.get_workspace_folder_of_resource(&resource).unwrap();
-        // Should match the more specific folder.
         assert_eq!(folder.uri.path, "/home/user/project");
     }
 
@@ -421,8 +677,7 @@ mod tests {
             content,
         )
         .unwrap();
-        // A workspace file with a single folder is still MultiRoot.
-        assert_eq!(ws.get_workspace_type(), WorkspaceType::MultiRoot);
+        assert!(matches!(ws.get_workspace_type(), WorkspaceType::MultiRoot(_)));
     }
 
     #[test]
@@ -432,186 +687,318 @@ mod tests {
 
     #[test]
     fn ne_workspacetype_diff() {
-        assert_ne!(WorkspaceType::Empty, WorkspaceType::SingleFolder);
+        assert_ne!(
+            WorkspaceType::Empty,
+            WorkspaceType::SingleFolder(PathBuf::from("/tmp"))
+        );
+    }
+
+    // -- New tests for requested features --
+
+    #[test]
+    fn open_folder_creates_single_folder_workspace() {
+        let ws = Workspace::open_folder(Path::new("/home/user/myapp"));
+        assert!(matches!(ws.get_workspace_type(), WorkspaceType::SingleFolder(_)));
+        assert_eq!(ws.get_folders().len(), 1);
+        assert_eq!(ws.get_folders()[0].name, "myapp");
     }
 
     #[test]
-    fn behavior_check_0() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn remove_folder_by_index() {
+        let mut ws = Workspace::empty();
+        ws.add_folder(VsUri::file("/home/user/a"), None);
+        ws.add_folder(VsUri::file("/home/user/b"), None);
+        ws.add_folder(VsUri::file("/home/user/c"), None);
+
+        let removed = ws.remove_folder_by_index(1);
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().name, "b");
+        assert_eq!(ws.get_folders().len(), 2);
+        assert_eq!(ws.get_folders()[1].index, 1);
     }
 
     #[test]
-    fn behavior_check_1() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn remove_folder_by_index_out_of_bounds() {
+        let mut ws = Workspace::empty();
+        ws.add_folder(VsUri::file("/home/user/a"), None);
+        assert!(ws.remove_folder_by_index(5).is_none());
+        assert_eq!(ws.get_folders().len(), 1);
     }
 
     #[test]
-    fn behavior_check_2() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn get_workspace_folder_alias() {
+        let ws = Workspace::single_folder(VsUri::file("/home/user/project"));
+        let resource = VsUri::file("/home/user/project/src/main.rs");
+        assert!(ws.get_workspace_folder(&resource).is_some());
     }
 
     #[test]
-    fn behavior_check_3() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn relative_path_resolution() {
+        let ws = Workspace::single_folder(VsUri::file("/home/user/project"));
+        let resource = VsUri::file("/home/user/project/src/main.rs");
+        let rel = ws.relative_path(&resource);
+        assert_eq!(rel.as_deref(), Some("src/main.rs"));
     }
 
     #[test]
-    fn behavior_check_4() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn relative_path_no_match() {
+        let ws = Workspace::single_folder(VsUri::file("/home/user/project"));
+        let resource = VsUri::file("/home/other/file.rs");
+        assert!(ws.relative_path(&resource).is_none());
     }
 
     #[test]
-    fn behavior_check_5() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn resolve_path_from_workspace_root() {
+        let ws = Workspace::single_folder(VsUri::file("/home/user/project"));
+        let resolved = ws.resolve_path("src/lib.rs").unwrap();
+        assert_eq!(resolved, PathBuf::from("/home/user/project/src/lib.rs"));
     }
 
     #[test]
-    fn behavior_check_6() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn resolve_path_empty_workspace() {
+        let ws = Workspace::empty();
+        assert!(ws.resolve_path("src/lib.rs").is_none());
     }
 
     #[test]
-    fn behavior_check_7() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn is_inside_workspace_true() {
+        let ws = Workspace::single_folder(VsUri::file("/home/user/project"));
+        assert!(ws.is_inside_workspace(Path::new("/home/user/project/src/main.rs")));
     }
 
     #[test]
-    fn behavior_check_8() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn is_inside_workspace_false() {
+        let ws = Workspace::single_folder(VsUri::file("/home/user/project"));
+        assert!(!ws.is_inside_workspace(Path::new("/home/other/file.rs")));
     }
 
     #[test]
-    fn behavior_check_9() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn get_workspace_root() {
+        let ws = Workspace::single_folder(VsUri::file("/home/user/project"));
+        assert_eq!(
+            ws.get_workspace_root(),
+            Some(PathBuf::from("/home/user/project"))
+        );
     }
 
     #[test]
-    fn behavior_check_10() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn workspace_trust_default_unknown() {
+        let ws = Workspace::empty();
+        assert_eq!(ws.trust(), WorkspaceTrust::Unknown);
+        assert!(!ws.is_trusted());
     }
 
     #[test]
-    fn behavior_check_11() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn trust_workspace() {
+        let mut ws = Workspace::empty();
+        ws.trust_workspace();
+        assert_eq!(ws.trust(), WorkspaceTrust::Trusted);
+        assert!(ws.is_trusted());
     }
 
     #[test]
-    fn behavior_check_12() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn workspace_configuration_from_file() {
+        let content = r#"{
+            "folders": [{ "path": "/home/user/project" }],
+            "settings": { "editor.fontSize": 14 }
+        }"#;
+        let ws = Workspace::from_workspace_file(
+            VsUri::file("/home/user/ws.code-workspace"),
+            content,
+        )
+        .unwrap();
+        assert_eq!(ws.configuration()["editor.fontSize"], 14);
     }
 
     #[test]
-    fn behavior_check_13() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn save_and_parse_workspace_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.code-workspace");
+
+        let wf = WorkspaceFile {
+            folders: vec![
+                FolderEntry {
+                    path: "/home/user/a".into(),
+                    name: Some("Alpha".into()),
+                },
+                FolderEntry {
+                    path: "/home/user/b".into(),
+                    name: None,
+                },
+            ],
+            settings: serde_json::json!({ "editor.tabSize": 2 }),
+            extensions: serde_json::Value::Null,
+            launch: serde_json::Value::Null,
+        };
+        save_workspace_file(&wf, &path).unwrap();
+
+        let parsed = parse_workspace_file(&path).unwrap();
+        assert_eq!(parsed.folders.len(), 2);
+        assert_eq!(parsed.folders[0].path, "/home/user/a");
+        assert_eq!(parsed.folders[0].name.as_deref(), Some("Alpha"));
+        assert_eq!(parsed.folders[1].name, None);
+        assert_eq!(parsed.settings["editor.tabSize"], 2);
     }
 
     #[test]
-    fn behavior_check_14() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn parse_workspace_file_not_found() {
+        let result = parse_workspace_file(Path::new("/nonexistent/file.code-workspace"));
+        assert!(result.is_err());
     }
 
     #[test]
-    fn behavior_check_15() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn save_workspace_as() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("saved.code-workspace");
+
+        let mut ws = Workspace::empty();
+        ws.add_folder(VsUri::file("/home/user/alpha"), Some("Alpha".into()));
+        ws.add_folder(VsUri::file("/home/user/beta"), None);
+        ws.save_workspace_as(&path).unwrap();
+
+        let parsed = parse_workspace_file(&path).unwrap();
+        assert_eq!(parsed.folders.len(), 2);
+        assert_eq!(parsed.folders[0].name.as_deref(), Some("Alpha"));
     }
 
     #[test]
-    fn behavior_check_16() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn recent_workspaces_add_and_get() {
+        let dir = tempfile::tempdir().unwrap();
+        let state_path = dir.path().join("recents.json");
+
+        let mut store = RecentWorkspaces::new(state_path.clone());
+        assert!(store.get_recents().is_empty());
+
+        store.add_recent(RecentWorkspace {
+            path: "/home/user/a".into(),
+            label: "A".into(),
+            last_opened: 1000,
+        });
+        store.add_recent(RecentWorkspace {
+            path: "/home/user/b".into(),
+            label: "B".into(),
+            last_opened: 2000,
+        });
+        assert_eq!(store.get_recents().len(), 2);
+        assert_eq!(store.get_recents()[0].path, "/home/user/b");
+
+        // Reload from disk.
+        let store2 = RecentWorkspaces::new(state_path);
+        assert_eq!(store2.get_recents().len(), 2);
     }
 
     #[test]
-    fn behavior_check_17() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn recent_workspaces_dedup() {
+        let dir = tempfile::tempdir().unwrap();
+        let state_path = dir.path().join("recents.json");
+
+        let mut store = RecentWorkspaces::new(state_path);
+        store.add_recent(RecentWorkspace {
+            path: "/home/user/a".into(),
+            label: "A".into(),
+            last_opened: 1000,
+        });
+        store.add_recent(RecentWorkspace {
+            path: "/home/user/a".into(),
+            label: "A (updated)".into(),
+            last_opened: 2000,
+        });
+        assert_eq!(store.get_recents().len(), 1);
+        assert_eq!(store.get_recents()[0].label, "A (updated)");
     }
 
     #[test]
-    fn behavior_check_18() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn recent_workspaces_clear() {
+        let dir = tempfile::tempdir().unwrap();
+        let state_path = dir.path().join("recents.json");
+
+        let mut store = RecentWorkspaces::new(state_path);
+        store.add_recent(RecentWorkspace {
+            path: "/home/user/a".into(),
+            label: "A".into(),
+            last_opened: 1000,
+        });
+        store.clear_recents();
+        assert!(store.get_recents().is_empty());
     }
 
     #[test]
-    fn behavior_check_19() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn on_did_open_workspace_event() {
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let e = events.clone();
+
+        // Build manually so we can subscribe before firing.
+        let mut ws = Workspace::empty();
+        let _h = ws.on_did_open_workspace().on(move |ev| {
+            e.lock().unwrap().push(ev.workspace_type.clone());
+        });
+        // Simulate opening.
+        ws.add_folder(VsUri::file("/home/user/project"), None);
+        ws.on_did_open_workspace.fire(&WorkspaceOpenEvent {
+            workspace_type: ws.get_workspace_type(),
+        });
+
+        let evts = events.lock().unwrap();
+        assert_eq!(evts.len(), 1);
     }
 
     #[test]
-    fn behavior_check_20() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn on_will_delete_workspace_folder_event() {
+        let mut ws = Workspace::empty();
+        ws.add_folder(VsUri::file("/home/user/a"), None);
+        ws.add_folder(VsUri::file("/home/user/b"), None);
+
+        let deleted = Arc::new(Mutex::new(Vec::new()));
+        let d = deleted.clone();
+        let _h = ws.on_will_delete_workspace_folder().on(move |folder| {
+            d.lock().unwrap().push(folder.name.clone());
+        });
+
+        ws.remove_folder_by_index(0);
+        let names = deleted.lock().unwrap();
+        assert_eq!(&*names, &["a"]);
     }
 
     #[test]
-    fn behavior_check_21() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn workspace_file_roundtrip_with_extensions_and_launch() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("full.code-workspace");
+
+        let wf = WorkspaceFile {
+            folders: vec![FolderEntry {
+                path: "/src".into(),
+                name: None,
+            }],
+            settings: serde_json::json!({}),
+            extensions: serde_json::json!({ "recommendations": ["rust-lang.rust-analyzer"] }),
+            launch: serde_json::json!({ "version": "0.2.0" }),
+        };
+        save_workspace_file(&wf, &path).unwrap();
+        let parsed = parse_workspace_file(&path).unwrap();
+        assert_eq!(
+            parsed.extensions["recommendations"][0],
+            "rust-lang.rust-analyzer"
+        );
+        assert_eq!(parsed.launch["version"], "0.2.0");
     }
 
     #[test]
-    fn behavior_check_22() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn folder_entry_serde() {
+        let entry = FolderEntry {
+            path: "/home/user/src".into(),
+            name: Some("Source".into()),
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        let parsed: FolderEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.path, "/home/user/src");
+        assert_eq!(parsed.name.as_deref(), Some("Source"));
     }
 
     #[test]
-    fn behavior_check_23() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_27() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_28() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_29() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_30() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_31() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_32() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_33() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_34() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_35() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn workspace_trust_serde() {
+        let t = WorkspaceTrust::Trusted;
+        let json = serde_json::to_string(&t).unwrap();
+        let parsed: WorkspaceTrust = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, WorkspaceTrust::Trusted);
     }
 }
