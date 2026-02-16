@@ -2059,6 +2059,25 @@ impl Workbench {
         self.workspace_files = files;
     }
 
+    /// Scan a workspace directory for files and populate [`workspace_files`].
+    pub fn scan_workspace_files(&mut self, root: &Path) {
+        self.workspace_files.clear();
+        fn is_hidden(entry: &walkdir::DirEntry) -> bool {
+            entry.file_name().to_str().is_some_and(|s| s.starts_with('.'))
+        }
+        for entry in walkdir::WalkDir::new(root)
+            .into_iter()
+            .filter_entry(|e| !is_hidden(e))
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+            .take(10_000)
+        {
+            if let Ok(rel) = entry.path().strip_prefix(root) {
+                self.workspace_files.push(root.join(rel));
+            }
+        }
+    }
+
     /// Switch the sidebar to the given panel, opening it if hidden.
     pub fn set_active_sidebar(&mut self, panel: ActiveSidebarPanel) {
         self.active_sidebar = panel;

@@ -27,4 +27,5 @@ vsedit-search-view = { path = "../vsedit-search-view" }
 vsedit-scm-view = { path = "../vsedit-scm-view" }
 vsedit-debug-view = { path = "../vsedit-debug-view" }
 ratatui = { workspace = true }
+walkdir = { workspace = true }
 

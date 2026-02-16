@@ -475,6 +475,20 @@ async fn run() -> io::Result<()> {
     // Restore previous sidebar / panel state from persisted state.
     restore_ui_state(&state_service, &mut workbench);
 
+    // Scan workspace for Quick Open file list and detect git branch.
+    if let Some(root) = workspace.get_workspace_root() {
+        workbench.scan_workspace_files(&root);
+        tracing::info!("Quick Open: {} workspace files indexed", workbench.workspace_files.len());
+
+        if vsedit_ext_scm::git::GitCli::is_git_repo(&root) {
+            let git = vsedit_ext_scm::git::GitCli::new(root.clone());
+            if let Ok(branch) = git.current_branch() {
+                workbench.statusbar.update_item("statusbar.branch", &format!("⎇ {}", branch));
+                tracing::info!("Git branch: {branch}");
+            }
+        }
+    }
+
     lifecycle.set_phase(LifecyclePhase::Ready);
     tracing::info!("Startup complete — entering event loop");
 
@@ -1301,11 +1315,31 @@ fn save_active_file(app: &mut AppState) {
                     let id = tab.id;
                     app.workbench.tab_service.set_modified(id, false);
                 }
+                // Refresh git branch in case of external commits.
+                refresh_git_branch(app);
             }
             Err(e) => {
                 tracing::error!("Failed to save: {e}");
                 app.notification_service
                     .error(format!("Failed to save {}: {e}", path.display()));
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Git branch refresh
+// ---------------------------------------------------------------------------
+
+/// Re-read the current git branch and update the status bar.
+fn refresh_git_branch(app: &mut AppState) {
+    if let Some(root) = app._workspace.get_workspace_root() {
+        if vsedit_ext_scm::git::GitCli::is_git_repo(&root) {
+            let git = vsedit_ext_scm::git::GitCli::new(root);
+            if let Ok(branch) = git.current_branch() {
+                app.workbench
+                    .statusbar
+                    .update_item("statusbar.branch", &format!("⎇ {}", branch));
             }
         }
     }

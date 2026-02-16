@@ -3011,6 +3011,7 @@ dependencies = [
  "vsedit-environment",
  "vsedit-ext-host",
  "vsedit-ext-mgmt",
+ "vsedit-ext-scm",
  "vsedit-ext-testing",
  "vsedit-ext-timeline",
  "vsedit-input",
@@ -3032,6 +3033,7 @@ dependencies = [
  "vsedit-wb-layout",
  "vsedit-workbench",
  "vsedit-workspace",
+ "walkdir",
 ]
 
 [[package]]
@@ -4576,6 +4578,7 @@ dependencies = [
  "vsedit-wb-statusbar",
  "vsedit-wb-textmate",
  "vsedit-wb-views",
+ "walkdir",
 ]
 
 [[package]]
