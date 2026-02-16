@@ -381,6 +381,233 @@ impl Default for SettingsView {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Navigation helper
+// ---------------------------------------------------------------------------
+
+/// Keyboard navigation state for a settings list of known length.
+#[derive(Debug, Clone)]
+pub struct SettingsNavigation {
+    selected: usize,
+    total: usize,
+    page_size: usize,
+}
+
+impl SettingsNavigation {
+    /// Create a new navigation state.
+    /// `total` is the number of items; `page_size` is used for page‑up/down.
+    pub fn new(total: usize, page_size: usize) -> Self {
+        Self {
+            selected: 0,
+            total,
+            page_size: page_size.max(1),
+        }
+    }
+
+    pub fn move_down(&mut self) {
+        if self.total > 0 {
+            self.selected = (self.selected + 1).min(self.total - 1);
+        }
+    }
+
+    pub fn move_up(&mut self) {
+        self.selected = self.selected.saturating_sub(1);
+    }
+
+    pub fn page_down(&mut self) {
+        if self.total > 0 {
+            self.selected = (self.selected + self.page_size).min(self.total - 1);
+        }
+    }
+
+    pub fn page_up(&mut self) {
+        self.selected = self.selected.saturating_sub(self.page_size);
+    }
+
+    pub fn go_to_first(&mut self) {
+        self.selected = 0;
+    }
+
+    pub fn go_to_last(&mut self) {
+        if self.total > 0 {
+            self.selected = self.total - 1;
+        }
+    }
+
+    pub fn get_selected_index(&self) -> usize {
+        self.selected
+    }
+
+    /// Update the total item count, clamping the selection if needed.
+    pub fn set_total(&mut self, total: usize) {
+        self.total = total;
+        if self.total == 0 {
+            self.selected = 0;
+        } else if self.selected >= self.total {
+            self.selected = self.total - 1;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Search state
+// ---------------------------------------------------------------------------
+
+/// Tracks the current search query and the indices that matched.
+#[derive(Debug, Clone)]
+pub struct SettingsSearchState {
+    pub query: String,
+    pub filtered_indices: Vec<usize>,
+}
+
+impl SettingsSearchState {
+    pub fn new() -> Self {
+        Self {
+            query: String::new(),
+            filtered_indices: Vec::new(),
+        }
+    }
+
+    /// Run a case-insensitive search over the given entries, storing matches.
+    pub fn search(&mut self, query: &str, entries: &[SettingEntry]) {
+        self.query = query.to_string();
+        let lower = query.to_lowercase();
+        if lower.is_empty() {
+            self.filtered_indices = (0..entries.len()).collect();
+        } else {
+            self.filtered_indices = entries
+                .iter()
+                .enumerate()
+                .filter(|(_, e)| {
+                    e.title.to_lowercase().contains(&lower)
+                        || e.id.to_lowercase().contains(&lower)
+                        || e.description.to_lowercase().contains(&lower)
+                })
+                .map(|(i, _)| i)
+                .collect();
+        }
+    }
+
+    pub fn result_count(&self) -> usize {
+        self.filtered_indices.len()
+    }
+
+    pub fn is_active(&self) -> bool {
+        !self.query.is_empty()
+    }
+}
+
+impl Default for SettingsSearchState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Breadcrumb path
+// ---------------------------------------------------------------------------
+
+/// Tracks the category hierarchy the user has navigated into
+/// (e.g. "Editor" → "Font" → "Ligatures").
+#[derive(Debug, Clone)]
+pub struct BreadcrumbPath {
+    segments: Vec<String>,
+}
+
+impl BreadcrumbPath {
+    pub fn new() -> Self {
+        Self {
+            segments: Vec::new(),
+        }
+    }
+
+    /// Push a new segment onto the path.
+    pub fn push(&mut self, segment: impl Into<String>) {
+        self.segments.push(segment.into());
+    }
+
+    /// Pop the last segment, returning it if present.
+    pub fn pop(&mut self) -> Option<String> {
+        self.segments.pop()
+    }
+
+    /// The most specific (deepest) segment, or `None` when at root.
+    pub fn current(&self) -> Option<&str> {
+        self.segments.last().map(|s| s.as_str())
+    }
+
+    /// Number of segments in the path.
+    pub fn depth(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// `true` when no segments have been pushed.
+    pub fn is_root(&self) -> bool {
+        self.segments.is_empty()
+    }
+}
+
+impl std::fmt::Display for BreadcrumbPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.segments.is_empty() {
+            write!(f, "Settings")
+        } else {
+            write!(f, "Settings > {}", self.segments.join(" > "))
+        }
+    }
+}
+
+impl Default for BreadcrumbPath {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Validation helper
+// ---------------------------------------------------------------------------
+
+/// Validates that a `SettingsView` is in a consistent state:
+///
+/// * Every index in `filtered_entries` is within bounds of `entries`.
+/// * `selected_index` is within bounds of `filtered_entries` (or both are 0).
+/// * `active_category`, if set, appears in `categories`.
+///
+/// Returns a list of human-readable error strings (empty = valid).
+pub fn validate_settings_view_state(view: &SettingsView) -> Vec<String> {
+    let mut errors = Vec::new();
+
+    for (pos, &idx) in view.filtered_entries.iter().enumerate() {
+        if idx >= view.entries.len() {
+            errors.push(format!(
+                "filtered_entries[{}] = {} is out of bounds (entries len = {})",
+                pos,
+                idx,
+                view.entries.len()
+            ));
+        }
+    }
+
+    if !view.filtered_entries.is_empty() && view.selected_index >= view.filtered_entries.len() {
+        errors.push(format!(
+            "selected_index {} is out of bounds (filtered len = {})",
+            view.selected_index,
+            view.filtered_entries.len()
+        ));
+    }
+
+    if let Some(ref cat) = view.active_category {
+        if !view.categories.contains(cat) {
+            errors.push(format!(
+                "active_category {:?} not found in categories list",
+                cat
+            ));
+        }
+    }
+
+    errors
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -537,5 +764,111 @@ mod tests {
     fn default_impl() {
         let v = SettingsView::default();
         assert!(v.entries.is_empty());
+    }
+
+    // --- SettingsNavigation tests ---
+
+    #[test]
+    fn navigation_move_and_bounds() {
+        let mut nav = SettingsNavigation::new(5, 3);
+        assert_eq!(nav.get_selected_index(), 0);
+        nav.move_down();
+        nav.move_down();
+        assert_eq!(nav.get_selected_index(), 2);
+        nav.move_up();
+        assert_eq!(nav.get_selected_index(), 1);
+        // Cannot go below 0
+        nav.go_to_first();
+        nav.move_up();
+        assert_eq!(nav.get_selected_index(), 0);
+        // Cannot exceed total-1
+        nav.go_to_last();
+        assert_eq!(nav.get_selected_index(), 4);
+        nav.move_down();
+        assert_eq!(nav.get_selected_index(), 4);
+    }
+
+    #[test]
+    fn navigation_page_up_down() {
+        let mut nav = SettingsNavigation::new(20, 5);
+        nav.page_down();
+        assert_eq!(nav.get_selected_index(), 5);
+        nav.page_down();
+        assert_eq!(nav.get_selected_index(), 10);
+        nav.page_up();
+        assert_eq!(nav.get_selected_index(), 5);
+        nav.page_up();
+        assert_eq!(nav.get_selected_index(), 0);
+        // Clamp at end
+        nav.go_to_last();
+        nav.page_down();
+        assert_eq!(nav.get_selected_index(), 19);
+    }
+
+    #[test]
+    fn navigation_set_total_clamps() {
+        let mut nav = SettingsNavigation::new(10, 3);
+        nav.go_to_last();
+        assert_eq!(nav.get_selected_index(), 9);
+        nav.set_total(5);
+        assert_eq!(nav.get_selected_index(), 4);
+        nav.set_total(0);
+        assert_eq!(nav.get_selected_index(), 0);
+    }
+
+    // --- SettingsSearchState tests ---
+
+    #[test]
+    fn search_state_filters_entries() {
+        let entries = sample_entries();
+        let mut ss = SettingsSearchState::new();
+        assert!(!ss.is_active());
+        ss.search("font", &entries);
+        assert!(ss.is_active());
+        assert_eq!(ss.result_count(), 2); // fontSize + fontFamily
+        ss.search("", &entries);
+        assert_eq!(ss.result_count(), 4);
+    }
+
+    // --- BreadcrumbPath tests ---
+
+    #[test]
+    fn breadcrumb_push_pop_display() {
+        let mut bc = BreadcrumbPath::new();
+        assert!(bc.is_root());
+        assert_eq!(bc.to_string(), "Settings");
+        bc.push("Editor");
+        assert_eq!(bc.current(), Some("Editor"));
+        assert_eq!(bc.depth(), 1);
+        bc.push("Font");
+        assert_eq!(bc.to_string(), "Settings > Editor > Font");
+        assert_eq!(bc.pop(), Some("Font".to_string()));
+        assert_eq!(bc.depth(), 1);
+        assert_eq!(bc.pop(), Some("Editor".to_string()));
+        assert!(bc.is_root());
+    }
+
+    // --- validate_settings_view_state tests ---
+
+    #[test]
+    fn validate_view_state_ok() {
+        let mut v = SettingsView::new();
+        for e in sample_entries() {
+            v.add_entry(e);
+        }
+        let errors = validate_settings_view_state(&v);
+        assert!(errors.is_empty(), "unexpected errors: {:?}", errors);
+    }
+
+    #[test]
+    fn validate_view_state_bad_category() {
+        let mut v = SettingsView::new();
+        for e in sample_entries() {
+            v.add_entry(e);
+        }
+        v.active_category = Some("NonExistent".to_string());
+        let errors = validate_settings_view_state(&v);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("NonExistent"));
     }
 }
