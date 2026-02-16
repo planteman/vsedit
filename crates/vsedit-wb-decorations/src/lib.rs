@@ -530,6 +530,124 @@ impl Default for WbDecorationsValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Gutter indicators
+// ---------------------------------------------------------------------------
+
+/// The visual type of a gutter indicator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GutterIndicatorKind {
+    /// Breakpoint (red dot).
+    Breakpoint,
+    /// Error indicator (red circle).
+    Error,
+    /// Warning indicator (yellow triangle).
+    Warning,
+    /// Git addition (green bar).
+    GitAdd,
+    /// Git modification (blue bar).
+    GitModify,
+    /// Git deletion (red bar).
+    GitDelete,
+    /// Custom kind identified by a string stored elsewhere.
+    Custom,
+}
+
+/// A single gutter decoration on a specific line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GutterDecoration {
+    /// The 1-based line number.
+    pub line: u32,
+    /// Icon name or path.
+    pub icon: Option<String>,
+    /// Color string (e.g. "red", "#ff0000").
+    pub color: Option<String>,
+    /// Tooltip shown on hover.
+    pub tooltip: Option<String>,
+    /// The kind of indicator.
+    pub kind: GutterIndicatorKind,
+}
+
+/// Service for managing gutter decorations across documents.
+pub struct GutterIndicatorService {
+    decorations: Vec<(String, Vec<GutterDecoration>)>,
+}
+
+impl GutterIndicatorService {
+    pub fn new() -> Self {
+        Self {
+            decorations: Vec::new(),
+        }
+    }
+
+    /// Set gutter decorations for a URI, replacing any previous set.
+    pub fn set_decorations(&mut self, uri: impl Into<String>, decs: Vec<GutterDecoration>) {
+        let uri = uri.into();
+        self.decorations.retain(|(u, _)| u != &uri);
+        if !decs.is_empty() {
+            self.decorations.push((uri, decs));
+        }
+    }
+
+    /// Get gutter decorations for a given URI.
+    pub fn get_decorations(&self, uri: &str) -> &[GutterDecoration] {
+        self.decorations
+            .iter()
+            .find(|(u, _)| u == uri)
+            .map(|(_, d)| d.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Get decorations for a specific line in a URI.
+    pub fn decorations_for_line(&self, uri: &str, line: u32) -> Vec<&GutterDecoration> {
+        self.get_decorations(uri)
+            .iter()
+            .filter(|d| d.line == line)
+            .collect()
+    }
+
+    /// Clear all gutter decorations for a URI.
+    pub fn clear(&mut self, uri: &str) {
+        self.decorations.retain(|(u, _)| u != uri);
+    }
+
+    /// Clear everything.
+    pub fn clear_all(&mut self) {
+        self.decorations.clear();
+    }
+
+    /// Total number of gutter decorations across all URIs.
+    pub fn total_count(&self) -> usize {
+        self.decorations.iter().map(|(_, d)| d.len()).sum()
+    }
+}
+
+impl Default for GutterIndicatorService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for GutterIndicatorKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Breakpoint => write!(f, "breakpoint"),
+            Self::Error => write!(f, "error"),
+            Self::Warning => write!(f, "warning"),
+            Self::GitAdd => write!(f, "git-add"),
+            Self::GitModify => write!(f, "git-modify"),
+            Self::GitDelete => write!(f, "git-delete"),
+            Self::Custom => write!(f, "custom"),
+        }
+    }
+}
+
+impl fmt::Display for GutterDecoration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "L{} [{}]", self.line, self.kind)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1008,5 +1126,117 @@ mod tests {
     fn wb_decorations_is_ascii_printable() {
         assert!(WbDecorationsValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbDecorationsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- gutter indicator tests ---------------------------------------------
+
+    #[test]
+    fn gutter_service_set_and_get() {
+        let mut svc = GutterIndicatorService::new();
+        svc.set_decorations("file:///a.rs", vec![
+            GutterDecoration {
+                line: 5,
+                icon: None,
+                color: Some("red".into()),
+                tooltip: Some("breakpoint".into()),
+                kind: GutterIndicatorKind::Breakpoint,
+            },
+        ]);
+        assert_eq!(svc.get_decorations("file:///a.rs").len(), 1);
+        assert_eq!(svc.get_decorations("file:///b.rs").len(), 0);
+    }
+
+    #[test]
+    fn gutter_service_decorations_for_line() {
+        let mut svc = GutterIndicatorService::new();
+        svc.set_decorations("f", vec![
+            GutterDecoration {
+                line: 1,
+                icon: None,
+                color: None,
+                tooltip: None,
+                kind: GutterIndicatorKind::Error,
+            },
+            GutterDecoration {
+                line: 2,
+                icon: None,
+                color: None,
+                tooltip: None,
+                kind: GutterIndicatorKind::Warning,
+            },
+            GutterDecoration {
+                line: 1,
+                icon: None,
+                color: None,
+                tooltip: None,
+                kind: GutterIndicatorKind::GitAdd,
+            },
+        ]);
+        assert_eq!(svc.decorations_for_line("f", 1).len(), 2);
+        assert_eq!(svc.decorations_for_line("f", 2).len(), 1);
+        assert_eq!(svc.decorations_for_line("f", 3).len(), 0);
+    }
+
+    #[test]
+    fn gutter_service_clear() {
+        let mut svc = GutterIndicatorService::new();
+        svc.set_decorations("f", vec![GutterDecoration {
+            line: 1,
+            icon: None,
+            color: None,
+            tooltip: None,
+            kind: GutterIndicatorKind::Custom,
+        }]);
+        assert_eq!(svc.total_count(), 1);
+        svc.clear("f");
+        assert_eq!(svc.total_count(), 0);
+    }
+
+    #[test]
+    fn gutter_service_replace_on_set() {
+        let mut svc = GutterIndicatorService::new();
+        svc.set_decorations("f", vec![GutterDecoration {
+            line: 1,
+            icon: None,
+            color: None,
+            tooltip: None,
+            kind: GutterIndicatorKind::Error,
+        }]);
+        svc.set_decorations("f", vec![
+            GutterDecoration {
+                line: 2,
+                icon: None,
+                color: None,
+                tooltip: None,
+                kind: GutterIndicatorKind::Warning,
+            },
+            GutterDecoration {
+                line: 3,
+                icon: None,
+                color: None,
+                tooltip: None,
+                kind: GutterIndicatorKind::GitModify,
+            },
+        ]);
+        assert_eq!(svc.total_count(), 2);
+        assert_eq!(svc.get_decorations("f").len(), 2);
+    }
+
+    #[test]
+    fn gutter_indicator_kind_display() {
+        assert_eq!(format!("{}", GutterIndicatorKind::Breakpoint), "breakpoint");
+        assert_eq!(format!("{}", GutterIndicatorKind::GitDelete), "git-delete");
+    }
+
+    #[test]
+    fn gutter_decoration_display() {
+        let dec = GutterDecoration {
+            line: 42,
+            icon: None,
+            color: None,
+            tooltip: None,
+            kind: GutterIndicatorKind::Error,
+        };
+        assert_eq!(format!("{dec}"), "L42 [error]");
     }
 }

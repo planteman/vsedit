@@ -643,6 +643,133 @@ impl Default for InlayhintsValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Inlay-hint display mode (on / off / offUnlessPressed)
+// ---------------------------------------------------------------------------
+
+/// Controls when inlay hints are visible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InlayHintDisplayMode {
+    /// Always show inlay hints.
+    On,
+    /// Never show inlay hints.
+    Off,
+    /// Hide by default; show while Ctrl+Alt is held.
+    OffUnlessPressed,
+}
+
+impl InlayHintDisplayMode {
+    /// Whether hints should be rendered given the current modifier state.
+    pub fn should_show(&self, modifier_held: bool) -> bool {
+        match self {
+            Self::On => true,
+            Self::Off => false,
+            Self::OffUnlessPressed => modifier_held,
+        }
+    }
+
+    /// Cycle through modes: On → Off → OffUnlessPressed → On.
+    pub fn toggle(self) -> Self {
+        match self {
+            Self::On => Self::Off,
+            Self::Off => Self::OffUnlessPressed,
+            Self::OffUnlessPressed => Self::On,
+        }
+    }
+}
+
+impl fmt::Display for InlayHintDisplayMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::On => write!(f, "on"),
+            Self::Off => write!(f, "off"),
+            Self::OffUnlessPressed => write!(f, "offUnlessPressed"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Inline rendering helper
+// ---------------------------------------------------------------------------
+
+/// Style descriptor passed into [`render_line_with_inlay_hints`].
+#[derive(Debug, Clone)]
+pub struct InlayHintStyle {
+    /// Prefix inserted before hint text (e.g. ANSI dim-on sequence).
+    pub prefix: String,
+    /// Suffix inserted after hint text (e.g. ANSI reset sequence).
+    pub suffix: String,
+}
+
+impl Default for InlayHintStyle {
+    fn default() -> Self {
+        Self {
+            prefix: String::new(),
+            suffix: String::new(),
+        }
+    }
+}
+
+/// Render a single editor line with inlay hints spliced in.
+///
+/// `hints` must contain only hints whose `position_line` matches the line
+/// being rendered and must be sorted by `position_col` ascending.  Each hint
+/// is inserted at the corresponding column offset, wrapped in the style
+/// prefix/suffix.
+pub fn render_line_with_inlay_hints(
+    line: &str,
+    hints: &[InlayHint],
+    style: &InlayHintStyle,
+) -> String {
+    if hints.is_empty() {
+        return line.to_string();
+    }
+
+    let mut result = String::with_capacity(line.len() + hints.len() * 16);
+    let mut col: u32 = 0;
+    let mut hint_idx = 0;
+
+    for ch in line.chars() {
+        // Insert any hints at this column position.
+        while hint_idx < hints.len() && hints[hint_idx].position_col == col {
+            let hint = &hints[hint_idx];
+            if hint.padding_left {
+                result.push(' ');
+            }
+            result.push_str(&style.prefix);
+            for part in &hint.label {
+                result.push_str(&part.value);
+            }
+            result.push_str(&style.suffix);
+            if hint.padding_right {
+                result.push(' ');
+            }
+            hint_idx += 1;
+        }
+        result.push(ch);
+        col += 1;
+    }
+
+    // Hints that appear past the end of the line.
+    while hint_idx < hints.len() {
+        let hint = &hints[hint_idx];
+        if hint.padding_left {
+            result.push(' ');
+        }
+        result.push_str(&style.prefix);
+        for part in &hint.label {
+            result.push_str(&part.value);
+        }
+        result.push_str(&style.suffix);
+        if hint.padding_right {
+            result.push(' ');
+        }
+        hint_idx += 1;
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1058,5 +1185,76 @@ mod tests {
     fn inlayhints_is_ascii_printable() {
         assert!(InlayhintsValidator::is_ascii_printable("Hello World 123"));
         assert!(!InlayhintsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- render & display-mode tests ----------------------------------------
+
+    #[test]
+    fn display_mode_should_show() {
+        assert!(InlayHintDisplayMode::On.should_show(false));
+        assert!(InlayHintDisplayMode::On.should_show(true));
+        assert!(!InlayHintDisplayMode::Off.should_show(false));
+        assert!(!InlayHintDisplayMode::Off.should_show(true));
+        assert!(!InlayHintDisplayMode::OffUnlessPressed.should_show(false));
+        assert!(InlayHintDisplayMode::OffUnlessPressed.should_show(true));
+    }
+
+    #[test]
+    fn display_mode_toggle_cycle() {
+        let m = InlayHintDisplayMode::On;
+        let m = m.toggle();
+        assert_eq!(m, InlayHintDisplayMode::Off);
+        let m = m.toggle();
+        assert_eq!(m, InlayHintDisplayMode::OffUnlessPressed);
+        let m = m.toggle();
+        assert_eq!(m, InlayHintDisplayMode::On);
+    }
+
+    #[test]
+    fn render_line_no_hints() {
+        let line = "let x = 42;";
+        let result = render_line_with_inlay_hints(line, &[], &InlayHintStyle::default());
+        assert_eq!(result, line);
+    }
+
+    #[test]
+    fn render_line_with_type_hint() {
+        let line = "let x = 42;";
+        let hint = InlayHint::simple(0, 5, ": i32", InlayHintKind::Type);
+        let style = InlayHintStyle {
+            prefix: "[".into(),
+            suffix: "]".into(),
+        };
+        let result = render_line_with_inlay_hints(line, &[hint], &style);
+        assert_eq!(result, "let x[: i32] = 42;");
+    }
+
+    #[test]
+    fn render_line_hint_with_padding() {
+        let line = "foo";
+        let mut hint = InlayHint::simple(0, 3, ": T", InlayHintKind::Type);
+        hint.padding_left = true;
+        hint.padding_right = true;
+        let result = render_line_with_inlay_hints(line, &[hint], &InlayHintStyle::default());
+        assert_eq!(result, "foo : T ");
+    }
+
+    #[test]
+    fn render_line_multiple_hints() {
+        let line = "ab";
+        let hints = vec![
+            InlayHint::simple(0, 1, "X", InlayHintKind::Other),
+            InlayHint::simple(0, 2, "Y", InlayHintKind::Other),
+        ];
+        let result = render_line_with_inlay_hints(line, &hints, &InlayHintStyle::default());
+        assert_eq!(result, "aXbY");
+    }
+
+    #[test]
+    fn render_line_hint_past_end() {
+        let line = "ab";
+        let hint = InlayHint::simple(0, 5, "Z", InlayHintKind::Other);
+        let result = render_line_with_inlay_hints(line, &[hint], &InlayHintStyle::default());
+        assert_eq!(result, "abZ");
     }
 }

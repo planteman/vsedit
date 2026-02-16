@@ -622,6 +622,94 @@ impl Default for ExtDecorationsValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Extended decoration options — after/before content, overview ruler
+// ---------------------------------------------------------------------------
+
+/// Content rendered inline after or before the decorated range.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ThemableDecorationAttachment {
+    /// Text to render.
+    pub content_text: Option<String>,
+    /// Foreground color.
+    pub color: Option<String>,
+    /// Background color.
+    pub background_color: Option<String>,
+    /// Font style (e.g. "italic").
+    pub font_style: Option<String>,
+}
+
+impl Default for ThemableDecorationAttachment {
+    fn default() -> Self {
+        Self {
+            content_text: None,
+            color: None,
+            background_color: None,
+            font_style: None,
+        }
+    }
+}
+
+/// Overview ruler lane for decoration markers.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum OverviewRulerLane {
+    Left,
+    Center,
+    Right,
+    Full,
+}
+
+/// Overview ruler configuration for a decoration type.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct OverviewRulerOptions {
+    pub color: String,
+    pub lane: OverviewRulerLane,
+}
+
+/// Extended decoration options with after/before content and overview ruler.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ExtendedDecorationOptions {
+    pub start_line: u32,
+    pub start_character: u32,
+    pub end_line: u32,
+    pub end_character: u32,
+    pub hover_message: Option<String>,
+    pub after_content: Option<ThemableDecorationAttachment>,
+    pub before_content: Option<ThemableDecorationAttachment>,
+}
+
+/// Extended render options including after/before and overview ruler.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ExtendedRenderOptions {
+    #[serde(flatten)]
+    pub base: DecorationRenderOptions,
+    pub after: Option<ThemableDecorationAttachment>,
+    pub before: Option<ThemableDecorationAttachment>,
+    pub overview_ruler: Option<OverviewRulerOptions>,
+}
+
+/// A fully-typed decoration type with a unique key and extended options.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextEditorDecorationType {
+    pub key: String,
+    pub options: ExtendedRenderOptions,
+}
+
+impl TextEditorDecorationType {
+    pub fn new(key: impl Into<String>, options: ExtendedRenderOptions) -> Self {
+        Self {
+            key: key.into(),
+            options,
+        }
+    }
+}
+
+impl fmt::Display for TextEditorDecorationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TextEditorDecorationType({})", self.key)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1052,5 +1140,57 @@ mod tests {
     fn ext_decorations_is_ascii_printable() {
         assert!(ExtDecorationsValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtDecorationsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- extended decoration tests ------------------------------------------
+
+    #[test]
+    fn text_editor_decoration_type_display() {
+        let dt = TextEditorDecorationType::new(
+            "errorHighlight",
+            ExtendedRenderOptions {
+                base: RenderOptionsBuilder::new()
+                    .background_color("rgba(255,0,0,0.3)")
+                    .build(),
+                after: None,
+                before: None,
+                overview_ruler: Some(OverviewRulerOptions {
+                    color: "red".into(),
+                    lane: OverviewRulerLane::Right,
+                }),
+            },
+        );
+        assert_eq!(
+            format!("{dt}"),
+            "TextEditorDecorationType(errorHighlight)"
+        );
+        assert!(dt.options.overview_ruler.is_some());
+    }
+
+    #[test]
+    fn extended_decoration_options_after_before() {
+        let opt = ExtendedDecorationOptions {
+            start_line: 1,
+            start_character: 0,
+            end_line: 1,
+            end_character: 10,
+            hover_message: None,
+            after_content: Some(ThemableDecorationAttachment {
+                content_text: Some(" // inferred".into()),
+                color: Some("gray".into()),
+                ..Default::default()
+            }),
+            before_content: None,
+        };
+        assert_eq!(
+            opt.after_content.as_ref().unwrap().content_text.as_deref(),
+            Some(" // inferred")
+        );
+    }
+
+    #[test]
+    fn overview_ruler_lane_variants() {
+        assert_ne!(OverviewRulerLane::Left, OverviewRulerLane::Right);
+        assert_ne!(OverviewRulerLane::Center, OverviewRulerLane::Full);
     }
 }

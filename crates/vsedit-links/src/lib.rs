@@ -541,6 +541,114 @@ impl Default for LinksValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// UrlMatch — structured URL match result
+// ---------------------------------------------------------------------------
+
+/// A structured match for a detected URL in source text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UrlMatch {
+    /// Byte start offset in the source string.
+    pub byte_start: usize,
+    /// Byte end offset (exclusive) in the source string.
+    pub byte_end: usize,
+    /// The matched URL string.
+    pub url: String,
+    /// Line number (0-based) where the URL starts, if computed.
+    pub line: Option<u32>,
+    /// Column (0-based) within the line.
+    pub column: Option<u32>,
+}
+
+/// Detect URLs in `text` and return structured [`UrlMatch`] results.
+///
+/// Line and column are computed relative to the full text.
+pub fn detect_urls_structured(text: &str) -> Vec<UrlMatch> {
+    let raw = detect_urls(text);
+    raw.into_iter()
+        .map(|(start, end, url)| {
+            let (line, col) = byte_offset_to_line_col(text, start);
+            UrlMatch {
+                byte_start: start,
+                byte_end: end,
+                url,
+                line: Some(line),
+                column: Some(col),
+            }
+        })
+        .collect()
+}
+
+/// Convert a byte offset into 0-based (line, column).
+fn byte_offset_to_line_col(text: &str, offset: usize) -> (u32, u32) {
+    let mut line: u32 = 0;
+    let mut col: u32 = 0;
+    for (i, ch) in text.char_indices() {
+        if i >= offset {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            col = 0;
+        } else {
+            col += 1;
+        }
+    }
+    (line, col)
+}
+
+// ---------------------------------------------------------------------------
+// Link interaction helpers
+// ---------------------------------------------------------------------------
+
+/// Style applied when a link is hovered (underline) or followed (Ctrl+Click).
+#[derive(Debug, Clone)]
+pub struct LinkStyle {
+    /// Prefix before the link text when rendering with underline.
+    pub underline_prefix: String,
+    /// Suffix after the link text.
+    pub underline_suffix: String,
+}
+
+impl Default for LinkStyle {
+    fn default() -> Self {
+        Self {
+            underline_prefix: String::new(),
+            underline_suffix: String::new(),
+        }
+    }
+}
+
+/// Result of a Ctrl+Click follow action.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FollowLinkAction {
+    /// Open a URL in an external browser.
+    OpenExternal(String),
+    /// Open a file path in the editor.
+    OpenFile(String),
+    /// Open a mailto link.
+    Mailto(String),
+    /// No actionable link at the position.
+    None,
+}
+
+/// Determine the follow action for a link at `(line, col)`.
+pub fn follow_link_at(links: &[DocumentLink], line: u32, col: u32) -> FollowLinkAction {
+    for link in links {
+        if link.contains_position(line, col) {
+            let target = &link.target;
+            if target.starts_with("http://") || target.starts_with("https://") {
+                return FollowLinkAction::OpenExternal(target.clone());
+            } else if target.starts_with("mailto:") || target.contains('@') {
+                return FollowLinkAction::Mailto(target.clone());
+            } else {
+                return FollowLinkAction::OpenFile(target.clone());
+            }
+        }
+    }
+    FollowLinkAction::None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -991,5 +1099,79 @@ mod tests {
     fn links_is_ascii_printable() {
         assert!(LinksValidator::is_ascii_printable("Hello World 123"));
         assert!(!LinksValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- structured URL & follow-link tests ---------------------------------
+
+    #[test]
+    fn detect_urls_structured_single() {
+        let text = "see https://example.com here";
+        let matches = detect_urls_structured(text);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].url, "https://example.com");
+        assert_eq!(matches[0].line, Some(0));
+        assert_eq!(matches[0].column, Some(4));
+    }
+
+    #[test]
+    fn detect_urls_structured_multiline() {
+        let text = "line1\nhttps://a.com\nline3";
+        let matches = detect_urls_structured(text);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].line, Some(1));
+        assert_eq!(matches[0].column, Some(0));
+    }
+
+    #[test]
+    fn follow_link_open_external() {
+        let links = vec![DocumentLink {
+            start_line: 1,
+            start_col: 0,
+            end_line: 1,
+            end_col: 20,
+            target: "https://example.com".into(),
+            tooltip: None,
+        }];
+        assert_eq!(
+            follow_link_at(&links, 1, 5),
+            FollowLinkAction::OpenExternal("https://example.com".into())
+        );
+    }
+
+    #[test]
+    fn follow_link_open_file() {
+        let links = vec![DocumentLink {
+            start_line: 2,
+            start_col: 0,
+            end_line: 2,
+            end_col: 10,
+            target: "./src/main.rs".into(),
+            tooltip: None,
+        }];
+        assert_eq!(
+            follow_link_at(&links, 2, 3),
+            FollowLinkAction::OpenFile("./src/main.rs".into())
+        );
+    }
+
+    #[test]
+    fn follow_link_none() {
+        assert_eq!(follow_link_at(&[], 0, 0), FollowLinkAction::None);
+    }
+
+    #[test]
+    fn follow_link_mailto() {
+        let links = vec![DocumentLink {
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 15,
+            target: "user@example.com".into(),
+            tooltip: None,
+        }];
+        assert_eq!(
+            follow_link_at(&links, 0, 5),
+            FollowLinkAction::Mailto("user@example.com".into())
+        );
     }
 }

@@ -559,6 +559,61 @@ impl Default for CodelensValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Code lens rendering
+// ---------------------------------------------------------------------------
+
+/// Style descriptor for rendering code lenses above a line.
+#[derive(Debug, Clone)]
+pub struct CodeLensStyle {
+    /// Prefix before the entire lens line (e.g. ANSI dim-on).
+    pub prefix: String,
+    /// Suffix after the entire lens line (e.g. ANSI reset).
+    pub suffix: String,
+    /// Separator between lenses on the same line (e.g. " | ").
+    pub separator: String,
+}
+
+impl Default for CodeLensStyle {
+    fn default() -> Self {
+        Self {
+            prefix: String::new(),
+            suffix: String::new(),
+            separator: " | ".into(),
+        }
+    }
+}
+
+/// Render a code-lens annotation line that appears above a source line.
+///
+/// Returns `None` if there are no resolved lenses with a command title.
+/// Unresolved lenses (no command) are silently skipped.
+pub fn render_code_lens_line(lenses: &[CodeLens], style: &CodeLensStyle) -> Option<String> {
+    let titles: Vec<&str> = lenses
+        .iter()
+        .filter_map(|l| l.command.as_ref().map(|c| c.title.as_str()))
+        .collect();
+    if titles.is_empty() {
+        return None;
+    }
+    let mut out = String::new();
+    out.push_str(&style.prefix);
+    out.push_str(&titles.join(&style.separator));
+    out.push_str(&style.suffix);
+    Some(out)
+}
+
+/// Group lenses by their start line, returning `(line, lenses)` pairs
+/// sorted by line number.
+pub fn group_lenses_by_line(lenses: &[CodeLens]) -> Vec<(u32, Vec<&CodeLens>)> {
+    let mut map: std::collections::BTreeMap<u32, Vec<&CodeLens>> =
+        std::collections::BTreeMap::new();
+    for lens in lenses {
+        map.entry(lens.start_line).or_default().push(lens);
+    }
+    map.into_iter().collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1018,5 +1073,73 @@ mod tests {
     fn codelens_is_ascii_printable() {
         assert!(CodelensValidator::is_ascii_printable("Hello World 123"));
         assert!(!CodelensValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- render tests -------------------------------------------------------
+
+    #[test]
+    fn render_code_lens_line_resolved() {
+        let lenses = vec![
+            CodeLens {
+                command: Some(Command {
+                    title: "3 references".into(),
+                    command_id: "showRefs".into(),
+                    tooltip: String::new(),
+                    arguments: vec![],
+                }),
+                ..CodeLens::new(0, 0, 0, 10)
+            },
+            CodeLens {
+                command: Some(Command {
+                    title: "Run Test".into(),
+                    command_id: "test.run".into(),
+                    tooltip: String::new(),
+                    arguments: vec![],
+                }),
+                ..CodeLens::new(0, 0, 0, 10)
+            },
+        ];
+        let result = render_code_lens_line(&lenses, &CodeLensStyle::default()).unwrap();
+        assert_eq!(result, "3 references | Run Test");
+    }
+
+    #[test]
+    fn render_code_lens_line_no_resolved() {
+        let lenses = vec![CodeLens::new(0, 0, 0, 10)];
+        assert!(render_code_lens_line(&lenses, &CodeLensStyle::default()).is_none());
+    }
+
+    #[test]
+    fn render_code_lens_line_with_style() {
+        let lens = CodeLens {
+            command: Some(Command {
+                title: "1 impl".into(),
+                command_id: "showImpl".into(),
+                tooltip: String::new(),
+                arguments: vec![],
+            }),
+            ..CodeLens::new(0, 0, 0, 5)
+        };
+        let style = CodeLensStyle {
+            prefix: "<".into(),
+            suffix: ">".into(),
+            separator: " | ".into(),
+        };
+        assert_eq!(render_code_lens_line(&[lens], &style).unwrap(), "<1 impl>");
+    }
+
+    #[test]
+    fn group_lenses_by_line_groups_correctly() {
+        let lenses = vec![
+            CodeLens::new(5, 0, 5, 10),
+            CodeLens::new(1, 0, 1, 10),
+            CodeLens::new(5, 0, 5, 20),
+        ];
+        let groups = group_lenses_by_line(&lenses);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].0, 1);
+        assert_eq!(groups[0].1.len(), 1);
+        assert_eq!(groups[1].0, 5);
+        assert_eq!(groups[1].1.len(), 2);
     }
 }

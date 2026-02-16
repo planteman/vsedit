@@ -36,6 +36,11 @@ pub enum DecorationKind {
     Hint,
     FoldedRegion,
     InlayHint,
+    CodeLens,
+    DocumentLink,
+    GutterBreakpoint,
+    GutterError,
+    GutterWarning,
     GitGutterAdd,
     GitGutterModify,
     GitGutterDelete,
@@ -54,8 +59,11 @@ impl DecorationKind {
             Self::TrailingWhitespace => 3,
             Self::Ruler => 4,
             Self::GitGutterAdd | Self::GitGutterModify | Self::GitGutterDelete => 5,
+            Self::GutterBreakpoint | Self::GutterError | Self::GutterWarning => 5,
             Self::FoldedRegion => 6,
             Self::InlayHint => 7,
+            Self::CodeLens => 8,
+            Self::DocumentLink => 9,
             Self::WordHighlight => 10,
             Self::BracketMatch => 11,
             Self::SearchMatch => 12,
@@ -311,6 +319,19 @@ impl LineDecoration {
             DecorationKind::GitGutterDelete
         )
     }
+
+    /// Whether this decoration is a gutter indicator (breakpoint, error, warning, or git).
+    pub fn is_gutter(&self) -> bool {
+        matches!(
+            self.kind,
+            DecorationKind::GutterBreakpoint
+                | DecorationKind::GutterError
+                | DecorationKind::GutterWarning
+                | DecorationKind::GitGutterAdd
+                | DecorationKind::GitGutterModify
+                | DecorationKind::GitGutterDelete
+        )
+    }
 }
 
 impl PartialEq for LineDecoration {
@@ -446,6 +467,88 @@ impl EditorRenderer {
             merged.push(dec);
         }
         *decorations = merged;
+    }
+}
+
+/// Resolve which decoration should win when two overlap at the same position.
+/// Returns the one with higher priority.
+pub fn resolve_decoration_priority<'a>(a: &'a LineDecoration, b: &'a LineDecoration) -> &'a LineDecoration {
+    if a.kind.priority() >= b.kind.priority() { a } else { b }
+}
+
+/// Clamp a visible range to the viewport boundaries.
+pub fn clamp_visible_range(start: u32, end: u32, viewport: &ViewportState) -> (u32, u32) {
+    let clamped_start = start.max(viewport.first_visible_line);
+    let clamped_end = end.min(viewport.last_visible_line);
+    if clamped_start > clamped_end {
+        (clamped_start, clamped_start)
+    } else {
+        (clamped_start, clamped_end)
+    }
+}
+
+/// Format a line number with a given width and optional relative mode.
+pub fn format_line_number_relative(line: u32, cursor_line: u32, width: usize, relative: bool) -> String {
+    if relative {
+        if line == cursor_line {
+            format!("{:>w$} ", line, w = width)
+        } else {
+            let diff = (line as i64 - cursor_line as i64).unsigned_abs();
+            format!("{:>w$} ", diff, w = width)
+        }
+    } else {
+        format!("{:>w$} ", line, w = width)
+    }
+}
+
+/// Tracks whether a render cache should be invalidated.
+#[derive(Debug, Clone)]
+pub struct RenderCacheState {
+    pub last_viewport_first: u32,
+    pub last_viewport_height: u32,
+    pub last_cursor_line: u32,
+    pub last_total_lines: u32,
+    pub dirty: bool,
+}
+
+impl RenderCacheState {
+    pub fn new() -> Self {
+        Self {
+            last_viewport_first: 0,
+            last_viewport_height: 0,
+            last_cursor_line: 0,
+            last_total_lines: 0,
+            dirty: true,
+        }
+    }
+
+    /// Check if the cache needs invalidation given the current state.
+    pub fn needs_invalidation(&self, viewport: &ViewportState, cursor_line: u32) -> bool {
+        self.dirty
+            || self.last_viewport_first != viewport.first_visible_line
+            || self.last_viewport_height != viewport.height
+            || self.last_cursor_line != cursor_line
+            || self.last_total_lines != viewport.total_lines
+    }
+
+    /// Update the cache state to reflect the current viewport and cursor.
+    pub fn update(&mut self, viewport: &ViewportState, cursor_line: u32) {
+        self.last_viewport_first = viewport.first_visible_line;
+        self.last_viewport_height = viewport.height;
+        self.last_cursor_line = cursor_line;
+        self.last_total_lines = viewport.total_lines;
+        self.dirty = false;
+    }
+
+    /// Mark the cache as dirty so the next render will regenerate.
+    pub fn invalidate(&mut self) {
+        self.dirty = true;
+    }
+}
+
+impl Default for RenderCacheState {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -725,5 +828,135 @@ mod tests {
         let c = RenderedEditorLine::new(2, "hello");
         assert_eq!(a, b);
         assert_ne!(a, c);
+    }
+
+    #[test]
+    fn test_resolve_decoration_priority() {
+        let error = LineDecoration::new(0, 5, DecorationKind::Error);
+        let selection = LineDecoration::new(0, 5, DecorationKind::Selection);
+        let winner = resolve_decoration_priority(&error, &selection);
+        assert_eq!(winner.kind, DecorationKind::Selection);
+    }
+
+    #[test]
+    fn test_resolve_decoration_priority_same_kind() {
+        let a = LineDecoration::new(0, 5, DecorationKind::Error);
+        let b = LineDecoration::new(3, 8, DecorationKind::Error);
+        let winner = resolve_decoration_priority(&a, &b);
+        assert_eq!(winner.start_col, 0);
+    }
+
+    #[test]
+    fn test_clamp_visible_range_within() {
+        let mut vp = ViewportState::new(10);
+        vp.update(5, 100);
+        let (s, e) = clamp_visible_range(6, 12, &vp);
+        assert_eq!(s, 6);
+        assert_eq!(e, 12);
+    }
+
+    #[test]
+    fn test_clamp_visible_range_outside() {
+        let mut vp = ViewportState::new(10);
+        vp.update(5, 100);
+        let (s, e) = clamp_visible_range(1, 3, &vp);
+        assert_eq!(s, 5);
+        assert_eq!(e, 5);
+    }
+
+    #[test]
+    fn test_clamp_visible_range_partial() {
+        let mut vp = ViewportState::new(10);
+        vp.update(5, 100);
+        let (s, e) = clamp_visible_range(3, 8, &vp);
+        assert_eq!(s, 5);
+        assert_eq!(e, 8);
+    }
+
+    #[test]
+    fn test_format_line_number_absolute() {
+        let s = format_line_number_relative(42, 10, 4, false);
+        assert!(s.contains("42"));
+    }
+
+    #[test]
+    fn test_format_line_number_relative_current() {
+        let s = format_line_number_relative(10, 10, 4, true);
+        assert!(s.contains("10"));
+    }
+
+    #[test]
+    fn test_format_line_number_relative_offset() {
+        let s = format_line_number_relative(13, 10, 4, true);
+        assert!(s.contains("3"));
+    }
+
+    #[test]
+    fn test_render_cache_state_initial_dirty() {
+        let cache = RenderCacheState::new();
+        assert!(cache.dirty);
+        let vp = ViewportState::new(10);
+        assert!(cache.needs_invalidation(&vp, 1));
+    }
+
+    #[test]
+    fn test_render_cache_state_update_clears_dirty() {
+        let mut cache = RenderCacheState::new();
+        let mut vp = ViewportState::new(10);
+        vp.update(1, 100);
+        cache.update(&vp, 1);
+        assert!(!cache.dirty);
+        assert!(!cache.needs_invalidation(&vp, 1));
+    }
+
+    #[test]
+    fn test_render_cache_state_detects_viewport_change() {
+        let mut cache = RenderCacheState::new();
+        let mut vp = ViewportState::new(10);
+        vp.update(1, 100);
+        cache.update(&vp, 1);
+        vp.scroll_down(5);
+        assert!(cache.needs_invalidation(&vp, 1));
+    }
+
+    #[test]
+    fn test_render_cache_invalidate() {
+        let mut cache = RenderCacheState::new();
+        let mut vp = ViewportState::new(10);
+        vp.update(1, 100);
+        cache.update(&vp, 1);
+        assert!(!cache.dirty);
+        cache.invalidate();
+        assert!(cache.dirty);
+        assert!(cache.needs_invalidation(&vp, 1));
+    }
+
+    // -- new decoration kind tests ------------------------------------------
+
+    #[test]
+    fn codelens_decoration_priority() {
+        assert_eq!(DecorationKind::CodeLens.priority(), 8);
+    }
+
+    #[test]
+    fn document_link_decoration_priority() {
+        assert_eq!(DecorationKind::DocumentLink.priority(), 9);
+    }
+
+    #[test]
+    fn gutter_breakpoint_priority() {
+        assert_eq!(DecorationKind::GutterBreakpoint.priority(), 5);
+        assert_eq!(DecorationKind::GutterError.priority(), 5);
+        assert_eq!(DecorationKind::GutterWarning.priority(), 5);
+    }
+
+    #[test]
+    fn is_gutter_returns_true_for_gutter_kinds() {
+        assert!(LineDecoration::new(0, 1, DecorationKind::GutterBreakpoint).is_gutter());
+        assert!(LineDecoration::new(0, 1, DecorationKind::GutterError).is_gutter());
+        assert!(LineDecoration::new(0, 1, DecorationKind::GutterWarning).is_gutter());
+        assert!(LineDecoration::new(0, 1, DecorationKind::GitGutterAdd).is_gutter());
+        assert!(!LineDecoration::new(0, 1, DecorationKind::Error).is_gutter());
+        assert!(!LineDecoration::new(0, 1, DecorationKind::CodeLens).is_gutter());
     }
 }
