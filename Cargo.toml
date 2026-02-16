@@ -278,6 +278,8 @@ keyring = "3"
 dirs = "5"
 syntect = "5"
 lsp-types = "0.97"
+zip = "2"
+tempfile = "3"
 
 [profile.release]
 lto = true

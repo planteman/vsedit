@@ -450,6 +450,279 @@ pub fn register() {
     // Registration will connect RPC handlers when extension host starts
 }
 
+// ── Extensions View ──
+
+use vsedit_ext_mgmt::{GalleryExtension, InstalledExtension};
+
+/// Active tab in the extensions view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExtensionsTab {
+    Installed,
+    Recommended,
+    SearchResults,
+}
+
+impl Default for ExtensionsTab {
+    fn default() -> Self {
+        Self::Installed
+    }
+}
+
+impl std::fmt::Display for ExtensionsTab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Installed => write!(f, "Installed"),
+            Self::Recommended => write!(f, "Recommended"),
+            Self::SearchResults => write!(f, "Search Results"),
+        }
+    }
+}
+
+/// Rendering entry for a single extension in the list.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ExtensionListItem {
+    pub id: String,
+    pub name: String,
+    pub publisher: String,
+    pub version: String,
+    pub icon: Option<String>,
+    pub is_enabled: bool,
+    pub is_installed: bool,
+    pub description: String,
+}
+
+impl ExtensionListItem {
+    /// Create from an installed extension.
+    pub fn from_installed(ext: &InstalledExtension) -> Self {
+        Self {
+            id: ext.id.clone(),
+            name: ext.manifest.display_name.clone(),
+            publisher: ext.manifest.publisher.clone(),
+            version: ext.version.clone(),
+            icon: None,
+            is_enabled: ext.is_enabled,
+            is_installed: true,
+            description: ext.manifest.description.clone(),
+        }
+    }
+
+    /// Create from a gallery search result.
+    pub fn from_gallery(ext: &GalleryExtension) -> Self {
+        Self {
+            id: ext.id.clone(),
+            name: ext.display_name.clone(),
+            publisher: ext.publisher.clone(),
+            version: ext.version.clone(),
+            icon: None,
+            is_enabled: false,
+            is_installed: false,
+            description: ext.description.clone(),
+        }
+    }
+
+    /// Render as a single-line summary for TUI.
+    pub fn render_line(&self) -> String {
+        let status = if self.is_installed {
+            if self.is_enabled { "✓" } else { "○" }
+        } else {
+            " "
+        };
+        format!(
+            "[{status}] {} — {} v{} ({})",
+            self.name, self.publisher, self.version, self.id,
+        )
+    }
+}
+
+/// Detail view data for a single extension.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ExtensionDetailView {
+    pub id: String,
+    pub name: String,
+    pub publisher: String,
+    pub version: String,
+    pub description: String,
+    pub is_installed: bool,
+    pub is_enabled: bool,
+    pub dependencies: Vec<String>,
+}
+
+impl ExtensionDetailView {
+    /// Create from an installed extension.
+    pub fn from_installed(ext: &InstalledExtension) -> Self {
+        Self {
+            id: ext.id.clone(),
+            name: ext.manifest.display_name.clone(),
+            publisher: ext.manifest.publisher.clone(),
+            version: ext.version.clone(),
+            description: ext.manifest.description.clone(),
+            is_installed: true,
+            is_enabled: ext.is_enabled,
+            dependencies: ext.manifest.extension_dependencies.clone(),
+        }
+    }
+
+    /// Create from a gallery extension.
+    pub fn from_gallery(ext: &GalleryExtension) -> Self {
+        Self {
+            id: ext.id.clone(),
+            name: ext.display_name.clone(),
+            publisher: ext.publisher.clone(),
+            version: ext.version.clone(),
+            description: ext.description.clone(),
+            is_installed: false,
+            is_enabled: false,
+            dependencies: Vec::new(),
+        }
+    }
+
+    /// Render a multi-line detail string for TUI display.
+    pub fn render(&self) -> String {
+        let status = if self.is_installed {
+            if self.is_enabled { "Enabled" } else { "Disabled" }
+        } else {
+            "Not Installed"
+        };
+        let deps = if self.dependencies.is_empty() {
+            "None".to_string()
+        } else {
+            self.dependencies.join(", ")
+        };
+        format!(
+            "{}\nPublisher: {}\nVersion: {}\nStatus: {status}\nID: {}\nDependencies: {deps}\n\n{}",
+            self.name, self.publisher, self.version, self.id, self.description,
+        )
+    }
+}
+
+/// State for the extensions view panel.
+#[derive(Debug, Clone)]
+pub struct ExtensionsViewState {
+    pub active_tab: ExtensionsTab,
+    pub search_query: String,
+    pub installed_items: Vec<ExtensionListItem>,
+    pub search_results: Vec<ExtensionListItem>,
+    pub recommended_items: Vec<ExtensionListItem>,
+    pub selected_index: usize,
+    pub detail: Option<ExtensionDetailView>,
+}
+
+impl ExtensionsViewState {
+    pub fn new() -> Self {
+        Self {
+            active_tab: ExtensionsTab::Installed,
+            search_query: String::new(),
+            installed_items: Vec::new(),
+            search_results: Vec::new(),
+            recommended_items: Vec::new(),
+            selected_index: 0,
+            detail: None,
+        }
+    }
+
+    /// Get the items list for the currently active tab.
+    pub fn active_items(&self) -> &[ExtensionListItem] {
+        match self.active_tab {
+            ExtensionsTab::Installed => &self.installed_items,
+            ExtensionsTab::Recommended => &self.recommended_items,
+            ExtensionsTab::SearchResults => &self.search_results,
+        }
+    }
+
+    /// Switch to a different tab, resetting selection.
+    pub fn switch_tab(&mut self, tab: ExtensionsTab) {
+        self.active_tab = tab;
+        self.selected_index = 0;
+        self.detail = None;
+    }
+
+    /// Set the search query and switch to the search results tab.
+    pub fn set_search_query(&mut self, query: impl Into<String>) {
+        self.search_query = query.into();
+        self.active_tab = ExtensionsTab::SearchResults;
+        self.selected_index = 0;
+    }
+
+    /// Load installed extensions into the view.
+    pub fn load_installed(&mut self, extensions: &[InstalledExtension]) {
+        self.installed_items = extensions
+            .iter()
+            .map(ExtensionListItem::from_installed)
+            .collect();
+    }
+
+    /// Load search results from gallery extensions.
+    pub fn load_search_results(&mut self, extensions: &[GalleryExtension]) {
+        self.search_results = extensions
+            .iter()
+            .map(ExtensionListItem::from_gallery)
+            .collect();
+    }
+
+    /// Get the currently selected item.
+    pub fn selected_item(&self) -> Option<&ExtensionListItem> {
+        self.active_items().get(self.selected_index)
+    }
+
+    /// Move selection up.
+    pub fn select_prev(&mut self) {
+        if self.selected_index > 0 {
+            self.selected_index -= 1;
+        }
+    }
+
+    /// Move selection down.
+    pub fn select_next(&mut self) {
+        let len = self.active_items().len();
+        if len > 0 && self.selected_index < len - 1 {
+            self.selected_index += 1;
+        }
+    }
+
+    /// Render all lines for the current tab.
+    pub fn render_list(&self) -> Vec<String> {
+        self.active_items()
+            .iter()
+            .enumerate()
+            .map(|(i, item)| {
+                let prefix = if i == self.selected_index { "▸ " } else { "  " };
+                format!("{prefix}{}", item.render_line())
+            })
+            .collect()
+    }
+
+    /// Count items in the current tab.
+    pub fn item_count(&self) -> usize {
+        self.active_items().len()
+    }
+
+    /// Render tab bar.
+    pub fn render_tab_bar(&self) -> String {
+        let tabs = [
+            ExtensionsTab::Installed,
+            ExtensionsTab::Recommended,
+            ExtensionsTab::SearchResults,
+        ];
+        tabs.iter()
+            .map(|t| {
+                if *t == self.active_tab {
+                    format!("[{t}]")
+                } else {
+                    format!(" {t} ")
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" | ")
+    }
+}
+
+impl Default for ExtensionsViewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -680,5 +953,237 @@ mod tests {
         let panel = bridge.get_panel(&id).unwrap();
         assert!(panel.is_visible);
         assert_eq!(panel.column, ViewColumn::Two);
+    }
+
+    // ── Extensions View Tests ──
+
+    fn make_installed_ext(id: &str, name: &str, publisher: &str, version: &str, enabled: bool) -> InstalledExtension {
+        InstalledExtension {
+            id: id.into(),
+            version: version.into(),
+            path: format!("/ext/{id}"),
+            is_enabled: enabled,
+            manifest: vsedit_ext_mgmt::ExtensionManifest {
+                name: id.split('.').last().unwrap_or(id).into(),
+                display_name: name.into(),
+                publisher: publisher.into(),
+                version: version.into(),
+                description: format!("Description of {name}"),
+                contributes: vsedit_ext_mgmt::ExtensionContributions::default(),
+                extension_dependencies: Vec::new(),
+            },
+        }
+    }
+
+    fn make_gallery_ext(id: &str, name: &str, publisher: &str) -> GalleryExtension {
+        GalleryExtension {
+            id: id.into(),
+            display_name: name.into(),
+            publisher: publisher.into(),
+            version: "1.0.0".into(),
+            description: format!("Gallery {name}"),
+            download_count: 1000,
+            rating: 4.5,
+            install_count: 1000,
+            download_url: None,
+        }
+    }
+
+    #[test]
+    fn extensions_tab_default() {
+        assert_eq!(ExtensionsTab::default(), ExtensionsTab::Installed);
+    }
+
+    #[test]
+    fn extensions_tab_display() {
+        assert_eq!(ExtensionsTab::Installed.to_string(), "Installed");
+        assert_eq!(ExtensionsTab::Recommended.to_string(), "Recommended");
+        assert_eq!(ExtensionsTab::SearchResults.to_string(), "Search Results");
+    }
+
+    #[test]
+    fn extension_list_item_from_installed() {
+        let ext = make_installed_ext("pub.ext", "My Ext", "pub", "1.0.0", true);
+        let item = ExtensionListItem::from_installed(&ext);
+        assert_eq!(item.id, "pub.ext");
+        assert_eq!(item.name, "My Ext");
+        assert!(item.is_installed);
+        assert!(item.is_enabled);
+    }
+
+    #[test]
+    fn extension_list_item_from_gallery() {
+        let ext = make_gallery_ext("pub.ext", "Gallery Ext", "pub");
+        let item = ExtensionListItem::from_gallery(&ext);
+        assert_eq!(item.id, "pub.ext");
+        assert!(!item.is_installed);
+        assert!(!item.is_enabled);
+    }
+
+    #[test]
+    fn extension_list_item_render_line() {
+        let ext = make_installed_ext("pub.ext", "My Ext", "pub", "1.0.0", true);
+        let item = ExtensionListItem::from_installed(&ext);
+        let line = item.render_line();
+        assert!(line.contains("✓"));
+        assert!(line.contains("My Ext"));
+        assert!(line.contains("v1.0.0"));
+
+        let disabled = make_installed_ext("pub.ext", "Disabled Ext", "pub", "2.0.0", false);
+        let item2 = ExtensionListItem::from_installed(&disabled);
+        assert!(item2.render_line().contains("○"));
+    }
+
+    #[test]
+    fn extension_detail_from_installed() {
+        let mut ext = make_installed_ext("pub.ext", "My Ext", "pub", "1.0.0", true);
+        ext.manifest.extension_dependencies = vec!["dep.one".into()];
+        let detail = ExtensionDetailView::from_installed(&ext);
+        assert_eq!(detail.id, "pub.ext");
+        assert!(detail.is_installed);
+        assert_eq!(detail.dependencies.len(), 1);
+    }
+
+    #[test]
+    fn extension_detail_render() {
+        let ext = make_installed_ext("pub.ext", "My Ext", "pub", "1.0.0", true);
+        let detail = ExtensionDetailView::from_installed(&ext);
+        let rendered = detail.render();
+        assert!(rendered.contains("My Ext"));
+        assert!(rendered.contains("Enabled"));
+        assert!(rendered.contains("Dependencies: None"));
+    }
+
+    #[test]
+    fn extensions_view_state_new() {
+        let state = ExtensionsViewState::new();
+        assert_eq!(state.active_tab, ExtensionsTab::Installed);
+        assert!(state.installed_items.is_empty());
+        assert!(state.search_query.is_empty());
+        assert_eq!(state.selected_index, 0);
+    }
+
+    #[test]
+    fn extensions_view_state_load_installed() {
+        let mut state = ExtensionsViewState::new();
+        let exts = vec![
+            make_installed_ext("pub.ext1", "Ext 1", "pub", "1.0.0", true),
+            make_installed_ext("pub.ext2", "Ext 2", "pub", "2.0.0", false),
+        ];
+        state.load_installed(&exts);
+        assert_eq!(state.installed_items.len(), 2);
+        assert_eq!(state.item_count(), 2);
+    }
+
+    #[test]
+    fn extensions_view_state_switch_tab() {
+        let mut state = ExtensionsViewState::new();
+        state.switch_tab(ExtensionsTab::Recommended);
+        assert_eq!(state.active_tab, ExtensionsTab::Recommended);
+        assert_eq!(state.selected_index, 0);
+    }
+
+    #[test]
+    fn extensions_view_state_search() {
+        let mut state = ExtensionsViewState::new();
+        let results = vec![make_gallery_ext("pub.ext", "Result", "pub")];
+        state.load_search_results(&results);
+        state.set_search_query("rust");
+        assert_eq!(state.active_tab, ExtensionsTab::SearchResults);
+        assert_eq!(state.search_query, "rust");
+        assert_eq!(state.item_count(), 1);
+    }
+
+    #[test]
+    fn extensions_view_state_navigation() {
+        let mut state = ExtensionsViewState::new();
+        let exts = vec![
+            make_installed_ext("pub.ext1", "Ext 1", "pub", "1.0.0", true),
+            make_installed_ext("pub.ext2", "Ext 2", "pub", "2.0.0", true),
+            make_installed_ext("pub.ext3", "Ext 3", "pub", "3.0.0", true),
+        ];
+        state.load_installed(&exts);
+        assert_eq!(state.selected_index, 0);
+
+        state.select_next();
+        assert_eq!(state.selected_index, 1);
+        state.select_next();
+        assert_eq!(state.selected_index, 2);
+        state.select_next(); // should not go past end
+        assert_eq!(state.selected_index, 2);
+
+        state.select_prev();
+        assert_eq!(state.selected_index, 1);
+        state.select_prev();
+        assert_eq!(state.selected_index, 0);
+        state.select_prev(); // should not go below 0
+        assert_eq!(state.selected_index, 0);
+    }
+
+    #[test]
+    fn extensions_view_state_render_list() {
+        let mut state = ExtensionsViewState::new();
+        let exts = vec![
+            make_installed_ext("pub.ext1", "Ext 1", "pub", "1.0.0", true),
+            make_installed_ext("pub.ext2", "Ext 2", "pub", "2.0.0", true),
+        ];
+        state.load_installed(&exts);
+        let lines = state.render_list();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].starts_with("▸ ")); // selected
+        assert!(lines[1].starts_with("  ")); // not selected
+    }
+
+    #[test]
+    fn extensions_view_state_render_tab_bar() {
+        let state = ExtensionsViewState::new();
+        let bar = state.render_tab_bar();
+        assert!(bar.contains("[Installed]"));
+        assert!(bar.contains(" Recommended "));
+        assert!(bar.contains(" Search Results "));
+    }
+
+    #[test]
+    fn extensions_view_state_selected_item() {
+        let mut state = ExtensionsViewState::new();
+        assert!(state.selected_item().is_none());
+
+        let exts = vec![make_installed_ext("pub.ext1", "Ext 1", "pub", "1.0.0", true)];
+        state.load_installed(&exts);
+        assert_eq!(state.selected_item().unwrap().id, "pub.ext1");
+    }
+
+    #[test]
+    fn extension_list_item_serialization() {
+        let item = ExtensionListItem {
+            id: "pub.ext".into(),
+            name: "Ext".into(),
+            publisher: "pub".into(),
+            version: "1.0.0".into(),
+            icon: Some("icon.png".into()),
+            is_enabled: true,
+            is_installed: true,
+            description: "desc".into(),
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        let back: ExtensionListItem = serde_json::from_str(&json).unwrap();
+        assert_eq!(item, back);
+    }
+
+    #[test]
+    fn extension_detail_view_serialization() {
+        let detail = ExtensionDetailView {
+            id: "pub.ext".into(),
+            name: "Ext".into(),
+            publisher: "pub".into(),
+            version: "1.0.0".into(),
+            description: "desc".into(),
+            is_installed: true,
+            is_enabled: true,
+            dependencies: vec!["dep.one".into()],
+        };
+        let json = serde_json::to_string(&detail).unwrap();
+        let back: ExtensionDetailView = serde_json::from_str(&json).unwrap();
+        assert_eq!(detail, back);
     }
 }

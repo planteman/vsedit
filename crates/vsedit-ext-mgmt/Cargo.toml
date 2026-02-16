@@ -11,4 +11,11 @@ vsedit-files = { path = "../vsedit-files" }
 tokio = { version = "1", features = ["full"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+reqwest = { workspace = true }
+zip = { workspace = true }
+dirs = { workspace = true }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
 
