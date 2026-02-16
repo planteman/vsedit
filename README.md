@@ -14,10 +14,10 @@ A full-fidelity terminal port of [Visual Studio Code](https://github.com/microso
 | Metric | Value |
 |--------|-------|
 | Workspace crates | 242 |
-| Lines of Rust | 340,000+ |
-| Tests | 13,900+ (all passing) |
+| Lines of Rust | 358,000+ |
+| Tests | 14,500+ (all passing) |
 | Lines of JS (extension host shim) | 1,200+ |
-| Minimum crate size | 1,200+ lines |
+| Minimum crate size | 1,250+ lines |
 
 All crates compile (`cargo check --workspace` ✅) and all tests pass (`cargo test --workspace` ✅).
 
@@ -64,14 +64,16 @@ All crates compile (`cargo check --workspace` ✅) and all tests pass (`cargo te
 
 ### Editor
 - Rope-based text model (Ropey) with O(log n) operations
-- Multi-cursor editing with VS Code-compatible behavior
-- Undo/redo with cursor state tracking
+- Multi-cursor editing with VS Code-compatible behavior (Ctrl+Alt+Up/Down)
+- Undo/redo with cursor state tracking and cursor undo (Ctrl+U)
+- Find bar overlay with live search, match count, next/prev navigation
 - Find and replace with regex support
 - Syntax highlighting via TextMate grammars (syntect)
-- Code folding, bracket matching, auto-closing pairs
-- Minimap, breadcrumbs, line numbers, rulers
-- Snippet engine with tabstops, variables, transforms
-- Word wrap, column memory, selection expansion
+- Code folding (Ctrl+Shift+[/]), bracket matching, auto-closing pairs
+- Minimap (braille character rendering), breadcrumbs, line numbers, rulers
+- Snippet engine with tabstops, variables ($TM_FILENAME, etc.), transforms
+- Word wrap, column memory, selection expansion, sticky scroll
+- Paste event handling, focus gained/lost events
 
 ### Extension System
 - JSON-RPC protocol compatible with VS Code extension host
@@ -79,34 +81,38 @@ All crates compile (`cargo check --workspace` ✅) and all tests pass (`cargo te
 - Extension activation events (`*`, `onLanguage`, `onCommand`, `onDebug`, `onView`, `onStartupFinished`)
 - Provider registry tracking 25 language feature kinds (completion, hover, definition, references, etc.)
 - Document sync notifications (didOpen/didChange/didSave/didClose)
+- 46 mainThread/* RPC handlers with real implementations
+- QuickPick/InputBox UI-driven responses for extensions
 - Extension marketplace client (install, update, uninstall)
-- Language server protocol (LSP) client
-- Debug adapter protocol (DAP) client
+- Language server protocol (LSP) client with capability negotiation
+- Debug adapter protocol (DAP) client with step over/into/out
 - Content-Length framed JSON message transport
 - Real filesystem operations in RPC handlers
 - In-memory clipboard and secret storage for extensions
 - Workspace edit support (create/delete/rename files)
+- Output channels, status bar messages, tree view registry
+- Diagnostics, progress reporting, file watches
 
 ### Workbench
 - VS Code-identical layout: activity bar, sidebar, editor area, panel, status bar
-- Command palette with fuzzy matching
+- Command palette with fuzzy matching (Ctrl+Shift+P)
 - File explorer with tree view, icons, create/delete/rename
 - Integrated terminal (PTY-based with keyboard routing)
-- Quick Open file picker with workspace scanning
-- Go To Line input dialog
-- Search across files with ripgrep
-- Source control (Git) integration with status icons
-- Debug view with breakpoints, call stack, variables
-- Debug launch sequence (F5 → launch.json → DAP)
-- Problems panel with diagnostic management
+- Quick Open file picker with tiered fuzzy ranking (Ctrl+P)
+- Go To Line input dialog (Ctrl+G)
+- Search across files with live results, grouped by file (Ctrl+Shift+F)
+- Source control (Git) integration with branch display and file status
+- Debug view with breakpoints, call stack, variables, stepping (F5/F10/F11)
+- Problems panel with severity coloring and count badge
 - Output panel, debug console
-- Extensions sidebar with installed extension listing
+- Extensions sidebar with search/filter, installed extension listing
 - Side-by-side diff viewer
 - Settings UI, keyboard shortcuts editor
 - Multi-root workspace support
 - UI state persistence (cursor, sidebar, panels restored on startup)
 - File encoding detection (UTF-8, UTF-8 BOM, UTF-16LE/BE, Latin1)
 - File watcher for external change detection
+- 40+ keyboard shortcuts matching VS Code defaults
 
 ### Configuration
 - Reads/writes `~/.config/vsedit/settings.json` (JSONC with comments)
@@ -114,7 +120,7 @@ All crates compile (`cargo check --workspace` ✅) and all tests pass (`cargo te
 - `tasks.json` with variable substitution and problem matchers
 - `launch.json` for debug configurations
 - Workspace settings (`.vscode/settings.json`)
-- 60+ default keybindings matching VS Code
+- 60+ default keybindings matching VS Code (including two-chord Ctrl+K sequences)
 
 ### Platform
 - Dependency injection container with singleton/transient lifetime
@@ -131,7 +137,7 @@ All crates compile (`cargo check --workspace` ✅) and all tests pass (`cargo te
 # Prerequisites: Rust 1.85+ (edition 2024)
 cargo check --workspace      # Type check all 242 crates
 cargo build --release         # Build optimized binary
-cargo test --workspace        # Run all 13,600+ tests
+cargo test --workspace        # Run all 14,500+ tests
 cargo run -- [file/folder]    # Run vsedit
 ```
 
