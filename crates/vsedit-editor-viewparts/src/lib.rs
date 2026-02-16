@@ -467,6 +467,192 @@ impl GlyphMarginConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Gutter decorations and indent guides
+// ---------------------------------------------------------------------------
+
+/// Type of gutter decoration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GutterDecorationType {
+    Breakpoint,
+    ConditionalBreakpoint,
+    Logpoint,
+    Bookmark,
+    Error,
+    Warning,
+    Info,
+}
+
+impl std::fmt::Display for GutterDecorationType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GutterDecorationType::Breakpoint => write!(f, "breakpoint"),
+            GutterDecorationType::ConditionalBreakpoint => write!(f, "conditional-breakpoint"),
+            GutterDecorationType::Logpoint => write!(f, "logpoint"),
+            GutterDecorationType::Bookmark => write!(f, "bookmark"),
+            GutterDecorationType::Error => write!(f, "error"),
+            GutterDecorationType::Warning => write!(f, "warning"),
+            GutterDecorationType::Info => write!(f, "info"),
+        }
+    }
+}
+
+/// A decoration in the editor gutter (left margin).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GutterDecoration {
+    pub line: u32,
+    pub decoration_type: GutterDecorationType,
+    pub tooltip: Option<String>,
+    pub enabled: bool,
+}
+
+impl GutterDecoration {
+    pub fn new(line: u32, decoration_type: GutterDecorationType) -> Self {
+        Self {
+            line,
+            decoration_type,
+            tooltip: None,
+            enabled: true,
+        }
+    }
+
+    pub fn with_tooltip(mut self, tooltip: impl Into<String>) -> Self {
+        self.tooltip = Some(tooltip.into());
+        self
+    }
+
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    /// Get the glyph character for this decoration type.
+    pub fn glyph(&self) -> &'static str {
+        match self.decoration_type {
+            GutterDecorationType::Breakpoint => "●",
+            GutterDecorationType::ConditionalBreakpoint => "◆",
+            GutterDecorationType::Logpoint => "◇",
+            GutterDecorationType::Bookmark => "★",
+            GutterDecorationType::Error => "✗",
+            GutterDecorationType::Warning => "⚠",
+            GutterDecorationType::Info => "ℹ",
+        }
+    }
+}
+
+impl std::fmt::Display for GutterDecoration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} L{}: {}", self.glyph(), self.line, self.decoration_type)
+    }
+}
+
+/// Manages a collection of gutter decorations.
+#[derive(Debug, Clone, Default)]
+pub struct GutterDecorationManager {
+    decorations: Vec<GutterDecoration>,
+}
+
+impl GutterDecorationManager {
+    pub fn new() -> Self {
+        Self { decorations: Vec::new() }
+    }
+
+    pub fn add(&mut self, decoration: GutterDecoration) {
+        self.decorations.push(decoration);
+    }
+
+    pub fn remove_at_line(&mut self, line: u32) {
+        self.decorations.retain(|d| d.line != line);
+    }
+
+    pub fn remove_by_type(&mut self, line: u32, dtype: GutterDecorationType) {
+        self.decorations.retain(|d| !(d.line == line && d.decoration_type == dtype));
+    }
+
+    pub fn get_at_line(&self, line: u32) -> Vec<&GutterDecoration> {
+        self.decorations.iter().filter(|d| d.line == line).collect()
+    }
+
+    pub fn toggle_breakpoint(&mut self, line: u32) {
+        let has_bp = self.decorations.iter().any(|d| d.line == line && d.decoration_type == GutterDecorationType::Breakpoint);
+        if has_bp {
+            self.remove_by_type(line, GutterDecorationType::Breakpoint);
+        } else {
+            self.add(GutterDecoration::new(line, GutterDecorationType::Breakpoint));
+        }
+    }
+
+    pub fn count(&self) -> usize {
+        self.decorations.len()
+    }
+
+    pub fn count_by_type(&self, dtype: GutterDecorationType) -> usize {
+        self.decorations.iter().filter(|d| d.decoration_type == dtype).count()
+    }
+
+    /// Get all decoration lines sorted.
+    pub fn decorated_lines(&self) -> Vec<u32> {
+        let mut lines: Vec<u32> = self.decorations.iter().map(|d| d.line).collect();
+        lines.sort();
+        lines.dedup();
+        lines
+    }
+}
+
+/// An indent guide for rendering vertical indent lines.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndentGuide {
+    pub line: u32,
+    pub indent_level: u32,
+    pub is_active: bool,
+}
+
+/// Compute indent guides for a range of lines.
+///
+/// `indentation_levels` is a slice where each element is the indentation level
+/// (number of indent units) for the corresponding line. `active_line` is the
+/// currently focused line (0-based index into the slice).
+pub fn compute_indent_guides(
+    indentation_levels: &[u32],
+    active_line: usize,
+    start_line: u32,
+) -> Vec<IndentGuide> {
+    let active_indent = indentation_levels.get(active_line).copied().unwrap_or(0);
+    let mut guides = Vec::new();
+
+    for (i, &level) in indentation_levels.iter().enumerate() {
+        for indent in 1..=level {
+            guides.push(IndentGuide {
+                line: start_line + i as u32,
+                indent_level: indent,
+                is_active: indent <= active_indent && i == active_line,
+            });
+        }
+    }
+
+    guides
+}
+
+/// Compute indentation levels from line content.
+///
+/// Returns the number of `tab_size`-column indent units for each line.
+pub fn compute_indentation_levels(lines: &[&str], tab_size: u32) -> Vec<u32> {
+    lines
+        .iter()
+        .map(|line| {
+            let mut col: u32 = 0;
+            for ch in line.chars() {
+                match ch {
+                    ' ' => col += 1,
+                    '\t' => col += tab_size - (col % tab_size),
+                    _ => break,
+                }
+            }
+            col / tab_size
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -916,5 +1102,124 @@ mod tests {
 
         let disabled = GlyphMarginConfig { enabled: false, ..Default::default() };
         assert_eq!(disabled.effective_width(8), 0);
+    }
+
+    #[test]
+    fn gutter_decoration_new_and_display() {
+        let d = GutterDecoration::new(5, GutterDecorationType::Breakpoint);
+        assert_eq!(d.line, 5);
+        assert!(d.enabled);
+        assert_eq!(d.glyph(), "●");
+        let s = format!("{d}");
+        assert!(s.contains("breakpoint"));
+        assert!(s.contains("L5"));
+    }
+
+    #[test]
+    fn gutter_decoration_with_tooltip() {
+        let d = GutterDecoration::new(10, GutterDecorationType::Error)
+            .with_tooltip("Syntax error on line 10");
+        assert_eq!(d.tooltip.as_deref(), Some("Syntax error on line 10"));
+    }
+
+    #[test]
+    fn gutter_decoration_type_display() {
+        assert_eq!(format!("{}", GutterDecorationType::Breakpoint), "breakpoint");
+        assert_eq!(format!("{}", GutterDecorationType::Bookmark), "bookmark");
+        assert_eq!(format!("{}", GutterDecorationType::Warning), "warning");
+    }
+
+    #[test]
+    fn gutter_decoration_glyphs() {
+        let types_and_glyphs = vec![
+            (GutterDecorationType::Breakpoint, "●"),
+            (GutterDecorationType::ConditionalBreakpoint, "◆"),
+            (GutterDecorationType::Bookmark, "★"),
+            (GutterDecorationType::Error, "✗"),
+            (GutterDecorationType::Warning, "⚠"),
+            (GutterDecorationType::Info, "ℹ"),
+        ];
+        for (dtype, expected_glyph) in types_and_glyphs {
+            let d = GutterDecoration::new(1, dtype);
+            assert_eq!(d.glyph(), expected_glyph);
+        }
+    }
+
+    #[test]
+    fn gutter_manager_add_and_query() {
+        let mut mgr = GutterDecorationManager::new();
+        mgr.add(GutterDecoration::new(5, GutterDecorationType::Breakpoint));
+        mgr.add(GutterDecoration::new(5, GutterDecorationType::Bookmark));
+        mgr.add(GutterDecoration::new(10, GutterDecorationType::Error));
+        assert_eq!(mgr.count(), 3);
+        assert_eq!(mgr.get_at_line(5).len(), 2);
+        assert_eq!(mgr.get_at_line(10).len(), 1);
+        assert_eq!(mgr.get_at_line(1).len(), 0);
+    }
+
+    #[test]
+    fn gutter_manager_toggle_breakpoint() {
+        let mut mgr = GutterDecorationManager::new();
+        mgr.toggle_breakpoint(5);
+        assert_eq!(mgr.count_by_type(GutterDecorationType::Breakpoint), 1);
+        mgr.toggle_breakpoint(5);
+        assert_eq!(mgr.count_by_type(GutterDecorationType::Breakpoint), 0);
+    }
+
+    #[test]
+    fn gutter_manager_remove_by_type() {
+        let mut mgr = GutterDecorationManager::new();
+        mgr.add(GutterDecoration::new(5, GutterDecorationType::Breakpoint));
+        mgr.add(GutterDecoration::new(5, GutterDecorationType::Bookmark));
+        mgr.remove_by_type(5, GutterDecorationType::Breakpoint);
+        assert_eq!(mgr.count(), 1);
+        assert_eq!(mgr.get_at_line(5)[0].decoration_type, GutterDecorationType::Bookmark);
+    }
+
+    #[test]
+    fn gutter_manager_decorated_lines() {
+        let mut mgr = GutterDecorationManager::new();
+        mgr.add(GutterDecoration::new(10, GutterDecorationType::Breakpoint));
+        mgr.add(GutterDecoration::new(5, GutterDecorationType::Error));
+        mgr.add(GutterDecoration::new(10, GutterDecorationType::Bookmark));
+        let lines = mgr.decorated_lines();
+        assert_eq!(lines, vec![5, 10]);
+    }
+
+    #[test]
+    fn compute_indent_guides_basic() {
+        let levels = vec![0, 1, 2, 2, 1, 0];
+        let guides = compute_indent_guides(&levels, 2, 1);
+        // Line at index 2 (indent level 2) should have guides at level 1 and 2
+        let line3_guides: Vec<_> = guides.iter().filter(|g| g.line == 3).collect();
+        assert_eq!(line3_guides.len(), 2);
+    }
+
+    #[test]
+    fn compute_indent_guides_active_line() {
+        let levels = vec![0, 1, 2];
+        let guides = compute_indent_guides(&levels, 2, 1);
+        let active_guides: Vec<_> = guides.iter().filter(|g| g.is_active).collect();
+        assert!(!active_guides.is_empty());
+    }
+
+    #[test]
+    fn compute_indentation_levels_spaces() {
+        let lines = vec!["fn main() {", "    let x = 1;", "        nested();", "}"];
+        let levels = compute_indentation_levels(&lines, 4);
+        assert_eq!(levels, vec![0, 1, 2, 0]);
+    }
+
+    #[test]
+    fn compute_indentation_levels_tabs() {
+        let lines = vec!["no indent", "\tone tab", "\t\ttwo tabs"];
+        let levels = compute_indentation_levels(&lines, 4);
+        assert_eq!(levels, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn compute_indentation_levels_empty() {
+        let levels = compute_indentation_levels(&[], 4);
+        assert!(levels.is_empty());
     }
 }

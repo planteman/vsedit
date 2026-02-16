@@ -2419,3 +2419,372 @@ mod syntax_editor {
         assert!(!spans2.is_empty());
     }
 }
+
+// ─── Tab Management Extended ────────────────────────────────────────────
+
+#[cfg(test)]
+mod tab_management_extended {
+    use vsedit_workbench::Workbench;
+    use std::path::Path;
+
+    #[test]
+    fn test_integration_tab_add_multiple() {
+        let mut wb = Workbench::new();
+        wb.start();
+        wb.open_file(Path::new("/tmp/a.rs"), "aaa");
+        wb.open_file(Path::new("/tmp/b.rs"), "bbb");
+        wb.open_file(Path::new("/tmp/c.rs"), "ccc");
+        assert_eq!(wb.tab_service.tab_count(), 3);
+    }
+
+    #[test]
+    fn test_integration_tab_switch_via_next_previous() {
+        let mut wb = Workbench::new();
+        wb.start();
+        wb.open_file(Path::new("/tmp/t1.rs"), "one");
+        wb.open_file(Path::new("/tmp/t2.rs"), "two");
+        wb.open_file(Path::new("/tmp/t3.rs"), "three");
+        // Active is t3 (last opened)
+        assert!(wb.tab_service.get_active_tab().unwrap().title.contains("t3"));
+        wb.tab_service.previous_tab();
+        assert!(wb.tab_service.get_active_tab().unwrap().title.contains("t2"));
+        wb.tab_service.next_tab();
+        assert!(wb.tab_service.get_active_tab().unwrap().title.contains("t3"));
+    }
+
+    #[test]
+    fn test_integration_tab_close_returns_to_neighbor() {
+        let mut wb = Workbench::new();
+        wb.start();
+        wb.open_file(Path::new("/tmp/c1.rs"), "one");
+        wb.open_file(Path::new("/tmp/c2.rs"), "two");
+        assert_eq!(wb.tab_service.tab_count(), 2);
+        // Close active (c2)
+        let active_id = wb.tab_service.get_active_tab().unwrap().id;
+        wb.tab_service.close_tab(active_id);
+        assert_eq!(wb.tab_service.tab_count(), 1);
+        // Remaining tab should now be active
+        assert!(wb.tab_service.get_active_tab().is_some());
+    }
+
+    #[test]
+    fn test_integration_tab_close_all_leaves_none_active() {
+        let mut wb = Workbench::new();
+        wb.start();
+        wb.open_file(Path::new("/tmp/x.rs"), "x");
+        let id = wb.tab_service.get_active_tab().unwrap().id;
+        wb.tab_service.close_tab(id);
+        assert_eq!(wb.tab_service.tab_count(), 0);
+        assert!(wb.tab_service.get_active_tab().is_none());
+    }
+
+    #[test]
+    fn test_integration_tab_active_content_matches_opened_file() {
+        let mut wb = Workbench::new();
+        wb.start();
+        wb.open_file(Path::new("/tmp/content.rs"), "fn hello() {}");
+        let content = wb.get_active_content();
+        assert!(content.is_some());
+        assert!(content.unwrap().contains("fn hello()"));
+    }
+}
+
+// ─── Command Registry Extended ──────────────────────────────────────────
+
+#[cfg(test)]
+mod command_registry_extended {
+    use vsedit_commands::CommandRegistry;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicI32, Ordering};
+
+    #[test]
+    fn test_integration_command_register_and_has() {
+        let registry = CommandRegistry::new();
+        let _reg = registry.register("test.cmd1", Box::new(|_| Ok(None)));
+        assert!(registry.has("test.cmd1"));
+        assert!(!registry.has("test.cmd2"));
+    }
+
+    #[test]
+    fn test_integration_command_execute_returns_value() {
+        let registry = CommandRegistry::new();
+        let _reg = registry.register("test.answer", Box::new(|_| {
+            Ok(Some(Box::new(42i32)))
+        }));
+        let result = registry.execute("test.answer", vec![]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_some());
+    }
+
+    #[test]
+    fn test_integration_command_unregister_via_drop() {
+        let registry = CommandRegistry::new();
+        {
+            let _reg = registry.register("test.ephemeral", Box::new(|_| Ok(None)));
+            assert!(registry.has("test.ephemeral"));
+        }
+        // Registration dropped, command should be gone
+        assert!(!registry.has("test.ephemeral"));
+    }
+
+    #[test]
+    fn test_integration_command_execute_with_side_effect() {
+        let registry = CommandRegistry::new();
+        let counter = Arc::new(AtomicI32::new(0));
+        let c = counter.clone();
+        let _reg = registry.register("test.inc", Box::new(move |_| {
+            c.fetch_add(1, Ordering::SeqCst);
+            Ok(None)
+        }));
+        registry.execute("test.inc", vec![]).unwrap();
+        registry.execute("test.inc", vec![]).unwrap();
+        registry.execute("test.inc", vec![]).unwrap();
+        assert_eq!(counter.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
+    fn test_integration_command_get_commands_lists_all() {
+        let registry = CommandRegistry::new();
+        let _r1 = registry.register("ns.alpha", Box::new(|_| Ok(None)));
+        let _r2 = registry.register("ns.beta", Box::new(|_| Ok(None)));
+        let cmds = registry.get_commands();
+        assert!(cmds.contains(&"ns.alpha".to_string()));
+        assert!(cmds.contains(&"ns.beta".to_string()));
+    }
+}
+
+// ─── Keybinding Resolution Extended ─────────────────────────────────────
+
+#[cfg(test)]
+mod keybinding_resolution_extended {
+    use std::sync::Arc;
+    use vsedit_keybinding_svc::{
+        KeybindingResolver, KeybindingRule, KeybindingSource, KeybindingWeight, ResolveResult,
+    };
+    use vsedit_keybindings::Keybinding;
+    use vsedit_keycodes::{KeyCode, KeyCodeChord};
+    use vsedit_contextkey::{ContextKeyExpr, ContextKeyService, ContextKeyValue};
+
+    fn ctrl_chord(key: KeyCode) -> KeyCodeChord {
+        KeyCodeChord::new(true, false, false, false, key)
+    }
+
+    #[test]
+    fn test_integration_keybinding_single_chord_lookup() {
+        let mut resolver = KeybindingResolver::new();
+        resolver.add_rule(KeybindingRule {
+            keybinding: Keybinding::new(ctrl_chord(KeyCode::KeyS)),
+            command: "file.save".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::EditorCore,
+            source: KeybindingSource::Default,
+        });
+        let ctx = ContextKeyService::new();
+        let result = resolver.resolve(&ctx, &[ctrl_chord(KeyCode::KeyS)]);
+        assert_eq!(
+            result,
+            ResolveResult::CommandMatch {
+                command: "file.save".into(),
+                args: None,
+            }
+        );
+    }
+
+    #[test]
+    fn test_integration_keybinding_ctrl_shift_modifier() {
+        let mut resolver = KeybindingResolver::new();
+        let chord = KeyCodeChord::new(true, true, false, false, KeyCode::KeyP);
+        resolver.add_rule(KeybindingRule {
+            keybinding: Keybinding::new(chord),
+            command: "workbench.action.showCommands".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
+        });
+        let ctx = ContextKeyService::new();
+        let result = resolver.resolve(&ctx, &[chord]);
+        assert_eq!(
+            result,
+            ResolveResult::CommandMatch {
+                command: "workbench.action.showCommands".into(),
+                args: None,
+            }
+        );
+    }
+
+    #[test]
+    fn test_integration_keybinding_no_match_returns_no_match() {
+        let resolver = KeybindingResolver::new();
+        let ctx = ContextKeyService::new();
+        let result = resolver.resolve(&ctx, &[ctrl_chord(KeyCode::KeyZ)]);
+        assert_eq!(result, ResolveResult::NoMatch);
+    }
+
+    #[test]
+    fn test_integration_keybinding_two_chord_sequence() {
+        let mut resolver = KeybindingResolver::new();
+        let first = ctrl_chord(KeyCode::KeyK);
+        let second = ctrl_chord(KeyCode::KeyC);
+        resolver.add_rule(KeybindingRule {
+            keybinding: Keybinding::two_chords(first, second),
+            command: "editor.action.addCommentLine".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::EditorContrib,
+            source: KeybindingSource::Default,
+        });
+        let ctx = ContextKeyService::new();
+        // First chord alone should need more chords
+        let partial = resolver.resolve(&ctx, &[first]);
+        assert_eq!(partial, ResolveResult::MoreChordsNeeded);
+        // Both chords should match
+        let full = resolver.resolve(&ctx, &[first, second]);
+        assert_eq!(
+            full,
+            ResolveResult::CommandMatch {
+                command: "editor.action.addCommentLine".into(),
+                args: None,
+            }
+        );
+    }
+
+    #[test]
+    fn test_integration_keybinding_when_clause_filtering() {
+        let mut resolver = KeybindingResolver::new();
+        resolver.add_rule(KeybindingRule {
+            keybinding: Keybinding::new(ctrl_chord(KeyCode::KeyD)),
+            command: "editor.action.duplicateLine".into(),
+            args: None,
+            when: Some(ContextKeyExpr::parse("editorFocus").unwrap()),
+            weight: KeybindingWeight::EditorCore,
+            source: KeybindingSource::Default,
+        });
+        // Without editorFocus set, should not match
+        let ctx_no_focus = ContextKeyService::new();
+        let result = resolver.resolve(&ctx_no_focus, &[ctrl_chord(KeyCode::KeyD)]);
+        assert_eq!(result, ResolveResult::NoMatch);
+        // With editorFocus set, should match
+        let ctx_focus = Arc::new(ContextKeyService::new());
+        ctx_focus.set_context("editorFocus", ContextKeyValue::Bool(true));
+        let result2 = resolver.resolve(ctx_focus.as_ref(), &[ctrl_chord(KeyCode::KeyD)]);
+        assert_eq!(
+            result2,
+            ResolveResult::CommandMatch {
+                command: "editor.action.duplicateLine".into(),
+                args: None,
+            }
+        );
+    }
+}
+
+// ─── Editor Model Extended ──────────────────────────────────────────────
+
+#[cfg(test)]
+mod editor_model_extended {
+    use vsedit_text_model::TextModel;
+    use vsedit_editor_types::{ITextModel, Position, Range};
+
+    #[test]
+    fn test_integration_model_insert_and_line_count() {
+        let mut model = TextModel::new("line1\nline2");
+        assert_eq!(model.get_line_count(), 2);
+        model.insert(Position { line: 2, column: 6 }, "\nline3");
+        assert_eq!(model.get_line_count(), 3);
+        assert_eq!(model.get_line_content(3), "line3");
+    }
+
+    #[test]
+    fn test_integration_model_delete_range_and_verify() {
+        let mut model = TextModel::new("abcdefgh");
+        model.delete(Range::new(1, 4, 1, 7));
+        assert_eq!(model.get_value(), "abcgh");
+    }
+
+    #[test]
+    fn test_integration_model_undo_restores_content() {
+        let mut model = TextModel::new("original");
+        model.insert(Position { line: 1, column: 9 }, " modified");
+        assert_eq!(model.get_value(), "original modified");
+        model.undo();
+        assert_eq!(model.get_value(), "original");
+    }
+
+    #[test]
+    fn test_integration_model_redo_reapplies_edit() {
+        let mut model = TextModel::new("base");
+        model.insert(Position { line: 1, column: 5 }, " ext");
+        model.undo();
+        assert_eq!(model.get_value(), "base");
+        model.redo();
+        assert_eq!(model.get_value(), "base ext");
+    }
+
+    #[test]
+    fn test_integration_model_get_line_content_per_line() {
+        let model = TextModel::new("alpha\nbeta\ngamma");
+        assert_eq!(model.get_line_count(), 3);
+        assert_eq!(model.get_line_content(1), "alpha");
+        assert_eq!(model.get_line_content(2), "beta");
+        assert_eq!(model.get_line_content(3), "gamma");
+    }
+}
+
+// ─── Configuration Extended ─────────────────────────────────────────────
+
+#[cfg(test)]
+mod configuration_extended {
+    use vsedit_configuration::{Configuration, ConfigurationModel, ConfigurationTarget};
+    use serde_json::json;
+
+    #[test]
+    fn test_integration_config_set_and_get_value() {
+        let mut config = Configuration::new();
+        config.update("editor.fontSize", json!(14), ConfigurationTarget::User);
+        let val: Option<i64> = config.get_value("editor.fontSize");
+        assert_eq!(val, Some(14));
+    }
+
+    #[test]
+    fn test_integration_config_defaults_layer() {
+        let mut defaults = ConfigurationModel::new();
+        defaults.set_value("editor.tabSize", json!(4));
+        let config = Configuration::with_defaults(defaults);
+        let val: Option<i64> = config.get_value("editor.tabSize");
+        assert_eq!(val, Some(4));
+    }
+
+    #[test]
+    fn test_integration_config_user_overrides_default() {
+        let mut defaults = ConfigurationModel::new();
+        defaults.set_value("editor.tabSize", json!(4));
+        let mut config = Configuration::with_defaults(defaults);
+        config.update("editor.tabSize", json!(2), ConfigurationTarget::User);
+        let val: Option<i64> = config.get_value("editor.tabSize");
+        assert_eq!(val, Some(2));
+    }
+
+    #[test]
+    fn test_integration_config_nested_keys() {
+        let mut config = Configuration::new();
+        config.update("editor.minimap.enabled", json!(true), ConfigurationTarget::User);
+        config.update("editor.minimap.side", json!("right"), ConfigurationTarget::User);
+        let enabled: Option<bool> = config.get_value("editor.minimap.enabled");
+        let side: Option<String> = config.get_value("editor.minimap.side");
+        assert_eq!(enabled, Some(true));
+        assert_eq!(side, Some("right".to_string()));
+    }
+
+    #[test]
+    fn test_integration_config_inspect_shows_layers() {
+        let mut defaults = ConfigurationModel::new();
+        defaults.set_value("editor.wordWrap", json!("off"));
+        let mut config = Configuration::with_defaults(defaults);
+        config.update("editor.wordWrap", json!("on"), ConfigurationTarget::User);
+        let inspect = config.inspect("editor.wordWrap");
+        assert_eq!(inspect.default_value, Some(json!("off")));
+        assert_eq!(inspect.user_value, Some(json!("on")));
+        assert_eq!(inspect.effective_value, Some(json!("on")));
+    }
+}

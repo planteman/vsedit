@@ -616,6 +616,168 @@ pub fn pad_to_width_with_char(text: &str, width: usize, tab_size: u32, fill: cha
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tab expansion, centering, and column alignment
+// ---------------------------------------------------------------------------
+
+/// Expand all tab characters to spaces, aligning to tab stops.
+///
+/// Unlike `render_line`, this function returns a simple string without
+/// column mapping metadata.
+pub fn tab_expand(text: &str, tab_size: u32) -> Result<String, RenderError> {
+    if tab_size == 0 {
+        return Err(RenderError::InvalidTabSize(0));
+    }
+    let mut result = String::with_capacity(text.len());
+    let mut col: usize = 0;
+    for ch in text.chars() {
+        if ch == '\t' {
+            let spaces = tab_size as usize - (col % tab_size as usize);
+            for _ in 0..spaces {
+                result.push(' ');
+            }
+            col += spaces;
+        } else {
+            result.push(ch);
+            col += UnicodeWidthChar::width(ch).unwrap_or(0);
+        }
+    }
+    Ok(result)
+}
+
+/// Center text within a given display width, padding with spaces.
+///
+/// If the text is wider than `width`, it is returned as-is.
+pub fn center_text(text: &str, width: usize, tab_size: u32) -> String {
+    let text_width = display_width(text, tab_size);
+    if text_width >= width {
+        return text.to_string();
+    }
+    let total_pad = width - text_width;
+    let left_pad = total_pad / 2;
+    let right_pad = total_pad - left_pad;
+    let mut result = String::with_capacity(width);
+    for _ in 0..left_pad {
+        result.push(' ');
+    }
+    result.push_str(text);
+    for _ in 0..right_pad {
+        result.push(' ');
+    }
+    result
+}
+
+/// Right-align text within a given display width, padding with spaces on the left.
+pub fn right_align(text: &str, width: usize, tab_size: u32) -> String {
+    let text_width = display_width(text, tab_size);
+    if text_width >= width {
+        return text.to_string();
+    }
+    let pad = width - text_width;
+    let mut result = String::with_capacity(width);
+    for _ in 0..pad {
+        result.push(' ');
+    }
+    result.push_str(text);
+    result
+}
+
+/// Count the number of visible lines after wrapping text to `max_width`.
+pub fn visible_line_count(text: &str, max_width: usize, mode: TextWrapMode) -> usize {
+    if max_width == 0 || mode == TextWrapMode::None {
+        return 1;
+    }
+    wrap_text(text, max_width, mode).len()
+}
+
+/// Align a list of strings into columns with the given column separator.
+///
+/// Each inner Vec<String> represents a row. The function pads each column
+/// to the width of the widest entry in that column.
+pub fn column_align(rows: &[Vec<String>], separator: &str, tab_size: u32) -> Vec<String> {
+    if rows.is_empty() {
+        return Vec::new();
+    }
+
+    let max_cols = rows.iter().map(|r| r.len()).max().unwrap_or(0);
+    let mut col_widths = vec![0usize; max_cols];
+    for row in rows {
+        for (i, cell) in row.iter().enumerate() {
+            let w = display_width(cell, tab_size);
+            if w > col_widths[i] {
+                col_widths[i] = w;
+            }
+        }
+    }
+
+    rows.iter()
+        .map(|row| {
+            let mut parts: Vec<String> = Vec::new();
+            for (i, cell) in row.iter().enumerate() {
+                if i < row.len() - 1 {
+                    parts.push(pad_to_width(cell, col_widths[i], tab_size));
+                } else {
+                    parts.push(cell.clone());
+                }
+            }
+            parts.join(separator)
+        })
+        .collect()
+}
+
+/// Strip leading whitespace uniformly from all lines, preserving relative indentation.
+///
+/// Finds the minimum indentation across all non-empty lines and removes that
+/// many columns from each line.
+pub fn dedent(text: &str, tab_size: u32) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let min_indent = lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| {
+            let mut indent = 0usize;
+            for ch in l.chars() {
+                match ch {
+                    ' ' => indent += 1,
+                    '\t' => indent += tab_size as usize - (indent % tab_size as usize),
+                    _ => break,
+                }
+            }
+            indent
+        })
+        .min()
+        .unwrap_or(0);
+
+    if min_indent == 0 {
+        return text.to_string();
+    }
+
+    lines
+        .iter()
+        .map(|line| {
+            let mut col = 0usize;
+            let mut byte_start = 0;
+            for (i, ch) in line.char_indices() {
+                if col >= min_indent {
+                    byte_start = i;
+                    break;
+                }
+                match ch {
+                    ' ' => col += 1,
+                    '\t' => col += tab_size as usize - (col % tab_size as usize),
+                    _ => {
+                        byte_start = i;
+                        break;
+                    }
+                }
+                byte_start = i + ch.len_utf8();
+            }
+            &line[byte_start..]
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -915,5 +1077,107 @@ mod tests {
     fn pad_with_char_truncates_long() {
         let s = pad_to_width_with_char("hello world", 5, 4, '.');
         assert_eq!(s, "hello");
+    }
+
+    #[test]
+    fn tab_expand_basic() {
+        assert_eq!(tab_expand("a\tb", 4).unwrap(), "a   b");
+        assert_eq!(tab_expand("\t", 4).unwrap(), "    ");
+        assert_eq!(tab_expand("ab\tc", 4).unwrap(), "ab  c");
+    }
+
+    #[test]
+    fn tab_expand_no_tabs() {
+        assert_eq!(tab_expand("hello", 4).unwrap(), "hello");
+    }
+
+    #[test]
+    fn tab_expand_invalid_tab_size() {
+        assert!(tab_expand("x", 0).is_err());
+    }
+
+    #[test]
+    fn tab_expand_custom_size() {
+        assert_eq!(tab_expand("\t", 2).unwrap(), "  ");
+        assert_eq!(tab_expand("a\t", 2).unwrap(), "a ");
+    }
+
+    #[test]
+    fn center_text_basic() {
+        let centered = center_text("hi", 10, 4);
+        assert_eq!(centered.len(), 10);
+        assert!(centered.starts_with("    "));
+        assert!(centered.ends_with("    "));
+    }
+
+    #[test]
+    fn center_text_wider_than_width() {
+        assert_eq!(center_text("hello world", 5, 4), "hello world");
+    }
+
+    #[test]
+    fn center_text_odd_padding() {
+        let centered = center_text("x", 4, 4);
+        assert_eq!(centered, " x  ");
+    }
+
+    #[test]
+    fn right_align_basic() {
+        let aligned = right_align("hi", 10, 4);
+        assert_eq!(aligned, "        hi");
+    }
+
+    #[test]
+    fn right_align_wider_than_width() {
+        assert_eq!(right_align("hello world", 5, 4), "hello world");
+    }
+
+    #[test]
+    fn visible_line_count_no_wrap() {
+        assert_eq!(visible_line_count("hello world", 5, TextWrapMode::None), 1);
+    }
+
+    #[test]
+    fn visible_line_count_character_wrap() {
+        assert_eq!(visible_line_count("abcdefgh", 3, TextWrapMode::Character), 3);
+    }
+
+    #[test]
+    fn column_align_basic() {
+        let rows = vec![
+            vec!["Name".into(), "Age".into()],
+            vec!["Alice".into(), "30".into()],
+            vec!["Bob".into(), "25".into()],
+        ];
+        let aligned = column_align(&rows, " | ", 4);
+        assert_eq!(aligned.len(), 3);
+        assert!(aligned[0].starts_with("Name "));
+        assert!(aligned[1].starts_with("Alice"));
+    }
+
+    #[test]
+    fn column_align_empty() {
+        let aligned = column_align(&[], " ", 4);
+        assert!(aligned.is_empty());
+    }
+
+    #[test]
+    fn dedent_removes_common_indent() {
+        let text = "    hello\n    world";
+        let result = dedent(text, 4);
+        assert_eq!(result, "hello\nworld");
+    }
+
+    #[test]
+    fn dedent_preserves_relative_indent() {
+        let text = "    hello\n        world";
+        let result = dedent(text, 4);
+        assert_eq!(result, "hello\n    world");
+    }
+
+    #[test]
+    fn dedent_no_indent() {
+        let text = "hello\nworld";
+        assert_eq!(dedent(text, 4), "hello\nworld");
     }
 }

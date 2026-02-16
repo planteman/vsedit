@@ -24,5 +24,11 @@ vsedit-uri = { path = "../vsedit-uri" }
 vsedit-configuration = { path = "../vsedit-configuration" }
 vsedit-syntax = { path = "../vsedit-syntax" }
 vsedit-workbench = { path = "../vsedit-workbench" }
+vsedit-keybinding-svc = { path = "../vsedit-keybinding-svc" }
+vsedit-keybindings = { path = "../vsedit-keybindings" }
+vsedit-keycodes = { path = "../vsedit-keycodes" }
+vsedit-contextkey = { path = "../vsedit-contextkey" }
+vsedit-platform = { path = "../vsedit-platform" }
+vsedit-editor-svc = { path = "../vsedit-editor-svc" }
 serde_json.workspace = true
 tempfile.workspace = true

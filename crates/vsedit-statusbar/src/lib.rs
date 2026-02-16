@@ -472,6 +472,177 @@ impl StatusBar {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Priority-sorted rendering and tooltip formatting
+// ---------------------------------------------------------------------------
+
+/// Priority tier for status bar entries, finer-grained than the i32 priority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum StatusBarPriorityTier {
+    /// Always shown, highest priority.
+    Essential,
+    /// Shown by default but can be hidden.
+    Standard,
+    /// Only shown when space allows.
+    Optional,
+}
+
+impl fmt::Display for StatusBarPriorityTier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StatusBarPriorityTier::Essential => write!(f, "Essential"),
+            StatusBarPriorityTier::Standard => write!(f, "Standard"),
+            StatusBarPriorityTier::Optional => write!(f, "Optional"),
+        }
+    }
+}
+
+/// A rendered tooltip with optional markdown-like formatting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusBarTooltip {
+    pub entry_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub shortcut: Option<String>,
+}
+
+impl StatusBarTooltip {
+    pub fn new(entry_id: impl Into<String>, title: impl Into<String>) -> Self {
+        Self {
+            entry_id: entry_id.into(),
+            title: title.into(),
+            description: None,
+            shortcut: None,
+        }
+    }
+
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+
+    pub fn with_shortcut(mut self, shortcut: impl Into<String>) -> Self {
+        self.shortcut = Some(shortcut.into());
+        self
+    }
+
+    /// Render the tooltip to a formatted string.
+    pub fn render(&self) -> String {
+        let mut out = self.title.clone();
+        if let Some(ref desc) = self.description {
+            out.push_str("\n");
+            out.push_str(desc);
+        }
+        if let Some(ref shortcut) = self.shortcut {
+            out.push_str(&format!("\n({})", shortcut));
+        }
+        out
+    }
+}
+
+impl fmt::Display for StatusBarTooltip {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.render())
+    }
+}
+
+/// Visibility rule for a status bar entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatusBarVisibility {
+    /// Always visible.
+    Always,
+    /// Hidden unless explicitly shown.
+    Hidden,
+    /// Visible only when the entry has content (non-empty text).
+    WhenNonEmpty,
+}
+
+impl StatusBar {
+    /// Render entries sorted by priority within each alignment, producing
+    /// a pair of (left_text, right_text) with entries separated by `separator`.
+    pub fn render_with_separator(&self, separator: &str) -> (String, String) {
+        let mut left: Vec<&StatusBarEntry> = self
+            .entries
+            .iter()
+            .filter(|e| e.visible && e.alignment == StatusBarAlignment::Left)
+            .collect();
+        left.sort_by_key(|e| e.priority);
+        let left_text = left.iter().map(|e| e.text.as_str()).collect::<Vec<_>>().join(separator);
+
+        let mut right: Vec<&StatusBarEntry> = self
+            .entries
+            .iter()
+            .filter(|e| e.visible && e.alignment == StatusBarAlignment::Right)
+            .collect();
+        right.sort_by_key(|e| e.priority);
+        let right_text = right.iter().map(|e| e.text.as_str()).collect::<Vec<_>>().join(separator);
+
+        (left_text, right_text)
+    }
+
+    /// Apply a visibility rule to an entry.
+    pub fn apply_visibility_rule(&mut self, id: &str, rule: StatusBarVisibility) -> bool {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.id == id) {
+            match rule {
+                StatusBarVisibility::Always => entry.visible = true,
+                StatusBarVisibility::Hidden => entry.visible = false,
+                StatusBarVisibility::WhenNonEmpty => entry.visible = !entry.text.is_empty(),
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Render tooltips for all visible entries that have tooltips set.
+    pub fn render_tooltips(&self) -> Vec<StatusBarTooltip> {
+        self.entries
+            .iter()
+            .filter(|e| e.visible && e.tooltip.is_some())
+            .map(|e| StatusBarTooltip::new(&e.id, e.tooltip.as_deref().unwrap_or("")))
+            .collect()
+    }
+
+    /// Get entries sorted by priority tier, where priority < 0 is Essential,
+    /// 0..=50 is Standard, and > 50 is Optional.
+    pub fn entries_by_tier(&self) -> Vec<(&StatusBarEntry, StatusBarPriorityTier)> {
+        let mut result: Vec<(&StatusBarEntry, StatusBarPriorityTier)> = self
+            .entries
+            .iter()
+            .map(|e| {
+                let tier = if e.priority < 0 {
+                    StatusBarPriorityTier::Essential
+                } else if e.priority <= 50 {
+                    StatusBarPriorityTier::Standard
+                } else {
+                    StatusBarPriorityTier::Optional
+                };
+                (e, tier)
+            })
+            .collect();
+        result.sort_by_key(|(_, tier)| *tier);
+        result
+    }
+
+    /// Hide all optional entries (priority > 50).
+    pub fn hide_optional_entries(&mut self) {
+        for entry in &mut self.entries {
+            if entry.priority > 50 {
+                entry.visible = false;
+            }
+        }
+    }
+
+    /// Show all essential entries (priority < 0).
+    pub fn show_essential_entries(&mut self) {
+        for entry in &mut self.entries {
+            if entry.priority < 0 {
+                entry.visible = true;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -909,5 +1080,131 @@ mod tests {
         assert_eq!(layout.total_hidden, 0);
         assert_eq!(layout.left_text_width, 0);
         assert_eq!(layout.right_text_width, 0);
+    }
+
+    #[test]
+    fn priority_tier_ordering() {
+        assert!(StatusBarPriorityTier::Essential < StatusBarPriorityTier::Standard);
+        assert!(StatusBarPriorityTier::Standard < StatusBarPriorityTier::Optional);
+    }
+
+    #[test]
+    fn priority_tier_display() {
+        assert_eq!(format!("{}", StatusBarPriorityTier::Essential), "Essential");
+        assert_eq!(format!("{}", StatusBarPriorityTier::Standard), "Standard");
+        assert_eq!(format!("{}", StatusBarPriorityTier::Optional), "Optional");
+    }
+
+    #[test]
+    fn tooltip_render_basic() {
+        let tip = StatusBarTooltip::new("git", "Current Branch: main");
+        assert_eq!(tip.render(), "Current Branch: main");
+    }
+
+    #[test]
+    fn tooltip_render_with_description_and_shortcut() {
+        let tip = StatusBarTooltip::new("git", "Branch")
+            .with_description("Currently on main")
+            .with_shortcut("Ctrl+Shift+G");
+        let rendered = tip.render();
+        assert!(rendered.contains("Branch"));
+        assert!(rendered.contains("Currently on main"));
+        assert!(rendered.contains("(Ctrl+Shift+G)"));
+    }
+
+    #[test]
+    fn tooltip_display() {
+        let tip = StatusBarTooltip::new("id", "Title");
+        assert_eq!(format!("{tip}"), "Title");
+    }
+
+    #[test]
+    fn render_with_separator() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("a", StatusBarAlignment::Left, 10));
+        bar.add_entry(make_entry("b", StatusBarAlignment::Left, 1));
+        bar.add_entry(make_entry("c", StatusBarAlignment::Right, 5));
+        bar.update_text("a", "A");
+        bar.update_text("b", "B");
+        bar.update_text("c", "C");
+        let (left, right) = bar.render_with_separator(" | ");
+        assert_eq!(left, "B | A");
+        assert_eq!(right, "C");
+    }
+
+    #[test]
+    fn apply_visibility_rule_always() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("x", StatusBarAlignment::Left, 0));
+        bar.set_visibility("x", false);
+        assert!(bar.apply_visibility_rule("x", StatusBarVisibility::Always));
+        assert!(bar.get_entry("x").unwrap().visible);
+    }
+
+    #[test]
+    fn apply_visibility_rule_hidden() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("x", StatusBarAlignment::Left, 0));
+        bar.apply_visibility_rule("x", StatusBarVisibility::Hidden);
+        assert!(!bar.get_entry("x").unwrap().visible);
+    }
+
+    #[test]
+    fn apply_visibility_rule_when_non_empty() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("x", StatusBarAlignment::Left, 0));
+        bar.update_text("x", "");
+        bar.apply_visibility_rule("x", StatusBarVisibility::WhenNonEmpty);
+        assert!(!bar.get_entry("x").unwrap().visible);
+        bar.update_text("x", "content");
+        bar.apply_visibility_rule("x", StatusBarVisibility::WhenNonEmpty);
+        assert!(bar.get_entry("x").unwrap().visible);
+    }
+
+    #[test]
+    fn render_tooltips_collects_visible() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(
+            StatusBarEntry::builder("a", "text", StatusBarAlignment::Left)
+                .tooltip("Tooltip A")
+                .build(),
+        );
+        bar.add_entry(make_entry("b", StatusBarAlignment::Left, 0));
+        let tooltips = bar.render_tooltips();
+        assert_eq!(tooltips.len(), 1);
+        assert_eq!(tooltips[0].entry_id, "a");
+        assert_eq!(tooltips[0].title, "Tooltip A");
+    }
+
+    #[test]
+    fn entries_by_tier_ordering() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("optional", StatusBarAlignment::Left, 100));
+        bar.add_entry(make_entry("essential", StatusBarAlignment::Left, -10));
+        bar.add_entry(make_entry("standard", StatusBarAlignment::Left, 25));
+        let tiered = bar.entries_by_tier();
+        assert_eq!(tiered[0].1, StatusBarPriorityTier::Essential);
+        assert_eq!(tiered[1].1, StatusBarPriorityTier::Standard);
+        assert_eq!(tiered[2].1, StatusBarPriorityTier::Optional);
+    }
+
+    #[test]
+    fn hide_optional_show_essential() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("e", StatusBarAlignment::Left, -5));
+        bar.add_entry(make_entry("s", StatusBarAlignment::Left, 25));
+        bar.add_entry(make_entry("o", StatusBarAlignment::Left, 100));
+        bar.set_visibility("e", false);
+        bar.hide_optional_entries();
+        assert!(!bar.get_entry("o").unwrap().visible);
+        assert!(bar.get_entry("s").unwrap().visible);
+        bar.show_essential_entries();
+        assert!(bar.get_entry("e").unwrap().visible);
+    }
+
+    #[test]
+    fn apply_visibility_rule_missing_entry() {
+        let mut bar = StatusBar::new();
+        assert!(!bar.apply_visibility_rule("nope", StatusBarVisibility::Always));
     }
 }

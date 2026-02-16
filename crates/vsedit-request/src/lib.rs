@@ -533,6 +533,150 @@ impl RequestService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Request retry orchestrator
+// ---------------------------------------------------------------------------
+
+/// Outcome of a single retry attempt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RetryOutcome {
+    /// The request succeeded.
+    Success,
+    /// The request failed but can be retried.
+    Retriable(String),
+    /// The request failed with a non-retriable error.
+    Fatal(String),
+}
+
+impl fmt::Display for RetryOutcome {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RetryOutcome::Success => write!(f, "Success"),
+            RetryOutcome::Retriable(msg) => write!(f, "Retriable: {msg}"),
+            RetryOutcome::Fatal(msg) => write!(f, "Fatal: {msg}"),
+        }
+    }
+}
+
+/// Full retry orchestrator that tracks attempts for a request.
+#[derive(Debug, Clone)]
+pub struct RequestRetry {
+    pub request_id: RequestId,
+    pub config: RetryConfig,
+    pub attempts: Vec<RetryAttempt>,
+    pub max_total_delay_ms: u64,
+}
+
+/// Record of a single retry attempt.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RetryAttempt {
+    pub attempt_number: u32,
+    pub outcome: RetryOutcome,
+    pub delay_ms: u64,
+}
+
+impl RequestRetry {
+    pub fn new(request_id: RequestId, config: RetryConfig) -> Self {
+        Self {
+            request_id,
+            config,
+            attempts: Vec::new(),
+            max_total_delay_ms: u64::MAX,
+        }
+    }
+
+    /// Set a maximum total delay across all retries.
+    pub fn with_max_total_delay(mut self, max_ms: u64) -> Self {
+        self.max_total_delay_ms = max_ms;
+        self
+    }
+
+    /// Record an attempt outcome. Returns true if a retry should be attempted.
+    pub fn record(&mut self, outcome: RetryOutcome) -> bool {
+        let attempt_number = self.attempts.len() as u32;
+        let delay = self.config.delay_for_retry(attempt_number);
+        self.attempts.push(RetryAttempt {
+            attempt_number,
+            outcome: outcome.clone(),
+            delay_ms: delay,
+        });
+
+        match outcome {
+            RetryOutcome::Success | RetryOutcome::Fatal(_) => false,
+            RetryOutcome::Retriable(_) => {
+                if self.attempts.len() as u32 > self.config.max_retries {
+                    return false;
+                }
+                if self.total_delay_ms() > self.max_total_delay_ms {
+                    return false;
+                }
+                true
+            }
+        }
+    }
+
+    /// Total delay accumulated across all attempts.
+    pub fn total_delay_ms(&self) -> u64 {
+        self.attempts.iter().map(|a| a.delay_ms).sum()
+    }
+
+    /// Number of attempts made so far.
+    pub fn attempt_count(&self) -> usize {
+        self.attempts.len()
+    }
+
+    /// Whether the last attempt was successful.
+    pub fn succeeded(&self) -> bool {
+        self.attempts.last().map_or(false, |a| a.outcome == RetryOutcome::Success)
+    }
+
+    /// Whether retries are exhausted (either max retries reached or fatal error).
+    pub fn is_exhausted(&self) -> bool {
+        if self.succeeded() {
+            return false;
+        }
+        if self.attempts.len() as u32 > self.config.max_retries {
+            return true;
+        }
+        self.attempts.last().map_or(false, |a| matches!(a.outcome, RetryOutcome::Fatal(_)))
+    }
+
+    /// Get the delay to use before the next retry attempt.
+    pub fn next_delay_ms(&self) -> u64 {
+        self.config.delay_for_retry(self.attempts.len() as u32)
+    }
+
+    /// Get all failure reasons from attempts.
+    pub fn failure_reasons(&self) -> Vec<&str> {
+        self.attempts
+            .iter()
+            .filter_map(|a| match &a.outcome {
+                RetryOutcome::Retriable(msg) | RetryOutcome::Fatal(msg) => Some(msg.as_str()),
+                RetryOutcome::Success => None,
+            })
+            .collect()
+    }
+}
+
+/// Simulate retry_with_backoff: run a closure up to max_retries times.
+///
+/// Returns the list of attempts and whether the final outcome was success.
+pub fn retry_with_backoff<F>(request_id: RequestId, config: RetryConfig, mut attempt_fn: F) -> RequestRetry
+where
+    F: FnMut(u32) -> RetryOutcome,
+{
+    let mut retry = RequestRetry::new(request_id, config);
+    loop {
+        let attempt_num = retry.attempt_count() as u32;
+        let outcome = attempt_fn(attempt_num);
+        let should_retry = retry.record(outcome);
+        if !should_retry {
+            break;
+        }
+    }
+    retry
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -915,5 +1059,113 @@ mod tests {
     fn newest_pending_none_when_empty() {
         let svc = RequestService::new();
         assert!(svc.newest_pending().is_none());
+    }
+
+    #[test]
+    fn retry_outcome_display() {
+        assert_eq!(format!("{}", RetryOutcome::Success), "Success");
+        assert!(format!("{}", RetryOutcome::Retriable("timeout".into())).contains("timeout"));
+        assert!(format!("{}", RetryOutcome::Fatal("crash".into())).contains("crash"));
+    }
+
+    #[test]
+    fn request_retry_succeeds_first_try() {
+        let mut r = RequestRetry::new(RequestId(1), RetryConfig::new(3, 100));
+        let should_retry = r.record(RetryOutcome::Success);
+        assert!(!should_retry);
+        assert!(r.succeeded());
+        assert!(!r.is_exhausted());
+        assert_eq!(r.attempt_count(), 1);
+    }
+
+    #[test]
+    fn request_retry_retries_then_succeeds() {
+        let mut r = RequestRetry::new(RequestId(1), RetryConfig::new(3, 100));
+        assert!(r.record(RetryOutcome::Retriable("err".into())));
+        assert!(r.record(RetryOutcome::Retriable("err".into())));
+        assert!(!r.record(RetryOutcome::Success));
+        assert!(r.succeeded());
+        assert_eq!(r.attempt_count(), 3);
+    }
+
+    #[test]
+    fn request_retry_exhausted() {
+        let mut r = RequestRetry::new(RequestId(1), RetryConfig::new(2, 100));
+        r.record(RetryOutcome::Retriable("err".into()));
+        r.record(RetryOutcome::Retriable("err".into()));
+        let should_retry = r.record(RetryOutcome::Retriable("err".into()));
+        assert!(!should_retry);
+        assert!(r.is_exhausted());
+        assert!(!r.succeeded());
+    }
+
+    #[test]
+    fn request_retry_fatal_stops_immediately() {
+        let mut r = RequestRetry::new(RequestId(1), RetryConfig::new(5, 100));
+        let should_retry = r.record(RetryOutcome::Fatal("crash".into()));
+        assert!(!should_retry);
+        assert!(r.is_exhausted());
+        assert_eq!(r.attempt_count(), 1);
+    }
+
+    #[test]
+    fn request_retry_total_delay() {
+        let mut r = RequestRetry::new(RequestId(1), RetryConfig::new(3, 100));
+        r.record(RetryOutcome::Retriable("err".into()));
+        r.record(RetryOutcome::Retriable("err".into()));
+        r.record(RetryOutcome::Success);
+        assert!(r.total_delay_ms() > 0);
+    }
+
+    #[test]
+    fn request_retry_max_total_delay() {
+        let mut r = RequestRetry::new(RequestId(1), RetryConfig::new(10, 100))
+            .with_max_total_delay(150);
+        r.record(RetryOutcome::Retriable("err".into())); // delay 100
+        let should_retry = r.record(RetryOutcome::Retriable("err".into())); // delay 200, total > 150
+        assert!(!should_retry);
+    }
+
+    #[test]
+    fn request_retry_failure_reasons() {
+        let mut r = RequestRetry::new(RequestId(1), RetryConfig::new(3, 100));
+        r.record(RetryOutcome::Retriable("timeout".into()));
+        r.record(RetryOutcome::Retriable("connection reset".into()));
+        r.record(RetryOutcome::Success);
+        let reasons = r.failure_reasons();
+        assert_eq!(reasons.len(), 2);
+        assert_eq!(reasons[0], "timeout");
+        assert_eq!(reasons[1], "connection reset");
+    }
+
+    #[test]
+    fn retry_with_backoff_succeeds_after_retries() {
+        let result = retry_with_backoff(RequestId(1), RetryConfig::new(3, 100), |attempt| {
+            if attempt < 2 {
+                RetryOutcome::Retriable("not ready".into())
+            } else {
+                RetryOutcome::Success
+            }
+        });
+        assert!(result.succeeded());
+        assert_eq!(result.attempt_count(), 3);
+    }
+
+    #[test]
+    fn retry_with_backoff_exhausts_retries() {
+        let result = retry_with_backoff(RequestId(1), RetryConfig::new(2, 50), |_| {
+            RetryOutcome::Retriable("always fails".into())
+        });
+        assert!(!result.succeeded());
+        assert!(result.is_exhausted());
+    }
+
+    #[test]
+    fn retry_with_backoff_fatal_error() {
+        let result = retry_with_backoff(RequestId(1), RetryConfig::new(5, 100), |_| {
+            RetryOutcome::Fatal("unrecoverable".into())
+        });
+        assert!(!result.succeeded());
+        assert_eq!(result.attempt_count(), 1);
     }
 }

@@ -549,6 +549,123 @@ impl BloomFilter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// File-level content hashing and diff hashing
+// ---------------------------------------------------------------------------
+
+/// Compute the SHA-256 hash of file content given as a byte slice.
+///
+/// Returns the hex-encoded digest string.
+pub fn content_hash_file(data: &[u8]) -> String {
+    sha256_hex(data)
+}
+
+/// A byte range within file content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ByteRange {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl ByteRange {
+    pub fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
+    }
+
+    /// Returns the length of this range.
+    pub fn len(&self) -> usize {
+        self.end.saturating_sub(self.start)
+    }
+
+    /// Returns true if the range is empty.
+    pub fn is_empty(&self) -> bool {
+        self.start >= self.end
+    }
+
+    /// Returns true if this range is valid (start <= end).
+    pub fn is_valid(&self) -> bool {
+        self.start <= self.end
+    }
+}
+
+impl std::fmt::Display for ByteRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}..{})", self.start, self.end)
+    }
+}
+
+/// Compute a SHA-256 hash of only the specified byte ranges within `data`.
+///
+/// Concatenates bytes from each range in order and hashes the result.
+/// Empty or out-of-bounds ranges are skipped.
+pub fn diff_hash(data: &[u8], ranges: &[ByteRange]) -> String {
+    let mut hasher = Sha256::new();
+    let mut any_data = false;
+    for range in ranges {
+        if !range.is_valid() || range.start >= data.len() {
+            continue;
+        }
+        let end = range.end.min(data.len());
+        let slice = &data[range.start..end];
+        if !slice.is_empty() {
+            hasher.update(slice);
+            any_data = true;
+        }
+    }
+    if !any_data {
+        return sha256_hex(b"");
+    }
+    let result = hasher.finalize();
+    hex_encode(&result)
+}
+
+/// Compute line-based diff ranges between two text contents.
+///
+/// Returns byte ranges in `new_content` that differ from `old_content`.
+pub fn compute_changed_ranges(old_content: &str, new_content: &str) -> Vec<ByteRange> {
+    let old_lines: Vec<&str> = old_content.lines().collect();
+    let new_lines: Vec<&str> = new_content.lines().collect();
+    let mut ranges = Vec::new();
+    let mut byte_offset = 0;
+
+    for (i, new_line) in new_lines.iter().enumerate() {
+        let line_len = new_line.len();
+        let changed = match old_lines.get(i) {
+            Some(old_line) => old_line != new_line,
+            None => true,
+        };
+        if changed {
+            ranges.push(ByteRange::new(byte_offset, byte_offset + line_len));
+        }
+        byte_offset += line_len + 1; // +1 for newline
+    }
+
+    ranges
+}
+
+/// Compute a combined hash of both the full content and its changed ranges.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffHashResult {
+    pub full_hash: String,
+    pub diff_hash: String,
+    pub changed_range_count: usize,
+    pub changed_bytes: usize,
+}
+
+/// Compute both full and diff hashes for a file, given the old and new content.
+pub fn compute_diff_hash(old_content: &str, new_content: &str) -> DiffHashResult {
+    let ranges = compute_changed_ranges(old_content, new_content);
+    let changed_bytes: usize = ranges.iter().map(|r| r.len()).sum();
+    let full_hash = content_hash_file(new_content.as_bytes());
+    let diff = diff_hash(new_content.as_bytes(), &ranges);
+    DiffHashResult {
+        full_hash,
+        diff_hash: diff,
+        changed_range_count: ranges.len(),
+        changed_bytes,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -909,5 +1026,126 @@ mod tests {
         for i in 0..10u32 {
             assert!(bf.may_contain(&i.to_le_bytes()));
         }
+    }
+
+    #[test]
+    fn content_hash_file_deterministic() {
+        let data = b"fn main() { println!(\"hello\"); }";
+        let h1 = content_hash_file(data);
+        let h2 = content_hash_file(data);
+        assert_eq!(h1, h2);
+        assert_eq!(h1.len(), 64);
+    }
+
+    #[test]
+    fn content_hash_file_differs_for_different_content() {
+        assert_ne!(content_hash_file(b"aaa"), content_hash_file(b"bbb"));
+    }
+
+    #[test]
+    fn content_hash_file_empty() {
+        let h = content_hash_file(b"");
+        assert_eq!(h.len(), 64);
+    }
+
+    #[test]
+    fn byte_range_basic() {
+        let r = ByteRange::new(5, 10);
+        assert_eq!(r.len(), 5);
+        assert!(!r.is_empty());
+        assert!(r.is_valid());
+        assert_eq!(format!("{r}"), "[5..10)");
+    }
+
+    #[test]
+    fn byte_range_empty() {
+        let r = ByteRange::new(5, 5);
+        assert!(r.is_empty());
+        assert_eq!(r.len(), 0);
+        assert!(r.is_valid());
+    }
+
+    #[test]
+    fn byte_range_invalid() {
+        let r = ByteRange::new(10, 5);
+        assert!(!r.is_valid());
+    }
+
+    #[test]
+    fn diff_hash_changed_ranges() {
+        let data = b"hello world test data";
+        let ranges = vec![ByteRange::new(0, 5), ByteRange::new(6, 11)];
+        let h = diff_hash(data, &ranges);
+        assert_eq!(h.len(), 64);
+        // Deterministic
+        assert_eq!(h, diff_hash(data, &ranges));
+    }
+
+    #[test]
+    fn diff_hash_empty_ranges() {
+        let data = b"hello";
+        let h = diff_hash(data, &[]);
+        // Should hash empty input
+        assert_eq!(h, sha256_hex(b""));
+    }
+
+    #[test]
+    fn diff_hash_out_of_bounds_range_skipped() {
+        let data = b"short";
+        let ranges = vec![ByteRange::new(100, 200)];
+        let h = diff_hash(data, &ranges);
+        assert_eq!(h, sha256_hex(b""));
+    }
+
+    #[test]
+    fn diff_hash_clamped_to_data_len() {
+        let data = b"hello";
+        let ranges = vec![ByteRange::new(0, 100)];
+        let h = diff_hash(data, &ranges);
+        // Should hash "hello" (clamped to data len)
+        assert_eq!(h, sha256_hex(b"hello"));
+    }
+
+    #[test]
+    fn compute_changed_ranges_detects_changes() {
+        let old = "line1\nline2\nline3";
+        let new = "line1\nmodified\nline3";
+        let ranges = compute_changed_ranges(old, new);
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].start, 6); // "modified" starts after "line1\n"
+    }
+
+    #[test]
+    fn compute_changed_ranges_added_lines() {
+        let old = "line1";
+        let new = "line1\nnew_line";
+        let ranges = compute_changed_ranges(old, new);
+        assert_eq!(ranges.len(), 1); // new_line is added
+    }
+
+    #[test]
+    fn compute_changed_ranges_identical() {
+        let content = "line1\nline2\nline3";
+        let ranges = compute_changed_ranges(content, content);
+        assert!(ranges.is_empty());
+    }
+
+    #[test]
+    fn compute_diff_hash_result() {
+        let old = "fn main() {}";
+        let new = "fn main() { println!(\"hi\"); }";
+        let result = compute_diff_hash(old, new);
+        assert_eq!(result.full_hash, content_hash_file(new.as_bytes()));
+        assert_eq!(result.changed_range_count, 1);
+        assert!(result.changed_bytes > 0);
+        assert_eq!(result.diff_hash.len(), 64);
+    }
+
+    #[test]
+    fn compute_diff_hash_no_changes() {
+        let content = "unchanged";
+        let result = compute_diff_hash(content, content);
+        assert_eq!(result.changed_range_count, 0);
+        assert_eq!(result.changed_bytes, 0);
     }
 }

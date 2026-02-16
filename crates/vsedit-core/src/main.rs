@@ -721,35 +721,38 @@ async fn handle_install_extension(ext_id: &str, ext_dir: &Path) -> io::Result<()
 // ---------------------------------------------------------------------------
 
 fn register_builtin_commands(registry: &CommandRegistry) {
-    let noop = || -> vsedit_commands::CommandHandler {
-        Box::new(|_args| Ok(None))
+    let log_cmd = |name: &'static str| -> vsedit_commands::CommandHandler {
+        Box::new(move |_args| {
+            tracing::debug!("{} triggered", name);
+            Ok(None)
+        })
     };
 
     let cmds: Vec<(&str, vsedit_commands::CommandHandler)> = vec![
-        ("workbench.action.quit", noop()),
-        ("workbench.action.files.save", noop()),
-        ("workbench.action.files.saveAll", noop()),
-        ("workbench.action.quickOpen", noop()),
-        ("workbench.action.gotoLine", noop()),
-        ("workbench.action.showCommands", noop()),
-        ("workbench.action.toggleSidebarVisibility", noop()),
-        ("workbench.action.togglePanel", noop()),
-        ("workbench.action.terminal.toggleTerminal", noop()),
-        ("workbench.action.splitEditor", noop()),
-        ("workbench.action.focusFirstEditorGroup", noop()),
-        ("workbench.action.focusSecondEditorGroup", noop()),
-        ("workbench.action.focusThirdEditorGroup", noop()),
-        ("workbench.action.tasks.build", noop()),
-        ("workbench.action.debug.start", noop()),
-        ("editor.action.formatDocument", noop()),
-        ("editor.action.commentLine", noop()),
-        ("editor.action.addSelectionToNextFindMatch", noop()),
-        ("editor.action.selectAllMatches", noop()),
-        ("editor.action.triggerSuggest", noop()),
-        ("editor.action.goToDeclaration", noop()),
-        ("editor.action.peekDefinition", noop()),
-        ("editor.action.rename", noop()),
-        ("editor.debug.toggleBreakpoint", noop()),
+        ("workbench.action.quit", log_cmd("workbench.action.quit")),
+        ("workbench.action.files.save", log_cmd("workbench.action.files.save")),
+        ("workbench.action.files.saveAll", log_cmd("workbench.action.files.saveAll")),
+        ("workbench.action.quickOpen", log_cmd("workbench.action.quickOpen")),
+        ("workbench.action.gotoLine", log_cmd("workbench.action.gotoLine")),
+        ("workbench.action.showCommands", log_cmd("workbench.action.showCommands")),
+        ("workbench.action.toggleSidebarVisibility", log_cmd("workbench.action.toggleSidebarVisibility")),
+        ("workbench.action.togglePanel", log_cmd("workbench.action.togglePanel")),
+        ("workbench.action.terminal.toggleTerminal", log_cmd("workbench.action.terminal.toggleTerminal")),
+        ("workbench.action.splitEditor", log_cmd("workbench.action.splitEditor")),
+        ("workbench.action.focusFirstEditorGroup", log_cmd("workbench.action.focusFirstEditorGroup")),
+        ("workbench.action.focusSecondEditorGroup", log_cmd("workbench.action.focusSecondEditorGroup")),
+        ("workbench.action.focusThirdEditorGroup", log_cmd("workbench.action.focusThirdEditorGroup")),
+        ("workbench.action.tasks.build", log_cmd("workbench.action.tasks.build")),
+        ("workbench.action.debug.start", log_cmd("workbench.action.debug.start")),
+        ("editor.action.formatDocument", log_cmd("editor.action.formatDocument")),
+        ("editor.action.commentLine", log_cmd("editor.action.commentLine")),
+        ("editor.action.addSelectionToNextFindMatch", log_cmd("editor.action.addSelectionToNextFindMatch")),
+        ("editor.action.selectAllMatches", log_cmd("editor.action.selectAllMatches")),
+        ("editor.action.triggerSuggest", log_cmd("editor.action.triggerSuggest")),
+        ("editor.action.goToDeclaration", log_cmd("editor.action.goToDeclaration")),
+        ("editor.action.peekDefinition", log_cmd("editor.action.peekDefinition")),
+        ("editor.action.rename", log_cmd("editor.action.rename")),
+        ("editor.debug.toggleBreakpoint", log_cmd("editor.debug.toggleBreakpoint")),
     ];
     vsedit_commands::register_builtin_commands(registry, cmds);
 }
@@ -977,9 +980,23 @@ async fn run_event_loop(
 fn handle_event(event: CtEvent, app: &mut AppState) -> bool {
     match event {
         CtEvent::Key(key_event) => handle_key_event(key_event, app),
-        CtEvent::Resize(_cols, _rows) => false,
+        CtEvent::Resize(_cols, _rows) => {
+            // Terminal resized — redraw will happen on next frame automatically.
+            false
+        }
         CtEvent::Mouse(mouse_event) => handle_mouse_event(mouse_event, app),
-        CtEvent::Paste(_) | CtEvent::FocusGained | CtEvent::FocusLost => false,
+        CtEvent::Paste(ref text) => {
+            exec_editor_mutating(app, EditorAction::Paste(text.clone()));
+            false
+        }
+        CtEvent::FocusGained => {
+            // Redraw happens automatically on next frame.
+            false
+        }
+        CtEvent::FocusLost => {
+            // TODO: optionally auto-save dirty files here.
+            false
+        }
     }
 }
 

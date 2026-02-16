@@ -615,6 +615,187 @@ pub fn token_type_name(tt: StandardTokenType) -> &'static str {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Token classification and enhanced statistics
+// ---------------------------------------------------------------------------
+
+/// Fine-grained token classification beyond the basic `StandardTokenType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TokenClassification {
+    Comment,
+    Keyword,
+    StringLiteral,
+    NumberLiteral,
+    TypeName,
+    FunctionName,
+    Variable,
+    Operator,
+    Punctuation,
+    Whitespace,
+    Unknown,
+}
+
+impl std::fmt::Display for TokenClassification {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TokenClassification::Comment => write!(f, "comment"),
+            TokenClassification::Keyword => write!(f, "keyword"),
+            TokenClassification::StringLiteral => write!(f, "string"),
+            TokenClassification::NumberLiteral => write!(f, "number"),
+            TokenClassification::TypeName => write!(f, "type"),
+            TokenClassification::FunctionName => write!(f, "function"),
+            TokenClassification::Variable => write!(f, "variable"),
+            TokenClassification::Operator => write!(f, "operator"),
+            TokenClassification::Punctuation => write!(f, "punctuation"),
+            TokenClassification::Whitespace => write!(f, "whitespace"),
+            TokenClassification::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
+/// Classify a token string into a `TokenClassification`.
+///
+/// This is a heuristic classifier for simple syntax highlighting.
+pub fn classify_token(text: &str) -> TokenClassification {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return TokenClassification::Whitespace;
+    }
+
+    // Check if it starts with comment markers
+    if trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.starts_with('#') {
+        return TokenClassification::Comment;
+    }
+
+    // Check string literals
+    if (trimmed.starts_with('"') && trimmed.ends_with('"'))
+        || (trimmed.starts_with('\'') && trimmed.ends_with('\''))
+    {
+        return TokenClassification::StringLiteral;
+    }
+
+    // Check number literals
+    if trimmed.chars().next().map_or(false, |c| c.is_ascii_digit())
+        && trimmed.chars().all(|c| {
+            c.is_ascii_hexdigit() || c == '.' || c == 'x' || c == 'b' || c == '_'
+        })
+    {
+        return TokenClassification::NumberLiteral;
+    }
+
+    // Check operators
+    if trimmed.len() <= 3 && trimmed.chars().all(|c| "+-*/%=<>!&|^~?:.".contains(c)) {
+        return TokenClassification::Operator;
+    }
+
+    // Check punctuation
+    if trimmed.len() == 1 && "(){}[];,".contains(trimmed) {
+        return TokenClassification::Punctuation;
+    }
+
+    // Check common keywords
+    const KEYWORDS: &[&str] = &[
+        "fn", "let", "mut", "const", "static", "struct", "enum", "impl", "trait", "pub", "use",
+        "mod", "if", "else", "match", "for", "while", "loop", "return", "break", "continue",
+        "where", "as", "in", "ref", "self", "super", "crate", "type", "async", "await", "move",
+        "dyn", "unsafe",
+    ];
+    if KEYWORDS.contains(&trimmed) {
+        return TokenClassification::Keyword;
+    }
+
+    // Check if it looks like a type name (starts with uppercase)
+    if trimmed.chars().next().map_or(false, |c| c.is_uppercase()) {
+        return TokenClassification::TypeName;
+    }
+
+    // Check if it looks like a variable (lowercase alphanumeric with underscores)
+    if trimmed
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_')
+        && trimmed.chars().next().map_or(false, |c| c.is_lowercase())
+    {
+        return TokenClassification::Variable;
+    }
+
+    TokenClassification::Unknown
+}
+
+/// A classified token with its text and classification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClassifiedToken {
+    pub text: String,
+    pub classification: TokenClassification,
+}
+
+/// Classify all whitespace-separated tokens in a line.
+pub fn classify_line_tokens(line: &str) -> Vec<ClassifiedToken> {
+    line.split_whitespace()
+        .map(|word| ClassifiedToken {
+            text: word.to_string(),
+            classification: classify_token(word),
+        })
+        .collect()
+}
+
+/// Enhanced statistics counting classifications across tokens.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ClassificationStats {
+    pub total: usize,
+    pub comments: usize,
+    pub keywords: usize,
+    pub strings: usize,
+    pub numbers: usize,
+    pub types: usize,
+    pub functions: usize,
+    pub variables: usize,
+    pub operators: usize,
+    pub punctuation: usize,
+    pub whitespace: usize,
+    pub unknown: usize,
+}
+
+/// Compute classification statistics for a slice of classified tokens.
+pub fn compute_classification_stats(tokens: &[ClassifiedToken]) -> ClassificationStats {
+    let mut stats = ClassificationStats {
+        total: tokens.len(),
+        ..Default::default()
+    };
+    for t in tokens {
+        match t.classification {
+            TokenClassification::Comment => stats.comments += 1,
+            TokenClassification::Keyword => stats.keywords += 1,
+            TokenClassification::StringLiteral => stats.strings += 1,
+            TokenClassification::NumberLiteral => stats.numbers += 1,
+            TokenClassification::TypeName => stats.types += 1,
+            TokenClassification::FunctionName => stats.functions += 1,
+            TokenClassification::Variable => stats.variables += 1,
+            TokenClassification::Operator => stats.operators += 1,
+            TokenClassification::Punctuation => stats.punctuation += 1,
+            TokenClassification::Whitespace => stats.whitespace += 1,
+            TokenClassification::Unknown => stats.unknown += 1,
+        }
+    }
+    stats
+}
+
+/// Map a `TokenClassification` to a semantic color name.
+pub fn classification_color_name(cls: TokenClassification) -> &'static str {
+    match cls {
+        TokenClassification::Comment => "comment.foreground",
+        TokenClassification::Keyword => "keyword.foreground",
+        TokenClassification::StringLiteral => "string.foreground",
+        TokenClassification::NumberLiteral => "number.foreground",
+        TokenClassification::TypeName => "type.foreground",
+        TokenClassification::FunctionName => "function.foreground",
+        TokenClassification::Variable => "variable.foreground",
+        TokenClassification::Operator => "operator.foreground",
+        TokenClassification::Punctuation => "punctuation.foreground",
+        TokenClassification::Whitespace => "editor.foreground",
+        TokenClassification::Unknown => "editor.foreground",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -915,5 +1096,100 @@ mod tests {
         for tt in [StandardTokenType::Other, StandardTokenType::Comment, StandardTokenType::String, StandardTokenType::RegExp] {
             assert!(!token_type_name(tt).is_empty());
         }
+    }
+
+    #[test]
+    fn classify_keyword() {
+        assert_eq!(classify_token("fn"), TokenClassification::Keyword);
+        assert_eq!(classify_token("let"), TokenClassification::Keyword);
+        assert_eq!(classify_token("struct"), TokenClassification::Keyword);
+        assert_eq!(classify_token("return"), TokenClassification::Keyword);
+    }
+
+    #[test]
+    fn classify_comment() {
+        assert_eq!(classify_token("// comment"), TokenClassification::Comment);
+        assert_eq!(classify_token("/* block */"), TokenClassification::Comment);
+    }
+
+    #[test]
+    fn classify_string_literal() {
+        assert_eq!(classify_token("\"hello\""), TokenClassification::StringLiteral);
+        assert_eq!(classify_token("'c'"), TokenClassification::StringLiteral);
+    }
+
+    #[test]
+    fn classify_number_literal() {
+        assert_eq!(classify_token("42"), TokenClassification::NumberLiteral);
+        assert_eq!(classify_token("3.14"), TokenClassification::NumberLiteral);
+        assert_eq!(classify_token("0xFF"), TokenClassification::NumberLiteral);
+    }
+
+    #[test]
+    fn classify_operator() {
+        assert_eq!(classify_token("+"), TokenClassification::Operator);
+        assert_eq!(classify_token("=="), TokenClassification::Operator);
+        assert_eq!(classify_token("=>"), TokenClassification::Operator);
+    }
+
+    #[test]
+    fn classify_punctuation() {
+        assert_eq!(classify_token("("), TokenClassification::Punctuation);
+        assert_eq!(classify_token(";"), TokenClassification::Punctuation);
+        assert_eq!(classify_token("{"), TokenClassification::Punctuation);
+    }
+
+    #[test]
+    fn classify_type_name() {
+        assert_eq!(classify_token("String"), TokenClassification::TypeName);
+        assert_eq!(classify_token("Vec"), TokenClassification::TypeName);
+    }
+
+    #[test]
+    fn classify_variable() {
+        assert_eq!(classify_token("my_var"), TokenClassification::Variable);
+        assert_eq!(classify_token("count"), TokenClassification::Variable);
+    }
+
+    #[test]
+    fn classify_whitespace() {
+        assert_eq!(classify_token(""), TokenClassification::Whitespace);
+        assert_eq!(classify_token("  "), TokenClassification::Whitespace);
+    }
+
+    #[test]
+    fn classify_line_tokens_works() {
+        let tokens = classify_line_tokens("fn main() {");
+        assert!(tokens.len() >= 2);
+        assert_eq!(tokens[0].classification, TokenClassification::Keyword);
+    }
+
+    #[test]
+    fn classification_stats_computation() {
+        let tokens = vec![
+            ClassifiedToken { text: "fn".into(), classification: TokenClassification::Keyword },
+            ClassifiedToken { text: "main".into(), classification: TokenClassification::Variable },
+            ClassifiedToken { text: "42".into(), classification: TokenClassification::NumberLiteral },
+            ClassifiedToken { text: "fn".into(), classification: TokenClassification::Keyword },
+        ];
+        let stats = compute_classification_stats(&tokens);
+        assert_eq!(stats.total, 4);
+        assert_eq!(stats.keywords, 2);
+        assert_eq!(stats.variables, 1);
+        assert_eq!(stats.numbers, 1);
+    }
+
+    #[test]
+    fn classification_display() {
+        assert_eq!(format!("{}", TokenClassification::Comment), "comment");
+        assert_eq!(format!("{}", TokenClassification::Keyword), "keyword");
+        assert_eq!(format!("{}", TokenClassification::Operator), "operator");
+    }
+
+    #[test]
+    fn classification_color_names() {
+        assert_eq!(classification_color_name(TokenClassification::Comment), "comment.foreground");
+        assert_eq!(classification_color_name(TokenClassification::Keyword), "keyword.foreground");
+        assert_eq!(classification_color_name(TokenClassification::Unknown), "editor.foreground");
     }
 }

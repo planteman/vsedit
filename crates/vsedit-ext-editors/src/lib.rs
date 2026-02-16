@@ -531,6 +531,170 @@ pub fn resolve_decoration_conflicts(decorations: &[TextEditorDecoration]) -> Vec
     result
 }
 
+// ── Tab serialization ──
+
+/// Saved state of a single editor tab, suitable for persistence.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorTabState {
+    pub uri: String,
+    pub cursor_line: u32,
+    pub cursor_col: u32,
+    pub scroll_top: u32,
+    pub view_state: Option<String>,
+    pub is_pinned: bool,
+    pub is_preview: bool,
+    pub is_dirty: bool,
+}
+
+impl EditorTabState {
+    /// Create a new tab state with minimal required fields.
+    pub fn new(uri: impl Into<String>, cursor_line: u32, cursor_col: u32) -> Self {
+        Self {
+            uri: uri.into(),
+            cursor_line,
+            cursor_col,
+            scroll_top: 0,
+            view_state: None,
+            is_pinned: false,
+            is_preview: false,
+            is_dirty: false,
+        }
+    }
+
+    /// Validate that the tab state has a non-empty URI.
+    pub fn validate(&self) -> Result<(), EditorError> {
+        if self.uri.is_empty() {
+            return Err(EditorError::InvalidUri(self.uri.clone()));
+        }
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for EditorTabState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Tab({} @{}:{} scroll={}{}{})",
+            self.uri,
+            self.cursor_line,
+            self.cursor_col,
+            self.scroll_top,
+            if self.is_pinned { " pinned" } else { "" },
+            if self.is_dirty { " dirty" } else { "" },
+        )
+    }
+}
+
+/// Serializer/deserializer for a collection of editor tab states.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorTabSerializer {
+    pub tabs: Vec<EditorTabState>,
+    pub active_tab_index: Option<usize>,
+}
+
+impl EditorTabSerializer {
+    pub fn new() -> Self {
+        Self {
+            tabs: Vec::new(),
+            active_tab_index: None,
+        }
+    }
+
+    /// Add a tab state to the serializer. Returns the index of the added tab.
+    pub fn add_tab(&mut self, tab: EditorTabState) -> usize {
+        let idx = self.tabs.len();
+        self.tabs.push(tab);
+        if self.active_tab_index.is_none() {
+            self.active_tab_index = Some(idx);
+        }
+        idx
+    }
+
+    /// Remove a tab by index, adjusting active_tab_index as needed.
+    pub fn remove_tab(&mut self, index: usize) -> Option<EditorTabState> {
+        if index >= self.tabs.len() {
+            return None;
+        }
+        let tab = self.tabs.remove(index);
+        if let Some(active) = self.active_tab_index {
+            if active == index {
+                self.active_tab_index = if self.tabs.is_empty() {
+                    None
+                } else {
+                    Some(active.min(self.tabs.len() - 1))
+                };
+            } else if active > index {
+                self.active_tab_index = Some(active - 1);
+            }
+        }
+        Some(tab)
+    }
+
+    /// Set the active tab index.
+    pub fn set_active(&mut self, index: usize) -> bool {
+        if index < self.tabs.len() {
+            self.active_tab_index = Some(index);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get the active tab state, if any.
+    pub fn active_tab(&self) -> Option<&EditorTabState> {
+        self.active_tab_index.and_then(|i| self.tabs.get(i))
+    }
+
+    /// Serialize all tab states to a JSON string.
+    pub fn serialize(&self) -> Result<String, String> {
+        serde_json::to_string(self).map_err(|e| e.to_string())
+    }
+
+    /// Deserialize tab states from a JSON string.
+    pub fn deserialize(json: &str) -> Result<Self, String> {
+        serde_json::from_str(json).map_err(|e| e.to_string())
+    }
+
+    /// Find the index of the first tab with the given URI.
+    pub fn find_tab_by_uri(&self, uri: &str) -> Option<usize> {
+        self.tabs.iter().position(|t| t.uri == uri)
+    }
+
+    /// Return the number of dirty (unsaved) tabs.
+    pub fn dirty_count(&self) -> usize {
+        self.tabs.iter().filter(|t| t.is_dirty).count()
+    }
+
+    /// Return the number of pinned tabs.
+    pub fn pinned_count(&self) -> usize {
+        self.tabs.iter().filter(|t| t.is_pinned).count()
+    }
+
+    /// Validate all tabs in the serializer.
+    pub fn validate_all(&self) -> Result<(), EditorError> {
+        for tab in &self.tabs {
+            tab.validate()?;
+        }
+        if let Some(idx) = self.active_tab_index {
+            if idx >= self.tabs.len() {
+                return Err(EditorError::InvalidUri(format!(
+                    "active_tab_index {} out of bounds (len {})",
+                    idx,
+                    self.tabs.len()
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Number of tabs.
+    pub fn tab_count(&self) -> usize {
+        self.tabs.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -906,5 +1070,132 @@ mod tests {
         assert!(diff.uri_changed);
         assert_eq!(diff.old_uri, "file:///old.rs");
         assert_eq!(diff.new_uri, "file:///new.rs");
+    }
+
+    #[test]
+    fn tab_state_new_defaults() {
+        let tab = EditorTabState::new("file:///main.rs", 10, 5);
+        assert_eq!(tab.uri, "file:///main.rs");
+        assert_eq!(tab.cursor_line, 10);
+        assert_eq!(tab.cursor_col, 5);
+        assert_eq!(tab.scroll_top, 0);
+        assert!(tab.view_state.is_none());
+        assert!(!tab.is_pinned);
+        assert!(!tab.is_preview);
+        assert!(!tab.is_dirty);
+    }
+
+    #[test]
+    fn tab_state_validate() {
+        let valid = EditorTabState::new("file:///a.rs", 0, 0);
+        assert!(valid.validate().is_ok());
+        let invalid = EditorTabState::new("", 0, 0);
+        assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn tab_state_display() {
+        let mut tab = EditorTabState::new("file:///a.rs", 5, 3);
+        let s = format!("{tab}");
+        assert!(s.contains("file:///a.rs"));
+        assert!(s.contains("5:3"));
+        tab.is_pinned = true;
+        tab.is_dirty = true;
+        let s = format!("{tab}");
+        assert!(s.contains("pinned"));
+        assert!(s.contains("dirty"));
+    }
+
+    #[test]
+    fn tab_serializer_add_and_active() {
+        let mut ser = EditorTabSerializer::new();
+        assert_eq!(ser.tab_count(), 0);
+        assert!(ser.active_tab().is_none());
+        let idx = ser.add_tab(EditorTabState::new("file:///a.rs", 0, 0));
+        assert_eq!(idx, 0);
+        assert_eq!(ser.active_tab_index, Some(0));
+        ser.add_tab(EditorTabState::new("file:///b.rs", 1, 0));
+        assert_eq!(ser.tab_count(), 2);
+        // active still points to first
+        assert_eq!(ser.active_tab().unwrap().uri, "file:///a.rs");
+    }
+
+    #[test]
+    fn tab_serializer_remove_adjusts_active() {
+        let mut ser = EditorTabSerializer::new();
+        ser.add_tab(EditorTabState::new("file:///a.rs", 0, 0));
+        ser.add_tab(EditorTabState::new("file:///b.rs", 0, 0));
+        ser.add_tab(EditorTabState::new("file:///c.rs", 0, 0));
+        ser.set_active(2);
+        // Remove middle tab: active was 2, after removing index 1, active becomes 1
+        ser.remove_tab(1);
+        assert_eq!(ser.active_tab_index, Some(1));
+        assert_eq!(ser.active_tab().unwrap().uri, "file:///c.rs");
+    }
+
+    #[test]
+    fn tab_serializer_remove_active_tab() {
+        let mut ser = EditorTabSerializer::new();
+        ser.add_tab(EditorTabState::new("file:///a.rs", 0, 0));
+        ser.add_tab(EditorTabState::new("file:///b.rs", 0, 0));
+        ser.set_active(0);
+        ser.remove_tab(0);
+        // After removing active tab at index 0, active should be 0 (now "b.rs")
+        assert_eq!(ser.active_tab().unwrap().uri, "file:///b.rs");
+    }
+
+    #[test]
+    fn tab_serializer_serialize_deserialize_roundtrip() {
+        let mut ser = EditorTabSerializer::new();
+        let mut tab = EditorTabState::new("file:///main.rs", 42, 10);
+        tab.scroll_top = 100;
+        tab.view_state = Some("collapsed".to_string());
+        tab.is_pinned = true;
+        tab.is_dirty = true;
+        ser.add_tab(tab);
+        ser.add_tab(EditorTabState::new("file:///lib.rs", 0, 0));
+        ser.set_active(1);
+
+        let json = ser.serialize().unwrap();
+        let restored = EditorTabSerializer::deserialize(&json).unwrap();
+        assert_eq!(restored.tab_count(), 2);
+        assert_eq!(restored.active_tab_index, Some(1));
+        assert_eq!(restored.tabs[0].cursor_line, 42);
+        assert_eq!(restored.tabs[0].scroll_top, 100);
+        assert!(restored.tabs[0].is_pinned);
+        assert!(restored.tabs[0].is_dirty);
+        assert_eq!(restored.tabs[0].view_state.as_deref(), Some("collapsed"));
+    }
+
+    #[test]
+    fn tab_serializer_find_and_counts() {
+        let mut ser = EditorTabSerializer::new();
+        let mut tab1 = EditorTabState::new("file:///a.rs", 0, 0);
+        tab1.is_dirty = true;
+        tab1.is_pinned = true;
+        ser.add_tab(tab1);
+        let mut tab2 = EditorTabState::new("file:///b.rs", 0, 0);
+        tab2.is_dirty = true;
+        ser.add_tab(tab2);
+        ser.add_tab(EditorTabState::new("file:///c.rs", 0, 0));
+
+        assert_eq!(ser.find_tab_by_uri("file:///b.rs"), Some(1));
+        assert!(ser.find_tab_by_uri("file:///missing.rs").is_none());
+        assert_eq!(ser.dirty_count(), 2);
+        assert_eq!(ser.pinned_count(), 1);
+    }
+
+    #[test]
+    fn tab_serializer_validate_all() {
+        let mut ser = EditorTabSerializer::new();
+        ser.add_tab(EditorTabState::new("file:///a.rs", 0, 0));
+        assert!(ser.validate_all().is_ok());
+        ser.add_tab(EditorTabState::new("", 0, 0));
+        assert!(ser.validate_all().is_err());
+    }
+
+    #[test]
+    fn tab_serializer_deserialize_invalid_json() {
+        assert!(EditorTabSerializer::deserialize("not json").is_err());
     }
 }

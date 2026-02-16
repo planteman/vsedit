@@ -548,6 +548,120 @@ pub fn group_by_category(
 }
 
 // ---------------------------------------------------------------------------
+// Keybinding overrides (user customization)
+// ---------------------------------------------------------------------------
+
+/// Represents a user keybinding override from keybindings.json.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeybindingOverride {
+    /// The command this keybinding is bound to.
+    pub command: String,
+    /// The keybinding chord sequence.
+    pub binding: Keybinding,
+    /// Optional context condition (e.g., "editorTextFocus").
+    pub when: Option<String>,
+    /// If true, this override removes the keybinding instead of adding it.
+    pub is_removal: bool,
+}
+
+impl KeybindingOverride {
+    /// Create a new override that adds a keybinding.
+    pub fn add(command: impl Into<String>, binding: Keybinding) -> Self {
+        Self {
+            command: command.into(),
+            binding,
+            when: None,
+            is_removal: false,
+        }
+    }
+
+    /// Create a new override that removes a keybinding.
+    pub fn remove(command: impl Into<String>, binding: Keybinding) -> Self {
+        Self {
+            command: command.into(),
+            binding,
+            when: None,
+            is_removal: true,
+        }
+    }
+
+    /// Set the `when` context condition.
+    pub fn with_when(mut self, when: impl Into<String>) -> Self {
+        self.when = Some(when.into());
+        self
+    }
+}
+
+impl std::fmt::Display for KeybindingOverride {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{} -> {}{}",
+            if self.is_removal { "-" } else { "" },
+            self.binding,
+            self.command,
+            self.when
+                .as_ref()
+                .map_or(String::new(), |w| format!(" (when: {w})"))
+        )
+    }
+}
+
+/// Merge user overrides on top of a set of default categorized keybindings.
+///
+/// - Override entries with `is_removal == true` remove the matching command+binding
+///   from the defaults.
+/// - Override entries with `is_removal == false` are appended to the result.
+///
+/// Returns a new list of `CategorizedKeybinding`.
+pub fn merge_overrides(
+    defaults: &[CategorizedKeybinding],
+    overrides: &[KeybindingOverride],
+) -> Vec<CategorizedKeybinding> {
+    let mut result: Vec<CategorizedKeybinding> = defaults.to_vec();
+
+    for ovr in overrides {
+        if ovr.is_removal {
+            result.retain(|kb| {
+                !(kb.command == ovr.command && kb.binding.parts == ovr.binding.parts)
+            });
+        } else {
+            result.push(CategorizedKeybinding {
+                binding: ovr.binding.clone(),
+                command: ovr.command.clone(),
+                category: KeybindingCategory::Custom(String::from("user")),
+            });
+        }
+    }
+
+    result
+}
+
+/// Count the number of overrides that are additions vs. removals.
+pub fn count_override_types(overrides: &[KeybindingOverride]) -> (usize, usize) {
+    let additions = overrides.iter().filter(|o| !o.is_removal).count();
+    let removals = overrides.iter().filter(|o| o.is_removal).count();
+    (additions, removals)
+}
+
+/// Validate overrides: checks for duplicate additions of the same binding.
+pub fn validate_overrides(overrides: &[KeybindingOverride]) -> Vec<KeybindingConflict> {
+    let additions: Vec<&KeybindingOverride> = overrides.iter().filter(|o| !o.is_removal).collect();
+    let mut conflicts = Vec::new();
+    for i in 0..additions.len() {
+        for j in (i + 1)..additions.len() {
+            if additions[i].binding.parts == additions[j].binding.parts {
+                conflicts.push(KeybindingConflict {
+                    binding_a: additions[i].binding.clone(),
+                    binding_b: additions[j].binding.clone(),
+                });
+            }
+        }
+    }
+    conflicts
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -906,5 +1020,153 @@ mod tests {
         let groups = group_by_category(&bindings);
         assert_eq!(groups[&KeybindingCategory::General].len(), 2);
         assert_eq!(groups[&KeybindingCategory::Navigation].len(), 1);
+    }
+
+    // -- KeybindingOverride tests --
+
+    #[test]
+    fn override_add_display() {
+        let kb = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS));
+        let ovr = KeybindingOverride::add("workbench.action.files.save", kb);
+        let s = format!("{ovr}");
+        assert!(s.contains("Ctrl+S"));
+        assert!(s.contains("workbench.action.files.save"));
+        assert!(!s.starts_with('-'));
+    }
+
+    #[test]
+    fn override_remove_display() {
+        let kb = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS));
+        let ovr = KeybindingOverride::remove("workbench.action.files.save", kb);
+        let s = format!("{ovr}");
+        assert!(s.starts_with('-'));
+    }
+
+    #[test]
+    fn override_with_when() {
+        let kb = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS));
+        let ovr = KeybindingOverride::add("save", kb).with_when("editorTextFocus");
+        assert_eq!(ovr.when.as_deref(), Some("editorTextFocus"));
+        let s = format!("{ovr}");
+        assert!(s.contains("editorTextFocus"));
+    }
+
+    #[test]
+    fn merge_overrides_adds_new_binding() {
+        let defaults = vec![CategorizedKeybinding {
+            binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+            command: "save".into(),
+            category: KeybindingCategory::General,
+        }];
+        let overrides = vec![KeybindingOverride::add(
+            "format",
+            Keybinding::new(KeyCodeChord::new(true, true, false, false, KeyCode::KeyF)),
+        )];
+        let merged = merge_overrides(&defaults, &overrides);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[1].command, "format");
+        assert_eq!(merged[1].category, KeybindingCategory::Custom("user".into()));
+    }
+
+    #[test]
+    fn merge_overrides_removes_binding() {
+        let defaults = vec![
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(
+                    true,
+                    false,
+                    false,
+                    false,
+                    KeyCode::KeyS,
+                )),
+                command: "save".into(),
+                category: KeybindingCategory::General,
+            },
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(
+                    true,
+                    false,
+                    false,
+                    false,
+                    KeyCode::KeyN,
+                )),
+                command: "new".into(),
+                category: KeybindingCategory::General,
+            },
+        ];
+        let overrides = vec![KeybindingOverride::remove(
+            "save",
+            Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+        )];
+        let merged = merge_overrides(&defaults, &overrides);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].command, "new");
+    }
+
+    #[test]
+    fn merge_overrides_remove_and_readd() {
+        let defaults = vec![CategorizedKeybinding {
+            binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+            command: "save".into(),
+            category: KeybindingCategory::General,
+        }];
+        let overrides = vec![
+            KeybindingOverride::remove(
+                "save",
+                Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+            ),
+            KeybindingOverride::add(
+                "save",
+                Keybinding::new(KeyCodeChord::new(true, true, false, false, KeyCode::KeyS)),
+            ),
+        ];
+        let merged = merge_overrides(&defaults, &overrides);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].command, "save");
+        // Should now be Ctrl+Shift+S
+        assert!(merged[0].binding.parts[0].shift);
+    }
+
+    #[test]
+    fn count_override_types_works() {
+        let overrides = vec![
+            KeybindingOverride::add("a", Keybinding::new(KeyCodeChord::just(KeyCode::KeyA))),
+            KeybindingOverride::remove("b", Keybinding::new(KeyCodeChord::just(KeyCode::KeyB))),
+            KeybindingOverride::add("c", Keybinding::new(KeyCodeChord::just(KeyCode::KeyC))),
+        ];
+        let (adds, removes) = count_override_types(&overrides);
+        assert_eq!(adds, 2);
+        assert_eq!(removes, 1);
+    }
+
+    #[test]
+    fn validate_overrides_no_conflicts() {
+        let overrides = vec![
+            KeybindingOverride::add("a", Keybinding::new(KeyCodeChord::just(KeyCode::KeyA))),
+            KeybindingOverride::add("b", Keybinding::new(KeyCodeChord::just(KeyCode::KeyB))),
+        ];
+        assert!(validate_overrides(&overrides).is_empty());
+    }
+
+    #[test]
+    fn validate_overrides_detects_conflict() {
+        let kb = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS));
+        let overrides = vec![
+            KeybindingOverride::add("save", kb.clone()),
+            KeybindingOverride::add("other", kb),
+        ];
+        let conflicts = validate_overrides(&overrides);
+        assert_eq!(conflicts.len(), 1);
+    }
+
+    #[test]
+    fn merge_overrides_empty_overrides() {
+        let defaults = vec![CategorizedKeybinding {
+            binding: Keybinding::new(KeyCodeChord::just(KeyCode::KeyA)),
+            command: "a".into(),
+            category: KeybindingCategory::General,
+        }];
+        let merged = merge_overrides(&defaults, &[]);
+        assert_eq!(merged.len(), 1);
     }
 }

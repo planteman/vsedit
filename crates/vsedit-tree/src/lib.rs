@@ -555,6 +555,215 @@ pub fn leaf_count<T>(model: &TreeModel<T>) -> usize {
     model.roots.iter().map(count_leaves).sum()
 }
 
+// ---------------------------------------------------------------------------
+// TreeNodePath, find_by_path, and flatten_visible
+// ---------------------------------------------------------------------------
+
+/// A breadcrumb-style path for navigating trees (e.g., "src/main.rs").
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TreeNodePath {
+    segments: Vec<String>,
+}
+
+impl TreeNodePath {
+    /// Create a path from a slash-separated string.
+    pub fn from_str(path: &str) -> Self {
+        Self {
+            segments: path
+                .split('/')
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+                .collect(),
+        }
+    }
+
+    /// Create a path from a vector of segments.
+    pub fn from_segments(segments: Vec<String>) -> Self {
+        Self { segments }
+    }
+
+    /// Create an empty path.
+    pub fn empty() -> Self {
+        Self { segments: Vec::new() }
+    }
+
+    /// Return the path as a slash-separated string.
+    pub fn to_string_path(&self) -> String {
+        self.segments.join("/")
+    }
+
+    /// Return the number of segments.
+    pub fn depth(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// Return the last segment (file/folder name).
+    pub fn name(&self) -> Option<&str> {
+        self.segments.last().map(|s| s.as_str())
+    }
+
+    /// Return the parent path (all segments except the last).
+    pub fn parent(&self) -> Option<TreeNodePath> {
+        if self.segments.len() <= 1 {
+            return None;
+        }
+        Some(TreeNodePath {
+            segments: self.segments[..self.segments.len() - 1].to_vec(),
+        })
+    }
+
+    /// Append a segment to this path.
+    pub fn join(&self, segment: impl Into<String>) -> TreeNodePath {
+        let mut segments = self.segments.clone();
+        segments.push(segment.into());
+        TreeNodePath { segments }
+    }
+
+    /// Check if this path starts with another path.
+    pub fn starts_with(&self, prefix: &TreeNodePath) -> bool {
+        if prefix.segments.len() > self.segments.len() {
+            return false;
+        }
+        self.segments[..prefix.segments.len()] == prefix.segments[..]
+    }
+
+    /// Return the segments.
+    pub fn segments(&self) -> &[String] {
+        &self.segments
+    }
+
+    /// Returns true if the path is empty.
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+}
+
+impl std::fmt::Display for TreeNodePath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string_path())
+    }
+}
+
+/// Find a node in the tree by matching segments against a label function.
+///
+/// Walks the tree depth-first, matching each segment of the path against
+/// nodes at corresponding depths. Returns the index path if found.
+pub fn find_by_path<T, F>(model: &TreeModel<T>, path: &TreeNodePath, to_label: &F) -> Option<Vec<usize>>
+where
+    F: Fn(&T) -> String,
+{
+    if path.is_empty() {
+        return None;
+    }
+
+    let segments = path.segments();
+    // Find matching root
+    for (root_idx, root) in model.roots.iter().enumerate() {
+        if to_label(&root.data) == segments[0] {
+            if segments.len() == 1 {
+                return Some(vec![root_idx]);
+            }
+            let mut result_path = vec![root_idx];
+            if find_by_path_recursive(root, &segments[1..], to_label, &mut result_path) {
+                return Some(result_path);
+            }
+        }
+    }
+    None
+}
+
+fn find_by_path_recursive<T, F>(
+    node: &TreeNode<T>,
+    remaining: &[String],
+    to_label: &F,
+    path: &mut Vec<usize>,
+) -> bool
+where
+    F: Fn(&T) -> String,
+{
+    if remaining.is_empty() {
+        return true;
+    }
+    for (i, child) in node.children.iter().enumerate() {
+        if to_label(&child.data) == remaining[0] {
+            path.push(i);
+            if remaining.len() == 1 {
+                return true;
+            }
+            if find_by_path_recursive(child, &remaining[1..], to_label, path) {
+                return true;
+            }
+            path.pop();
+        }
+    }
+    false
+}
+
+/// A visible tree item with its rendered indent prefix and label.
+#[derive(Debug, Clone)]
+pub struct VisibleTreeLine {
+    pub indent: String,
+    pub label: String,
+    pub depth: u32,
+    pub is_expanded: bool,
+    pub has_children: bool,
+}
+
+/// Flatten the visible tree into renderable lines with indent prefixes.
+///
+/// Only expanded nodes' children are included. The `to_label` closure
+/// converts node data to display strings.
+pub fn tree_flatten_visible<T, F>(model: &TreeModel<T>, to_label: &F) -> Vec<VisibleTreeLine>
+where
+    F: Fn(&T) -> String,
+{
+    let mut lines = Vec::new();
+    for root in &model.roots {
+        flatten_visible_node(root, to_label, &mut lines);
+    }
+    lines
+}
+
+fn flatten_visible_node<T, F>(
+    node: &TreeNode<T>,
+    to_label: &F,
+    lines: &mut Vec<VisibleTreeLine>,
+) where
+    F: Fn(&T) -> String,
+{
+    let indent = "  ".repeat(node.depth as usize);
+    let prefix = if !node.children.is_empty() {
+        if node.is_expanded { "▼ " } else { "▶ " }
+    } else {
+        "  "
+    };
+    lines.push(VisibleTreeLine {
+        indent: format!("{indent}{prefix}"),
+        label: to_label(&node.data),
+        depth: node.depth,
+        is_expanded: node.is_expanded,
+        has_children: !node.children.is_empty(),
+    });
+    if node.is_expanded {
+        for child in &node.children {
+            flatten_visible_node(child, to_label, lines);
+        }
+    }
+}
+
+/// Render a tree to a string suitable for terminal display.
+pub fn render_tree<T, F>(model: &TreeModel<T>, to_label: &F) -> String
+where
+    F: Fn(&T) -> String,
+{
+    let lines = tree_flatten_visible(model, to_label);
+    lines
+        .iter()
+        .map(|l| format!("{}{}", l.indent, l.label))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -916,5 +1125,115 @@ mod tests {
         assert_eq!(leaf_count(&model), 4); // main.rs, mod.rs, utils.rs, Cargo.toml
         let empty: TreeModel<&str> = TreeModel::new();
         assert_eq!(leaf_count(&empty), 0);
+    }
+
+    #[test]
+    fn tree_node_path_from_str() {
+        let p = TreeNodePath::from_str("src/main.rs");
+        assert_eq!(p.depth(), 2);
+        assert_eq!(p.name(), Some("main.rs"));
+        assert_eq!(p.to_string_path(), "src/main.rs");
+    }
+
+    #[test]
+    fn tree_node_path_parent() {
+        let p = TreeNodePath::from_str("src/lib/mod.rs");
+        let parent = p.parent().unwrap();
+        assert_eq!(parent.to_string_path(), "src/lib");
+        let grandparent = parent.parent().unwrap();
+        assert_eq!(grandparent.to_string_path(), "src");
+        assert!(grandparent.parent().is_none());
+    }
+
+    #[test]
+    fn tree_node_path_join() {
+        let p = TreeNodePath::from_str("src");
+        let joined = p.join("main.rs");
+        assert_eq!(joined.to_string_path(), "src/main.rs");
+    }
+
+    #[test]
+    fn tree_node_path_starts_with() {
+        let p = TreeNodePath::from_str("src/lib/mod.rs");
+        let prefix = TreeNodePath::from_str("src/lib");
+        assert!(p.starts_with(&prefix));
+        let non_prefix = TreeNodePath::from_str("tests");
+        assert!(!p.starts_with(&non_prefix));
+    }
+
+    #[test]
+    fn tree_node_path_empty() {
+        let p = TreeNodePath::empty();
+        assert!(p.is_empty());
+        assert_eq!(p.depth(), 0);
+        assert!(p.name().is_none());
+    }
+
+    #[test]
+    fn tree_node_path_display() {
+        let p = TreeNodePath::from_str("src/main.rs");
+        assert_eq!(format!("{p}"), "src/main.rs");
+    }
+
+    #[test]
+    fn find_by_path_finds_root() {
+        let model = sample_model();
+        let path = TreeNodePath::from_str("src");
+        let result = find_by_path(&model, &path, &|d: &&str| d.to_string());
+        assert_eq!(result, Some(vec![0]));
+    }
+
+    #[test]
+    fn find_by_path_finds_nested() {
+        let model = sample_model();
+        let path = TreeNodePath::from_str("src/lib/utils.rs");
+        let result = find_by_path(&model, &path, &|d: &&str| d.to_string());
+        assert_eq!(result, Some(vec![0, 1, 1]));
+    }
+
+    #[test]
+    fn find_by_path_returns_none_for_missing() {
+        let model = sample_model();
+        let path = TreeNodePath::from_str("missing/file.rs");
+        assert!(find_by_path(&model, &path, &|d: &&str| d.to_string()).is_none());
+    }
+
+    #[test]
+    fn find_by_path_empty_path() {
+        let model = sample_model();
+        let path = TreeNodePath::empty();
+        assert!(find_by_path(&model, &path, &|d: &&str| d.to_string()).is_none());
+    }
+
+    #[test]
+    fn tree_flatten_visible_collapsed() {
+        let model = sample_model();
+        let lines = tree_flatten_visible(&model, &|d: &&str| d.to_string());
+        assert_eq!(lines.len(), 2); // only roots visible
+        assert!(lines[0].has_children);
+        assert!(!lines[0].is_expanded);
+        assert!(lines[0].indent.contains("▶"));
+    }
+
+    #[test]
+    fn tree_flatten_visible_expanded() {
+        let mut model = sample_model();
+        model.expand_all();
+        let lines = tree_flatten_visible(&model, &|d: &&str| d.to_string());
+        assert_eq!(lines.len(), 6); // all nodes visible
+        assert!(lines[0].indent.contains("▼"));
+        assert_eq!(lines[3].label, "mod.rs");
+        assert_eq!(lines[3].depth, 2);
+    }
+
+    #[test]
+    fn render_tree_output() {
+        let mut model = sample_model();
+        model.toggle_expanded(&[0]); // expand src
+        let output = render_tree(&model, &|d: &&str| d.to_string());
+        assert!(output.contains("▼ src"));
+        assert!(output.contains("  main.rs"));
+        assert!(output.contains("  ▶ lib"));
+        assert!(output.contains("Cargo.toml"));
     }
 }

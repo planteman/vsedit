@@ -470,6 +470,173 @@ impl LocalHistoryService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Garbage collector and line-level diff
+// ---------------------------------------------------------------------------
+
+/// Configuration for automatic garbage collection of history entries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GarbageCollectorConfig {
+    /// Maximum age of entries in seconds.
+    pub max_age_seconds: u64,
+    /// Maximum number of entries per file.
+    pub max_entries_per_file: usize,
+    /// Maximum total size in bytes across all entries.
+    pub max_total_size_bytes: u64,
+}
+
+impl Default for GarbageCollectorConfig {
+    fn default() -> Self {
+        Self {
+            max_age_seconds: 7 * 24 * 60 * 60, // 7 days
+            max_entries_per_file: 50,
+            max_total_size_bytes: 50 * 1024 * 1024, // 50 MB
+        }
+    }
+}
+
+/// Garbage collector for local history entries.
+pub struct LocalHistoryGarbageCollector {
+    pub config: GarbageCollectorConfig,
+}
+
+/// Result of a garbage collection run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GarbageCollectionResult {
+    pub entries_before: usize,
+    pub entries_after: usize,
+    pub entries_removed: usize,
+    pub bytes_freed: u64,
+}
+
+impl LocalHistoryGarbageCollector {
+    pub fn new(config: GarbageCollectorConfig) -> Self {
+        Self { config }
+    }
+
+    /// Run garbage collection on the given service at the specified current time.
+    pub fn collect(&self, service: &mut LocalHistoryService, current_time: u64) -> GarbageCollectionResult {
+        let entries_before = service.entry_count();
+        let size_before = service.total_size_bytes();
+
+        // Phase 1: Remove entries older than max_age
+        service.prune_by_age(self.config.max_age_seconds, current_time);
+
+        // Phase 2: Enforce per-file limit
+        let uris = service.get_unique_uris();
+        for uri in &uris {
+            let count = service.entries.iter().filter(|e| e.uri == *uri).count();
+            if count > self.config.max_entries_per_file {
+                let old_max = service.max_entries_per_file;
+                service.max_entries_per_file = self.config.max_entries_per_file;
+                service.prune(uri);
+                service.max_entries_per_file = old_max;
+            }
+        }
+
+        // Phase 3: Enforce total size limit
+        while service.total_size_bytes() > self.config.max_total_size_bytes && !service.entries.is_empty() {
+            // Remove the oldest entry
+            if let Some(oldest_idx) = service
+                .entries
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, e)| e.timestamp)
+                .map(|(i, _)| i)
+            {
+                service.entries.remove(oldest_idx);
+            }
+        }
+
+        let entries_after = service.entry_count();
+        let size_after = service.total_size_bytes();
+        GarbageCollectionResult {
+            entries_before,
+            entries_after,
+            entries_removed: entries_before.saturating_sub(entries_after),
+            bytes_freed: size_before.saturating_sub(size_after),
+        }
+    }
+
+    /// Check if garbage collection is needed based on current state.
+    pub fn needs_collection(&self, service: &LocalHistoryService, current_time: u64) -> bool {
+        if service.total_size_bytes() > self.config.max_total_size_bytes {
+            return true;
+        }
+        service.entries.iter().any(|e| e.age(current_time) > self.config.max_age_seconds)
+    }
+}
+
+/// A changed line between two history entry contents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineDiff {
+    pub line_number: usize,
+    pub kind: LineDiffKind,
+    pub content: String,
+}
+
+/// Kind of line difference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineDiffKind {
+    Added,
+    Removed,
+    Modified,
+}
+
+impl fmt::Display for LineDiffKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LineDiffKind::Added => write!(f, "+"),
+            LineDiffKind::Removed => write!(f, "-"),
+            LineDiffKind::Modified => write!(f, "~"),
+        }
+    }
+}
+
+/// Compute line-level diffs between two content strings.
+pub fn history_diff(old_content: &str, new_content: &str) -> Vec<LineDiff> {
+    let old_lines: Vec<&str> = old_content.lines().collect();
+    let new_lines: Vec<&str> = new_content.lines().collect();
+    let mut diffs = Vec::new();
+    let max_len = old_lines.len().max(new_lines.len());
+
+    for i in 0..max_len {
+        match (old_lines.get(i), new_lines.get(i)) {
+            (Some(old), Some(new)) => {
+                if old != new {
+                    diffs.push(LineDiff {
+                        line_number: i + 1,
+                        kind: LineDiffKind::Modified,
+                        content: new.to_string(),
+                    });
+                }
+            }
+            (None, Some(new)) => {
+                diffs.push(LineDiff {
+                    line_number: i + 1,
+                    kind: LineDiffKind::Added,
+                    content: new.to_string(),
+                });
+            }
+            (Some(old), None) => {
+                diffs.push(LineDiff {
+                    line_number: i + 1,
+                    kind: LineDiffKind::Removed,
+                    content: old.to_string(),
+                });
+            }
+            (None, None) => {}
+        }
+    }
+
+    diffs
+}
+
+/// Compute the number of changed lines between two content strings.
+pub fn history_diff_count(old_content: &str, new_content: &str) -> usize {
+    history_diff(old_content, new_content).len()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -911,5 +1078,124 @@ mod tests {
         svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
         let diffs = svc.compute_consecutive_diffs("file:///a.rs");
         assert!(diffs.is_empty());
+    }
+
+    #[test]
+    fn gc_config_defaults() {
+        let cfg = GarbageCollectorConfig::default();
+        assert_eq!(cfg.max_age_seconds, 7 * 24 * 60 * 60);
+        assert_eq!(cfg.max_entries_per_file, 50);
+        assert_eq!(cfg.max_total_size_bytes, 50 * 1024 * 1024);
+    }
+
+    #[test]
+    fn gc_prunes_old_entries() {
+        let mut svc = LocalHistoryService::new(100);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h3", HistorySource::Auto);
+        // timestamps: 1, 2, 3
+        let gc = LocalHistoryGarbageCollector::new(GarbageCollectorConfig {
+            max_age_seconds: 1,
+            max_entries_per_file: 100,
+            max_total_size_bytes: u64::MAX,
+        });
+        let result = gc.collect(&mut svc, 4); // cutoff = 3, keeps >= 3
+        assert_eq!(result.entries_removed, 2);
+        assert_eq!(result.entries_after, 1);
+    }
+
+    #[test]
+    fn gc_enforces_per_file_limit() {
+        let mut svc = LocalHistoryService::new(100);
+        for i in 0..10 {
+            svc.add_entry("file:///a.rs", &format!("h{i}"), HistorySource::Auto);
+        }
+        let gc = LocalHistoryGarbageCollector::new(GarbageCollectorConfig {
+            max_age_seconds: u64::MAX,
+            max_entries_per_file: 3,
+            max_total_size_bytes: u64::MAX,
+        });
+        let result = gc.collect(&mut svc, 100);
+        assert_eq!(result.entries_after, 3);
+    }
+
+    #[test]
+    fn gc_enforces_total_size() {
+        let mut svc = LocalHistoryService::new(100);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Auto);
+        svc.entries[0].size_bytes = 500;
+        svc.entries[1].size_bytes = 500;
+        let gc = LocalHistoryGarbageCollector::new(GarbageCollectorConfig {
+            max_age_seconds: u64::MAX,
+            max_entries_per_file: 100,
+            max_total_size_bytes: 600,
+        });
+        let result = gc.collect(&mut svc, 100);
+        assert!(svc.total_size_bytes() <= 600);
+        assert!(result.entries_removed > 0);
+    }
+
+    #[test]
+    fn gc_needs_collection() {
+        let mut svc = LocalHistoryService::new(100);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        let gc = LocalHistoryGarbageCollector::new(GarbageCollectorConfig {
+            max_age_seconds: 5,
+            max_entries_per_file: 100,
+            max_total_size_bytes: u64::MAX,
+        });
+        assert!(!gc.needs_collection(&svc, 3)); // age=2, max=5
+        assert!(gc.needs_collection(&svc, 10)); // age=9, max=5
+    }
+
+    #[test]
+    fn history_diff_detects_modifications() {
+        let old = "line1\nline2\nline3";
+        let new = "line1\nmodified\nline3";
+        let diffs = history_diff(old, new);
+        assert_eq!(diffs.len(), 1);
+        assert_eq!(diffs[0].line_number, 2);
+        assert_eq!(diffs[0].kind, LineDiffKind::Modified);
+        assert_eq!(diffs[0].content, "modified");
+    }
+
+    #[test]
+    fn history_diff_detects_additions() {
+        let old = "line1";
+        let new = "line1\nnew_line";
+        let diffs = history_diff(old, new);
+        assert_eq!(diffs.len(), 1);
+        assert_eq!(diffs[0].kind, LineDiffKind::Added);
+    }
+
+    #[test]
+    fn history_diff_detects_removals() {
+        let old = "line1\nline2";
+        let new = "line1";
+        let diffs = history_diff(old, new);
+        assert_eq!(diffs.len(), 1);
+        assert_eq!(diffs[0].kind, LineDiffKind::Removed);
+    }
+
+    #[test]
+    fn history_diff_identical() {
+        let content = "same\ncontent";
+        assert!(history_diff(content, content).is_empty());
+    }
+
+    #[test]
+    fn history_diff_count_works() {
+        let old = "a\nb\nc";
+        let new = "a\nmodified\nc\nnew";
+        assert_eq!(history_diff_count(old, new), 2); // modified + added
+    }
+
+    #[test]
+    fn line_diff_kind_display() {
+        assert_eq!(format!("{}", LineDiffKind::Added), "+");
+        assert_eq!(format!("{}", LineDiffKind::Removed), "-");
+        assert_eq!(format!("{}", LineDiffKind::Modified), "~");
     }
 }
