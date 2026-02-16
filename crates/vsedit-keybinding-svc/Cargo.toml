@@ -10,4 +10,10 @@ vsedit-commands = { path = "../vsedit-commands" }
 vsedit-contextkey = { path = "../vsedit-contextkey" }
 vsedit-keybindings = { path = "../vsedit-keybindings" }
 vsedit-keycodes = { path = "../vsedit-keycodes" }
+vsedit-platform = { path = "../vsedit-platform" }
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
 
