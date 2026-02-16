@@ -125,6 +125,217 @@ pub trait ColorProvider {
 }
 
 // ---------------------------------------------------------------------------
+// HSL color type
+// ---------------------------------------------------------------------------
+
+/// An HSLA color with hue in degrees `0..360`, saturation and lightness in
+/// `0.0..=1.0`, and alpha in `0.0..=1.0`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HslColor {
+    pub h: f64,
+    pub s: f64,
+    pub l: f64,
+    pub a: f64,
+}
+
+impl HslColor {
+    pub fn new(h: f64, s: f64, l: f64, a: f64) -> Self {
+        Self { h, s, l, a }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HSL conversion helpers
+// ---------------------------------------------------------------------------
+
+/// Converts an RGB [`Color`] to an [`HslColor`].
+pub fn rgb_to_hsl(c: &Color) -> HslColor {
+    let r = c.r;
+    let g = c.g;
+    let b = c.b;
+    let max = r.max(g).max(b);
+    let min = r.min(g).min(b);
+    let l = (max + min) / 2.0;
+
+    if (max - min).abs() < f64::EPSILON {
+        return HslColor::new(0.0, 0.0, l, c.a);
+    }
+
+    let d = max - min;
+    let s = if l > 0.5 {
+        d / (2.0 - max - min)
+    } else {
+        d / (max + min)
+    };
+
+    let h = if (max - r).abs() < f64::EPSILON {
+        let mut h = (g - b) / d;
+        if g < b {
+            h += 6.0;
+        }
+        h
+    } else if (max - g).abs() < f64::EPSILON {
+        (b - r) / d + 2.0
+    } else {
+        (r - g) / d + 4.0
+    };
+
+    HslColor::new(h * 60.0, s, l, c.a)
+}
+
+/// Converts an [`HslColor`] back to an RGB [`Color`].
+pub fn hsl_to_rgb(hsl: &HslColor) -> Color {
+    let h = hsl.h;
+    let s = hsl.s;
+    let l = hsl.l;
+
+    if s.abs() < f64::EPSILON {
+        return Color::new(l, l, l, hsl.a);
+    }
+
+    fn hue_to_rgb(p: f64, q: f64, mut t: f64) -> f64 {
+        if t < 0.0 {
+            t += 1.0;
+        }
+        if t > 1.0 {
+            t -= 1.0;
+        }
+        if t < 1.0 / 6.0 {
+            return p + (q - p) * 6.0 * t;
+        }
+        if t < 1.0 / 2.0 {
+            return q;
+        }
+        if t < 2.0 / 3.0 {
+            return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+        }
+        p
+    }
+
+    let q = if l < 0.5 {
+        l * (1.0 + s)
+    } else {
+        l + s - l * s
+    };
+    let p = 2.0 * l - q;
+    let hk = h / 360.0;
+
+    Color::new(
+        hue_to_rgb(p, q, hk + 1.0 / 3.0),
+        hue_to_rgb(p, q, hk),
+        hue_to_rgb(p, q, hk - 1.0 / 3.0),
+        hsl.a,
+    )
+}
+
+/// Formats a [`Color`] as an `hsl(H, S%, L%)` CSS-style string.
+pub fn color_to_hsl_string(color: &Color) -> String {
+    let hsl = rgb_to_hsl(color);
+    format!(
+        "hsl({:.0}, {:.0}%, {:.0}%)",
+        hsl.h,
+        hsl.s * 100.0,
+        hsl.l * 100.0
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Luminance & contrast
+// ---------------------------------------------------------------------------
+
+/// Returns the relative luminance of a color using the WCAG formula.
+pub fn luminance(c: &Color) -> f64 {
+    fn linearize(v: f64) -> f64 {
+        if v <= 0.03928 {
+            v / 12.92
+        } else {
+            ((v + 0.055) / 1.055).powf(2.4)
+        }
+    }
+    0.2126 * linearize(c.r) + 0.7152 * linearize(c.g) + 0.0722 * linearize(c.b)
+}
+
+/// Returns the WCAG contrast ratio between two colors.
+pub fn contrast_ratio(c1: &Color, c2: &Color) -> f64 {
+    let l1 = luminance(c1);
+    let l2 = luminance(c2);
+    let (lighter, darker) = if l1 > l2 { (l1, l2) } else { (l2, l1) };
+    (lighter + 0.05) / (darker + 0.05)
+}
+
+/// Returns `true` if the color is considered dark (luminance < 0.5).
+pub fn is_dark(c: &Color) -> bool {
+    luminance(c) < 0.179
+}
+
+// ---------------------------------------------------------------------------
+// Blending
+// ---------------------------------------------------------------------------
+
+/// Linearly interpolates between two colors by `factor` (0.0 = c1, 1.0 = c2).
+pub fn blend(c1: &Color, c2: &Color, factor: f64) -> Color {
+    let f = factor.clamp(0.0, 1.0);
+    Color::new(
+        c1.r + (c2.r - c1.r) * f,
+        c1.g + (c2.g - c1.g) * f,
+        c1.b + (c2.b - c1.b) * f,
+        c1.a + (c2.a - c1.a) * f,
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Extended hex parsing
+// ---------------------------------------------------------------------------
+
+/// Parses a `#RRGGBBAA` hex string into a [`Color`].
+pub fn hex_to_color_with_alpha(hex: &str) -> Option<Color> {
+    let hex = hex.strip_prefix('#')?;
+    if hex.len() != 8 {
+        return None;
+    }
+    let r = u8::from_str_radix(hex.get(0..2)?, 16).ok()?;
+    let g = u8::from_str_radix(hex.get(2..4)?, 16).ok()?;
+    let b = u8::from_str_radix(hex.get(4..6)?, 16).ok()?;
+    let a = u8::from_str_radix(hex.get(6..8)?, 16).ok()?;
+    Some(Color::new(
+        f64::from(r) / 255.0,
+        f64::from(g) / 255.0,
+        f64::from(b) / 255.0,
+        f64::from(a) / 255.0,
+    ))
+}
+
+/// Attempts to parse a color string in multiple formats:
+/// `#RGB`, `#RRGGBB`, `#RRGGBBAA`, or `rgb(R, G, B)`.
+pub fn parse_color(input: &str) -> Option<Color> {
+    let input = input.trim();
+    if input.starts_with('#') {
+        return match input.len() - 1 {
+            3 | 6 => hex_to_color(input),
+            8 => hex_to_color_with_alpha(input),
+            _ => None,
+        };
+    }
+    if input.starts_with("rgb(") && input.ends_with(')') {
+        let inner = &input[4..input.len() - 1];
+        let parts: Vec<&str> = inner.split(',').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+        let r: u8 = parts[0].trim().parse().ok()?;
+        let g: u8 = parts[1].trim().parse().ok()?;
+        let b: u8 = parts[2].trim().parse().ok()?;
+        return Some(Color::new(
+            f64::from(r) / 255.0,
+            f64::from(g) / 255.0,
+            f64::from(b) / 255.0,
+            1.0,
+        ));
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -169,5 +380,98 @@ mod tests {
 
         let pres_no_edit = ColorPresentation::new("red", None);
         assert_eq!(pres_no_edit.text_edit, None);
+    }
+
+    #[test]
+    fn rgb_to_hsl_pure_red() {
+        let red = Color::new(1.0, 0.0, 0.0, 1.0);
+        let hsl = rgb_to_hsl(&red);
+        assert!((hsl.h - 0.0).abs() < 1.0);
+        assert!((hsl.s - 1.0).abs() < 0.01);
+        assert!((hsl.l - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn hsl_rgb_round_trip() {
+        let orig = Color::new(0.2, 0.6, 0.8, 0.9);
+        let hsl = rgb_to_hsl(&orig);
+        let back = hsl_to_rgb(&hsl);
+        assert!((back.r - orig.r).abs() < 0.01);
+        assert!((back.g - orig.g).abs() < 0.01);
+        assert!((back.b - orig.b).abs() < 0.01);
+        assert!((back.a - orig.a).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn hsl_grayscale() {
+        let gray = Color::new(0.5, 0.5, 0.5, 1.0);
+        let hsl = rgb_to_hsl(&gray);
+        assert!(hsl.s.abs() < 0.01);
+    }
+
+    #[test]
+    fn color_to_hsl_string_format() {
+        let c = Color::new(1.0, 0.0, 0.0, 1.0);
+        let s = color_to_hsl_string(&c);
+        assert!(s.starts_with("hsl("));
+        assert!(s.ends_with(')'));
+    }
+
+    #[test]
+    fn luminance_black_white() {
+        let black = Color::new(0.0, 0.0, 0.0, 1.0);
+        let white = Color::new(1.0, 1.0, 1.0, 1.0);
+        assert!(luminance(&black) < 0.01);
+        assert!(luminance(&white) > 0.99);
+    }
+
+    #[test]
+    fn contrast_ratio_black_white() {
+        let black = Color::new(0.0, 0.0, 0.0, 1.0);
+        let white = Color::new(1.0, 1.0, 1.0, 1.0);
+        let ratio = contrast_ratio(&black, &white);
+        assert!((ratio - 21.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn is_dark_check() {
+        let black = Color::new(0.0, 0.0, 0.0, 1.0);
+        let white = Color::new(1.0, 1.0, 1.0, 1.0);
+        assert!(is_dark(&black));
+        assert!(!is_dark(&white));
+    }
+
+    #[test]
+    fn blend_midpoint() {
+        let c1 = Color::new(0.0, 0.0, 0.0, 1.0);
+        let c2 = Color::new(1.0, 1.0, 1.0, 1.0);
+        let mid = blend(&c1, &c2, 0.5);
+        assert!((mid.r - 0.5).abs() < 0.01);
+        assert!((mid.g - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn hex_to_color_with_alpha_parse() {
+        let c = hex_to_color_with_alpha("#FF000080").unwrap();
+        assert!((c.r - 1.0).abs() < 0.01);
+        assert!((c.a - 128.0 / 255.0).abs() < 0.01);
+        assert!(hex_to_color_with_alpha("#FF00").is_none());
+    }
+
+    #[test]
+    fn parse_color_multiple_formats() {
+        let hex6 = parse_color("#FF0000").unwrap();
+        assert!((hex6.r - 1.0).abs() < 0.01);
+
+        let hex3 = parse_color("#F00").unwrap();
+        assert!((hex3.r - 1.0).abs() < 0.01);
+
+        let hex8 = parse_color("#FF000080").unwrap();
+        assert!((hex8.a - 128.0 / 255.0).abs() < 0.01);
+
+        let rgb = parse_color("rgb(255, 0, 0)").unwrap();
+        assert!((rgb.r - 1.0).abs() < 0.01);
+
+        assert!(parse_color("invalid").is_none());
     }
 }

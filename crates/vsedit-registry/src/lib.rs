@@ -5,6 +5,40 @@
 //! extension points here so the system can discover and validate them.
 
 use std::collections::{HashMap, HashSet};
+use std::fmt;
+
+// ---------------------------------------------------------------------------
+// RegistryError
+// ---------------------------------------------------------------------------
+
+/// Errors that can occur when operating on the extension point registry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryError {
+    /// The extension point ID is already registered.
+    DuplicatePoint(String),
+    /// The extension point ID was not found.
+    PointNotFound(String),
+    /// The extension point ID does not follow naming conventions.
+    InvalidId(String),
+}
+
+impl fmt::Display for RegistryError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RegistryError::DuplicatePoint(id) => {
+                write!(f, "extension point already registered: {id}")
+            }
+            RegistryError::PointNotFound(id) => {
+                write!(f, "extension point not found: {id}")
+            }
+            RegistryError::InvalidId(id) => {
+                write!(f, "invalid extension point id: {id}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for RegistryError {}
 
 // ---------------------------------------------------------------------------
 // ExtensionPointRegistry
@@ -24,6 +58,21 @@ pub struct ExtensionPointRegistry {
 #[derive(Debug, Clone, Default)]
 pub struct ExtensionPointMetadata {
     pub description: String,
+    pub version: Option<String>,
+    pub deprecated: bool,
+}
+
+impl fmt::Display for ExtensionPointMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description)?;
+        if let Some(ref v) = self.version {
+            write!(f, " (v{v})")?;
+        }
+        if self.deprecated {
+            write!(f, " [DEPRECATED]")?;
+        }
+        Ok(())
+    }
 }
 
 impl ExtensionPointRegistry {
@@ -69,6 +118,74 @@ impl ExtensionPointRegistry {
     /// Returns an iterator over all registered extension point IDs.
     pub fn iter(&self) -> impl Iterator<Item = &str> {
         self.points.iter().map(String::as_str)
+    }
+
+    /// Unregister an extension point by ID.
+    ///
+    /// Returns an error if the point was not previously registered.
+    pub fn unregister_point(&mut self, id: &str) -> Result<(), RegistryError> {
+        if !self.points.remove(id) {
+            return Err(RegistryError::PointNotFound(id.to_string()));
+        }
+        self.metadata.remove(id);
+        Ok(())
+    }
+
+    /// Register an extension point, returning an error if it already exists.
+    pub fn try_register(&mut self, id: &str) -> Result<(), RegistryError> {
+        if self.points.contains(id) {
+            return Err(RegistryError::DuplicatePoint(id.to_string()));
+        }
+        self.points.insert(id.to_string());
+        Ok(())
+    }
+
+    /// Find all registered extension points whose ID starts with `prefix`.
+    pub fn find_by_prefix(&self, prefix: &str) -> Vec<&str> {
+        let mut result: Vec<&str> = self
+            .points
+            .iter()
+            .filter(|id| id.starts_with(prefix))
+            .map(String::as_str)
+            .collect();
+        result.sort();
+        result
+    }
+
+    /// Return IDs of all extension points marked as deprecated.
+    pub fn get_deprecated(&self) -> Vec<&str> {
+        let mut result: Vec<&str> = self
+            .metadata
+            .iter()
+            .filter(|(_, meta)| meta.deprecated)
+            .map(|(id, _)| id.as_str())
+            .collect();
+        result.sort();
+        result
+    }
+
+    /// Remove all registered extension points.
+    pub fn clear(&mut self) {
+        self.points.clear();
+        self.metadata.clear();
+    }
+
+    /// Validate that an extension point ID follows naming conventions.
+    ///
+    /// A valid ID consists of dot-separated segments where each segment is
+    /// non-empty and contains no whitespace.
+    pub fn validate_id(id: &str) -> Result<(), RegistryError> {
+        if id.is_empty() {
+            return Err(RegistryError::InvalidId(id.to_string()));
+        }
+        if id.contains(char::is_whitespace) {
+            return Err(RegistryError::InvalidId(id.to_string()));
+        }
+        let segments: Vec<&str> = id.split('.').collect();
+        if segments.iter().any(|s| s.is_empty()) {
+            return Err(RegistryError::InvalidId(id.to_string()));
+        }
+        Ok(())
     }
 }
 
@@ -122,6 +239,7 @@ mod tests {
             "vsedit.themes",
             ExtensionPointMetadata {
                 description: "Color themes".into(),
+                ..Default::default()
             },
         );
         assert!(reg.has_point("vsedit.themes"));
@@ -152,5 +270,139 @@ mod tests {
         let mut ids: Vec<&str> = reg.iter().collect();
         ids.sort();
         assert_eq!(ids, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn unregister_existing_point() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point_with_metadata(
+            "vsedit.commands",
+            ExtensionPointMetadata {
+                description: "Commands".into(),
+                ..Default::default()
+            },
+        );
+        assert!(reg.has_point("vsedit.commands"));
+        reg.unregister_point("vsedit.commands").unwrap();
+        assert!(!reg.has_point("vsedit.commands"));
+        assert!(reg.get_metadata("vsedit.commands").is_none());
+    }
+
+    #[test]
+    fn unregister_missing_point_returns_error() {
+        let mut reg = ExtensionPointRegistry::new();
+        let err = reg.unregister_point("nonexistent").unwrap_err();
+        assert_eq!(err, RegistryError::PointNotFound("nonexistent".into()));
+    }
+
+    #[test]
+    fn try_register_duplicate_returns_error() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.try_register("vsedit.editor").unwrap();
+        let err = reg.try_register("vsedit.editor").unwrap_err();
+        assert_eq!(err, RegistryError::DuplicatePoint("vsedit.editor".into()));
+    }
+
+    #[test]
+    fn find_by_prefix_returns_sorted_matches() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point("vsedit.editor.tabs");
+        reg.register_point("vsedit.editor.gutter");
+        reg.register_point("vsedit.themes");
+        reg.register_point("vsedit.editor.minimap");
+
+        let results = reg.find_by_prefix("vsedit.editor.");
+        assert_eq!(
+            results,
+            vec!["vsedit.editor.gutter", "vsedit.editor.minimap", "vsedit.editor.tabs"]
+        );
+    }
+
+    #[test]
+    fn get_deprecated_filters_correctly() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point_with_metadata(
+            "vsedit.oldapi",
+            ExtensionPointMetadata {
+                description: "Old API".into(),
+                deprecated: true,
+                ..Default::default()
+            },
+        );
+        reg.register_point_with_metadata(
+            "vsedit.newapi",
+            ExtensionPointMetadata {
+                description: "New API".into(),
+                deprecated: false,
+                ..Default::default()
+            },
+        );
+        reg.register_point("vsedit.plain");
+
+        let deprecated = reg.get_deprecated();
+        assert_eq!(deprecated, vec!["vsedit.oldapi"]);
+    }
+
+    #[test]
+    fn clear_removes_all() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point("a");
+        reg.register_point("b");
+        reg.register_point_with_metadata(
+            "c",
+            ExtensionPointMetadata {
+                description: "C".into(),
+                ..Default::default()
+            },
+        );
+        assert_eq!(reg.len(), 3);
+        reg.clear();
+        assert!(reg.is_empty());
+        assert!(reg.get_metadata("c").is_none());
+    }
+
+    #[test]
+    fn validate_id_accepts_valid_ids() {
+        assert!(ExtensionPointRegistry::validate_id("vsedit.commands").is_ok());
+        assert!(ExtensionPointRegistry::validate_id("a.b.c.d").is_ok());
+        assert!(ExtensionPointRegistry::validate_id("single").is_ok());
+    }
+
+    #[test]
+    fn validate_id_rejects_invalid_ids() {
+        assert!(ExtensionPointRegistry::validate_id("").is_err());
+        assert!(ExtensionPointRegistry::validate_id("has space").is_err());
+        assert!(ExtensionPointRegistry::validate_id(".leading.dot").is_err());
+        assert!(ExtensionPointRegistry::validate_id("trailing.dot.").is_err());
+        assert!(ExtensionPointRegistry::validate_id("double..dot").is_err());
+    }
+
+    #[test]
+    fn metadata_display_impl() {
+        let meta = ExtensionPointMetadata {
+            description: "Color themes".into(),
+            version: Some("1.2.0".into()),
+            deprecated: false,
+        };
+        assert_eq!(format!("{meta}"), "Color themes (v1.2.0)");
+
+        let deprecated_meta = ExtensionPointMetadata {
+            description: "Old themes".into(),
+            version: None,
+            deprecated: true,
+        };
+        assert_eq!(format!("{deprecated_meta}"), "Old themes [DEPRECATED]");
+    }
+
+    #[test]
+    fn error_display_messages() {
+        let e1 = RegistryError::DuplicatePoint("foo".into());
+        assert_eq!(format!("{e1}"), "extension point already registered: foo");
+
+        let e2 = RegistryError::PointNotFound("bar".into());
+        assert_eq!(format!("{e2}"), "extension point not found: bar");
+
+        let e3 = RegistryError::InvalidId("bad id".into());
+        assert_eq!(format!("{e3}"), "invalid extension point id: bad id");
     }
 }

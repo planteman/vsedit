@@ -1,11 +1,62 @@
 //! Unicode confusable detection.
 
+use std::fmt;
+
+/// Severity level for a unicode highlight.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Severity {
+    Error,
+    Warning,
+    Info,
+}
+
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Severity::Error => write!(f, "error"),
+            Severity::Warning => write!(f, "warning"),
+            Severity::Info => write!(f, "info"),
+        }
+    }
+}
+
+/// Error type for unicode highlight operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UnicodeError {
+    InvalidRange { start: u32, end: u32 },
+    ConfigError(String),
+}
+
+impl fmt::Display for UnicodeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UnicodeError::InvalidRange { start, end } => {
+                write!(f, "invalid range: {}..{}", start, end)
+            }
+            UnicodeError::ConfigError(msg) => write!(f, "config error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for UnicodeError {}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnicodeCategory {
     Ambiguous,
     Invisible,
     NonBasicAscii,
     ConfusableWithAscii,
+}
+
+impl fmt::Display for UnicodeCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UnicodeCategory::Ambiguous => write!(f, "ambiguous"),
+            UnicodeCategory::Invisible => write!(f, "invisible"),
+            UnicodeCategory::NonBasicAscii => write!(f, "non-basic ASCII"),
+            UnicodeCategory::ConfusableWithAscii => write!(f, "confusable with ASCII"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -15,6 +66,31 @@ pub struct UnicodeHighlight {
     pub character: char,
     pub category: UnicodeCategory,
     pub replacement: Option<char>,
+}
+
+impl fmt::Display for UnicodeHighlight {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "U+{:04X} '{}' at {}:{} ({})",
+            self.character as u32,
+            self.character,
+            self.line,
+            self.column,
+            self.category,
+        )
+    }
+}
+
+impl UnicodeHighlight {
+    /// Returns the severity level for this highlight.
+    pub fn severity(&self) -> Severity {
+        match self.category {
+            UnicodeCategory::Invisible => Severity::Error,
+            UnicodeCategory::ConfusableWithAscii | UnicodeCategory::Ambiguous => Severity::Warning,
+            UnicodeCategory::NonBasicAscii => Severity::Info,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -29,6 +105,28 @@ impl Default for UnicodeHighlightConfig {
     fn default() -> Self {
         Self {
             ambiguous_characters: true,
+            invisible_characters: true,
+            non_basic_ascii: false,
+            allowed_characters: Vec::new(),
+        }
+    }
+}
+
+impl UnicodeHighlightConfig {
+    /// Strict config: all checks enabled.
+    pub fn strict() -> Self {
+        Self {
+            ambiguous_characters: true,
+            invisible_characters: true,
+            non_basic_ascii: true,
+            allowed_characters: Vec::new(),
+        }
+    }
+
+    /// Permissive config: only invisible character checks.
+    pub fn permissive() -> Self {
+        Self {
+            ambiguous_characters: false,
             invisible_characters: true,
             non_basic_ascii: false,
             allowed_characters: Vec::new(),
@@ -111,6 +209,46 @@ pub fn highlight_line(
     highlights
 }
 
+/// Returns `true` for RTL override and embedding characters (security concern).
+pub fn is_rtl_override(ch: char) -> bool {
+    matches!(
+        ch,
+        '\u{202A}' // left-to-right embedding
+        | '\u{202B}' // right-to-left embedding
+        | '\u{202C}' // pop directional formatting
+        | '\u{202D}' // left-to-right override
+        | '\u{202E}' // right-to-left override
+        | '\u{2066}' // left-to-right isolate
+        | '\u{2067}' // right-to-left isolate
+        | '\u{2068}' // first strong isolate
+        | '\u{2069}' // pop directional isolate
+    )
+}
+
+/// Count non-ASCII characters in a string.
+pub fn count_non_ascii(s: &str) -> usize {
+    s.chars().filter(|ch| !ch.is_ascii()).count()
+}
+
+/// Replace all confusable characters with their ASCII equivalents.
+pub fn replace_confusables(s: &str) -> String {
+    s.chars()
+        .map(|ch| is_confusable(ch).unwrap_or(ch))
+        .collect()
+}
+
+/// Process multiple lines and return all highlights.
+pub fn highlight_document(
+    lines: &[&str],
+    config: &UnicodeHighlightConfig,
+) -> Vec<UnicodeHighlight> {
+    lines
+        .iter()
+        .enumerate()
+        .flat_map(|(i, line)| highlight_line(line, i as u32, config))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,5 +288,142 @@ mod tests {
         let line = "\u{0430}bc";
         let results = highlight_line(line, 0, &config);
         assert!(results.is_empty());
+    }
+
+    #[test]
+    fn highlight_document_multi_line() {
+        let config = UnicodeHighlightConfig::default();
+        let lines = vec!["h\u{0435}llo", "w\u{200B}rld"];
+        let results = highlight_document(&lines, &config);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].line, 0);
+        assert_eq!(results[0].category, UnicodeCategory::ConfusableWithAscii);
+        assert_eq!(results[1].line, 1);
+        assert_eq!(results[1].category, UnicodeCategory::Invisible);
+    }
+
+    #[test]
+    fn highlight_document_empty() {
+        let config = UnicodeHighlightConfig::default();
+        let results = highlight_document(&[], &config);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn severity_levels() {
+        let invisible = UnicodeHighlight {
+            line: 0,
+            column: 0,
+            character: '\u{200B}',
+            category: UnicodeCategory::Invisible,
+            replacement: None,
+        };
+        assert_eq!(invisible.severity(), Severity::Error);
+
+        let confusable = UnicodeHighlight {
+            line: 0,
+            column: 0,
+            character: '\u{0430}',
+            category: UnicodeCategory::ConfusableWithAscii,
+            replacement: Some('a'),
+        };
+        assert_eq!(confusable.severity(), Severity::Warning);
+
+        let non_basic = UnicodeHighlight {
+            line: 0,
+            column: 0,
+            character: '\u{00E9}',
+            category: UnicodeCategory::NonBasicAscii,
+            replacement: None,
+        };
+        assert_eq!(non_basic.severity(), Severity::Info);
+    }
+
+    #[test]
+    fn strict_config_catches_non_basic() {
+        let config = UnicodeHighlightConfig::strict();
+        assert!(config.ambiguous_characters);
+        assert!(config.invisible_characters);
+        assert!(config.non_basic_ascii);
+        let line = "caf\u{00E9}";
+        let results = highlight_line(line, 0, &config);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].category, UnicodeCategory::NonBasicAscii);
+    }
+
+    #[test]
+    fn permissive_config_only_invisible() {
+        let config = UnicodeHighlightConfig::permissive();
+        assert!(!config.ambiguous_characters);
+        assert!(config.invisible_characters);
+        assert!(!config.non_basic_ascii);
+        // Confusable should be ignored under permissive config
+        let line = "h\u{0435}llo";
+        let results = highlight_line(line, 0, &config);
+        assert!(results.is_empty());
+        // Invisible should still be caught
+        let line2 = "a\u{200B}b";
+        let results2 = highlight_line(line2, 0, &config);
+        assert_eq!(results2.len(), 1);
+        assert_eq!(results2[0].category, UnicodeCategory::Invisible);
+    }
+
+    #[test]
+    fn detects_rtl_override() {
+        assert!(is_rtl_override('\u{202E}'));
+        assert!(is_rtl_override('\u{2067}'));
+        assert!(!is_rtl_override('a'));
+        assert!(!is_rtl_override('\u{0430}'));
+    }
+
+    #[test]
+    fn count_non_ascii_works() {
+        assert_eq!(count_non_ascii("hello"), 0);
+        assert_eq!(count_non_ascii("h\u{0435}ll\u{043E}"), 2);
+        assert_eq!(count_non_ascii(""), 0);
+        assert_eq!(count_non_ascii("\u{200B}\u{200C}\u{200D}"), 3);
+    }
+
+    #[test]
+    fn replace_confusables_works() {
+        assert_eq!(replace_confusables("h\u{0435}llo"), "hello");
+        assert_eq!(replace_confusables("\u{0430}\u{043E}"), "ao");
+        assert_eq!(replace_confusables("hello"), "hello");
+    }
+
+    #[test]
+    fn display_impls() {
+        assert_eq!(format!("{}", UnicodeCategory::Invisible), "invisible");
+        assert_eq!(
+            format!("{}", UnicodeCategory::ConfusableWithAscii),
+            "confusable with ASCII"
+        );
+        assert_eq!(format!("{}", UnicodeCategory::NonBasicAscii), "non-basic ASCII");
+        assert_eq!(format!("{}", UnicodeCategory::Ambiguous), "ambiguous");
+
+        assert_eq!(format!("{}", Severity::Error), "error");
+        assert_eq!(format!("{}", Severity::Warning), "warning");
+        assert_eq!(format!("{}", Severity::Info), "info");
+
+        let h = UnicodeHighlight {
+            line: 5,
+            column: 3,
+            character: '\u{0430}',
+            category: UnicodeCategory::ConfusableWithAscii,
+            replacement: Some('a'),
+        };
+        let display = format!("{}", h);
+        assert!(display.contains("U+0430"));
+        assert!(display.contains("5:3"));
+        assert!(display.contains("confusable with ASCII"));
+    }
+
+    #[test]
+    fn error_display() {
+        let err = UnicodeError::InvalidRange { start: 10, end: 5 };
+        assert_eq!(format!("{}", err), "invalid range: 10..5");
+
+        let err2 = UnicodeError::ConfigError("bad value".to_string());
+        assert_eq!(format!("{}", err2), "config error: bad value");
     }
 }

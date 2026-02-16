@@ -1,5 +1,8 @@
 //! Theme color system mapping VS Code colors to terminal colors.
 
+use std::collections::HashMap;
+use std::fmt;
+
 // Re-export ratatui colors
 pub use vsedit_tui::{Color, Modifier, Style};
 
@@ -10,6 +13,17 @@ pub struct ThemeColor(pub String);
 impl ThemeColor {
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
+    }
+
+    /// Construct from a string slice.
+    pub fn from_str(id: &str) -> Self {
+        Self(id.to_string())
+    }
+}
+
+impl fmt::Display for ThemeColor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -97,6 +111,128 @@ pub fn sidebar_style() -> Style {
         .bg(ThemeDefaults::sidebar_background())
 }
 
+pub fn error_style() -> Style {
+    Style::default().fg(ThemeDefaults::error_foreground())
+}
+
+pub fn warning_style() -> Style {
+    Style::default().fg(ThemeDefaults::warning_foreground())
+}
+
+pub fn info_style() -> Style {
+    Style::default().fg(ThemeDefaults::info_foreground())
+}
+
+pub fn panel_style() -> Style {
+    Style::default()
+        .fg(ThemeDefaults::editor_foreground())
+        .bg(ThemeDefaults::panel_background())
+}
+
+pub fn tab_active_style() -> Style {
+    Style::default()
+        .fg(ThemeDefaults::editor_foreground())
+        .bg(ThemeDefaults::tab_active_background())
+        .add_modifier(Modifier::BOLD)
+}
+
+pub fn tab_inactive_style() -> Style {
+    Style::default()
+        .fg(ThemeDefaults::sidebar_foreground())
+        .bg(ThemeDefaults::tab_inactive_background())
+}
+
+pub fn cursor_style() -> Style {
+    Style::default()
+        .fg(ThemeDefaults::editor_background())
+        .bg(ThemeDefaults::editor_cursor())
+}
+
+pub fn border_style() -> Style {
+    Style::default().fg(ThemeDefaults::border())
+}
+
+pub fn accent_style() -> Style {
+    Style::default().fg(ThemeDefaults::accent())
+}
+
+/// Maps `ThemeColor` tokens to resolved `Style` values.
+pub struct ThemeColorResolver {
+    map: HashMap<ThemeColor, Style>,
+}
+
+impl ThemeColorResolver {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+        }
+    }
+
+    /// Register a style for a given theme color token.
+    pub fn register(&mut self, color: ThemeColor, style: Style) {
+        self.map.insert(color, style);
+    }
+
+    /// Resolve a theme color to its registered style, falling back to default.
+    pub fn resolve(&self, color: &ThemeColor) -> Style {
+        self.map.get(color).copied().unwrap_or_default()
+    }
+
+    /// Number of registered mappings.
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    /// Returns true if no mappings are registered.
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+}
+
+impl Default for ThemeColorResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Incremental builder for constructing a `Style`.
+pub struct StyleBuilder {
+    style: Style,
+}
+
+impl StyleBuilder {
+    pub fn new() -> Self {
+        Self {
+            style: Style::default(),
+        }
+    }
+
+    pub fn fg(mut self, color: Color) -> Self {
+        self.style = self.style.fg(color);
+        self
+    }
+
+    pub fn bg(mut self, color: Color) -> Self {
+        self.style = self.style.bg(color);
+        self
+    }
+
+    pub fn modifier(mut self, modifier: Modifier) -> Self {
+        self.style = self.style.add_modifier(modifier);
+        self
+    }
+
+    pub fn build(self) -> Style {
+        self.style
+    }
+}
+
+impl Default for StyleBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,5 +273,102 @@ mod tests {
     fn line_number_style_is_not_default() {
         let style = line_number_style();
         assert_ne!(style, Style::default());
+    }
+
+    #[test]
+    fn theme_color_display() {
+        let tc = ThemeColor::new("editor.background");
+        assert_eq!(format!("{tc}"), "editor.background");
+    }
+
+    #[test]
+    fn theme_color_from_str() {
+        let tc = ThemeColor::from_str("editor.foreground");
+        assert_eq!(tc.0, "editor.foreground");
+    }
+
+    #[test]
+    fn error_style_is_red() {
+        let style = error_style();
+        assert_eq!(style, Style::default().fg(Color::Red));
+    }
+
+    #[test]
+    fn warning_style_is_yellow() {
+        let style = warning_style();
+        assert_eq!(style, Style::default().fg(Color::Yellow));
+    }
+
+    #[test]
+    fn info_style_is_blue() {
+        let style = info_style();
+        assert_eq!(style, Style::default().fg(Color::Blue));
+    }
+
+    #[test]
+    fn panel_style_has_background() {
+        let style = panel_style();
+        assert_ne!(style, Style::default());
+    }
+
+    #[test]
+    fn tab_active_vs_inactive_differ() {
+        assert_ne!(tab_active_style(), tab_inactive_style());
+    }
+
+    #[test]
+    fn cursor_style_has_colors() {
+        let style = cursor_style();
+        assert_ne!(style, Style::default());
+    }
+
+    #[test]
+    fn border_style_uses_border_color() {
+        let style = border_style();
+        assert_eq!(style, Style::default().fg(ThemeDefaults::border()));
+    }
+
+    #[test]
+    fn accent_style_uses_accent_color() {
+        let style = accent_style();
+        assert_eq!(style, Style::default().fg(ThemeDefaults::accent()));
+    }
+
+    #[test]
+    fn resolver_register_and_resolve() {
+        let mut resolver = ThemeColorResolver::new();
+        let tc = ThemeColor::new("test.color");
+        let style = Style::default().fg(Color::Red);
+        resolver.register(tc.clone(), style);
+        assert_eq!(resolver.resolve(&tc), style);
+        assert_eq!(resolver.len(), 1);
+    }
+
+    #[test]
+    fn resolver_missing_returns_default() {
+        let resolver = ThemeColorResolver::new();
+        let tc = ThemeColor::new("missing");
+        assert_eq!(resolver.resolve(&tc), Style::default());
+        assert!(resolver.is_empty());
+    }
+
+    #[test]
+    fn style_builder_fg_bg_modifier() {
+        let style = StyleBuilder::new()
+            .fg(Color::Red)
+            .bg(Color::Blue)
+            .modifier(Modifier::BOLD)
+            .build();
+        let expected = Style::default()
+            .fg(Color::Red)
+            .bg(Color::Blue)
+            .add_modifier(Modifier::BOLD);
+        assert_eq!(style, expected);
+    }
+
+    #[test]
+    fn style_builder_default() {
+        let style = StyleBuilder::default().build();
+        assert_eq!(style, Style::default());
     }
 }

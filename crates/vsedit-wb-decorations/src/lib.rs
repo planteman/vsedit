@@ -83,11 +83,106 @@ impl DecorationService {
         self.types.clear();
         self.sets.clear();
     }
+
+    pub fn get_type(&self, id: &str) -> Option<&DecorationType> {
+        self.types.iter().find(|t| t.id == id)
+    }
+
+    pub fn has_type(&self, id: &str) -> bool {
+        self.types.iter().any(|t| t.id == id)
+    }
+
+    pub fn unregister_type(&mut self, id: &str) -> bool {
+        let len = self.types.len();
+        self.types.retain(|t| t.id != id);
+        self.sets.retain(|s| s.type_id != id);
+        self.types.len() != len
+    }
+
+    pub fn get_all_uris(&self) -> Vec<&str> {
+        let mut uris: Vec<&str> = self.sets.iter().map(|s| s.uri.as_str()).collect();
+        uris.sort();
+        uris.dedup();
+        uris
+    }
+
+    pub fn decoration_count(&self) -> usize {
+        self.sets.iter().map(|s| s.ranges.len()).sum()
+    }
 }
 
 impl Default for DecorationService {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Merge overlapping or adjacent ranges on the same line into combined ranges.
+pub fn merge_ranges(mut ranges: Vec<DecorationRange>) -> Vec<DecorationRange> {
+    if ranges.is_empty() {
+        return ranges;
+    }
+    ranges.sort_by(|a, b| {
+        a.start_line
+            .cmp(&b.start_line)
+            .then(a.start_col.cmp(&b.start_col))
+    });
+    let mut merged: Vec<DecorationRange> = Vec::new();
+    merged.push(ranges[0].clone());
+    for r in ranges.into_iter().skip(1) {
+        let last = merged.last_mut().unwrap();
+        if r.start_line <= last.end_line && r.start_col <= last.end_col {
+            if r.end_line > last.end_line || (r.end_line == last.end_line && r.end_col > last.end_col) {
+                last.end_line = r.end_line;
+                last.end_col = r.end_col;
+            }
+        } else {
+            merged.push(r);
+        }
+    }
+    merged
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RangeBehavior {
+    OpenOpen,
+    ClosedClosed,
+    OpenClosed,
+    ClosedOpen,
+}
+
+#[derive(Debug, Clone)]
+pub struct DecorationRenderOptions {
+    pub background_color: Option<String>,
+    pub border_color: Option<String>,
+    pub border_width: Option<String>,
+    pub border_style: Option<String>,
+    pub font_weight: Option<String>,
+    pub font_style: Option<String>,
+    pub opacity: Option<f32>,
+    pub range_behavior: RangeBehavior,
+}
+
+impl Default for DecorationRenderOptions {
+    fn default() -> Self {
+        Self {
+            background_color: None,
+            border_color: None,
+            border_width: None,
+            border_style: None,
+            font_weight: None,
+            font_style: None,
+            opacity: None,
+            range_behavior: RangeBehavior::OpenOpen,
+        }
+    }
+}
+
+pub trait DecorationProvider {
+    fn provide_decorations(&self, uri: &str) -> Vec<DecorationRange>;
+
+    fn event_uri_filter(&self) -> Option<Vec<String>> {
+        None
     }
 }
 
@@ -114,6 +209,16 @@ mod tests {
             start_col: 0,
             end_line: line,
             end_col: 10,
+            hover_message: None,
+        }
+    }
+
+    fn sample_range_cols(line: u32, start: u32, end: u32) -> DecorationRange {
+        DecorationRange {
+            start_line: line,
+            start_col: start,
+            end_line: line,
+            end_col: end,
             hover_message: None,
         }
     }
@@ -170,5 +275,93 @@ mod tests {
         let decs = svc.get_decorations("file:///c.rs");
         assert_eq!(decs.len(), 1);
         assert_eq!(decs[0].ranges[0].start_line, 9);
+    }
+
+    #[test]
+    fn get_type_and_has_type() {
+        let mut svc = DecorationService::new();
+        svc.register_type(sample_type("err"));
+        assert!(svc.has_type("err"));
+        assert!(!svc.has_type("warn"));
+        assert_eq!(svc.get_type("err").unwrap().id, "err");
+        assert!(svc.get_type("warn").is_none());
+    }
+
+    #[test]
+    fn unregister_type_removes_sets() {
+        let mut svc = DecorationService::new();
+        svc.register_type(sample_type("err"));
+        svc.set_decorations("err".into(), "file:///a.rs".into(), vec![sample_range(1)]);
+        assert!(svc.unregister_type("err"));
+        assert!(!svc.has_type("err"));
+        assert!(svc.get_decorations("file:///a.rs").is_empty());
+        assert!(!svc.unregister_type("err"));
+    }
+
+    #[test]
+    fn get_all_uris_deduplicates() {
+        let mut svc = DecorationService::new();
+        svc.set_decorations("a".into(), "file:///x.rs".into(), vec![sample_range(1)]);
+        svc.set_decorations("b".into(), "file:///x.rs".into(), vec![sample_range(2)]);
+        svc.set_decorations("a".into(), "file:///y.rs".into(), vec![sample_range(3)]);
+        let uris = svc.get_all_uris();
+        assert_eq!(uris.len(), 2);
+        assert!(uris.contains(&"file:///x.rs"));
+        assert!(uris.contains(&"file:///y.rs"));
+    }
+
+    #[test]
+    fn decoration_count_sums_ranges() {
+        let mut svc = DecorationService::new();
+        svc.set_decorations("a".into(), "file:///a.rs".into(), vec![sample_range(1), sample_range(2)]);
+        svc.set_decorations("b".into(), "file:///b.rs".into(), vec![sample_range(3)]);
+        assert_eq!(svc.decoration_count(), 3);
+    }
+
+    #[test]
+    fn merge_ranges_combines_overlapping() {
+        let ranges = vec![
+            sample_range_cols(1, 0, 5),
+            sample_range_cols(1, 3, 8),
+            sample_range_cols(1, 10, 15),
+        ];
+        let merged = merge_ranges(ranges);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].start_col, 0);
+        assert_eq!(merged[0].end_col, 8);
+        assert_eq!(merged[1].start_col, 10);
+    }
+
+    #[test]
+    fn merge_ranges_empty() {
+        let merged = merge_ranges(vec![]);
+        assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn decoration_render_options_default() {
+        let opts = DecorationRenderOptions::default();
+        assert!(opts.background_color.is_none());
+        assert_eq!(opts.range_behavior, RangeBehavior::OpenOpen);
+        assert!(opts.opacity.is_none());
+    }
+
+    #[test]
+    fn range_behavior_variants() {
+        assert_ne!(RangeBehavior::OpenOpen, RangeBehavior::ClosedClosed);
+        assert_ne!(RangeBehavior::OpenClosed, RangeBehavior::ClosedOpen);
+    }
+
+    #[test]
+    fn decoration_provider_default_filter() {
+        struct TestProvider;
+        impl DecorationProvider for TestProvider {
+            fn provide_decorations(&self, _uri: &str) -> Vec<DecorationRange> {
+                vec![sample_range(1)]
+            }
+        }
+        let provider = TestProvider;
+        assert!(provider.event_uri_filter().is_none());
+        assert_eq!(provider.provide_decorations("file:///a.rs").len(), 1);
     }
 }

@@ -3,8 +3,9 @@
 //! Equivalent to VS Code's `vs/platform/lifecycle/common/lifecycle.ts`.
 //! Manages application phases and shutdown confirmation.
 
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use vsedit_events::{Emitter, Event};
 
@@ -20,6 +21,33 @@ pub enum LifecyclePhase {
     Restored = 2,
     /// The workbench is fully interactive.
     Eventually = 3,
+}
+
+impl LifecyclePhase {
+    /// Returns true if this is the final phase (`Eventually`).
+    pub fn is_terminal(&self) -> bool {
+        *self == LifecyclePhase::Eventually
+    }
+
+    /// Returns the next phase, or `None` if already terminal.
+    pub fn next(&self) -> Option<LifecyclePhase> {
+        match self {
+            LifecyclePhase::Starting => Some(LifecyclePhase::Ready),
+            LifecyclePhase::Ready => Some(LifecyclePhase::Restored),
+            LifecyclePhase::Restored => Some(LifecyclePhase::Eventually),
+            LifecyclePhase::Eventually => None,
+        }
+    }
+}
+
+/// Returns a human-readable name for a lifecycle phase.
+pub fn phase_name(phase: LifecyclePhase) -> &'static str {
+    match phase {
+        LifecyclePhase::Starting => "Starting",
+        LifecyclePhase::Ready => "Ready",
+        LifecyclePhase::Restored => "Restored",
+        LifecyclePhase::Eventually => "Eventually",
+    }
 }
 
 /// Shutdown reason.
@@ -60,9 +88,29 @@ impl WillShutdownEvent {
     }
 }
 
+/// Snapshot of a completed shutdown.
+#[derive(Debug, Clone)]
+pub struct ShutdownEvent {
+    pub reason: ShutdownReason,
+    pub phase_at_shutdown: LifecyclePhase,
+    pub timestamp: Instant,
+}
+
+/// Statistics about the lifecycle service.
+#[derive(Debug, Clone)]
+pub struct LifecycleStats {
+    pub phase_transition_count: u64,
+    pub shutdown_attempts: u64,
+    pub vetoed_shutdowns: u64,
+    pub current_phase: LifecyclePhase,
+}
+
 /// The lifecycle service.
 pub struct LifecycleService {
     phase: AtomicU8,
+    phase_transition_count: AtomicU64,
+    shutdown_attempt_count: AtomicU64,
+    vetoed_count: AtomicU64,
     on_will_shutdown: Emitter<WillShutdownEvent>,
     on_did_shutdown: Emitter<ShutdownReason>,
     on_phase_change: Emitter<LifecyclePhase>,
@@ -72,6 +120,9 @@ impl LifecycleService {
     pub fn new() -> Self {
         Self {
             phase: AtomicU8::new(LifecyclePhase::Starting as u8),
+            phase_transition_count: AtomicU64::new(0),
+            shutdown_attempt_count: AtomicU64::new(0),
+            vetoed_count: AtomicU64::new(0),
             on_will_shutdown: Emitter::new(),
             on_did_shutdown: Emitter::new(),
             on_phase_change: Emitter::new(),
@@ -92,21 +143,77 @@ impl LifecycleService {
         let current = self.phase.load(Ordering::Relaxed);
         if (phase as u8) > current {
             self.phase.store(phase as u8, Ordering::Relaxed);
+            self.phase_transition_count.fetch_add(1, Ordering::Relaxed);
             self.on_phase_change.fire(&phase);
         }
     }
 
     /// Request shutdown. Returns false if vetoed.
     pub fn request_shutdown(&self, reason: ShutdownReason) -> bool {
+        self.shutdown_attempt_count.fetch_add(1, Ordering::Relaxed);
         let event = WillShutdownEvent::new(reason);
         self.on_will_shutdown.fire(&event);
 
         if event.is_vetoed() {
+            self.vetoed_count.fetch_add(1, Ordering::Relaxed);
             return false;
         }
 
         self.on_did_shutdown.fire(&reason);
         true
+    }
+
+    /// Force shutdown without checking for vetoes.
+    pub fn force_shutdown(&self, reason: ShutdownReason) -> bool {
+        self.shutdown_attempt_count.fetch_add(1, Ordering::Relaxed);
+        self.on_did_shutdown.fire(&reason);
+        true
+    }
+
+    /// Returns true if the current phase is at least `phase`.
+    pub fn is_phase_at_least(&self, phase: LifecyclePhase) -> bool {
+        self.phase.load(Ordering::Relaxed) >= phase as u8
+    }
+
+    /// Register a callback to run when a specific phase is reached.
+    /// If the phase has already been reached, the callback runs immediately.
+    pub fn when_phase<F>(&self, phase: LifecyclePhase, callback: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        if self.is_phase_at_least(phase) {
+            callback();
+            return;
+        }
+
+        let callback = Arc::new(Mutex::new(Some(callback)));
+        let _sub = self.on_phase_change().on(move |current: &LifecyclePhase| {
+            if *current >= phase {
+                if let Some(cb) = callback.lock().unwrap().take() {
+                    cb();
+                }
+            }
+        });
+    }
+
+    /// Get a snapshot of lifecycle statistics.
+    pub fn get_stats(&self) -> LifecycleStats {
+        LifecycleStats {
+            phase_transition_count: self.phase_transition_count.load(Ordering::Relaxed),
+            shutdown_attempts: self.shutdown_attempt_count.load(Ordering::Relaxed),
+            vetoed_shutdowns: self.vetoed_count.load(Ordering::Relaxed),
+            current_phase: self.phase(),
+        }
+    }
+
+    /// Total number of shutdown attempts.
+    pub fn shutdown_attempt_count(&self) -> u64 {
+        self.shutdown_attempt_count.load(Ordering::Relaxed)
+    }
+
+    /// Number of shutdowns that were vetoed.
+    pub fn vetoed_count(&self) -> u64 {
+        self.vetoed_count.load(Ordering::Relaxed)
     }
 
     pub fn on_will_shutdown(&self) -> Event<WillShutdownEvent> {
@@ -132,6 +239,7 @@ impl Default for LifecycleService {
 mod tests {
     use super::*;
     use std::sync::atomic::AtomicBool;
+    use std::time::Instant;
 
     #[test]
     fn initial_phase() {
@@ -175,5 +283,145 @@ mod tests {
             evt.veto();
         });
         assert!(!svc.request_shutdown(ShutdownReason::Close));
+    }
+
+    #[test]
+    fn phase_name_returns_correct_strings() {
+        assert_eq!(phase_name(LifecyclePhase::Starting), "Starting");
+        assert_eq!(phase_name(LifecyclePhase::Ready), "Ready");
+        assert_eq!(phase_name(LifecyclePhase::Restored), "Restored");
+        assert_eq!(phase_name(LifecyclePhase::Eventually), "Eventually");
+    }
+
+    #[test]
+    fn phase_is_terminal() {
+        assert!(!LifecyclePhase::Starting.is_terminal());
+        assert!(!LifecyclePhase::Ready.is_terminal());
+        assert!(!LifecyclePhase::Restored.is_terminal());
+        assert!(LifecyclePhase::Eventually.is_terminal());
+    }
+
+    #[test]
+    fn phase_next() {
+        assert_eq!(LifecyclePhase::Starting.next(), Some(LifecyclePhase::Ready));
+        assert_eq!(LifecyclePhase::Ready.next(), Some(LifecyclePhase::Restored));
+        assert_eq!(LifecyclePhase::Restored.next(), Some(LifecyclePhase::Eventually));
+        assert_eq!(LifecyclePhase::Eventually.next(), None);
+    }
+
+    #[test]
+    fn is_phase_at_least() {
+        let svc = LifecycleService::new();
+        assert!(svc.is_phase_at_least(LifecyclePhase::Starting));
+        assert!(!svc.is_phase_at_least(LifecyclePhase::Ready));
+        svc.set_phase(LifecyclePhase::Restored);
+        assert!(svc.is_phase_at_least(LifecyclePhase::Starting));
+        assert!(svc.is_phase_at_least(LifecyclePhase::Ready));
+        assert!(svc.is_phase_at_least(LifecyclePhase::Restored));
+        assert!(!svc.is_phase_at_least(LifecyclePhase::Eventually));
+    }
+
+    #[test]
+    fn force_shutdown_skips_veto() {
+        let svc = LifecycleService::new();
+        let _sub = svc.on_will_shutdown().on(move |evt: &WillShutdownEvent| {
+            evt.veto();
+        });
+        // Normal shutdown is vetoed
+        assert!(!svc.request_shutdown(ShutdownReason::Quit));
+        // Force shutdown ignores veto listeners entirely
+        let did_shutdown = Arc::new(AtomicBool::new(false));
+        let did_shutdown2 = did_shutdown.clone();
+        let _sub2 = svc.on_did_shutdown().on(move |_: &ShutdownReason| {
+            did_shutdown2.store(true, Ordering::Relaxed);
+        });
+        assert!(svc.force_shutdown(ShutdownReason::Kill));
+        assert!(did_shutdown.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn stats_initial_values() {
+        let svc = LifecycleService::new();
+        let stats = svc.get_stats();
+        assert_eq!(stats.phase_transition_count, 0);
+        assert_eq!(stats.shutdown_attempts, 0);
+        assert_eq!(stats.vetoed_shutdowns, 0);
+        assert_eq!(stats.current_phase, LifecyclePhase::Starting);
+    }
+
+    #[test]
+    fn stats_after_transitions() {
+        let svc = LifecycleService::new();
+        svc.set_phase(LifecyclePhase::Ready);
+        svc.set_phase(LifecyclePhase::Restored);
+        svc.set_phase(LifecyclePhase::Eventually);
+        let stats = svc.get_stats();
+        assert_eq!(stats.phase_transition_count, 3);
+        assert_eq!(stats.current_phase, LifecyclePhase::Eventually);
+    }
+
+    #[test]
+    fn stats_after_shutdown_attempts() {
+        let svc = LifecycleService::new();
+        let _sub = svc.on_will_shutdown().on(move |evt: &WillShutdownEvent| {
+            evt.veto();
+        });
+        svc.request_shutdown(ShutdownReason::Quit);
+        svc.request_shutdown(ShutdownReason::Close);
+        let stats = svc.get_stats();
+        assert_eq!(stats.shutdown_attempts, 2);
+        assert_eq!(stats.vetoed_shutdowns, 2);
+    }
+
+    #[test]
+    fn shutdown_attempt_count_accessor() {
+        let svc = LifecycleService::new();
+        assert_eq!(svc.shutdown_attempt_count(), 0);
+        svc.request_shutdown(ShutdownReason::Quit);
+        assert_eq!(svc.shutdown_attempt_count(), 1);
+        svc.force_shutdown(ShutdownReason::Kill);
+        assert_eq!(svc.shutdown_attempt_count(), 2);
+    }
+
+    #[test]
+    fn vetoed_count_accessor() {
+        let svc = LifecycleService::new();
+        assert_eq!(svc.vetoed_count(), 0);
+        let _sub = svc.on_will_shutdown().on(move |evt: &WillShutdownEvent| {
+            evt.veto();
+        });
+        svc.request_shutdown(ShutdownReason::Quit);
+        assert_eq!(svc.vetoed_count(), 1);
+    }
+
+    #[test]
+    fn backward_phase_does_not_increment_count() {
+        let svc = LifecycleService::new();
+        svc.set_phase(LifecyclePhase::Restored);
+        svc.set_phase(LifecyclePhase::Ready); // ignored
+        assert_eq!(svc.get_stats().phase_transition_count, 1);
+    }
+
+    #[test]
+    fn shutdown_event_struct() {
+        let evt = ShutdownEvent {
+            reason: ShutdownReason::Reload,
+            phase_at_shutdown: LifecyclePhase::Restored,
+            timestamp: Instant::now(),
+        };
+        assert_eq!(evt.reason, ShutdownReason::Reload);
+        assert_eq!(evt.phase_at_shutdown, LifecyclePhase::Restored);
+    }
+
+    #[test]
+    fn when_phase_already_reached() {
+        let svc = LifecycleService::new();
+        svc.set_phase(LifecyclePhase::Ready);
+        let called = Arc::new(AtomicBool::new(false));
+        let called2 = called.clone();
+        svc.when_phase(LifecyclePhase::Starting, move || {
+            called2.store(true, Ordering::Relaxed);
+        });
+        assert!(called.load(Ordering::Relaxed));
     }
 }

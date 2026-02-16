@@ -4,7 +4,32 @@
 //! `vs/base/common/lazy.ts`.
 
 use std::cell::OnceCell;
+use std::collections::HashMap;
 use std::sync::OnceLock;
+use std::time::{Duration, Instant};
+
+/// Errors related to lazy evaluation and caching.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LazyError {
+    /// The value has already been initialized.
+    AlreadyInitialized,
+    /// The value has not been initialized yet.
+    NotInitialized,
+    /// The computation failed.
+    ComputationFailed(String),
+}
+
+impl std::fmt::Display for LazyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LazyError::AlreadyInitialized => write!(f, "value has already been initialized"),
+            LazyError::NotInitialized => write!(f, "value has not been initialized"),
+            LazyError::ComputationFailed(msg) => write!(f, "computation failed: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for LazyError {}
 
 /// A lazily initialized value computed from a closure.
 ///
@@ -31,6 +56,17 @@ impl<T> Lazy<T> {
             }
         }
         self.cell.get().expect("lazy value must be initialized")
+    }
+
+    /// Try to get the value without initializing it.
+    /// Returns `None` if not yet initialized.
+    pub fn try_get(&self) -> Option<&T> {
+        self.cell.get()
+    }
+
+    /// Consume the `Lazy` and return the inner value if initialized.
+    pub fn into_inner(self) -> Option<T> {
+        self.cell.into_inner()
     }
 
     /// Check if the value has been initialized.
@@ -109,6 +145,121 @@ impl<T> CachedValue<T> {
     pub fn is_cached(&self) -> bool {
         self.value.is_some()
     }
+
+    /// Get the cached value, or compute it with a fallback closure if not cached.
+    pub fn get_or_compute_with(&mut self, fallback: impl FnOnce() -> T) -> &T {
+        if self.value.is_none() {
+            self.value = Some(fallback());
+        }
+        self.value.as_ref().unwrap()
+    }
+
+    /// Take the cached value out, leaving the cache invalidated.
+    /// Returns `None` if no value was cached.
+    pub fn take(&mut self) -> Option<T> {
+        self.value.take()
+    }
+
+    /// Check if the cached value is stale according to a predicate.
+    /// Returns `false` if no value is cached.
+    pub fn is_stale(&self, predicate: impl FnOnce(&T) -> bool) -> bool {
+        match &self.value {
+            Some(v) => predicate(v),
+            None => false,
+        }
+    }
+}
+
+/// A cached value that auto-invalidates after a configurable duration.
+pub struct TimedCache<T> {
+    value: Option<T>,
+    compute: Box<dyn FnMut() -> T>,
+    duration: Duration,
+    last_computed: Option<Instant>,
+}
+
+impl<T> TimedCache<T> {
+    /// Create a new timed cache with the given computation and TTL duration.
+    pub fn new(duration: Duration, compute: impl FnMut() -> T + 'static) -> Self {
+        Self {
+            value: None,
+            compute: Box::new(compute),
+            duration,
+            last_computed: None,
+        }
+    }
+
+    /// Get the cached value, recomputing if expired or not yet computed.
+    pub fn get(&mut self) -> &T {
+        let expired = match self.last_computed {
+            Some(ts) => ts.elapsed() >= self.duration,
+            None => true,
+        };
+        if expired {
+            self.value = Some((self.compute)());
+            self.last_computed = Some(Instant::now());
+        }
+        self.value.as_ref().unwrap()
+    }
+
+    /// Force invalidation, causing recomputation on next access.
+    pub fn invalidate(&mut self) {
+        self.value = None;
+        self.last_computed = None;
+    }
+
+    /// Check if the cached value has expired.
+    pub fn is_expired(&self) -> bool {
+        match self.last_computed {
+            Some(ts) => ts.elapsed() >= self.duration,
+            None => true,
+        }
+    }
+
+    /// Check if a value is currently cached (not expired).
+    pub fn is_cached(&self) -> bool {
+        self.value.is_some() && !self.is_expired()
+    }
+}
+
+/// Memoization cache for a function: caches results keyed by input.
+pub struct MemoizedFn<K, V> {
+    cache: HashMap<K, V>,
+    compute: Box<dyn FnMut(&K) -> V>,
+}
+
+impl<K: Eq + std::hash::Hash + Clone, V> MemoizedFn<K, V> {
+    /// Create a new memoized function wrapper.
+    pub fn new(compute: impl FnMut(&K) -> V + 'static) -> Self {
+        Self {
+            cache: HashMap::new(),
+            compute: Box::new(compute),
+        }
+    }
+
+    /// Call the function with the given key, returning a cached result if available.
+    pub fn call(&mut self, key: K) -> &V {
+        if !self.cache.contains_key(&key) {
+            let value = (self.compute)(&key);
+            self.cache.insert(key.clone(), value);
+        }
+        self.cache.get(&key).unwrap()
+    }
+
+    /// Clear all cached results.
+    pub fn clear(&mut self) {
+        self.cache.clear();
+    }
+
+    /// Return the number of cached entries.
+    pub fn len(&self) -> usize {
+        self.cache.len()
+    }
+
+    /// Check if the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.cache.is_empty()
+    }
 }
 
 #[cfg(test)]
@@ -152,5 +303,117 @@ mod tests {
         assert_eq!(*cached.get(), 1);
         cached.invalidate();
         assert_eq!(*cached.get(), 2);
+    }
+
+    #[test]
+    fn try_get_before_init() {
+        let lazy = Lazy::new(|| 99);
+        assert!(lazy.try_get().is_none());
+    }
+
+    #[test]
+    fn try_get_after_init() {
+        let mut lazy = Lazy::new(|| 99);
+        let _ = lazy.get();
+        assert_eq!(lazy.try_get(), Some(&99));
+    }
+
+    #[test]
+    fn into_inner_initialized() {
+        let mut lazy = Lazy::new(|| String::from("hello"));
+        let _ = lazy.get();
+        assert_eq!(lazy.into_inner(), Some(String::from("hello")));
+    }
+
+    #[test]
+    fn into_inner_uninitialized() {
+        let lazy = Lazy::new(|| 42);
+        assert_eq!(lazy.into_inner(), None);
+    }
+
+    #[test]
+    fn cached_take() {
+        let mut cached = CachedValue::new(|| 10);
+        assert_eq!(*cached.get(), 10);
+        assert!(cached.is_cached());
+        let taken = cached.take();
+        assert_eq!(taken, Some(10));
+        assert!(!cached.is_cached());
+    }
+
+    #[test]
+    fn cached_get_or_compute_with() {
+        let mut cached = CachedValue::new(|| 1);
+        let v = cached.get_or_compute_with(|| 999);
+        assert_eq!(*v, 999);
+        // Once cached, original compute is not used either
+        assert_eq!(*cached.get(), 999);
+    }
+
+    #[test]
+    fn cached_is_stale() {
+        let mut cached = CachedValue::new(|| 5);
+        // No value cached yet
+        assert!(!cached.is_stale(|_| true));
+        let _ = cached.get();
+        assert!(cached.is_stale(|v| *v < 10));
+        assert!(!cached.is_stale(|v| *v > 10));
+    }
+
+    #[test]
+    fn timed_cache_expiry() {
+        use std::time::Duration;
+        let mut counter = 0u32;
+        let mut tc = TimedCache::new(Duration::from_millis(50), move || {
+            counter += 1;
+            counter
+        });
+        assert_eq!(*tc.get(), 1);
+        assert!(tc.is_cached());
+        assert_eq!(*tc.get(), 1); // still cached
+        std::thread::sleep(Duration::from_millis(60));
+        assert!(tc.is_expired());
+        assert_eq!(*tc.get(), 2); // recomputed
+    }
+
+    #[test]
+    fn timed_cache_invalidate() {
+        use std::time::Duration;
+        let mut counter = 0u32;
+        let mut tc = TimedCache::new(Duration::from_secs(60), move || {
+            counter += 1;
+            counter
+        });
+        assert_eq!(*tc.get(), 1);
+        tc.invalidate();
+        assert!(!tc.is_cached());
+        assert_eq!(*tc.get(), 2);
+    }
+
+    #[test]
+    fn memoized_fn_caching() {
+        let mut memo = MemoizedFn::new(|k: &i32| k * 2);
+        assert_eq!(*memo.call(3), 6);
+        assert_eq!(*memo.call(3), 6); // cached
+        assert_eq!(*memo.call(5), 10);
+        assert_eq!(memo.len(), 2);
+        memo.clear();
+        assert!(memo.is_empty());
+    }
+
+    #[test]
+    fn error_display() {
+        assert_eq!(
+            LazyError::AlreadyInitialized.to_string(),
+            "value has already been initialized"
+        );
+        assert_eq!(
+            LazyError::NotInitialized.to_string(),
+            "value has not been initialized"
+        );
+        assert_eq!(
+            LazyError::ComputationFailed("oops".into()).to_string(),
+            "computation failed: oops"
+        );
     }
 }
