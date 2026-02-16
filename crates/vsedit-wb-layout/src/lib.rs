@@ -202,9 +202,19 @@ impl WorkbenchLayout {
         self.visibility.get(&part).copied().unwrap_or(false)
     }
 
+    /// Get the current sidebar width.
+    pub fn get_sidebar_width(&self) -> u16 {
+        self.sidebar_width
+    }
+
     /// Set the sidebar width.
     pub fn set_sidebar_width(&mut self, width: u16) {
         self.sidebar_width = width;
+    }
+
+    /// Get the current panel height.
+    pub fn get_panel_height(&self) -> u16 {
+        self.panel_height
     }
 
     /// Set the panel height.

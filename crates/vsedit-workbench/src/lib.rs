@@ -4,10 +4,11 @@
 use std::collections::HashMap;
 use std::path::Path;
 
+use ratatui::buffer::Buffer;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph, Widget};
 use ratatui::Frame;
 
 use vsedit_quickinput::fuzzy_match;
@@ -25,14 +26,517 @@ use vsedit_editor_svc::EditorTabService;
 use vsedit_explorer::ExplorerView;
 use vsedit_input::{key_input_to_chord, InputEvent, KeyInput};
 use vsedit_keybinding_svc::{
-    register_default_keybindings, KeybindingResolver, KeybindingRule, KeybindingWeight,
-    ResolveResult,
+    register_default_keybindings, KeybindingResolver, KeybindingRule, KeybindingSource,
+    KeybindingWeight, ResolveResult,
 };
 use vsedit_keycodes::{KeyCode, KeyCodeChord};
 use vsedit_wb_layout::WorkbenchLayout;
 use vsedit_wb_statusbar::{register_default_items, StatusBarService};
 use vsedit_wb_textmate::{syntect_to_ratatui_color, TextMateService};
 use vsedit_wb_views::{register_default_containers, ViewContainerLocation, ViewsRegistry};
+
+// ---------------------------------------------------------------------------
+// SplitDirection
+// ---------------------------------------------------------------------------
+
+/// Direction in which to split an editor group.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SplitDirection {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+// ---------------------------------------------------------------------------
+// EditorGroupOrientation
+// ---------------------------------------------------------------------------
+
+/// Orientation of an editor group within a layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorGroupOrientation {
+    Horizontal,
+    Vertical,
+}
+
+// ---------------------------------------------------------------------------
+// EditorGroupTab
+// ---------------------------------------------------------------------------
+
+/// A single tab within an editor group.
+#[derive(Debug, Clone)]
+pub struct EditorGroupTab {
+    pub title: String,
+    pub file_path: Option<String>,
+    pub content: String,
+    pub is_modified: bool,
+}
+
+// ---------------------------------------------------------------------------
+// EditorGroup
+// ---------------------------------------------------------------------------
+
+/// An editor group containing tabs, analogous to VS Code split editors.
+#[derive(Debug, Clone)]
+pub struct EditorGroup {
+    pub group_id: usize,
+    pub tabs: Vec<EditorGroupTab>,
+    pub active_tab_idx: usize,
+    pub orientation: EditorGroupOrientation,
+}
+
+impl EditorGroup {
+    /// Create a new empty editor group.
+    pub fn new(group_id: usize) -> Self {
+        Self {
+            group_id,
+            tabs: Vec::new(),
+            active_tab_idx: 0,
+            orientation: EditorGroupOrientation::Horizontal,
+        }
+    }
+
+    /// Add a tab to this group.
+    pub fn add_tab(&mut self, tab: EditorGroupTab) {
+        self.tabs.push(tab);
+        self.active_tab_idx = self.tabs.len() - 1;
+    }
+
+    /// Close a tab by index, returning it.
+    pub fn close_tab(&mut self, idx: usize) -> Option<EditorGroupTab> {
+        if idx >= self.tabs.len() {
+            return None;
+        }
+        let tab = self.tabs.remove(idx);
+        if self.active_tab_idx >= self.tabs.len() && !self.tabs.is_empty() {
+            self.active_tab_idx = self.tabs.len() - 1;
+        }
+        Some(tab)
+    }
+
+    /// Get the active tab, if any.
+    pub fn active_tab(&self) -> Option<&EditorGroupTab> {
+        self.tabs.get(self.active_tab_idx)
+    }
+
+    /// Whether this group has no tabs.
+    pub fn is_empty(&self) -> bool {
+        self.tabs.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorGroupLayout
+// ---------------------------------------------------------------------------
+
+/// Layout arrangement of editor groups.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EditorGroupLayout {
+    Single,
+    Horizontal(Vec<usize>),
+    Vertical(Vec<usize>),
+    Grid(Vec<Vec<usize>>),
+}
+
+// ---------------------------------------------------------------------------
+// EditorGroupManager
+// ---------------------------------------------------------------------------
+
+/// Manages multiple editor groups for split editor support.
+pub struct EditorGroupManager {
+    pub groups: Vec<EditorGroup>,
+    pub active_group_id: usize,
+    pub layout: EditorGroupLayout,
+    next_id: usize,
+}
+
+impl EditorGroupManager {
+    /// Create a manager with a single default group.
+    pub fn new() -> Self {
+        let group = EditorGroup::new(0);
+        Self {
+            groups: vec![group],
+            active_group_id: 0,
+            layout: EditorGroupLayout::Single,
+            next_id: 1,
+        }
+    }
+
+    /// Get a reference to the active editor group.
+    pub fn active_group(&self) -> Option<&EditorGroup> {
+        self.groups.iter().find(|g| g.group_id == self.active_group_id)
+    }
+
+    /// Get a mutable reference to the active editor group.
+    pub fn active_group_mut(&mut self) -> Option<&mut EditorGroup> {
+        self.groups.iter_mut().find(|g| g.group_id == self.active_group_id)
+    }
+
+    /// Get a group by ID.
+    pub fn get_group(&self, group_id: usize) -> Option<&EditorGroup> {
+        self.groups.iter().find(|g| g.group_id == group_id)
+    }
+
+    /// Split the current editor group in the given direction.
+    pub fn split_editor(&mut self, direction: SplitDirection) -> usize {
+        let new_id = self.next_id;
+        self.next_id += 1;
+        let new_group = EditorGroup::new(new_id);
+        self.groups.push(new_group);
+
+        // Transfer the active tab (clone) to the new group if one exists.
+        if let Some(active) = self.groups.iter().find(|g| g.group_id == self.active_group_id) {
+            if let Some(tab) = active.active_tab() {
+                let cloned = EditorGroupTab {
+                    title: tab.title.clone(),
+                    file_path: tab.file_path.clone(),
+                    content: tab.content.clone(),
+                    is_modified: false,
+                };
+                if let Some(new_g) = self.groups.iter_mut().find(|g| g.group_id == new_id) {
+                    new_g.add_tab(cloned);
+                }
+            }
+        }
+
+        // Update layout
+        let ids: Vec<usize> = self.groups.iter().map(|g| g.group_id).collect();
+        match direction {
+            SplitDirection::Left | SplitDirection::Right => {
+                self.layout = EditorGroupLayout::Horizontal(ids);
+            }
+            SplitDirection::Up | SplitDirection::Down => {
+                self.layout = EditorGroupLayout::Vertical(ids);
+            }
+        }
+
+        self.active_group_id = new_id;
+        new_id
+    }
+
+    /// Close a group by ID and redistribute its tabs to the previous group.
+    pub fn close_group(&mut self, group_id: usize) -> bool {
+        if self.groups.len() <= 1 {
+            return false;
+        }
+        let idx = match self.groups.iter().position(|g| g.group_id == group_id) {
+            Some(i) => i,
+            None => return false,
+        };
+        let removed = self.groups.remove(idx);
+        // Find the target group to receive orphaned tabs.
+        let target_id = if self.active_group_id == group_id {
+            self.groups[0].group_id
+        } else {
+            self.active_group_id
+        };
+        if let Some(target) = self.groups.iter_mut().find(|g| g.group_id == target_id) {
+            for tab in removed.tabs {
+                target.add_tab(tab);
+            }
+        }
+        if self.active_group_id == group_id {
+            self.active_group_id = self.groups[0].group_id;
+        }
+        // Update layout
+        if self.groups.len() == 1 {
+            self.layout = EditorGroupLayout::Single;
+        } else {
+            let ids: Vec<usize> = self.groups.iter().map(|g| g.group_id).collect();
+            match &self.layout {
+                EditorGroupLayout::Vertical(_) => {
+                    self.layout = EditorGroupLayout::Vertical(ids);
+                }
+                _ => {
+                    self.layout = EditorGroupLayout::Horizontal(ids);
+                }
+            }
+        }
+        true
+    }
+
+    /// Move a tab from one group to another.
+    pub fn move_editor_to_group(
+        &mut self,
+        from_group: usize,
+        to_group: usize,
+        tab_idx: usize,
+    ) -> bool {
+        if from_group == to_group {
+            return false;
+        }
+        let tab = {
+            let from = match self.groups.iter_mut().find(|g| g.group_id == from_group) {
+                Some(g) => g,
+                None => return false,
+            };
+            match from.close_tab(tab_idx) {
+                Some(t) => t,
+                None => return false,
+            }
+        };
+        match self.groups.iter_mut().find(|g| g.group_id == to_group) {
+            Some(to) => {
+                to.add_tab(tab);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Focus a specific group by ID.
+    pub fn focus_group(&mut self, group_id: usize) -> bool {
+        if self.groups.iter().any(|g| g.group_id == group_id) {
+            self.active_group_id = group_id;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get the number of groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+}
+
+impl Default for EditorGroupManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivityBarItem
+// ---------------------------------------------------------------------------
+
+/// A single item in the activity bar with badge support.
+#[derive(Debug, Clone)]
+pub struct ActivityBarItem {
+    pub id: String,
+    pub label: String,
+    pub icon_char: &'static str,
+    pub badge: Option<usize>,
+    pub is_active: bool,
+}
+
+impl ActivityBarItem {
+    /// Create a new activity bar item.
+    pub fn new(id: &str, label: &str, icon_char: &'static str) -> Self {
+        Self {
+            id: id.to_string(),
+            label: label.to_string(),
+            icon_char,
+            badge: None,
+            is_active: false,
+        }
+    }
+
+    /// Set the badge count.
+    pub fn set_badge(&mut self, count: usize) {
+        self.badge = if count > 0 { Some(count) } else { None };
+    }
+
+    /// Render the display text for this item.
+    pub fn display_text(&self) -> String {
+        match self.badge {
+            Some(n) => format!("{}{}", self.icon_char, n),
+            None => self.icon_char.to_string(),
+        }
+    }
+}
+
+/// Create the default set of activity bar items.
+pub fn default_activity_bar_items() -> Vec<ActivityBarItem> {
+    vec![
+        ActivityBarItem::new("workbench.view.explorer", "Explorer", "📁"),
+        ActivityBarItem::new("workbench.view.search", "Search", "🔍"),
+        ActivityBarItem::new("workbench.view.scm", "Source Control", "🔀"),
+        ActivityBarItem::new("workbench.view.debug", "Run and Debug", "🐛"),
+        ActivityBarItem::new("workbench.view.extensions", "Extensions", "📦"),
+    ]
+}
+
+// ---------------------------------------------------------------------------
+// BreadcrumbItem
+// ---------------------------------------------------------------------------
+
+/// Kind of breadcrumb item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BreadcrumbKind {
+    File,
+    Folder,
+    Symbol,
+}
+
+/// A single breadcrumb in the path trail.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BreadcrumbItem {
+    pub label: String,
+    pub kind: BreadcrumbKind,
+    pub path: String,
+}
+
+impl BreadcrumbItem {
+    /// Create a new breadcrumb item.
+    pub fn new(label: &str, kind: BreadcrumbKind, path: &str) -> Self {
+        Self {
+            label: label.to_string(),
+            kind,
+            path: path.to_string(),
+        }
+    }
+}
+
+/// Compute breadcrumbs from a file path and optional symbols.
+pub fn compute_breadcrumbs(file_path: &str, symbols: &[String]) -> Vec<BreadcrumbItem> {
+    let path = std::path::Path::new(file_path);
+    let mut crumbs = Vec::new();
+
+    // Add folder components
+    if let Some(parent) = path.parent() {
+        let mut accumulated = String::new();
+        for component in parent.components() {
+            let name = component.as_os_str().to_string_lossy().to_string();
+            if name == "/" || name == "." {
+                continue;
+            }
+            if !accumulated.is_empty() {
+                accumulated.push('/');
+            }
+            accumulated.push_str(&name);
+            crumbs.push(BreadcrumbItem::new(&name, BreadcrumbKind::Folder, &accumulated));
+        }
+    }
+
+    // Add the file itself
+    if let Some(filename) = path.file_name() {
+        crumbs.push(BreadcrumbItem::new(
+            &filename.to_string_lossy(),
+            BreadcrumbKind::File,
+            file_path,
+        ));
+    }
+
+    // Add symbol breadcrumbs
+    for sym in symbols {
+        crumbs.push(BreadcrumbItem::new(sym, BreadcrumbKind::Symbol, file_path));
+    }
+
+    crumbs
+}
+
+/// Render breadcrumbs into the given buffer area.
+pub fn render_breadcrumbs(crumbs: &[BreadcrumbItem], area: Rect, buf: &mut Buffer) {
+    if area.width == 0 || area.height == 0 || crumbs.is_empty() {
+        return;
+    }
+    let mut spans: Vec<Span> = Vec::new();
+    for (i, crumb) in crumbs.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::styled(" › ", Style::default().fg(Color::DarkGray)));
+        }
+        let style = match crumb.kind {
+            BreadcrumbKind::Folder => Style::default().fg(Color::DarkGray),
+            BreadcrumbKind::File => Style::default().fg(Color::White),
+            BreadcrumbKind::Symbol => Style::default().fg(Color::Yellow),
+        };
+        spans.push(Span::styled(&crumb.label, style));
+    }
+    let line = Line::from(spans);
+    let para = Paragraph::new(line);
+    para.render(area, buf);
+}
+
+// ---------------------------------------------------------------------------
+// Minimap
+// ---------------------------------------------------------------------------
+
+/// Render a text minimap using Braille characters.
+///
+/// Each minimap row represents `LINES_PER_ROW` editor lines. The current
+/// viewport is highlighted with a different background.
+pub fn render_minimap(
+    lines: &[String],
+    viewport_start: usize,
+    viewport_height: usize,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    if area.width == 0 || area.height == 0 || lines.is_empty() {
+        return;
+    }
+
+    const LINES_PER_ROW: usize = 4;
+    let minimap_cols = area.width as usize;
+
+    for row in 0..area.height as usize {
+        let start_line = row * LINES_PER_ROW;
+        if start_line >= lines.len() {
+            break;
+        }
+
+        // Determine if this minimap row overlaps the viewport
+        let end_line = (start_line + LINES_PER_ROW).min(lines.len());
+        let in_viewport = start_line < viewport_start + viewport_height
+            && end_line > viewport_start;
+
+        let bg = if in_viewport { Color::DarkGray } else { Color::Black };
+
+        // Build a condensed representation using block characters
+        let mut text = String::new();
+        for col in 0..minimap_cols {
+            let mut has_content = false;
+            for ln in start_line..end_line {
+                if let Some(line) = lines.get(ln) {
+                    if col < line.len() && !line.as_bytes().get(col).map_or(true, |b| *b == b' ') {
+                        has_content = true;
+                        break;
+                    }
+                }
+            }
+            text.push(if has_content { '▒' } else { ' ' });
+        }
+
+        let y = area.y + row as u16;
+        if y >= area.y + area.height {
+            break;
+        }
+        let style = Style::default().fg(Color::Gray).bg(bg);
+        buf.set_string(area.x, y, &text, style);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TitleBar
+// ---------------------------------------------------------------------------
+
+/// Compute the title bar text for the workbench.
+pub fn compute_title_bar(
+    file_path: Option<&str>,
+    folder: Option<&str>,
+    is_modified: bool,
+) -> String {
+    let dirty = if is_modified { "● " } else { "" };
+    match (file_path, folder) {
+        (Some(fp), Some(dir)) => {
+            let filename = std::path::Path::new(fp)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| fp.to_string());
+            format!("{}{} — {} — vsedit", dirty, filename, dir)
+        }
+        (Some(fp), None) => {
+            let filename = std::path::Path::new(fp)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| fp.to_string());
+            format!("{}{} — vsedit", dirty, filename)
+        }
+        (None, Some(dir)) => format!("{} — vsedit", dir),
+        (None, None) => "vsedit".to_string(),
+    }
+}
 
 // ---------------------------------------------------------------------------
 // ActivePanelView
@@ -230,6 +734,16 @@ pub struct Workbench {
     pub problems_panel: ProblemsPanel,
     /// Output panel view.
     pub output_panel: OutputPanel,
+    /// Editor group manager for split editors.
+    pub editor_groups: EditorGroupManager,
+    /// Activity bar items with badge support.
+    pub activity_bar_items: Vec<ActivityBarItem>,
+    /// Computed breadcrumb trail for the current file.
+    pub breadcrumbs: Vec<BreadcrumbItem>,
+    /// Current viewport scroll offset (line number of first visible line).
+    pub viewport_scroll: usize,
+    /// Working directory for title bar.
+    pub workspace_folder: Option<String>,
 }
 
 impl Workbench {
@@ -254,6 +768,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         keybindings.add_rule(KeybindingRule {
             keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
@@ -263,6 +778,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         keybindings.add_rule(KeybindingRule {
             keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
@@ -272,6 +788,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         // Tab navigation keybindings
         keybindings.add_rule(KeybindingRule {
@@ -282,6 +799,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         keybindings.add_rule(KeybindingRule {
             keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
@@ -291,6 +809,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         keybindings.add_rule(KeybindingRule {
             keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
@@ -300,6 +819,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         // Panel keybindings
         keybindings.add_rule(KeybindingRule {
@@ -310,6 +830,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         keybindings.add_rule(KeybindingRule {
             keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
@@ -319,6 +840,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         keybindings.add_rule(KeybindingRule {
             keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
@@ -328,6 +850,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         // Sidebar panel keybindings
         keybindings.add_rule(KeybindingRule {
@@ -338,6 +861,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         keybindings.add_rule(KeybindingRule {
             keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
@@ -347,6 +871,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         keybindings.add_rule(KeybindingRule {
             keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
@@ -356,6 +881,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         keybindings.add_rule(KeybindingRule {
             keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
@@ -365,6 +891,7 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
         keybindings.add_rule(KeybindingRule {
             keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
@@ -374,6 +901,70 @@ impl Workbench {
             args: None,
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
+        });
+        // Editor split keybinding: Ctrl+\
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, false, false, false, KeyCode::Backslash,
+            )),
+            command: "workbench.action.splitEditor".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
+        });
+        // Focus group keybindings: Ctrl+1/2/3
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, false, false, false, KeyCode::Digit1,
+            )),
+            command: "workbench.action.focusFirstEditorGroup".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
+        });
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, false, false, false, KeyCode::Digit2,
+            )),
+            command: "workbench.action.focusSecondEditorGroup".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
+        });
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, false, false, false, KeyCode::Digit3,
+            )),
+            command: "workbench.action.focusThirdEditorGroup".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
+        });
+        // Resize sidebar: Ctrl+Shift+Left/Right
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, true, false, false, KeyCode::LeftArrow,
+            )),
+            command: "workbench.action.decreaseSidebarWidth".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
+        });
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, true, false, false, KeyCode::RightArrow,
+            )),
+            command: "workbench.action.increaseSidebarWidth".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
         });
 
         let mut views = ViewsRegistry::new();
@@ -406,6 +997,12 @@ impl Workbench {
             commands.register("workbench.view.scm", Box::new(|_| Ok(None))),
             commands.register("workbench.view.debug", Box::new(|_| Ok(None))),
             commands.register("workbench.view.extensions", Box::new(|_| Ok(None))),
+            commands.register("workbench.action.splitEditor", Box::new(|_| Ok(None))),
+            commands.register("workbench.action.focusFirstEditorGroup", Box::new(|_| Ok(None))),
+            commands.register("workbench.action.focusSecondEditorGroup", Box::new(|_| Ok(None))),
+            commands.register("workbench.action.focusThirdEditorGroup", Box::new(|_| Ok(None))),
+            commands.register("workbench.action.decreaseSidebarWidth", Box::new(|_| Ok(None))),
+            commands.register("workbench.action.increaseSidebarWidth", Box::new(|_| Ok(None))),
         ];
 
         let mut context = WorkbenchContext::new();
@@ -446,6 +1043,11 @@ impl Workbench {
             terminal_view: TerminalView::new(),
             problems_panel: ProblemsPanel::new(),
             output_panel: OutputPanel::new(),
+            editor_groups: EditorGroupManager::new(),
+            activity_bar_items: default_activity_bar_items(),
+            breadcrumbs: Vec::new(),
+            viewport_scroll: 0,
+            workspace_folder: None,
         }
     }
 
@@ -463,6 +1065,12 @@ impl Workbench {
     pub fn set_editor_content(&mut self, content: &str, path: Option<String>) {
         self.editor_content = Some(content.lines().map(|l| l.to_string()).collect());
         self.file_path = path.clone();
+        // Compute breadcrumbs from file path
+        if let Some(ref p) = path {
+            self.breadcrumbs = compute_breadcrumbs(p, &[]);
+        } else {
+            self.breadcrumbs.clear();
+        }
         // Detect syntax from file path
         if let Some(ref p) = path {
             let file_path = std::path::Path::new(p);
@@ -495,13 +1103,11 @@ impl Workbench {
 
         // Titlebar / menubar
         if let Some(menubar) = result.menubar {
-            let title_text = match &self.file_path {
-                Some(path) => {
-                    let modified = if self.is_modified { " ●" } else { "" };
-                    format!("{}{} — vsedit", path, modified)
-                }
-                None => "vsedit".to_string(),
-            };
+            let title_text = compute_title_bar(
+                self.file_path.as_deref(),
+                self.workspace_folder.as_deref(),
+                self.is_modified,
+            );
             let title = Paragraph::new(Line::from(vec![
                 Span::styled(title_text, Style::default().fg(Color::Cyan)),
             ]))
@@ -510,13 +1116,12 @@ impl Workbench {
             frame.render_widget(title, menubar);
         }
 
-        // Activity bar
+        // Activity bar (using activity_bar_items with badge support)
         if let Some(ab) = result.activity_bar {
-            let containers = self.views.get_containers(ViewContainerLocation::Sidebar);
-            let icons: Vec<Line> = containers
+            let icons: Vec<Line> = self.activity_bar_items
                 .iter()
-                .map(|c| {
-                    let is_active = match (self.active_sidebar, c.id.as_str()) {
+                .map(|item| {
+                    let is_active = match (self.active_sidebar, item.id.as_str()) {
                         (ActiveSidebarPanel::Explorer, "workbench.view.explorer") => true,
                         (ActiveSidebarPanel::Search, "workbench.view.search") => true,
                         (ActiveSidebarPanel::SourceControl, "workbench.view.scm") => true,
@@ -524,24 +1129,7 @@ impl Workbench {
                         (ActiveSidebarPanel::Extensions, "workbench.view.extensions") => true,
                         _ => false,
                     };
-                    let badge = match c.id.as_str() {
-                        "workbench.view.scm" => {
-                            let n: usize = self.scm_groups.iter()
-                                .map(|g| g.changes.len())
-                                .sum();
-                            if n > 0 { format!(" {n}") } else { String::new() }
-                        }
-                        _ => String::new(),
-                    };
-                    let icon_char = match c.id.as_str() {
-                        "workbench.view.explorer" => "📁",
-                        "workbench.view.search" => "🔍",
-                        "workbench.view.scm" => "⎇",
-                        "workbench.view.debug" => "▶",
-                        "workbench.view.extensions" => "⊞",
-                        _ => "·",
-                    };
-                    let text = format!("{icon_char}{badge}");
+                    let text = item.display_text();
                     let style = if is_active {
                         Style::default().fg(Color::White).bg(Color::DarkGray)
                     } else {
@@ -618,30 +1206,15 @@ impl Workbench {
             }
         }
 
-        // Editor area (with tab bar)
+        // Editor area (with tab bar, breadcrumbs, and minimap)
         {
             let editor_rect = result.editor;
-            let (tab_bar_area, content_area) = if self.tab_service.tab_count() > 0
-                && editor_rect.height > 1
-            {
-                let tab_area = Rect::new(
-                    editor_rect.x,
-                    editor_rect.y,
-                    editor_rect.width,
-                    1,
-                );
-                let content = Rect::new(
-                    editor_rect.x,
-                    editor_rect.y + 1,
-                    editor_rect.width,
-                    editor_rect.height - 1,
-                );
-                (Some(tab_area), content)
-            } else {
-                (None, editor_rect)
-            };
+            let mut current_y = editor_rect.y;
+            let mut remaining_h = editor_rect.height;
 
-            if let Some(tab_area) = tab_bar_area {
+            // Tab bar
+            if self.tab_service.tab_count() > 0 && remaining_h > 1 {
+                let tab_area = Rect::new(editor_rect.x, current_y, editor_rect.width, 1);
                 let mut tab_spans: Vec<Span> = Vec::new();
                 for tab in self.tab_service.get_tabs() {
                     let indicator = if tab.is_modified { " ●" } else { " ✕" };
@@ -656,7 +1229,22 @@ impl Workbench {
                 let tab_line = Paragraph::new(Line::from(tab_spans))
                     .style(Style::default().bg(Color::DarkGray));
                 frame.render_widget(tab_line, tab_area);
+                current_y += 1;
+                remaining_h -= 1;
             }
+
+            // Breadcrumb bar
+            if !self.breadcrumbs.is_empty() && remaining_h > 1 {
+                let bc_area = Rect::new(editor_rect.x, current_y, editor_rect.width, 1);
+                render_breadcrumbs(&self.breadcrumbs, bc_area, frame.buffer_mut());
+                current_y += 1;
+                remaining_h -= 1;
+            }
+
+            // Split remaining into editor text + minimap
+            let minimap_width: u16 = if remaining_h > 2 && editor_rect.width > 30 { 10 } else { 0 };
+            let text_width = editor_rect.width.saturating_sub(minimap_width);
+            let content_area = Rect::new(editor_rect.x, current_y, text_width, remaining_h);
 
             match &self.editor_content {
                 Some(lines) if !lines.is_empty() || self.file_path.is_some() => {
@@ -707,6 +1295,23 @@ impl Workbench {
                     };
                     let editor = Paragraph::new(rendered);
                     frame.render_widget(editor, content_area);
+
+                    // Render minimap
+                    if minimap_width > 0 && !lines.is_empty() {
+                        let minimap_area = Rect::new(
+                            editor_rect.x + text_width,
+                            current_y,
+                            minimap_width,
+                            remaining_h,
+                        );
+                        render_minimap(
+                            lines,
+                            self.viewport_scroll,
+                            remaining_h as usize,
+                            minimap_area,
+                            frame.buffer_mut(),
+                        );
+                    }
                 }
                 _ => {
                     let editor = Paragraph::new("No editors open")
@@ -1026,6 +1631,35 @@ impl Workbench {
             "workbench.action.panel.previousTab" => {
                 self.active_panel = self.active_panel.prev();
             }
+            "workbench.action.splitEditor" => {
+                self.editor_groups.split_editor(SplitDirection::Right);
+            }
+            "workbench.action.focusFirstEditorGroup" => {
+                if let Some(g) = self.editor_groups.groups.first() {
+                    let id = g.group_id;
+                    self.editor_groups.focus_group(id);
+                }
+            }
+            "workbench.action.focusSecondEditorGroup" => {
+                if let Some(g) = self.editor_groups.groups.get(1) {
+                    let id = g.group_id;
+                    self.editor_groups.focus_group(id);
+                }
+            }
+            "workbench.action.focusThirdEditorGroup" => {
+                if let Some(g) = self.editor_groups.groups.get(2) {
+                    let id = g.group_id;
+                    self.editor_groups.focus_group(id);
+                }
+            }
+            "workbench.action.decreaseSidebarWidth" => {
+                let w = self.layout.get_sidebar_width();
+                self.layout.set_sidebar_width(w.saturating_sub(2).max(10));
+            }
+            "workbench.action.increaseSidebarWidth" => {
+                let w = self.layout.get_sidebar_width();
+                self.layout.set_sidebar_width((w + 2).min(80));
+            }
             _ => {
                 let _ = self.commands.execute(command_id, vec![]);
             }
@@ -1315,6 +1949,31 @@ impl Workbench {
         let (e, w, i) = self.get_problem_count();
         self.statusbar
             .update_item("statusbar.problems", &format!("✖ {} ⚠ {} ℹ {}", e, w, i));
+    }
+
+    /// Update activity bar badge counts from current state.
+    pub fn update_activity_bar_badges(&mut self) {
+        let scm_count: usize = self.scm_groups.iter().map(|g| g.changes.len()).sum();
+        for item in &mut self.activity_bar_items {
+            match item.id.as_str() {
+                "workbench.view.scm" => item.set_badge(scm_count),
+                _ => {}
+            }
+        }
+    }
+
+    /// Set the workspace folder for the title bar.
+    pub fn set_workspace_folder(&mut self, folder: Option<String>) {
+        self.workspace_folder = folder;
+    }
+
+    /// Get the computed title bar text.
+    pub fn get_title_bar_text(&self) -> String {
+        compute_title_bar(
+            self.file_path.as_deref(),
+            self.workspace_folder.as_deref(),
+            self.is_modified,
+        )
     }
 }
 
@@ -2077,5 +2736,273 @@ mod tests {
                 wb.render(frame);
             })
             .unwrap();
+    }
+
+    // -- Editor group management tests --------------------------------------
+
+    #[test]
+    fn editor_group_manager_starts_with_single_group() {
+        let mgr = EditorGroupManager::new();
+        assert_eq!(mgr.group_count(), 1);
+        assert_eq!(mgr.layout, EditorGroupLayout::Single);
+        assert!(mgr.active_group().unwrap().is_empty());
+    }
+
+    #[test]
+    fn editor_group_add_and_close_tab() {
+        let mut group = EditorGroup::new(0);
+        group.add_tab(EditorGroupTab {
+            title: "main.rs".into(),
+            file_path: Some("/src/main.rs".into()),
+            content: "fn main() {}".into(),
+            is_modified: false,
+        });
+        group.add_tab(EditorGroupTab {
+            title: "lib.rs".into(),
+            file_path: Some("/src/lib.rs".into()),
+            content: "pub mod foo;".into(),
+            is_modified: true,
+        });
+        assert_eq!(group.tabs.len(), 2);
+        assert_eq!(group.active_tab_idx, 1);
+        assert_eq!(group.active_tab().unwrap().title, "lib.rs");
+
+        let closed = group.close_tab(1).unwrap();
+        assert_eq!(closed.title, "lib.rs");
+        assert_eq!(group.tabs.len(), 1);
+        assert_eq!(group.active_tab_idx, 0);
+    }
+
+    #[test]
+    fn split_editor_creates_new_group() {
+        let mut mgr = EditorGroupManager::new();
+        mgr.active_group_mut().unwrap().add_tab(EditorGroupTab {
+            title: "test.rs".into(),
+            file_path: None,
+            content: "// test".into(),
+            is_modified: false,
+        });
+        let new_id = mgr.split_editor(SplitDirection::Right);
+        assert_eq!(mgr.group_count(), 2);
+        assert_eq!(mgr.active_group_id, new_id);
+        assert_eq!(mgr.active_group().unwrap().tabs.len(), 1);
+        assert_eq!(mgr.active_group().unwrap().tabs[0].title, "test.rs");
+        assert!(matches!(mgr.layout, EditorGroupLayout::Horizontal(_)));
+    }
+
+    #[test]
+    fn split_editor_vertical() {
+        let mut mgr = EditorGroupManager::new();
+        mgr.split_editor(SplitDirection::Down);
+        assert!(matches!(mgr.layout, EditorGroupLayout::Vertical(_)));
+    }
+
+    #[test]
+    fn close_group_redistributes_tabs() {
+        let mut mgr = EditorGroupManager::new();
+        mgr.active_group_mut().unwrap().add_tab(EditorGroupTab {
+            title: "a.rs".into(),
+            file_path: None,
+            content: "a".into(),
+            is_modified: false,
+        });
+        let new_id = mgr.split_editor(SplitDirection::Right);
+        mgr.active_group_mut().unwrap().add_tab(EditorGroupTab {
+            title: "b.rs".into(),
+            file_path: None,
+            content: "b".into(),
+            is_modified: false,
+        });
+        assert!(mgr.close_group(new_id));
+        assert_eq!(mgr.group_count(), 1);
+        assert!(mgr.active_group().unwrap().tabs.len() >= 2);
+        assert_eq!(mgr.layout, EditorGroupLayout::Single);
+    }
+
+    #[test]
+    fn close_last_group_fails() {
+        let mut mgr = EditorGroupManager::new();
+        assert!(!mgr.close_group(0));
+    }
+
+    #[test]
+    fn move_editor_to_group() {
+        let mut mgr = EditorGroupManager::new();
+        mgr.active_group_mut().unwrap().add_tab(EditorGroupTab {
+            title: "file.rs".into(),
+            file_path: None,
+            content: "code".into(),
+            is_modified: false,
+        });
+        let first_id = mgr.active_group_id;
+        let second_id = mgr.split_editor(SplitDirection::Right);
+        assert!(mgr.move_editor_to_group(first_id, second_id, 0));
+        assert!(mgr.get_group(first_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn focus_group() {
+        let mut mgr = EditorGroupManager::new();
+        let first_id = mgr.active_group_id;
+        let second_id = mgr.split_editor(SplitDirection::Right);
+        assert_eq!(mgr.active_group_id, second_id);
+        assert!(mgr.focus_group(first_id));
+        assert_eq!(mgr.active_group_id, first_id);
+        assert!(!mgr.focus_group(999));
+    }
+
+    // -- Activity bar item tests --------------------------------------------
+
+    #[test]
+    fn activity_bar_item_badge() {
+        let mut item = ActivityBarItem::new("test", "Test", "🔧");
+        assert_eq!(item.display_text(), "🔧");
+        item.set_badge(5);
+        assert_eq!(item.display_text(), "🔧5");
+        item.set_badge(0);
+        assert_eq!(item.display_text(), "🔧");
+    }
+
+    #[test]
+    fn default_activity_bar_items_count() {
+        let items = default_activity_bar_items();
+        assert_eq!(items.len(), 5);
+        assert_eq!(items[0].id, "workbench.view.explorer");
+        assert_eq!(items[1].icon_char, "🔍");
+        assert_eq!(items[2].icon_char, "🔀");
+        assert_eq!(items[3].icon_char, "🐛");
+        assert_eq!(items[4].icon_char, "📦");
+    }
+
+    // -- Breadcrumb tests ---------------------------------------------------
+
+    #[test]
+    fn compute_breadcrumbs_file_path() {
+        let crumbs = compute_breadcrumbs("src/main.rs", &[]);
+        assert!(crumbs.len() >= 2);
+        assert_eq!(crumbs.last().unwrap().label, "main.rs");
+        assert_eq!(crumbs.last().unwrap().kind, BreadcrumbKind::File);
+        assert_eq!(crumbs[0].kind, BreadcrumbKind::Folder);
+    }
+
+    #[test]
+    fn compute_breadcrumbs_with_symbols() {
+        let crumbs = compute_breadcrumbs("src/lib.rs", &["MyStruct".to_string(), "method".to_string()]);
+        let symbols: Vec<_> = crumbs.iter().filter(|c| c.kind == BreadcrumbKind::Symbol).collect();
+        assert_eq!(symbols.len(), 2);
+        assert_eq!(symbols[0].label, "MyStruct");
+    }
+
+    #[test]
+    fn compute_breadcrumbs_empty_path() {
+        let crumbs = compute_breadcrumbs("file.txt", &[]);
+        assert_eq!(crumbs.len(), 1);
+        assert_eq!(crumbs[0].label, "file.txt");
+        assert_eq!(crumbs[0].kind, BreadcrumbKind::File);
+    }
+
+    // -- Title bar tests ----------------------------------------------------
+
+    #[test]
+    fn title_bar_no_file() {
+        assert_eq!(compute_title_bar(None, None, false), "vsedit");
+    }
+
+    #[test]
+    fn title_bar_with_file_and_folder() {
+        let text = compute_title_bar(Some("/src/main.rs"), Some("myproject"), false);
+        assert!(text.contains("main.rs"));
+        assert!(text.contains("myproject"));
+        assert!(text.contains("vsedit"));
+        assert!(!text.contains("●"));
+    }
+
+    #[test]
+    fn title_bar_dirty_indicator() {
+        let text = compute_title_bar(Some("/src/main.rs"), None, true);
+        assert!(text.contains("●"));
+    }
+
+    // -- Keybinding tests for new commands ----------------------------------
+
+    #[test]
+    fn keybinding_ctrl_backslash_splits_editor() {
+        let mut wb = Workbench::new();
+        let action = wb.handle_input(make_key(KeyCode::Backslash, true, false));
+        assert_eq!(
+            action,
+            WorkbenchAction::ExecuteCommand("workbench.action.splitEditor".to_string())
+        );
+    }
+
+    #[test]
+    fn keybinding_ctrl_1_focuses_first_group() {
+        let mut wb = Workbench::new();
+        let action = wb.handle_input(make_key(KeyCode::Digit1, true, false));
+        assert_eq!(
+            action,
+            WorkbenchAction::ExecuteCommand("workbench.action.focusFirstEditorGroup".to_string())
+        );
+    }
+
+    // -- Resize sidebar tests -----------------------------------------------
+
+    #[test]
+    fn decrease_sidebar_width() {
+        let mut wb = Workbench::new();
+        let initial = wb.layout.get_sidebar_width();
+        wb.execute_command("workbench.action.decreaseSidebarWidth");
+        assert_eq!(wb.layout.get_sidebar_width(), initial - 2);
+    }
+
+    #[test]
+    fn increase_sidebar_width() {
+        let mut wb = Workbench::new();
+        let initial = wb.layout.get_sidebar_width();
+        wb.execute_command("workbench.action.increaseSidebarWidth");
+        assert_eq!(wb.layout.get_sidebar_width(), initial + 2);
+    }
+
+    #[test]
+    fn sidebar_width_minimum_clamp() {
+        let mut wb = Workbench::new();
+        wb.layout.set_sidebar_width(10);
+        wb.execute_command("workbench.action.decreaseSidebarWidth");
+        assert_eq!(wb.layout.get_sidebar_width(), 10);
+    }
+
+    // -- Render with new features -------------------------------------------
+
+    #[test]
+    fn render_with_breadcrumbs_and_minimap() {
+        let mut wb = Workbench::new();
+        wb.open_file(std::path::Path::new("/src/main.rs"), "fn main() {\n    println!(\"hello\");\n}\n");
+        assert!(!wb.breadcrumbs.is_empty());
+        let backend = TestBackend::new(100, 30);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| wb.render(frame)).unwrap();
+    }
+
+    #[test]
+    fn render_with_workspace_folder_title() {
+        let mut wb = Workbench::new();
+        wb.set_workspace_folder(Some("myproject".into()));
+        wb.open_file(std::path::Path::new("/src/main.rs"), "code");
+        let title = wb.get_title_bar_text();
+        assert!(title.contains("myproject"));
+        assert!(title.contains("main.rs"));
+    }
+
+    #[test]
+    fn update_activity_bar_badges_from_scm() {
+        use vsedit_scm_view::{ScmFileChange, ScmFileStatus, ScmGroup};
+        let mut wb = Workbench::new();
+        let mut group = ScmGroup::new("changes", "Changes");
+        group.add_change(ScmFileChange::new("a.rs", ScmFileStatus::Modified));
+        group.add_change(ScmFileChange::new("b.rs", ScmFileStatus::Added));
+        wb.scm_groups = vec![group];
+        wb.update_activity_bar_badges();
+        let scm_item = wb.activity_bar_items.iter().find(|i| i.id == "workbench.view.scm").unwrap();
+        assert_eq!(scm_item.badge, Some(2));
     }
 }
