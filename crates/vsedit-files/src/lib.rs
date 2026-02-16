@@ -3,8 +3,10 @@
 //! Equivalent to VS Code's `vs/platform/files/common/fileService.ts`.
 //! Provides file system operations with URI-based paths and file watching.
 
+pub mod watcher;
+
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use vsedit_events::{Emitter, Event};

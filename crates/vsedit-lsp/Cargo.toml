@@ -1,0 +1,17 @@
+[package]
+name = "vsedit-lsp"
+description = "LSP client for language server integration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lsp-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { version = "1", features = ["process", "io-util", "sync", "rt", "macros"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }

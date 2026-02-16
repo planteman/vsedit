@@ -116,6 +116,7 @@ members = [
     "crates/vsedit-list",
     "crates/vsedit-local-history",
     "crates/vsedit-log",
+    "crates/vsedit-lsp",
     "crates/vsedit-markdown",
     "crates/vsedit-markers",
     "crates/vsedit-markers-view",
@@ -274,6 +275,7 @@ unicode-segmentation = "1"
 keyring = "3"
 dirs = "5"
 syntect = "5"
+lsp-types = "0.97"
 
 [profile.release]
 lto = true
