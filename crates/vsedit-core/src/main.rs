@@ -13,7 +13,7 @@ use futures::StreamExt;
 use vsedit_editor_controller::{EditorAction, EditorController};
 use vsedit_input::{from_crossterm_key, InputEvent};
 use vsedit_tui::{restore_terminal, setup_terminal};
-use vsedit_workbench::{WorkbenchAction, Workbench};
+use vsedit_workbench::{FocusedPart, WorkbenchAction, Workbench};
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -54,9 +54,12 @@ async fn main() -> io::Result<()> {
 
     let mut controller = EditorController::new(&content);
 
-    // Sync initial state to workbench.
-    let path_str = file_path.as_ref().map(|p| p.display().to_string());
-    workbench.set_editor_content(&controller.model.get_value(), path_str.clone());
+    // Sync initial state to workbench. Open the file as a tab.
+    if let Some(ref path) = file_path {
+        workbench.open_file(path, &content);
+    } else {
+        workbench.set_editor_content(&controller.model.get_value(), None);
+    }
     let pos = controller.cursors.get_primary().position();
     workbench.set_cursor_info(pos.line, pos.column);
 
@@ -127,6 +130,35 @@ fn handle_event(
             let has_ctrl = key_event.modifiers.contains(KeyModifiers::CONTROL);
             let has_shift = key_event.modifiers.contains(KeyModifiers::SHIFT);
 
+            // When command palette is open, route all keys through workbench.
+            if workbench.focused == FocusedPart::CommandPalette {
+                let input = from_crossterm_key(key_event);
+                let action = workbench.handle_input(InputEvent::Key(input));
+                match action {
+                    WorkbenchAction::ExecuteCommand(ref cmd) => {
+                        if cmd == "workbench.action.quit" {
+                            return true;
+                        }
+                        if cmd == "workbench.action.files.save" {
+                            if let Some(path) = file_path {
+                                let value = controller.model.get_value();
+                                if let Err(e) = std::fs::write(path, &value) {
+                                    tracing::error!("Failed to save: {}", e);
+                                } else {
+                                    tracing::info!("Saved: {}", path.display());
+                                    workbench.is_modified = false;
+                                }
+                            }
+                            sync_state(workbench, controller, path_str);
+                            return false;
+                        }
+                        workbench.execute_command(cmd);
+                    }
+                    _ => {}
+                }
+                return false;
+            }
+
             // Ctrl+key combos: route through workbench or handle directly.
             if has_ctrl {
                 match key_event.code {
@@ -176,6 +208,19 @@ fn handle_event(
                             WorkbenchAction::ExecuteCommand(ref cmd) => {
                                 if cmd == "workbench.action.quit" {
                                     return true;
+                                }
+                                if cmd == "workbench.action.files.save" {
+                                    if let Some(path) = file_path {
+                                        let value = controller.model.get_value();
+                                        if let Err(e) = std::fs::write(path, &value) {
+                                            tracing::error!("Failed to save: {}", e);
+                                        } else {
+                                            tracing::info!("Saved: {}", path.display());
+                                            workbench.is_modified = false;
+                                        }
+                                    }
+                                    sync_state(workbench, controller, path_str);
+                                    return false;
                                 }
                                 workbench.execute_command(cmd);
                             }

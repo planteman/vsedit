@@ -19,5 +19,6 @@ vsedit-wb-layout = { path = "../vsedit-wb-layout" }
 vsedit-wb-statusbar = { path = "../vsedit-wb-statusbar" }
 vsedit-wb-textmate = { path = "../vsedit-wb-textmate" }
 vsedit-wb-views = { path = "../vsedit-wb-views" }
+vsedit-quickinput = { path = "../vsedit-quickinput" }
 ratatui = { workspace = true }
 
