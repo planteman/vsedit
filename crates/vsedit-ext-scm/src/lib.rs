@@ -2,6 +2,8 @@
 //!
 //! RPC bridge between the extension host and the main thread for SCM.
 
+pub mod git;
+
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
