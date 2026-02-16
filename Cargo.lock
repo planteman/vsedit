@@ -3610,6 +3610,7 @@ name = "vsedit-scm-view"
 version = "0.1.0"
 dependencies = [
  "ratatui",
+ "tempfile",
  "vsedit-ext-scm",
  "vsedit-wb-views",
 ]

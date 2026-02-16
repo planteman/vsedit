@@ -10,3 +10,6 @@ vsedit-ext-scm = { path = "../vsedit-ext-scm" }
 vsedit-wb-views = { path = "../vsedit-wb-views" }
 ratatui.workspace = true
 
+[dev-dependencies]
+tempfile = "3"
+

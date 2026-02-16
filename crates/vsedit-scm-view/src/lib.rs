@@ -1,6 +1,7 @@
 //! Source control view — SCM sidebar equivalent to VS Code's Git panel.
 
 use std::fmt;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -183,7 +184,7 @@ impl GitScmProvider {
             .output()
             .ok()
             .filter(|o| o.status.success())
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim_end().to_string())
     }
 }
 
@@ -275,6 +276,422 @@ pub fn parse_ahead_behind(output: &str) -> (usize, usize) {
         (ahead, behind)
     } else {
         (0, 0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileStatus (fine-grained status enum)
+// ---------------------------------------------------------------------------
+
+/// Fine-grained status for a file tracked by git.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FileStatus {
+    Untracked,
+    Modified,
+    Added,
+    Deleted,
+    Renamed,
+    Copied,
+    Unmerged,
+}
+
+impl FileStatus {
+    /// Single-character indicator.
+    pub fn indicator(self) -> char {
+        match self {
+            Self::Untracked => '?',
+            Self::Modified => 'M',
+            Self::Added => 'A',
+            Self::Deleted => 'D',
+            Self::Renamed => 'R',
+            Self::Copied => 'C',
+            Self::Unmerged => 'U',
+        }
+    }
+}
+
+impl fmt::Display for FileStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Untracked => "Untracked",
+            Self::Modified => "Modified",
+            Self::Added => "Added",
+            Self::Deleted => "Deleted",
+            Self::Renamed => "Renamed",
+            Self::Copied => "Copied",
+            Self::Unmerged => "Unmerged",
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusEntry (parsed from `git status --porcelain=v1`)
+// ---------------------------------------------------------------------------
+
+/// A single entry from `git status --porcelain=v1`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusEntry {
+    pub path: PathBuf,
+    pub index_status: FileStatus,
+    pub worktree_status: FileStatus,
+    /// Original path for renames/copies.
+    pub original_path: Option<PathBuf>,
+}
+
+/// Parse a porcelain v1 status character into a `FileStatus`.
+fn char_to_file_status(ch: u8) -> FileStatus {
+    match ch {
+        b'M' | b'T' => FileStatus::Modified,
+        b'A' => FileStatus::Added,
+        b'D' => FileStatus::Deleted,
+        b'R' => FileStatus::Renamed,
+        b'C' => FileStatus::Copied,
+        b'U' => FileStatus::Unmerged,
+        b'?' => FileStatus::Untracked,
+        _ => FileStatus::Untracked,
+    }
+}
+
+/// Parse `git status --porcelain=v1` output into `StatusEntry` items.
+pub fn parse_status_porcelain(output: &str) -> Vec<StatusEntry> {
+    output
+        .lines()
+        .filter(|l| l.len() >= 4)
+        .filter_map(|line| {
+            let idx = line.as_bytes()[0];
+            let wt = line.as_bytes()[1];
+            let path_part = &line[3..];
+
+            if idx == b'?' && wt == b'?' {
+                return Some(StatusEntry {
+                    path: PathBuf::from(path_part),
+                    index_status: FileStatus::Untracked,
+                    worktree_status: FileStatus::Untracked,
+                    original_path: None,
+                });
+            }
+
+            // Handle renames/copies: "R  old -> new" or "C  old -> new"
+            if idx == b'R' || idx == b'C' || wt == b'R' || wt == b'C' {
+                let parts: Vec<&str> = path_part.splitn(2, " -> ").collect();
+                let (new_path, orig) = if parts.len() == 2 {
+                    (parts[1], Some(PathBuf::from(parts[0])))
+                } else {
+                    (path_part, None)
+                };
+                return Some(StatusEntry {
+                    path: PathBuf::from(new_path),
+                    index_status: char_to_file_status(idx),
+                    worktree_status: char_to_file_status(wt),
+                    original_path: orig,
+                });
+            }
+
+            let index_status = if idx == b' ' {
+                FileStatus::Untracked
+            } else {
+                char_to_file_status(idx)
+            };
+            let worktree_status = if wt == b' ' {
+                FileStatus::Untracked
+            } else {
+                char_to_file_status(wt)
+            };
+
+            Some(StatusEntry {
+                path: PathBuf::from(path_part),
+                index_status,
+                worktree_status,
+                original_path: None,
+            })
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// DiffLine / DiffHunk (parsed unified diff)
+// ---------------------------------------------------------------------------
+
+/// A single line in a diff hunk.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffLine {
+    Context(String),
+    Added(String),
+    Removed(String),
+}
+
+/// A parsed hunk from unified diff output.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffHunk {
+    pub old_start: u32,
+    pub old_count: u32,
+    pub new_start: u32,
+    pub new_count: u32,
+    pub lines: Vec<DiffLine>,
+}
+
+/// Parse `git diff --unified=3` (or `--cached`) output into `DiffHunk` structs.
+pub fn parse_diff_hunks(diff_output: &str) -> Vec<DiffHunk> {
+    let mut hunks = Vec::new();
+    let mut current: Option<DiffHunk> = None;
+
+    for line in diff_output.lines() {
+        if let Some(header) = line.strip_prefix("@@ ") {
+            // Flush previous hunk.
+            if let Some(h) = current.take() {
+                hunks.push(h);
+            }
+            // Parse "@@ -old_start,old_count +new_start,new_count @@"
+            if let Some((old, new)) = parse_hunk_header(header) {
+                current = Some(DiffHunk {
+                    old_start: old.0,
+                    old_count: old.1,
+                    new_start: new.0,
+                    new_count: new.1,
+                    lines: Vec::new(),
+                });
+            }
+        } else if let Some(ref mut hunk) = current {
+            if let Some(rest) = line.strip_prefix('+') {
+                hunk.lines.push(DiffLine::Added(rest.to_string()));
+            } else if let Some(rest) = line.strip_prefix('-') {
+                hunk.lines.push(DiffLine::Removed(rest.to_string()));
+            } else if let Some(rest) = line.strip_prefix(' ') {
+                hunk.lines.push(DiffLine::Context(rest.to_string()));
+            } else if line.is_empty() || !line.starts_with('\\') {
+                // Context line with no prefix (empty line) or non-special line.
+                hunk.lines.push(DiffLine::Context(line.to_string()));
+            }
+        }
+    }
+    if let Some(h) = current {
+        hunks.push(h);
+    }
+    hunks
+}
+
+/// Parse a hunk header like `-1,3 +1,4 @@` into ((old_start, old_count), (new_start, new_count)).
+fn parse_hunk_header(header: &str) -> Option<((u32, u32), (u32, u32))> {
+    // Header format: "-old_start,old_count +new_start,new_count @@..."
+    let parts: Vec<&str> = header.splitn(2, " @@").collect();
+    let range_part = parts.first()?;
+    let mut ranges = range_part.split_whitespace();
+
+    let old_range = ranges.next()?.strip_prefix('-')?;
+    let new_range = ranges.next()?.strip_prefix('+')?;
+
+    let old = parse_range(old_range);
+    let new = parse_range(new_range);
+
+    Some((old, new))
+}
+
+fn parse_range(range: &str) -> (u32, u32) {
+    if let Some((start, count)) = range.split_once(',') {
+        (
+            start.parse().unwrap_or(0),
+            count.parse().unwrap_or(0),
+        )
+    } else {
+        (range.parse().unwrap_or(0), 1)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LogEntry
+// ---------------------------------------------------------------------------
+
+/// A single commit from `git log --oneline`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogEntry {
+    pub hash: String,
+    pub message: String,
+}
+
+/// Parse `git log --oneline -n` output into `LogEntry` items.
+pub fn parse_log_oneline(output: &str) -> Vec<LogEntry> {
+    output
+        .lines()
+        .filter(|l| !l.is_empty())
+        .filter_map(|line| {
+            let (hash, msg) = line.split_once(' ')?;
+            Some(LogEntry {
+                hash: hash.to_string(),
+                message: msg.to_string(),
+            })
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// GitRepository
+// ---------------------------------------------------------------------------
+
+/// Error type for git operations.
+#[derive(Debug)]
+pub enum GitError {
+    /// The git command failed with a non-zero exit code.
+    CommandFailed { stderr: String },
+    /// An I/O error occurred launching or communicating with git.
+    Io(io::Error),
+}
+
+impl fmt::Display for GitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CommandFailed { stderr } => write!(f, "git: {stderr}"),
+            Self::Io(e) => write!(f, "git I/O: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for GitError {}
+
+impl From<io::Error> for GitError {
+    fn from(e: io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+/// High-level wrapper around the `git` CLI for repository operations.
+pub struct GitRepository {
+    root: PathBuf,
+}
+
+impl GitRepository {
+    /// Open a repository at the given root directory.
+    pub fn open(root: impl Into<PathBuf>) -> Self {
+        Self { root: root.into() }
+    }
+
+    /// Root directory of this repository.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    /// Run a git command and return stdout on success.
+    fn run(&self, args: &[&str]) -> Result<String, GitError> {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(&self.root)
+            .output()?;
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        } else {
+            Err(GitError::CommandFailed {
+                stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+            })
+        }
+    }
+
+    /// Run a git command preserving leading whitespace in output lines.
+    fn run_raw(&self, args: &[&str]) -> Result<String, GitError> {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(&self.root)
+            .output()?;
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout)
+                .trim_end()
+                .to_string())
+        } else {
+            Err(GitError::CommandFailed {
+                stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+            })
+        }
+    }
+
+    /// Run `git status --porcelain=v1` and parse into `StatusEntry` items.
+    pub fn git_status(&self) -> Result<Vec<StatusEntry>, GitError> {
+        let out = self.run_raw(&["status", "--porcelain=v1"])?;
+        Ok(parse_status_porcelain(&out))
+    }
+
+    /// Get `git diff` output for a specific file (unstaged changes).
+    pub fn git_diff(&self, file: &Path) -> Result<Vec<DiffHunk>, GitError> {
+        let path_str = file.to_string_lossy();
+        let out = self.run_raw(&["diff", "--unified=3", "--", &path_str])?;
+        Ok(parse_diff_hunks(&out))
+    }
+
+    /// Get `git diff --cached` output for a specific file (staged changes).
+    pub fn git_diff_staged(&self, file: &Path) -> Result<Vec<DiffHunk>, GitError> {
+        let path_str = file.to_string_lossy();
+        let out =
+            self.run_raw(&["diff", "--cached", "--unified=3", "--", &path_str])?;
+        Ok(parse_diff_hunks(&out))
+    }
+
+    /// Get the current branch name.
+    pub fn git_branch(&self) -> Result<String, GitError> {
+        self.run(&["rev-parse", "--abbrev-ref", "HEAD"])
+    }
+
+    /// Get the last `n` commits as `LogEntry` items.
+    pub fn git_log(&self, n: usize) -> Result<Vec<LogEntry>, GitError> {
+        let n_str = format!("-{n}");
+        let out = self.run(&["log", "--oneline", &n_str])?;
+        Ok(parse_log_oneline(&out))
+    }
+
+    /// Stage a file with `git add`.
+    pub fn git_stage(&self, file: &Path) -> Result<(), GitError> {
+        let path_str = file.to_string_lossy();
+        self.run(&["add", "--", &path_str])?;
+        Ok(())
+    }
+
+    /// Unstage a file with `git restore --staged`.
+    pub fn git_unstage(&self, file: &Path) -> Result<(), GitError> {
+        let path_str = file.to_string_lossy();
+        self.run(&["restore", "--staged", "--", &path_str])?;
+        Ok(())
+    }
+
+    /// Commit staged changes with the given message.
+    pub fn git_commit(&self, message: &str) -> Result<(), GitError> {
+        self.run(&["commit", "-m", message])?;
+        Ok(())
+    }
+
+    /// Discard working-tree changes to a file.
+    pub fn git_discard(&self, file: &Path) -> Result<(), GitError> {
+        let path_str = file.to_string_lossy();
+        self.run(&["checkout", "--", &path_str])?;
+        Ok(())
+    }
+
+    /// Return grouped changes: (staged, unstaged, untracked).
+    pub fn grouped_status(
+        &self,
+    ) -> Result<(Vec<StatusEntry>, Vec<StatusEntry>, Vec<StatusEntry>), GitError> {
+        let entries = self.git_status()?;
+        let mut staged = Vec::new();
+        let mut unstaged = Vec::new();
+        let mut untracked = Vec::new();
+
+        for entry in entries {
+            match (entry.index_status, entry.worktree_status) {
+                (FileStatus::Untracked, FileStatus::Untracked) => {
+                    untracked.push(entry);
+                }
+                (idx, wt) => {
+                    // If index has a real status, it's staged.
+                    if idx != FileStatus::Untracked {
+                        staged.push(entry.clone());
+                    }
+                    // If worktree has a real change, it's unstaged.
+                    if wt != FileStatus::Untracked
+                        && !(idx != FileStatus::Untracked
+                            && wt == FileStatus::Untracked)
+                    {
+                        unstaged.push(entry);
+                    }
+                }
+            }
+        }
+
+        Ok((staged, unstaged, untracked))
     }
 }
 
@@ -768,5 +1185,389 @@ mod tests {
         let provider = GitScmProvider::new("/tmp");
         assert_eq!(provider.name(), "git");
         assert_eq!(provider.root_path(), Path::new("/tmp"));
+    }
+
+    // -- FileStatus tests ---------------------------------------------------
+
+    #[test]
+    fn file_status_indicators() {
+        assert_eq!(FileStatus::Untracked.indicator(), '?');
+        assert_eq!(FileStatus::Modified.indicator(), 'M');
+        assert_eq!(FileStatus::Added.indicator(), 'A');
+        assert_eq!(FileStatus::Deleted.indicator(), 'D');
+        assert_eq!(FileStatus::Renamed.indicator(), 'R');
+        assert_eq!(FileStatus::Copied.indicator(), 'C');
+        assert_eq!(FileStatus::Unmerged.indicator(), 'U');
+    }
+
+    #[test]
+    fn file_status_display_all() {
+        assert_eq!(FileStatus::Untracked.to_string(), "Untracked");
+        assert_eq!(FileStatus::Modified.to_string(), "Modified");
+        assert_eq!(FileStatus::Added.to_string(), "Added");
+        assert_eq!(FileStatus::Deleted.to_string(), "Deleted");
+        assert_eq!(FileStatus::Renamed.to_string(), "Renamed");
+        assert_eq!(FileStatus::Copied.to_string(), "Copied");
+        assert_eq!(FileStatus::Unmerged.to_string(), "Unmerged");
+    }
+
+    // -- parse_status_porcelain tests ---------------------------------------
+
+    #[test]
+    fn parse_status_modified_worktree() {
+        let entries = parse_status_porcelain(" M src/lib.rs\n");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].index_status, FileStatus::Untracked);
+        assert_eq!(entries[0].worktree_status, FileStatus::Modified);
+        assert_eq!(entries[0].path, PathBuf::from("src/lib.rs"));
+    }
+
+    #[test]
+    fn parse_status_modified_index() {
+        let entries = parse_status_porcelain("M  staged.rs\n");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].index_status, FileStatus::Modified);
+    }
+
+    #[test]
+    fn parse_status_both_modified() {
+        let entries = parse_status_porcelain("MM both.rs\n");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].index_status, FileStatus::Modified);
+        assert_eq!(entries[0].worktree_status, FileStatus::Modified);
+    }
+
+    #[test]
+    fn parse_status_untracked() {
+        let entries = parse_status_porcelain("?? new_file.txt\n");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].index_status, FileStatus::Untracked);
+        assert_eq!(entries[0].worktree_status, FileStatus::Untracked);
+    }
+
+    #[test]
+    fn parse_status_added() {
+        let entries = parse_status_porcelain("A  brand_new.rs\n");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].index_status, FileStatus::Added);
+    }
+
+    #[test]
+    fn parse_status_deleted() {
+        let entries = parse_status_porcelain(" D gone.rs\n");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].worktree_status, FileStatus::Deleted);
+    }
+
+    #[test]
+    fn parse_status_renamed() {
+        let entries = parse_status_porcelain("R  old.rs -> new.rs\n");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].index_status, FileStatus::Renamed);
+        assert_eq!(entries[0].path, PathBuf::from("new.rs"));
+        assert_eq!(entries[0].original_path, Some(PathBuf::from("old.rs")));
+    }
+
+    #[test]
+    fn parse_status_mixed_output() {
+        let output = "M  staged.rs\n M unstaged.rs\nA  added.rs\n?? untracked.txt\n D gone.rs\n";
+        let entries = parse_status_porcelain(output);
+        assert_eq!(entries.len(), 5);
+    }
+
+    // -- DiffHunk / parse_diff_hunks tests ----------------------------------
+
+    #[test]
+    fn parse_single_hunk() {
+        let diff = "\
+diff --git a/foo.rs b/foo.rs
+index abc..def 100644
+--- a/foo.rs
++++ b/foo.rs
+@@ -1,3 +1,4 @@
+ line1
+-old line
++new line
++added line
+ line3
+";
+        let hunks = parse_diff_hunks(diff);
+        assert_eq!(hunks.len(), 1);
+        assert_eq!(hunks[0].old_start, 1);
+        assert_eq!(hunks[0].old_count, 3);
+        assert_eq!(hunks[0].new_start, 1);
+        assert_eq!(hunks[0].new_count, 4);
+        assert_eq!(hunks[0].lines.len(), 5);
+        assert_eq!(hunks[0].lines[0], DiffLine::Context("line1".into()));
+        assert_eq!(hunks[0].lines[1], DiffLine::Removed("old line".into()));
+        assert_eq!(hunks[0].lines[2], DiffLine::Added("new line".into()));
+        assert_eq!(hunks[0].lines[3], DiffLine::Added("added line".into()));
+        assert_eq!(hunks[0].lines[4], DiffLine::Context("line3".into()));
+    }
+
+    #[test]
+    fn parse_multiple_hunks() {
+        let diff = "\
+@@ -1,2 +1,2 @@
+-aaa
++bbb
+ ctx
+@@ -10,3 +10,3 @@
+ ctx
+-old
++new
+ ctx
+";
+        let hunks = parse_diff_hunks(diff);
+        assert_eq!(hunks.len(), 2);
+        assert_eq!(hunks[0].old_start, 1);
+        assert_eq!(hunks[1].old_start, 10);
+    }
+
+    #[test]
+    fn parse_hunk_single_line_range() {
+        let diff = "@@ -5 +5 @@\n-removed\n+added\n";
+        let hunks = parse_diff_hunks(diff);
+        assert_eq!(hunks.len(), 1);
+        assert_eq!(hunks[0].old_start, 5);
+        assert_eq!(hunks[0].old_count, 1);
+        assert_eq!(hunks[0].new_start, 5);
+        assert_eq!(hunks[0].new_count, 1);
+    }
+
+    #[test]
+    fn parse_empty_diff() {
+        let hunks = parse_diff_hunks("");
+        assert!(hunks.is_empty());
+    }
+
+    // -- LogEntry / parse_log_oneline tests ---------------------------------
+
+    #[test]
+    fn parse_log_entries() {
+        let output = "abc1234 Initial commit\ndef5678 Add feature\n";
+        let entries = parse_log_oneline(output);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].hash, "abc1234");
+        assert_eq!(entries[0].message, "Initial commit");
+        assert_eq!(entries[1].hash, "def5678");
+        assert_eq!(entries[1].message, "Add feature");
+    }
+
+    #[test]
+    fn parse_log_empty() {
+        let entries = parse_log_oneline("");
+        assert!(entries.is_empty());
+    }
+
+    // -- GitError display ---------------------------------------------------
+
+    #[test]
+    fn git_error_display() {
+        let err = GitError::CommandFailed {
+            stderr: "fatal: not a git repo".into(),
+        };
+        assert!(err.to_string().contains("not a git repo"));
+    }
+
+    // -- GitRepository construction -----------------------------------------
+
+    #[test]
+    fn git_repository_root() {
+        let repo = GitRepository::open("/tmp/test");
+        assert_eq!(repo.root(), Path::new("/tmp/test"));
+    }
+
+    // -- Real git integration tests (use temp dirs) -------------------------
+
+    /// Helper: create a temp dir with `git init`.
+    fn init_temp_repo() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().expect("create temp dir");
+        Command::new("git")
+            .args(["init"])
+            .current_dir(dir.path())
+            .output()
+            .expect("git init");
+        Command::new("git")
+            .args(["config", "user.email", "test@test.com"])
+            .current_dir(dir.path())
+            .output()
+            .expect("git config email");
+        Command::new("git")
+            .args(["config", "user.name", "Test User"])
+            .current_dir(dir.path())
+            .output()
+            .expect("git config name");
+        dir
+    }
+
+    #[test]
+    fn real_git_branch() {
+        let dir = init_temp_repo();
+        let repo = GitRepository::open(dir.path());
+        // Create an initial commit so HEAD exists.
+        std::fs::write(dir.path().join("init.txt"), "init").unwrap();
+        repo.git_stage(Path::new("init.txt")).unwrap();
+        repo.git_commit("initial").unwrap();
+
+        let branch = repo.git_branch().unwrap();
+        // Default branch is typically "main" or "master".
+        assert!(!branch.is_empty());
+    }
+
+    #[test]
+    fn real_git_status_untracked() {
+        let dir = init_temp_repo();
+        let repo = GitRepository::open(dir.path());
+        std::fs::write(dir.path().join("hello.txt"), "hello").unwrap();
+
+        let entries = repo.git_status().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].index_status, FileStatus::Untracked);
+        assert_eq!(entries[0].path, PathBuf::from("hello.txt"));
+    }
+
+    #[test]
+    fn real_git_stage_and_commit() {
+        let dir = init_temp_repo();
+        let repo = GitRepository::open(dir.path());
+
+        std::fs::write(dir.path().join("file.txt"), "content").unwrap();
+        repo.git_stage(Path::new("file.txt")).unwrap();
+
+        // Should now appear as staged (Added).
+        let entries = repo.git_status().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].index_status, FileStatus::Added);
+
+        // Commit and verify clean status.
+        repo.git_commit("add file").unwrap();
+        let entries = repo.git_status().unwrap();
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn real_git_unstage() {
+        let dir = init_temp_repo();
+        let repo = GitRepository::open(dir.path());
+
+        // Need initial commit first.
+        std::fs::write(dir.path().join("base.txt"), "v1").unwrap();
+        repo.git_stage(Path::new("base.txt")).unwrap();
+        repo.git_commit("init").unwrap();
+
+        // Modify and stage.
+        std::fs::write(dir.path().join("base.txt"), "v2").unwrap();
+        repo.git_stage(Path::new("base.txt")).unwrap();
+
+        // Unstage it.
+        repo.git_unstage(Path::new("base.txt")).unwrap();
+
+        let entries = repo.git_status().unwrap();
+        assert_eq!(entries.len(), 1);
+        // Should be modified in worktree only.
+        assert_eq!(entries[0].worktree_status, FileStatus::Modified);
+    }
+
+    #[test]
+    fn real_git_discard() {
+        let dir = init_temp_repo();
+        let repo = GitRepository::open(dir.path());
+
+        std::fs::write(dir.path().join("f.txt"), "original").unwrap();
+        repo.git_stage(Path::new("f.txt")).unwrap();
+        repo.git_commit("init").unwrap();
+
+        // Modify the file.
+        std::fs::write(dir.path().join("f.txt"), "changed").unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("f.txt")).unwrap(),
+            "changed"
+        );
+
+        // Discard changes.
+        repo.git_discard(Path::new("f.txt")).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("f.txt")).unwrap(),
+            "original"
+        );
+    }
+
+    #[test]
+    fn real_git_diff() {
+        let dir = init_temp_repo();
+        let repo = GitRepository::open(dir.path());
+
+        std::fs::write(dir.path().join("d.txt"), "line1\nline2\n").unwrap();
+        repo.git_stage(Path::new("d.txt")).unwrap();
+        repo.git_commit("init").unwrap();
+
+        std::fs::write(dir.path().join("d.txt"), "line1\nmodified\n").unwrap();
+
+        let hunks = repo.git_diff(Path::new("d.txt")).unwrap();
+        assert!(!hunks.is_empty());
+        let has_removed = hunks[0].lines.iter().any(|l| matches!(l, DiffLine::Removed(_)));
+        let has_added = hunks[0].lines.iter().any(|l| matches!(l, DiffLine::Added(_)));
+        assert!(has_removed);
+        assert!(has_added);
+    }
+
+    #[test]
+    fn real_git_diff_staged() {
+        let dir = init_temp_repo();
+        let repo = GitRepository::open(dir.path());
+
+        std::fs::write(dir.path().join("s.txt"), "v1\n").unwrap();
+        repo.git_stage(Path::new("s.txt")).unwrap();
+        repo.git_commit("init").unwrap();
+
+        std::fs::write(dir.path().join("s.txt"), "v2\n").unwrap();
+        repo.git_stage(Path::new("s.txt")).unwrap();
+
+        let hunks = repo.git_diff_staged(Path::new("s.txt")).unwrap();
+        assert!(!hunks.is_empty());
+    }
+
+    #[test]
+    fn real_git_log() {
+        let dir = init_temp_repo();
+        let repo = GitRepository::open(dir.path());
+
+        std::fs::write(dir.path().join("a.txt"), "a").unwrap();
+        repo.git_stage(Path::new("a.txt")).unwrap();
+        repo.git_commit("first commit").unwrap();
+
+        std::fs::write(dir.path().join("b.txt"), "b").unwrap();
+        repo.git_stage(Path::new("b.txt")).unwrap();
+        repo.git_commit("second commit").unwrap();
+
+        let log = repo.git_log(5).unwrap();
+        assert_eq!(log.len(), 2);
+        assert_eq!(log[0].message, "second commit");
+        assert_eq!(log[1].message, "first commit");
+    }
+
+    #[test]
+    fn real_git_grouped_status() {
+        let dir = init_temp_repo();
+        let repo = GitRepository::open(dir.path());
+
+        // Create initial commit.
+        std::fs::write(dir.path().join("tracked.txt"), "v1").unwrap();
+        repo.git_stage(Path::new("tracked.txt")).unwrap();
+        repo.git_commit("init").unwrap();
+
+        // Modify tracked file (unstaged).
+        std::fs::write(dir.path().join("tracked.txt"), "v2").unwrap();
+        // Create untracked file.
+        std::fs::write(dir.path().join("new.txt"), "new").unwrap();
+        // Stage a new file.
+        std::fs::write(dir.path().join("staged.txt"), "staged").unwrap();
+        repo.git_stage(Path::new("staged.txt")).unwrap();
+
+        let (staged, unstaged, untracked) = repo.grouped_status().unwrap();
+        assert!(!staged.is_empty(), "should have staged files");
+        assert!(!unstaged.is_empty(), "should have unstaged files");
+        assert!(!untracked.is_empty(), "should have untracked files");
     }
 }
