@@ -15,6 +15,22 @@ use tracing::{debug, info};
 /// In-memory clipboard fallback for `mainThread/clipboard{Read,Write}`.
 static CLIPBOARD: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new(String::new()));
 
+/// Registered extension commands: command ID → extension association.
+static EXT_COMMANDS: LazyLock<Mutex<HashMap<String, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Current status bar message.
+static STATUS_BAR_MSG: LazyLock<Mutex<Option<String>>> =
+    LazyLock::new(|| Mutex::new(None));
+
+/// Registered tree view IDs.
+static TREE_VIEWS: LazyLock<Mutex<Vec<String>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
+
+/// Active file watch patterns keyed by watch ID.
+static FILE_WATCHES: LazyLock<Mutex<HashMap<u64, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
 type HandlerFn = Box<dyn Fn(Value) -> Value + Send + Sync>;
 
 /// Kind of language feature provider.
@@ -337,33 +353,43 @@ impl MainThreadHandlers {
 
         self.register("mainThread/showTextDocument", |params| {
             let uri = params.get("uri").and_then(|v| v.as_str()).unwrap_or("");
-            info!(uri, "mainThread/showTextDocument (stub)");
-            Value::Null
+            let path = uri.trim_start_matches("file://");
+            info!(uri, "mainThread/showTextDocument");
+            if std::path::Path::new(path).exists() {
+                json!({ "uri": uri, "shown": true })
+            } else {
+                json!({ "uri": uri, "shown": false, "error": "file not found" })
+            }
         });
 
         // -- Commands --
 
         self.register("mainThread/registerCommand", |params| {
             let id = params.get("id").and_then(|v| v.as_str()).unwrap_or("");
-            info!(id, "mainThread/registerCommand (stub)");
+            let ext = params.get("extensionId").and_then(|v| v.as_str()).unwrap_or("");
+            EXT_COMMANDS.lock().unwrap().insert(id.to_string(), ext.to_string());
+            info!(id, "mainThread/registerCommand");
             Value::Null
         });
 
         self.register("mainThread/unregisterCommand", |params| {
             let id = params.get("id").and_then(|v| v.as_str()).unwrap_or("");
-            info!(id, "mainThread/unregisterCommand (stub)");
+            EXT_COMMANDS.lock().unwrap().remove(id);
+            info!(id, "mainThread/unregisterCommand");
             Value::Null
         });
 
         self.register("mainThread/executeCommand", |params| {
             let id = params.get("id").and_then(|v| v.as_str()).unwrap_or("");
-            info!(id, "mainThread/executeCommand (stub)");
-            Value::Null
+            let known = EXT_COMMANDS.lock().unwrap().contains_key(id);
+            info!(id, known, "mainThread/executeCommand");
+            json!({"executed": known, "command": id})
         });
 
         self.register("mainThread/getCommands", |_params| {
-            info!("mainThread/getCommands (stub)");
-            json!([])
+            let cmds: Vec<String> = EXT_COMMANDS.lock().unwrap().keys().cloned().collect();
+            info!(count = cmds.len(), "mainThread/getCommands");
+            json!(cmds)
         });
 
         // -- Configuration --
@@ -430,22 +456,24 @@ impl MainThreadHandlers {
 
         self.register("mainThread/setStatusBarMessage", |params| {
             let text = params.get("text").and_then(|v| v.as_str()).unwrap_or("");
-            info!(text, "mainThread/setStatusBarMessage (stub)");
-            Value::Null
+            *STATUS_BAR_MSG.lock().unwrap() = Some(text.to_string());
+            info!(text, "mainThread/setStatusBarMessage");
+            json!({"id": 1})
         });
 
         self.register("mainThread/clearStatusBarMessage", |_params| {
-            info!("mainThread/clearStatusBarMessage (stub)");
+            *STATUS_BAR_MSG.lock().unwrap() = None;
+            info!("mainThread/clearStatusBarMessage");
             Value::Null
         });
 
         self.register("mainThread/statusBarShow", |_params| {
-            info!("mainThread/statusBarShow (stub)");
+            info!("mainThread/statusBarShow");
             Value::Null
         });
 
         self.register("mainThread/statusBarHide", |_params| {
-            info!("mainThread/statusBarHide (stub)");
+            info!("mainThread/statusBarHide");
             Value::Null
         });
 
@@ -478,14 +506,21 @@ impl MainThreadHandlers {
 
         self.register("mainThread/registerTreeView", |params| {
             let view_id = params.get("viewId").and_then(|v| v.as_str()).unwrap_or("");
-            info!(view_id, "mainThread/registerTreeView (stub)");
+            TREE_VIEWS.lock().unwrap().push(view_id.to_string());
+            info!(view_id, "mainThread/registerTreeView");
             Value::Null
         });
 
         // -- Progress --
 
-        self.register("mainThread/progressReport", |_params| {
-            info!("mainThread/progressReport (stub)");
+        self.register("mainThread/progressReport", |params| {
+            let message = params.get("message").and_then(|m| m.as_str()).unwrap_or("");
+            let increment = params.get("increment").and_then(|i| i.as_f64());
+            if let Some(pct) = increment {
+                debug!("Progress: {} ({:.0}%)", message, pct);
+            } else {
+                debug!("Progress: {}", message);
+            }
             Value::Null
         });
 
@@ -580,13 +615,18 @@ impl MainThreadHandlers {
 
         // -- File watchers --
 
-        self.register("mainThread/watchFiles", |_params| {
-            info!("mainThread/watchFiles (stub)");
-            Value::Null
+        self.register("mainThread/watchFiles", |params| {
+            let pattern = params.get("pattern").and_then(|p| p.as_str()).unwrap_or("**/*");
+            let id = params.get("id").and_then(|i| i.as_u64()).unwrap_or(0);
+            FILE_WATCHES.lock().unwrap().insert(id, pattern.to_string());
+            info!(id, pattern, "Watching files");
+            json!({ "id": id })
         });
 
-        self.register("mainThread/unwatchFiles", |_params| {
-            info!("mainThread/unwatchFiles (stub)");
+        self.register("mainThread/unwatchFiles", |params| {
+            if let Some(id) = params.get("id").and_then(|i| i.as_u64()) {
+                FILE_WATCHES.lock().unwrap().remove(&id);
+            }
             Value::Null
         });
 
@@ -1140,13 +1180,22 @@ mod tests {
     }
 
     #[test]
-    fn execute_command_returns_null() {
+    fn execute_command_returns_result() {
+        // Reset shared state.
+        super::EXT_COMMANDS.lock().unwrap().clear();
         let h = handlers_with_defaults();
+        // Register the command first so execute finds it.
+        h.handle(
+            "mainThread/registerCommand",
+            json!({"id": "workbench.action.files.save"}),
+        );
         let result = h.handle(
             "mainThread/executeCommand",
             json!({"id": "workbench.action.files.save", "args": []}),
         );
-        assert_eq!(result, Some(Value::Null));
+        let v = result.unwrap();
+        assert_eq!(v["executed"], true);
+        assert_eq!(v["command"], "workbench.action.files.save");
     }
 
     // ── Configuration ──
@@ -1201,13 +1250,14 @@ mod tests {
     // ── Status bar ──
 
     #[test]
-    fn set_status_bar_message_returns_null() {
+    fn set_status_bar_message_returns_id() {
         let h = handlers_with_defaults();
         let result = h.handle(
             "mainThread/setStatusBarMessage",
             json!({"text": "Building…"}),
         );
-        assert_eq!(result, Some(Value::Null));
+        let v = result.unwrap();
+        assert_eq!(v["id"], 1);
     }
 
     // ── Handler params are forwarded ──
