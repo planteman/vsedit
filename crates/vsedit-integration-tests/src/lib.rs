@@ -3685,3 +3685,362 @@ incoming change
         assert_eq!(result[0], "alpha\nbeta");
     }
 }
+
+// ─── Workbench Find Bar ─────────────────────────────────────────────────
+
+#[cfg(test)]
+mod find_bar {
+    use vsedit_workbench::Workbench;
+
+    fn workbench_with_content(text: &str) -> Workbench {
+        let mut wb = Workbench::new();
+        wb.set_editor_content(text, None);
+        wb
+    }
+
+    #[test]
+    fn test_integration_toggle_find_bar() {
+        let mut wb = workbench_with_content("hello world");
+        assert!(!wb.show_find_bar);
+        wb.toggle_find_bar();
+        assert!(wb.show_find_bar);
+        wb.toggle_find_bar();
+        assert!(!wb.show_find_bar);
+    }
+
+    #[test]
+    fn test_integration_find_bar_input() {
+        let mut wb = workbench_with_content("foo bar foo baz");
+        wb.toggle_find_bar();
+        wb.find_bar_input('f');
+        wb.find_bar_input('o');
+        wb.find_bar_input('o');
+        assert_eq!(wb.find_query, "foo");
+        assert_eq!(wb.find_matches.len(), 2);
+    }
+
+    #[test]
+    fn test_integration_find_bar_backspace() {
+        let mut wb = workbench_with_content("foobar foobaz");
+        wb.toggle_find_bar();
+        wb.find_bar_input('f');
+        wb.find_bar_input('o');
+        wb.find_bar_input('o');
+        wb.find_bar_input('b');
+        wb.find_bar_input('a');
+        wb.find_bar_input('r');
+        assert_eq!(wb.find_matches.len(), 1);
+        wb.find_bar_backspace();
+        wb.find_bar_backspace();
+        wb.find_bar_backspace();
+        // query is now "foo", matches both "foobar" and "foobaz"
+        assert_eq!(wb.find_query, "foo");
+        assert_eq!(wb.find_matches.len(), 2);
+    }
+
+    #[test]
+    fn test_integration_update_find_matches_multiline() {
+        let mut wb = workbench_with_content("abc\nabc def\nabc");
+        wb.toggle_find_bar();
+        wb.find_bar_input('a');
+        wb.find_bar_input('b');
+        wb.find_bar_input('c');
+        assert_eq!(wb.find_matches.len(), 3);
+        // matches on lines 0, 1, 2
+        assert_eq!(wb.find_matches[0].0, 0);
+        assert_eq!(wb.find_matches[1].0, 1);
+        assert_eq!(wb.find_matches[2].0, 2);
+    }
+
+    #[test]
+    fn test_integration_find_bar_next_prev() {
+        let mut wb = workbench_with_content("aa aa aa");
+        wb.toggle_find_bar();
+        wb.find_bar_input('a');
+        wb.find_bar_input('a');
+        assert_eq!(wb.find_matches.len(), 3);
+        assert_eq!(wb.find_current_match, 0);
+        wb.find_bar_next();
+        assert_eq!(wb.find_current_match, 1);
+        wb.find_bar_next();
+        assert_eq!(wb.find_current_match, 2);
+        wb.find_bar_next();
+        // wraps around
+        assert_eq!(wb.find_current_match, 0);
+        wb.find_bar_prev();
+        assert_eq!(wb.find_current_match, 2);
+    }
+}
+
+// ─── Smart Selection ────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod smart_selection {
+    use vsedit_smartselect::{
+        SelectionRange, expand_selection, shrink_selection,
+        build_selection_chain, selection_contains, selection_intersects,
+    };
+
+    #[test]
+    fn test_integration_expand_selection() {
+        let parent = SelectionRange::new(1, 1, 10, 80);
+        let child = SelectionRange::new(3, 5, 3, 15).with_parent(parent);
+        let expanded = expand_selection(&child);
+        assert!(expanded.is_some());
+        let exp = expanded.unwrap();
+        assert_eq!(exp.start_line, 1);
+        assert_eq!(exp.end_line, 10);
+    }
+
+    #[test]
+    fn test_integration_shrink_selection() {
+        let parent = SelectionRange::new(1, 1, 10, 80);
+        let child = SelectionRange::new(3, 5, 3, 15).with_parent(parent.clone());
+        let shrunk = shrink_selection(&child, &parent);
+        assert!(shrunk.is_some());
+        let s = shrunk.unwrap();
+        assert_eq!(s.start_line, 3);
+        assert_eq!(s.end_line, 3);
+    }
+
+    #[test]
+    fn test_integration_expand_at_root_returns_none() {
+        let root = SelectionRange::new(1, 1, 100, 1);
+        assert!(expand_selection(&root).is_none());
+    }
+
+    #[test]
+    fn test_integration_build_selection_chain() {
+        let chain = build_selection_chain(vec![
+            (1, 1, 50, 1),
+            (5, 1, 20, 1),
+            (10, 5, 10, 15),
+        ]);
+        // first element becomes innermost (returned), last becomes root parent
+        assert_eq!(chain.depth(), 2);
+        assert_eq!(chain.start_line, 1);
+        let outer = chain.outermost();
+        assert_eq!(outer.start_line, 10);
+    }
+
+    #[test]
+    fn test_integration_selection_contains_and_intersects() {
+        let outer = SelectionRange::new(1, 1, 10, 80);
+        let inner = SelectionRange::new(3, 5, 7, 20);
+        let disjoint = SelectionRange::new(20, 1, 30, 1);
+
+        assert!(selection_contains(&outer, &inner));
+        assert!(!selection_contains(&inner, &outer));
+        assert!(selection_intersects(&outer, &inner));
+        assert!(!selection_intersects(&outer, &disjoint));
+    }
+}
+
+// ─── Snippets ───────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod snippet_ops {
+    use vsedit_snippet::{
+        parse_snippet, expand_snippet, collect_tabstops,
+        collect_variables, element_count, SnippetVariables,
+    };
+
+    #[test]
+    fn test_integration_parse_snippet_tabstops() {
+        let snippet = parse_snippet("for ($1; $2; $3) {\n\t$0\n}");
+        let tabstops = collect_tabstops(&snippet);
+        assert!(tabstops.contains(&0));
+        assert!(tabstops.contains(&1));
+        assert!(tabstops.contains(&2));
+        assert!(tabstops.contains(&3));
+    }
+
+    #[test]
+    fn test_integration_parse_snippet_placeholder() {
+        let snippet = parse_snippet("fn ${1:name}($2) -> ${3:Type} {\n\t$0\n}");
+        assert!(element_count(&snippet) > 0);
+        let vars = SnippetVariables::new();
+        let expanded = expand_snippet(&snippet, &vars);
+        assert!(expanded.contains("fn "));
+        assert!(expanded.contains("name"));
+        assert!(expanded.contains("Type"));
+    }
+
+    #[test]
+    fn test_integration_snippet_variable_expansion() {
+        let snippet = parse_snippet("// File: $TM_FILENAME\n$0");
+        let vars = collect_variables(&snippet);
+        assert!(vars.contains(&"TM_FILENAME".to_string()));
+
+        let mut sv = SnippetVariables::new();
+        sv.set("TM_FILENAME", "main.rs");
+        let expanded = expand_snippet(&snippet, &sv);
+        assert!(expanded.contains("main.rs"));
+    }
+
+    #[test]
+    fn test_integration_snippet_choice() {
+        let snippet = parse_snippet("${1|public,private,protected|} class $2 {}");
+        let vars = SnippetVariables::new();
+        let expanded = expand_snippet(&snippet, &vars);
+        // first choice is used as default
+        assert!(expanded.contains("public"));
+    }
+
+    #[test]
+    fn test_integration_snippet_element_count() {
+        let simple = parse_snippet("hello world");
+        assert_eq!(element_count(&simple), 1);
+
+        let complex = parse_snippet("$1 text $2 more ${3:default}");
+        assert!(element_count(&complex) >= 5);
+    }
+}
+
+// ─── Sticky Scroll ──────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod sticky_scroll {
+    use vsedit_stickyscroll::{
+        StickyScrollWidget, StickyScrollConfig,
+    };
+
+    #[test]
+    fn test_integration_sticky_scroll_update_lines() {
+        let mut widget = StickyScrollWidget::new(5);
+        widget.update_lines(1, 50, &[
+            (1, "fn main() {", 0),
+            (5, "    if condition {", 1),
+            (10, "        for i in 0..10 {", 2),
+        ]);
+        let lines = widget.get_visible_sticky_lines();
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines[0].line_number, 1);
+        assert_eq!(lines[2].nesting_level, 2);
+    }
+
+    #[test]
+    fn test_integration_sticky_scroll_max_lines_limit() {
+        let mut widget = StickyScrollWidget::new(2);
+        widget.update_lines(1, 100, &[
+            (1, "mod a {", 0),
+            (2, "  fn b() {", 1),
+            (3, "    if c {", 2),
+        ]);
+        let lines = widget.get_visible_sticky_lines();
+        assert_eq!(lines.len(), 2);
+    }
+
+    #[test]
+    fn test_integration_sticky_scroll_toggle_collapse() {
+        let mut widget = StickyScrollWidget::new(5);
+        widget.update_lines(1, 50, &[
+            (1, "fn main() {", 0),
+            (5, "    loop {", 1),
+        ]);
+        assert_eq!(widget.collapsed_count(), 0);
+        widget.toggle_collapse(1).unwrap();
+        assert_eq!(widget.collapsed_count(), 1);
+        widget.toggle_collapse(1).unwrap();
+        assert_eq!(widget.collapsed_count(), 0);
+    }
+
+    #[test]
+    fn test_integration_sticky_scroll_config_defaults() {
+        let cfg = StickyScrollConfig::default();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.max_line_count, 5);
+        assert_eq!(cfg.default_model, "outlineModel");
+    }
+
+    #[test]
+    fn test_integration_sticky_scroll_disabled() {
+        let mut widget = StickyScrollWidget::new(5);
+        widget.set_enabled(false);
+        assert!(!widget.is_enabled());
+        widget.update_lines(1, 50, &[(1, "fn main() {", 0)]);
+        // disabled widget ignores updates
+        assert!(widget.get_visible_sticky_lines().is_empty());
+    }
+}
+
+// ─── Code Lens ──────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod code_lens {
+    use vsedit_codelens::{
+        CodeLens, CodeLensCommand, CommandBuilder,
+        codelens_group_adjacent, group_lenses_by_line,
+    };
+
+    #[test]
+    fn test_integration_codelens_creation() {
+        let lens = CodeLens::new(10, 1, 10, 20);
+        assert!(!lens.is_resolved());
+        assert!(lens.is_single_line());
+        assert_eq!(lens.line_span(), 1);
+    }
+
+    #[test]
+    fn test_integration_codelens_command_wiring() {
+        let cmd = CodeLensCommand::ShowReferences { count: 5 };
+        let command = cmd.to_command();
+        assert_eq!(command.command_id, "editor.showReferences");
+        assert!(command.title.contains("5"));
+
+        let lens = CodeLens::new(1, 1, 1, 10).with_command(command);
+        assert!(lens.is_resolved());
+    }
+
+    #[test]
+    fn test_integration_codelens_group_adjacent() {
+        let lenses = vec![
+            CodeLens::new(1, 1, 1, 10),
+            CodeLens::new(2, 1, 2, 10),
+            CodeLens::new(10, 1, 10, 10),
+            CodeLens::new(11, 1, 11, 10),
+        ];
+        let groups = codelens_group_adjacent(&lenses, 2);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].len(), 2); // lines 1, 2
+        assert_eq!(groups[1].len(), 2); // lines 10, 11
+    }
+
+    #[test]
+    fn test_integration_codelens_group_by_line() {
+        let cmd = CodeLensCommand::RunTest { test_name: "test_a".into() }.to_command();
+        let lenses = vec![
+            CodeLens::new(5, 1, 5, 10).with_command(cmd.clone()),
+            CodeLens::new(5, 15, 5, 30).with_command(
+                CodeLensCommand::ShowReferences { count: 3 }.to_command(),
+            ),
+            CodeLens::new(10, 1, 10, 10),
+        ];
+        let by_line = group_lenses_by_line(&lenses);
+        // two distinct lines: 5 and 10
+        assert_eq!(by_line.len(), 2);
+        let (line, group) = &by_line[0];
+        assert_eq!(*line, 5);
+        assert_eq!(group.len(), 2);
+    }
+
+    #[test]
+    fn test_integration_codelens_command_builder() {
+        let cmd = CommandBuilder::new()
+            .title("Run All Tests")
+            .command_id("test.runAll")
+            .tooltip("Run all tests in file")
+            .argument("src/lib.rs")
+            .build();
+        assert!(cmd.is_ok());
+        let c = cmd.unwrap();
+        assert_eq!(c.title, "Run All Tests");
+        assert_eq!(c.arguments.len(), 1);
+
+        // missing title should fail
+        let bad = CommandBuilder::new()
+            .command_id("test.runAll")
+            .build();
+        assert!(bad.is_err());
+    }
+}

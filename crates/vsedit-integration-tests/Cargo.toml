@@ -37,5 +37,8 @@ vsedit-debug = { path = "../vsedit-debug" }
 vsedit-folding = { path = "../vsedit-folding" }
 vsedit-bracket = { path = "../vsedit-bracket" }
 vsedit-merge-editor = { path = "../vsedit-merge-editor" }
+vsedit-smartselect = { path = "../vsedit-smartselect" }
+vsedit-stickyscroll = { path = "../vsedit-stickyscroll" }
+vsedit-codelens = { path = "../vsedit-codelens" }
 serde_json.workspace = true
 tempfile.workspace = true

@@ -504,10 +504,29 @@ async fn run() -> io::Result<()> {
 
         if vsedit_ext_scm::git::GitCli::is_git_repo(&root) {
             let git = vsedit_ext_scm::git::GitCli::new(root.clone());
-            if let Ok(branch) = git.current_branch() {
-                workbench.statusbar.update_item("statusbar.branch", &format!("⎇ {}", branch));
-                tracing::info!("Git branch: {branch}");
+            let branch = git.current_branch().ok();
+            if let Some(ref b) = branch {
+                workbench.statusbar.update_item("statusbar.branch", &format!("⎇ {}", b));
+                tracing::info!("Git branch: {b}");
             }
+            let changes: Vec<(char, String)> = git
+                .status()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|entry| {
+                    let ch = match entry.status {
+                        vsedit_ext_scm::git::FileStatus::Modified => 'M',
+                        vsedit_ext_scm::git::FileStatus::Added => 'A',
+                        vsedit_ext_scm::git::FileStatus::Deleted => 'D',
+                        vsedit_ext_scm::git::FileStatus::Renamed => 'R',
+                        vsedit_ext_scm::git::FileStatus::Untracked => '?',
+                        vsedit_ext_scm::git::FileStatus::Staged => 'M',
+                    };
+                    (ch, entry.path.to_string_lossy().to_string())
+                })
+                .collect();
+            workbench.set_scm_status(branch, changes);
+            tracing::info!("SCM sidebar populated with {} changes", workbench.scm_changes.len());
         }
     }
 
