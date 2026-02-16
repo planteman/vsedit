@@ -32,6 +32,37 @@ impl MenuId {
             MenuId::Custom(s) => s.clone(),
         }
     }
+
+    /// Parses a string into a `MenuId`, matching known names case-insensitively
+    /// and falling back to `Custom` for unrecognized values.
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "file" => MenuId::File,
+            "edit" => MenuId::Edit,
+            "selection" => MenuId::Selection,
+            "view" => MenuId::View,
+            "go" => MenuId::Go,
+            "run" => MenuId::Run,
+            "terminal" => MenuId::Terminal,
+            "help" => MenuId::Help,
+            other => MenuId::Custom(other.to_string()),
+        }
+    }
+
+    /// Returns a human-readable label for display in the menu bar.
+    pub fn label(&self) -> &str {
+        match self {
+            MenuId::File => "File",
+            MenuId::Edit => "Edit",
+            MenuId::Selection => "Selection",
+            MenuId::View => "View",
+            MenuId::Go => "Go",
+            MenuId::Run => "Run",
+            MenuId::Terminal => "Terminal",
+            MenuId::Help => "Help",
+            MenuId::Custom(s) => s.as_str(),
+        }
+    }
 }
 
 impl fmt::Display for MenuId {
@@ -69,6 +100,8 @@ pub struct MenuEntry {
     pub group: Option<String>,
     pub order: i32,
     pub when: Option<String>,
+    pub enabled: bool,
+    pub shortcut: Option<String>,
 }
 
 impl MenuEntry {
@@ -82,6 +115,27 @@ impl MenuEntry {
     pub fn with_when(mut self, when: &str) -> Self {
         self.when = Some(when.to_string());
         self
+    }
+
+    /// Builder method to set the shortcut.
+    pub fn with_shortcut(mut self, shortcut: &str) -> Self {
+        self.shortcut = Some(shortcut.to_string());
+        self
+    }
+
+    /// Builder method to set the enabled state.
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+
+    /// Returns a display string showing the title with an optional shortcut.
+    /// e.g. "Save          Ctrl+S" or just "Save" if no shortcut is set.
+    pub fn display_with_shortcut(&self) -> String {
+        match &self.shortcut {
+            Some(sc) => format!("{}    {}", self.title, sc),
+            None => self.title.clone(),
+        }
     }
 }
 
@@ -195,36 +249,137 @@ impl MenuBarService {
     /// Populates File, Edit, and View menus with common default entries.
     pub fn create_default_menus(&mut self) {
         let file_entries = vec![
-            MenuEntry { command_id: "newFile".into(), title: "New File".into(), group: Some("1_new".into()), order: 1, when: None },
-            MenuEntry { command_id: "openFile".into(), title: "Open File".into(), group: Some("1_new".into()), order: 2, when: None },
-            MenuEntry { command_id: "save".into(), title: "Save".into(), group: Some("2_save".into()), order: 1, when: None },
-            MenuEntry { command_id: "saveAs".into(), title: "Save As...".into(), group: Some("2_save".into()), order: 2, when: None },
-            MenuEntry { command_id: "close".into(), title: "Close".into(), group: Some("3_close".into()), order: 1, when: None },
+            MenuEntry { command_id: "newFile".into(), title: "New File".into(), group: Some("1_new".into()), order: 1, when: None, enabled: true, shortcut: Some("Ctrl+N".into()) },
+            MenuEntry { command_id: "openFile".into(), title: "Open File".into(), group: Some("1_new".into()), order: 2, when: None, enabled: true, shortcut: Some("Ctrl+O".into()) },
+            MenuEntry { command_id: "save".into(), title: "Save".into(), group: Some("2_save".into()), order: 1, when: None, enabled: true, shortcut: Some("Ctrl+S".into()) },
+            MenuEntry { command_id: "saveAs".into(), title: "Save As...".into(), group: Some("2_save".into()), order: 2, when: None, enabled: true, shortcut: Some("Ctrl+Shift+S".into()) },
+            MenuEntry { command_id: "close".into(), title: "Close".into(), group: Some("3_close".into()), order: 1, when: None, enabled: true, shortcut: Some("Ctrl+W".into()) },
         ];
         for e in file_entries {
             self.add_entry(&MenuId::File, e);
         }
 
         let edit_entries = vec![
-            MenuEntry { command_id: "undo".into(), title: "Undo".into(), group: Some("1_undo".into()), order: 1, when: None },
-            MenuEntry { command_id: "redo".into(), title: "Redo".into(), group: Some("1_undo".into()), order: 2, when: None },
-            MenuEntry { command_id: "cut".into(), title: "Cut".into(), group: Some("2_clipboard".into()), order: 1, when: None },
-            MenuEntry { command_id: "copy".into(), title: "Copy".into(), group: Some("2_clipboard".into()), order: 2, when: None },
-            MenuEntry { command_id: "paste".into(), title: "Paste".into(), group: Some("2_clipboard".into()), order: 3, when: None },
+            MenuEntry { command_id: "undo".into(), title: "Undo".into(), group: Some("1_undo".into()), order: 1, when: None, enabled: true, shortcut: Some("Ctrl+Z".into()) },
+            MenuEntry { command_id: "redo".into(), title: "Redo".into(), group: Some("1_undo".into()), order: 2, when: None, enabled: true, shortcut: Some("Ctrl+Y".into()) },
+            MenuEntry { command_id: "cut".into(), title: "Cut".into(), group: Some("2_clipboard".into()), order: 1, when: None, enabled: true, shortcut: Some("Ctrl+X".into()) },
+            MenuEntry { command_id: "copy".into(), title: "Copy".into(), group: Some("2_clipboard".into()), order: 2, when: None, enabled: true, shortcut: Some("Ctrl+C".into()) },
+            MenuEntry { command_id: "paste".into(), title: "Paste".into(), group: Some("2_clipboard".into()), order: 3, when: None, enabled: true, shortcut: Some("Ctrl+V".into()) },
         ];
         for e in edit_entries {
             self.add_entry(&MenuId::Edit, e);
         }
 
         let view_entries = vec![
-            MenuEntry { command_id: "toggleSidebar".into(), title: "Toggle Sidebar".into(), group: Some("1_layout".into()), order: 1, when: None },
-            MenuEntry { command_id: "togglePanel".into(), title: "Toggle Panel".into(), group: Some("1_layout".into()), order: 2, when: None },
-            MenuEntry { command_id: "zoomIn".into(), title: "Zoom In".into(), group: Some("2_zoom".into()), order: 1, when: None },
-            MenuEntry { command_id: "zoomOut".into(), title: "Zoom Out".into(), group: Some("2_zoom".into()), order: 2, when: None },
+            MenuEntry { command_id: "toggleSidebar".into(), title: "Toggle Sidebar".into(), group: Some("1_layout".into()), order: 1, when: None, enabled: true, shortcut: Some("Ctrl+B".into()) },
+            MenuEntry { command_id: "togglePanel".into(), title: "Toggle Panel".into(), group: Some("1_layout".into()), order: 2, when: None, enabled: true, shortcut: Some("Ctrl+J".into()) },
+            MenuEntry { command_id: "zoomIn".into(), title: "Zoom In".into(), group: Some("2_zoom".into()), order: 1, when: None, enabled: true, shortcut: Some("Ctrl+=".into()) },
+            MenuEntry { command_id: "zoomOut".into(), title: "Zoom Out".into(), group: Some("2_zoom".into()), order: 2, when: None, enabled: true, shortcut: Some("Ctrl+-".into()) },
         ];
         for e in view_entries {
             self.add_entry(&MenuId::View, e);
         }
+    }
+
+    /// Returns all entries across all menus as (menu_key, &MenuEntry) pairs.
+    pub fn flatten_items(&self) -> Vec<(String, &MenuEntry)> {
+        let mut items: Vec<(String, &MenuEntry)> = Vec::new();
+        let mut keys: Vec<&String> = self.menus.keys().collect();
+        keys.sort();
+        for key in keys {
+            if let Some(entries) = self.menus.get(key) {
+                let mut sorted: Vec<&MenuEntry> = entries.iter().collect();
+                sorted.sort_by_key(|e| e.order);
+                for entry in sorted {
+                    items.push((key.clone(), entry));
+                }
+            }
+        }
+        items
+    }
+
+    /// Finds an entry by command_id across all menus.
+    /// Alias with a different return shape returning just the entry reference.
+    pub fn find_item_by_command(&self, command_id: &str) -> Option<&MenuEntry> {
+        self.find_entry(command_id).map(|(_, e)| e)
+    }
+
+    /// Returns the total count of entries across all menus.
+    pub fn total_item_count(&self) -> usize {
+        self.entry_count()
+    }
+
+    /// Returns all enabled entries across all menus as (menu_key, &MenuEntry) pairs.
+    pub fn enabled_items(&self) -> Vec<(String, &MenuEntry)> {
+        self.flatten_items()
+            .into_iter()
+            .filter(|(_, e)| e.enabled)
+            .collect()
+    }
+
+    /// Toggles the enabled state of an entry identified by command_id.
+    /// Returns `Ok(bool)` with the new enabled state, or an error if not found.
+    pub fn toggle_item_enabled(&mut self, command_id: &str) -> Result<bool, MenuError> {
+        for entries in self.menus.values_mut() {
+            for entry in entries.iter_mut() {
+                if entry.command_id == command_id {
+                    entry.enabled = !entry.enabled;
+                    return Ok(entry.enabled);
+                }
+            }
+        }
+        Err(MenuError::EntryNotFound(command_id.to_string()))
+    }
+
+    /// Returns the display path of an item, e.g. "File > Save As...".
+    /// Uses the MenuId label for known menus.
+    pub fn item_path(&self, command_id: &str) -> Option<String> {
+        for (key, entries) in &self.menus {
+            for entry in entries {
+                if entry.command_id == command_id {
+                    let menu_label = MenuId::from_str(key).label().to_string();
+                    return Some(format!("{} > {}", menu_label, entry.title));
+                }
+            }
+        }
+        None
+    }
+
+    /// Creates a snapshot of the current menu bar state that can be restored later.
+    pub fn snapshot(&self) -> MenuBarSnapshot {
+        MenuBarSnapshot {
+            menus: self.menus.clone(),
+        }
+    }
+
+    /// Restores the menu bar state from a previously captured snapshot.
+    pub fn restore(&mut self, snapshot: &MenuBarSnapshot) {
+        self.menus = snapshot.menus.clone();
+    }
+}
+
+/// A captured snapshot of the menu bar state, used for save/restore operations.
+#[derive(Debug, Clone)]
+pub struct MenuBarSnapshot {
+    menus: HashMap<String, Vec<MenuEntry>>,
+}
+
+impl MenuBarSnapshot {
+    /// Returns the number of menus in this snapshot.
+    pub fn menu_count(&self) -> usize {
+        self.menus.len()
+    }
+
+    /// Returns the total entry count in this snapshot.
+    pub fn entry_count(&self) -> usize {
+        self.menus.values().map(|v| v.len()).sum()
+    }
+
+    /// Returns the menu keys present in this snapshot.
+    pub fn menu_keys(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self.menus.keys().cloned().collect();
+        keys.sort();
+        keys
     }
 }
 
@@ -245,6 +400,20 @@ mod tests {
             group: None,
             order,
             when: None,
+            enabled: true,
+            shortcut: None,
+        }
+    }
+
+    fn titled_entry(cmd: &str, title: &str, order: i32) -> MenuEntry {
+        MenuEntry {
+            command_id: cmd.to_string(),
+            title: title.to_string(),
+            group: None,
+            order,
+            when: None,
+            enabled: true,
+            shortcut: None,
         }
     }
 
@@ -387,5 +556,209 @@ mod tests {
         assert_eq!(format!("{}", err), "entry not found: cmd");
         let err = MenuError::DuplicateEntry("cmd".into());
         assert_eq!(format!("{}", err), "duplicate entry: cmd");
+    }
+
+    // --- New tests ---
+
+    #[test]
+    fn menu_id_from_str_known() {
+        assert_eq!(MenuId::from_str("file"), MenuId::File);
+        assert_eq!(MenuId::from_str("FILE"), MenuId::File);
+        assert_eq!(MenuId::from_str("Edit"), MenuId::Edit);
+        assert_eq!(MenuId::from_str("selection"), MenuId::Selection);
+        assert_eq!(MenuId::from_str("View"), MenuId::View);
+        assert_eq!(MenuId::from_str("go"), MenuId::Go);
+        assert_eq!(MenuId::from_str("RUN"), MenuId::Run);
+        assert_eq!(MenuId::from_str("Terminal"), MenuId::Terminal);
+        assert_eq!(MenuId::from_str("help"), MenuId::Help);
+    }
+
+    #[test]
+    fn menu_id_from_str_custom() {
+        assert_eq!(MenuId::from_str("tools"), MenuId::Custom("tools".to_string()));
+        assert_eq!(MenuId::from_str("debug"), MenuId::Custom("debug".to_string()));
+    }
+
+    #[test]
+    fn menu_id_label() {
+        assert_eq!(MenuId::File.label(), "File");
+        assert_eq!(MenuId::Edit.label(), "Edit");
+        assert_eq!(MenuId::Custom("Tools".into()).label(), "Tools");
+    }
+
+    #[test]
+    fn display_with_shortcut_present() {
+        let e = entry("save", 1).with_shortcut("Ctrl+S");
+        assert_eq!(e.display_with_shortcut(), "save    Ctrl+S");
+    }
+
+    #[test]
+    fn display_with_shortcut_absent() {
+        let e = entry("save", 1);
+        assert_eq!(e.display_with_shortcut(), "save");
+    }
+
+    #[test]
+    fn flatten_items_across_menus() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("open", 1));
+        svc.add_entry(&MenuId::File, entry("save", 2));
+        svc.add_entry(&MenuId::Edit, entry("undo", 1));
+        let flat = svc.flatten_items();
+        assert_eq!(flat.len(), 3);
+        // edit comes before file alphabetically
+        assert_eq!(flat[0].0, "edit");
+        assert_eq!(flat[0].1.command_id, "undo");
+        assert_eq!(flat[1].0, "file");
+        assert_eq!(flat[1].1.command_id, "open");
+        assert_eq!(flat[2].0, "file");
+        assert_eq!(flat[2].1.command_id, "save");
+    }
+
+    #[test]
+    fn flatten_items_empty() {
+        let svc = MenuBarService::new();
+        assert!(svc.flatten_items().is_empty());
+    }
+
+    #[test]
+    fn find_item_by_command_found() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::Edit, entry("undo", 1));
+        let item = svc.find_item_by_command("undo").unwrap();
+        assert_eq!(item.command_id, "undo");
+    }
+
+    #[test]
+    fn find_item_by_command_missing() {
+        let svc = MenuBarService::new();
+        assert!(svc.find_item_by_command("nonexistent").is_none());
+    }
+
+    #[test]
+    fn total_item_count() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("open", 1));
+        svc.add_entry(&MenuId::Edit, entry("undo", 1));
+        svc.add_entry(&MenuId::Edit, entry("redo", 2));
+        assert_eq!(svc.total_item_count(), 3);
+    }
+
+    #[test]
+    fn enabled_items_all_enabled() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("open", 1));
+        svc.add_entry(&MenuId::File, entry("save", 2));
+        assert_eq!(svc.enabled_items().len(), 2);
+    }
+
+    #[test]
+    fn enabled_items_with_disabled() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("open", 1));
+        svc.add_entry(&MenuId::File, entry("save", 2).with_enabled(false));
+        let enabled = svc.enabled_items();
+        assert_eq!(enabled.len(), 1);
+        assert_eq!(enabled[0].1.command_id, "open");
+    }
+
+    #[test]
+    fn toggle_item_enabled_success() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("save", 1));
+        // starts enabled, toggle to disabled
+        let new_state = svc.toggle_item_enabled("save").unwrap();
+        assert!(!new_state);
+        assert!(!svc.find_item_by_command("save").unwrap().enabled);
+        // toggle back to enabled
+        let new_state = svc.toggle_item_enabled("save").unwrap();
+        assert!(new_state);
+    }
+
+    #[test]
+    fn toggle_item_enabled_not_found() {
+        let mut svc = MenuBarService::new();
+        let result = svc.toggle_item_enabled("nonexistent");
+        assert_eq!(result, Err(MenuError::EntryNotFound("nonexistent".into())));
+    }
+
+    #[test]
+    fn item_path_found() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, titled_entry("saveAs", "Save As...", 2));
+        assert_eq!(svc.item_path("saveAs").unwrap(), "File > Save As...");
+    }
+
+    #[test]
+    fn item_path_custom_menu() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::Custom("tools".into()), titled_entry("lint", "Lint", 1));
+        assert_eq!(svc.item_path("lint").unwrap(), "tools > Lint");
+    }
+
+    #[test]
+    fn item_path_not_found() {
+        let svc = MenuBarService::new();
+        assert!(svc.item_path("nonexistent").is_none());
+    }
+
+    #[test]
+    fn snapshot_and_restore() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("open", 1));
+        svc.add_entry(&MenuId::Edit, entry("undo", 1));
+        let snap = svc.snapshot();
+        assert_eq!(snap.menu_count(), 2);
+        assert_eq!(snap.entry_count(), 2);
+
+        // mutate
+        svc.add_entry(&MenuId::File, entry("save", 2));
+        assert_eq!(svc.entry_count(), 3);
+
+        // restore
+        svc.restore(&snap);
+        assert_eq!(svc.entry_count(), 2);
+        assert_eq!(svc.menu_count(), 2);
+    }
+
+    #[test]
+    fn snapshot_menu_keys() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("open", 1));
+        svc.add_entry(&MenuId::View, entry("zoom", 1));
+        let snap = svc.snapshot();
+        let keys = snap.menu_keys();
+        assert_eq!(keys, vec!["file".to_string(), "view".to_string()]);
+    }
+
+    #[test]
+    fn with_shortcut_builder() {
+        let e = entry("cmd", 1).with_shortcut("Ctrl+P");
+        assert_eq!(e.shortcut.as_deref(), Some("Ctrl+P"));
+    }
+
+    #[test]
+    fn with_enabled_builder() {
+        let e = entry("cmd", 1).with_enabled(false);
+        assert!(!e.enabled);
+    }
+
+    #[test]
+    fn create_default_menus_has_shortcuts() {
+        let mut svc = MenuBarService::new();
+        svc.create_default_menus();
+        let save = svc.find_item_by_command("save").unwrap();
+        assert_eq!(save.shortcut.as_deref(), Some("Ctrl+S"));
+        assert_eq!(save.display_with_shortcut(), "Save    Ctrl+S");
+    }
+
+    #[test]
+    fn flatten_items_sorted_within_menu() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("z_last", 10));
+        svc.add_entry(&MenuId::File, entry("a_first", 1));
+        let flat = svc.flatten_items();
+        assert_eq!(flat[0].1.command_id, "a_first");
+        assert_eq!(flat[1].1.command_id, "z_last");
     }
 }
