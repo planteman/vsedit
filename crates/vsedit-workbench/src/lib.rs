@@ -1913,4 +1913,169 @@ mod tests {
             )
         );
     }
+
+    // -- Sidebar panel tests ------------------------------------------------
+
+    #[test]
+    fn default_active_sidebar_is_explorer() {
+        let wb = Workbench::new();
+        assert_eq!(wb.active_sidebar, ActiveSidebarPanel::Explorer);
+    }
+
+    #[test]
+    fn set_active_sidebar_switches_panel() {
+        let mut wb = Workbench::new();
+        wb.set_active_sidebar(ActiveSidebarPanel::Search);
+        assert_eq!(wb.active_sidebar, ActiveSidebarPanel::Search);
+        assert_eq!(wb.focused, FocusedPart::Sidebar);
+        assert_eq!(
+            wb.views.get_active_container(ViewContainerLocation::Sidebar),
+            Some("workbench.view.search"),
+        );
+    }
+
+    #[test]
+    fn set_active_sidebar_opens_hidden_sidebar() {
+        let mut wb = Workbench::new();
+        wb.layout.toggle_sidebar();
+        assert!(!wb.layout.is_part_visible(Part::Sidebar));
+        wb.set_active_sidebar(ActiveSidebarPanel::Debug);
+        assert!(wb.layout.is_part_visible(Part::Sidebar));
+        assert_eq!(wb.active_sidebar, ActiveSidebarPanel::Debug);
+    }
+
+    #[test]
+    fn sidebar_keybinding_ctrl_shift_e() {
+        let mut wb = Workbench::new();
+        let action = wb.handle_input(make_key(KeyCode::KeyE, true, true));
+        assert_eq!(
+            action,
+            WorkbenchAction::ExecuteCommand("workbench.view.explorer".to_string())
+        );
+    }
+
+    #[test]
+    fn sidebar_keybinding_ctrl_shift_f() {
+        let mut wb = Workbench::new();
+        let action = wb.handle_input(make_key(KeyCode::KeyF, true, true));
+        assert_eq!(
+            action,
+            WorkbenchAction::ExecuteCommand("workbench.view.search".to_string())
+        );
+    }
+
+    #[test]
+    fn sidebar_keybinding_ctrl_shift_g() {
+        let mut wb = Workbench::new();
+        let action = wb.handle_input(make_key(KeyCode::KeyG, true, true));
+        assert_eq!(
+            action,
+            WorkbenchAction::ExecuteCommand("workbench.view.scm".to_string())
+        );
+    }
+
+    #[test]
+    fn sidebar_keybinding_ctrl_shift_d() {
+        let mut wb = Workbench::new();
+        let action = wb.handle_input(make_key(KeyCode::KeyD, true, true));
+        assert_eq!(
+            action,
+            WorkbenchAction::ExecuteCommand("workbench.view.debug".to_string())
+        );
+    }
+
+    #[test]
+    fn sidebar_keybinding_ctrl_shift_x() {
+        let mut wb = Workbench::new();
+        let action = wb.handle_input(make_key(KeyCode::KeyX, true, true));
+        assert_eq!(
+            action,
+            WorkbenchAction::ExecuteCommand("workbench.view.extensions".to_string())
+        );
+    }
+
+    #[test]
+    fn sidebar_commands_registered() {
+        let wb = Workbench::new();
+        assert!(wb.commands.has("workbench.view.explorer"));
+        assert!(wb.commands.has("workbench.view.search"));
+        assert!(wb.commands.has("workbench.view.scm"));
+        assert!(wb.commands.has("workbench.view.debug"));
+        assert!(wb.commands.has("workbench.view.extensions"));
+    }
+
+    #[test]
+    fn render_each_sidebar_panel_no_panic() {
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        for panel in [
+            ActiveSidebarPanel::Explorer,
+            ActiveSidebarPanel::Search,
+            ActiveSidebarPanel::SourceControl,
+            ActiveSidebarPanel::Debug,
+            ActiveSidebarPanel::Extensions,
+        ] {
+            let mut wb = Workbench::new();
+            wb.active_sidebar = panel;
+            terminal
+                .draw(|frame| {
+                    wb.render(frame);
+                })
+                .unwrap();
+        }
+    }
+
+    #[test]
+    fn sidebar_key_routing_debug_view() {
+        let mut wb = Workbench::new();
+        wb.set_active_sidebar(ActiveSidebarPanel::Debug);
+        wb.debug_view.variables.push(
+            vsedit_debug_view::DebugVariable::new("x", "42", "i32"),
+        );
+        wb.debug_view.variables.push(
+            vsedit_debug_view::DebugVariable::new("y", "10", "i32"),
+        );
+        assert_eq!(wb.debug_view.selected_index, 0);
+        wb.handle_sidebar_key(&KeyInput {
+            key_code: KeyCode::DownArrow,
+            ctrl: false, shift: false, alt: false, meta: false,
+        });
+        assert_eq!(wb.debug_view.selected_index, 1);
+        wb.handle_sidebar_key(&KeyInput {
+            key_code: KeyCode::UpArrow,
+            ctrl: false, shift: false, alt: false, meta: false,
+        });
+        assert_eq!(wb.debug_view.selected_index, 0);
+    }
+
+    #[test]
+    fn sidebar_key_routing_search_view() {
+        let mut wb = Workbench::new();
+        wb.set_active_sidebar(ActiveSidebarPanel::Search);
+        wb.handle_sidebar_key(&KeyInput {
+            key_code: KeyCode::DownArrow,
+            ctrl: false, shift: false, alt: false, meta: false,
+        });
+        wb.handle_sidebar_key(&KeyInput {
+            key_code: KeyCode::UpArrow,
+            ctrl: false, shift: false, alt: false, meta: false,
+        });
+    }
+
+    #[test]
+    fn scm_badge_in_activity_bar() {
+        use vsedit_scm_view::{ScmFileChange, ScmFileStatus, ScmGroup};
+        let mut wb = Workbench::new();
+        let mut group = ScmGroup::new("changes", "Changes");
+        group.add_change(ScmFileChange::new("a.rs", ScmFileStatus::Modified));
+        group.add_change(ScmFileChange::new("b.rs", ScmFileStatus::Added));
+        wb.scm_groups = vec![group];
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| {
+                wb.render(frame);
+            })
+            .unwrap();
+    }
 }
