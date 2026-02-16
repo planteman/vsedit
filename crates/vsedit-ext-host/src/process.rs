@@ -1,7 +1,7 @@
 //! Extension host child-process management.
 
 use std::io::{self, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 
 use vsedit_ext_rpc::RpcMessage;
@@ -63,6 +63,28 @@ impl Default for ExtensionHostConfig {
     }
 }
 
+impl ExtensionHostConfig {
+    /// Resolve the boot script path, falling back to the bundled
+    /// `runtime/extHostMain.js` next to the current executable.
+    pub fn resolved_boot_script(&self) -> PathBuf {
+        if let Some(ref p) = self.boot_script {
+            return p.clone();
+        }
+        // Look next to the binary first, then relative to CWD
+        if let Ok(exe) = std::env::current_exe() {
+            let candidate = exe
+                .parent()
+                .unwrap_or(Path::new("."))
+                .join("runtime")
+                .join("extHostMain.js");
+            if candidate.exists() {
+                return candidate;
+            }
+        }
+        PathBuf::from("runtime/extHostMain.js")
+    }
+}
+
 // ---------------------------------------------------------------------------
 // ExtensionHostProcess
 // ---------------------------------------------------------------------------
@@ -91,9 +113,9 @@ impl ExtensionHostProcess {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
-        if let Some(script) = &config.boot_script {
-            cmd.arg(script);
-        }
+        // Always pass the boot script (resolved from config or default)
+        let boot_script = config.resolved_boot_script();
+        cmd.arg(&boot_script);
 
         cmd.env("VSEDIT_LOG_LEVEL", &config.log_level);
         cmd.env("VSEDIT_LOCALE", &config.locale);
