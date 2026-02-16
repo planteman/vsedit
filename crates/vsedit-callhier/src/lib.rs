@@ -3,7 +3,7 @@
 //! Provides types and a trait for navigating incoming and outgoing calls,
 //! mirroring the VS Code call hierarchy contribution.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 
 /// Errors that may occur when resolving call hierarchy information.
@@ -520,6 +520,157 @@ impl Default for CallhierValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CallHierarchyDirection
+// ---------------------------------------------------------------------------
+
+/// Direction of call hierarchy traversal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallHierarchyDirection {
+    Incoming,
+    Outgoing,
+}
+
+impl CallHierarchyDirection {
+    /// Returns `true` if this is the Incoming direction.
+    pub fn is_incoming(&self) -> bool {
+        *self == CallHierarchyDirection::Incoming
+    }
+
+    /// Returns the opposite direction.
+    pub fn opposite(&self) -> Self {
+        match self {
+            CallHierarchyDirection::Incoming => CallHierarchyDirection::Outgoing,
+            CallHierarchyDirection::Outgoing => CallHierarchyDirection::Incoming,
+        }
+    }
+}
+
+impl fmt::Display for CallHierarchyDirection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CallHierarchyDirection::Incoming => f.write_str("Incoming"),
+            CallHierarchyDirection::Outgoing => f.write_str("Outgoing"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CallGraphBuilder
+// ---------------------------------------------------------------------------
+
+/// Builder for constructing a CallGraph from caller/callee pairs.
+#[derive(Debug, Clone)]
+pub struct CallGraphBuilder {
+    graph: CallGraph,
+    edge_count: usize,
+}
+
+impl CallGraphBuilder {
+    /// Create a new empty builder.
+    pub fn new() -> Self {
+        Self {
+            graph: CallGraph::new(),
+            edge_count: 0,
+        }
+    }
+
+    /// Add a call edge from caller to callee.
+    pub fn add_call(&mut self, caller: CallHierarchyItem, callee: CallHierarchyItem) -> &mut Self {
+        self.graph.add_edge(&caller, &callee);
+        self.edge_count += 1;
+        self
+    }
+
+    /// Build the final CallGraph.
+    pub fn build(self) -> CallGraph {
+        self.graph
+    }
+
+    /// Number of edges added so far.
+    pub fn edge_count(&self) -> usize {
+        self.edge_count
+    }
+}
+
+impl Default for CallGraphBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// call_hierarchy_flatten
+// ---------------------------------------------------------------------------
+
+/// Flatten a call graph via BFS from a starting item in the given direction.
+///
+/// Returns `(depth, item)` pairs up to `max_depth` levels deep.
+pub fn call_hierarchy_flatten<'a>(
+    graph: &'a CallGraph,
+    start: &CallHierarchyItem,
+    direction: CallHierarchyDirection,
+    max_depth: usize,
+) -> Vec<(usize, &'a CallHierarchyItem)> {
+    let mut result = Vec::new();
+    let mut visited = HashSet::new();
+    let mut queue: VecDeque<(String, usize)> = VecDeque::new();
+
+    let start_key = format!("{}@{}", start.name, start.uri);
+    visited.insert(start_key.clone());
+    queue.push_back((start_key, 0));
+
+    while let Some((key, depth)) = queue.pop_front() {
+        if let Some(item) = graph.items.get(&key) {
+            if depth > 0 {
+                result.push((depth, item));
+            }
+        }
+
+        if depth >= max_depth {
+            continue;
+        }
+
+        let neighbors: Vec<String> = match direction {
+            CallHierarchyDirection::Outgoing => graph
+                .edges
+                .get(&key)
+                .map(|s| s.iter().cloned().collect())
+                .unwrap_or_default(),
+            CallHierarchyDirection::Incoming => graph
+                .reverse_edges
+                .get(&key)
+                .map(|s| s.iter().cloned().collect())
+                .unwrap_or_default(),
+        };
+
+        for n in neighbors {
+            if visited.insert(n.clone()) {
+                queue.push_back((n, depth + 1));
+            }
+        }
+    }
+
+    result
+}
+
+// ---------------------------------------------------------------------------
+// CallGraph extensions
+// ---------------------------------------------------------------------------
+
+impl CallGraph {
+    /// Total number of edges in the graph.
+    pub fn edge_count(&self) -> usize {
+        self.edges.values().map(|s| s.len()).sum()
+    }
+
+    /// Look up an item by name and URI.
+    pub fn get_item(&self, name: &str, uri: &str) -> Option<&CallHierarchyItem> {
+        let key = format!("{}@{}", name, uri);
+        self.items.get(&key)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -766,87 +917,109 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn call_hierarchy_direction_display() {
+        assert_eq!(format!("{}", CallHierarchyDirection::Incoming), "Incoming");
+        assert_eq!(format!("{}", CallHierarchyDirection::Outgoing), "Outgoing");
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn call_hierarchy_direction_is_incoming_and_opposite() {
+        assert!(CallHierarchyDirection::Incoming.is_incoming());
+        assert!(!CallHierarchyDirection::Outgoing.is_incoming());
+        assert_eq!(
+            CallHierarchyDirection::Incoming.opposite(),
+            CallHierarchyDirection::Outgoing
+        );
+        assert_eq!(
+            CallHierarchyDirection::Outgoing.opposite(),
+            CallHierarchyDirection::Incoming
+        );
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn call_graph_builder_basic() {
+        let mut builder = CallGraphBuilder::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Method);
+        builder.add_call(a, b);
+        assert_eq!(builder.edge_count(), 1);
+        let graph = builder.build();
+        assert_eq!(graph.node_count(), 2);
+        assert_eq!(graph.edge_count(), 1);
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn call_graph_builder_multiple_edges() {
+        let mut builder = CallGraphBuilder::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        builder.add_call(a.clone(), b).add_call(a, c);
+        assert_eq!(builder.edge_count(), 2);
+        let graph = builder.build();
+        assert_eq!(graph.node_count(), 3);
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn call_hierarchy_flatten_outgoing() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &c);
+        let flat = call_hierarchy_flatten(&graph, &a, CallHierarchyDirection::Outgoing, 10);
+        assert_eq!(flat.len(), 2);
+        assert_eq!(flat[0].0, 1); // depth 1
+        assert_eq!(flat[1].0, 2); // depth 2
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn call_hierarchy_flatten_incoming() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &c);
+        let flat = call_hierarchy_flatten(&graph, &c, CallHierarchyDirection::Incoming, 10);
+        assert_eq!(flat.len(), 2);
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn call_hierarchy_flatten_max_depth() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &c);
+        let flat = call_hierarchy_flatten(&graph, &a, CallHierarchyDirection::Outgoing, 1);
+        assert_eq!(flat.len(), 1); // only depth 1, not depth 2
+        assert_eq!(flat[0].1.name, "b");
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn call_graph_edge_count() {
+        let mut graph = CallGraph::new();
+        assert_eq!(graph.edge_count(), 0);
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&a, &c);
+        assert_eq!(graph.edge_count(), 2);
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_9() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_10() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = CallGraph::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn call_graph_get_item() {
+        let mut graph = CallGraph::new();
+        let item = sample_item("foo", SymbolKind::Method);
+        graph.add_item(item.clone());
+        let found = graph.get_item("foo", "file:///src/main.rs");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().name, "foo");
+        assert!(graph.get_item("nonexistent", "file:///src/main.rs").is_none());
     }
 
     #[test]

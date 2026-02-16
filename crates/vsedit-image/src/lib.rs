@@ -525,6 +525,180 @@ impl Default for ImageValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ImageMetadata – rich image metadata
+// ---------------------------------------------------------------------------
+
+/// Rich metadata describing an image file.
+#[derive(Debug, Clone)]
+pub struct ImageMetadata {
+    pub width: u32,
+    pub height: u32,
+    pub format: String,
+    pub color_depth: u8,
+    pub has_alpha: bool,
+    pub file_size_bytes: u64,
+    pub aspect_ratio: f64,
+}
+
+impl ImageMetadata {
+    /// Create metadata with sensible defaults (8-bit, no alpha, file size 0).
+    pub fn new(width: u32, height: u32, format: &str) -> Self {
+        let aspect_ratio = if height == 0 {
+            0.0
+        } else {
+            width as f64 / height as f64
+        };
+        Self {
+            width,
+            height,
+            format: format.to_string(),
+            color_depth: 8,
+            has_alpha: false,
+            file_size_bytes: 0,
+            aspect_ratio,
+        }
+    }
+
+    /// Total number of megapixels.
+    pub fn megapixels(&self) -> f64 {
+        (self.width as f64 * self.height as f64) / 1_000_000.0
+    }
+
+    /// True when width > height.
+    pub fn is_landscape(&self) -> bool {
+        self.width > self.height
+    }
+
+    /// True when height > width.
+    pub fn is_portrait(&self) -> bool {
+        self.height > self.width
+    }
+
+    /// True when width == height.
+    pub fn is_square(&self) -> bool {
+        self.width == self.height
+    }
+
+    /// Human-readable dimensions string, e.g. "1920x1080".
+    pub fn dimensions_string(&self) -> String {
+        format!("{}x{}", self.width, self.height)
+    }
+
+    /// Builder-style setter to mark the image as having an alpha channel.
+    pub fn with_alpha(mut self) -> Self {
+        self.has_alpha = true;
+        self
+    }
+
+    /// Builder-style setter for the on-disk file size in bytes.
+    pub fn with_file_size(mut self, bytes: u64) -> Self {
+        self.file_size_bytes = bytes;
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// image_to_braille – convert grayscale pixels to Unicode braille art
+// ---------------------------------------------------------------------------
+
+/// Convert a row-major grayscale pixel buffer into a Unicode braille-art string.
+///
+/// Each braille character encodes a 2-column × 4-row block of pixels.
+/// A pixel whose value is **≥ `threshold`** is considered "on" (dot raised).
+///
+/// The braille dot offsets inside the 2×4 cell are:
+///
+/// ```text
+///   col 0   col 1
+///   -----   -----
+///   0x01    0x08      row 0
+///   0x02    0x10      row 1
+///   0x04    0x20      row 2
+///   0x40    0x80      row 3
+/// ```
+///
+/// Base codepoint is U+2800.
+pub fn image_to_braille(pixels: &[u8], width: usize, height: usize, threshold: u8) -> String {
+    // Dot bit for (row, col) inside the 2×4 cell.
+    const DOT_MAP: [[u8; 2]; 4] = [
+        [0x01, 0x08],
+        [0x02, 0x10],
+        [0x04, 0x20],
+        [0x40, 0x80],
+    ];
+
+    let rows = (height + 3) / 4; // number of braille rows
+    let cols = (width + 1) / 2; // number of braille columns
+
+    let mut out = String::with_capacity(rows * (cols + 1));
+
+    for br in 0..rows {
+        if br > 0 {
+            out.push('\n');
+        }
+        for bc in 0..cols {
+            let mut code: u32 = 0;
+            for dr in 0..4u32 {
+                let py = br * 4 + dr as usize;
+                if py >= height {
+                    continue;
+                }
+                for dc in 0..2u32 {
+                    let px = bc * 2 + dc as usize;
+                    if px >= width {
+                        continue;
+                    }
+                    let val = pixels[py * width + px];
+                    if val >= threshold {
+                        code |= DOT_MAP[dr as usize][dc as usize] as u32;
+                    }
+                }
+            }
+            // SAFETY: 0x2800..=0x28FF are all valid Unicode codepoints.
+            out.push(char::from_u32(0x2800 + code).unwrap_or(' '));
+        }
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
+// image_resize – nearest-neighbour resize
+// ---------------------------------------------------------------------------
+
+/// Resize a row-major grayscale pixel buffer using nearest-neighbour sampling.
+pub fn image_resize(
+    pixels: &[u8],
+    src_width: usize,
+    src_height: usize,
+    dst_width: usize,
+    dst_height: usize,
+) -> Vec<u8> {
+    let mut out = vec![0u8; dst_width * dst_height];
+    for dy in 0..dst_height {
+        let sy = dy * src_height / dst_height;
+        for dx in 0..dst_width {
+            let sx = dx * src_width / dst_width;
+            out[dy * dst_width + dx] = pixels[sy * src_width + sx];
+        }
+    }
+    out
+}
+
+/// Compute the largest dimensions that fit within `max_w × max_h` while
+/// preserving the aspect ratio of `src_w × src_h`.
+pub fn image_fit_dimensions(src_w: u32, src_h: u32, max_w: u32, max_h: u32) -> (u32, u32) {
+    if src_w == 0 || src_h == 0 || max_w == 0 || max_h == 0 {
+        return (0, 0);
+    }
+    let scale_w = max_w as f64 / src_w as f64;
+    let scale_h = max_h as f64 / src_h as f64;
+    let scale = scale_w.min(scale_h).min(1.0);
+    let new_w = (src_w as f64 * scale).round() as u32;
+    let new_h = (src_h as f64 * scale).round() as u32;
+    (new_w.max(1), new_h.max(1))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -748,6 +922,121 @@ mod tests {
     #[test]
     fn display_imageerror_variants() {
         assert!(!ImageError::DetectionFailed.to_string().is_empty());
+    }
+
+    // ---------------------------------------------------------------
+    // ImageMetadata tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn metadata_creation() {
+        let m = ImageMetadata::new(1920, 1080, "png");
+        assert_eq!(m.width, 1920);
+        assert_eq!(m.height, 1080);
+        assert_eq!(m.format, "png");
+        assert_eq!(m.color_depth, 8);
+        assert!(!m.has_alpha);
+        assert_eq!(m.file_size_bytes, 0);
+        assert!((m.aspect_ratio - 1920.0 / 1080.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn metadata_megapixels() {
+        let m = ImageMetadata::new(2000, 1000, "jpeg");
+        assert!((m.megapixels() - 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn metadata_landscape_portrait() {
+        let landscape = ImageMetadata::new(1920, 1080, "png");
+        assert!(landscape.is_landscape());
+        assert!(!landscape.is_portrait());
+
+        let portrait = ImageMetadata::new(1080, 1920, "png");
+        assert!(portrait.is_portrait());
+        assert!(!portrait.is_landscape());
+    }
+
+    #[test]
+    fn metadata_square() {
+        let sq = ImageMetadata::new(500, 500, "bmp");
+        assert!(sq.is_square());
+        assert!(!sq.is_landscape());
+        assert!(!sq.is_portrait());
+    }
+
+    #[test]
+    fn metadata_dimensions_string() {
+        let m = ImageMetadata::new(800, 600, "gif");
+        assert_eq!(m.dimensions_string(), "800x600");
+    }
+
+    #[test]
+    fn metadata_builders() {
+        let m = ImageMetadata::new(10, 10, "png")
+            .with_alpha()
+            .with_file_size(4096);
+        assert!(m.has_alpha);
+        assert_eq!(m.file_size_bytes, 4096);
+    }
+
+    // ---------------------------------------------------------------
+    // image_to_braille tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn braille_all_white() {
+        // All pixels below threshold → all dots off → U+2800 (blank braille)
+        let pixels = vec![0u8; 4 * 2]; // 2×4 block, all zero
+        let result = image_to_braille(&pixels, 2, 4, 128);
+        assert_eq!(result, "\u{2800}");
+    }
+
+    #[test]
+    fn braille_all_black() {
+        // All pixels at 255, threshold 128 → all 8 dots on → U+28FF
+        let pixels = vec![255u8; 4 * 2]; // 2×4 block, all max
+        let result = image_to_braille(&pixels, 2, 4, 128);
+        assert_eq!(result, "\u{28FF}");
+    }
+
+    // ---------------------------------------------------------------
+    // image_resize / image_fit_dimensions tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn resize_same_size() {
+        let src = vec![10, 20, 30, 40];
+        let dst = image_resize(&src, 2, 2, 2, 2);
+        assert_eq!(dst, src);
+    }
+
+    #[test]
+    fn resize_downscale() {
+        // 4×4 → 2×2, nearest-neighbour picks top-left of each quadrant
+        #[rustfmt::skip]
+        let src: Vec<u8> = vec![
+            1, 2, 3, 4,
+            5, 6, 7, 8,
+            9,10,11,12,
+           13,14,15,16,
+        ];
+        let dst = image_resize(&src, 4, 4, 2, 2);
+        assert_eq!(dst, vec![1, 3, 9, 11]);
+    }
+
+    #[test]
+    fn fit_dimensions_wider() {
+        // 2000×1000 into 1000×1000 → limited by width → 1000×500
+        let (w, h) = image_fit_dimensions(2000, 1000, 1000, 1000);
+        assert_eq!((w, h), (1000, 500));
+    }
+
+    #[test]
+    fn fit_dimensions_taller() {
+        // 1000×2000 into 1000×1000 → limited by height → 500×1000
+        let (w, h) = image_fit_dimensions(1000, 2000, 1000, 1000);
+        assert_eq!((w, h), (500, 1000));
     }
 
     #[test]

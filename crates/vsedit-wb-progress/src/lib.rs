@@ -27,6 +27,8 @@ pub enum ProgressLocation {
     Window,
     SourceControl,
     StatusBar,
+    Panel,
+    Editor,
 }
 
 impl fmt::Display for ProgressLocation {
@@ -36,6 +38,8 @@ impl fmt::Display for ProgressLocation {
             Self::Window => write!(f, "Window"),
             Self::SourceControl => write!(f, "Source Control"),
             Self::StatusBar => write!(f, "Status Bar"),
+            Self::Panel => write!(f, "Panel"),
+            Self::Editor => write!(f, "Editor"),
         }
     }
 }
@@ -490,6 +494,113 @@ impl Default for WbProgressValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ProgressReportBatch — batch multiple reports
+// ---------------------------------------------------------------------------
+
+/// A queued report to be applied in batch.
+struct QueuedReport {
+    task_id: u64,
+    message: Option<String>,
+    increment: Option<f64>,
+}
+
+/// Batch multiple progress reports for grouped application.
+pub struct ProgressReportBatch {
+    reports: Vec<QueuedReport>,
+}
+
+impl ProgressReportBatch {
+    pub fn new() -> Self {
+        Self {
+            reports: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, task_id: u64, message: Option<String>, increment: Option<f64>) {
+        self.reports.push(QueuedReport {
+            task_id,
+            message,
+            increment,
+        });
+    }
+
+    pub fn apply(&self, service: &mut ProgressService) {
+        for r in &self.reports {
+            service.report(r.task_id, r.message.clone(), r.increment);
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.reports.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.reports.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.reports.clear();
+    }
+}
+
+impl Default for ProgressReportBatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// progress_estimate_remaining
+// ---------------------------------------------------------------------------
+
+/// Estimate remaining time in milliseconds based on completed fraction and elapsed time.
+/// Returns `None` if fraction is <= 0 or >= 1.0.
+pub fn estimate_remaining_ms(completed_fraction: f64, elapsed_ms: u64) -> Option<u64> {
+    if completed_fraction <= 0.0 || completed_fraction >= 1.0 {
+        return None;
+    }
+    let remaining = elapsed_ms as f64 * (1.0 - completed_fraction) / completed_fraction;
+    Some(remaining as u64)
+}
+
+// ---------------------------------------------------------------------------
+// ProgressService extensions
+// ---------------------------------------------------------------------------
+
+impl ProgressService {
+    /// Get all tasks at a specific location.
+    pub fn get_tasks_by_location(&self, location: ProgressLocation) -> Vec<&ProgressTask> {
+        self.tasks
+            .iter()
+            .filter(|t| !t.done && t.options.location == location)
+            .collect()
+    }
+
+    /// Cancel all active tasks, returning the count cancelled.
+    pub fn cancel_all(&mut self) -> usize {
+        let mut count = 0;
+        for task in &mut self.tasks {
+            if !task.done {
+                task.cancelled = true;
+                task.done = true;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Average percentage across all active tasks.
+    pub fn overall_percentage(&self) -> f64 {
+        let active: Vec<&ProgressTask> = self.tasks.iter().filter(|t| !t.done).collect();
+        if active.is_empty() {
+            return 0.0;
+        }
+        let sum: f64 = active.iter().map(|t| t.report.total.min(100.0).max(0.0)).sum();
+        sum / active.len() as f64
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -693,160 +804,107 @@ mod tests {
         assert!(!ProgressLocation::StatusBar.to_string().is_empty());
     }
 
+    // -- ProgressLocation Panel/Editor tests --
+
     #[test]
-    fn behavior_check_0() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn display_progress_location_panel_editor() {
+        assert_eq!(ProgressLocation::Panel.to_string(), "Panel");
+        assert_eq!(ProgressLocation::Editor.to_string(), "Editor");
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn eq_progresslocation_panel() {
+        assert_eq!(ProgressLocation::Panel, ProgressLocation::Panel);
+        assert_ne!(ProgressLocation::Panel, ProgressLocation::Editor);
+    }
+
+    // -- ProgressReportBatch tests --
+
+    #[test]
+    fn batch_empty() {
+        let batch = ProgressReportBatch::new();
+        assert!(batch.is_empty());
+        assert_eq!(batch.len(), 0);
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn batch_add_and_apply() {
+        let mut svc = ProgressService::new();
+        let id = svc.start(opts(ProgressLocation::Notification));
+        let mut batch = ProgressReportBatch::new();
+        batch.add(id, Some("step 1".into()), Some(25.0));
+        batch.add(id, Some("step 2".into()), Some(25.0));
+        assert_eq!(batch.len(), 2);
+        assert!(!batch.is_empty());
+        batch.apply(&mut svc);
+        let task = svc.get_task(id).unwrap();
+        assert_eq!(task.report.total, 50.0);
+        assert_eq!(task.report.message.as_deref(), Some("step 2"));
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn batch_clear() {
+        let mut batch = ProgressReportBatch::new();
+        batch.add(1, None, Some(10.0));
+        batch.clear();
+        assert!(batch.is_empty());
+    }
+
+    // -- estimate_remaining_ms tests --
+
+    #[test]
+    fn estimate_remaining_at_half() {
+        let result = estimate_remaining_ms(0.5, 1000);
+        assert_eq!(result, Some(1000));
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn estimate_remaining_edge_cases() {
+        assert_eq!(estimate_remaining_ms(0.0, 1000), None);
+        assert_eq!(estimate_remaining_ms(1.0, 1000), None);
+        assert_eq!(estimate_remaining_ms(-0.5, 1000), None);
+    }
+
+    // -- ProgressService extension tests --
+
+    #[test]
+    fn get_tasks_by_location() {
+        let mut svc = ProgressService::new();
+        svc.start(opts(ProgressLocation::Notification));
+        svc.start(opts(ProgressLocation::Window));
+        svc.start(opts(ProgressLocation::Notification));
+        let notif_tasks = svc.get_tasks_by_location(ProgressLocation::Notification);
+        assert_eq!(notif_tasks.len(), 2);
+        let window_tasks = svc.get_tasks_by_location(ProgressLocation::Window);
+        assert_eq!(window_tasks.len(), 1);
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn cancel_all_tasks() {
+        let mut svc = ProgressService::new();
+        svc.start(opts(ProgressLocation::Notification));
+        svc.start(opts(ProgressLocation::Window));
+        let id3 = svc.start(opts(ProgressLocation::StatusBar));
+        svc.complete(id3);
+        let cancelled = svc.cancel_all();
+        assert_eq!(cancelled, 2);
+        assert_eq!(svc.active_count(), 0);
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn overall_percentage_average() {
+        let mut svc = ProgressService::new();
+        let id1 = svc.start(opts(ProgressLocation::Notification));
+        let id2 = svc.start(opts(ProgressLocation::Window));
+        svc.report(id1, None, Some(50.0));
+        svc.report(id2, None, Some(100.0));
+        assert!((svc.overall_percentage() - 75.0).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_8() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_9() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_10() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        let _svc = ProgressService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn overall_percentage_no_active() {
+        let svc = ProgressService::new();
+        assert!((svc.overall_percentage() - 0.0).abs() < f64::EPSILON);
     }
 
     #[test]

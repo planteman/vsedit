@@ -592,9 +592,378 @@ impl Default for ChatViewValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ChatMessageRenderer – renders messages/sessions to plain text
+// ---------------------------------------------------------------------------
+
+/// Renders chat messages and sessions to plain text with configurable formatting.
+#[derive(Debug, Clone)]
+pub struct ChatMessageRenderer {
+    pub show_timestamps: bool,
+    pub show_role_prefix: bool,
+    pub max_line_width: Option<usize>,
+}
+
+impl ChatMessageRenderer {
+    /// Creates a new renderer with timestamps and role prefixes enabled and no
+    /// maximum line width.
+    pub fn new() -> Self {
+        Self {
+            show_timestamps: true,
+            show_role_prefix: true,
+            max_line_width: None,
+        }
+    }
+
+    /// Builder helper – enable or disable timestamp display.
+    pub fn with_timestamps(mut self, show: bool) -> Self {
+        self.show_timestamps = show;
+        self
+    }
+
+    /// Builder helper – set a maximum line width for word-wrapping.
+    pub fn with_max_width(mut self, width: usize) -> Self {
+        self.max_line_width = Some(width);
+        self
+    }
+
+    /// Render a single [`ChatMessage`] to a plain-text string.
+    ///
+    /// When `show_role_prefix` is true the line starts with `[role]`.
+    /// When `show_timestamps` is true the timestamp is prepended.
+    pub fn render_message(&self, msg: &ChatMessage) -> String {
+        let mut parts: Vec<String> = Vec::new();
+
+        if self.show_timestamps {
+            parts.push(format!("[{}]", msg.timestamp));
+        }
+        if self.show_role_prefix {
+            parts.push(format!("[{}]", msg.role));
+        }
+
+        parts.push(msg.content.clone());
+
+        let line = parts.join(" ");
+
+        match self.max_line_width {
+            Some(w) => Self::word_wrap(&line, w),
+            None => line,
+        }
+    }
+
+    /// Render every message in a [`ChatSession`], separated by newlines.
+    pub fn render_session(&self, session: &ChatSession) -> String {
+        session
+            .messages
+            .iter()
+            .map(|m| self.render_message(m))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Word-wrap `text` so that no output line exceeds `max_width` characters.
+    ///
+    /// Words that are themselves longer than `max_width` are placed on their
+    /// own line without breaking.
+    pub fn word_wrap(text: &str, max_width: usize) -> String {
+        if max_width == 0 {
+            return text.to_string();
+        }
+
+        let mut result = String::new();
+        for (i, input_line) in text.lines().enumerate() {
+            if i > 0 {
+                result.push('\n');
+            }
+            let words: Vec<&str> = input_line.split_whitespace().collect();
+            if words.is_empty() {
+                continue;
+            }
+            let mut current_len: usize = 0;
+            for (j, word) in words.iter().enumerate() {
+                let wlen = word.len();
+                if j == 0 {
+                    result.push_str(word);
+                    current_len = wlen;
+                } else if current_len + 1 + wlen > max_width {
+                    result.push('\n');
+                    result.push_str(word);
+                    current_len = wlen;
+                } else {
+                    result.push(' ');
+                    result.push_str(word);
+                    current_len += 1 + wlen;
+                }
+            }
+        }
+        result
+    }
+}
+
+impl Default for ChatMessageRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatCodeBlock – extract fenced code blocks from message content
+// ---------------------------------------------------------------------------
+
+/// A fenced code block extracted from a chat message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatCodeBlock {
+    /// Optional language tag (e.g. `"rust"`, `"python"`).
+    pub language: Option<String>,
+    /// The raw code inside the fences.
+    pub code: String,
+    /// 1-based start line of the opening fence in the source content.
+    pub start_line: usize,
+    /// 1-based end line of the closing fence in the source content.
+    pub end_line: usize,
+}
+
+impl ChatCodeBlock {
+    /// Scan `content` for fenced code blocks (` ```lang\n…\n``` `) and return
+    /// all that are found.
+    pub fn extract_code_blocks(content: &str) -> Vec<ChatCodeBlock> {
+        let mut blocks = Vec::new();
+        let lines: Vec<&str> = content.lines().collect();
+        let mut idx = 0;
+        while idx < lines.len() {
+            let trimmed = lines[idx].trim();
+            if trimmed.starts_with("```") {
+                let lang_tag = trimmed.trim_start_matches('`');
+                let language = if lang_tag.is_empty() {
+                    None
+                } else {
+                    Some(lang_tag.to_string())
+                };
+                let start_line = idx + 1; // 1-based
+                let mut code_lines: Vec<&str> = Vec::new();
+                idx += 1;
+                while idx < lines.len() {
+                    let t = lines[idx].trim();
+                    if t == "```" {
+                        break;
+                    }
+                    code_lines.push(lines[idx]);
+                    idx += 1;
+                }
+                let end_line = idx + 1; // 1-based (line of closing fence)
+                blocks.push(ChatCodeBlock {
+                    language,
+                    code: code_lines.join("\n"),
+                    start_line,
+                    end_line,
+                });
+            }
+            idx += 1;
+        }
+        blocks
+    }
+
+    /// Number of lines in the code body.
+    pub fn line_count(&self) -> usize {
+        if self.code.is_empty() {
+            return 0;
+        }
+        self.code.lines().count()
+    }
+
+    /// Human-readable label such as `"rust (5 lines)"` or `"code (3 lines)"`.
+    pub fn display_label(&self) -> String {
+        let tag = self
+            .language
+            .as_deref()
+            .unwrap_or("code");
+        format!("{} ({} lines)", tag, self.line_count())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Standalone helper functions
+// ---------------------------------------------------------------------------
+
+/// Produce a copy-friendly plain-text version of a chat message.
+///
+/// When `include_role` is true the role is prepended as `[role] `.
+pub fn chat_message_copy(msg: &ChatMessage, include_role: bool) -> String {
+    if include_role {
+        format!("[{}] {}", msg.role, msg.content)
+    } else {
+        msg.content.clone()
+    }
+}
+
+/// Export an entire [`ChatSession`] as a Markdown document.
+///
+/// Each message is rendered under a heading that matches its role:
+///
+/// ```text
+/// ## User
+///
+/// message content
+///
+/// ## Assistant
+///
+/// reply content
+/// ```
+///
+/// Returns [`ChatError::EmptySession`] when the session contains no messages.
+pub fn chat_session_export_markdown(session: &ChatSession) -> Result<String, ChatError> {
+    if session.messages.is_empty() {
+        return Err(ChatError::EmptySession);
+    }
+
+    let mut md = String::new();
+    if let Some(ref title) = session.title {
+        md.push_str(&format!("# {}\n\n", title));
+    }
+
+    for (i, msg) in session.messages.iter().enumerate() {
+        if i > 0 {
+            md.push('\n');
+        }
+        let heading = match msg.role {
+            ChatRole::User => "User",
+            ChatRole::Assistant => "Assistant",
+            ChatRole::System => "System",
+        };
+        md.push_str(&format!("## {}\n\n{}\n", heading, msg.content));
+    }
+
+    Ok(md)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // -- ChatMessageRenderer tests ------------------------------------------
+
+    #[test]
+    fn renderer_basic() {
+        let renderer = ChatMessageRenderer::new();
+        let msg = ChatMessage {
+            id: 0,
+            role: ChatRole::User,
+            content: "Hello world".into(),
+            timestamp: 1000,
+            status: ChatMessageStatus::Complete,
+        };
+        let out = renderer.render_message(&msg);
+        assert_eq!(out, "[1000] [user] Hello world");
+    }
+
+    #[test]
+    fn renderer_no_timestamps() {
+        let renderer = ChatMessageRenderer::new().with_timestamps(false);
+        let msg = ChatMessage {
+            id: 1,
+            role: ChatRole::Assistant,
+            content: "Hi there".into(),
+            timestamp: 2000,
+            status: ChatMessageStatus::Complete,
+        };
+        let out = renderer.render_message(&msg);
+        assert_eq!(out, "[assistant] Hi there");
+    }
+
+    #[test]
+    fn renderer_word_wrap() {
+        let wrapped = ChatMessageRenderer::word_wrap("hello world foo bar baz", 11);
+        // "hello world" is 11 chars, fits; "foo bar baz" on next line
+        assert_eq!(wrapped, "hello world\nfoo bar baz");
+    }
+
+    #[test]
+    fn renderer_session() {
+        let renderer = ChatMessageRenderer::new()
+            .with_timestamps(false);
+        let mut session = ChatSession::new("s-render");
+        session.add_message(ChatRole::User, "ping", 10);
+        session.add_message(ChatRole::Assistant, "pong", 20);
+        let out = renderer.render_session(&session);
+        assert_eq!(out, "[user] ping\n[assistant] pong");
+    }
+
+    // -- ChatCodeBlock tests ------------------------------------------------
+
+    #[test]
+    fn code_block_extraction() {
+        let content = "Some text\n```rust\nfn main() {}\n```\nMore text";
+        let blocks = ChatCodeBlock::extract_code_blocks(content);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].code, "fn main() {}");
+    }
+
+    #[test]
+    fn code_block_with_language() {
+        let content = "```python\nprint('hi')\nprint('bye')\n```";
+        let blocks = ChatCodeBlock::extract_code_blocks(content);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].language.as_deref(), Some("python"));
+        assert_eq!(blocks[0].line_count(), 2);
+        assert_eq!(blocks[0].display_label(), "python (2 lines)");
+    }
+
+    #[test]
+    fn code_block_no_language() {
+        let content = "```\nsome code\n```";
+        let blocks = ChatCodeBlock::extract_code_blocks(content);
+        assert_eq!(blocks.len(), 1);
+        assert!(blocks[0].language.is_none());
+        assert_eq!(blocks[0].display_label(), "code (1 lines)");
+    }
+
+    // -- chat_message_copy / export tests -----------------------------------
+
+    #[test]
+    fn chat_message_copy_with_role() {
+        let msg = ChatMessage {
+            id: 0,
+            role: ChatRole::User,
+            content: "test content".into(),
+            timestamp: 500,
+            status: ChatMessageStatus::Complete,
+        };
+        assert_eq!(chat_message_copy(&msg, true), "[user] test content");
+    }
+
+    #[test]
+    fn chat_message_copy_without_role() {
+        let msg = ChatMessage {
+            id: 0,
+            role: ChatRole::Assistant,
+            content: "response text".into(),
+            timestamp: 600,
+            status: ChatMessageStatus::Complete,
+        };
+        assert_eq!(chat_message_copy(&msg, false), "response text");
+    }
+
+    #[test]
+    fn session_export_markdown() {
+        let mut session = ChatSession::new("md-export");
+        session.set_title("Test Chat");
+        session.add_message(ChatRole::User, "What is Rust?", 1);
+        session.add_message(ChatRole::Assistant, "A systems language.", 2);
+
+        let md = chat_session_export_markdown(&session).unwrap();
+        assert!(md.starts_with("# Test Chat\n"));
+        assert!(md.contains("## User\n\nWhat is Rust?\n"));
+        assert!(md.contains("## Assistant\n\nA systems language.\n"));
+    }
+
+    #[test]
+    fn session_export_markdown_empty() {
+        let session = ChatSession::new("empty");
+        let result = chat_session_export_markdown(&session);
+        assert_eq!(result, Err(ChatError::EmptySession));
+    }
+
+    // -- existing tests below -----------------------------------------------
 
     #[test]
     fn add_and_retrieve_messages() {

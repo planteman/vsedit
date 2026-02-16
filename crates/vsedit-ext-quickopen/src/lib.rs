@@ -566,6 +566,201 @@ impl Default for ExtQuickopenValidator {
     }
 }
 
+/// Multi-factor scoring system for fuzzy matching in quick-open dialogs.
+///
+/// Scores are computed by walking through the query characters and matching
+/// them against the candidate string. Bonuses are awarded for:
+/// - An exact (case-insensitive) full match (`exact_bonus`).
+/// - The candidate starting with the query (`prefix_bonus`).
+/// - Consecutive character matches (`consecutive_bonus` per consecutive char).
+///
+/// A score of `0.0` means the query does not match the candidate at all.
+pub struct QuickOpenScoring {
+    pub consecutive_bonus: f64,
+    pub prefix_bonus: f64,
+    pub exact_bonus: f64,
+}
+
+impl QuickOpenScoring {
+    /// Creates a new `QuickOpenScoring` with sensible defaults.
+    pub fn new() -> Self {
+        Self {
+            consecutive_bonus: 2.0,
+            prefix_bonus: 3.0,
+            exact_bonus: 10.0,
+        }
+    }
+
+    /// Scores how well `query` matches `candidate`.
+    ///
+    /// Returns `0.0` when the characters of `query` do not all appear in
+    /// `candidate` in order. Otherwise a positive score is returned that
+    /// reflects the quality of the match.
+    pub fn score_match(&self, query: &str, candidate: &str) -> f64 {
+        if query.is_empty() {
+            return 0.0;
+        }
+
+        let query_lower = query.to_lowercase();
+        let candidate_lower = candidate.to_lowercase();
+
+        // Exact match bonus
+        if query_lower == candidate_lower {
+            return self.exact_bonus;
+        }
+
+        // Walk query chars through candidate chars in order
+        let candidate_chars: Vec<char> = candidate_lower.chars().collect();
+        let query_chars: Vec<char> = query_lower.chars().collect();
+
+        let mut score: f64 = 0.0;
+        let mut candidate_idx: usize = 0;
+        let mut prev_match_idx: Option<usize> = None;
+        let mut consecutive_count: usize = 0;
+
+        for &qc in &query_chars {
+            let mut found = false;
+            while candidate_idx < candidate_chars.len() {
+                if candidate_chars[candidate_idx] == qc {
+                    // Base point for every matched character
+                    score += 1.0;
+
+                    // Consecutive bonus
+                    if let Some(prev) = prev_match_idx {
+                        if candidate_idx == prev + 1 {
+                            consecutive_count += 1;
+                            score += self.consecutive_bonus;
+                        } else {
+                            consecutive_count = 0;
+                        }
+                    }
+
+                    prev_match_idx = Some(candidate_idx);
+                    candidate_idx += 1;
+                    found = true;
+                    break;
+                }
+                candidate_idx += 1;
+            }
+            if !found {
+                return 0.0;
+            }
+        }
+
+        // Prefix bonus
+        if candidate_lower.starts_with(&query_lower) {
+            score += self.prefix_bonus;
+        }
+
+        // Extra bonus proportional to consecutive run length
+        if consecutive_count > 0 {
+            score += consecutive_count as f64 * 0.5;
+        }
+
+        score
+    }
+
+    /// Returns the highest-scoring candidate, or `None` when no candidate
+    /// matches at all (all scores are `0.0`).
+    pub fn best_match<'a>(&self, query: &str, candidates: &[&'a str]) -> Option<&'a str> {
+        let mut best: Option<&'a str> = None;
+        let mut best_score: f64 = 0.0;
+
+        for &c in candidates {
+            let s = self.score_match(query, c);
+            if s > best_score {
+                best_score = s;
+                best = Some(c);
+            }
+        }
+
+        best
+    }
+}
+
+impl Default for QuickOpenScoring {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Tracks recently opened items so they can be boosted in future searches
+/// or shown as suggestions.
+pub struct QuickOpenHistory {
+    pub entries: Vec<String>,
+    pub max_entries: usize,
+}
+
+impl QuickOpenHistory {
+    /// Creates a new, empty history with the given capacity.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+        }
+    }
+
+    /// Records an item at the front of the history.
+    ///
+    /// If the item already exists it is moved to the front. The history is
+    /// trimmed to `max_entries` afterwards.
+    pub fn record(&mut self, item: &str) {
+        self.entries.retain(|e| e != item);
+        self.entries.insert(0, item.to_string());
+        self.entries.truncate(self.max_entries);
+    }
+
+    /// Returns up to `count` most-recent entries.
+    pub fn recent(&self, count: usize) -> &[String] {
+        let end = count.min(self.entries.len());
+        &self.entries[..end]
+    }
+
+    /// Returns `true` when the item is present in history.
+    pub fn contains(&self, item: &str) -> bool {
+        self.entries.iter().any(|e| e == item)
+    }
+
+    /// Removes all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Adds a recency bonus to `base_score` depending on the item's position
+    /// in history. Items closer to the front receive a larger bonus. Items not
+    /// in history receive no bonus.
+    pub fn boost_score(&self, item: &str, base_score: f64) -> f64 {
+        if let Some(pos) = self.entries.iter().position(|e| e == item) {
+            let recency_factor = 1.0 - (pos as f64 / self.max_entries.max(1) as f64);
+            base_score + recency_factor * 5.0
+        } else {
+            base_score
+        }
+    }
+}
+
+/// Filters and scores `items` against `query`, returning only those with a
+/// positive score, sorted in descending order by score.
+pub fn quick_open_filter(
+    query: &str,
+    items: &[&str],
+    scorer: &QuickOpenScoring,
+) -> Vec<(String, f64)> {
+    let mut results: Vec<(String, f64)> = items
+        .iter()
+        .filter_map(|&item| {
+            let score = scorer.score_match(query, item);
+            if score > 0.0 {
+                Some((item.to_string(), score))
+            } else {
+                None
+            }
+        })
+        .collect();
+    results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -774,6 +969,100 @@ mod tests {
     #[test]
     fn ne_inputvalidationseverity_diff() {
         assert_ne!(InputValidationSeverity::Info, InputValidationSeverity::Warning);
+    }
+
+    #[test]
+    fn scoring_exact_match() {
+        let scorer = QuickOpenScoring::new();
+        let score = scorer.score_match("main.rs", "main.rs");
+        assert!((score - scorer.exact_bonus).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scoring_prefix_match() {
+        let scorer = QuickOpenScoring::new();
+        let score = scorer.score_match("mai", "main.rs");
+        assert!(score > 0.0);
+        // Prefix matches should include the prefix_bonus
+        assert!(score >= scorer.prefix_bonus);
+    }
+
+    #[test]
+    fn scoring_no_match() {
+        let scorer = QuickOpenScoring::new();
+        assert!((scorer.score_match("xyz", "main.rs")).abs() < f64::EPSILON);
+        assert!((scorer.score_match("zz", "abc")).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scoring_best_match() {
+        let scorer = QuickOpenScoring::new();
+        let candidates = vec!["readme.md", "main.rs", "lib.rs"];
+        let best = scorer.best_match("main", &candidates);
+        assert_eq!(best, Some("main.rs"));
+    }
+
+    #[test]
+    fn history_record_and_recent() {
+        let mut history = QuickOpenHistory::new(5);
+        history.record("file_a.rs");
+        history.record("file_b.rs");
+        history.record("file_c.rs");
+        let recent = history.recent(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0], "file_c.rs");
+        assert_eq!(recent[1], "file_b.rs");
+    }
+
+    #[test]
+    fn history_dedup() {
+        let mut history = QuickOpenHistory::new(5);
+        history.record("alpha");
+        history.record("beta");
+        history.record("alpha");
+        assert_eq!(history.entries.len(), 2);
+        assert_eq!(history.entries[0], "alpha");
+        assert_eq!(history.entries[1], "beta");
+    }
+
+    #[test]
+    fn history_max_entries() {
+        let mut history = QuickOpenHistory::new(3);
+        history.record("a");
+        history.record("b");
+        history.record("c");
+        history.record("d");
+        assert_eq!(history.entries.len(), 3);
+        assert!(!history.contains("a"));
+        assert!(history.contains("d"));
+    }
+
+    #[test]
+    fn history_boost_score() {
+        let mut history = QuickOpenHistory::new(10);
+        history.record("old_item");
+        history.record("new_item");
+        let boosted_new = history.boost_score("new_item", 5.0);
+        let boosted_old = history.boost_score("old_item", 5.0);
+        let unboosted = history.boost_score("missing", 5.0);
+        assert!(boosted_new > boosted_old);
+        assert!(boosted_old > unboosted);
+        assert!((unboosted - 5.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn quick_open_filter_sorts_by_score() {
+        let scorer = QuickOpenScoring::new();
+        let items = vec!["main.rs", "readme.md", "manifest.json", "xyz"];
+        let results = quick_open_filter("main", &items, &scorer);
+        // "xyz" should be filtered out
+        assert!(results.iter().all(|(name, _)| name != "xyz"));
+        // Results should be sorted descending by score
+        for pair in results.windows(2) {
+            assert!(pair[0].1 >= pair[1].1);
+        }
+        // "main.rs" should be the top result (exact prefix match)
+        assert_eq!(results[0].0, "main.rs");
     }
 
     #[test]

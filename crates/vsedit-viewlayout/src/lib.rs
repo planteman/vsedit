@@ -482,6 +482,132 @@ impl Default for ViewlayoutValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Viewport metrics and line-height layout utilities
+// ---------------------------------------------------------------------------
+
+/// Tracks viewport dimensions and scroll state for an editor view.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ViewportMetrics {
+    pub width: f64,
+    pub height: f64,
+    pub scroll_top: f64,
+    pub device_pixel_ratio: f64,
+}
+
+impl ViewportMetrics {
+    /// Create a new `ViewportMetrics` with zero scroll and a device-pixel-ratio of 1.0.
+    pub fn new(width: f64, height: f64) -> Self {
+        Self {
+            width,
+            height,
+            scroll_top: 0.0,
+            device_pixel_ratio: 1.0,
+        }
+    }
+
+    /// Logical visible height after accounting for device pixel ratio.
+    pub fn visible_height(&self) -> f64 {
+        self.height / self.device_pixel_ratio
+    }
+
+    /// The y-coordinate of the bottom edge of the visible area.
+    pub fn scroll_bottom(&self) -> f64 {
+        self.scroll_top + self.visible_height()
+    }
+
+    /// Returns `true` when the given y-coordinate falls within the visible range.
+    pub fn contains_vertical(&self, y: f64) -> bool {
+        y >= self.scroll_top && y <= self.scroll_bottom()
+    }
+
+    /// The y-coordinate of the vertical centre of the visible area.
+    pub fn center_y(&self) -> f64 {
+        self.scroll_top + self.visible_height() / 2.0
+    }
+}
+
+/// Calculates vertical positions and sizes for fixed-height editor lines.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LineHeightCalculator {
+    pub base_line_height: f64,
+    pub font_size: f64,
+    pub line_height_multiplier: f64,
+}
+
+impl LineHeightCalculator {
+    /// Create a new calculator. `base_line_height` is derived as
+    /// `font_size * multiplier`.
+    pub fn new(font_size: f64, multiplier: f64) -> Self {
+        Self {
+            base_line_height: font_size * multiplier,
+            font_size,
+            line_height_multiplier: multiplier,
+        }
+    }
+
+    /// The computed line height.
+    pub fn line_height(&self) -> f64 {
+        self.base_line_height
+    }
+
+    /// The y-coordinate of the top of the given (0-based) line.
+    pub fn line_top(&self, line_number: usize) -> f64 {
+        line_number as f64 * self.base_line_height
+    }
+
+    /// Which (0-based) line number occupies the given y-coordinate.
+    pub fn line_at_y(&self, y: f64) -> usize {
+        if y < 0.0 {
+            return 0;
+        }
+        (y / self.base_line_height) as usize
+    }
+
+    /// How many complete lines fit in the given viewport height.
+    pub fn lines_per_page(&self, viewport_height: f64) -> usize {
+        if self.base_line_height <= 0.0 {
+            return 0;
+        }
+        (viewport_height / self.base_line_height) as usize
+    }
+
+    /// Total pixel height for `line_count` lines.
+    pub fn total_height(&self, line_count: usize) -> f64 {
+        line_count as f64 * self.base_line_height
+    }
+}
+
+/// Returns the inclusive range `(first_visible_line, last_visible_line)` that
+/// is currently on screen, clamped to `[0, total_lines.saturating_sub(1)]`.
+pub fn viewport_visible_range(
+    viewport: &ViewportMetrics,
+    calc: &LineHeightCalculator,
+    total_lines: usize,
+) -> (usize, usize) {
+    if total_lines == 0 {
+        return (0, 0);
+    }
+    let first = calc.line_at_y(viewport.scroll_top);
+    let last_raw = calc.line_at_y(viewport.scroll_bottom());
+    let max_line = total_lines.saturating_sub(1);
+    let first_clamped = first.min(max_line);
+    let last_clamped = last_raw.min(max_line);
+    (first_clamped, last_clamped)
+}
+
+/// Adjusts `viewport.scroll_top` so that the given (0-based) line is
+/// vertically centred in the viewport.
+pub fn scroll_to_line(
+    viewport: &mut ViewportMetrics,
+    calc: &LineHeightCalculator,
+    line: usize,
+) {
+    let line_mid = calc.line_top(line) + calc.line_height() / 2.0;
+    let new_scroll = (line_mid - viewport.visible_height() / 2.0).max(0.0);
+    viewport.scroll_top = new_scroll;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -665,6 +791,93 @@ mod tests {
         assert_eq!(e2.to_string(), "duplicate view: y");
         let e3 = LayoutError::InvalidPosition("bad".into());
         assert_eq!(e3.to_string(), "invalid position: bad");
+    }
+
+    // -----------------------------------------------------------------------
+    // ViewportMetrics / LineHeightCalculator / visible-range tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn viewport_metrics_creation() {
+        let vp = ViewportMetrics::new(800.0, 600.0);
+        assert_eq!(vp.width, 800.0);
+        assert_eq!(vp.height, 600.0);
+        assert_eq!(vp.scroll_top, 0.0);
+        assert_eq!(vp.device_pixel_ratio, 1.0);
+    }
+
+    #[test]
+    fn viewport_visible_height() {
+        let mut vp = ViewportMetrics::new(800.0, 600.0);
+        assert!((vp.visible_height() - 600.0).abs() < f64::EPSILON);
+        vp.device_pixel_ratio = 2.0;
+        assert!((vp.visible_height() - 300.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn viewport_contains_vertical() {
+        let mut vp = ViewportMetrics::new(800.0, 600.0);
+        vp.scroll_top = 100.0;
+        assert!(vp.contains_vertical(100.0));
+        assert!(vp.contains_vertical(400.0));
+        assert!(vp.contains_vertical(700.0));
+        assert!(!vp.contains_vertical(99.0));
+        assert!(!vp.contains_vertical(701.0));
+    }
+
+    #[test]
+    fn line_height_calculator_basic() {
+        let calc = LineHeightCalculator::new(14.0, 1.5);
+        assert!((calc.line_height() - 21.0).abs() < f64::EPSILON);
+        assert!((calc.font_size - 14.0).abs() < f64::EPSILON);
+        assert!((calc.line_height_multiplier - 1.5).abs() < f64::EPSILON);
+        assert!((calc.total_height(10) - 210.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn line_at_y_calculation() {
+        let calc = LineHeightCalculator::new(10.0, 2.0); // line_height = 20
+        assert_eq!(calc.line_at_y(0.0), 0);
+        assert_eq!(calc.line_at_y(19.9), 0);
+        assert_eq!(calc.line_at_y(20.0), 1);
+        assert_eq!(calc.line_at_y(59.0), 2);
+        assert_eq!(calc.line_at_y(-5.0), 0); // negative clamped
+    }
+
+    #[test]
+    fn lines_per_page_calculation() {
+        let calc = LineHeightCalculator::new(10.0, 2.0); // line_height = 20
+        assert_eq!(calc.lines_per_page(100.0), 5);
+        assert_eq!(calc.lines_per_page(99.0), 4);
+        assert_eq!(calc.lines_per_page(0.0), 0);
+    }
+
+    #[test]
+    fn visible_range_at_top() {
+        let vp = ViewportMetrics::new(800.0, 200.0);
+        let calc = LineHeightCalculator::new(10.0, 2.0); // line_height = 20
+        let (first, last) = viewport_visible_range(&vp, &calc, 100);
+        assert_eq!(first, 0);
+        assert_eq!(last, 10); // 200/20 = line 10
+    }
+
+    #[test]
+    fn visible_range_scrolled() {
+        let mut vp = ViewportMetrics::new(800.0, 200.0);
+        vp.scroll_top = 100.0; // scrolled 5 lines down (line_height = 20)
+        let calc = LineHeightCalculator::new(10.0, 2.0);
+        let (first, last) = viewport_visible_range(&vp, &calc, 100);
+        assert_eq!(first, 5);
+        assert_eq!(last, 15);
+    }
+
+    #[test]
+    fn scroll_to_line_centers() {
+        let mut vp = ViewportMetrics::new(800.0, 200.0);
+        let calc = LineHeightCalculator::new(10.0, 2.0); // line_height = 20
+        scroll_to_line(&mut vp, &calc, 50);
+        // line 50 top = 1000, mid = 1010, scroll = 1010 - 100 = 910
+        assert!((vp.scroll_top - 910.0).abs() < f64::EPSILON);
     }
 
     #[test]

@@ -533,6 +533,176 @@ impl Default for BackupValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// BackupScheduler – periodic backup scheduling
+// ---------------------------------------------------------------------------
+
+/// Schedules periodic backups for a set of watched files.
+pub struct BackupScheduler {
+    pub interval_secs: u64,
+    pub last_backup_time: u64,
+    pub enabled: bool,
+    pub files_to_backup: Vec<String>,
+}
+
+impl BackupScheduler {
+    /// Create a new scheduler that triggers every `interval_secs` seconds.
+    pub fn new(interval_secs: u64) -> Self {
+        Self {
+            interval_secs,
+            last_backup_time: 0,
+            enabled: true,
+            files_to_backup: Vec::new(),
+        }
+    }
+
+    /// Register a file path for scheduled backup.
+    pub fn add_file(&mut self, path: &str) {
+        if !self.files_to_backup.iter().any(|p| p == path) {
+            self.files_to_backup.push(path.to_string());
+        }
+    }
+
+    /// Remove a file path from the schedule. Returns `true` if it was present.
+    pub fn remove_file(&mut self, path: &str) -> bool {
+        if let Some(pos) = self.files_to_backup.iter().position(|p| p == path) {
+            self.files_to_backup.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Returns `true` when enough time has elapsed since the last backup.
+    pub fn is_due(&self, current_time: u64) -> bool {
+        self.enabled && current_time.saturating_sub(self.last_backup_time) >= self.interval_secs
+    }
+
+    /// Record that a backup was completed at `current_time`.
+    pub fn mark_completed(&mut self, current_time: u64) {
+        self.last_backup_time = current_time;
+    }
+
+    /// Enable scheduling.
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    /// Disable scheduling.
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    /// Return the list of files registered for backup.
+    pub fn files_to_backup(&self) -> &[String] {
+        &self.files_to_backup
+    }
+}
+
+impl fmt::Display for BackupScheduler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "BackupScheduler(interval={}s, enabled={}, files={})",
+            self.interval_secs,
+            self.enabled,
+            self.files_to_backup.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BackupRotation – keep only the N most-recent backups
+// ---------------------------------------------------------------------------
+
+/// Rotation policy that keeps at most `max_count` backup entries.
+pub struct BackupRotation {
+    pub max_count: usize,
+}
+
+impl BackupRotation {
+    pub fn new(max_count: usize) -> Self {
+        Self { max_count }
+    }
+
+    /// Sort `entries` by timestamp (ascending) and drop the oldest until only
+    /// `max_count` remain.
+    pub fn rotate(&self, entries: &mut Vec<BackupEntry>) {
+        if entries.len() <= self.max_count {
+            return;
+        }
+        entries.sort_by_key(|e| e.timestamp);
+        let remove_count = entries.len() - self.max_count;
+        entries.drain(..remove_count);
+    }
+
+    /// Returns `true` when the number of backups exceeds the limit.
+    pub fn should_rotate(&self, count: usize) -> bool {
+        count > self.max_count
+    }
+
+    /// How many entries would need to be removed to satisfy the limit.
+    pub fn entries_to_remove(&self, count: usize) -> usize {
+        count.saturating_sub(self.max_count)
+    }
+}
+
+impl fmt::Display for BackupRotation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "BackupRotation(max_count={})", self.max_count)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// backup_verify – integrity verification helpers
+// ---------------------------------------------------------------------------
+
+/// Result of comparing an original hash with a backup hash.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BackupVerifyResult {
+    Valid,
+    Corrupted { expected: u64, actual: u64 },
+}
+
+impl fmt::Display for BackupVerifyResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Valid => write!(f, "backup verified: valid"),
+            Self::Corrupted { expected, actual } => {
+                write!(
+                    f,
+                    "backup corrupted: expected hash {expected:#x}, got {actual:#x}"
+                )
+            }
+        }
+    }
+}
+
+/// Compare an original file hash with the hash of its backup.
+pub fn backup_verify(original_hash: u64, backup_hash: u64) -> BackupVerifyResult {
+    if original_hash == backup_hash {
+        BackupVerifyResult::Valid
+    } else {
+        BackupVerifyResult::Corrupted {
+            expected: original_hash,
+            actual: backup_hash,
+        }
+    }
+}
+
+/// A simple FNV-1a 64-bit hash suitable for quick integrity checks in tests.
+pub fn simple_hash(data: &[u8]) -> u64 {
+    const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+    const FNV_PRIME: u64 = 0x0100_0000_01b3;
+
+    let mut hash = FNV_OFFSET_BASIS;
+    for &byte in data {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -719,6 +889,128 @@ mod tests {
             result.unwrap_err(),
             BackupError::BackupLimitReached { .. }
         ));
+    }
+
+    // -- BackupScheduler tests --
+
+    #[test]
+    fn scheduler_is_due() {
+        let sched = BackupScheduler::new(60);
+        assert!(sched.is_due(60));
+        assert!(sched.is_due(120));
+        assert!(!sched.is_due(30));
+    }
+
+    #[test]
+    fn scheduler_mark_completed() {
+        let mut sched = BackupScheduler::new(60);
+        sched.mark_completed(100);
+        assert!(!sched.is_due(110));
+        assert!(sched.is_due(160));
+    }
+
+    #[test]
+    fn scheduler_add_remove_files() {
+        let mut sched = BackupScheduler::new(60);
+        sched.add_file("/a.txt");
+        sched.add_file("/b.txt");
+        assert_eq!(sched.files_to_backup().len(), 2);
+        // duplicates are ignored
+        sched.add_file("/a.txt");
+        assert_eq!(sched.files_to_backup().len(), 2);
+        assert!(sched.remove_file("/a.txt"));
+        assert!(!sched.remove_file("/nonexistent"));
+        assert_eq!(sched.files_to_backup(), &["/b.txt".to_string()]);
+    }
+
+    #[test]
+    fn scheduler_enable_disable() {
+        let mut sched = BackupScheduler::new(10);
+        assert!(sched.is_due(10));
+        sched.disable();
+        assert!(!sched.is_due(10));
+        sched.enable();
+        assert!(sched.is_due(10));
+    }
+
+    // -- BackupRotation tests --
+
+    #[test]
+    fn rotation_keeps_max() {
+        let rot = BackupRotation::new(2);
+        let mut entries = vec![
+            BackupEntry {
+                original_path: "/a".into(),
+                backup_path: "/b/a".into(),
+                timestamp: 1,
+                size: 10,
+            },
+            BackupEntry {
+                original_path: "/b".into(),
+                backup_path: "/b/b".into(),
+                timestamp: 3,
+                size: 20,
+            },
+            BackupEntry {
+                original_path: "/c".into(),
+                backup_path: "/b/c".into(),
+                timestamp: 2,
+                size: 15,
+            },
+        ];
+        rot.rotate(&mut entries);
+        assert_eq!(entries.len(), 2);
+        // oldest (timestamp 1) should be removed; remaining sorted ascending
+        assert_eq!(entries[0].timestamp, 2);
+        assert_eq!(entries[1].timestamp, 3);
+    }
+
+    #[test]
+    fn rotation_no_removal_when_under_limit() {
+        let rot = BackupRotation::new(5);
+        let mut entries = vec![BackupEntry {
+            original_path: "/x".into(),
+            backup_path: "/b/x".into(),
+            timestamp: 1,
+            size: 5,
+        }];
+        rot.rotate(&mut entries);
+        assert_eq!(entries.len(), 1);
+        assert!(!rot.should_rotate(1));
+        assert_eq!(rot.entries_to_remove(1), 0);
+    }
+
+    // -- backup_verify tests --
+
+    #[test]
+    fn backup_verify_valid() {
+        let result = backup_verify(42, 42);
+        assert_eq!(result, BackupVerifyResult::Valid);
+        assert!(result.to_string().contains("valid"));
+    }
+
+    #[test]
+    fn backup_verify_corrupted() {
+        let result = backup_verify(42, 99);
+        assert_eq!(
+            result,
+            BackupVerifyResult::Corrupted {
+                expected: 42,
+                actual: 99
+            }
+        );
+        assert!(result.to_string().contains("corrupted"));
+    }
+
+    #[test]
+    fn simple_hash_consistency() {
+        let data = b"hello world";
+        let h1 = simple_hash(data);
+        let h2 = simple_hash(data);
+        assert_eq!(h1, h2);
+        // different data should (very likely) produce a different hash
+        let h3 = simple_hash(b"hello worlD");
+        assert_ne!(h1, h3);
     }
 
     #[test]

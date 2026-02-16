@@ -505,6 +505,207 @@ impl Default for EmmetValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// AbbreviationNode & EmmetAbbreviationParser
+// ---------------------------------------------------------------------------
+
+/// Parsed representation of an Emmet abbreviation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AbbreviationNode {
+    /// A single HTML tag with optional children.
+    Tag {
+        name: String,
+        children: Vec<AbbreviationNode>,
+    },
+    /// A node repeated N times.
+    Repeat {
+        node: Box<AbbreviationNode>,
+        count: usize,
+    },
+    /// Sibling nodes rendered sequentially.
+    Sibling {
+        nodes: Vec<AbbreviationNode>,
+    },
+}
+
+impl AbbreviationNode {
+    /// Render the node tree into HTML output.
+    pub fn render(&self) -> String {
+        match self {
+            AbbreviationNode::Tag { name, children } => {
+                if children.is_empty() {
+                    format!("<{name}></{name}>")
+                } else {
+                    let inner: Vec<String> = children.iter().map(|c| c.render()).collect();
+                    let inner_str = inner.join("\n");
+                    let indented: String = inner_str
+                        .lines()
+                        .map(|l| format!("  {l}"))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    format!("<{name}>\n{indented}\n</{name}>")
+                }
+            }
+            AbbreviationNode::Repeat { node, count } => {
+                let single = node.render();
+                let parts: Vec<&str> = std::iter::repeat(single.as_str()).take(*count).collect();
+                parts.join("\n")
+            }
+            AbbreviationNode::Sibling { nodes } => {
+                let rendered: Vec<String> = nodes.iter().map(|n| n.render()).collect();
+                rendered.join("\n")
+            }
+        }
+    }
+}
+
+/// Parser for Emmet abbreviation syntax.
+#[derive(Debug)]
+pub struct EmmetAbbreviationParser {
+    input: String,
+}
+
+impl EmmetAbbreviationParser {
+    /// Create a new parser with the given input abbreviation.
+    pub fn new(input: &str) -> Self {
+        Self {
+            input: input.trim().to_string(),
+        }
+    }
+
+    /// Check if the input is a valid abbreviation.
+    pub fn is_valid(&self) -> bool {
+        is_abbreviation(&self.input)
+    }
+
+    /// Parse the input into an `AbbreviationNode` tree.
+    pub fn parse(&self) -> Option<AbbreviationNode> {
+        if !self.is_valid() {
+            return None;
+        }
+        Self::parse_expr(&self.input)
+    }
+
+    fn parse_expr(input: &str) -> Option<AbbreviationNode> {
+        if input.is_empty() {
+            return None;
+        }
+
+        // Sibling: split on '+'
+        if let Some(pos) = input.find('+') {
+            let left = &input[..pos];
+            let right = &input[pos + 1..];
+            let left_node = Self::parse_expr(left)?;
+            let right_node = Self::parse_expr(right)?;
+            let mut nodes = Vec::new();
+            // Flatten nested siblings
+            match left_node {
+                AbbreviationNode::Sibling { nodes: mut ln } => nodes.append(&mut ln),
+                other => nodes.push(other),
+            }
+            match right_node {
+                AbbreviationNode::Sibling { nodes: mut rn } => nodes.append(&mut rn),
+                other => nodes.push(other),
+            }
+            return Some(AbbreviationNode::Sibling { nodes });
+        }
+
+        // Parent>child
+        if let Some(pos) = input.find('>') {
+            let parent = &input[..pos];
+            let child = &input[pos + 1..];
+            let child_node = Self::parse_expr(child)?;
+            return Some(AbbreviationNode::Tag {
+                name: parent.to_string(),
+                children: vec![child_node],
+            });
+        }
+
+        // Repeat: tag*N
+        if let Some(pos) = input.find('*') {
+            let tag_part = &input[..pos];
+            let count_str = &input[pos + 1..];
+            let count: usize = count_str.parse().ok()?;
+            if count == 0 {
+                return None;
+            }
+            let node = Self::parse_expr(tag_part)?;
+            return Some(AbbreviationNode::Repeat {
+                node: Box::new(node),
+                count,
+            });
+        }
+
+        // Plain tag name
+        if input.chars().all(|c| c.is_alphanumeric()) {
+            return Some(AbbreviationNode::Tag {
+                name: input.to_string(),
+                children: Vec::new(),
+            });
+        }
+
+        None
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tag completion helpers
+// ---------------------------------------------------------------------------
+
+/// Given a partial opening tag like `<div`, returns the closing `</div>`.
+pub fn tag_completion(partial: &str) -> Option<String> {
+    let trimmed = partial.trim();
+    let tag_content = trimmed.strip_prefix('<')?;
+    if tag_content.is_empty() || tag_content.starts_with('/') {
+        return None;
+    }
+    // Extract the tag name (first word)
+    let tag_name = tag_content
+        .split(|c: char| c.is_whitespace() || c == '>')
+        .next()?;
+    if tag_name.is_empty() {
+        return None;
+    }
+    if !needs_closing_tag(tag_name) {
+        return None;
+    }
+    Some(close_tag(tag_name))
+}
+
+/// Returns `false` for self-closing/void HTML tags.
+pub fn needs_closing_tag(tag: &str) -> bool {
+    !self_closing_tags().contains(&tag)
+}
+
+/// Returns a closing tag string like `</tag_name>`.
+pub fn close_tag(tag_name: &str) -> String {
+    format!("</{tag_name}>")
+}
+
+// ---------------------------------------------------------------------------
+// Wrap with abbreviation
+// ---------------------------------------------------------------------------
+
+/// Wrap each selection with the abbreviation expansion, placing the selection
+/// text inside the innermost tag.
+pub fn emmet_wrap_with_abbreviation(selections: &[&str], abbreviation: &str) -> Option<Vec<String>> {
+    // Validate the abbreviation first
+    let expanded = expand_abbreviation(abbreviation)?;
+    let mut results = Vec::with_capacity(selections.len());
+    for &sel in selections {
+        if let Some(close_idx) = expanded.rfind("</") {
+            let mut result = String::with_capacity(expanded.len() + sel.len());
+            result.push_str(&expanded[..close_idx]);
+            result.push_str(sel);
+            result.push_str(&expanded[close_idx..]);
+            results.push(result);
+        } else {
+            return None;
+        }
+    }
+    Some(results)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -743,111 +944,102 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn parser_simple_tag() {
+        let parser = EmmetAbbreviationParser::new("div");
+        assert!(parser.is_valid());
+        let node = parser.parse().unwrap();
+        assert_eq!(
+            node,
+            AbbreviationNode::Tag {
+                name: "div".to_string(),
+                children: Vec::new(),
+            }
+        );
+        assert_eq!(node.render(), "<div></div>");
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn parser_parent_child() {
+        let parser = EmmetAbbreviationParser::new("ul>li");
+        let node = parser.parse().unwrap();
+        assert_eq!(node.render(), "<ul>\n  <li></li>\n</ul>");
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn parser_sibling() {
+        let parser = EmmetAbbreviationParser::new("h1+p+footer");
+        let node = parser.parse().unwrap();
+        assert_eq!(node.render(), "<h1></h1>\n<p></p>\n<footer></footer>");
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn parser_repeat() {
+        let parser = EmmetAbbreviationParser::new("li*3");
+        let node = parser.parse().unwrap();
+        assert_eq!(node.render(), "<li></li>\n<li></li>\n<li></li>");
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn parser_invalid_input() {
+        let parser = EmmetAbbreviationParser::new("");
+        assert!(!parser.is_valid());
+        assert!(parser.parse().is_none());
+
+        let parser2 = EmmetAbbreviationParser::new("hello world");
+        assert!(!parser2.is_valid());
+        assert!(parser2.parse().is_none());
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn tag_completion_basic() {
+        assert_eq!(tag_completion("<div"), Some("</div>".to_string()));
+        assert_eq!(tag_completion("<span"), Some("</span>".to_string()));
+        assert_eq!(tag_completion("<br"), None); // self-closing
+        assert_eq!(tag_completion("<img"), None); // self-closing
+        assert_eq!(tag_completion("div"), None); // no '<'
+        assert_eq!(tag_completion("<"), None); // empty tag
+        assert_eq!(tag_completion("</div"), None); // closing tag
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn needs_closing_tag_basic() {
+        assert!(needs_closing_tag("div"));
+        assert!(needs_closing_tag("span"));
+        assert!(needs_closing_tag("p"));
+        assert!(!needs_closing_tag("br"));
+        assert!(!needs_closing_tag("img"));
+        assert!(!needs_closing_tag("hr"));
+        assert!(!needs_closing_tag("input"));
+        assert!(!needs_closing_tag("meta"));
+        assert!(!needs_closing_tag("link"));
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn close_tag_basic() {
+        assert_eq!(close_tag("div"), "</div>");
+        assert_eq!(close_tag("span"), "</span>");
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn wrap_with_abbreviation_basic() {
+        let result = emmet_wrap_with_abbreviation(&["Hello", "World"], "div").unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], "<div>Hello</div>");
+        assert_eq!(result[1], "<div>World</div>");
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn wrap_with_abbreviation_invalid() {
+        assert!(emmet_wrap_with_abbreviation(&["text"], "").is_none());
     }
 
     #[test]
-    fn behavior_check_10() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        let _svc = EmmetConfig::default();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn wrap_with_abbreviation_nested() {
+        let result = emmet_wrap_with_abbreviation(&["content"], "ul>li").unwrap();
+        assert_eq!(result.len(), 1);
+        assert!(result[0].contains("content"));
+        assert!(result[0].contains("<ul>"));
+        assert!(result[0].contains("</ul>"));
     }
 
     #[test]

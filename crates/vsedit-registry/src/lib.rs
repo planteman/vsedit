@@ -433,6 +433,339 @@ impl Default for RegistryValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ContributionValue & SchemaFieldType
+// ---------------------------------------------------------------------------
+
+/// Describes the expected type of a field in an extension point schema.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SchemaFieldType {
+    /// A string value.
+    StringType,
+    /// A boolean value.
+    BoolType,
+    /// A numeric (f64) value.
+    NumberType,
+    /// An array of contribution values.
+    ArrayType,
+}
+
+/// A dynamically-typed value that can appear in a contribution.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ContributionValue {
+    /// String payload.
+    Str(String),
+    /// Boolean payload.
+    Bool(bool),
+    /// Numeric payload.
+    Number(f64),
+    /// Array of nested values.
+    Array(Vec<ContributionValue>),
+}
+
+impl ContributionValue {
+    /// Returns the `SchemaFieldType` that corresponds to this value.
+    pub fn field_type(&self) -> SchemaFieldType {
+        match self {
+            ContributionValue::Str(_) => SchemaFieldType::StringType,
+            ContributionValue::Bool(_) => SchemaFieldType::BoolType,
+            ContributionValue::Number(_) => SchemaFieldType::NumberType,
+            ContributionValue::Array(_) => SchemaFieldType::ArrayType,
+        }
+    }
+
+    /// Returns a human-readable type name.
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            ContributionValue::Str(_) => "string",
+            ContributionValue::Bool(_) => "bool",
+            ContributionValue::Number(_) => "number",
+            ContributionValue::Array(_) => "array",
+        }
+    }
+}
+
+impl fmt::Display for ContributionValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ContributionValue::Str(s) => write!(f, "\"{s}\""),
+            ContributionValue::Bool(b) => write!(f, "{b}"),
+            ContributionValue::Number(n) => write!(f, "{n}"),
+            ContributionValue::Array(arr) => {
+                write!(f, "[")?;
+                for (i, v) in arr.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{v}")?;
+                }
+                write!(f, "]")
+            }
+        }
+    }
+}
+
+impl SchemaFieldType {
+    /// Returns a human-readable name for this field type.
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            SchemaFieldType::StringType => "string",
+            SchemaFieldType::BoolType => "bool",
+            SchemaFieldType::NumberType => "number",
+            SchemaFieldType::ArrayType => "array",
+        }
+    }
+
+    /// Returns `true` if the given `ContributionValue` matches this schema type.
+    pub fn matches(&self, value: &ContributionValue) -> bool {
+        value.field_type() == *self
+    }
+}
+
+impl fmt::Display for SchemaFieldType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.type_name())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ExtensionPointValidator
+// ---------------------------------------------------------------------------
+
+/// Validates contributions against an extension point schema.
+///
+/// Define the expected fields and their types, then validate incoming
+/// contribution maps. Missing fields and type mismatches are reported as
+/// a list of human-readable error strings.
+#[derive(Debug, Clone)]
+pub struct ExtensionPointValidator {
+    schema: HashMap<String, SchemaFieldType>,
+}
+
+impl ExtensionPointValidator {
+    /// Create a new validator with an empty schema.
+    pub fn new() -> Self {
+        Self {
+            schema: HashMap::new(),
+        }
+    }
+
+    /// Add a required field to the schema.
+    pub fn add_field(&mut self, name: &str, field_type: SchemaFieldType) {
+        self.schema.insert(name.to_string(), field_type);
+    }
+
+    /// Returns the number of fields in the schema.
+    pub fn field_count(&self) -> usize {
+        self.schema.len()
+    }
+
+    /// Returns `true` if the schema contains no fields.
+    pub fn is_empty(&self) -> bool {
+        self.schema.is_empty()
+    }
+
+    /// Returns the expected type for a given field name, if defined.
+    pub fn get_field_type(&self, name: &str) -> Option<&SchemaFieldType> {
+        self.schema.get(name)
+    }
+
+    /// Validate a contribution against the schema.
+    ///
+    /// Returns an empty `Vec` if the contribution is valid.  Otherwise each
+    /// entry describes one validation failure (missing field or type mismatch).
+    pub fn validate_contribution(
+        &self,
+        contribution: &HashMap<String, ContributionValue>,
+    ) -> Vec<String> {
+        let mut errors = Vec::new();
+
+        // Check every schema field is present and has the right type.
+        let mut sorted_fields: Vec<(&String, &SchemaFieldType)> = self.schema.iter().collect();
+        sorted_fields.sort_by_key(|(name, _)| name.as_str());
+
+        for (field_name, expected_type) in &sorted_fields {
+            match contribution.get(*field_name) {
+                None => {
+                    errors.push(format!("missing required field: {field_name}"));
+                }
+                Some(value) => {
+                    if !expected_type.matches(value) {
+                        errors.push(format!(
+                            "field '{field_name}' expected type {expected_type}, got {}",
+                            value.type_name()
+                        ));
+                    }
+                }
+            }
+        }
+
+        errors
+    }
+}
+
+impl Default for ExtensionPointValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RegistrySnapshot
+// ---------------------------------------------------------------------------
+
+/// A point-in-time snapshot of the extension point registry.
+///
+/// Snapshots are cheap to create and can be compared via [`registry_diff`] to
+/// detect additions and removals between two points in time.
+#[derive(Debug, Clone)]
+pub struct RegistrySnapshot {
+    point_ids: Vec<String>,
+    metadata: HashMap<String, ExtensionPointMetadata>,
+    timestamp: u64,
+}
+
+impl RegistrySnapshot {
+    /// Capture a snapshot from the current state of a registry.
+    pub fn from_registry(registry: &ExtensionPointRegistry, timestamp: u64) -> Self {
+        let mut point_ids: Vec<String> = registry.iter().map(String::from).collect();
+        point_ids.sort();
+
+        let metadata: HashMap<String, ExtensionPointMetadata> = point_ids
+            .iter()
+            .filter_map(|id| {
+                registry
+                    .get_metadata(id)
+                    .cloned()
+                    .map(|m| (id.clone(), m))
+            })
+            .collect();
+
+        Self {
+            point_ids,
+            metadata,
+            timestamp,
+        }
+    }
+
+    /// Returns `true` if the snapshot contains the given extension point ID.
+    pub fn contains(&self, id: &str) -> bool {
+        self.point_ids.iter().any(|p| p == id)
+    }
+
+    /// Returns the number of extension points in the snapshot.
+    pub fn len(&self) -> usize {
+        self.point_ids.len()
+    }
+
+    /// Returns `true` if the snapshot contains no extension points.
+    pub fn is_empty(&self) -> bool {
+        self.point_ids.is_empty()
+    }
+
+    /// Returns the sorted list of extension point IDs.
+    pub fn point_ids(&self) -> &[String] {
+        &self.point_ids
+    }
+
+    /// Returns the timestamp at which this snapshot was taken.
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    /// Returns metadata for the given extension point, if captured.
+    pub fn get_metadata(&self, id: &str) -> Option<&ExtensionPointMetadata> {
+        self.metadata.get(id)
+    }
+}
+
+impl fmt::Display for RegistrySnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "RegistrySnapshot(points={}, ts={})",
+            self.point_ids.len(),
+            self.timestamp
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RegistryDiff
+// ---------------------------------------------------------------------------
+
+/// The difference between two [`RegistrySnapshot`]s.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegistryDiff {
+    /// Extension points present in `new` but not in `old`.
+    pub added: Vec<String>,
+    /// Extension points present in `old` but not in `new`.
+    pub removed: Vec<String>,
+    /// Extension points present in both snapshots.
+    pub unchanged: Vec<String>,
+}
+
+impl RegistryDiff {
+    /// Returns `true` if there are no additions or removals.
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty()
+    }
+
+    /// Returns a human-readable summary of the diff.
+    pub fn summary(&self) -> String {
+        format!(
+            "{} added, {} removed, {} unchanged",
+            self.added.len(),
+            self.removed.len(),
+            self.unchanged.len()
+        )
+    }
+
+    /// Returns the total number of changes (additions + removals).
+    pub fn change_count(&self) -> usize {
+        self.added.len() + self.removed.len()
+    }
+}
+
+impl fmt::Display for RegistryDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RegistryDiff({})", self.summary())
+    }
+}
+
+/// Compute the difference between two registry snapshots.
+///
+/// Extension points that appear only in `new_snap` are reported as added;
+/// those only in `old_snap` are removed; those in both are unchanged.
+pub fn registry_diff(old_snap: &RegistrySnapshot, new_snap: &RegistrySnapshot) -> RegistryDiff {
+    let old_set: HashSet<&str> = old_snap.point_ids.iter().map(String::as_str).collect();
+    let new_set: HashSet<&str> = new_snap.point_ids.iter().map(String::as_str).collect();
+
+    let mut added: Vec<String> = new_set
+        .difference(&old_set)
+        .map(|s| s.to_string())
+        .collect();
+    added.sort();
+
+    let mut removed: Vec<String> = old_set
+        .difference(&new_set)
+        .map(|s| s.to_string())
+        .collect();
+    removed.sort();
+
+    let mut unchanged: Vec<String> = old_set
+        .intersection(&new_set)
+        .map(|s| s.to_string())
+        .collect();
+    unchanged.sort();
+
+    RegistryDiff {
+        added,
+        removed,
+        unchanged,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -638,6 +971,179 @@ mod tests {
 
         let e3 = RegistryError::InvalidId("bad id".into());
         assert_eq!(format!("{e3}"), "invalid extension point id: bad id");
+    }
+
+    // -----------------------------------------------------------------------
+    // ExtensionPointValidator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn validator_accepts_matching_contribution() {
+        let mut v = ExtensionPointValidator::new();
+        v.add_field("name", SchemaFieldType::StringType);
+        v.add_field("enabled", SchemaFieldType::BoolType);
+        v.add_field("priority", SchemaFieldType::NumberType);
+
+        let mut contrib = HashMap::new();
+        contrib.insert("name".into(), ContributionValue::Str("hello".into()));
+        contrib.insert("enabled".into(), ContributionValue::Bool(true));
+        contrib.insert("priority".into(), ContributionValue::Number(1.0));
+
+        let errors = v.validate_contribution(&contrib);
+        assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+    }
+
+    #[test]
+    fn validator_rejects_missing_field() {
+        let mut v = ExtensionPointValidator::new();
+        v.add_field("title", SchemaFieldType::StringType);
+        v.add_field("active", SchemaFieldType::BoolType);
+
+        let mut contrib = HashMap::new();
+        contrib.insert("title".into(), ContributionValue::Str("t".into()));
+        // "active" is missing
+
+        let errors = v.validate_contribution(&contrib);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("missing required field"));
+        assert!(errors[0].contains("active"));
+    }
+
+    #[test]
+    fn validator_rejects_wrong_type() {
+        let mut v = ExtensionPointValidator::new();
+        v.add_field("count", SchemaFieldType::NumberType);
+
+        let mut contrib = HashMap::new();
+        contrib.insert(
+            "count".into(),
+            ContributionValue::Str("not a number".into()),
+        );
+
+        let errors = v.validate_contribution(&contrib);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("expected type number"));
+        assert!(errors[0].contains("got string"));
+    }
+
+    #[test]
+    fn validator_empty_schema_accepts_anything() {
+        let v = ExtensionPointValidator::new();
+
+        let mut contrib = HashMap::new();
+        contrib.insert("whatever".into(), ContributionValue::Bool(false));
+        contrib.insert("stuff".into(), ContributionValue::Number(42.0));
+
+        let errors = v.validate_contribution(&contrib);
+        assert!(errors.is_empty());
+
+        // Also accepts an empty contribution.
+        let errors2 = v.validate_contribution(&HashMap::new());
+        assert!(errors2.is_empty());
+    }
+
+    #[test]
+    fn validator_array_type_field() {
+        let mut v = ExtensionPointValidator::new();
+        v.add_field("tags", SchemaFieldType::ArrayType);
+
+        let mut contrib = HashMap::new();
+        contrib.insert(
+            "tags".into(),
+            ContributionValue::Array(vec![
+                ContributionValue::Str("a".into()),
+                ContributionValue::Str("b".into()),
+            ]),
+        );
+
+        let errors = v.validate_contribution(&contrib);
+        assert!(errors.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // RegistrySnapshot tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn snapshot_from_registry() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point("vsedit.commands");
+        reg.register_point("vsedit.themes");
+
+        let snap = RegistrySnapshot::from_registry(&reg, 100);
+        assert_eq!(snap.len(), 2);
+        assert_eq!(snap.timestamp(), 100);
+        assert!(snap.point_ids().contains(&"vsedit.commands".to_string()));
+        assert!(snap.point_ids().contains(&"vsedit.themes".to_string()));
+    }
+
+    #[test]
+    fn snapshot_contains_check() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point("vsedit.keybindings");
+
+        let snap = RegistrySnapshot::from_registry(&reg, 200);
+        assert!(snap.contains("vsedit.keybindings"));
+        assert!(!snap.contains("vsedit.nonexistent"));
+    }
+
+    // -----------------------------------------------------------------------
+    // registry_diff tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn diff_detects_additions() {
+        let mut reg_old = ExtensionPointRegistry::new();
+        reg_old.register_point("vsedit.a");
+
+        let mut reg_new = ExtensionPointRegistry::new();
+        reg_new.register_point("vsedit.a");
+        reg_new.register_point("vsedit.b");
+
+        let old_snap = RegistrySnapshot::from_registry(&reg_old, 0);
+        let new_snap = RegistrySnapshot::from_registry(&reg_new, 1);
+
+        let diff = registry_diff(&old_snap, &new_snap);
+        assert_eq!(diff.added, vec!["vsedit.b".to_string()]);
+        assert!(diff.removed.is_empty());
+        assert_eq!(diff.unchanged, vec!["vsedit.a".to_string()]);
+        assert!(!diff.is_empty());
+    }
+
+    #[test]
+    fn diff_detects_removals() {
+        let mut reg_old = ExtensionPointRegistry::new();
+        reg_old.register_point("vsedit.x");
+        reg_old.register_point("vsedit.y");
+
+        let mut reg_new = ExtensionPointRegistry::new();
+        reg_new.register_point("vsedit.x");
+
+        let old_snap = RegistrySnapshot::from_registry(&reg_old, 10);
+        let new_snap = RegistrySnapshot::from_registry(&reg_new, 20);
+
+        let diff = registry_diff(&old_snap, &new_snap);
+        assert!(diff.added.is_empty());
+        assert_eq!(diff.removed, vec!["vsedit.y".to_string()]);
+        assert_eq!(diff.unchanged, vec!["vsedit.x".to_string()]);
+        assert!(!diff.is_empty());
+    }
+
+    #[test]
+    fn diff_unchanged_points() {
+        let mut reg = ExtensionPointRegistry::new();
+        reg.register_point("vsedit.config");
+        reg.register_point("vsedit.lang");
+
+        let snap_a = RegistrySnapshot::from_registry(&reg, 0);
+        let snap_b = RegistrySnapshot::from_registry(&reg, 1);
+
+        let diff = registry_diff(&snap_a, &snap_b);
+        assert!(diff.is_empty());
+        assert!(diff.added.is_empty());
+        assert!(diff.removed.is_empty());
+        assert_eq!(diff.unchanged.len(), 2);
+        assert_eq!(diff.summary(), "0 added, 0 removed, 2 unchanged");
     }
 
     #[test]

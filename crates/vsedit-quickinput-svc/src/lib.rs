@@ -542,6 +542,246 @@ impl Default for QuickinputSvcValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// QuickPickSeparator & QuickPickEntry
+// ---------------------------------------------------------------------------
+
+/// A visual separator in a quick pick list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QuickPickSeparator {
+    pub label: String,
+}
+
+impl QuickPickSeparator {
+    /// Create a new separator with the given label.
+    pub fn new(label: &str) -> Self {
+        Self {
+            label: label.to_string(),
+        }
+    }
+}
+
+/// An entry in a quick pick list – either a selectable item or a visual
+/// separator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QuickPickEntry {
+    /// A selectable quick pick item.
+    Item(QuickPickItem),
+    /// A visual separator between groups of items.
+    Separator(QuickPickSeparator),
+}
+
+impl QuickPickEntry {
+    /// Returns `true` if this entry is a separator.
+    pub fn is_separator(&self) -> bool {
+        matches!(self, Self::Separator(_))
+    }
+
+    /// Returns the label of this entry regardless of variant.
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Item(item) => &item.label,
+            Self::Separator(sep) => &sep.label,
+        }
+    }
+}
+
+/// Groups entries by separator.
+///
+/// Items appearing before the first separator are grouped under `None`.
+/// Each separator starts a new group keyed by `Some(separator_label)`.
+pub fn group_by_separator<'a>(
+    entries: &'a [QuickPickEntry],
+) -> Vec<(Option<String>, Vec<&'a QuickPickItem>)> {
+    let mut groups: Vec<(Option<String>, Vec<&'a QuickPickItem>)> = Vec::new();
+    let mut current_key: Option<String> = None;
+    let mut current_items: Vec<&'a QuickPickItem> = Vec::new();
+
+    for entry in entries {
+        match entry {
+            QuickPickEntry::Separator(sep) => {
+                // Push the previous group (even if empty) when we hit a new
+                // separator, but only if there are accumulated items or if
+                // this isn't the very first entry.
+                if !current_items.is_empty() || groups.is_empty() {
+                    groups.push((current_key.clone(), current_items));
+                    current_items = Vec::new();
+                }
+                current_key = Some(sep.label.clone());
+            }
+            QuickPickEntry::Item(item) => {
+                current_items.push(item);
+            }
+        }
+    }
+
+    // Push the last group.
+    if !current_items.is_empty() || groups.is_empty() {
+        groups.push((current_key, current_items));
+    }
+
+    groups
+}
+
+// ---------------------------------------------------------------------------
+// QuickPickMultiSelect
+// ---------------------------------------------------------------------------
+
+/// Manages multi-selection state for a quick pick list.
+#[derive(Debug, Clone)]
+pub struct QuickPickMultiSelect {
+    /// The currently selected indices.
+    pub selected_indices: Vec<usize>,
+    /// Optional cap on the number of selections allowed.
+    pub max_selections: Option<usize>,
+}
+
+impl QuickPickMultiSelect {
+    /// Create an uncapped multi-select manager.
+    pub fn new() -> Self {
+        Self {
+            selected_indices: Vec::new(),
+            max_selections: None,
+        }
+    }
+
+    /// Create a multi-select manager with an upper bound on selections.
+    pub fn with_max(max: usize) -> Self {
+        Self {
+            selected_indices: Vec::new(),
+            max_selections: Some(max),
+        }
+    }
+
+    /// Toggle the selection at `index`.
+    ///
+    /// Returns `true` if the toggle succeeded, `false` if it would exceed the
+    /// maximum number of selections.
+    pub fn toggle(&mut self, index: usize) -> bool {
+        if let Some(pos) = self.selected_indices.iter().position(|&i| i == index) {
+            self.selected_indices.remove(pos);
+            true
+        } else {
+            if let Some(max) = self.max_selections {
+                if self.selected_indices.len() >= max {
+                    return false;
+                }
+            }
+            self.selected_indices.push(index);
+            true
+        }
+    }
+
+    /// Returns `true` if `index` is currently selected.
+    pub fn is_selected(&self, index: usize) -> bool {
+        self.selected_indices.contains(&index)
+    }
+
+    /// Returns the number of currently selected indices.
+    pub fn selected_count(&self) -> usize {
+        self.selected_indices.len()
+    }
+
+    /// Clear all selections.
+    pub fn clear(&mut self) {
+        self.selected_indices.clear();
+    }
+
+    /// Select all indices from `0..count`, respecting `max_selections`.
+    pub fn select_all(&mut self, count: usize) {
+        self.selected_indices.clear();
+        let limit = match self.max_selections {
+            Some(max) => count.min(max),
+            None => count,
+        };
+        self.selected_indices = (0..limit).collect();
+    }
+}
+
+impl Default for QuickPickMultiSelect {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Input validation helpers
+// ---------------------------------------------------------------------------
+
+/// A validation rule that can be applied to user input.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ValidationRule {
+    /// The input must not be empty.
+    Required,
+    /// The input must be at least this many characters.
+    MinLength(usize),
+    /// The input must be at most this many characters.
+    MaxLength(usize),
+    /// The input must contain this substring.
+    Pattern(String),
+}
+
+/// Validate `input` against a set of [`ValidationRule`]s.
+///
+/// Returns a list of human-readable error messages. An empty list means the
+/// input is valid.
+pub fn quick_input_validation(input: &str, rules: &[ValidationRule]) -> Vec<String> {
+    let mut errors = Vec::new();
+    for rule in rules {
+        match rule {
+            ValidationRule::Required => {
+                if input.trim().is_empty() {
+                    errors.push("input is required".to_string());
+                }
+            }
+            ValidationRule::MinLength(min) => {
+                if input.len() < *min {
+                    errors.push(format!(
+                        "input must be at least {} characters (got {})",
+                        min,
+                        input.len()
+                    ));
+                }
+            }
+            ValidationRule::MaxLength(max) => {
+                if input.len() > *max {
+                    errors.push(format!(
+                        "input must be at most {} characters (got {})",
+                        max,
+                        input.len()
+                    ));
+                }
+            }
+            ValidationRule::Pattern(substring) => {
+                if !input.contains(substring.as_str()) {
+                    errors.push(format!("input must contain \"{}\"", substring));
+                }
+            }
+        }
+    }
+    errors
+}
+
+/// Validate a slice of [`QuickPickItem`]s.
+///
+/// Returns error messages for items with empty labels and for duplicate
+/// labels.
+pub fn validate_quick_pick_items(items: &[QuickPickItem]) -> Vec<String> {
+    let mut errors = Vec::new();
+    let mut seen_labels = std::collections::HashSet::new();
+
+    for (i, item) in items.iter().enumerate() {
+        if item.label.trim().is_empty() {
+            errors.push(format!("item at index {} has an empty label", i));
+        }
+        if !seen_labels.insert(&item.label) {
+            errors.push(format!("duplicate label \"{}\"", item.label));
+        }
+    }
+
+    errors
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -744,6 +984,127 @@ mod tests {
     #[test]
     fn display_inputboxvalidation_variants() {
         assert!(!InputBoxValidation::Ok.to_string().is_empty());
+    }
+
+    // -- QuickPickSeparator / QuickPickEntry tests --
+
+    #[test]
+    fn separator_creation() {
+        let sep = QuickPickSeparator::new("Section A");
+        assert_eq!(sep.label, "Section A");
+    }
+
+    #[test]
+    fn entry_is_separator() {
+        let sep_entry = QuickPickEntry::Separator(QuickPickSeparator::new("sep"));
+        let item_entry = QuickPickEntry::Item(item("hello"));
+        assert!(sep_entry.is_separator());
+        assert!(!item_entry.is_separator());
+        assert_eq!(sep_entry.label(), "sep");
+        assert_eq!(item_entry.label(), "hello");
+    }
+
+    #[test]
+    fn group_by_separator_basic() {
+        let entries = vec![
+            QuickPickEntry::Item(item("a")),
+            QuickPickEntry::Item(item("b")),
+            QuickPickEntry::Separator(QuickPickSeparator::new("Group 1")),
+            QuickPickEntry::Item(item("c")),
+            QuickPickEntry::Separator(QuickPickSeparator::new("Group 2")),
+            QuickPickEntry::Item(item("d")),
+            QuickPickEntry::Item(item("e")),
+        ];
+        let groups = group_by_separator(&entries);
+        assert_eq!(groups.len(), 3);
+        assert_eq!(groups[0].0, None);
+        assert_eq!(groups[0].1.len(), 2);
+        assert_eq!(groups[1].0, Some("Group 1".to_string()));
+        assert_eq!(groups[1].1.len(), 1);
+        assert_eq!(groups[2].0, Some("Group 2".to_string()));
+        assert_eq!(groups[2].1.len(), 2);
+    }
+
+    // -- QuickPickMultiSelect tests --
+
+    #[test]
+    fn multi_select_toggle() {
+        let mut ms = QuickPickMultiSelect::new();
+        assert!(ms.toggle(0));
+        assert!(ms.is_selected(0));
+        assert_eq!(ms.selected_count(), 1);
+        assert!(ms.toggle(0));
+        assert!(!ms.is_selected(0));
+        assert_eq!(ms.selected_count(), 0);
+    }
+
+    #[test]
+    fn multi_select_max_limit() {
+        let mut ms = QuickPickMultiSelect::with_max(2);
+        assert!(ms.toggle(0));
+        assert!(ms.toggle(1));
+        assert!(!ms.toggle(2)); // should fail – at max
+        assert_eq!(ms.selected_count(), 2);
+        // deselect one, then add should succeed
+        assert!(ms.toggle(0));
+        assert!(ms.toggle(2));
+        assert!(ms.is_selected(2));
+    }
+
+    #[test]
+    fn multi_select_select_all() {
+        let mut ms = QuickPickMultiSelect::with_max(3);
+        ms.select_all(5);
+        assert_eq!(ms.selected_count(), 3); // capped at max
+        assert!(ms.is_selected(0));
+        assert!(ms.is_selected(1));
+        assert!(ms.is_selected(2));
+        assert!(!ms.is_selected(3));
+
+        let mut ms2 = QuickPickMultiSelect::new();
+        ms2.select_all(4);
+        assert_eq!(ms2.selected_count(), 4);
+    }
+
+    // -- Validation tests --
+
+    #[test]
+    fn validation_required() {
+        let rules = [ValidationRule::Required];
+        assert!(!quick_input_validation("", &rules).is_empty());
+        assert!(!quick_input_validation("   ", &rules).is_empty());
+        assert!(quick_input_validation("hello", &rules).is_empty());
+    }
+
+    #[test]
+    fn validation_min_max_length() {
+        let rules = [ValidationRule::MinLength(3), ValidationRule::MaxLength(5)];
+        let errs = quick_input_validation("ab", &rules);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].contains("at least"));
+
+        let errs = quick_input_validation("abcdef", &rules);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].contains("at most"));
+
+        assert!(quick_input_validation("abc", &rules).is_empty());
+    }
+
+    #[test]
+    fn validation_pattern() {
+        let rules = [ValidationRule::Pattern("foo".to_string())];
+        assert!(quick_input_validation("hello foo bar", &rules).is_empty());
+        let errs = quick_input_validation("hello bar", &rules);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].contains("foo"));
+    }
+
+    #[test]
+    fn validate_quick_pick_items_rejects_empty_label() {
+        let items = vec![item("ok"), item(""), item("ok")];
+        let errs = validate_quick_pick_items(&items);
+        assert!(errs.iter().any(|e| e.contains("empty label")));
+        assert!(errs.iter().any(|e| e.contains("duplicate")));
     }
 
     #[test]

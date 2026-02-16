@@ -525,6 +525,174 @@ impl OutputSearch {
     }
 }
 
+// ---------------------------------------------------------------------------
+// OutputViewFilter — filter output by channel and severity
+// ---------------------------------------------------------------------------
+
+/// Filters output by channel ID and minimum severity level.
+pub struct OutputViewFilter {
+    channel_ids: Vec<String>,
+    min_severity: Option<LogLevel>,
+}
+
+impl OutputViewFilter {
+    pub fn new() -> Self {
+        Self {
+            channel_ids: Vec::new(),
+            min_severity: None,
+        }
+    }
+
+    pub fn with_channel(mut self, channel_id: &str) -> Self {
+        self.channel_ids.push(channel_id.to_string());
+        self
+    }
+
+    pub fn with_min_severity(mut self, level: LogLevel) -> Self {
+        self.min_severity = Some(level);
+        self
+    }
+
+    pub fn matches_channel(&self, channel_id: &str) -> bool {
+        if self.channel_ids.is_empty() {
+            return true;
+        }
+        self.channel_ids.iter().any(|id| id == channel_id)
+    }
+
+    pub fn matches_severity(&self, level: LogLevel) -> bool {
+        match self.min_severity {
+            None => true,
+            Some(min) => level >= min,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.channel_ids.is_empty() && self.min_severity.is_none()
+    }
+}
+
+impl Default for OutputViewFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputViewSearch — search across output channels
+// ---------------------------------------------------------------------------
+
+/// A hit found by `OutputViewSearch`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputViewSearchHit {
+    pub channel_name: String,
+    pub line_index: usize,
+    pub line_text: String,
+    pub match_start: usize,
+    pub match_end: usize,
+}
+
+/// Searches for text across output channels.
+pub struct OutputViewSearch {
+    query: String,
+    case_sensitive: bool,
+}
+
+impl OutputViewSearch {
+    pub fn new(query: &str) -> Self {
+        Self {
+            query: query.to_string(),
+            case_sensitive: true,
+        }
+    }
+
+    pub fn case_sensitive(mut self, sensitive: bool) -> Self {
+        self.case_sensitive = sensitive;
+        self
+    }
+
+    pub fn search_channel(&self, channel: &OutputChannel) -> Vec<OutputViewSearchHit> {
+        let needle = if self.case_sensitive {
+            self.query.clone()
+        } else {
+            self.query.to_lowercase()
+        };
+        let mut hits = Vec::new();
+        for (line_index, line) in channel.lines.iter().enumerate() {
+            let haystack = if self.case_sensitive {
+                line.clone()
+            } else {
+                line.to_lowercase()
+            };
+            let mut start = 0;
+            while let Some(pos) = haystack[start..].find(&needle) {
+                let abs = start + pos;
+                hits.push(OutputViewSearchHit {
+                    channel_name: channel.name.clone(),
+                    line_index,
+                    line_text: line.clone(),
+                    match_start: abs,
+                    match_end: abs + needle.len(),
+                });
+                start = abs + 1;
+            }
+        }
+        hits
+    }
+
+    pub fn search_service(&self, service: &OutputService) -> Vec<OutputViewSearchHit> {
+        let mut all = Vec::new();
+        for ch in &service.channels {
+            all.extend(self.search_channel(ch));
+        }
+        all
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputViewTailState — follow tail of output
+// ---------------------------------------------------------------------------
+
+/// Tracks tail-follow state for an output view.
+pub struct OutputViewTailState {
+    pub enabled: bool,
+    pub last_line_count: usize,
+}
+
+impl OutputViewTailState {
+    pub fn new() -> Self {
+        Self {
+            enabled: true,
+            last_line_count: 0,
+        }
+    }
+
+    pub fn toggle(&mut self) {
+        self.enabled = !self.enabled;
+    }
+
+    pub fn is_following(&self) -> bool {
+        self.enabled
+    }
+
+    /// Returns true if new lines were added since last update.
+    pub fn update(&mut self, current_line_count: usize) -> bool {
+        let had_new = current_line_count > self.last_line_count;
+        self.last_line_count = current_line_count;
+        had_new
+    }
+
+    pub fn new_lines_count(&self, current_line_count: usize) -> usize {
+        current_line_count.saturating_sub(self.last_line_count)
+    }
+}
+
+impl Default for OutputViewTailState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -989,5 +1157,117 @@ mod tests {
         let search = OutputSearch::new("error");
         let ml = search.matching_lines(&lines);
         assert_eq!(ml, vec![0, 2]);
+    }
+
+    // -- OutputViewFilter tests --
+
+    #[test]
+    fn filter_empty_matches_all() {
+        let f = OutputViewFilter::new();
+        assert!(f.is_empty());
+        assert!(f.matches_channel("any"));
+        assert!(f.matches_severity(LogLevel::Trace));
+    }
+
+    #[test]
+    fn filter_by_channel() {
+        let f = OutputViewFilter::new()
+            .with_channel("ch-1")
+            .with_channel("ch-2");
+        assert!(!f.is_empty());
+        assert!(f.matches_channel("ch-1"));
+        assert!(f.matches_channel("ch-2"));
+        assert!(!f.matches_channel("ch-3"));
+    }
+
+    #[test]
+    fn filter_by_severity() {
+        let f = OutputViewFilter::new().with_min_severity(LogLevel::Warn);
+        assert!(!f.is_empty());
+        assert!(!f.matches_severity(LogLevel::Trace));
+        assert!(!f.matches_severity(LogLevel::Debug));
+        assert!(!f.matches_severity(LogLevel::Info));
+        assert!(f.matches_severity(LogLevel::Warn));
+        assert!(f.matches_severity(LogLevel::Error));
+    }
+
+    // -- OutputViewSearch tests --
+
+    #[test]
+    fn view_search_channel() {
+        let mut ch = OutputChannel::new("ch1", "Build");
+        ch.append_line("error: compilation failed");
+        ch.append_line("info: done");
+        ch.append_line("error: link failed");
+        let search = OutputViewSearch::new("error");
+        let hits = search.search_channel(&ch);
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].channel_name, "Build");
+        assert_eq!(hits[0].line_index, 0);
+        assert_eq!(hits[0].match_start, 0);
+        assert_eq!(hits[1].line_index, 2);
+    }
+
+    #[test]
+    fn view_search_case_insensitive() {
+        let mut ch = OutputChannel::new("ch1", "Log");
+        ch.append_line("ERROR: big problem");
+        let search = OutputViewSearch::new("error").case_sensitive(false);
+        let hits = search.search_channel(&ch);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].match_start, 0);
+        assert_eq!(hits[0].match_end, 5);
+    }
+
+    #[test]
+    fn view_search_service() {
+        let mut svc = OutputService::new();
+        svc.create_channel("Build");
+        svc.create_channel("Tests");
+        svc.get_channel_mut("channel-0").unwrap().append_line("error here");
+        svc.get_channel_mut("channel-1").unwrap().append_line("error there");
+        let search = OutputViewSearch::new("error");
+        let hits = search.search_service(&svc);
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].channel_name, "Build");
+        assert_eq!(hits[1].channel_name, "Tests");
+    }
+
+    // -- OutputViewTailState tests --
+
+    #[test]
+    fn tail_state_defaults() {
+        let ts = OutputViewTailState::new();
+        assert!(ts.is_following());
+        assert_eq!(ts.last_line_count, 0);
+    }
+
+    #[test]
+    fn tail_state_toggle() {
+        let mut ts = OutputViewTailState::new();
+        assert!(ts.is_following());
+        ts.toggle();
+        assert!(!ts.is_following());
+        ts.toggle();
+        assert!(ts.is_following());
+    }
+
+    #[test]
+    fn tail_state_update_detects_new_lines() {
+        let mut ts = OutputViewTailState::new();
+        assert!(ts.update(5));
+        assert_eq!(ts.last_line_count, 5);
+        assert!(!ts.update(5));
+        assert!(ts.update(8));
+        assert_eq!(ts.last_line_count, 8);
+    }
+
+    #[test]
+    fn tail_state_new_lines_count() {
+        let mut ts = OutputViewTailState::new();
+        ts.update(10);
+        assert_eq!(ts.new_lines_count(15), 5);
+        assert_eq!(ts.new_lines_count(10), 0);
+        assert_eq!(ts.new_lines_count(5), 0);
     }
 }

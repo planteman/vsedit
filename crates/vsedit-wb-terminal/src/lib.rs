@@ -507,6 +507,149 @@ impl Default for WbTerminalValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TerminalProfile
+// ---------------------------------------------------------------------------
+
+/// A registered terminal shell profile.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TerminalProfile {
+    pub name: String,
+    pub shell: TerminalShellType,
+    pub path: String,
+}
+
+// ---------------------------------------------------------------------------
+// TerminalProfileResolver
+// ---------------------------------------------------------------------------
+
+/// Resolves terminal shell profiles by name.
+pub struct TerminalProfileResolver {
+    profiles: Vec<TerminalProfile>,
+}
+
+impl TerminalProfileResolver {
+    pub fn new() -> Self {
+        Self {
+            profiles: Vec::new(),
+        }
+    }
+
+    pub fn add_profile(&mut self, name: &str, shell: TerminalShellType, path: &str) {
+        self.profiles.push(TerminalProfile {
+            name: name.to_string(),
+            shell,
+            path: path.to_string(),
+        });
+    }
+
+    pub fn resolve(&self, name: &str) -> Option<&TerminalProfile> {
+        self.profiles.iter().find(|p| p.name == name)
+    }
+
+    pub fn default_profile(&self) -> Option<&TerminalProfile> {
+        self.profiles.first()
+    }
+
+    pub fn profile_count(&self) -> usize {
+        self.profiles.len()
+    }
+
+    pub fn profile_names(&self) -> Vec<&str> {
+        self.profiles.iter().map(|p| p.name.as_str()).collect()
+    }
+}
+
+impl Default for TerminalProfileResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalEnvironmentMerge
+// ---------------------------------------------------------------------------
+
+/// Merges environment variables for terminal instances.
+pub struct TerminalEnvironmentMerge {
+    vars: HashMap<String, String>,
+}
+
+impl TerminalEnvironmentMerge {
+    pub fn new() -> Self {
+        Self {
+            vars: HashMap::new(),
+        }
+    }
+
+    pub fn set(&mut self, key: &str, value: &str) {
+        self.vars.insert(key.to_string(), value.to_string());
+    }
+
+    /// Append a value to an existing variable with `:` separator.
+    pub fn append_path(&mut self, key: &str, value: &str) {
+        self.vars
+            .entry(key.to_string())
+            .and_modify(|existing| {
+                existing.push(':');
+                existing.push_str(value);
+            })
+            .or_insert_with(|| value.to_string());
+    }
+
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.vars.get(key).map(|s| s.as_str())
+    }
+
+    pub fn remove(&mut self, key: &str) -> bool {
+        self.vars.remove(key).is_some()
+    }
+
+    pub fn to_vec(&self) -> Vec<(String, String)> {
+        let mut pairs: Vec<(String, String)> = self
+            .vars
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        pairs
+    }
+
+    pub fn len(&self) -> usize {
+        self.vars.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.vars.is_empty()
+    }
+}
+
+impl Default for TerminalEnvironmentMerge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// terminal_title_from_process
+// ---------------------------------------------------------------------------
+
+/// Generate a terminal title from a process name and arguments.
+/// Truncates to 40 characters with `…` if too long.
+pub fn terminal_title_from_process(process_name: &str, args: &[&str]) -> String {
+    let full = if args.is_empty() {
+        process_name.to_string()
+    } else {
+        format!("{} {}", process_name, args.join(" "))
+    };
+    if full.chars().count() <= 40 {
+        full
+    } else {
+        let truncated: String = full.chars().take(39).collect();
+        format!("{truncated}\u{2026}")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -729,124 +872,109 @@ mod tests {
         assert!(!TerminalError::NoActiveInstance.to_string().is_empty());
     }
 
+    // -- TerminalProfileResolver tests --
+
     #[test]
-    fn behavior_check_0() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn profile_resolver_empty() {
+        let resolver = TerminalProfileResolver::new();
+        assert_eq!(resolver.profile_count(), 0);
+        assert!(resolver.default_profile().is_none());
+        assert!(resolver.resolve("bash").is_none());
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn profile_resolver_add_and_resolve() {
+        let mut resolver = TerminalProfileResolver::new();
+        resolver.add_profile("bash", TerminalShellType::Bash, "/bin/bash");
+        resolver.add_profile("zsh", TerminalShellType::Zsh, "/bin/zsh");
+        assert_eq!(resolver.profile_count(), 2);
+        let bash = resolver.resolve("bash").unwrap();
+        assert_eq!(bash.shell, TerminalShellType::Bash);
+        assert_eq!(bash.path, "/bin/bash");
+        assert!(resolver.resolve("fish").is_none());
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn profile_resolver_default_profile() {
+        let mut resolver = TerminalProfileResolver::new();
+        resolver.add_profile("zsh", TerminalShellType::Zsh, "/bin/zsh");
+        resolver.add_profile("bash", TerminalShellType::Bash, "/bin/bash");
+        assert_eq!(resolver.default_profile().unwrap().name, "zsh");
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn profile_resolver_names() {
+        let mut resolver = TerminalProfileResolver::new();
+        resolver.add_profile("bash", TerminalShellType::Bash, "/bin/bash");
+        resolver.add_profile("zsh", TerminalShellType::Zsh, "/bin/zsh");
+        assert_eq!(resolver.profile_names(), vec!["bash", "zsh"]);
+    }
+
+    // -- TerminalEnvironmentMerge tests --
+
+    #[test]
+    fn env_merge_set_and_get() {
+        let mut env = TerminalEnvironmentMerge::new();
+        env.set("HOME", "/home/user");
+        assert_eq!(env.get("HOME"), Some("/home/user"));
+        assert_eq!(env.get("MISSING"), None);
+        assert_eq!(env.len(), 1);
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn env_merge_append_path() {
+        let mut env = TerminalEnvironmentMerge::new();
+        env.set("PATH", "/usr/bin");
+        env.append_path("PATH", "/usr/local/bin");
+        assert_eq!(env.get("PATH"), Some("/usr/bin:/usr/local/bin"));
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn env_merge_append_path_new_key() {
+        let mut env = TerminalEnvironmentMerge::new();
+        env.append_path("PATH", "/usr/bin");
+        assert_eq!(env.get("PATH"), Some("/usr/bin"));
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn env_merge_remove() {
+        let mut env = TerminalEnvironmentMerge::new();
+        env.set("KEY", "val");
+        assert!(env.remove("KEY"));
+        assert!(!env.remove("KEY"));
+        assert!(env.is_empty());
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn env_merge_to_vec() {
+        let mut env = TerminalEnvironmentMerge::new();
+        env.set("B", "2");
+        env.set("A", "1");
+        let pairs = env.to_vec();
+        assert_eq!(pairs, vec![("A".into(), "1".into()), ("B".into(), "2".into())]);
+    }
+
+    // -- terminal_title_from_process tests --
+
+    #[test]
+    fn title_from_process_no_args() {
+        assert_eq!(terminal_title_from_process("bash", &[]), "bash");
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn title_from_process_with_args() {
+        let title = terminal_title_from_process("node", &["server.js", "--port", "3000"]);
+        assert_eq!(title, "node server.js --port 3000");
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_10() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = TerminalWorkbenchService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn title_from_process_truncated() {
+        let title = terminal_title_from_process(
+            "python3",
+            &["very_long_script_name_that_exceeds_the_limit.py", "--verbose"],
+        );
+        assert_eq!(title.chars().count(), 40);
+        assert!(title.ends_with('\u{2026}'));
     }
 
     #[test]

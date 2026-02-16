@@ -3,6 +3,7 @@
 //! Equivalent to VS Code's `vs/platform/lifecycle/common/lifecycle.ts`.
 //! Manages application phases and shutdown confirmation.
 
+use std::collections::HashSet;
 use std::fmt;
 use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -470,6 +471,180 @@ impl Default for LifecycleSvcValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ShutdownBarrier
+// ---------------------------------------------------------------------------
+
+/// Tracks registered task names and blocks until all complete.
+#[derive(Debug, Clone)]
+pub struct ShutdownBarrier {
+    pending: HashSet<String>,
+}
+
+impl ShutdownBarrier {
+    /// Create a new empty barrier.
+    pub fn new() -> Self {
+        Self {
+            pending: HashSet::new(),
+        }
+    }
+
+    /// Register a task by name.
+    pub fn register(&mut self, name: &str) {
+        self.pending.insert(name.to_string());
+    }
+
+    /// Mark a task as complete. Returns `true` if the task was found and removed.
+    pub fn complete(&mut self, name: &str) -> bool {
+        self.pending.remove(name)
+    }
+
+    /// Number of tasks still pending.
+    pub fn remaining(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// Returns `true` if no tasks are pending.
+    pub fn is_clear(&self) -> bool {
+        self.pending.is_empty()
+    }
+
+    /// Names of pending tasks.
+    pub fn pending_names(&self) -> Vec<&str> {
+        self.pending.iter().map(|s| s.as_str()).collect()
+    }
+}
+
+impl Default for ShutdownBarrier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StartupPhase
+// ---------------------------------------------------------------------------
+
+/// Phases of application startup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+pub enum StartupPhase {
+    /// Before services are created.
+    EarlyInit = 0,
+    /// Services are being created.
+    ServiceInit = 1,
+    /// Extensions are loading.
+    ExtensionLoad = 2,
+    /// Fully ready.
+    Ready = 3,
+}
+
+impl StartupPhase {
+    /// Human-readable label for this phase.
+    pub fn phase_label(&self) -> &'static str {
+        match self {
+            StartupPhase::EarlyInit => "Early Init",
+            StartupPhase::ServiceInit => "Service Init",
+            StartupPhase::ExtensionLoad => "Extension Load",
+            StartupPhase::Ready => "Ready",
+        }
+    }
+
+    /// Returns `true` if this phase is `Ready`.
+    pub fn is_complete(&self) -> bool {
+        *self == StartupPhase::Ready
+    }
+}
+
+impl fmt::Display for StartupPhase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.phase_label())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TimelineEntry
+// ---------------------------------------------------------------------------
+
+/// A single entry in the startup timeline.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimelineEntry {
+    pub phase: StartupPhase,
+    pub label: String,
+    pub duration_ms: u64,
+}
+
+// ---------------------------------------------------------------------------
+// LifecycleTimeline
+// ---------------------------------------------------------------------------
+
+/// Records startup profiling entries grouped by phase.
+#[derive(Debug, Clone)]
+pub struct LifecycleTimeline {
+    entries: Vec<TimelineEntry>,
+}
+
+impl LifecycleTimeline {
+    /// Create a new empty timeline.
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Record a timing entry.
+    pub fn record(&mut self, phase: StartupPhase, label: &str, duration_ms: u64) {
+        self.entries.push(TimelineEntry {
+            phase,
+            label: label.to_string(),
+            duration_ms,
+        });
+    }
+
+    /// Sum of all recorded durations.
+    pub fn total_duration_ms(&self) -> u64 {
+        self.entries.iter().map(|e| e.duration_ms).sum()
+    }
+
+    /// Filter entries by phase.
+    pub fn entries_for_phase(&self, phase: StartupPhase) -> Vec<&TimelineEntry> {
+        self.entries.iter().filter(|e| e.phase == phase).collect()
+    }
+
+    /// Entry with the longest duration.
+    pub fn slowest_entry(&self) -> Option<&TimelineEntry> {
+        self.entries.iter().max_by_key(|e| e.duration_ms)
+    }
+
+    /// Number of recorded entries.
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Formatted summary string.
+    pub fn to_summary(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push(format!(
+            "Timeline: {} entries, total={}ms",
+            self.entries.len(),
+            self.total_duration_ms()
+        ));
+        for entry in &self.entries {
+            lines.push(format!(
+                "  [{}] {} ({}ms)",
+                entry.phase, entry.label, entry.duration_ms
+            ));
+        }
+        lines.join("\n")
+    }
+}
+
+impl Default for LifecycleTimeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -681,171 +856,109 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn shutdown_barrier_register_and_complete() {
+        let mut barrier = ShutdownBarrier::new();
+        barrier.register("save_files");
+        barrier.register("flush_logs");
+        assert_eq!(barrier.remaining(), 2);
+        assert!(!barrier.is_clear());
+        assert!(barrier.complete("save_files"));
+        assert_eq!(barrier.remaining(), 1);
+        assert!(!barrier.complete("nonexistent"));
+        assert!(barrier.complete("flush_logs"));
+        assert!(barrier.is_clear());
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn shutdown_barrier_pending_names() {
+        let mut barrier = ShutdownBarrier::new();
+        barrier.register("task_a");
+        barrier.register("task_b");
+        let mut names = barrier.pending_names();
+        names.sort();
+        assert_eq!(names, vec!["task_a", "task_b"]);
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn shutdown_barrier_duplicate_register() {
+        let mut barrier = ShutdownBarrier::new();
+        barrier.register("task");
+        barrier.register("task");
+        assert_eq!(barrier.remaining(), 1);
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn startup_phase_ordering() {
+        assert!(StartupPhase::EarlyInit < StartupPhase::ServiceInit);
+        assert!(StartupPhase::ServiceInit < StartupPhase::ExtensionLoad);
+        assert!(StartupPhase::ExtensionLoad < StartupPhase::Ready);
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn startup_phase_display_and_label() {
+        assert_eq!(StartupPhase::EarlyInit.phase_label(), "Early Init");
+        assert_eq!(format!("{}", StartupPhase::Ready), "Ready");
+        assert_eq!(format!("{}", StartupPhase::ExtensionLoad), "Extension Load");
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn startup_phase_is_complete() {
+        assert!(!StartupPhase::EarlyInit.is_complete());
+        assert!(!StartupPhase::ServiceInit.is_complete());
+        assert!(!StartupPhase::ExtensionLoad.is_complete());
+        assert!(StartupPhase::Ready.is_complete());
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lifecycle_timeline_record_and_total() {
+        let mut timeline = LifecycleTimeline::new();
+        timeline.record(StartupPhase::EarlyInit, "config", 50);
+        timeline.record(StartupPhase::ServiceInit, "db_connect", 200);
+        timeline.record(StartupPhase::ExtensionLoad, "ext_a", 100);
+        assert_eq!(timeline.entry_count(), 3);
+        assert_eq!(timeline.total_duration_ms(), 350);
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lifecycle_timeline_filter_by_phase() {
+        let mut timeline = LifecycleTimeline::new();
+        timeline.record(StartupPhase::EarlyInit, "a", 10);
+        timeline.record(StartupPhase::EarlyInit, "b", 20);
+        timeline.record(StartupPhase::ServiceInit, "c", 30);
+        let early = timeline.entries_for_phase(StartupPhase::EarlyInit);
+        assert_eq!(early.len(), 2);
+        let svc = timeline.entries_for_phase(StartupPhase::ServiceInit);
+        assert_eq!(svc.len(), 1);
+        assert_eq!(svc[0].label, "c");
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lifecycle_timeline_slowest_entry() {
+        let mut timeline = LifecycleTimeline::new();
+        timeline.record(StartupPhase::EarlyInit, "fast", 10);
+        timeline.record(StartupPhase::ServiceInit, "slow", 500);
+        timeline.record(StartupPhase::ExtensionLoad, "medium", 100);
+        let slowest = timeline.slowest_entry().unwrap();
+        assert_eq!(slowest.label, "slow");
+        assert_eq!(slowest.duration_ms, 500);
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lifecycle_timeline_summary() {
+        let mut timeline = LifecycleTimeline::new();
+        timeline.record(StartupPhase::EarlyInit, "config", 50);
+        let summary = timeline.to_summary();
+        assert!(summary.contains("1 entries"));
+        assert!(summary.contains("total=50ms"));
+        assert!(summary.contains("[Early Init] config (50ms)"));
     }
 
     #[test]
-    fn behavior_check_10() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_27() {
-        let _svc = LifecycleService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn lifecycle_timeline_empty() {
+        let timeline = LifecycleTimeline::new();
+        assert_eq!(timeline.entry_count(), 0);
+        assert_eq!(timeline.total_duration_ms(), 0);
+        assert!(timeline.slowest_entry().is_none());
     }
 
     #[test]

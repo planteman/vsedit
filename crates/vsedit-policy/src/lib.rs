@@ -479,6 +479,137 @@ impl Default for PolicyValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// PolicyScope — scope of a policy
+// ---------------------------------------------------------------------------
+
+/// Scope at which a policy is defined.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PolicyScope {
+    User,
+    Workspace,
+    Machine,
+}
+
+impl PolicyScope {
+    /// Returns the precedence level. Machine > Workspace > User.
+    pub fn precedence(&self) -> u8 {
+        match self {
+            PolicyScope::User => 1,
+            PolicyScope::Workspace => 2,
+            PolicyScope::Machine => 3,
+        }
+    }
+}
+
+impl fmt::Display for PolicyScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PolicyScope::User => write!(f, "User"),
+            PolicyScope::Workspace => write!(f, "Workspace"),
+            PolicyScope::Machine => write!(f, "Machine"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScopedPolicy
+// ---------------------------------------------------------------------------
+
+/// A policy associated with a specific scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScopedPolicy {
+    pub policy: Policy,
+    pub scope: PolicyScope,
+}
+
+/// Merge scoped policies: higher-precedence scope wins on name conflict.
+pub fn merge_scoped_policies(policies: &[ScopedPolicy]) -> Vec<Policy> {
+    let mut best: HashMap<String, (u8, Policy)> = HashMap::new();
+    for sp in policies {
+        let prec = sp.scope.precedence();
+        let entry = best.entry(sp.policy.name.clone());
+        entry
+            .and_modify(|(existing_prec, existing_policy)| {
+                if prec > *existing_prec {
+                    *existing_prec = prec;
+                    *existing_policy = sp.policy.clone();
+                }
+            })
+            .or_insert((prec, sp.policy.clone()));
+    }
+    let mut result: Vec<Policy> = best.into_values().map(|(_, p)| p).collect();
+    result.sort_by(|a, b| a.name.cmp(&b.name));
+    result
+}
+
+// ---------------------------------------------------------------------------
+// PolicyEngine — evaluate allow/deny rules with prefix matching
+// ---------------------------------------------------------------------------
+
+/// A rule in the policy engine.
+#[derive(Debug, Clone)]
+struct PolicyRule {
+    pattern: String,
+    allowed: bool,
+}
+
+/// Engine for evaluating allow/deny rules via prefix matching.
+#[derive(Debug)]
+pub struct PolicyEngine {
+    rules: Vec<PolicyRule>,
+}
+
+impl PolicyEngine {
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    pub fn add_rule(&mut self, pattern: &str, allowed: bool) {
+        self.rules.push(PolicyRule {
+            pattern: pattern.to_string(),
+            allowed,
+        });
+    }
+
+    /// Evaluate a feature against the rules. Most-specific (longest pattern) wins.
+    pub fn evaluate(&self, feature: &str) -> Option<bool> {
+        self.rules
+            .iter()
+            .filter(|r| feature.starts_with(&r.pattern))
+            .max_by_key(|r| r.pattern.len())
+            .map(|r| r.allowed)
+    }
+
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.rules.clear();
+    }
+
+    pub fn remove_rule(&mut self, pattern: &str) -> bool {
+        let before = self.rules.len();
+        self.rules.retain(|r| r.pattern != pattern);
+        self.rules.len() < before
+    }
+
+    /// Check multiple features, returning results for each.
+    pub fn matches_any<'a>(&self, features: &[&'a str]) -> Vec<(&'a str, bool)> {
+        features
+            .iter()
+            .filter_map(|&f| self.evaluate(f).map(|v| (f, v)))
+            .collect()
+    }
+}
+
+impl Default for PolicyEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -705,148 +836,123 @@ mod tests {
         assert!(!PolicyError::PolicyNotFound("test".into()).to_string().is_empty());
     }
 
+    // -- PolicyEngine tests --
+
     #[test]
-    fn behavior_check_0() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn engine_empty_returns_none() {
+        let engine = PolicyEngine::new();
+        assert_eq!(engine.evaluate("anything"), None);
+        assert_eq!(engine.rule_count(), 0);
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn engine_add_and_evaluate() {
+        let mut engine = PolicyEngine::new();
+        engine.add_rule("editor.", true);
+        engine.add_rule("terminal.", false);
+        assert_eq!(engine.evaluate("editor.fontSize"), Some(true));
+        assert_eq!(engine.evaluate("terminal.shell"), Some(false));
+        assert_eq!(engine.evaluate("unknown.feature"), None);
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn engine_most_specific_wins() {
+        let mut engine = PolicyEngine::new();
+        engine.add_rule("editor.", true);
+        engine.add_rule("editor.font", false);
+        assert_eq!(engine.evaluate("editor.fontSize"), Some(false));
+        assert_eq!(engine.evaluate("editor.tabSize"), Some(true));
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn engine_remove_rule() {
+        let mut engine = PolicyEngine::new();
+        engine.add_rule("a", true);
+        engine.add_rule("b", false);
+        assert_eq!(engine.rule_count(), 2);
+        assert!(engine.remove_rule("a"));
+        assert_eq!(engine.rule_count(), 1);
+        assert!(!engine.remove_rule("nonexistent"));
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn engine_clear() {
+        let mut engine = PolicyEngine::new();
+        engine.add_rule("x", true);
+        engine.clear();
+        assert_eq!(engine.rule_count(), 0);
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn engine_matches_any() {
+        let mut engine = PolicyEngine::new();
+        engine.add_rule("editor.", true);
+        engine.add_rule("terminal.", false);
+        let results = engine.matches_any(&["editor.font", "terminal.shell", "unknown"]);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0], ("editor.font", true));
+        assert_eq!(results[1], ("terminal.shell", false));
+    }
+
+    // -- PolicyScope tests --
+
+    #[test]
+    fn scope_precedence_ordering() {
+        assert!(PolicyScope::Machine.precedence() > PolicyScope::Workspace.precedence());
+        assert!(PolicyScope::Workspace.precedence() > PolicyScope::User.precedence());
+        assert_eq!(PolicyScope::User.precedence(), 1);
+        assert_eq!(PolicyScope::Machine.precedence(), 3);
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn scope_display() {
+        assert_eq!(PolicyScope::User.to_string(), "User");
+        assert_eq!(PolicyScope::Workspace.to_string(), "Workspace");
+        assert_eq!(PolicyScope::Machine.to_string(), "Machine");
+    }
+
+    // -- merge_scoped_policies tests --
+
+    #[test]
+    fn merge_scoped_higher_wins() {
+        let policies = vec![
+            ScopedPolicy {
+                policy: Policy {
+                    name: "telemetry".into(),
+                    value: PolicyValue::Bool(true),
+                    description: None,
+                },
+                scope: PolicyScope::User,
+            },
+            ScopedPolicy {
+                policy: Policy {
+                    name: "telemetry".into(),
+                    value: PolicyValue::Bool(false),
+                    description: None,
+                },
+                scope: PolicyScope::Machine,
+            },
+            ScopedPolicy {
+                policy: Policy {
+                    name: "theme".into(),
+                    value: PolicyValue::String("dark".into()),
+                    description: None,
+                },
+                scope: PolicyScope::Workspace,
+            },
+        ];
+        let merged = merge_scoped_policies(&policies);
+        assert_eq!(merged.len(), 2);
+        let telemetry = merged.iter().find(|p| p.name == "telemetry").unwrap();
+        assert_eq!(telemetry.value, PolicyValue::Bool(false));
+        let theme = merged.iter().find(|p| p.name == "theme").unwrap();
+        assert_eq!(theme.value, PolicyValue::String("dark".into()));
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_8() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_9() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_10() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        let _svc = PolicyService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn merge_scoped_empty() {
+        let merged = merge_scoped_policies(&[]);
+        assert!(merged.is_empty());
     }
 
     #[test]

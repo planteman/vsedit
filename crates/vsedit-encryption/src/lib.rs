@@ -525,6 +525,161 @@ impl Default for EncryptionValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// PasswordDerivation
+// ---------------------------------------------------------------------------
+
+/// Builder for PBKDF2-style password derivation.
+pub struct PasswordDerivation {
+    password: String,
+    salt: Vec<u8>,
+    iterations: u32,
+}
+
+impl PasswordDerivation {
+    /// Create a new derivation from a password.
+    pub fn new(password: &str) -> Self {
+        Self {
+            password: password.to_string(),
+            salt: vec![0u8; 16],
+            iterations: 1000,
+        }
+    }
+
+    /// Set a custom salt.
+    pub fn with_salt(mut self, salt: &[u8]) -> Self {
+        self.salt = salt.to_vec();
+        self
+    }
+
+    /// Set the number of iterations.
+    pub fn with_iterations(mut self, iterations: u32) -> Self {
+        self.iterations = iterations;
+        self
+    }
+
+    /// Derive a key (default 32 bytes).
+    pub fn derive(&self) -> Vec<u8> {
+        self.derive_with_length(32)
+    }
+
+    /// Derive a key of a specific length.
+    pub fn derive_with_length(&self, len: usize) -> Vec<u8> {
+        key_stretching(&self.password, &self.salt, self.iterations, len)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EncryptedPayload
+// ---------------------------------------------------------------------------
+
+/// Packages an IV and ciphertext together for serialization.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EncryptedPayload {
+    iv: Vec<u8>,
+    ciphertext: Vec<u8>,
+}
+
+impl EncryptedPayload {
+    /// Create a new payload with the given IV and ciphertext.
+    pub fn new(iv: Vec<u8>, ciphertext: Vec<u8>) -> Self {
+        assert!(iv.len() <= 255, "IV length must fit in a single byte");
+        Self { iv, ciphertext }
+    }
+
+    /// Serialize as `[iv_len(1 byte)][iv][ciphertext]`.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(1 + self.iv.len() + self.ciphertext.len());
+        out.push(self.iv.len() as u8);
+        out.extend_from_slice(&self.iv);
+        out.extend_from_slice(&self.ciphertext);
+        out
+    }
+
+    /// Deserialize from the format produced by `to_bytes`.
+    pub fn from_bytes(data: &[u8]) -> Option<Self> {
+        if data.is_empty() {
+            return None;
+        }
+        let iv_len = data[0] as usize;
+        if data.len() < 1 + iv_len {
+            return None;
+        }
+        let iv = data[1..1 + iv_len].to_vec();
+        let ciphertext = data[1 + iv_len..].to_vec();
+        Some(Self { iv, ciphertext })
+    }
+
+    /// Returns a reference to the IV.
+    pub fn iv(&self) -> &[u8] {
+        &self.iv
+    }
+
+    /// Returns a reference to the ciphertext.
+    pub fn ciphertext(&self) -> &[u8] {
+        &self.ciphertext
+    }
+
+    /// Total length of IV + ciphertext.
+    pub fn total_len(&self) -> usize {
+        self.iv.len() + self.ciphertext.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// key_stretching
+// ---------------------------------------------------------------------------
+
+/// Derive an encryption key of arbitrary length using iterated hashing.
+pub fn key_stretching(passphrase: &str, salt: &[u8], iterations: u32, key_len: usize) -> Vec<u8> {
+    // Start from base key
+    let base = derive_key(passphrase);
+    let mut key = vec![0u8; key_len];
+
+    // Initialize from base key and salt
+    for i in 0..key_len {
+        key[i] = base[i % base.len()] ^ salt[i % salt.len().max(1)];
+    }
+
+    // Iterate to strengthen
+    for round in 0..iterations {
+        for i in 0..key_len {
+            key[i] = key[i]
+                .wrapping_add(round as u8)
+                .wrapping_mul(31)
+                .wrapping_add(key[(i + 1) % key_len]);
+        }
+    }
+    key
+}
+
+// ---------------------------------------------------------------------------
+// EncryptionService extensions
+// ---------------------------------------------------------------------------
+
+impl EncryptionService {
+    /// Encrypt data with a specific IV, returning an `EncryptedPayload`.
+    /// The IV is XOR'd into the data before the standard key XOR.
+    pub fn encrypt_with_iv(&self, data: &[u8], iv: &[u8]) -> EncryptedPayload {
+        let mut modified = data.to_vec();
+        for (i, b) in modified.iter_mut().enumerate() {
+            *b ^= iv[i % iv.len()];
+        }
+        let ciphertext = self.encrypt(&modified);
+        EncryptedPayload::new(iv.to_vec(), ciphertext)
+    }
+
+    /// Decrypt an `EncryptedPayload`, reversing the IV XOR.
+    pub fn decrypt_payload(&self, payload: &EncryptedPayload) -> Vec<u8> {
+        let mut decrypted = self.decrypt(payload.ciphertext());
+        let iv = payload.iv();
+        for (i, b) in decrypted.iter_mut().enumerate() {
+            *b ^= iv[i % iv.len()];
+        }
+        decrypted
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -716,138 +871,95 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn password_derivation_basic() {
+        let pd = PasswordDerivation::new("secret");
+        let key = pd.derive();
+        assert_eq!(key.len(), 32);
     }
 
     #[test]
-    fn behavior_check_1() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn password_derivation_with_salt_and_iterations() {
+        let k1 = PasswordDerivation::new("pass")
+            .with_salt(b"salt1")
+            .with_iterations(100)
+            .derive();
+        let k2 = PasswordDerivation::new("pass")
+            .with_salt(b"salt2")
+            .with_iterations(100)
+            .derive();
+        assert_ne!(k1, k2);
+        assert_eq!(k1.len(), 32);
     }
 
     #[test]
-    fn behavior_check_2() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn password_derivation_custom_length() {
+        let key = PasswordDerivation::new("pass")
+            .with_salt(b"salt")
+            .derive_with_length(64);
+        assert_eq!(key.len(), 64);
     }
 
     #[test]
-    fn behavior_check_3() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn encrypted_payload_round_trip() {
+        let iv = vec![1, 2, 3, 4];
+        let ct = vec![10, 20, 30, 40, 50];
+        let payload = EncryptedPayload::new(iv.clone(), ct.clone());
+        assert_eq!(payload.iv(), &iv[..]);
+        assert_eq!(payload.ciphertext(), &ct[..]);
+        assert_eq!(payload.total_len(), 9);
+
+        let bytes = payload.to_bytes();
+        assert_eq!(bytes[0], 4); // iv_len
+        let restored = EncryptedPayload::from_bytes(&bytes).unwrap();
+        assert_eq!(restored, payload);
     }
 
     #[test]
-    fn behavior_check_4() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn encrypted_payload_from_bytes_empty() {
+        assert!(EncryptedPayload::from_bytes(&[]).is_none());
     }
 
     #[test]
-    fn behavior_check_5() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn encrypted_payload_from_bytes_too_short() {
+        // iv_len=5 but only 3 bytes of data total
+        assert!(EncryptedPayload::from_bytes(&[5, 1, 2]).is_none());
     }
 
     #[test]
-    fn behavior_check_6() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn key_stretching_variable_len() {
+        let k16 = key_stretching("pass", b"salt", 10, 16);
+        let k64 = key_stretching("pass", b"salt", 10, 64);
+        assert_eq!(k16.len(), 16);
+        assert_eq!(k64.len(), 64);
     }
 
     #[test]
-    fn behavior_check_7() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn key_stretching_deterministic() {
+        let k1 = key_stretching("pass", b"salt", 100, 32);
+        let k2 = key_stretching("pass", b"salt", 100, 32);
+        assert_eq!(k1, k2);
     }
 
     #[test]
-    fn behavior_check_8() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn encrypt_with_iv_round_trip() {
+        let svc = EncryptionService::from_passphrase("key");
+        let data = b"hello world";
+        let iv = vec![0xAA, 0xBB, 0xCC, 0xDD];
+        let payload = svc.encrypt_with_iv(data, &iv);
+        let decrypted = svc.decrypt_payload(&payload);
+        assert_eq!(decrypted, data);
     }
 
     #[test]
-    fn behavior_check_9() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_10() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn encrypt_with_iv_different_ivs_differ() {
+        let svc = EncryptionService::from_passphrase("key");
+        let data = b"test data";
+        let p1 = svc.encrypt_with_iv(data, &[0x01, 0x02]);
+        let p2 = svc.encrypt_with_iv(data, &[0x03, 0x04]);
+        assert_ne!(p1.ciphertext(), p2.ciphertext());
+        // But both decrypt to the same plaintext
+        assert_eq!(svc.decrypt_payload(&p1), data);
+        assert_eq!(svc.decrypt_payload(&p2), data);
     }
 
     #[test]

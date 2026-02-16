@@ -572,6 +572,188 @@ impl Default for BatchFileResults {
     }
 }
 
+// ---------------------------------------------------------------------------
+// FileTreeBuilder – constructs a hierarchical file tree from flat paths
+// ---------------------------------------------------------------------------
+
+/// A node in a hierarchical file tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileTreeNode {
+    /// The name of this node (file or directory name, not full path).
+    pub name: String,
+    /// Whether this node represents a directory.
+    pub is_directory: bool,
+    /// Child nodes (empty for files).
+    pub children: Vec<FileTreeNode>,
+}
+
+impl FileTreeNode {
+    /// Create a new file node (leaf).
+    pub fn new_file(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            is_directory: false,
+            children: Vec::new(),
+        }
+    }
+
+    /// Create a new directory node.
+    pub fn new_dir(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            is_directory: true,
+            children: Vec::new(),
+        }
+    }
+
+    /// Find a direct child by name.
+    pub fn find(&self, name: &str) -> Option<&FileTreeNode> {
+        self.children.iter().find(|c| c.name == name)
+    }
+
+    /// Find a direct child by name (mutable).
+    pub fn find_mut(&mut self, name: &str) -> Option<&mut FileTreeNode> {
+        self.children.iter_mut().find(|c| c.name == name)
+    }
+
+    /// Count all file nodes recursively (not counting directories).
+    pub fn total_files(&self) -> usize {
+        if !self.is_directory {
+            return 1;
+        }
+        self.children.iter().map(|c| c.total_files()).sum()
+    }
+
+    /// Count all directory nodes recursively (including self if it is a directory).
+    pub fn total_dirs(&self) -> usize {
+        if !self.is_directory {
+            return 0;
+        }
+        1 + self.children.iter().map(|c| c.total_dirs()).sum::<usize>()
+    }
+
+    /// Sort children: directories first, then alphabetically (case-insensitive).
+    pub fn sort_recursive(&mut self) {
+        self.children.sort_by(|a, b| {
+            match (a.is_directory, b.is_directory) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            }
+        });
+        for child in &mut self.children {
+            child.sort_recursive();
+        }
+    }
+}
+
+/// Builds a hierarchical [`FileTreeNode`] from a flat list of paths.
+pub struct FileTreeBuilder;
+
+impl FileTreeBuilder {
+    /// Create a new builder.
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Build a tree from a slice of path strings.
+    ///
+    /// Each path is split on `/`. Intermediate components become directory nodes
+    /// and the final component becomes a file node. The returned root node
+    /// represents the project root directory.
+    pub fn build(paths: &[&str]) -> FileTreeNode {
+        let mut root = FileTreeNode::new_dir("");
+
+        for path in paths {
+            let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+            if parts.is_empty() {
+                continue;
+            }
+
+            let mut current = &mut root;
+
+            for (i, part) in parts.iter().enumerate() {
+                let is_last = i == parts.len() - 1;
+
+                if is_last {
+                    // Final component is a file.
+                    if current.find(part).is_none() {
+                        current.children.push(FileTreeNode::new_file(*part));
+                    }
+                } else {
+                    // Intermediate component is a directory.
+                    if current.find(part).is_none() {
+                        current.children.push(FileTreeNode::new_dir(*part));
+                    }
+                    current = current.find_mut(part).unwrap();
+                }
+            }
+        }
+
+        root.sort_recursive();
+        root
+    }
+}
+
+impl Default for FileTreeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// file_icon_theme – maps file extensions to icon theme names
+// ---------------------------------------------------------------------------
+
+/// Map a file extension to an icon theme name.
+///
+/// Supports common extensions used in software projects. Unknown extensions
+/// return `"file"`.
+pub fn file_icon_theme(extension: &str) -> &'static str {
+    match extension {
+        "rs" => "rust",
+        "py" => "python",
+        "js" => "javascript",
+        "ts" => "typescript",
+        "md" => "markdown",
+        "json" => "json",
+        "toml" => "toml",
+        "yaml" | "yml" => "yaml",
+        "html" => "html",
+        "css" => "css",
+        "go" => "go",
+        "java" => "java",
+        "c" => "c",
+        "cpp" | "cxx" | "cc" => "cpp",
+        "h" | "hpp" => "header",
+        "sh" | "bash" => "shell",
+        "xml" => "xml",
+        "svg" => "svg",
+        "png" | "jpg" | "jpeg" | "gif" | "webp" => "image",
+        "lock" => "lock",
+        "txt" => "text",
+        _ => "file",
+    }
+}
+
+// ---------------------------------------------------------------------------
+// file_sort – sorts (name, is_directory) tuples: dirs first, then alpha
+// ---------------------------------------------------------------------------
+
+/// Sort a list of `(name, is_directory)` tuples.
+///
+/// Directories are placed before files. Within each group entries are sorted
+/// alphabetically using case-insensitive comparison.
+pub fn file_sort(entries: &mut [(String, bool)]) {
+    entries.sort_by(|a, b| {
+        match (a.1, b.1) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.0.to_lowercase().cmp(&b.0.to_lowercase()),
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -990,5 +1172,137 @@ mod tests {
         assert!(!results.all_succeeded());
         assert_eq!(results.failure_count(), 1);
         assert_eq!(results.failed_uris(), vec!["b.rs"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // FileTreeBuilder tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn tree_builder_simple() {
+        let tree = FileTreeBuilder::build(&["README.md", "Cargo.toml"]);
+        assert!(tree.is_directory);
+        assert_eq!(tree.children.len(), 2);
+        // Sorted alphabetically: Cargo.toml < README.md (case-insensitive)
+        assert_eq!(tree.children[0].name, "Cargo.toml");
+        assert_eq!(tree.children[1].name, "README.md");
+        assert!(!tree.children[0].is_directory);
+    }
+
+    #[test]
+    fn tree_builder_nested_paths() {
+        let tree = FileTreeBuilder::build(&[
+            "src/main.rs",
+            "src/lib.rs",
+            "src/utils/helpers.rs",
+            "README.md",
+        ]);
+        // Root should have: src/ dir + README.md file. Dirs come first.
+        assert_eq!(tree.children.len(), 2);
+        let src = &tree.children[0];
+        assert_eq!(src.name, "src");
+        assert!(src.is_directory);
+        // src has: utils/ dir + lib.rs, main.rs files → dirs first
+        assert_eq!(src.children.len(), 3);
+        assert_eq!(src.children[0].name, "utils");
+        assert!(src.children[0].is_directory);
+        // utils/helpers.rs
+        assert_eq!(src.children[0].children.len(), 1);
+        assert_eq!(src.children[0].children[0].name, "helpers.rs");
+    }
+
+    #[test]
+    fn tree_node_find_child() {
+        let tree = FileTreeBuilder::build(&["src/main.rs", "README.md"]);
+        assert!(tree.find("src").is_some());
+        assert!(tree.find("README.md").is_some());
+        assert!(tree.find("nonexistent").is_none());
+    }
+
+    #[test]
+    fn tree_node_total_files() {
+        let tree = FileTreeBuilder::build(&[
+            "src/main.rs",
+            "src/lib.rs",
+            "src/utils/helpers.rs",
+            "README.md",
+        ]);
+        assert_eq!(tree.total_files(), 4);
+    }
+
+    #[test]
+    fn tree_node_total_dirs() {
+        let tree = FileTreeBuilder::build(&[
+            "src/main.rs",
+            "src/lib.rs",
+            "src/utils/helpers.rs",
+            "README.md",
+        ]);
+        // root, src, utils → 3 directories
+        assert_eq!(tree.total_dirs(), 3);
+    }
+
+    // -----------------------------------------------------------------------
+    // file_icon_theme tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn icon_theme_rust() {
+        assert_eq!(file_icon_theme("rs"), "rust");
+        assert_eq!(file_icon_theme("py"), "python");
+        assert_eq!(file_icon_theme("js"), "javascript");
+        assert_eq!(file_icon_theme("ts"), "typescript");
+        assert_eq!(file_icon_theme("md"), "markdown");
+        assert_eq!(file_icon_theme("json"), "json");
+        assert_eq!(file_icon_theme("toml"), "toml");
+        assert_eq!(file_icon_theme("yaml"), "yaml");
+        assert_eq!(file_icon_theme("yml"), "yaml");
+        assert_eq!(file_icon_theme("html"), "html");
+        assert_eq!(file_icon_theme("css"), "css");
+    }
+
+    #[test]
+    fn icon_theme_unknown_ext() {
+        assert_eq!(file_icon_theme("xyz"), "file");
+        assert_eq!(file_icon_theme(""), "file");
+        assert_eq!(file_icon_theme("zzz"), "file");
+    }
+
+    // -----------------------------------------------------------------------
+    // file_sort tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn file_sort_dirs_first() {
+        let mut entries = vec![
+            ("main.rs".to_string(), false),
+            ("src".to_string(), true),
+            ("lib.rs".to_string(), false),
+            ("tests".to_string(), true),
+        ];
+        file_sort(&mut entries);
+        // Dirs first
+        assert!(entries[0].1); // directory
+        assert!(entries[1].1); // directory
+        assert!(!entries[2].1); // file
+        assert!(!entries[3].1); // file
+    }
+
+    #[test]
+    fn file_sort_alphabetical() {
+        let mut entries = vec![
+            ("Zebra.rs".to_string(), false),
+            ("alpha.rs".to_string(), false),
+            ("Beta.rs".to_string(), false),
+            ("zdir".to_string(), true),
+            ("Adir".to_string(), true),
+        ];
+        file_sort(&mut entries);
+        // Dirs first, then alphabetically case-insensitive
+        assert_eq!(entries[0].0, "Adir");
+        assert_eq!(entries[1].0, "zdir");
+        assert_eq!(entries[2].0, "alpha.rs");
+        assert_eq!(entries[3].0, "Beta.rs");
+        assert_eq!(entries[4].0, "Zebra.rs");
     }
 }

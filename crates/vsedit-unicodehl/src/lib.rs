@@ -518,6 +518,174 @@ impl Default for UnicodehlValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Enhanced Unicode character category detection
+// ---------------------------------------------------------------------------
+
+/// Fine-grained Unicode character category based on code-point ranges.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum UnicodeCharCategory {
+    Ascii,
+    Latin,
+    Cyrillic,
+    Greek,
+    CJK,
+    Emoji,
+    MathSymbol,
+    Invisible,
+    Bidi,
+    Other,
+}
+
+impl fmt::Display for UnicodeCharCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            UnicodeCharCategory::Ascii => "ASCII",
+            UnicodeCharCategory::Latin => "Latin extended",
+            UnicodeCharCategory::Cyrillic => "Cyrillic",
+            UnicodeCharCategory::Greek => "Greek",
+            UnicodeCharCategory::CJK => "CJK",
+            UnicodeCharCategory::Emoji => "Emoji",
+            UnicodeCharCategory::MathSymbol => "math symbol",
+            UnicodeCharCategory::Invisible => "invisible",
+            UnicodeCharCategory::Bidi => "bidirectional control",
+            UnicodeCharCategory::Other => "other non-ASCII",
+        };
+        write!(f, "{}", label)
+    }
+}
+
+/// Classify a single character into a [`UnicodeCharCategory`].
+pub fn classify_char(c: char) -> UnicodeCharCategory {
+    let cp = c as u32;
+    match cp {
+        0x0000..=0x007F => UnicodeCharCategory::Ascii,
+        // Invisible characters (check before Bidi since ranges partially overlap)
+        0x200B..=0x200E | 0xFEFF => UnicodeCharCategory::Invisible,
+        // Bidi control characters
+        0x200F..=0x202E => UnicodeCharCategory::Bidi,
+        0x00C0..=0x024F => UnicodeCharCategory::Latin,
+        0x0370..=0x03FF => UnicodeCharCategory::Greek,
+        0x0400..=0x04FF => UnicodeCharCategory::Cyrillic,
+        0x2200..=0x22FF => UnicodeCharCategory::MathSymbol,
+        0x4E00..=0x9FFF => UnicodeCharCategory::CJK,
+        0x1F600..=0x1F64F => UnicodeCharCategory::Emoji,
+        _ => UnicodeCharCategory::Other,
+    }
+}
+
+/// Classify every character in a string, returning `(char, category)` pairs.
+pub fn classify_string(s: &str) -> Vec<(char, UnicodeCharCategory)> {
+    s.chars().map(|c| (c, classify_char(c))).collect()
+}
+
+// ---------------------------------------------------------------------------
+// Highlight ranges – contiguous runs of non-ASCII characters
+// ---------------------------------------------------------------------------
+
+/// A contiguous byte-range of non-ASCII characters sharing the same category.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnicodeHighlightRange {
+    /// Byte offset of the first character in the range (inclusive).
+    pub start: usize,
+    /// Byte offset one past the last character in the range (exclusive).
+    pub end: usize,
+    /// The shared category of the characters in this range.
+    pub category: UnicodeCharCategory,
+    /// Human-readable description of the range.
+    pub description: String,
+}
+
+/// Scan `line` for runs of non-ASCII characters and return merged ranges.
+///
+/// Adjacent characters that share the same [`UnicodeCharCategory`] are merged
+/// into a single [`UnicodeHighlightRange`].  Pure-ASCII characters are skipped.
+pub fn unicode_highlight_ranges(line: &str) -> Vec<UnicodeHighlightRange> {
+    let mut ranges: Vec<UnicodeHighlightRange> = Vec::new();
+
+    for (byte_offset, ch) in line.char_indices() {
+        let cat = classify_char(ch);
+        if cat == UnicodeCharCategory::Ascii {
+            continue;
+        }
+
+        let ch_end = byte_offset + ch.len_utf8();
+
+        if let Some(last) = ranges.last_mut() {
+            if last.category == cat && last.end == byte_offset {
+                // Extend the current range.
+                last.end = ch_end;
+                last.description = format!(
+                    "{} characters (U+{:04X}..U+{:04X})",
+                    last.category,
+                    line[last.start..].chars().next().unwrap() as u32,
+                    ch as u32,
+                );
+                continue;
+            }
+        }
+
+        ranges.push(UnicodeHighlightRange {
+            start: byte_offset,
+            end: ch_end,
+            category: cat,
+            description: format!("{} character U+{:04X}", cat, ch as u32),
+        });
+    }
+
+    ranges
+}
+
+// ---------------------------------------------------------------------------
+// Unicode escape / unescape helpers
+// ---------------------------------------------------------------------------
+
+/// Replace every non-ASCII character with its `\u{XXXX}` escape sequence.
+pub fn unicode_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        if ch.is_ascii() {
+            out.push(ch);
+        } else {
+            out.push_str(&format!("\\u{{{:04X}}}", ch as u32));
+        }
+    }
+    out
+}
+
+/// Convert `\u{XXXX}` escape sequences back to the corresponding characters.
+///
+/// Characters that are not part of a valid escape sequence are passed through
+/// unchanged.
+pub fn unicode_unescape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let bytes = s.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+
+    while i < len {
+        // Look for the start of a \u{...} escape.
+        if i + 3 < len && bytes[i] == b'\\' && bytes[i + 1] == b'u' && bytes[i + 2] == b'{' {
+            if let Some(close) = s[i + 3..].find('}') {
+                let hex_str = &s[i + 3..i + 3 + close];
+                if let Ok(cp) = u32::from_str_radix(hex_str, 16) {
+                    if let Some(ch) = char::from_u32(cp) {
+                        out.push(ch);
+                        i += 3 + close + 1; // skip past the closing '}'
+                        continue;
+                    }
+                }
+            }
+        }
+        // Not a valid escape – emit the byte as-is (safe because we index
+        // only on ASCII-compatible bytes for the escape prefix).
+        out.push(s[i..].chars().next().unwrap());
+        i += s[i..].chars().next().unwrap().len_utf8();
+    }
+
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -735,6 +903,83 @@ mod tests {
         assert!(!UnicodeCategory::Invisible.to_string().is_empty());
         assert!(!UnicodeCategory::NonBasicAscii.to_string().is_empty());
         assert!(!UnicodeCategory::ConfusableWithAscii.to_string().is_empty());
+    }
+
+    // ---- Enhanced UnicodeCharCategory tests ----
+
+    #[test]
+    fn classify_ascii() {
+        assert_eq!(classify_char('A'), UnicodeCharCategory::Ascii);
+        assert_eq!(classify_char('z'), UnicodeCharCategory::Ascii);
+        assert_eq!(classify_char(' '), UnicodeCharCategory::Ascii);
+        assert_eq!(classify_char('\n'), UnicodeCharCategory::Ascii);
+    }
+
+    #[test]
+    fn classify_cyrillic() {
+        // Cyrillic small 'а' U+0430
+        assert_eq!(classify_char('\u{0430}'), UnicodeCharCategory::Cyrillic);
+        // Cyrillic capital 'Д' U+0414
+        assert_eq!(classify_char('\u{0414}'), UnicodeCharCategory::Cyrillic);
+    }
+
+    #[test]
+    fn classify_cjk() {
+        // CJK Unified Ideograph '中' U+4E2D
+        assert_eq!(classify_char('\u{4E2D}'), UnicodeCharCategory::CJK);
+        // CJK Unified Ideograph '人' U+4EBA
+        assert_eq!(classify_char('\u{4EBA}'), UnicodeCharCategory::CJK);
+    }
+
+    #[test]
+    fn classify_emoji() {
+        // Grinning Face U+1F600
+        assert_eq!(classify_char('\u{1F600}'), UnicodeCharCategory::Emoji);
+        // Slightly Smiling Face U+1F642
+        assert_eq!(classify_char('\u{1F642}'), UnicodeCharCategory::Emoji);
+    }
+
+    #[test]
+    fn classify_invisible() {
+        // Zero Width Space U+200B
+        assert_eq!(classify_char('\u{200B}'), UnicodeCharCategory::Invisible);
+        // BOM / Zero Width No-Break Space U+FEFF
+        assert_eq!(classify_char('\u{FEFF}'), UnicodeCharCategory::Invisible);
+    }
+
+    #[test]
+    fn highlight_ranges_finds_non_ascii() {
+        let line = "hello \u{0430} world";
+        let ranges = unicode_highlight_ranges(line);
+        assert!(!ranges.is_empty());
+        assert_eq!(ranges[0].category, UnicodeCharCategory::Cyrillic);
+        // The range should cover exactly the one Cyrillic char.
+        assert_eq!(&line[ranges[0].start..ranges[0].end], "\u{0430}");
+    }
+
+    #[test]
+    fn highlight_ranges_merges_adjacent() {
+        // Two adjacent Cyrillic characters should be merged into one range.
+        let line = "ab\u{0430}\u{0431}cd";
+        let ranges = unicode_highlight_ranges(line);
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].category, UnicodeCharCategory::Cyrillic);
+        assert_eq!(&line[ranges[0].start..ranges[0].end], "\u{0430}\u{0431}");
+    }
+
+    #[test]
+    fn unicode_escape_roundtrip() {
+        let original = "café \u{0430}\u{0431}";
+        let escaped = unicode_escape(original);
+        let unescaped = unicode_unescape(&escaped);
+        assert_eq!(unescaped, original);
+    }
+
+    #[test]
+    fn unicode_escape_ascii_passthrough() {
+        let ascii = "hello world 123 !@#";
+        assert_eq!(unicode_escape(ascii), ascii);
+        assert_eq!(unicode_unescape(ascii), ascii);
     }
 
     #[test]

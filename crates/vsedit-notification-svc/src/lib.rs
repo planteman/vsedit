@@ -20,6 +20,74 @@ pub struct NotificationAction {
     pub id: String,
 }
 
+/// Priority level for notifications.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum NotificationPriority {
+    Low,
+    Normal,
+    High,
+    Urgent,
+}
+
+impl NotificationPriority {
+    /// Returns `true` if this priority is `Urgent`.
+    pub fn is_urgent(&self) -> bool {
+        matches!(self, NotificationPriority::Urgent)
+    }
+}
+
+impl fmt::Display for NotificationPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            NotificationPriority::Low => "Low",
+            NotificationPriority::Normal => "Normal",
+            NotificationPriority::High => "High",
+            NotificationPriority::Urgent => "Urgent",
+        };
+        write!(f, "{s}")
+    }
+}
+
+/// A typed action callback with optional tooltip.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotificationActionCallback {
+    label: String,
+    action_id: String,
+    tooltip: Option<String>,
+}
+
+impl NotificationActionCallback {
+    /// Create a new action callback.
+    pub fn new(label: &str, action_id: &str) -> Self {
+        Self {
+            label: label.to_string(),
+            action_id: action_id.to_string(),
+            tooltip: None,
+        }
+    }
+
+    /// Set a tooltip for this action.
+    pub fn with_tooltip(mut self, tooltip: &str) -> Self {
+        self.tooltip = Some(tooltip.to_string());
+        self
+    }
+
+    /// Returns the label.
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    /// Returns the action id.
+    pub fn action_id(&self) -> &str {
+        &self.action_id
+    }
+
+    /// Returns the tooltip, if set.
+    pub fn tooltip(&self) -> Option<&str> {
+        self.tooltip.as_deref()
+    }
+}
+
 /// A single notification entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Notification {
@@ -30,6 +98,7 @@ pub struct Notification {
     pub actions: Vec<NotificationAction>,
     pub sticky: bool,
     pub dismissed: bool,
+    pub priority: Option<NotificationPriority>,
 }
 
 // ---------------------------------------------------------------------------
@@ -108,6 +177,7 @@ impl NotificationService {
             actions: Vec::new(),
             sticky: false,
             dismissed: false,
+            priority: None,
         });
         id
     }
@@ -518,6 +588,64 @@ impl Default for NotificationSvcValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Dedup & priority extensions
+// ---------------------------------------------------------------------------
+
+impl NotificationService {
+    /// Remove duplicate notifications by message, keeping the first occurrence.
+    /// Only considers non-dismissed notifications. Returns the number removed.
+    pub fn dedup_by_message(&mut self) -> usize {
+        let mut seen = std::collections::HashSet::new();
+        let before = self.notifications.len();
+        self.notifications.retain(|n| {
+            if n.dismissed {
+                return true; // keep dismissed as-is
+            }
+            seen.insert(n.message.clone())
+        });
+        before - self.notifications.len()
+    }
+
+    /// Check if a non-dismissed notification with the given message already exists.
+    pub fn has_duplicate(&self, message: &str) -> bool {
+        self.notifications
+            .iter()
+            .any(|n| !n.dismissed && n.message == message)
+    }
+
+    /// Create a notification with a specific priority.
+    pub fn add_with_priority(
+        &mut self,
+        msg: &str,
+        severity: NotificationSeverity,
+        priority: NotificationPriority,
+    ) -> u64 {
+        let id = self.add(msg.to_string(), severity);
+        if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) {
+            n.priority = Some(priority);
+        }
+        id
+    }
+
+    /// Get all non-dismissed notifications matching the given priority.
+    pub fn get_by_priority(&self, priority: NotificationPriority) -> Vec<&Notification> {
+        self.notifications
+            .iter()
+            .filter(|n| !n.dismissed && n.priority == Some(priority))
+            .collect()
+    }
+
+    /// Returns the highest priority among active (non-dismissed) notifications.
+    pub fn highest_priority_active(&self) -> Option<NotificationPriority> {
+        self.notifications
+            .iter()
+            .filter(|n| !n.dismissed)
+            .filter_map(|n| n.priority)
+            .max()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -672,6 +800,7 @@ mod tests {
             actions: Vec::new(),
             sticky: false,
             dismissed: false,
+            priority: None,
         };
         handler.on_notification(&n);
         handler.on_dismiss(1);
@@ -695,159 +824,113 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn priority_ordering() {
+        assert!(NotificationPriority::Urgent > NotificationPriority::High);
+        assert!(NotificationPriority::High > NotificationPriority::Normal);
+        assert!(NotificationPriority::Normal > NotificationPriority::Low);
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn priority_is_urgent() {
+        assert!(NotificationPriority::Urgent.is_urgent());
+        assert!(!NotificationPriority::High.is_urgent());
+        assert!(!NotificationPriority::Normal.is_urgent());
+        assert!(!NotificationPriority::Low.is_urgent());
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn priority_display() {
+        assert_eq!(NotificationPriority::Low.to_string(), "Low");
+        assert_eq!(NotificationPriority::Normal.to_string(), "Normal");
+        assert_eq!(NotificationPriority::High.to_string(), "High");
+        assert_eq!(NotificationPriority::Urgent.to_string(), "Urgent");
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn dedup_by_message() {
+        let mut svc = NotificationService::new();
+        svc.info("hello");
+        svc.info("hello");
+        svc.info("world");
+        svc.info("hello");
+        assert_eq!(svc.notification_count(), 4);
+        let removed = svc.dedup_by_message();
+        assert_eq!(removed, 2);
+        assert_eq!(svc.notification_count(), 2);
+        assert_eq!(svc.get_active()[0].message, "hello");
+        assert_eq!(svc.get_active()[1].message, "world");
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn has_duplicate() {
+        let mut svc = NotificationService::new();
+        svc.info("test msg");
+        assert!(svc.has_duplicate("test msg"));
+        assert!(!svc.has_duplicate("other msg"));
+        let id = svc.get_active()[0].id;
+        svc.dismiss(id);
+        assert!(!svc.has_duplicate("test msg")); // dismissed doesn't count
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn action_callback_builder() {
+        let cb = NotificationActionCallback::new("Install", "install_action")
+            .with_tooltip("Click to install");
+        assert_eq!(cb.label(), "Install");
+        assert_eq!(cb.action_id(), "install_action");
+        assert_eq!(cb.tooltip(), Some("Click to install"));
+
+        let cb2 = NotificationActionCallback::new("Cancel", "cancel");
+        assert!(cb2.tooltip().is_none());
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn add_with_priority() {
+        let mut svc = NotificationService::new();
+        svc.add_with_priority("urgent!", NotificationSeverity::Error, NotificationPriority::Urgent);
+        svc.add_with_priority("low priority", NotificationSeverity::Info, NotificationPriority::Low);
+        svc.info("no priority");
+        let urgent = svc.get_by_priority(NotificationPriority::Urgent);
+        assert_eq!(urgent.len(), 1);
+        assert_eq!(urgent[0].message, "urgent!");
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn get_by_priority_filters() {
+        let mut svc = NotificationService::new();
+        svc.add_with_priority("a", NotificationSeverity::Info, NotificationPriority::High);
+        svc.add_with_priority("b", NotificationSeverity::Info, NotificationPriority::Low);
+        svc.add_with_priority("c", NotificationSeverity::Info, NotificationPriority::High);
+        assert_eq!(svc.get_by_priority(NotificationPriority::High).len(), 2);
+        assert_eq!(svc.get_by_priority(NotificationPriority::Urgent).len(), 0);
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn highest_priority_active() {
+        let mut svc = NotificationService::new();
+        assert!(svc.highest_priority_active().is_none());
+
+        svc.add_with_priority("low", NotificationSeverity::Info, NotificationPriority::Low);
+        assert_eq!(svc.highest_priority_active(), Some(NotificationPriority::Low));
+
+        svc.add_with_priority("high", NotificationSeverity::Warning, NotificationPriority::High);
+        assert_eq!(svc.highest_priority_active(), Some(NotificationPriority::High));
+
+        svc.add_with_priority("urgent", NotificationSeverity::Error, NotificationPriority::Urgent);
+        assert_eq!(svc.highest_priority_active(), Some(NotificationPriority::Urgent));
+
+        // Dismiss the urgent one
+        let urgent_id = svc.get_by_priority(NotificationPriority::Urgent)[0].id;
+        svc.dismiss(urgent_id);
+        assert_eq!(svc.highest_priority_active(), Some(NotificationPriority::High));
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_10() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        let _svc = NotificationService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn notification_has_priority_field() {
+        let mut svc = NotificationService::new();
+        svc.info("plain");
+        let n = svc.first_notification().unwrap();
+        assert_eq!(n.priority, None);
     }
 
     #[test]

@@ -528,6 +528,175 @@ impl Default for NetworkValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ProxyConfig extensions
+// ---------------------------------------------------------------------------
+
+impl ProxyConfig {
+    /// Format as `http://host:port`.
+    pub fn proxy_url(&self) -> String {
+        format!("http://{}:{}", self.host, self.port)
+    }
+
+    /// Returns `true` if the proxy requires authentication.
+    pub fn requires_auth(&self) -> bool {
+        self.username.is_some()
+    }
+
+    /// Set authentication credentials (builder pattern).
+    pub fn with_auth(mut self, user: &str, pass: &str) -> Self {
+        self.username = Some(user.to_string());
+        self.password = Some(pass.to_string());
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NetworkStatus
+// ---------------------------------------------------------------------------
+
+/// Network connectivity status.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NetworkStatus {
+    Online,
+    Offline,
+    Limited,
+}
+
+impl NetworkStatus {
+    /// Returns `true` if network is available (Online or Limited).
+    pub fn is_available(&self) -> bool {
+        matches!(self, NetworkStatus::Online | NetworkStatus::Limited)
+    }
+}
+
+impl fmt::Display for NetworkStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NetworkStatus::Online => f.write_str("Online"),
+            NetworkStatus::Offline => f.write_str("Offline"),
+            NetworkStatus::Limited => f.write_str("Limited"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DownloadProgress
+// ---------------------------------------------------------------------------
+
+/// Tracks download progress.
+#[derive(Debug, Clone)]
+pub struct DownloadProgress {
+    total_bytes: u64,
+    received_bytes: u64,
+}
+
+impl DownloadProgress {
+    /// Create a new progress tracker with the given total size.
+    pub fn new(total_bytes: u64) -> Self {
+        Self {
+            total_bytes,
+            received_bytes: 0,
+        }
+    }
+
+    /// Add received bytes.
+    pub fn update(&mut self, bytes_received: u64) {
+        self.received_bytes += bytes_received;
+        if self.received_bytes > self.total_bytes {
+            self.received_bytes = self.total_bytes;
+        }
+    }
+
+    /// Percentage complete (0.0 to 100.0).
+    pub fn percentage(&self) -> f64 {
+        if self.total_bytes == 0 {
+            return 100.0;
+        }
+        (self.received_bytes as f64 / self.total_bytes as f64) * 100.0
+    }
+
+    /// Returns `true` if all bytes have been received.
+    pub fn is_complete(&self) -> bool {
+        self.received_bytes >= self.total_bytes
+    }
+
+    /// Bytes remaining to download.
+    pub fn bytes_remaining(&self) -> u64 {
+        self.total_bytes.saturating_sub(self.received_bytes)
+    }
+
+    /// Bytes received so far.
+    pub fn received(&self) -> u64 {
+        self.received_bytes
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NetworkService extensions
+// ---------------------------------------------------------------------------
+
+impl NetworkService {
+    /// Return the current network status (stub: always Online).
+    pub fn status(&self) -> NetworkStatus {
+        NetworkStatus::Online
+    }
+
+    /// Set a proxy configuration (builder pattern).
+    pub fn with_proxy(mut self, config: ProxyConfig) -> Self {
+        self.proxy = Some(config);
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ConnectionPool
+// ---------------------------------------------------------------------------
+
+/// Simple connection pool tracker.
+#[derive(Debug, Clone)]
+pub struct ConnectionPool {
+    max_connections: usize,
+    active: usize,
+}
+
+impl ConnectionPool {
+    /// Create a new pool with the given maximum connections.
+    pub fn new(max_connections: usize) -> Self {
+        Self {
+            max_connections,
+            active: 0,
+        }
+    }
+
+    /// Try to acquire a connection. Returns `true` if successful.
+    pub fn acquire(&mut self) -> bool {
+        if self.active < self.max_connections {
+            self.active += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Release a connection back to the pool.
+    pub fn release(&mut self) {
+        if self.active > 0 {
+            self.active -= 1;
+        }
+    }
+
+    /// Number of available connections.
+    pub fn available(&self) -> usize {
+        self.max_connections - self.active
+    }
+
+    /// Number of connections currently in use.
+    pub fn in_use(&self) -> usize {
+        self.active
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -711,141 +880,111 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn proxy_config_url_and_auth() {
+        let proxy = ProxyConfig {
+            host: "proxy.example.com".into(),
+            port: 8080,
+            username: None,
+            password: None,
+        };
+        assert_eq!(proxy.proxy_url(), "http://proxy.example.com:8080");
+        assert!(!proxy.requires_auth());
+        let authed = proxy.with_auth("user", "pass");
+        assert!(authed.requires_auth());
+        assert_eq!(authed.username.as_deref(), Some("user"));
+        assert_eq!(authed.password.as_deref(), Some("pass"));
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn network_status_display_and_available() {
+        assert_eq!(format!("{}", NetworkStatus::Online), "Online");
+        assert_eq!(format!("{}", NetworkStatus::Offline), "Offline");
+        assert_eq!(format!("{}", NetworkStatus::Limited), "Limited");
+        assert!(NetworkStatus::Online.is_available());
+        assert!(!NetworkStatus::Offline.is_available());
+        assert!(NetworkStatus::Limited.is_available());
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn download_progress_basic() {
+        let mut progress = DownloadProgress::new(1000);
+        assert_eq!(progress.received(), 0);
+        assert_eq!(progress.bytes_remaining(), 1000);
+        assert!(!progress.is_complete());
+        assert!((progress.percentage() - 0.0).abs() < f64::EPSILON);
+
+        progress.update(500);
+        assert_eq!(progress.received(), 500);
+        assert_eq!(progress.bytes_remaining(), 500);
+        assert!((progress.percentage() - 50.0).abs() < f64::EPSILON);
+        assert!(!progress.is_complete());
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn download_progress_complete() {
+        let mut progress = DownloadProgress::new(100);
+        progress.update(100);
+        assert!(progress.is_complete());
+        assert!((progress.percentage() - 100.0).abs() < f64::EPSILON);
+        assert_eq!(progress.bytes_remaining(), 0);
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn download_progress_overflow_clamped() {
+        let mut progress = DownloadProgress::new(100);
+        progress.update(200);
+        assert_eq!(progress.received(), 100);
+        assert!(progress.is_complete());
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn download_progress_zero_total() {
+        let progress = DownloadProgress::new(0);
+        assert!(progress.is_complete());
+        assert!((progress.percentage() - 100.0).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn network_service_status_stub() {
+        let svc = NetworkService::new();
+        assert_eq!(svc.status(), NetworkStatus::Online);
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn network_service_with_proxy() {
+        let proxy = ProxyConfig {
+            host: "p.local".into(),
+            port: 3128,
+            username: None,
+            password: None,
+        };
+        let svc = NetworkService::new().with_proxy(proxy);
+        assert!(svc.get_proxy().is_some());
+        assert_eq!(svc.get_proxy().unwrap().port, 3128);
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_pool_basic() {
+        let mut pool = ConnectionPool::new(2);
+        assert_eq!(pool.available(), 2);
+        assert_eq!(pool.in_use(), 0);
+        assert!(pool.acquire());
+        assert_eq!(pool.available(), 1);
+        assert_eq!(pool.in_use(), 1);
+        assert!(pool.acquire());
+        assert!(!pool.acquire()); // exhausted
+        assert_eq!(pool.available(), 0);
+        pool.release();
+        assert_eq!(pool.available(), 1);
+        assert!(pool.acquire());
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_10() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        let _svc = NetworkService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn connection_pool_release_at_zero() {
+        let mut pool = ConnectionPool::new(1);
+        pool.release(); // should not underflow
+        assert_eq!(pool.in_use(), 0);
+        assert_eq!(pool.available(), 1);
     }
 
     #[test]

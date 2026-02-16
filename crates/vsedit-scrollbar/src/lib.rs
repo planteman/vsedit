@@ -466,6 +466,182 @@ impl Default for ScrollbarValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ScrollbarTrack – represents the scrollbar track area
+// ---------------------------------------------------------------------------
+
+/// Represents the scrollbar track area where the thumb slides.
+#[derive(Debug, Clone)]
+pub struct ScrollbarTrack {
+    /// Start position of the track in pixels (e.g. top edge for vertical).
+    pub position: f64,
+    /// Total length of the track in pixels.
+    pub length: f64,
+    /// Whether this is a vertical or horizontal scrollbar track.
+    pub orientation: ScrollbarOrientation,
+}
+
+impl ScrollbarTrack {
+    /// Create a new scrollbar track.
+    pub fn new(position: f64, length: f64, orientation: ScrollbarOrientation) -> Self {
+        Self {
+            position,
+            length,
+            orientation,
+        }
+    }
+
+    /// Returns the `(start, end)` of the visible portion as fractions of
+    /// total content, each in `0.0..=1.0`.
+    pub fn visible_range(&self, state: &ScrollState) -> (f64, f64) {
+        let (scroll_offset, viewport_size, content_size) = match self.orientation {
+            ScrollbarOrientation::Vertical => {
+                (state.scroll_top, state.viewport_height, state.content_height)
+            }
+            ScrollbarOrientation::Horizontal => {
+                (state.scroll_left, state.viewport_width, state.content_width)
+            }
+        };
+
+        if content_size <= 0.0 {
+            return (0.0, 1.0);
+        }
+
+        let start = (scroll_offset / content_size).clamp(0.0, 1.0);
+        let end = ((scroll_offset + viewport_size) / content_size).clamp(0.0, 1.0);
+        (start, end)
+    }
+
+    /// Returns `true` if the given coordinate falls within the track bounds.
+    pub fn contains_point(&self, point: f64) -> bool {
+        point >= self.position && point <= self.position + self.length
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScrollbarThumb – the draggable thumb element
+// ---------------------------------------------------------------------------
+
+/// The draggable thumb inside a scrollbar track.
+#[derive(Debug, Clone)]
+pub struct ScrollbarThumb {
+    /// Minimum size in pixels so the thumb never becomes too small to grab.
+    pub min_size: f64,
+}
+
+impl ScrollbarThumb {
+    /// Create a new thumb with the given minimum size.
+    pub fn new(min_size: f64) -> Self {
+        Self { min_size }
+    }
+
+    /// Compute the thumb size proportional to the viewport/content ratio,
+    /// clamped so it never shrinks below `min_size`.
+    ///
+    /// If the viewport is >= the content, the thumb fills the entire track.
+    pub fn compute_size(
+        &self,
+        viewport_size: f64,
+        content_size: f64,
+        track_length: f64,
+    ) -> f64 {
+        if content_size <= 0.0 || viewport_size >= content_size {
+            return track_length;
+        }
+        let proportional = (viewport_size / content_size) * track_length;
+        proportional.max(self.min_size).min(track_length)
+    }
+
+    /// Compute the thumb position along the track given the current scroll
+    /// fraction (`0.0..=1.0`).
+    pub fn compute_position(
+        &self,
+        scroll_fraction: f64,
+        track_length: f64,
+        thumb_size: f64,
+    ) -> f64 {
+        let available = (track_length - thumb_size).max(0.0);
+        let fraction = scroll_fraction.clamp(0.0, 1.0);
+        fraction * available
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hit-testing
+// ---------------------------------------------------------------------------
+
+/// Result of a hit-test against the scrollbar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScrollHitResult {
+    /// The click landed on the thumb itself.
+    OnThumb,
+    /// The click landed on the track *before* the thumb (scroll page up / left).
+    BeforeThumb,
+    /// The click landed on the track *after* the thumb (scroll page down / right).
+    AfterThumb,
+    /// The click landed outside the track entirely.
+    Outside,
+}
+
+/// Perform a hit-test for a click at `click_position` against the given
+/// track, thumb, and scroll state.
+pub fn scrollbar_hit_test(
+    click_position: f64,
+    track: &ScrollbarTrack,
+    thumb: &ScrollbarThumb,
+    state: &ScrollState,
+) -> ScrollHitResult {
+    if !track.contains_point(click_position) {
+        return ScrollHitResult::Outside;
+    }
+
+    let (viewport_size, content_size, scroll_fraction) = match track.orientation {
+        ScrollbarOrientation::Vertical => (
+            state.viewport_height,
+            state.content_height,
+            state.scroll_percentage_vertical(),
+        ),
+        ScrollbarOrientation::Horizontal => (
+            state.viewport_width,
+            state.content_width,
+            state.scroll_percentage_horizontal(),
+        ),
+    };
+
+    let thumb_size = thumb.compute_size(viewport_size, content_size, track.length);
+    let thumb_start = track.position + thumb.compute_position(scroll_fraction, track.length, thumb_size);
+    let thumb_end = thumb_start + thumb_size;
+
+    if click_position >= thumb_start && click_position <= thumb_end {
+        ScrollHitResult::OnThumb
+    } else if click_position < thumb_start {
+        ScrollHitResult::BeforeThumb
+    } else {
+        ScrollHitResult::AfterThumb
+    }
+}
+
+/// Convert a click position on the track to a scroll offset in content
+/// coordinates.
+///
+/// The returned value is clamped to `0.0..=max_scroll` where
+/// `max_scroll = content_size - viewport_size`.
+pub fn scroll_position_from_click(
+    click_pos: f64,
+    track: &ScrollbarTrack,
+    content_size: f64,
+    viewport_size: f64,
+) -> f64 {
+    let max_scroll = (content_size - viewport_size).max(0.0);
+    if track.length <= 0.0 {
+        return 0.0;
+    }
+
+    let relative = (click_pos - track.position).clamp(0.0, track.length);
+    let fraction = relative / track.length;
+    (fraction * max_scroll).clamp(0.0, max_scroll)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -678,6 +854,114 @@ mod tests {
     #[test]
     fn display_scrollbarerror_variants() {
         assert!(std::mem::size_of::<ScrollbarError>() > 0);
+    }
+
+    // ---------------------------------------------------------------
+    // ScrollbarTrack / ScrollbarThumb / hit-test tests
+    // ---------------------------------------------------------------
+
+    fn make_state(scroll_top: f64, vh: f64, ch: f64) -> ScrollState {
+        ScrollState {
+            scroll_top,
+            scroll_left: 0.0,
+            viewport_height: vh,
+            viewport_width: 200.0,
+            content_height: ch,
+            content_width: 200.0,
+        }
+    }
+
+    #[test]
+    fn track_visible_range_at_top() {
+        let track = ScrollbarTrack::new(0.0, 400.0, ScrollbarOrientation::Vertical);
+        let state = make_state(0.0, 100.0, 1000.0);
+        let (start, end) = track.visible_range(&state);
+        assert!((start - 0.0).abs() < f64::EPSILON);
+        assert!((end - 0.1).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn track_visible_range_at_middle() {
+        let track = ScrollbarTrack::new(0.0, 400.0, ScrollbarOrientation::Vertical);
+        let state = make_state(450.0, 100.0, 1000.0);
+        let (start, end) = track.visible_range(&state);
+        assert!((start - 0.45).abs() < f64::EPSILON);
+        assert!((end - 0.55).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn track_contains_point() {
+        let track = ScrollbarTrack::new(10.0, 200.0, ScrollbarOrientation::Vertical);
+        assert!(track.contains_point(10.0));
+        assert!(track.contains_point(110.0));
+        assert!(track.contains_point(210.0));
+        assert!(!track.contains_point(9.9));
+        assert!(!track.contains_point(210.1));
+    }
+
+    #[test]
+    fn thumb_proportional_sizing() {
+        let thumb = ScrollbarThumb::new(20.0);
+        // viewport=100, content=500, track=400 → proportional = 80
+        let size = thumb.compute_size(100.0, 500.0, 400.0);
+        assert!((size - 80.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn thumb_min_size_clamping() {
+        let thumb = ScrollbarThumb::new(30.0);
+        // viewport=10, content=10_000, track=400 → proportional = 0.4, clamped to 30
+        let size = thumb.compute_size(10.0, 10_000.0, 400.0);
+        assert!((size - 30.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn thumb_position_at_start() {
+        let thumb = ScrollbarThumb::new(20.0);
+        let pos = thumb.compute_position(0.0, 400.0, 80.0);
+        assert!((pos - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn thumb_position_at_end() {
+        let thumb = ScrollbarThumb::new(20.0);
+        let pos = thumb.compute_position(1.0, 400.0, 80.0);
+        // available = 400 - 80 = 320
+        assert!((pos - 320.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn hit_test_on_thumb() {
+        let track = ScrollbarTrack::new(0.0, 400.0, ScrollbarOrientation::Vertical);
+        let thumb = ScrollbarThumb::new(20.0);
+        // viewport=100, content=500 → thumb_size=80, scroll at top → thumb 0..80
+        let state = make_state(0.0, 100.0, 500.0);
+        let result = scrollbar_hit_test(40.0, &track, &thumb, &state);
+        assert_eq!(result, ScrollHitResult::OnThumb);
+    }
+
+    #[test]
+    fn hit_test_before_thumb() {
+        let track = ScrollbarTrack::new(0.0, 400.0, ScrollbarOrientation::Vertical);
+        let thumb = ScrollbarThumb::new(20.0);
+        // scroll at 100% → thumb at end (320..400)
+        let state = make_state(400.0, 100.0, 500.0);
+        let result = scrollbar_hit_test(50.0, &track, &thumb, &state);
+        assert_eq!(result, ScrollHitResult::BeforeThumb);
+    }
+
+    #[test]
+    fn scroll_position_from_click_test() {
+        let track = ScrollbarTrack::new(0.0, 400.0, ScrollbarOrientation::Vertical);
+        // click at middle of track → fraction 0.5 → offset = 0.5 * (1000-100) = 450
+        let offset = scroll_position_from_click(200.0, &track, 1000.0, 100.0);
+        assert!((offset - 450.0).abs() < f64::EPSILON);
+        // click at start → 0
+        let offset = scroll_position_from_click(0.0, &track, 1000.0, 100.0);
+        assert!((offset - 0.0).abs() < f64::EPSILON);
+        // click at end → 900
+        let offset = scroll_position_from_click(400.0, &track, 1000.0, 100.0);
+        assert!((offset - 900.0).abs() < f64::EPSILON);
     }
 
     #[test]

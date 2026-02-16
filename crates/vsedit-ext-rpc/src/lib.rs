@@ -486,6 +486,183 @@ impl Default for ExtRpcValidator {
     }
 }
 
+// ── Batch RPC support ──
+
+/// Collects multiple [`RpcMessage`]s into a single batch that can be sent in
+/// one round-trip.  The batch enforces an upper bound on the number of
+/// messages it will accept.
+#[derive(Debug, Clone)]
+pub struct RpcBatch {
+    pub requests: Vec<RpcMessage>,
+    pub max_batch_size: usize,
+}
+
+impl RpcBatch {
+    /// Create an empty batch that accepts at most `max_batch_size` messages.
+    pub fn new(max_batch_size: usize) -> Self {
+        Self {
+            requests: Vec::new(),
+            max_batch_size,
+        }
+    }
+
+    /// Append a message to the batch.
+    ///
+    /// Returns `Err` if the batch is already at capacity.
+    pub fn add(&mut self, msg: RpcMessage) -> Result<(), String> {
+        if self.requests.len() >= self.max_batch_size {
+            return Err(format!(
+                "batch is full (max {} messages)",
+                self.max_batch_size
+            ));
+        }
+        self.requests.push(msg);
+        Ok(())
+    }
+
+    /// Number of messages currently in the batch.
+    pub fn len(&self) -> usize {
+        self.requests.len()
+    }
+
+    /// Whether the batch contains no messages.
+    pub fn is_empty(&self) -> bool {
+        self.requests.is_empty()
+    }
+
+    /// Whether the batch has reached its maximum capacity.
+    pub fn is_full(&self) -> bool {
+        self.requests.len() >= self.max_batch_size
+    }
+
+    /// Remove and return all messages, leaving the batch empty.
+    pub fn drain(&mut self) -> Vec<RpcMessage> {
+        std::mem::take(&mut self.requests)
+    }
+
+    /// Estimate the total serialized payload size (in bytes) of every message
+    /// currently in the batch by serializing each one to JSON and summing
+    /// their lengths.
+    pub fn total_payload_size(&self) -> usize {
+        self.requests
+            .iter()
+            .map(|msg| {
+                let wire: WireMessage = msg.into();
+                serde_json::to_string(&wire)
+                    .map(|s| s.len())
+                    .unwrap_or(0)
+            })
+            .sum()
+    }
+}
+
+// ── Timeout tracking ──
+
+/// Tracks a deadline for an individual RPC request so that callers can check
+/// whether the request has taken too long and how much time remains.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RpcTimeout {
+    pub timeout_ms: u64,
+    pub start_time_ms: u64,
+}
+
+impl RpcTimeout {
+    /// Create a new timeout that expires `timeout_ms` milliseconds after
+    /// `start_time_ms`.
+    pub fn new(timeout_ms: u64, start_time_ms: u64) -> Self {
+        Self {
+            timeout_ms,
+            start_time_ms,
+        }
+    }
+
+    /// Returns `true` when the deadline has been reached or exceeded.
+    pub fn is_expired(&self, current_time_ms: u64) -> bool {
+        current_time_ms >= self.start_time_ms.saturating_add(self.timeout_ms)
+    }
+
+    /// Milliseconds remaining until the deadline.  Returns `0` once expired.
+    pub fn remaining_ms(&self, current_time_ms: u64) -> u64 {
+        let deadline = self.start_time_ms.saturating_add(self.timeout_ms);
+        deadline.saturating_sub(current_time_ms)
+    }
+
+    /// Push the deadline further into the future by `additional_ms`.
+    pub fn extend(&mut self, additional_ms: u64) {
+        self.timeout_ms = self.timeout_ms.saturating_add(additional_ms);
+    }
+}
+
+// ── Retry policy & state ──
+
+/// Configures exponential-backoff retry behaviour for failed RPC calls.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RetryPolicy {
+    /// Maximum number of retry attempts (not counting the initial call).
+    pub max_retries: u32,
+    /// Base delay in milliseconds; doubled on each successive attempt.
+    pub base_delay_ms: u64,
+    /// Upper bound on the computed delay.
+    pub max_delay_ms: u64,
+}
+
+impl Default for RetryPolicy {
+    fn default() -> Self {
+        Self {
+            max_retries: 3,
+            base_delay_ms: 100,
+            max_delay_ms: 5000,
+        }
+    }
+}
+
+impl RetryPolicy {
+    /// Compute the delay (in ms) for the given `attempt` number using
+    /// exponential backoff: `min(base_delay_ms * 2^attempt, max_delay_ms)`.
+    pub fn delay_for_attempt(&self, attempt: u32) -> u64 {
+        let exp_delay = self
+            .base_delay_ms
+            .saturating_mul(1u64.checked_shl(attempt).unwrap_or(u64::MAX));
+        exp_delay.min(self.max_delay_ms)
+    }
+
+    /// Whether another retry should be attempted.
+    pub fn should_retry(&self, attempt: u32) -> bool {
+        attempt < self.max_retries
+    }
+}
+
+/// Mutable state that accompanies a [`RetryPolicy`] over the lifetime of a
+/// single retriable operation.
+#[derive(Debug, Clone)]
+pub struct RetryState {
+    /// How many attempts have been made so far.
+    pub attempt: u32,
+    /// The policy governing this retry loop.
+    pub policy: RetryPolicy,
+    /// The most recent error message, if any.
+    pub last_error: Option<String>,
+}
+
+impl RetryState {
+    /// Start tracking retries for the given `policy`.
+    pub fn new(policy: RetryPolicy) -> Self {
+        Self {
+            attempt: 0,
+            policy,
+            last_error: None,
+        }
+    }
+
+    /// Record a failure.  Returns `true` when the policy allows another
+    /// retry, `false` when retries are exhausted.
+    pub fn record_failure(&mut self, error: &str) -> bool {
+        self.last_error = Some(error.to_string());
+        self.attempt += 1;
+        self.policy.should_retry(self.attempt)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -670,6 +847,131 @@ mod tests {
         assert_eq!(proxies::EXT_HOST_COMMANDS, "ExtHostCommands");
         assert_eq!(proxies::MAIN_THREAD_DEBUG, "MainThreadDebugService");
         assert_eq!(proxies::EXT_HOST_DEBUG, "ExtHostDebugService");
+    }
+
+    // ── Batch / Timeout / Retry tests ──
+
+    fn sample_request(id: u64) -> RpcMessage {
+        RpcMessage::Request(RpcRequest {
+            id,
+            proxy_id: "TestProxy".into(),
+            method: "doSomething".into(),
+            args: vec![json!(id)],
+        })
+    }
+
+    #[test]
+    fn batch_add_and_drain() {
+        let mut batch = RpcBatch::new(10);
+        batch.add(sample_request(1)).unwrap();
+        batch.add(sample_request(2)).unwrap();
+        assert_eq!(batch.len(), 2);
+
+        let drained = batch.drain();
+        assert_eq!(drained.len(), 2);
+        assert!(batch.is_empty());
+    }
+
+    #[test]
+    fn batch_full_rejects() {
+        let mut batch = RpcBatch::new(2);
+        batch.add(sample_request(1)).unwrap();
+        batch.add(sample_request(2)).unwrap();
+        assert!(batch.is_full());
+
+        let err = batch.add(sample_request(3)).unwrap_err();
+        assert!(err.contains("full"));
+    }
+
+    #[test]
+    fn batch_is_empty() {
+        let batch = RpcBatch::new(5);
+        assert!(batch.is_empty());
+        assert!(!batch.is_full());
+        assert_eq!(batch.len(), 0);
+    }
+
+    #[test]
+    fn batch_total_payload_size() {
+        let mut batch = RpcBatch::new(10);
+        batch.add(sample_request(1)).unwrap();
+        let size = batch.total_payload_size();
+        assert!(size > 0, "payload size should be positive");
+    }
+
+    #[test]
+    fn timeout_not_expired() {
+        let t = RpcTimeout::new(1000, 500);
+        assert!(!t.is_expired(600));
+        assert!(!t.is_expired(1499));
+    }
+
+    #[test]
+    fn timeout_expired() {
+        let t = RpcTimeout::new(1000, 500);
+        assert!(t.is_expired(1500));
+        assert!(t.is_expired(2000));
+    }
+
+    #[test]
+    fn timeout_remaining() {
+        let t = RpcTimeout::new(1000, 500);
+        assert_eq!(t.remaining_ms(600), 900);
+        assert_eq!(t.remaining_ms(1500), 0);
+        assert_eq!(t.remaining_ms(2000), 0);
+    }
+
+    #[test]
+    fn timeout_extend() {
+        let mut t = RpcTimeout::new(1000, 0);
+        assert!(t.is_expired(1000));
+        t.extend(500);
+        assert!(!t.is_expired(1000));
+        assert_eq!(t.remaining_ms(1000), 500);
+    }
+
+    #[test]
+    fn retry_exponential_backoff() {
+        let policy = RetryPolicy {
+            max_retries: 5,
+            base_delay_ms: 100,
+            max_delay_ms: 5000,
+        };
+        assert_eq!(policy.delay_for_attempt(0), 100);  // 100 * 2^0
+        assert_eq!(policy.delay_for_attempt(1), 200);  // 100 * 2^1
+        assert_eq!(policy.delay_for_attempt(2), 400);  // 100 * 2^2
+        assert_eq!(policy.delay_for_attempt(3), 800);  // 100 * 2^3
+        assert_eq!(policy.delay_for_attempt(6), 5000); // capped at max
+    }
+
+    #[test]
+    fn retry_should_retry() {
+        let policy = RetryPolicy::default();
+        assert!(policy.should_retry(0));
+        assert!(policy.should_retry(2));
+        assert!(!policy.should_retry(3));
+        assert!(!policy.should_retry(10));
+    }
+
+    #[test]
+    fn retry_state_record_failure() {
+        let mut state = RetryState::new(RetryPolicy::default()); // max_retries = 3
+        assert!(state.record_failure("err1"));  // attempt 1 < 3
+        assert_eq!(state.attempt, 1);
+        assert!(state.record_failure("err2"));  // attempt 2 < 3
+        assert_eq!(state.attempt, 2);
+        // 3rd failure — retries exhausted (attempt 3 == max_retries)
+        assert!(!state.record_failure("err3"));
+        assert_eq!(state.attempt, 3);
+        assert_eq!(state.last_error.as_deref(), Some("err3"));
+    }
+
+    #[test]
+    fn retry_default_policy() {
+        let p = RetryPolicy::default();
+        assert_eq!(p.max_retries, 3);
+        assert_eq!(p.base_delay_ms, 100);
+        assert_eq!(p.max_delay_ms, 5000);
     }
 
     #[test]

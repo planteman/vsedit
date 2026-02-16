@@ -559,6 +559,214 @@ impl Default for FilesValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// FileReadOptions / FileWriteOptions / file_stat_batch
+// ---------------------------------------------------------------------------
+
+/// Encoding to use when reading a file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileEncoding {
+    Utf8,
+    Utf16Le,
+    Utf16Be,
+    Latin1,
+    Auto,
+}
+
+impl fmt::Display for FileEncoding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Utf8 => write!(f, "UTF-8"),
+            Self::Utf16Le => write!(f, "UTF-16 LE"),
+            Self::Utf16Be => write!(f, "UTF-16 BE"),
+            Self::Latin1 => write!(f, "Latin-1"),
+            Self::Auto => write!(f, "Auto"),
+        }
+    }
+}
+
+/// Options that control how a file is read.
+#[derive(Debug, Clone)]
+pub struct FileReadOptions {
+    /// The text encoding to apply.
+    pub encoding: FileEncoding,
+    /// Whether binary (non-text) files are acceptable.
+    pub accept_binary: bool,
+    /// Optional upper bound on the file size in bytes.
+    pub max_size: Option<u64>,
+    /// Whether to normalise line endings to `\n`.
+    pub line_ending_normalization: bool,
+}
+
+impl Default for FileReadOptions {
+    fn default() -> Self {
+        Self {
+            encoding: FileEncoding::Utf8,
+            accept_binary: false,
+            max_size: None,
+            line_ending_normalization: true,
+        }
+    }
+}
+
+impl FileReadOptions {
+    /// Set the encoding (builder pattern).
+    pub fn with_encoding(mut self, enc: FileEncoding) -> Self {
+        self.encoding = enc;
+        self
+    }
+
+    /// Set the maximum acceptable file size (builder pattern).
+    pub fn with_max_size(mut self, size: u64) -> Self {
+        self.max_size = Some(size);
+        self
+    }
+
+    /// Set whether binary content is accepted (builder pattern).
+    pub fn with_binary(mut self, accept: bool) -> Self {
+        self.accept_binary = accept;
+        self
+    }
+
+    /// Returns `true` when a file with the given `size` and binary flag would
+    /// be accepted under these options.
+    pub fn would_accept(&self, size: u64, is_binary: bool) -> bool {
+        if is_binary && !self.accept_binary {
+            return false;
+        }
+        if let Some(max) = self.max_size {
+            if size > max {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+/// Options that control how a file is written.
+#[derive(Debug, Clone)]
+pub struct FileWriteOptions {
+    /// Create intermediate parent directories if they don't exist.
+    pub create_parents: bool,
+    /// Allow overwriting an existing file.
+    pub overwrite: bool,
+    /// Use atomic write (write-to-tmp then rename).
+    pub atomic: bool,
+    /// Create a backup of the existing file before writing.
+    pub backup_before_write: bool,
+}
+
+impl Default for FileWriteOptions {
+    fn default() -> Self {
+        Self {
+            create_parents: true,
+            overwrite: true,
+            atomic: false,
+            backup_before_write: false,
+        }
+    }
+}
+
+impl FileWriteOptions {
+    /// Set atomic write (builder pattern).
+    pub fn with_atomic(mut self, atomic: bool) -> Self {
+        self.atomic = atomic;
+        self
+    }
+
+    /// Set backup-before-write (builder pattern).
+    pub fn with_backup(mut self, backup: bool) -> Self {
+        self.backup_before_write = backup;
+        self
+    }
+
+    /// Set overwrite flag (builder pattern).
+    pub fn with_overwrite(mut self, overwrite: bool) -> Self {
+        self.overwrite = overwrite;
+        self
+    }
+
+    /// Set create-parents flag (builder pattern).
+    pub fn with_create_parents(mut self, create_parents: bool) -> Self {
+        self.create_parents = create_parents;
+        self
+    }
+
+    /// Validates whether a write is permissible.
+    ///
+    /// Returns `Err` with a description when the file already exists but
+    /// `overwrite` is `false`.
+    pub fn validate_write(&self, file_exists: bool) -> Result<(), String> {
+        if file_exists && !self.overwrite {
+            return Err("file already exists and overwrite is disabled".into());
+        }
+        Ok(())
+    }
+}
+
+/// Result of a lightweight (no-I/O) path inspection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileStatResult {
+    /// The original path string.
+    pub path: String,
+    /// Estimated size – always `0` since we don't touch the filesystem.
+    pub size: u64,
+    /// `true` when the path looks like a directory (ends with `/` or `\`).
+    pub is_dir: bool,
+    /// `true` when the path contains a symlink indicator (`->`) — a
+    /// heuristic useful for `ls -l` style output.
+    pub is_symlink: bool,
+    /// The file extension extracted from the path, if any.
+    pub extension: Option<String>,
+}
+
+impl fmt::Display for FileStatResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let kind = if self.is_dir {
+            "dir"
+        } else if self.is_symlink {
+            "symlink"
+        } else {
+            "file"
+        };
+        let ext = self.extension.as_deref().unwrap_or("(none)");
+        write!(
+            f,
+            "{} [{}] size={} ext={}",
+            self.path, kind, self.size, ext
+        )
+    }
+}
+
+/// Parse a batch of path strings into [`FileStatResult`] values.
+///
+/// This function does **not** access the filesystem – it only examines the
+/// path strings themselves. Extension is derived from the final `.`-delimited
+/// segment, and a trailing `/` or `\` is taken as a directory indicator.
+pub fn file_stat_batch(paths: &[&str]) -> Vec<FileStatResult> {
+    paths.iter().map(|p| {
+        let is_dir = p.ends_with('/') || p.ends_with('\\');
+        let is_symlink = p.contains(" -> ");
+
+        let extension = if is_dir {
+            None
+        } else {
+            std::path::Path::new(p)
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.to_string())
+        };
+
+        FileStatResult {
+            path: p.to_string(),
+            size: 0,
+            is_dir,
+            is_symlink,
+            extension,
+        }
+    }).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -699,6 +907,84 @@ mod tests {
     #[test]
     fn ne_filechangetype_diff() {
         assert_ne!(FileChangeType::Created, FileChangeType::Changed);
+    }
+
+    // ---- FileReadOptions / FileWriteOptions / file_stat_batch tests ----
+
+    #[test]
+    fn read_options_default() {
+        let opts = FileReadOptions::default();
+        assert_eq!(opts.encoding, FileEncoding::Utf8);
+        assert!(!opts.accept_binary);
+        assert!(opts.max_size.is_none());
+        assert!(opts.line_ending_normalization);
+    }
+
+    #[test]
+    fn read_options_builder() {
+        let opts = FileReadOptions::default()
+            .with_encoding(FileEncoding::Utf16Le)
+            .with_max_size(1024)
+            .with_binary(true);
+        assert_eq!(opts.encoding, FileEncoding::Utf16Le);
+        assert!(opts.accept_binary);
+        assert_eq!(opts.max_size, Some(1024));
+    }
+
+    #[test]
+    fn read_options_would_accept_valid() {
+        let opts = FileReadOptions::default()
+            .with_max_size(2048)
+            .with_binary(true);
+        assert!(opts.would_accept(100, false));
+        assert!(opts.would_accept(2048, true));
+    }
+
+    #[test]
+    fn read_options_rejects_binary() {
+        let opts = FileReadOptions::default(); // accept_binary = false
+        assert!(!opts.would_accept(10, true));
+    }
+
+    #[test]
+    fn read_options_rejects_too_large() {
+        let opts = FileReadOptions::default().with_max_size(500);
+        assert!(!opts.would_accept(501, false));
+        assert!(opts.would_accept(500, false));
+    }
+
+    #[test]
+    fn write_options_default() {
+        let opts = FileWriteOptions::default();
+        assert!(opts.create_parents);
+        assert!(opts.overwrite);
+        assert!(!opts.atomic);
+        assert!(!opts.backup_before_write);
+    }
+
+    #[test]
+    fn write_options_validate_no_overwrite() {
+        let opts = FileWriteOptions::default().with_overwrite(false);
+        assert!(opts.validate_write(true).is_err());
+        assert!(opts.validate_write(false).is_ok());
+    }
+
+    #[test]
+    fn file_stat_batch_parses_paths() {
+        let results = file_stat_batch(&["/tmp/dir/", "some_file.txt", "link -> target"]);
+        assert_eq!(results.len(), 3);
+        assert!(results[0].is_dir);
+        assert!(!results[1].is_dir);
+        assert!(results[2].is_symlink);
+    }
+
+    #[test]
+    fn file_stat_batch_detects_extension() {
+        let results = file_stat_batch(&["foo.rs", "bar.tar.gz", "no_ext", "trailing/"]);
+        assert_eq!(results[0].extension.as_deref(), Some("rs"));
+        assert_eq!(results[1].extension.as_deref(), Some("gz"));
+        assert!(results[2].extension.is_none());
+        assert!(results[3].extension.is_none()); // directory – no extension
     }
 
     #[test]

@@ -521,6 +521,172 @@ impl Default for WbPathValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// PathBar – breadcrumb-style path display
+// ---------------------------------------------------------------------------
+
+/// A breadcrumb-style path display that splits a path into navigable segments.
+#[derive(Debug, Clone)]
+pub struct PathBar {
+    /// The individual path segments (directory/file names).
+    pub segments: Vec<String>,
+    /// The separator character used in the original path.
+    pub separator: char,
+}
+
+impl PathBar {
+    /// Create a `PathBar` by splitting `path` according to the given
+    /// [`PathSeparator`] style.
+    pub fn from_path(path: &str, separator: PathSeparator) -> Self {
+        let sep = match separator {
+            PathSeparator::Unix => '/',
+            PathSeparator::Windows => '\\',
+        };
+        let segments: Vec<String> = path
+            .split(sep)
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect();
+        Self {
+            segments,
+            separator: sep,
+        }
+    }
+
+    /// Render the breadcrumb as `"seg1 > seg2 > seg3"`.
+    pub fn render(&self) -> String {
+        self.segments.join(" > ")
+    }
+
+    /// Return a new `PathBar` that keeps only the last `max_segments` segments.
+    ///
+    /// If truncation occurs the first visible segment is prefixed with `"…"`.
+    pub fn truncate(&self, max_segments: usize) -> PathBar {
+        if self.segments.len() <= max_segments {
+            return self.clone();
+        }
+        let start = self.segments.len() - max_segments;
+        let mut truncated: Vec<String> = self.segments[start..].to_vec();
+        if let Some(first) = truncated.first_mut() {
+            *first = format!("…{}{}", self.separator, first);
+        }
+        PathBar {
+            segments: truncated,
+            separator: self.separator,
+        }
+    }
+
+    /// Return the number of segments in the path bar.
+    pub fn segment_count(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// Simulate clicking on a segment at `index`.
+    ///
+    /// Returns the full path up to and including that segment, or `None` if
+    /// the index is out of range.
+    pub fn click_segment(&self, index: usize) -> Option<String> {
+        if index >= self.segments.len() {
+            return None;
+        }
+        let sep = self.separator.to_string();
+        let joined = self.segments[..=index].join(&sep);
+        // Preserve a leading separator for absolute Unix paths.
+        if self.separator == '/' {
+            Some(format!("/{joined}"))
+        } else {
+            Some(joined)
+        }
+    }
+}
+
+impl fmt::Display for PathBar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.render())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathCompletionProvider – path autocomplete
+// ---------------------------------------------------------------------------
+
+/// Provides path auto-completion against a set of known paths.
+#[derive(Debug, Clone)]
+pub struct PathCompletionProvider {
+    /// The set of known paths available for completion.
+    pub known_paths: Vec<String>,
+}
+
+impl PathCompletionProvider {
+    /// Create an empty provider.
+    pub fn new() -> Self {
+        Self {
+            known_paths: Vec::new(),
+        }
+    }
+
+    /// Register a path for future completions.
+    pub fn add_path(&mut self, path: &str) {
+        self.known_paths.push(path.to_string());
+    }
+
+    /// Return all known paths that start with `partial`, sorted
+    /// lexicographically.
+    pub fn complete<'a>(&'a self, partial: &str) -> Vec<&'a str> {
+        let mut matches: Vec<&str> = self
+            .known_paths
+            .iter()
+            .filter(|p| p.starts_with(partial))
+            .map(String::as_str)
+            .collect();
+        matches.sort();
+        matches
+    }
+
+    /// Return all known paths whose **basename** (last component) starts with
+    /// `partial`, sorted lexicographically.
+    pub fn complete_basename<'a>(&'a self, partial: &str) -> Vec<&'a str> {
+        let mut matches: Vec<&str> = self
+            .known_paths
+            .iter()
+            .filter(|p| {
+                let basename = p.rsplit('/').next().or_else(|| p.rsplit('\\').next()).unwrap_or(p);
+                basename.starts_with(partial)
+            })
+            .map(String::as_str)
+            .collect();
+        matches.sort();
+        matches
+    }
+}
+
+impl Default for PathCompletionProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// path_shorten – replace home directory prefix with "~"
+// ---------------------------------------------------------------------------
+
+/// Shorten `path` by replacing a leading `home_dir` prefix with `~`.
+///
+/// If `path` does not start with `home_dir` the original string is returned
+/// unchanged.
+pub fn path_shorten(path: &str, home_dir: &str) -> String {
+    let home = home_dir.trim_end_matches('/');
+    if path == home {
+        return "~".to_string();
+    }
+    if let Some(rest) = path.strip_prefix(home) {
+        if rest.starts_with('/') {
+            return format!("~{rest}");
+        }
+    }
+    path.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -643,6 +809,84 @@ mod tests {
     #[test]
     fn ne_pathseparator_diff() {
         assert_ne!(PathSeparator::Unix, PathSeparator::Windows);
+    }
+
+    #[test]
+    fn pathbar_from_unix_path() {
+        let bar = PathBar::from_path("/home/user/docs", PathSeparator::Unix);
+        assert_eq!(bar.segments, vec!["home", "user", "docs"]);
+        assert_eq!(bar.separator, '/');
+    }
+
+    #[test]
+    fn pathbar_render() {
+        let bar = PathBar::from_path("/a/b/c", PathSeparator::Unix);
+        assert_eq!(bar.render(), "a > b > c");
+    }
+
+    #[test]
+    fn pathbar_truncate() {
+        let bar = PathBar::from_path("/a/b/c/d", PathSeparator::Unix);
+        let t = bar.truncate(2);
+        assert_eq!(t.segment_count(), 2);
+        assert_eq!(t.render(), "…/c > d");
+
+        // No truncation when within limit.
+        let t2 = bar.truncate(10);
+        assert_eq!(t2.segment_count(), 4);
+    }
+
+    #[test]
+    fn pathbar_click_segment() {
+        let bar = PathBar::from_path("/home/user/docs", PathSeparator::Unix);
+        assert_eq!(bar.click_segment(0), Some("/home".to_string()));
+        assert_eq!(bar.click_segment(1), Some("/home/user".to_string()));
+        assert_eq!(bar.click_segment(2), Some("/home/user/docs".to_string()));
+        assert_eq!(bar.click_segment(5), None);
+    }
+
+    #[test]
+    fn completion_provider_complete() {
+        let mut cp = PathCompletionProvider::new();
+        cp.add_path("/home/user/docs");
+        cp.add_path("/home/user/downloads");
+        cp.add_path("/etc/config");
+
+        let results = cp.complete("/home/user/do");
+        assert_eq!(results, vec!["/home/user/docs", "/home/user/downloads"]);
+
+        let empty = cp.complete("/var");
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn completion_provider_complete_basename() {
+        let mut cp = PathCompletionProvider::new();
+        cp.add_path("/home/user/docs");
+        cp.add_path("/home/user/downloads");
+        cp.add_path("/etc/default");
+
+        let results = cp.complete_basename("do");
+        assert_eq!(results, vec!["/home/user/docs", "/home/user/downloads"]);
+    }
+
+    #[test]
+    fn path_shorten_replaces_home() {
+        assert_eq!(path_shorten("/home/user/docs", "/home/user"), "~/docs");
+        assert_eq!(path_shorten("/home/user", "/home/user"), "~");
+        assert_eq!(
+            path_shorten("/home/user/a/b", "/home/user/"),
+            "~/a/b"
+        );
+    }
+
+    #[test]
+    fn path_shorten_no_home_prefix() {
+        assert_eq!(path_shorten("/etc/config", "/home/user"), "/etc/config");
+        assert_eq!(
+            path_shorten("/home/username/file", "/home/user"),
+            "/home/username/file"
+        );
     }
 
     #[test]

@@ -485,6 +485,106 @@ impl Default for OutlineViewValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DocumentSymbolTree
+// ---------------------------------------------------------------------------
+
+/// Renders an outline model as an indented text tree.
+pub struct DocumentSymbolTree {
+    lines: Vec<(String, OutlineKind, usize)>,
+}
+
+impl DocumentSymbolTree {
+    /// Build a tree from an outline model.
+    pub fn new(model: &OutlineModel) -> Self {
+        let mut lines = Vec::new();
+        fn collect(elems: &[OutlineElement], depth: usize, out: &mut Vec<(String, OutlineKind, usize)>) {
+            for e in elems {
+                out.push((e.label.clone(), e.kind, depth));
+                collect(&e.children, depth + 1, out);
+            }
+        }
+        collect(&model.elements, 0, &mut lines);
+        Self { lines }
+    }
+
+    /// Render the tree with indentation (2 spaces per depth level).
+    pub fn render(&self) -> String {
+        self.lines
+            .iter()
+            .map(|(label, kind, depth)| self.render_line(label, *kind, *depth))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Render a single line with indentation.
+    pub fn render_line(&self, label: &str, kind: OutlineKind, depth: usize) -> String {
+        let indent = "  ".repeat(depth);
+        format!("{indent}{label} ({kind})")
+    }
+
+    /// Total number of nodes in the tree.
+    pub fn total_nodes(&self) -> usize {
+        self.lines.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// outline_filter / outline_exclude
+// ---------------------------------------------------------------------------
+
+/// Return elements matching any of the given kinds.
+pub fn outline_filter<'a>(model: &'a OutlineModel, kinds: &[OutlineKind]) -> Vec<&'a OutlineElement> {
+    model.flatten().into_iter().filter(|e| kinds.contains(&e.kind)).collect()
+}
+
+/// Return elements NOT matching any of the given kinds.
+pub fn outline_exclude<'a>(model: &'a OutlineModel, kinds: &[OutlineKind]) -> Vec<&'a OutlineElement> {
+    model.flatten().into_iter().filter(|e| !kinds.contains(&e.kind)).collect()
+}
+
+// ---------------------------------------------------------------------------
+// outline_breadcrumb
+// ---------------------------------------------------------------------------
+
+/// Returns a formatted breadcrumb string like "Class > Method > Variable".
+pub fn outline_breadcrumb(model: &OutlineModel, line: u32) -> String {
+    outline_breadcrumb_labels(model, line).join(" > ")
+}
+
+/// Returns just the labels of the breadcrumb path.
+pub fn outline_breadcrumb_labels(model: &OutlineModel, line: u32) -> Vec<String> {
+    model
+        .breadcrumb_at_line(line)
+        .iter()
+        .map(|e| e.label.clone())
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// OutlineModel extensions
+// ---------------------------------------------------------------------------
+
+impl OutlineModel {
+    /// Merge elements from another model into this one.
+    pub fn merge(&mut self, other: &OutlineModel) {
+        self.elements.extend(other.elements.iter().cloned());
+    }
+
+    /// Find the first element with an exact label match (searches all levels).
+    pub fn find_by_label(&self, label: &str) -> Option<&OutlineElement> {
+        self.flatten().into_iter().find(|e| e.label == label)
+    }
+
+    /// Return unique kinds present in the model.
+    pub fn kinds_present(&self) -> Vec<OutlineKind> {
+        let mut kinds: Vec<OutlineKind> = self.flatten().iter().map(|e| e.kind).collect();
+        kinds.sort_by_key(|k| format!("{k:?}"));
+        kinds.dedup();
+        kinds
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -701,153 +801,128 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn document_symbol_tree_render() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(
+            elem("MyClass", OutlineKind::Class, 1, 50)
+                .with_child(elem("method_a", OutlineKind::Method, 5, 20))
+                .with_child(elem("field_x", OutlineKind::Field, 22, 22)),
+        );
+        model.add_element(elem("helper", OutlineKind::Function, 52, 60));
+        let tree = DocumentSymbolTree::new(&model);
+        assert_eq!(tree.total_nodes(), 4);
+        let rendered = tree.render();
+        assert!(rendered.contains("MyClass (Class)"));
+        assert!(rendered.contains("  method_a (Method)"));
+        assert!(rendered.contains("  field_x (Field)"));
+        assert!(rendered.contains("helper (Function)"));
     }
 
     #[test]
-    fn behavior_check_1() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn document_symbol_tree_empty() {
+        let model = OutlineModel::new("empty.rs");
+        let tree = DocumentSymbolTree::new(&model);
+        assert_eq!(tree.total_nodes(), 0);
+        assert_eq!(tree.render(), "");
     }
 
     #[test]
-    fn behavior_check_2() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn outline_filter_by_kinds() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(elem("main", OutlineKind::Function, 1, 10));
+        model.add_element(elem("Foo", OutlineKind::Struct, 12, 30));
+        model.add_element(elem("BAR", OutlineKind::Constant, 32, 32));
+        let fns = outline_filter(&model, &[OutlineKind::Function, OutlineKind::Constant]);
+        assert_eq!(fns.len(), 2);
+        assert_eq!(fns[0].label, "main");
+        assert_eq!(fns[1].label, "BAR");
     }
 
     #[test]
-    fn behavior_check_3() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn outline_exclude_by_kinds() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(elem("main", OutlineKind::Function, 1, 10));
+        model.add_element(elem("Foo", OutlineKind::Struct, 12, 30));
+        model.add_element(elem("BAR", OutlineKind::Constant, 32, 32));
+        let not_fns = outline_exclude(&model, &[OutlineKind::Function]);
+        assert_eq!(not_fns.len(), 2);
+        assert_eq!(not_fns[0].label, "Foo");
+        assert_eq!(not_fns[1].label, "BAR");
     }
 
     #[test]
-    fn behavior_check_4() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn outline_breadcrumb_formatted() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(
+            elem("MyClass", OutlineKind::Class, 1, 50)
+                .with_child(
+                    elem("my_method", OutlineKind::Method, 10, 40)
+                        .with_child(elem("local_var", OutlineKind::Variable, 15, 15)),
+                ),
+        );
+        let bc = outline_breadcrumb(&model, 15);
+        assert_eq!(bc, "MyClass > my_method > local_var");
+
+        let labels = outline_breadcrumb_labels(&model, 15);
+        assert_eq!(labels, vec!["MyClass", "my_method", "local_var"]);
     }
 
     #[test]
-    fn behavior_check_5() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn outline_breadcrumb_empty_for_unknown_line() {
+        let model = OutlineModel::new("file.rs");
+        assert_eq!(outline_breadcrumb(&model, 99), "");
+        assert!(outline_breadcrumb_labels(&model, 99).is_empty());
     }
 
     #[test]
-    fn behavior_check_6() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn model_merge() {
+        let mut m1 = OutlineModel::new("a.rs");
+        m1.add_element(elem("foo", OutlineKind::Function, 1, 10));
+        let mut m2 = OutlineModel::new("b.rs");
+        m2.add_element(elem("bar", OutlineKind::Function, 1, 5));
+        m2.add_element(elem("Baz", OutlineKind::Struct, 6, 20));
+        m1.merge(&m2);
+        assert_eq!(m1.element_count(), 3);
     }
 
     #[test]
-    fn behavior_check_7() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn model_find_by_label() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(
+            elem("Parent", OutlineKind::Class, 1, 50)
+                .with_child(elem("nested_child", OutlineKind::Method, 5, 20)),
+        );
+        model.add_element(elem("top_level", OutlineKind::Function, 52, 60));
+
+        let found = model.find_by_label("nested_child").unwrap();
+        assert_eq!(found.kind, OutlineKind::Method);
+
+        let found2 = model.find_by_label("top_level").unwrap();
+        assert_eq!(found2.kind, OutlineKind::Function);
+
+        assert!(model.find_by_label("nonexistent").is_none());
     }
 
     #[test]
-    fn behavior_check_8() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn model_kinds_present() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(elem("main", OutlineKind::Function, 1, 10));
+        model.add_element(elem("Foo", OutlineKind::Struct, 12, 30));
+        model.add_element(elem("helper", OutlineKind::Function, 32, 40));
+        let kinds = model.kinds_present();
+        assert!(kinds.contains(&OutlineKind::Function));
+        assert!(kinds.contains(&OutlineKind::Struct));
+        assert_eq!(kinds.len(), 2); // deduped
     }
 
     #[test]
-    fn behavior_check_9() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_10() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_27() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_28() {
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_29() {
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn render_line_indentation() {
+        let model = OutlineModel::new("file.rs");
+        let tree = DocumentSymbolTree::new(&model);
+        let line = tree.render_line("foo", OutlineKind::Function, 0);
+        assert_eq!(line, "foo (Function)");
+        let line2 = tree.render_line("bar", OutlineKind::Method, 2);
+        assert_eq!(line2, "    bar (Method)");
     }
 
     #[test]

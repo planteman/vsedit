@@ -12,7 +12,7 @@ vsedit-stream = { path = "../vsedit-stream" }
 vsedit-uri = { path = "../vsedit-uri" }
 notify = "7"
 thiserror = { workspace = true }
-tokio = { version = "1", features = ["fs", "sync"] }
+tokio = { version = "1", features = ["fs", "sync", "time", "test-util", "macros", "rt"] }
 tracing = { workspace = true }
 walkdir = "2"
 

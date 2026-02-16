@@ -625,6 +625,85 @@ impl Default for ExtOutputValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// OutputBridge extensions
+// ---------------------------------------------------------------------------
+
+impl OutputBridge {
+    /// Append multiple lines at once to a channel.
+    pub fn append_multiple_lines(&mut self, channel_id: &str, lines: &[&str]) {
+        for line in lines {
+            self.append_line(channel_id, line);
+        }
+    }
+
+    /// Append a line with an auto-incrementing counter prefix. Returns the formatted line.
+    pub fn append_timestamped(&mut self, channel_id: &str, line: &str) -> String {
+        let counter = if let Some(ch) = self.channels.iter().find(|c| c.id == channel_id) {
+            ch.line_count() + 1
+        } else {
+            0
+        };
+        let formatted = format!("[{:04}] {}", counter, line);
+        self.append_line(channel_id, &formatted);
+        formatted
+    }
+
+    /// Clear channel but preserve the first `preserve_lines` lines as a header.
+    pub fn clear_with_options(&mut self, channel_id: &str, preserve_lines: usize) {
+        if let Some(ch) = self.channels.iter_mut().find(|c| c.id == channel_id) {
+            if preserve_lines == 0 {
+                ch.content.clear();
+                return;
+            }
+            let lines: Vec<&str> = ch.content.lines().collect();
+            let kept = lines.iter().take(preserve_lines).copied().collect::<Vec<_>>();
+            ch.content = kept.join("\n");
+        }
+    }
+
+    /// Export a channel's content with header metadata.
+    pub fn export_channel(&self, channel_id: &str) -> Result<String, OutputError> {
+        let ch = self
+            .channels
+            .iter()
+            .find(|c| c.id == channel_id)
+            .ok_or_else(|| OutputError::ChannelNotFound(channel_id.to_string()))?;
+        Ok(format!(
+            "--- Channel: {} (id: {}) ---\n{}",
+            ch.name, ch.id, ch.content
+        ))
+    }
+
+    /// Find channels whose name matches the given string.
+    pub fn find_channels_by_name(&self, name: &str) -> Vec<&OutputChannel> {
+        self.channels.iter().filter(|c| c.name == name).collect()
+    }
+
+    /// Merge source channel content into target channel.
+    pub fn merge_channels(&mut self, source_id: &str, target_id: &str) -> Result<(), OutputError> {
+        let source_content = self
+            .channels
+            .iter()
+            .find(|c| c.id == source_id)
+            .ok_or_else(|| OutputError::ChannelNotFound(source_id.to_string()))?
+            .content
+            .clone();
+
+        let target = self
+            .channels
+            .iter_mut()
+            .find(|c| c.id == target_id)
+            .ok_or_else(|| OutputError::ChannelNotFound(target_id.to_string()))?;
+
+        if !target.content.is_empty() && !source_content.is_empty() {
+            target.content.push('\n');
+        }
+        target.content.push_str(&source_content);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -989,5 +1068,98 @@ mod tests {
     fn ext_output_is_ascii_printable() {
         assert!(ExtOutputValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtOutputValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn append_multiple_lines_at_once() {
+        let mut bridge = OutputBridge::new();
+        let id = bridge.create_channel("Test", None);
+        bridge.append_multiple_lines(&id, &["line1", "line2", "line3"]);
+        let ch = bridge.get_channel(&id).unwrap();
+        assert_eq!(ch.line_count(), 3);
+        assert_eq!(ch.content, "line1\nline2\nline3");
+    }
+
+    #[test]
+    fn append_timestamped_increments() {
+        let mut bridge = OutputBridge::new();
+        let id = bridge.create_channel("Log", None);
+        let line1 = bridge.append_timestamped(&id, "hello");
+        assert_eq!(line1, "[0001] hello");
+        let line2 = bridge.append_timestamped(&id, "world");
+        assert_eq!(line2, "[0002] world");
+    }
+
+    #[test]
+    fn clear_with_options_preserve_header() {
+        let mut bridge = OutputBridge::new();
+        let id = bridge.create_channel("Build", None);
+        bridge.append_multiple_lines(&id, &["=== Header ===", "line1", "line2", "line3"]);
+        bridge.clear_with_options(&id, 1);
+        let ch = bridge.get_channel(&id).unwrap();
+        assert_eq!(ch.content, "=== Header ===");
+        assert_eq!(ch.line_count(), 1);
+    }
+
+    #[test]
+    fn clear_with_options_preserve_zero() {
+        let mut bridge = OutputBridge::new();
+        let id = bridge.create_channel("X", None);
+        bridge.append_line(&id, "data");
+        bridge.clear_with_options(&id, 0);
+        let ch = bridge.get_channel(&id).unwrap();
+        assert!(ch.content.is_empty());
+    }
+
+    #[test]
+    fn export_channel_format() {
+        let mut bridge = OutputBridge::new();
+        let id = bridge.create_channel("Build", None);
+        bridge.append_line(&id, "compiling...");
+        let export = bridge.export_channel(&id).unwrap();
+        assert!(export.contains("--- Channel: Build"));
+        assert!(export.contains(&format!("(id: {})", id)));
+        assert!(export.contains("compiling..."));
+    }
+
+    #[test]
+    fn export_channel_not_found() {
+        let bridge = OutputBridge::new();
+        let err = bridge.export_channel("nonexistent").unwrap_err();
+        assert!(matches!(err, OutputError::ChannelNotFound(_)));
+    }
+
+    #[test]
+    fn find_channels_by_name_matches() {
+        let mut bridge = OutputBridge::new();
+        bridge.create_channel("Build", None);
+        bridge.create_channel("Build", None);
+        bridge.create_channel("Test", None);
+        let found = bridge.find_channels_by_name("Build");
+        assert_eq!(found.len(), 2);
+        let found_test = bridge.find_channels_by_name("Test");
+        assert_eq!(found_test.len(), 1);
+        let found_none = bridge.find_channels_by_name("Missing");
+        assert!(found_none.is_empty());
+    }
+
+    #[test]
+    fn merge_channels_success() {
+        let mut bridge = OutputBridge::new();
+        let src = bridge.create_channel("Source", None);
+        let tgt = bridge.create_channel("Target", None);
+        bridge.append_line(&src, "source line");
+        bridge.append_line(&tgt, "target line");
+        bridge.merge_channels(&src, &tgt).unwrap();
+        let target = bridge.get_channel(&tgt).unwrap();
+        assert_eq!(target.content, "target line\nsource line");
+    }
+
+    #[test]
+    fn merge_channels_not_found() {
+        let mut bridge = OutputBridge::new();
+        let id = bridge.create_channel("A", None);
+        assert!(bridge.merge_channels("nope", &id).is_err());
+        assert!(bridge.merge_channels(&id, "nope").is_err());
     }
 }
