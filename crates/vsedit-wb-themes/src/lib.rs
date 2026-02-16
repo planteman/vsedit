@@ -79,10 +79,22 @@ impl ColorTheme {
     }
 }
 
+/// Summary information about a theme.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ThemeSummary {
+    pub id: String,
+    pub label: String,
+    pub theme_type: ThemeType,
+}
+
+/// Callback type for theme change events.
+type ThemeChangeCallback = Box<dyn Fn(&ColorTheme)>;
+
 /// Service for theme management.
 pub struct ThemeService {
     themes: Vec<ColorTheme>,
     active_theme: Option<usize>,
+    change_listeners: Vec<ThemeChangeCallback>,
 }
 
 impl ThemeService {
@@ -90,19 +102,47 @@ impl ThemeService {
         Self {
             themes: Vec::new(),
             active_theme: None,
+            change_listeners: Vec::new(),
         }
+    }
+
+    /// Create a `ThemeService` pre-loaded with all built-in themes from
+    /// `vsedit-theme`.
+    pub fn with_builtins() -> Self {
+        let mut svc = Self::new();
+        for theme in vsedit_theme::builtin_themes() {
+            svc.register_core_theme(theme);
+        }
+        svc
     }
 
     pub fn register_theme(&mut self, theme: ColorTheme) {
         self.themes.push(theme);
     }
 
+    /// Register a theme from `vsedit-theme::ColorTheme`, converting to the
+    /// local `ColorTheme` type.
+    pub fn register_core_theme(&mut self, core: vsedit_theme::ColorTheme) {
+        let theme = convert_core_theme(core);
+        self.themes.push(theme);
+    }
+
     pub fn set_active(&mut self, id: &str) -> bool {
         if let Some(idx) = self.themes.iter().position(|t| t.id == id) {
             self.active_theme = Some(idx);
+            self.fire_change();
             true
         } else {
             false
+        }
+    }
+
+    /// Set the active theme, returning an error if not found.
+    pub fn set_theme(&mut self, id: &str) -> Result<(), ThemeError> {
+        if self.set_active(id) {
+            Ok(())
+        } else {
+            Err(ThemeError::ThemeNotFound(id.to_string()))
         }
     }
 
@@ -162,6 +202,35 @@ impl ThemeService {
     /// Get the theme type of the currently active theme.
     pub fn active_theme_type(&self) -> Option<&ThemeType> {
         self.get_active().map(|t| &t.theme_type)
+    }
+
+    /// Return a summary list of all registered themes.
+    pub fn list_themes(&self) -> Vec<ThemeSummary> {
+        self.themes.iter().map(|t| ThemeSummary {
+            id: t.id.clone(),
+            label: t.label.clone(),
+            theme_type: t.theme_type.clone(),
+        }).collect()
+    }
+
+    /// Register a callback invoked whenever the active theme changes.
+    pub fn on_did_change_theme<F: Fn(&ColorTheme) + 'static>(&mut self, f: F) {
+        self.change_listeners.push(Box::new(f));
+    }
+
+    /// Returns `true` if the active theme is a high-contrast variant.
+    pub fn is_high_contrast(&self) -> bool {
+        self.get_active().map_or(false, |t| {
+            matches!(t.theme_type, ThemeType::HighContrast | ThemeType::HighContrastLight)
+        })
+    }
+
+    fn fire_change(&self) {
+        if let Some(theme) = self.get_active() {
+            for cb in &self.change_listeners {
+                cb(theme);
+            }
+        }
     }
 }
 
@@ -320,6 +389,36 @@ impl ColorTheme {
         let mut keys: Vec<&str> = self.colors.keys().map(|k| k.as_str()).collect();
         keys.sort();
         keys
+    }
+}
+
+/// Convert a `vsedit_theme::ColorTheme` into the local `ColorTheme`.
+fn convert_core_theme(core: vsedit_theme::ColorTheme) -> ColorTheme {
+    let colors: HashMap<String, String> = core.colors.iter()
+        .map(|(k, v)| (k.clone(), v.to_hex()))
+        .collect();
+
+    let token_colors: Vec<TokenColor> = core.token_colors.iter()
+        .map(|tc| TokenColor {
+            scope: tc.scope.clone(),
+            foreground: tc.settings.foreground.map(|c| c.to_hex()),
+            font_style: tc.settings.font_style.clone(),
+        })
+        .collect();
+
+    let theme_type = match core.theme_type {
+        vsedit_theme::ThemeType::Light => ThemeType::Light,
+        vsedit_theme::ThemeType::Dark => ThemeType::Dark,
+        vsedit_theme::ThemeType::HighContrast => ThemeType::HighContrast,
+        vsedit_theme::ThemeType::HighContrastLight => ThemeType::HighContrastLight,
+    };
+
+    ColorTheme {
+        id: core.id,
+        label: core.label,
+        theme_type,
+        colors,
+        token_colors,
     }
 }
 
@@ -659,5 +758,127 @@ mod tests {
         assert_eq!(keys[1], "editor.background");
         assert_eq!(keys[2], "editor.foreground");
         assert_eq!(keys[3], "statusBar.background");
+    }
+
+    // -- ThemeSummary / list_themes --
+
+    #[test]
+    fn list_themes_empty() {
+        let svc = ThemeService::new();
+        assert!(svc.list_themes().is_empty());
+    }
+
+    #[test]
+    fn list_themes_populated() {
+        let mut svc = ThemeService::new();
+        svc.register_theme(dark_theme());
+        svc.register_theme(ColorTheme {
+            id: "light-plus".into(),
+            label: "Light+".into(),
+            theme_type: ThemeType::Light,
+            colors: HashMap::new(),
+            token_colors: Vec::new(),
+        });
+        let summaries = svc.list_themes();
+        assert_eq!(summaries.len(), 2);
+        assert_eq!(summaries[0].id, "dark-plus");
+        assert_eq!(summaries[0].label, "Dark+");
+        assert_eq!(summaries[0].theme_type, ThemeType::Dark);
+        assert_eq!(summaries[1].id, "light-plus");
+    }
+
+    // -- set_theme --
+
+    #[test]
+    fn set_theme_ok() {
+        let mut svc = ThemeService::new();
+        svc.register_theme(dark_theme());
+        assert!(svc.set_theme("dark-plus").is_ok());
+        assert_eq!(svc.get_active().unwrap().id, "dark-plus");
+    }
+
+    #[test]
+    fn set_theme_not_found() {
+        let mut svc = ThemeService::new();
+        let err = svc.set_theme("missing").unwrap_err();
+        assert_eq!(err, ThemeError::ThemeNotFound("missing".into()));
+    }
+
+    // -- on_did_change_theme --
+
+    #[test]
+    fn on_did_change_theme_fires() {
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        let mut svc = ThemeService::new();
+        svc.register_theme(dark_theme());
+
+        let called = Rc::new(Cell::new(false));
+        let called_clone = called.clone();
+        svc.on_did_change_theme(move |_theme| {
+            called_clone.set(true);
+        });
+
+        svc.set_active("dark-plus");
+        assert!(called.get());
+    }
+
+    // -- is_high_contrast --
+
+    #[test]
+    fn is_high_contrast_false() {
+        let mut svc = ThemeService::new();
+        svc.register_theme(dark_theme());
+        svc.set_active("dark-plus");
+        assert!(!svc.is_high_contrast());
+    }
+
+    #[test]
+    fn is_high_contrast_true() {
+        let mut svc = ThemeService::new();
+        svc.register_theme(ColorTheme {
+            id: "hc".into(),
+            label: "HC".into(),
+            theme_type: ThemeType::HighContrast,
+            colors: HashMap::new(),
+            token_colors: Vec::new(),
+        });
+        svc.set_active("hc");
+        assert!(svc.is_high_contrast());
+    }
+
+    // -- with_builtins --
+
+    #[test]
+    fn with_builtins_loads_themes() {
+        let svc = ThemeService::with_builtins();
+        assert!(svc.theme_count() >= 6, "expected 6+ builtins, got {}", svc.theme_count());
+        let summaries = svc.list_themes();
+        let ids: Vec<&str> = summaries.iter().map(|s| s.id.as_str()).collect();
+        assert!(ids.contains(&"vs-dark-plus"));
+        assert!(ids.contains(&"vs-light-plus"));
+        assert!(ids.contains(&"monokai"));
+        assert!(ids.contains(&"solarized-dark"));
+        assert!(ids.contains(&"hc-black"));
+        assert!(ids.contains(&"hc-light"));
+    }
+
+    #[test]
+    fn with_builtins_activate_and_get_color() {
+        let mut svc = ThemeService::with_builtins();
+        svc.set_active("vs-dark-plus");
+        let bg = svc.get_color("editor.background");
+        assert!(bg.is_some());
+        assert_eq!(bg.unwrap(), "#1E1E1E");
+    }
+
+    #[test]
+    fn with_builtins_switch_theme() {
+        let mut svc = ThemeService::with_builtins();
+        svc.set_theme("monokai").unwrap();
+        assert_eq!(svc.get_active().unwrap().id, "monokai");
+        svc.set_theme("solarized-dark").unwrap();
+        assert_eq!(svc.get_active().unwrap().id, "solarized-dark");
     }
 }
