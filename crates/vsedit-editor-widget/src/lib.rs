@@ -17,6 +17,7 @@ use vsedit_editor_config::WordWrap;
 use vsedit_editor_render::EditorRenderer;
 use vsedit_editor_types::{ITextModel, Position};
 use vsedit_editor_viewparts::{format_line_number, LineNumberMode};
+use vsedit_find::{FindMatch, FindOptions, FindState};
 use vsedit_text_model::TextModel;
 use vsedit_text_render::{display_width, truncate_to_width};
 use vsedit_viewmodel::ViewModel;
@@ -43,6 +44,16 @@ pub struct EditorWidget {
     // Viewport dimensions (set by handle_resize)
     viewport_width: u16,
     viewport_height: u16,
+
+    // Find/replace state
+    pub show_find: bool,
+    pub find_input: String,
+    pub replace_input: String,
+    pub show_replace: bool,
+    pub find_state: FindState,
+    pub find_is_regex: bool,
+    pub find_is_case_sensitive: bool,
+    pub find_is_whole_word: bool,
 }
 
 impl EditorWidget {
@@ -65,6 +76,14 @@ impl EditorWidget {
             is_readonly: false,
             viewport_width: 80,
             viewport_height: 24,
+            show_find: false,
+            find_input: String::new(),
+            replace_input: String::new(),
+            show_replace: false,
+            find_state: FindState::new(),
+            find_is_regex: false,
+            find_is_case_sensitive: false,
+            find_is_whole_word: false,
         }
     }
 
@@ -152,6 +171,123 @@ impl EditorWidget {
         &self.view_model
     }
 
+    // -- Find / Replace -------------------------------------------------------
+
+    /// Show the find overlay.
+    pub fn open_find(&mut self) {
+        self.show_find = true;
+    }
+
+    /// Hide the find overlay and clear highlights.
+    pub fn close_find(&mut self) {
+        self.show_find = false;
+        self.show_replace = false;
+        self.find_state.matches.clear();
+        self.find_state.current_match = None;
+    }
+
+    /// Toggle the replace input visibility.
+    pub fn toggle_replace(&mut self) {
+        self.show_replace = !self.show_replace;
+    }
+
+    /// Recompute matches from the current find_input and options.
+    pub fn update_find_matches(&mut self) {
+        let opts = FindOptions::new(&self.find_input)
+            .with_regex(self.find_is_regex)
+            .with_case_sensitive(self.find_is_case_sensitive)
+            .with_whole_word(self.find_is_whole_word);
+        self.find_state.options = opts;
+        let text = self.model.get_value();
+        self.find_state.search(&text);
+    }
+
+    /// Navigate to the next match and scroll it into view.
+    pub fn find_next(&mut self) {
+        self.find_state.next_match();
+        self.scroll_to_current_match();
+    }
+
+    /// Navigate to the previous match and scroll it into view.
+    pub fn find_previous(&mut self) {
+        self.find_state.previous_match();
+        self.scroll_to_current_match();
+    }
+
+    /// Replace the current match with `replace_input`.
+    pub fn replace_current(&mut self) {
+        if let Some(fm) = self.find_state.current().cloned() {
+            let text = self.model.get_value();
+            // Build new text with the current match replaced
+            let mut new_text = String::with_capacity(text.len());
+            for (line_idx, line) in text.lines().enumerate() {
+                let line_num = (line_idx + 1) as u32;
+                if line_num == fm.line {
+                    let start = (fm.start_col - 1) as usize;
+                    let end = (fm.end_col - 1) as usize;
+                    new_text.push_str(&line[..start]);
+                    new_text.push_str(&self.replace_input);
+                    new_text.push_str(&line[end..]);
+                } else {
+                    new_text.push_str(line);
+                }
+                if line_idx + 1 < text.lines().count() {
+                    new_text.push('\n');
+                }
+            }
+            // Handle trailing newline
+            if text.ends_with('\n') {
+                new_text.push('\n');
+            }
+            self.model = Arc::new(TextModel::new(&new_text));
+            self.view_model = ViewModel::new(self.model.clone(), 0, WordWrap::Off);
+            self.update_find_matches();
+        }
+    }
+
+    /// Replace all matches with `replace_input`.
+    pub fn replace_all(&mut self) {
+        let opts = FindOptions::new(&self.find_input)
+            .with_regex(self.find_is_regex)
+            .with_case_sensitive(self.find_is_case_sensitive)
+            .with_whole_word(self.find_is_whole_word);
+        let text = self.model.get_value();
+        let new_text = vsedit_find::replace_all(&text, &opts, &self.replace_input);
+        self.model = Arc::new(TextModel::new(&new_text));
+        self.view_model = ViewModel::new(self.model.clone(), 0, WordWrap::Off);
+        self.update_find_matches();
+    }
+
+    /// Access find matches.
+    pub fn find_matches(&self) -> &[FindMatch] {
+        &self.find_state.matches
+    }
+
+    /// Current match index.
+    pub fn current_match_index(&self) -> Option<usize> {
+        self.find_state.current_match
+    }
+
+    fn scroll_to_current_match(&mut self) {
+        if let Some(fm) = self.find_state.current() {
+            let pos = Position::new(fm.line, fm.start_col);
+            let state = vsedit_cursor::CursorState::from_position(pos);
+            self.cursor.set_state(0, state);
+            self.ensure_cursor_visible();
+        }
+    }
+
+    /// Height of the find bar in rows.
+    fn find_bar_height(&self) -> u16 {
+        if !self.show_find {
+            0
+        } else if self.show_replace {
+            2
+        } else {
+            1
+        }
+    }
+
     // -- Private helpers ----------------------------------------------------
 
     fn gutter_width(&self) -> u16 {
@@ -174,6 +310,75 @@ impl EditorWidget {
 
     /// Render the editor into a ratatui buffer.
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
+        // Render find bar at the top if visible
+        let find_bar_h = self.find_bar_height();
+        if find_bar_h > 0 && area.height > find_bar_h {
+            self.render_find_bar(
+                Rect::new(area.x, area.y, area.width, find_bar_h),
+                buf,
+            );
+        }
+
+        // Adjust editor area below the find bar
+        let editor_area = if find_bar_h > 0 && area.height > find_bar_h {
+            Rect::new(area.x, area.y + find_bar_h, area.width, area.height - find_bar_h)
+        } else {
+            area
+        };
+
+        self.render_editor(editor_area, buf);
+    }
+
+    fn render_find_bar(&self, area: Rect, buf: &mut Buffer) {
+        let bar_style = Style::default().bg(Color::Rgb(60, 60, 60)).fg(Color::White);
+        // Fill background
+        for row in 0..area.height {
+            for col in 0..area.width {
+                let x = area.x + col;
+                let y = area.y + row;
+                buf[(x, y)].set_char(' ').set_style(bar_style);
+            }
+        }
+
+        // Row 0: Find input
+        let match_info = if self.find_input.is_empty() {
+            String::new()
+        } else {
+            let total = self.find_state.matches.len();
+            match self.find_state.current_match {
+                Some(idx) if total > 0 => format!(" {} of {}", idx + 1, total),
+                _ => format!(" 0 of {}", total),
+            }
+        };
+
+        let flags = format!(
+            "{}{}{}",
+            if self.find_is_regex { ".*" } else { "" },
+            if self.find_is_case_sensitive { "Aa" } else { "" },
+            if self.find_is_whole_word { "W" } else { "" },
+        );
+
+        let find_line = format!("Find: {}{} {}", self.find_input, match_info, flags);
+        for (i, ch) in find_line.chars().enumerate() {
+            let x = area.x + i as u16;
+            if x < area.x + area.width {
+                buf[(x, area.y)].set_char(ch).set_style(bar_style);
+            }
+        }
+
+        // Row 1: Replace input (if visible)
+        if self.show_replace && area.height > 1 {
+            let replace_line = format!("Replace: {}", self.replace_input);
+            for (i, ch) in replace_line.chars().enumerate() {
+                let x = area.x + i as u16;
+                if x < area.x + area.width {
+                    buf[(x, area.y + 1)].set_char(ch).set_style(bar_style);
+                }
+            }
+        }
+    }
+
+    fn render_editor(&self, area: Rect, buf: &mut Buffer) {
         let gutter_w = self.gutter_width();
         let content_w = area.width.saturating_sub(gutter_w);
         let current_line = self.cursor.get_primary().position().line;
@@ -270,6 +475,26 @@ impl EditorWidget {
                         let pos = Position::new(model_line, model_col);
                         if sel_range.contains_position(&pos) {
                             style = style.bg(Color::Rgb(38, 79, 120));
+                        }
+                    }
+
+                    // Find match highlighting
+                    if self.show_find && !self.find_state.matches.is_empty() {
+                        let col_1based = model_col;
+                        for (mi, fm) in self.find_state.matches.iter().enumerate() {
+                            if fm.line == model_line
+                                && col_1based >= fm.start_col
+                                && col_1based < fm.end_col
+                            {
+                                if Some(mi) == self.find_state.current_match {
+                                    // Current match: orange
+                                    style = style.bg(Color::Rgb(220, 150, 30));
+                                } else {
+                                    // Other matches: yellow
+                                    style = style.bg(Color::Rgb(180, 180, 30));
+                                }
+                                break;
+                            }
                         }
                     }
 
@@ -573,5 +798,213 @@ mod tests {
         let mut w = EditorWidget::new();
         w.open_text("hello\nworld");
         assert_eq!(w.view_model().get_view_line_count(), 2);
+    }
+
+    // -- Find / Replace tests -----------------------------------------------
+
+    #[test]
+    fn open_close_find() {
+        let mut w = EditorWidget::new();
+        assert!(!w.show_find);
+        w.open_find();
+        assert!(w.show_find);
+        w.close_find();
+        assert!(!w.show_find);
+    }
+
+    #[test]
+    fn find_matches_in_text() {
+        let mut w = EditorWidget::new();
+        w.open_text("hello world\nhello rust\ngoodbye");
+        w.find_input = "hello".to_string();
+        w.update_find_matches();
+        assert_eq!(w.find_matches().len(), 2);
+        assert_eq!(w.current_match_index(), Some(0));
+    }
+
+    #[test]
+    fn find_next_navigates() {
+        let mut w = EditorWidget::new();
+        w.open_text("aaa bbb aaa ccc aaa");
+        w.find_input = "aaa".to_string();
+        w.update_find_matches();
+        assert_eq!(w.current_match_index(), Some(0));
+        w.find_next();
+        assert_eq!(w.current_match_index(), Some(1));
+        w.find_next();
+        assert_eq!(w.current_match_index(), Some(2));
+        w.find_next(); // wraps
+        assert_eq!(w.current_match_index(), Some(0));
+    }
+
+    #[test]
+    fn find_previous_navigates() {
+        let mut w = EditorWidget::new();
+        w.open_text("aaa bbb aaa");
+        w.find_input = "aaa".to_string();
+        w.update_find_matches();
+        assert_eq!(w.current_match_index(), Some(0));
+        w.find_previous(); // wraps to last
+        assert_eq!(w.current_match_index(), Some(1));
+        w.find_previous();
+        assert_eq!(w.current_match_index(), Some(0));
+    }
+
+    #[test]
+    fn replace_current_match() {
+        let mut w = EditorWidget::new();
+        w.open_text("hello world hello");
+        w.find_input = "hello".to_string();
+        w.replace_input = "hi".to_string();
+        w.update_find_matches();
+        assert_eq!(w.find_matches().len(), 2);
+        w.replace_current();
+        assert_eq!(w.model().get_line_content(1), "hi world hello");
+        assert_eq!(w.find_matches().len(), 1);
+    }
+
+    #[test]
+    fn replace_all_matches() {
+        let mut w = EditorWidget::new();
+        w.open_text("hello world\nhello rust");
+        w.find_input = "hello".to_string();
+        w.replace_input = "hi".to_string();
+        w.update_find_matches();
+        assert_eq!(w.find_matches().len(), 2);
+        w.replace_all();
+        assert_eq!(w.model().get_line_content(1), "hi world");
+        assert_eq!(w.model().get_line_content(2), "hi rust");
+        assert_eq!(w.find_matches().len(), 0);
+    }
+
+    #[test]
+    fn find_regex() {
+        let mut w = EditorWidget::new();
+        w.open_text("abc 123 def 456");
+        w.find_input = r"\d+".to_string();
+        w.find_is_regex = true;
+        w.update_find_matches();
+        assert_eq!(w.find_matches().len(), 2);
+        assert_eq!(w.find_matches()[0].text, "123");
+        assert_eq!(w.find_matches()[1].text, "456");
+    }
+
+    #[test]
+    fn find_case_sensitive() {
+        let mut w = EditorWidget::new();
+        w.open_text("Hello hello HELLO");
+        w.find_input = "Hello".to_string();
+        w.find_is_case_sensitive = true;
+        w.update_find_matches();
+        assert_eq!(w.find_matches().len(), 1);
+        assert_eq!(w.find_matches()[0].start_col, 1);
+    }
+
+    #[test]
+    fn find_case_insensitive() {
+        let mut w = EditorWidget::new();
+        w.open_text("Hello hello HELLO");
+        w.find_input = "hello".to_string();
+        w.find_is_case_sensitive = false;
+        w.update_find_matches();
+        assert_eq!(w.find_matches().len(), 3);
+    }
+
+    #[test]
+    fn find_whole_word() {
+        let mut w = EditorWidget::new();
+        w.open_text("he hello the he");
+        w.find_input = "he".to_string();
+        w.find_is_whole_word = true;
+        w.update_find_matches();
+        assert_eq!(w.find_matches().len(), 2);
+    }
+
+    #[test]
+    fn empty_search_returns_no_matches() {
+        let mut w = EditorWidget::new();
+        w.open_text("hello world");
+        w.find_input = String::new();
+        w.update_find_matches();
+        assert!(w.find_matches().is_empty());
+        assert_eq!(w.current_match_index(), None);
+    }
+
+    #[test]
+    fn match_highlight_positions() {
+        let mut w = EditorWidget::new();
+        w.open_text("abcabc");
+        w.find_input = "abc".to_string();
+        w.update_find_matches();
+        assert_eq!(w.find_matches().len(), 2);
+        let m0 = &w.find_matches()[0];
+        assert_eq!(m0.line, 1);
+        assert_eq!(m0.start_col, 1);
+        assert_eq!(m0.end_col, 4);
+        let m1 = &w.find_matches()[1];
+        assert_eq!(m1.line, 1);
+        assert_eq!(m1.start_col, 4);
+        assert_eq!(m1.end_col, 7);
+    }
+
+    #[test]
+    fn toggle_replace_visibility() {
+        let mut w = EditorWidget::new();
+        assert!(!w.show_replace);
+        w.toggle_replace();
+        assert!(w.show_replace);
+        w.toggle_replace();
+        assert!(!w.show_replace);
+    }
+
+    #[test]
+    fn render_with_find_bar_does_not_panic() {
+        let mut w = EditorWidget::new();
+        w.open_text("hello world\nhello rust");
+        w.open_find();
+        w.find_input = "hello".to_string();
+        w.update_find_matches();
+        let area = Rect::new(0, 0, 40, 10);
+        let mut buf = Buffer::empty(area);
+        w.render(area, &mut buf);
+    }
+
+    #[test]
+    fn render_with_find_and_replace_bar() {
+        let mut w = EditorWidget::new();
+        w.open_text("hello world");
+        w.open_find();
+        w.show_replace = true;
+        w.find_input = "hello".to_string();
+        w.replace_input = "hi".to_string();
+        w.update_find_matches();
+        let area = Rect::new(0, 0, 40, 10);
+        let mut buf = Buffer::empty(area);
+        w.render(area, &mut buf);
+        // Find bar should be 2 rows, check "Find:" appears on row 0
+        let row0: String = (0..area.width)
+            .map(|x| buf[(x, 0)].symbol().to_string())
+            .collect();
+        assert!(row0.contains("Find:"));
+        // Check "Replace:" appears on row 1
+        let row1: String = (0..area.width)
+            .map(|x| buf[(x, 1)].symbol().to_string())
+            .collect();
+        assert!(row1.contains("Replace:"));
+    }
+
+    #[test]
+    fn close_find_clears_matches() {
+        let mut w = EditorWidget::new();
+        w.open_text("hello world hello");
+        w.open_find();
+        w.find_input = "hello".to_string();
+        w.update_find_matches();
+        assert_eq!(w.find_matches().len(), 2);
+        w.close_find();
+        assert!(w.find_matches().is_empty());
+        assert_eq!(w.current_match_index(), None);
+        assert!(!w.show_find);
+        assert!(!w.show_replace);
     }
 }

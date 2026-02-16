@@ -9,6 +9,7 @@ license.workspace = true
 vsedit-configuration = { path = "../vsedit-configuration" }
 vsedit-di = { path = "../vsedit-di" }
 vsedit-editor-controller = { path = "../vsedit-editor-controller" }
+vsedit-editor-widget = { path = "../vsedit-editor-widget" }
 vsedit-environment = { path = "../vsedit-environment" }
 vsedit-ext-host = { path = "../vsedit-ext-host" }
 vsedit-input = { path = "../vsedit-input" }

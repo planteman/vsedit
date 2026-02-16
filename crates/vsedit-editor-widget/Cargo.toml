@@ -15,5 +15,6 @@ vsedit-viewmodel = { path = "../vsedit-viewmodel" }
 vsedit-editor-types = { path = "../vsedit-editor-types" }
 vsedit-editor-config = { path = "../vsedit-editor-config" }
 vsedit-text-render = { path = "../vsedit-text-render" }
+vsedit-find = { path = "../vsedit-find" }
 ratatui = { workspace = true }
 

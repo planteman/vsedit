@@ -11,6 +11,7 @@ use crossterm::event::{Event as CtEvent, EventStream, KeyCode, KeyModifiers};
 use futures::StreamExt;
 
 use vsedit_editor_controller::{EditorAction, EditorController};
+use vsedit_editor_widget::EditorWidget;
 use vsedit_input::{from_crossterm_key, InputEvent};
 use vsedit_tui::{restore_terminal, setup_terminal};
 use vsedit_workbench::{FocusedPart, WorkbenchAction, Workbench};
@@ -53,6 +54,8 @@ async fn main() -> io::Result<()> {
     workbench.start();
 
     let mut controller = EditorController::new(&content);
+    let mut editor_widget = EditorWidget::new();
+    editor_widget.open_text(&content);
 
     // Sync initial state to workbench. Open the file as a tab.
     if let Some(ref path) = file_path {
@@ -69,6 +72,7 @@ async fn main() -> io::Result<()> {
         &mut terminal,
         &mut workbench,
         &mut controller,
+        &mut editor_widget,
         &file_path,
     )
     .await;
@@ -82,6 +86,7 @@ async fn run_event_loop(
     terminal: &mut ratatui::Terminal<ratatui::backend::CrosstermBackend<io::Stdout>>,
     workbench: &mut Workbench,
     controller: &mut EditorController,
+    editor_widget: &mut EditorWidget,
     file_path: &Option<PathBuf>,
 ) -> io::Result<()> {
     let mut event_stream = EventStream::new();
@@ -100,7 +105,7 @@ async fn run_event_loop(
                 match maybe_event {
                     Some(Ok(event)) => {
                         should_quit = handle_event(
-                            event, workbench, controller, file_path,
+                            event, workbench, controller, editor_widget, file_path,
                         );
                     }
                     Some(Err(_)) | None => {
@@ -120,6 +125,7 @@ fn handle_event(
     event: CtEvent,
     workbench: &mut Workbench,
     controller: &mut EditorController,
+    editor_widget: &mut EditorWidget,
     file_path: &Option<PathBuf>,
 ) -> bool {
     match event {
@@ -165,9 +171,61 @@ fn handle_event(
                 return false;
             }
 
+            // When find overlay is open, handle find-specific keys first.
+            if editor_widget.show_find && !has_ctrl {
+                match key_event.code {
+                    KeyCode::Esc => {
+                        editor_widget.close_find();
+                        return false;
+                    }
+                    KeyCode::Enter => {
+                        if has_shift {
+                            editor_widget.find_previous();
+                        } else {
+                            editor_widget.find_next();
+                        }
+                        return false;
+                    }
+                    KeyCode::F(3) => {
+                        if has_shift {
+                            editor_widget.find_previous();
+                        } else {
+                            editor_widget.find_next();
+                        }
+                        return false;
+                    }
+                    _ => {}
+                }
+            }
+
+            // F3/Shift+F3 work even when find is not focused
+            if !has_ctrl && (key_event.code == KeyCode::F(3)) && !editor_widget.show_find {
+                // Only if there are existing matches
+                if !editor_widget.find_state.matches.is_empty() {
+                    editor_widget.show_find = true;
+                    if has_shift {
+                        editor_widget.find_previous();
+                    } else {
+                        editor_widget.find_next();
+                    }
+                    return false;
+                }
+            }
+
             // Ctrl+key combos: route through workbench or handle directly.
             if has_ctrl {
                 match key_event.code {
+                    KeyCode::Char('f') => {
+                        editor_widget.open_find();
+                        return false;
+                    }
+                    KeyCode::Char('h') => {
+                        editor_widget.open_find();
+                        if !editor_widget.show_replace {
+                            editor_widget.toggle_replace();
+                        }
+                        return false;
+                    }
                     KeyCode::Char('s') => {
                         let save_path = workbench
                             .tab_service
