@@ -3,6 +3,12 @@
 //! Equivalent to VS Code's diff computation.
 //! Uses the `similar` crate for diffing text.
 
+pub mod diff_result;
+pub mod diff_editor;
+pub mod merge;
+pub mod dirty_diff;
+pub mod git_diff;
+
 use similar::{ChangeTag, TextDiff};
 
 /// A single change in a diff.
