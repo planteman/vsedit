@@ -440,6 +440,19 @@ async fn run() -> io::Result<()> {
     let mut workbench = Workbench::new();
     workbench.start();
 
+    // Populate extensions sidebar from registered extensions.
+    for ext in ext_host.get_all_extensions() {
+        workbench.installed_extensions.push(
+            vsedit_workbench::InstalledExtensionInfo {
+                id: ext.id.clone(),
+                name: ext.name.clone(),
+                publisher: ext.publisher.clone(),
+                version: ext.version.to_string(),
+                activated: ext_host.is_activated(&ext.id),
+            },
+        );
+    }
+
     // Determine the file to open (from --goto, positional args, etc.).
     let (file_path, goto_pos) = resolve_open_target(&cli);
 

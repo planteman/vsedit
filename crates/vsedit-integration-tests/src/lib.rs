@@ -1901,3 +1901,339 @@ mod explorer_advanced {
         assert!(!sub.exists());
     }
 }
+
+// ─── Provider Registry ─────────────────────────────────────────────────
+
+#[cfg(test)]
+mod provider_registry {
+    use vsedit_ext_host::handlers::{ProviderKind, ProviderRegistry};
+
+    #[test]
+    fn provider_registry_tracks_multiple_kinds() {
+        let mut reg = ProviderRegistry::new();
+        let _h1 = reg.register(
+            ProviderKind::Completion,
+            "ext-a",
+            serde_json::json!({"language": "rust"}),
+        );
+        let h2 = reg.register(
+            ProviderKind::Hover,
+            "ext-a",
+            serde_json::json!({"language": "rust"}),
+        );
+        let _h3 = reg.register(ProviderKind::Definition, "ext-b", serde_json::Value::Null);
+        assert_eq!(reg.count(), 3);
+        assert!(reg.has_provider(ProviderKind::Completion));
+        assert!(reg.has_provider(ProviderKind::Hover));
+        assert!(reg.has_provider(ProviderKind::Definition));
+        assert!(!reg.has_provider(ProviderKind::Formatting));
+        // Unregister one
+        assert!(reg.unregister(h2));
+        assert_eq!(reg.count(), 2);
+        assert!(!reg.has_provider(ProviderKind::Hover));
+    }
+
+    #[test]
+    fn provider_registry_providers_for_kind() {
+        let mut reg = ProviderRegistry::new();
+        reg.register(ProviderKind::Completion, "ext-1", serde_json::Value::Null);
+        reg.register(ProviderKind::Completion, "ext-2", serde_json::Value::Null);
+        reg.register(ProviderKind::Hover, "ext-3", serde_json::Value::Null);
+        let completions = reg.providers_for(ProviderKind::Completion);
+        assert_eq!(completions.len(), 2);
+        assert_eq!(reg.providers_for(ProviderKind::Hover).len(), 1);
+    }
+
+    #[test]
+    fn provider_registry_get_by_handle() {
+        let mut reg = ProviderRegistry::new();
+        let h = reg.register(
+            ProviderKind::References,
+            "my-ext",
+            serde_json::json!({"language": "python"}),
+        );
+        let provider = reg.get(h).unwrap();
+        assert_eq!(provider.extension_id, "my-ext");
+        assert_eq!(provider.kind, ProviderKind::References);
+        assert!(reg.get(999).is_none());
+    }
+}
+
+// ─── Document Event Serialization ──────────────────────────────────────
+
+#[cfg(test)]
+mod document_events {
+    use vsedit_ext_host::handlers::{DocumentChange, DocumentEvent};
+
+    #[test]
+    fn document_event_did_open_serialization() {
+        let event = DocumentEvent::DidOpen {
+            uri: "file:///home/user/main.rs".to_string(),
+            language_id: "rust".to_string(),
+            version: 1,
+            content: "fn main() {}".to_string(),
+        };
+        let (method, params) = event.to_rpc_notification();
+        assert_eq!(method, "ext/didOpenTextDocument");
+        assert_eq!(params["uri"], "file:///home/user/main.rs");
+        assert_eq!(params["languageId"], "rust");
+        assert_eq!(params["version"], 1);
+        assert_eq!(params["text"], "fn main() {}");
+    }
+
+    #[test]
+    fn document_event_did_change_serialization() {
+        let event = DocumentEvent::DidChange {
+            uri: "file:///test.py".to_string(),
+            version: 3,
+            changes: vec![
+                DocumentChange {
+                    start_line: 0,
+                    start_col: 0,
+                    end_line: 0,
+                    end_col: 5,
+                    text: "hello".to_string(),
+                },
+                DocumentChange {
+                    start_line: 2,
+                    start_col: 0,
+                    end_line: 2,
+                    end_col: 0,
+                    text: "new line\n".to_string(),
+                },
+            ],
+        };
+        let (method, params) = event.to_rpc_notification();
+        assert_eq!(method, "ext/didChangeTextDocument");
+        assert_eq!(params["version"], 3);
+        let changes = params["changes"].as_array().unwrap();
+        assert_eq!(changes.len(), 2);
+        assert_eq!(changes[0]["text"], "hello");
+    }
+
+    #[test]
+    fn document_event_did_save_serialization() {
+        let event = DocumentEvent::DidSave {
+            uri: "file:///saved.txt".to_string(),
+        };
+        let (method, params) = event.to_rpc_notification();
+        assert_eq!(method, "ext/didSaveTextDocument");
+        assert_eq!(params["uri"], "file:///saved.txt");
+    }
+
+    #[test]
+    fn document_event_did_close_serialization() {
+        let event = DocumentEvent::DidClose {
+            uri: "file:///closed.rs".to_string(),
+        };
+        let (method, _params) = event.to_rpc_notification();
+        assert_eq!(method, "ext/didCloseTextDocument");
+    }
+}
+
+// ─── Encoding Detection ────────────────────────────────────────────────
+
+#[cfg(test)]
+mod encoding_detection {
+    use vsedit_text_model::FileEncoding;
+
+    #[test]
+    fn encoding_detect_utf8() {
+        let data = b"Hello, world!";
+        assert_eq!(FileEncoding::detect(data), FileEncoding::Utf8);
+    }
+
+    #[test]
+    fn encoding_detect_utf8_bom() {
+        let data = [0xEF, 0xBB, 0xBF, b'H', b'i'];
+        assert_eq!(FileEncoding::detect(&data), FileEncoding::Utf8Bom);
+    }
+
+    #[test]
+    fn encoding_detect_utf16le() {
+        let data = [0xFF, 0xFE, b'H', 0x00];
+        assert_eq!(FileEncoding::detect(&data), FileEncoding::Utf16Le);
+    }
+
+    #[test]
+    fn encoding_detect_utf16be() {
+        let data = [0xFE, 0xFF, 0x00, b'H'];
+        assert_eq!(FileEncoding::detect(&data), FileEncoding::Utf16Be);
+    }
+
+    #[test]
+    fn encoding_roundtrip_utf8_bom() {
+        let original = "Hello UTF-8 BOM";
+        let encoded = FileEncoding::Utf8Bom.encode(original);
+        assert!(encoded.starts_with(&[0xEF, 0xBB, 0xBF]));
+        let decoded = FileEncoding::Utf8Bom.decode(&encoded);
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn encoding_roundtrip_latin1() {
+        let original = "Hello";
+        let encoded = FileEncoding::Latin1.encode(original);
+        let decoded = FileEncoding::Latin1.decode(&encoded);
+        assert_eq!(decoded, original);
+    }
+}
+
+// ─── Extension Activation Events ───────────────────────────────────────
+
+#[cfg(test)]
+mod extension_activation {
+    use vsedit_ext_host::{ExtensionDescription, ExtensionHostManager};
+
+    #[test]
+    fn extension_activation_on_language() {
+        let mut mgr = ExtensionHostManager::new();
+        let json = r#"{
+            "name": "test-ext",
+            "publisher": "test",
+            "version": "1.0.0",
+            "engines": { "vscode": "^1.70.0" },
+            "activationEvents": ["onLanguage:rust"]
+        }"#;
+        if let Ok(desc) =
+            ExtensionDescription::from_package_json(json, vsedit_uri::VsUri::parse("file:///ext"))
+        {
+            mgr.register_extension(desc);
+            let matches = mgr.should_activate("onLanguage:rust");
+            assert_eq!(matches.len(), 1);
+            assert_eq!(matches[0].id, "test.test-ext");
+            // Activating marks it
+            mgr.mark_activated("test.test-ext");
+            assert!(mgr.is_activated("test.test-ext"));
+            // Verify it's marked as activated
+            assert!(mgr.is_activated("test.test-ext"));
+        }
+    }
+
+    #[test]
+    fn extension_activation_star() {
+        let mut mgr = ExtensionHostManager::new();
+        let json = r#"{
+            "name": "always-on",
+            "publisher": "test",
+            "version": "1.0.0",
+            "engines": { "vscode": "^1.70.0" },
+            "activationEvents": ["*"]
+        }"#;
+        if let Ok(desc) =
+            ExtensionDescription::from_package_json(json, vsedit_uri::VsUri::parse("file:///ext"))
+        {
+            mgr.register_extension(desc);
+            let matches = mgr.should_activate("*");
+            assert_eq!(matches.len(), 1);
+        }
+    }
+}
+
+// ─── Syntax Highlighter ────────────────────────────────────────────────
+
+#[cfg(test)]
+mod syntax_highlighter {
+    use vsedit_syntax::SyntaxHighlighter;
+
+    #[test]
+    fn syntax_highlighter_detect_language() {
+        let hl = SyntaxHighlighter::new();
+        let lang = hl.detect_language("main.rs", None);
+        assert!(lang.is_some());
+        assert_eq!(lang.unwrap().name, "Rust");
+    }
+
+    #[test]
+    fn syntax_highlighter_language_id_mapping() {
+        let hl = SyntaxHighlighter::new();
+        assert_eq!(
+            hl.language_id_for_path("app.tsx"),
+            Some("typescriptreact".to_string())
+        );
+        assert_eq!(
+            hl.language_id_for_path("style.css"),
+            Some("css".to_string())
+        );
+        assert_eq!(
+            hl.language_id_for_path("data.json"),
+            Some("json".to_string())
+        );
+    }
+
+    #[test]
+    fn syntax_highlighter_theme_palette() {
+        let hl = SyntaxHighlighter::new();
+        let palette = hl.palette();
+        // Default theme should have non-zero foreground
+        assert_ne!(palette.foreground, (0, 0, 0));
+    }
+
+    #[test]
+    fn syntax_highlighter_highlight_range() {
+        let hl = SyntaxHighlighter::new();
+        let syntax = hl.syntax_for_file("test.rs").unwrap();
+        let lines = vec![
+            "fn main() {\n",
+            "    let x = 1;\n",
+            "    let y = 2;\n",
+            "}\n",
+        ];
+        let result = hl.highlight_range(&lines, syntax, 1, 3);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].line_number, 1);
+        assert_eq!(result[1].line_number, 2);
+    }
+}
+
+// ─── RPC Handler End-to-End ────────────────────────────────────────────
+
+#[cfg(test)]
+mod rpc_handler {
+    use vsedit_ext_host::handlers::MainThreadHandlers;
+
+    #[test]
+    fn rpc_handler_register_and_unregister_provider() {
+        let mut h = MainThreadHandlers::new();
+        h.register_defaults();
+        // Register a completion provider
+        let result = h
+            .handle(
+                "mainThread/registerCompletionProvider",
+                serde_json::json!({"extensionId": "test.ext", "selector": {"language": "rust"}}),
+            )
+            .unwrap();
+        let handle = result["handle"].as_u64().unwrap();
+        // Verify it's tracked
+        let reg = h.provider_registry();
+        assert_eq!(reg.lock().unwrap().count(), 1);
+        // Unregister
+        h.handle(
+            "mainThread/unregisterProvider",
+            serde_json::json!({"handle": handle}),
+        );
+        assert_eq!(reg.lock().unwrap().count(), 0);
+    }
+
+    #[test]
+    fn rpc_handler_filesystem_operations() {
+        let mut h = MainThreadHandlers::new();
+        h.register_defaults();
+        // Try reading a nonexistent file
+        let result = h
+            .handle(
+                "mainThread/fsReadFile",
+                serde_json::json!({"path": "/tmp/__vsedit_test_nonexistent__"}),
+            )
+            .unwrap();
+        assert!(result.get("error").is_some());
+        // Stat should also fail
+        let result = h
+            .handle(
+                "mainThread/fsStat",
+                serde_json::json!({"path": "/tmp/__vsedit_test_nonexistent__"}),
+            )
+            .unwrap();
+        assert!(result.get("error").is_some());
+    }
+}

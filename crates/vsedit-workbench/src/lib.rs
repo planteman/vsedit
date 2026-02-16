@@ -827,6 +827,18 @@ pub struct Workbench {
     pub show_goto_line: bool,
     /// Current text typed into the Go To Line input.
     pub goto_line_input: String,
+    /// Installed extension names for the sidebar.
+    pub installed_extensions: Vec<InstalledExtensionInfo>,
+}
+
+/// Summary info for an installed extension shown in the sidebar.
+#[derive(Debug, Clone)]
+pub struct InstalledExtensionInfo {
+    pub id: String,
+    pub name: String,
+    pub publisher: String,
+    pub version: String,
+    pub activated: bool,
 }
 
 impl Workbench {
@@ -1136,6 +1148,7 @@ impl Workbench {
             workspace_files: Vec::new(),
             show_goto_line: false,
             goto_line_input: String::new(),
+            installed_extensions: Vec::new(),
         }
     }
 
@@ -1283,11 +1296,33 @@ impl Workbench {
                             self.debug_view.render(content_area, frame.buffer_mut());
                         }
                         ActiveSidebarPanel::Extensions => {
-                            let stub = Paragraph::new(Span::styled(
-                                " No extensions installed",
-                                Style::default().fg(Color::DarkGray),
-                            ));
-                            frame.render_widget(stub, content_area);
+                            if self.installed_extensions.is_empty() {
+                                let stub = Paragraph::new(Span::styled(
+                                    " No extensions installed",
+                                    Style::default().fg(Color::DarkGray),
+                                ));
+                                frame.render_widget(stub, content_area);
+                            } else {
+                                let items: Vec<Line> = self
+                                    .installed_extensions
+                                    .iter()
+                                    .map(|ext| {
+                                        let status = if ext.activated { "●" } else { "○" };
+                                        let label = format!(
+                                            " {} {} — {} v{}",
+                                            status, ext.name, ext.publisher, ext.version
+                                        );
+                                        let color = if ext.activated {
+                                            Color::Green
+                                        } else {
+                                            Color::Gray
+                                        };
+                                        Line::from(Span::styled(label, Style::default().fg(color)))
+                                    })
+                                    .collect();
+                                let ext_list = Paragraph::new(items);
+                                frame.render_widget(ext_list, content_area);
+                            }
                         }
                     }
                 }
