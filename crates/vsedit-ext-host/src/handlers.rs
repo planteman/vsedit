@@ -7,10 +7,13 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use serde_json::{json, Value};
 use tracing::{debug, info};
+
+/// In-memory clipboard fallback for `mainThread/clipboard{Read,Write}`.
+static CLIPBOARD: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new(String::new()));
 
 type HandlerFn = Box<dyn Fn(Value) -> Value + Send + Sync>;
 
@@ -288,13 +291,14 @@ impl MainThreadHandlers {
         // -- Clipboard --
 
         self.register("mainThread/clipboardRead", |_params| {
-            info!("mainThread/clipboardRead (stub: returning empty)");
-            json!("")
+            let content = CLIPBOARD.lock().unwrap().clone();
+            json!(content)
         });
 
         self.register("mainThread/clipboardWrite", |params| {
-            let text = params.get("text").and_then(|v| v.as_str()).unwrap_or("");
-            info!(text, "mainThread/clipboardWrite (stub)");
+            if let Some(text) = params.get("text").and_then(|v| v.as_str()) {
+                *CLIPBOARD.lock().unwrap() = text.to_string();
+            }
             Value::Null
         });
 
@@ -302,14 +306,33 @@ impl MainThreadHandlers {
 
         self.register("mainThread/openTextDocument", |params| {
             let uri = params.get("uri").and_then(|v| v.as_str()).unwrap_or("untitled:Untitled-1");
-            info!(uri, "mainThread/openTextDocument (stub)");
-            json!({ "uri": uri, "languageId": "plaintext", "version": 1, "lineCount": 0 })
+            let path = uri.trim_start_matches("file://");
+            match std::fs::read_to_string(path) {
+                Ok(content) => {
+                    let line_count = content.lines().count();
+                    json!({ "uri": uri, "content": content, "languageId": "plaintext", "version": 1, "lineCount": line_count })
+                }
+                Err(_) => {
+                    info!(uri, "mainThread/openTextDocument (file not found, returning stub)");
+                    json!({ "uri": uri, "languageId": "plaintext", "version": 1, "lineCount": 0 })
+                }
+            }
         });
 
         self.register("mainThread/saveDocument", |params| {
-            let uri = params.get("uri").and_then(|v| v.as_str()).unwrap_or("");
-            info!(uri, "mainThread/saveDocument (stub)");
-            json!(true)
+            if let Some(uri) = params.get("uri").and_then(|v| v.as_str()) {
+                let path = uri.trim_start_matches("file://");
+                if let Some(content) = params.get("content").and_then(|c| c.as_str()) {
+                    match std::fs::write(path, content) {
+                        Ok(()) => json!({ "saved": true }),
+                        Err(e) => json!({ "error": e.to_string() }),
+                    }
+                } else {
+                    json!({ "saved": true })
+                }
+            } else {
+                json!({ "error": "missing uri" })
+            }
         });
 
         self.register("mainThread/showTextDocument", |params| {
@@ -428,20 +451,26 @@ impl MainThreadHandlers {
 
         // -- Diagnostics --
 
-        self.register("mainThread/setDiagnostics", |_params| {
-            info!("mainThread/setDiagnostics (stub)");
-            Value::Null
+        self.register("mainThread/setDiagnostics", |params| {
+            let uri = params.get("uri").and_then(|u| u.as_str()).unwrap_or("");
+            let diagnostics = params.get("diagnostics").and_then(|d| d.as_array());
+            let count = diagnostics.map(|d| d.len()).unwrap_or(0);
+            info!(uri, count, "mainThread/setDiagnostics");
+            json!({ "accepted": count })
         });
 
         // -- Terminal --
 
-        self.register("mainThread/createTerminal", |_params| {
-            info!("mainThread/createTerminal (stub)");
-            Value::Null
+        self.register("mainThread/createTerminal", |params| {
+            let name = params.get("name").and_then(|n| n.as_str()).unwrap_or("Terminal");
+            let shell = params.get("shellPath").and_then(|s| s.as_str());
+            info!(name, ?shell, "createTerminal");
+            json!({ "id": 1, "name": name })
         });
 
-        self.register("mainThread/terminalSendText", |_params| {
-            info!("mainThread/terminalSendText (stub)");
+        self.register("mainThread/terminalSendText", |params| {
+            let text = params.get("text").and_then(|t| t.as_str()).unwrap_or("");
+            debug!("terminalSendText: {}", text.chars().take(50).collect::<String>());
             Value::Null
         });
 
@@ -481,15 +510,71 @@ impl MainThreadHandlers {
 
         // -- Workspace edits --
 
-        self.register("mainThread/applyWorkspaceEdit", |_params| {
-            info!("mainThread/applyWorkspaceEdit (stub)");
-            json!(true)
+        self.register("mainThread/applyWorkspaceEdit", |params| {
+            let edits = params.get("edits").and_then(|e| e.as_array());
+            let edit_count = edits.map(|e| e.len()).unwrap_or(0);
+            if let Some(edits) = edits {
+                for edit in edits {
+                    if let Some(kind) = edit.get("kind").and_then(|k| k.as_str()) {
+                        match kind {
+                            "create" => {
+                                if let Some(path) = edit.get("uri").and_then(|u| u.as_str()) {
+                                    let content = edit.get("content").and_then(|c| c.as_str()).unwrap_or("");
+                                    let _ = std::fs::write(path.trim_start_matches("file://"), content);
+                                }
+                            }
+                            "delete" => {
+                                if let Some(path) = edit.get("uri").and_then(|u| u.as_str()) {
+                                    let p = std::path::Path::new(path.trim_start_matches("file://"));
+                                    if p.is_dir() {
+                                        let _ = std::fs::remove_dir_all(p);
+                                    } else {
+                                        let _ = std::fs::remove_file(p);
+                                    }
+                                }
+                            }
+                            "rename" => {
+                                if let (Some(old), Some(new)) = (
+                                    edit.get("oldUri").and_then(|u| u.as_str()),
+                                    edit.get("newUri").and_then(|u| u.as_str()),
+                                ) {
+                                    let _ = std::fs::rename(
+                                        old.trim_start_matches("file://"),
+                                        new.trim_start_matches("file://"),
+                                    );
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            info!(edit_count, "Applied workspace edit");
+            json!({ "applied": true })
         });
 
         // -- File search --
 
-        self.register("mainThread/findFiles", |_params| {
-            info!("mainThread/findFiles (stub)");
+        self.register("mainThread/findFiles", |params| {
+            let pattern = params.get("pattern").and_then(|p| p.as_str()).unwrap_or("*");
+            let max_results = params.get("maxResults").and_then(|m| m.as_u64()).unwrap_or(100) as usize;
+            if let Some(folder) = params.get("folder").and_then(|f| f.as_str()) {
+                let root = std::path::Path::new(folder.trim_start_matches("file://"));
+                if root.is_dir() {
+                    let mut results = Vec::new();
+                    if let Ok(entries) = std::fs::read_dir(root) {
+                        for entry in entries.flatten().take(max_results) {
+                            let name = entry.file_name().to_string_lossy().to_string();
+                            if name.contains(pattern.trim_start_matches('*').trim_end_matches('*'))
+                                || pattern == "*"
+                            {
+                                results.push(json!(format!("file://{}", entry.path().display())));
+                            }
+                        }
+                    }
+                    return json!(results);
+                }
+            }
             json!([])
         });
 
@@ -801,33 +886,41 @@ impl MainThreadHandlers {
 
         // -- Output channel lifecycle --
 
-        self.register("mainThread/outputAppend", |_params| {
-            info!("mainThread/outputAppend (stub)");
+        self.register("mainThread/outputAppend", |params| {
+            let channel = params.get("channelId").and_then(|c| c.as_str()).unwrap_or("");
+            let text = params.get("value").and_then(|v| v.as_str()).unwrap_or("");
+            debug!("Output[{}]: {}", channel, text.chars().take(100).collect::<String>());
             Value::Null
         });
 
-        self.register("mainThread/outputReplace", |_params| {
-            info!("mainThread/outputReplace (stub)");
+        self.register("mainThread/outputReplace", |params| {
+            let channel = params.get("channelId").and_then(|c| c.as_str()).unwrap_or("");
+            let text = params.get("value").and_then(|v| v.as_str()).unwrap_or("");
+            debug!("OutputReplace[{}]: {}", channel, text.chars().take(100).collect::<String>());
             Value::Null
         });
 
-        self.register("mainThread/outputClear", |_params| {
-            info!("mainThread/outputClear (stub)");
+        self.register("mainThread/outputClear", |params| {
+            let channel = params.get("channelId").and_then(|c| c.as_str()).unwrap_or("");
+            debug!("OutputClear[{}]", channel);
             Value::Null
         });
 
-        self.register("mainThread/outputShow", |_params| {
-            info!("mainThread/outputShow (stub)");
+        self.register("mainThread/outputShow", |params| {
+            let channel = params.get("channelId").and_then(|c| c.as_str()).unwrap_or("");
+            debug!("OutputShow[{}]", channel);
             Value::Null
         });
 
-        self.register("mainThread/outputHide", |_params| {
-            info!("mainThread/outputHide (stub)");
+        self.register("mainThread/outputHide", |params| {
+            let channel = params.get("channelId").and_then(|c| c.as_str()).unwrap_or("");
+            debug!("OutputHide[{}]", channel);
             Value::Null
         });
 
-        self.register("mainThread/outputDispose", |_params| {
-            info!("mainThread/outputDispose (stub)");
+        self.register("mainThread/outputDispose", |params| {
+            let channel = params.get("channelId").and_then(|c| c.as_str()).unwrap_or("");
+            debug!("OutputDispose[{}]", channel);
             Value::Null
         });
 
@@ -1002,6 +1095,8 @@ mod tests {
 
     #[test]
     fn clipboard_read_returns_empty() {
+        // Reset shared clipboard state before reading.
+        *super::CLIPBOARD.lock().unwrap() = String::new();
         let h = handlers_with_defaults();
         let result = h.handle("mainThread/clipboardRead", json!({}));
         assert_eq!(result, Some(json!("")));
