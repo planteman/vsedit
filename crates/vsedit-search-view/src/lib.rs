@@ -78,7 +78,7 @@ impl SearchQuery {
     }
 
     /// Build a [`Regex`] from the query options. Returns `None` on invalid pattern.
-    fn build_regex(&self) -> Option<Regex> {
+    pub fn build_regex(&self) -> Option<Regex> {
         if self.pattern.is_empty() {
             return None;
         }
@@ -290,6 +290,11 @@ impl SearchEngine {
             }
         }
         matches
+    }
+
+    /// Public wrapper for `build_preview`, used by `SearchView::search_in_files`.
+    pub fn build_preview_public(line: &str, start: usize, end: usize) -> String {
+        Self::build_preview(line, start, end)
     }
 
     fn build_preview(line: &str, start: usize, end: usize) -> String {
@@ -852,6 +857,90 @@ impl SearchView {
         // Re-run search to refresh results
         self.execute_search_via_service(root);
         count
+    }
+
+    /// Set the search query text.
+    pub fn set_query(&mut self, query: &str) {
+        self.search_text = query.to_string();
+    }
+
+    /// Search through in-memory file contents (path, content) pairs using
+    /// case-insensitive substring matching.  Results are grouped by file.
+    pub fn search_in_files(&mut self, files: &[(String, String)]) {
+        if self.search_text.is_empty() {
+            self.results = SearchResults::empty();
+            self.selected_result = None;
+            self.scroll_offset = 0;
+            return;
+        }
+
+        let query = self.build_query();
+        let re = match query.build_regex() {
+            Some(r) => r,
+            None => {
+                self.results = SearchResults::empty();
+                self.selected_result = None;
+                self.scroll_offset = 0;
+                return;
+            }
+        };
+
+        let mut file_matches: Vec<FileMatches> = Vec::new();
+        let mut total = 0usize;
+
+        for (path, content) in files {
+            let mut matches = Vec::new();
+            for (line_idx, line) in content.lines().enumerate() {
+                for m in re.find_iter(line) {
+                    matches.push(SearchMatch {
+                        file_path: PathBuf::from(path),
+                        line_number: (line_idx + 1) as u32,
+                        column: (m.start() + 1) as u32,
+                        line_content: line.to_string(),
+                        match_range: m.start()..m.end(),
+                        preview: SearchEngine::build_preview_public(line, m.start(), m.end()),
+                    });
+                    total += 1;
+                    if total >= MAX_RESULTS {
+                        break;
+                    }
+                }
+                if total >= MAX_RESULTS {
+                    break;
+                }
+            }
+            if !matches.is_empty() {
+                file_matches.push(FileMatches::new(PathBuf::from(path), matches));
+            }
+            if total >= MAX_RESULTS {
+                break;
+            }
+        }
+
+        self.results = SearchResults::new(file_matches);
+        self.selected_result = if self.results.total_matches() > 0 {
+            Some(0)
+        } else {
+            None
+        };
+        self.scroll_offset = 0;
+    }
+
+    /// Return search results as (file_path, vec of (line_number, line_content)) pairs.
+    pub fn get_results(&self) -> Vec<(String, Vec<(usize, String)>)> {
+        self.results
+            .files()
+            .iter()
+            .map(|fm| {
+                let path = fm.file_path.to_string_lossy().to_string();
+                let lines = fm
+                    .matches
+                    .iter()
+                    .map(|m| (m.line_number as usize, m.line_content.clone()))
+                    .collect();
+                (path, lines)
+            })
+            .collect()
     }
 
     /// Get the match at a given visible entry index, or `None` if it's a file header.

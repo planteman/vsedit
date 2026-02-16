@@ -842,6 +842,8 @@ pub struct Workbench {
     pub terminal_view: TerminalView,
     /// Problems panel view.
     pub problems_panel: ProblemsPanel,
+    /// Raw diagnostics: (severity, file, message, line).
+    pub diagnostics: Vec<(String, String, String, u32)>,
     /// Output panel view.
     pub output_panel: OutputPanel,
     /// Editor group manager for split editors.
@@ -1199,6 +1201,7 @@ impl Workbench {
             active_panel: ActivePanelView::Terminal,
             terminal_view: TerminalView::new(),
             problems_panel: ProblemsPanel::new(),
+            diagnostics: Vec::new(),
             output_panel: OutputPanel::new(),
             editor_groups: EditorGroupManager::new(),
             activity_bar_items: default_activity_bar_items(),
@@ -1706,6 +1709,7 @@ impl Workbench {
         // Tab bar row
         let tab_area = Rect::new(inner.x, inner.y, inner.width, 1);
         let mut tab_spans: Vec<Span> = Vec::new();
+        let problem_count = self.problems_panel.total_count();
         for view in ActivePanelView::all() {
             let style = if *view == self.active_panel {
                 Style::default()
@@ -1715,7 +1719,12 @@ impl Workbench {
             } else {
                 Style::default().fg(Color::Gray)
             };
-            tab_spans.push(Span::styled(format!(" {} ", view.label()), style));
+            let label = if *view == ActivePanelView::Problems && problem_count > 0 {
+                format!(" {} ({}) ", view.label(), problem_count)
+            } else {
+                format!(" {} ", view.label())
+            };
+            tab_spans.push(Span::styled(label, style));
         }
         frame.render_widget(Paragraph::new(Line::from(tab_spans)), tab_area);
 
@@ -2582,6 +2591,19 @@ impl Workbench {
         self.focused = FocusedPart::Sidebar;
     }
 
+    /// Read workspace files and run the search view's in-memory search.
+    fn run_search_in_workspace_files(&mut self) {
+        let files: Vec<(String, String)> = self
+            .workspace_files
+            .iter()
+            .filter_map(|p| {
+                let content = std::fs::read_to_string(p).ok()?;
+                Some((p.to_string_lossy().to_string(), content))
+            })
+            .collect();
+        self.search_view.search_in_files(&files);
+    }
+
     /// Handle Up/Down/Enter keys when sidebar is focused.
     pub fn handle_sidebar_key(&mut self, key: &KeyInput) {
         use vsedit_keycodes::KeyCode as KC;
@@ -2600,7 +2622,21 @@ impl Workbench {
                 match key.key_code {
                     KC::UpArrow => self.search_view.select_previous(),
                     KC::DownArrow => self.search_view.select_next(),
-                    _ => {}
+                    KC::Backspace => {
+                        self.search_view.search_text.pop();
+                        self.run_search_in_workspace_files();
+                    }
+                    KC::Enter => {
+                        self.run_search_in_workspace_files();
+                    }
+                    other => {
+                        if !key.ctrl && !key.alt && !key.meta {
+                            if let Some(ch) = key_code_to_char(other, key.shift) {
+                                self.search_view.search_text.push(ch);
+                                self.run_search_in_workspace_files();
+                            }
+                        }
+                    }
                 }
             }
             ActiveSidebarPanel::SourceControl => {
@@ -2722,6 +2758,28 @@ impl Workbench {
         self.problems_panel.problems.push(Problem::new(
             severity, message, "", file, line, col,
         ));
+        self.update_problem_status();
+    }
+
+    /// Replace all diagnostics from a list of `(severity, file, message, line)` tuples.
+    ///
+    /// The severity string is matched case-insensitively: `"error"`, `"warning"`,
+    /// `"info"`, or `"hint"`.  Unrecognised values default to `Info`.
+    pub fn set_diagnostics(&mut self, diags: Vec<(String, String, String, u32)>) {
+        self.diagnostics = diags.clone();
+        self.problems_panel.clear_all();
+        for (sev_str, file, message, line) in diags {
+            let severity = match sev_str.to_lowercase().as_str() {
+                "error" => ProblemSeverity::Error,
+                "warning" => ProblemSeverity::Warning,
+                "hint" => ProblemSeverity::Hint,
+                _ => ProblemSeverity::Info,
+            };
+            self.problems_panel
+                .problems
+                .push(Problem::new(severity, message, "", file, line, 1));
+        }
+        self.problems_panel.sort_problems();
         self.update_problem_status();
     }
 
