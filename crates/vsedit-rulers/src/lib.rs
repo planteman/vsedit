@@ -630,6 +630,138 @@ impl Default for RulersValidator {
     }
 }
 
+/// Public wrapper for hex color validation (delegates to private helper).
+pub fn is_valid_hex_color_pub(s: &str) -> bool {
+    is_valid_hex_color(s)
+}
+
+/// Higher-level ruler configuration with named ruler sets.
+#[derive(Debug, Clone)]
+pub struct RulerConfiguration {
+    pub name: String,
+    pub positions: Vec<u32>,
+    pub color_map: Vec<(u32, String)>,
+    pub default_color: String,
+}
+
+impl RulerConfiguration {
+    /// Create a new named ruler configuration.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            positions: Vec::new(),
+            color_map: Vec::new(),
+            default_color: "#d3d3d3".to_string(),
+        }
+    }
+
+    /// Add a ruler position.
+    pub fn add_position(&mut self, col: u32) -> Result<(), RulerError> {
+        if col > MAX_COLUMN {
+            return Err(RulerError::ColumnOutOfRange(col));
+        }
+        if !self.positions.contains(&col) {
+            self.positions.push(col);
+            self.positions.sort_unstable();
+        }
+        Ok(())
+    }
+
+    /// Set color for a specific column position.
+    pub fn set_color(&mut self, col: u32, color: impl Into<String>) -> Result<(), RulerError> {
+        let c = color.into();
+        if !is_valid_hex_color_pub(&c) {
+            return Err(RulerError::InvalidColor(c));
+        }
+        self.color_map.retain(|(pos, _)| *pos != col);
+        self.color_map.push((col, c));
+        Ok(())
+    }
+
+    /// Get the number of ruler positions.
+    pub fn position_count(&self) -> usize {
+        self.positions.len()
+    }
+
+    /// Convert to a RulersConfig.
+    pub fn to_rulers_config(&self) -> RulersConfig {
+        let rulers = self
+            .positions
+            .iter()
+            .map(|&col| {
+                let color = self
+                    .color_map
+                    .iter()
+                    .find(|(c, _)| *c == col)
+                    .map(|(_, clr)| clr.clone());
+                RulerConfig { column: col, color }
+            })
+            .collect();
+        RulersConfig {
+            rulers,
+            default_color: self.default_color.clone(),
+        }
+    }
+}
+
+/// A computed render position for a ruler line.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RulerRenderPosition {
+    pub column: u32,
+    pub pixel_x: f64,
+    pub color: String,
+}
+
+/// Compute pixel render positions for all rulers in a configuration.
+/// `char_width` is the width of a single character in pixels.
+/// `scroll_offset` is the horizontal scroll offset in pixels.
+pub fn ruler_render_positions(
+    config: &RulersConfig,
+    char_width: f64,
+    scroll_offset: f64,
+) -> Result<Vec<RulerRenderPosition>, RulerError> {
+    if char_width <= 0.0 {
+        return Err(RulerError::InvalidCharWidth(format!(
+            "char_width must be positive, got {}",
+            char_width
+        )));
+    }
+    Ok(config
+        .rulers
+        .iter()
+        .map(|r| {
+            let pixel_x = (r.column as f64 * char_width) - scroll_offset;
+            let color = r.effective_color(&config.default_color).to_string();
+            RulerRenderPosition {
+                column: r.column,
+                pixel_x,
+                color,
+            }
+        })
+        .collect())
+}
+
+/// Resolve the color for a ruler at a specific column.
+/// Checks the configuration's color map, then falls back to default.
+pub fn ruler_color_by_position(config: &RulersConfig, column: u32) -> String {
+    config
+        .rulers
+        .iter()
+        .find(|r| r.column == column)
+        .and_then(|r| r.color.clone())
+        .unwrap_or_else(|| config.default_color.clone())
+}
+
+/// Check if any ruler is within a visible column range.
+pub fn rulers_in_range(config: &RulersConfig, start_col: u32, end_col: u32) -> Vec<u32> {
+    config
+        .rulers
+        .iter()
+        .filter(|r| r.column >= start_col && r.column <= end_col)
+        .map(|r| r.column)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1025,5 +1157,75 @@ mod tests {
     fn rulers_is_ascii_printable() {
         assert!(RulersValidator::is_ascii_printable("Hello World 123"));
         assert!(!RulersValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn ruler_configuration_add_positions() {
+        let mut rc = RulerConfiguration::new("default");
+        rc.add_position(80).unwrap();
+        rc.add_position(120).unwrap();
+        assert_eq!(rc.position_count(), 2);
+        assert_eq!(rc.positions, vec![80, 120]);
+    }
+
+    #[test]
+    fn ruler_configuration_dedup() {
+        let mut rc = RulerConfiguration::new("test");
+        rc.add_position(80).unwrap();
+        rc.add_position(80).unwrap();
+        assert_eq!(rc.position_count(), 1);
+    }
+
+    #[test]
+    fn ruler_configuration_out_of_range() {
+        let mut rc = RulerConfiguration::new("test");
+        assert!(rc.add_position(MAX_COLUMN + 1).is_err());
+    }
+
+    #[test]
+    fn ruler_configuration_set_color() {
+        let mut rc = RulerConfiguration::new("test");
+        rc.add_position(80).unwrap();
+        rc.set_color(80, "#ff0000").unwrap();
+        let config = rc.to_rulers_config();
+        assert_eq!(config.rulers[0].color, Some("#ff0000".to_string()));
+    }
+
+    #[test]
+    fn ruler_render_positions_basic() {
+        let mut config = RulersConfig::default();
+        config.add_ruler(80, Some("#ff0000".into()));
+        config.add_ruler(120, None);
+        let positions = ruler_render_positions(&config, 8.0, 0.0).unwrap();
+        assert_eq!(positions.len(), 2);
+        assert!((positions[0].pixel_x - 640.0).abs() < 0.001);
+        assert_eq!(positions[0].color, "#ff0000");
+        assert!((positions[1].pixel_x - 960.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn ruler_render_positions_invalid_char_width() {
+        let config = RulersConfig::default();
+        assert!(ruler_render_positions(&config, 0.0, 0.0).is_err());
+        assert!(ruler_render_positions(&config, -1.0, 0.0).is_err());
+    }
+
+    #[test]
+    fn ruler_color_by_position_with_override() {
+        let mut config = RulersConfig::default();
+        config.add_ruler(80, Some("#ff0000".into()));
+        config.add_ruler(120, None);
+        assert_eq!(ruler_color_by_position(&config, 80), "#ff0000");
+        assert_eq!(ruler_color_by_position(&config, 120), "#d3d3d3");
+    }
+
+    #[test]
+    fn rulers_in_range_basic() {
+        let mut config = RulersConfig::default();
+        config.add_ruler(40, None);
+        config.add_ruler(80, None);
+        config.add_ruler(120, None);
+        let visible = rulers_in_range(&config, 50, 100);
+        assert_eq!(visible, vec![80]);
     }
 }

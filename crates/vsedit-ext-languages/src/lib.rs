@@ -496,6 +496,269 @@ impl ProviderRanking {
     }
 }
 
+// ── Language status ──
+
+/// Severity level for a language status item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LanguageStatusSeverity {
+    Information,
+    Warning,
+    Error,
+}
+
+/// Status bar information for a specific language.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LanguageStatus {
+    pub language_id: String,
+    pub label: String,
+    pub detail: Option<String>,
+    pub severity: LanguageStatusSeverity,
+    pub busy: bool,
+}
+
+impl LanguageStatus {
+    pub fn new(language_id: &str, label: &str) -> Self {
+        Self {
+            language_id: language_id.to_string(),
+            label: label.to_string(),
+            detail: None,
+            severity: LanguageStatusSeverity::Information,
+            busy: false,
+        }
+    }
+
+    pub fn with_detail(mut self, detail: &str) -> Self {
+        self.detail = Some(detail.to_string());
+        self
+    }
+
+    pub fn with_severity(mut self, severity: LanguageStatusSeverity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn set_busy(&mut self, busy: bool) {
+        self.busy = busy;
+    }
+
+    pub fn display_text(&self) -> String {
+        match &self.detail {
+            Some(d) => format!("{} ({})", self.label, d),
+            None => self.label.clone(),
+        }
+    }
+
+    pub fn is_error(&self) -> bool {
+        self.severity == LanguageStatusSeverity::Error
+    }
+}
+
+// ── Completion item converter ──
+
+/// Converts between VSCode completion item kind numbers and string names.
+pub struct CompletionItemConverter;
+
+impl CompletionItemConverter {
+    /// Maps a VSCode completion kind number to its string name.
+    pub fn kind_to_string(kind: u32) -> &'static str {
+        match kind {
+            1 => "Method",
+            2 => "Function",
+            3 => "Constructor",
+            4 => "Field",
+            5 => "Variable",
+            6 => "Class",
+            7 => "Interface",
+            8 => "Module",
+            9 => "Property",
+            10 => "Unit",
+            11 => "Value",
+            12 => "Enum",
+            13 => "Keyword",
+            14 => "Snippet",
+            15 => "Color",
+            16 => "File",
+            17 => "Reference",
+            18 => "Folder",
+            19 => "EnumMember",
+            20 => "Constant",
+            21 => "Struct",
+            22 => "Event",
+            23 => "Operator",
+            24 => "TypeParameter",
+            _ => "Unknown",
+        }
+    }
+
+    /// Maps a string name back to its VSCode completion kind number.
+    pub fn string_to_kind(s: &str) -> Option<u32> {
+        match s {
+            "Method" => Some(1),
+            "Function" => Some(2),
+            "Constructor" => Some(3),
+            "Field" => Some(4),
+            "Variable" => Some(5),
+            "Class" => Some(6),
+            "Interface" => Some(7),
+            "Module" => Some(8),
+            "Property" => Some(9),
+            "Unit" => Some(10),
+            "Value" => Some(11),
+            "Enum" => Some(12),
+            "Keyword" => Some(13),
+            "Snippet" => Some(14),
+            "Color" => Some(15),
+            "File" => Some(16),
+            "Reference" => Some(17),
+            "Folder" => Some(18),
+            "EnumMember" => Some(19),
+            "Constant" => Some(20),
+            "Struct" => Some(21),
+            "Event" => Some(22),
+            "Operator" => Some(23),
+            "TypeParameter" => Some(24),
+            _ => None,
+        }
+    }
+
+    /// Returns an icon character for the given completion kind.
+    pub fn icon_for_kind(kind: u32) -> &'static str {
+        match kind {
+            1 => "ƒ",  // Method
+            2 => "ƒ",  // Function
+            3 => "⊕",  // Constructor
+            4 => "□",  // Field
+            5 => "𝑥",  // Variable
+            6 => "◆",  // Class
+            7 => "◇",  // Interface
+            8 => "▣",  // Module
+            9 => "◫",  // Property
+            10 => "∪", // Unit
+            11 => "=",  // Value
+            12 => "∈", // Enum
+            13 => "⌘", // Keyword
+            14 => "✂",  // Snippet
+            15 => "◉", // Color
+            16 => "📄", // File
+            17 => "↗",  // Reference
+            18 => "📁", // Folder
+            19 => "∊", // EnumMember
+            20 => "π",  // Constant
+            21 => "▧", // Struct
+            22 => "⚡", // Event
+            23 => "±", // Operator
+            24 => "τ",  // TypeParameter
+            _ => "?",
+        }
+    }
+
+    /// Returns a sort prefix string that orders kinds logically:
+    /// methods/functions first, then fields/properties, then variables, etc.
+    pub fn sort_text_for_kind(kind: u32) -> String {
+        let prefix = match kind {
+            1 => "aa", // Method
+            2 => "ab", // Function
+            3 => "ac", // Constructor
+            4 => "ba", // Field
+            9 => "bb", // Property
+            5 => "ca", // Variable
+            20 => "cb", // Constant
+            6 => "da", // Class
+            21 => "db", // Struct
+            7 => "dc", // Interface
+            12 => "dd", // Enum
+            19 => "de", // EnumMember
+            8 => "ea", // Module
+            13 => "fa", // Keyword
+            14 => "fb", // Snippet
+            24 => "ga", // TypeParameter
+            _ => "zz",
+        };
+        prefix.to_string()
+    }
+}
+
+// ── Feature support query ──
+
+/// Returns `true` if at least one provider registered in `bridge` for the
+/// given `language` supports the specified `feature`.
+pub fn language_feature_supported(
+    bridge: &LanguageBridge,
+    language: &str,
+    feature: LanguageFeatureKind,
+) -> bool {
+    for (id, reg) in &bridge.providers {
+        if reg.selector.language.as_deref() != Some(language) {
+            continue;
+        }
+        if let Some(&kind) = bridge.feature_kinds.get(id.as_str()) {
+            if kind == feature {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+// ── Language status registry ──
+
+/// Registry for tracking language status items across multiple languages.
+#[derive(Debug, Default)]
+pub struct LanguageStatusRegistry {
+    statuses: HashMap<String, LanguageStatus>,
+}
+
+impl LanguageStatusRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Insert or update a status for a language.
+    pub fn set_status(&mut self, status: LanguageStatus) {
+        self.statuses.insert(status.language_id.clone(), status);
+    }
+
+    /// Retrieve the status for a language, if any.
+    pub fn get_status(&self, language_id: &str) -> Option<&LanguageStatus> {
+        self.statuses.get(language_id)
+    }
+
+    /// Remove a language status. Returns `true` if it existed.
+    pub fn remove_status(&mut self, language_id: &str) -> bool {
+        self.statuses.remove(language_id).is_some()
+    }
+
+    /// Return all statuses in the registry.
+    pub fn all_statuses(&self) -> Vec<&LanguageStatus> {
+        self.statuses.values().collect()
+    }
+
+    /// Return language IDs that have error severity.
+    pub fn error_languages(&self) -> Vec<&str> {
+        self.statuses
+            .values()
+            .filter(|s| s.severity == LanguageStatusSeverity::Error)
+            .map(|s| s.language_id.as_str())
+            .collect()
+    }
+
+    /// Return language IDs that are marked busy.
+    pub fn busy_languages(&self) -> Vec<&str> {
+        self.statuses
+            .values()
+            .filter(|s| s.busy)
+            .map(|s| s.language_id.as_str())
+            .collect()
+    }
+
+    /// Number of tracked language statuses.
+    pub fn count(&self) -> usize {
+        self.statuses.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1032,5 +1295,132 @@ mod tests {
     fn ranking_best_returns_none_when_empty() {
         let best = ProviderRanking::best(&[], "rust", "file", "/a.rs");
         assert!(best.is_none());
+    }
+
+    // ── LanguageStatus tests ──
+
+    #[test]
+    fn language_status_creation_and_display_text() {
+        let status = LanguageStatus::new("rust", "Rust Analyzer");
+        assert_eq!(status.language_id, "rust");
+        assert_eq!(status.label, "Rust Analyzer");
+        assert_eq!(status.severity, LanguageStatusSeverity::Information);
+        assert!(!status.busy);
+        assert_eq!(status.display_text(), "Rust Analyzer");
+    }
+
+    #[test]
+    fn language_status_with_detail() {
+        let status = LanguageStatus::new("python", "Pylance")
+            .with_detail("loading workspace");
+        assert_eq!(status.detail, Some("loading workspace".to_string()));
+        assert_eq!(status.display_text(), "Pylance (loading workspace)");
+    }
+
+    #[test]
+    fn language_status_is_error() {
+        let info = LanguageStatus::new("go", "gopls");
+        assert!(!info.is_error());
+
+        let err = LanguageStatus::new("go", "gopls")
+            .with_severity(LanguageStatusSeverity::Error);
+        assert!(err.is_error());
+
+        let warn = LanguageStatus::new("go", "gopls")
+            .with_severity(LanguageStatusSeverity::Warning);
+        assert!(!warn.is_error());
+    }
+
+    // ── CompletionItemConverter tests ──
+
+    #[test]
+    fn completion_converter_kind_to_string() {
+        assert_eq!(CompletionItemConverter::kind_to_string(1), "Method");
+        assert_eq!(CompletionItemConverter::kind_to_string(2), "Function");
+        assert_eq!(CompletionItemConverter::kind_to_string(6), "Class");
+        assert_eq!(CompletionItemConverter::kind_to_string(13), "Keyword");
+        assert_eq!(CompletionItemConverter::kind_to_string(99), "Unknown");
+    }
+
+    #[test]
+    fn completion_converter_string_to_kind() {
+        assert_eq!(CompletionItemConverter::string_to_kind("Method"), Some(1));
+        assert_eq!(CompletionItemConverter::string_to_kind("Variable"), Some(5));
+        assert_eq!(CompletionItemConverter::string_to_kind("Struct"), Some(21));
+        assert_eq!(CompletionItemConverter::string_to_kind("Bogus"), None);
+    }
+
+    #[test]
+    fn completion_converter_icon_for_kind() {
+        assert_eq!(CompletionItemConverter::icon_for_kind(1), "ƒ");
+        assert_eq!(CompletionItemConverter::icon_for_kind(6), "◆");
+        assert_eq!(CompletionItemConverter::icon_for_kind(13), "⌘");
+        assert_eq!(CompletionItemConverter::icon_for_kind(255), "?");
+    }
+
+    // ── language_feature_supported tests ──
+
+    #[test]
+    fn language_feature_supported_returns_true_when_provider_exists() {
+        let mut bridge = LanguageBridge::new();
+        bridge.handle(LanguageMessage::RegisterCompletionProvider {
+            registration: ProviderRegistration {
+                provider_id: "rust-compl".into(),
+                selector: selector("rust"),
+            },
+        });
+        assert!(language_feature_supported(&bridge, "rust", LanguageFeatureKind::Completion));
+        assert!(!language_feature_supported(&bridge, "rust", LanguageFeatureKind::Hover));
+        assert!(!language_feature_supported(&bridge, "python", LanguageFeatureKind::Completion));
+    }
+
+    // ── LanguageStatusRegistry tests ──
+
+    #[test]
+    fn status_registry_set_and_get() {
+        let mut reg = LanguageStatusRegistry::new();
+        assert_eq!(reg.count(), 0);
+
+        reg.set_status(LanguageStatus::new("rust", "RA"));
+        assert_eq!(reg.count(), 1);
+        let s = reg.get_status("rust").unwrap();
+        assert_eq!(s.label, "RA");
+
+        assert!(reg.get_status("python").is_none());
+    }
+
+    #[test]
+    fn status_registry_error_languages() {
+        let mut reg = LanguageStatusRegistry::new();
+        reg.set_status(LanguageStatus::new("rust", "RA"));
+        reg.set_status(
+            LanguageStatus::new("python", "Pylance")
+                .with_severity(LanguageStatusSeverity::Error),
+        );
+        reg.set_status(
+            LanguageStatus::new("go", "gopls")
+                .with_severity(LanguageStatusSeverity::Warning),
+        );
+
+        let errors = reg.error_languages();
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0], "python");
+    }
+
+    #[test]
+    fn status_registry_busy_languages_and_remove() {
+        let mut reg = LanguageStatusRegistry::new();
+        let mut status = LanguageStatus::new("typescript", "tsserver");
+        status.set_busy(true);
+        reg.set_status(status);
+        reg.set_status(LanguageStatus::new("css", "css-lsp"));
+
+        let busy = reg.busy_languages();
+        assert_eq!(busy.len(), 1);
+        assert_eq!(busy[0], "typescript");
+
+        assert!(reg.remove_status("typescript"));
+        assert!(!reg.remove_status("typescript"));
+        assert_eq!(reg.count(), 1);
     }
 }

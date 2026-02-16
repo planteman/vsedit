@@ -676,6 +676,195 @@ fn split_file_line(s: &str) -> (&str, Option<u32>) {
 }
 
 // ---------------------------------------------------------------------------
+// DebugAdapterMessage
+// ---------------------------------------------------------------------------
+
+/// A typed representation of a DAP protocol message (request, response, or event).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum DebugAdapterMessage {
+    #[serde(rename = "request")]
+    Request {
+        seq: u64,
+        command: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        arguments: Option<serde_json::Value>,
+    },
+    #[serde(rename = "response")]
+    Response {
+        seq: u64,
+        request_seq: u64,
+        success: bool,
+        command: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        body: Option<serde_json::Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        message: Option<String>,
+    },
+    #[serde(rename = "event")]
+    Event {
+        seq: u64,
+        event: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        body: Option<serde_json::Value>,
+    },
+}
+
+impl DebugAdapterMessage {
+    /// Returns `true` if this message is a request.
+    pub fn is_request(&self) -> bool {
+        matches!(self, Self::Request { .. })
+    }
+
+    /// Returns `true` if this message is a response.
+    pub fn is_response(&self) -> bool {
+        matches!(self, Self::Response { .. })
+    }
+
+    /// Returns `true` if this message is an event.
+    pub fn is_event(&self) -> bool {
+        matches!(self, Self::Event { .. })
+    }
+
+    /// Returns the sequence number of the message.
+    pub fn seq(&self) -> u64 {
+        match self {
+            Self::Request { seq, .. }
+            | Self::Response { seq, .. }
+            | Self::Event { seq, .. } => *seq,
+        }
+    }
+
+    /// Returns the command name (for request/response) or event name.
+    pub fn command_or_event(&self) -> &str {
+        match self {
+            Self::Request { command, .. } | Self::Response { command, .. } => command,
+            Self::Event { event, .. } => event,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DebugSessionLifecycle
+// ---------------------------------------------------------------------------
+
+/// Tracks debug session state transitions with timestamps.
+#[derive(Debug, Clone)]
+pub struct DebugSessionLifecycle {
+    pub session_id: String,
+    transitions: Vec<(DebugSessionState, u64)>,
+}
+
+impl DebugSessionLifecycle {
+    /// Create a new lifecycle tracker for the given session.
+    pub fn new(session_id: impl Into<String>) -> Self {
+        Self {
+            session_id: session_id.into(),
+            transitions: Vec::new(),
+        }
+    }
+
+    /// Record a state transition at the given timestamp (milliseconds).
+    pub fn record_transition(&mut self, state: DebugSessionState, timestamp_ms: u64) {
+        self.transitions.push((state, timestamp_ms));
+    }
+
+    /// Returns the most recently recorded state, or `NotStarted` if empty.
+    pub fn current_state(&self) -> DebugSessionState {
+        self.transitions
+            .last()
+            .map(|(s, _)| *s)
+            .unwrap_or(DebugSessionState::NotStarted)
+    }
+
+    /// Returns the number of recorded transitions.
+    pub fn transition_count(&self) -> usize {
+        self.transitions.len()
+    }
+
+    /// Compute total time (ms) spent in the given state across all intervals.
+    ///
+    /// Each transition marks the *start* of time in that state; the duration
+    /// lasts until the next transition (or is open-ended for the last entry,
+    /// which is excluded from the sum).
+    pub fn time_in_state(&self, state: DebugSessionState) -> Option<u64> {
+        let mut total: u64 = 0;
+        let mut found = false;
+        for window in self.transitions.windows(2) {
+            if window[0].0 == state {
+                found = true;
+                total += window[1].1.saturating_sub(window[0].1);
+            }
+        }
+        if found { Some(total) } else { None }
+    }
+
+    /// Returns the full transition history.
+    pub fn history(&self) -> &[(DebugSessionState, u64)] {
+        &self.transitions
+    }
+}
+
+// ---------------------------------------------------------------------------
+// debug_capabilities_negotiate
+// ---------------------------------------------------------------------------
+
+/// Negotiate debug capabilities by merging an adapter's initialize response
+/// with the client's requested capabilities.
+///
+/// `_client_caps` is the client's `InitializeRequestArguments` (currently
+/// unused but reserved for future negotiation logic).
+/// `adapter_caps` is the body of the adapter's `initialize` response.
+pub fn debug_capabilities_negotiate(
+    _client_caps: &serde_json::Value,
+    adapter_caps: &serde_json::Value,
+) -> DebugCapabilities {
+    DebugCapabilities::from_dap(adapter_caps)
+}
+
+// ---------------------------------------------------------------------------
+// DebugAdapterMessageCodec
+// ---------------------------------------------------------------------------
+
+/// Codec for encoding / decoding DAP messages with Content-Length framing.
+pub struct DebugAdapterMessageCodec;
+
+impl DebugAdapterMessageCodec {
+    /// Encode a `DebugAdapterMessage` into the DAP wire format:
+    ///
+    /// ```text
+    /// Content-Length: <len>\r\n\r\n<json>
+    /// ```
+    pub fn encode(msg: &DebugAdapterMessage) -> String {
+        let json = serde_json::to_string(msg).expect("DebugAdapterMessage is always serialisable");
+        format!("Content-Length: {}\r\n\r\n{}", json.len(), json)
+    }
+
+    /// Decode a DAP wire-format payload into a `DebugAdapterMessage`.
+    ///
+    /// Expects `raw` to start with a `Content-Length:` header followed by
+    /// `\r\n\r\n` and the JSON body.
+    pub fn decode(raw: &str) -> Result<DebugAdapterMessage, DapError> {
+        let separator = "\r\n\r\n";
+        let sep_pos = raw.find(separator).ok_or_else(|| {
+            DapError::DeserializeFailed("missing header/body separator".into())
+        })?;
+        let header = &raw[..sep_pos];
+        let body = &raw[sep_pos + separator.len()..];
+
+        // Validate Content-Length header is present.
+        let _content_length: usize = header
+            .strip_prefix("Content-Length: ")
+            .and_then(|v| v.trim().parse().ok())
+            .ok_or_else(|| {
+                DapError::DeserializeFailed("invalid Content-Length header".into())
+            })?;
+
+        serde_json::from_str(body).map_err(|e| DapError::DeserializeFailed(e.to_string()))
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1039,5 +1228,140 @@ mod tests {
         assert_eq!(frame.frame_number, Some(3));
         assert_eq!(frame.function_name, "some_function");
         assert!(frame.file_path.is_none());
+    }
+
+    // -- DebugAdapterMessage -------------------------------------------------
+
+    #[test]
+    fn adapter_message_request_is_request() {
+        let msg = DebugAdapterMessage::Request {
+            seq: 1,
+            command: "initialize".into(),
+            arguments: None,
+        };
+        assert!(msg.is_request());
+        assert!(!msg.is_response());
+        assert!(!msg.is_event());
+        assert_eq!(msg.seq(), 1);
+        assert_eq!(msg.command_or_event(), "initialize");
+    }
+
+    #[test]
+    fn adapter_message_response_is_response() {
+        let msg = DebugAdapterMessage::Response {
+            seq: 2,
+            request_seq: 1,
+            success: true,
+            command: "initialize".into(),
+            body: Some(serde_json::json!({"supportsConfigurationDoneRequest": true})),
+            message: None,
+        };
+        assert!(msg.is_response());
+        assert!(!msg.is_request());
+        assert!(!msg.is_event());
+        assert_eq!(msg.seq(), 2);
+        assert_eq!(msg.command_or_event(), "initialize");
+    }
+
+    #[test]
+    fn adapter_message_event_command_or_event() {
+        let msg = DebugAdapterMessage::Event {
+            seq: 5,
+            event: "stopped".into(),
+            body: Some(serde_json::json!({"reason": "breakpoint"})),
+        };
+        assert!(msg.is_event());
+        assert_eq!(msg.command_or_event(), "stopped");
+    }
+
+    // -- DebugSessionLifecycle -----------------------------------------------
+
+    #[test]
+    fn lifecycle_transitions() {
+        let mut lc = DebugSessionLifecycle::new("sess-1");
+        assert_eq!(lc.current_state(), DebugSessionState::NotStarted);
+        assert_eq!(lc.transition_count(), 0);
+
+        lc.record_transition(DebugSessionState::Initializing, 100);
+        lc.record_transition(DebugSessionState::Running, 200);
+        lc.record_transition(DebugSessionState::Paused, 500);
+
+        assert_eq!(lc.current_state(), DebugSessionState::Paused);
+        assert_eq!(lc.transition_count(), 3);
+        assert_eq!(lc.history().len(), 3);
+    }
+
+    #[test]
+    fn lifecycle_time_in_state() {
+        let mut lc = DebugSessionLifecycle::new("sess-2");
+        lc.record_transition(DebugSessionState::Initializing, 0);
+        lc.record_transition(DebugSessionState::Running, 50);
+        lc.record_transition(DebugSessionState::Paused, 150);
+        lc.record_transition(DebugSessionState::Running, 200);
+        lc.record_transition(DebugSessionState::Terminated, 400);
+
+        // Running: [50..150) + [200..400) = 100 + 200 = 300
+        assert_eq!(lc.time_in_state(DebugSessionState::Running), Some(300));
+        // Initializing: [0..50) = 50
+        assert_eq!(lc.time_in_state(DebugSessionState::Initializing), Some(50));
+        // Paused: [150..200) = 50
+        assert_eq!(lc.time_in_state(DebugSessionState::Paused), Some(50));
+        // NotStarted never recorded
+        assert_eq!(lc.time_in_state(DebugSessionState::NotStarted), None);
+    }
+
+    // -- debug_capabilities_negotiate ----------------------------------------
+
+    #[test]
+    fn capabilities_negotiate_merges() {
+        let client = serde_json::json!({
+            "clientID": "vsedit",
+            "adapterID": "test"
+        });
+        let adapter = serde_json::json!({
+            "supportsConfigurationDoneRequest": true,
+            "supportsEvaluateForHovers": true,
+            "supportsTerminateRequest": true
+        });
+        let caps = debug_capabilities_negotiate(&client, &adapter);
+        assert!(caps.supports_configuration_done);
+        assert!(caps.supports_evaluate_for_hovers);
+        assert!(caps.supports_terminate_request);
+        assert!(!caps.supports_restart);
+        assert!(!caps.supports_data_breakpoints);
+    }
+
+    // -- DebugAdapterMessageCodec --------------------------------------------
+
+    #[test]
+    fn codec_encode_decode_roundtrip() {
+        let msg = DebugAdapterMessage::Request {
+            seq: 42,
+            command: "launch".into(),
+            arguments: Some(serde_json::json!({"program": "/bin/test"})),
+        };
+        let encoded = DebugAdapterMessageCodec::encode(&msg);
+        assert!(encoded.starts_with("Content-Length: "));
+        assert!(encoded.contains("\r\n\r\n"));
+
+        let decoded = DebugAdapterMessageCodec::decode(&encoded).unwrap();
+        assert!(decoded.is_request());
+        assert_eq!(decoded.seq(), 42);
+        assert_eq!(decoded.command_or_event(), "launch");
+    }
+
+    #[test]
+    fn codec_decode_invalid_returns_error() {
+        // No header at all
+        let result = DebugAdapterMessageCodec::decode("just some garbage");
+        assert!(result.is_err());
+
+        // Header present but invalid JSON body
+        let result = DebugAdapterMessageCodec::decode("Content-Length: 5\r\n\r\nhello");
+        assert!(result.is_err());
+
+        // Missing Content-Length prefix
+        let result = DebugAdapterMessageCodec::decode("X-Custom: 5\r\n\r\n{}");
+        assert!(result.is_err());
     }
 }

@@ -634,6 +634,223 @@ impl Default for ExtChatValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ChatMessagePart – rich message content
+// ---------------------------------------------------------------------------
+
+/// A single part of a rich chat message.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ChatMessagePart {
+    Text(String),
+    Code { language: String, code: String },
+    Markdown(String),
+    Reference { uri: String, label: Option<String> },
+}
+
+impl ChatMessagePart {
+    /// Returns `true` if this part is plain text.
+    pub fn is_text(&self) -> bool {
+        matches!(self, Self::Text(_))
+    }
+
+    /// Returns `true` if this part is a code block.
+    pub fn is_code(&self) -> bool {
+        matches!(self, Self::Code { .. })
+    }
+
+    /// Returns `true` if this part is markdown.
+    pub fn is_markdown(&self) -> bool {
+        matches!(self, Self::Markdown(_))
+    }
+
+    /// Returns `true` if this part is a reference.
+    pub fn is_reference(&self) -> bool {
+        matches!(self, Self::Reference { .. })
+    }
+
+    /// Returns the textual content of this part.
+    pub fn text_content(&self) -> &str {
+        match self {
+            Self::Text(s) | Self::Markdown(s) => s.as_str(),
+            Self::Code { code, .. } => code.as_str(),
+            Self::Reference { uri, .. } => uri.as_str(),
+        }
+    }
+
+    /// Returns the character count of the textual content.
+    pub fn char_count(&self) -> usize {
+        self.text_content().chars().count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// chat_format_response – terminal rendering
+// ---------------------------------------------------------------------------
+
+/// Formats a slice of [`ChatMessagePart`]s into a single string suitable for
+/// terminal rendering.
+pub fn chat_format_response(parts: &[ChatMessagePart]) -> String {
+    let mut out = String::new();
+    for (i, part) in parts.iter().enumerate() {
+        if i > 0 {
+            out.push('\n');
+        }
+        match part {
+            ChatMessagePart::Text(s) => out.push_str(s),
+            ChatMessagePart::Code { language, code } => {
+                out.push_str("```");
+                out.push_str(language);
+                out.push('\n');
+                out.push_str(code);
+                out.push_str("\n```");
+            }
+            ChatMessagePart::Markdown(s) => out.push_str(s),
+            ChatMessagePart::Reference { uri, label } => {
+                if let Some(lbl) = label {
+                    out.push('[');
+                    out.push_str(lbl);
+                    out.push_str("](");
+                    out.push_str(uri);
+                    out.push(')');
+                } else {
+                    out.push_str(uri);
+                }
+            }
+        }
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
+// ChatMessageBuilder – builder for multi-part messages
+// ---------------------------------------------------------------------------
+
+/// Builder for constructing a list of [`ChatMessagePart`]s.
+#[derive(Debug, Clone, Default)]
+pub struct ChatMessageBuilder {
+    parts: Vec<ChatMessagePart>,
+}
+
+impl ChatMessageBuilder {
+    /// Creates a new empty builder.
+    pub fn new() -> Self {
+        Self { parts: Vec::new() }
+    }
+
+    /// Appends a plain-text part.
+    pub fn add_text(mut self, text: &str) -> Self {
+        self.parts.push(ChatMessagePart::Text(text.to_string()));
+        self
+    }
+
+    /// Appends a code-block part.
+    pub fn add_code(mut self, lang: &str, code: &str) -> Self {
+        self.parts.push(ChatMessagePart::Code {
+            language: lang.to_string(),
+            code: code.to_string(),
+        });
+        self
+    }
+
+    /// Appends a markdown part.
+    pub fn add_markdown(mut self, md: &str) -> Self {
+        self.parts.push(ChatMessagePart::Markdown(md.to_string()));
+        self
+    }
+
+    /// Appends a reference part.
+    pub fn add_reference(mut self, uri: &str, label: Option<&str>) -> Self {
+        self.parts.push(ChatMessagePart::Reference {
+            uri: uri.to_string(),
+            label: label.map(String::from),
+        });
+        self
+    }
+
+    /// Consumes the builder and returns the parts.
+    pub fn build(self) -> Vec<ChatMessagePart> {
+        self.parts
+    }
+
+    /// Returns the total character count across all parts.
+    pub fn total_chars(&self) -> usize {
+        self.parts.iter().map(ChatMessagePart::char_count).sum()
+    }
+
+    /// Returns the number of parts added so far.
+    pub fn part_count(&self) -> usize {
+        self.parts.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatConversationMessage / ChatConversation – conversation tracking
+// ---------------------------------------------------------------------------
+
+/// A single message inside a [`ChatConversation`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ChatConversationMessage {
+    pub role: String,
+    pub parts: Vec<ChatMessagePart>,
+    pub timestamp_ms: u64,
+}
+
+/// Tracks a sequence of messages in a conversation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ChatConversation {
+    id: String,
+    messages: Vec<ChatConversationMessage>,
+}
+
+impl ChatConversation {
+    /// Creates a new conversation with the given identifier.
+    pub fn new(id: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            messages: Vec::new(),
+        }
+    }
+
+    /// Adds a user message with plain-text content.
+    pub fn add_user_message(&mut self, content: &str) {
+        self.messages.push(ChatConversationMessage {
+            role: "user".to_string(),
+            parts: vec![ChatMessagePart::Text(content.to_string())],
+            timestamp_ms: 0,
+        });
+    }
+
+    /// Adds an assistant message composed of the given parts.
+    pub fn add_assistant_message(&mut self, parts: Vec<ChatMessagePart>) {
+        self.messages.push(ChatConversationMessage {
+            role: "assistant".to_string(),
+            parts,
+            timestamp_ms: 0,
+        });
+    }
+
+    /// Returns the number of messages in this conversation.
+    pub fn message_count(&self) -> usize {
+        self.messages.len()
+    }
+
+    /// Returns the last message, if any.
+    pub fn last_message(&self) -> Option<&ChatConversationMessage> {
+        self.messages.last()
+    }
+
+    /// Returns a rough token estimate (total chars / 4).
+    pub fn total_tokens_estimate(&self) -> usize {
+        let total_chars: usize = self
+            .messages
+            .iter()
+            .flat_map(|m| &m.parts)
+            .map(ChatMessagePart::char_count)
+            .sum();
+        total_chars / 4
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1045,5 +1262,152 @@ mod tests {
     fn ext_chat_is_ascii_printable() {
         assert!(ExtChatValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtChatValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // ChatMessagePart tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn chat_message_part_text_creation_and_is_text() {
+        let part = ChatMessagePart::Text("hello".into());
+        assert!(part.is_text());
+        assert!(!part.is_code());
+        assert!(!part.is_markdown());
+        assert!(!part.is_reference());
+        assert_eq!(part.text_content(), "hello");
+    }
+
+    #[test]
+    fn chat_message_part_code_with_language() {
+        let part = ChatMessagePart::Code {
+            language: "rust".into(),
+            code: "fn main() {}".into(),
+        };
+        assert!(part.is_code());
+        assert!(!part.is_text());
+        assert_eq!(part.text_content(), "fn main() {}");
+    }
+
+    #[test]
+    fn chat_message_part_char_count() {
+        let text = ChatMessagePart::Text("abc".into());
+        assert_eq!(text.char_count(), 3);
+
+        let code = ChatMessagePart::Code {
+            language: "py".into(),
+            code: "print()".into(),
+        };
+        assert_eq!(code.char_count(), 7);
+
+        let md = ChatMessagePart::Markdown("# Title".into());
+        assert_eq!(md.char_count(), 7);
+
+        let refp = ChatMessagePart::Reference {
+            uri: "https://example.com".into(),
+            label: Some("Example".into()),
+        };
+        assert_eq!(refp.char_count(), 19);
+    }
+
+    // -----------------------------------------------------------------------
+    // chat_format_response tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn chat_format_response_renders_code_blocks() {
+        let parts = vec![ChatMessagePart::Code {
+            language: "rust".into(),
+            code: "let x = 1;".into(),
+        }];
+        let out = chat_format_response(&parts);
+        assert!(out.starts_with("```rust\n"));
+        assert!(out.ends_with("\n```"));
+        assert!(out.contains("let x = 1;"));
+    }
+
+    #[test]
+    fn chat_format_response_renders_references() {
+        let with_label = vec![ChatMessagePart::Reference {
+            uri: "https://example.com".into(),
+            label: Some("Example".into()),
+        }];
+        assert_eq!(
+            chat_format_response(&with_label),
+            "[Example](https://example.com)"
+        );
+
+        let without_label = vec![ChatMessagePart::Reference {
+            uri: "https://bare.com".into(),
+            label: None,
+        }];
+        assert_eq!(chat_format_response(&without_label), "https://bare.com");
+    }
+
+    // -----------------------------------------------------------------------
+    // ChatMessageBuilder tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn chat_message_builder_builds_multi_part() {
+        let parts = ChatMessageBuilder::new()
+            .add_text("Hello")
+            .add_code("rs", "fn f() {}")
+            .add_markdown("**bold**")
+            .add_reference("https://a.com", Some("link"))
+            .build();
+
+        assert_eq!(parts.len(), 4);
+        assert!(parts[0].is_text());
+        assert!(parts[1].is_code());
+        assert!(parts[2].is_markdown());
+        assert!(parts[3].is_reference());
+
+        let builder = ChatMessageBuilder::new()
+            .add_text("ab")
+            .add_code("py", "cd");
+        assert_eq!(builder.part_count(), 2);
+        assert_eq!(builder.total_chars(), 4);
+    }
+
+    // -----------------------------------------------------------------------
+    // ChatConversation tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn chat_conversation_tracks_messages() {
+        let mut conv = ChatConversation::new("conv-1");
+        assert_eq!(conv.message_count(), 0);
+        assert!(conv.last_message().is_none());
+
+        conv.add_user_message("Hi");
+        assert_eq!(conv.message_count(), 1);
+
+        let last = conv.last_message().unwrap();
+        assert_eq!(last.role, "user");
+        assert_eq!(last.parts.len(), 1);
+        assert!(last.parts[0].is_text());
+
+        conv.add_assistant_message(vec![
+            ChatMessagePart::Text("Hello!".into()),
+            ChatMessagePart::Code {
+                language: "rs".into(),
+                code: "let x = 1;".into(),
+            },
+        ]);
+        assert_eq!(conv.message_count(), 2);
+        assert_eq!(conv.last_message().unwrap().role, "assistant");
+    }
+
+    #[test]
+    fn chat_conversation_total_tokens_estimate() {
+        let mut conv = ChatConversation::new("conv-2");
+        // "abcdefgh" = 8 chars => 8/4 = 2 tokens
+        conv.add_user_message("abcdefgh");
+        assert_eq!(conv.total_tokens_estimate(), 2);
+
+        // add assistant with 12 chars => total 20 chars => 5 tokens
+        conv.add_assistant_message(vec![ChatMessagePart::Text("123456789012".into())]);
+        assert_eq!(conv.total_tokens_estimate(), 5);
     }
 }

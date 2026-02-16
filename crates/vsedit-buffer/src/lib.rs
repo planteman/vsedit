@@ -640,6 +640,245 @@ impl Default for BufferValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// BufferPool
+// ---------------------------------------------------------------------------
+
+/// A pool of reusable byte buffers to reduce allocation overhead.
+pub struct BufferPool {
+    pool: Vec<BytesMut>,
+    default_capacity: usize,
+    max_pool_size: usize,
+    total_acquired: u64,
+    total_released: u64,
+}
+
+impl BufferPool {
+    /// Create a new buffer pool.
+    pub fn new(default_capacity: usize, max_pool_size: usize) -> Self {
+        Self {
+            pool: Vec::new(),
+            default_capacity,
+            max_pool_size,
+            total_acquired: 0,
+            total_released: 0,
+        }
+    }
+
+    /// Acquire a buffer from the pool, or allocate a new one.
+    pub fn acquire(&mut self) -> BytesMut {
+        self.total_acquired += 1;
+        self.pool
+            .pop()
+            .unwrap_or_else(|| BytesMut::with_capacity(self.default_capacity))
+    }
+
+    /// Release a buffer back to the pool. The buffer is cleared before storing.
+    pub fn release(&mut self, mut buf: BytesMut) {
+        self.total_released += 1;
+        if self.pool.len() < self.max_pool_size {
+            buf.clear();
+            self.pool.push(buf);
+        }
+    }
+
+    /// Number of buffers currently available in the pool.
+    pub fn available(&self) -> usize {
+        self.pool.len()
+    }
+
+    /// Total number of buffers acquired from this pool.
+    pub fn total_acquired(&self) -> u64 {
+        self.total_acquired
+    }
+
+    /// Total number of buffers released back to this pool.
+    pub fn total_released(&self) -> u64 {
+        self.total_released
+    }
+
+    /// Pool hit rate (released / acquired), or 1.0 if no acquisitions.
+    pub fn hit_rate(&self) -> f64 {
+        if self.total_acquired == 0 {
+            return 1.0;
+        }
+        self.total_released as f64 / self.total_acquired as f64
+    }
+
+    /// Clear all buffers from the pool.
+    pub fn clear(&mut self) {
+        self.pool.clear();
+    }
+
+    /// Whether the pool contains no buffers.
+    pub fn is_empty(&self) -> bool {
+        self.pool.is_empty()
+    }
+
+    /// Shrink the pool to at most `target` buffers, dropping the excess.
+    pub fn shrink_pool(&mut self, target: usize) {
+        self.pool.truncate(target);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BufferReader
+// ---------------------------------------------------------------------------
+
+/// A reader that tracks position while reading from a VsBuffer.
+pub struct BufferReader {
+    buffer: VsBuffer,
+    position: usize,
+    mark: Option<usize>,
+}
+
+impl BufferReader {
+    /// Create a new reader over the given buffer.
+    pub fn new(buffer: VsBuffer) -> Self {
+        Self {
+            buffer,
+            position: 0,
+            mark: None,
+        }
+    }
+
+    /// Current read position.
+    pub fn position(&self) -> usize {
+        self.position
+    }
+
+    /// Number of bytes remaining.
+    pub fn remaining(&self) -> usize {
+        self.buffer.len().saturating_sub(self.position)
+    }
+
+    /// Whether the reader has reached the end of the buffer.
+    pub fn is_eof(&self) -> bool {
+        self.position >= self.buffer.len()
+    }
+
+    /// Read a single byte, advancing the position.
+    pub fn read_byte(&mut self) -> Option<u8> {
+        if self.is_eof() {
+            return None;
+        }
+        let b = self.buffer.as_bytes()[self.position];
+        self.position += 1;
+        Some(b)
+    }
+
+    /// Read up to `n` bytes, returning what is available.
+    pub fn read_bytes(&mut self, n: usize) -> VsBuffer {
+        let start = self.position;
+        let end = (start + n).min(self.buffer.len());
+        self.position = end;
+        if start >= self.buffer.len() {
+            return VsBuffer::empty();
+        }
+        self.buffer.slice(start..end)
+    }
+
+    /// Peek at the next byte without advancing the position.
+    pub fn peek_byte(&self) -> Option<u8> {
+        if self.is_eof() {
+            return None;
+        }
+        Some(self.buffer.as_bytes()[self.position])
+    }
+
+    /// Skip up to `n` bytes, returning the actual number skipped.
+    pub fn skip(&mut self, n: usize) -> usize {
+        let skipped = n.min(self.remaining());
+        self.position += skipped;
+        skipped
+    }
+
+    /// Save the current position as a mark.
+    pub fn set_mark(&mut self) {
+        self.mark = Some(self.position);
+    }
+
+    /// Reset the position to the previously saved mark.
+    /// Returns `false` if no mark was set.
+    pub fn reset_to_mark(&mut self) -> bool {
+        match self.mark {
+            Some(m) => {
+                self.position = m;
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Read bytes up to and including the given delimiter.
+    /// If the delimiter is not found, reads to the end.
+    pub fn read_until(&mut self, delimiter: u8) -> VsBuffer {
+        let start = self.position;
+        let data = self.buffer.as_bytes();
+        while self.position < data.len() {
+            self.position += 1;
+            if data[self.position - 1] == delimiter {
+                break;
+            }
+        }
+        if start >= self.buffer.len() {
+            return VsBuffer::empty();
+        }
+        self.buffer.slice(start..self.position)
+    }
+
+    /// Read a line (up to and including `\n`), or to the end of buffer.
+    /// Returns `None` if already at EOF.
+    pub fn read_line(&mut self) -> Option<VsBuffer> {
+        if self.is_eof() {
+            return None;
+        }
+        Some(self.read_until(b'\n'))
+    }
+
+    /// Seek to an absolute position. Returns `false` if the position is
+    /// beyond the buffer length.
+    pub fn seek(&mut self, pos: usize) -> bool {
+        if pos > self.buffer.len() {
+            return false;
+        }
+        self.position = pos;
+        true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// buffer_concat helpers
+// ---------------------------------------------------------------------------
+
+/// Efficiently concatenate multiple VsBuffers with an optional separator.
+pub fn buffer_concat(buffers: &[VsBuffer], separator: Option<&[u8]>) -> VsBuffer {
+    if buffers.is_empty() {
+        return VsBuffer::empty();
+    }
+    let sep = separator.unwrap_or(&[]);
+    let total: usize = buffers.iter().map(|b| b.len()).sum::<usize>()
+        + sep.len() * buffers.len().saturating_sub(1);
+    let mut out = BytesMut::with_capacity(total);
+    for (i, buf) in buffers.iter().enumerate() {
+        if i > 0 && !sep.is_empty() {
+            out.extend_from_slice(sep);
+        }
+        out.extend_from_slice(buf.as_bytes());
+    }
+    VsBuffer::new(out.freeze())
+}
+
+/// Concatenate multiple VsBuffers with a string separator.
+pub fn buffer_concat_with_str(buffers: &[VsBuffer], separator: &str) -> VsBuffer {
+    buffer_concat(buffers, Some(separator.as_bytes()))
+}
+
+/// Join buffer lines with newlines.
+pub fn buffer_join_lines(lines: &[VsBuffer]) -> VsBuffer {
+    buffer_concat(lines, Some(b"\n"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1038,5 +1277,289 @@ mod tests {
     fn buffer_is_ascii_printable() {
         assert!(BufferValidator::is_ascii_printable("Hello World 123"));
         assert!(!BufferValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // BufferPool tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn pool_acquire_creates_new_buffer() {
+        let mut pool = BufferPool::new(64, 4);
+        let buf = pool.acquire();
+        assert!(buf.is_empty());
+        assert_eq!(pool.total_acquired(), 1);
+    }
+
+    #[test]
+    fn pool_release_and_reuse() {
+        let mut pool = BufferPool::new(64, 4);
+        let mut buf = pool.acquire();
+        buf.extend_from_slice(b"hello");
+        pool.release(buf);
+        assert_eq!(pool.available(), 1);
+        let reused = pool.acquire();
+        assert!(reused.is_empty()); // cleared on release
+        assert_eq!(pool.available(), 0);
+    }
+
+    #[test]
+    fn pool_respects_max_size() {
+        let mut pool = BufferPool::new(16, 2);
+        for _ in 0..5 {
+            let buf = pool.acquire();
+            pool.release(buf);
+        }
+        // acquire then release 5 times; pool capped at 2
+        assert!(pool.available() <= 2);
+    }
+
+    #[test]
+    fn pool_hit_rate_no_acquisitions() {
+        let pool = BufferPool::new(16, 4);
+        assert!((pool.hit_rate() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn pool_hit_rate_with_usage() {
+        let mut pool = BufferPool::new(16, 4);
+        let b1 = pool.acquire();
+        let _b2 = pool.acquire();
+        pool.release(b1);
+        assert!((pool.hit_rate() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn pool_clear() {
+        let mut pool = BufferPool::new(16, 4);
+        let buf = pool.acquire();
+        pool.release(buf);
+        assert!(!pool.is_empty());
+        pool.clear();
+        assert!(pool.is_empty());
+    }
+
+    #[test]
+    fn pool_shrink() {
+        let mut pool = BufferPool::new(16, 10);
+        // Fill the pool with 8 buffers
+        let bufs: Vec<_> = (0..8).map(|_| pool.acquire()).collect();
+        for buf in bufs {
+            pool.release(buf);
+        }
+        assert_eq!(pool.available(), 8);
+        pool.shrink_pool(3);
+        assert_eq!(pool.available(), 3);
+    }
+
+    #[test]
+    fn pool_is_empty_initially() {
+        let pool = BufferPool::new(16, 4);
+        assert!(pool.is_empty());
+        assert_eq!(pool.available(), 0);
+        assert_eq!(pool.total_acquired(), 0);
+        assert_eq!(pool.total_released(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // BufferReader tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn reader_position_and_remaining() {
+        let buf = VsBuffer::from_string("abcdef");
+        let reader = BufferReader::new(buf);
+        assert_eq!(reader.position(), 0);
+        assert_eq!(reader.remaining(), 6);
+        assert!(!reader.is_eof());
+    }
+
+    #[test]
+    fn reader_read_byte() {
+        let buf = VsBuffer::from_string("hi");
+        let mut reader = BufferReader::new(buf);
+        assert_eq!(reader.read_byte(), Some(b'h'));
+        assert_eq!(reader.read_byte(), Some(b'i'));
+        assert_eq!(reader.read_byte(), None);
+        assert!(reader.is_eof());
+    }
+
+    #[test]
+    fn reader_read_bytes() {
+        let buf = VsBuffer::from_string("hello world");
+        let mut reader = BufferReader::new(buf);
+        let chunk = reader.read_bytes(5);
+        assert_eq!(chunk.to_string_lossy(), "hello");
+        assert_eq!(reader.position(), 5);
+    }
+
+    #[test]
+    fn reader_read_bytes_past_end() {
+        let buf = VsBuffer::from_string("ab");
+        let mut reader = BufferReader::new(buf);
+        let chunk = reader.read_bytes(10);
+        assert_eq!(chunk.to_string_lossy(), "ab");
+        assert!(reader.is_eof());
+    }
+
+    #[test]
+    fn reader_peek_does_not_advance() {
+        let buf = VsBuffer::from_string("xy");
+        let reader = BufferReader::new(buf);
+        assert_eq!(reader.peek_byte(), Some(b'x'));
+        assert_eq!(reader.position(), 0);
+    }
+
+    #[test]
+    fn reader_skip() {
+        let buf = VsBuffer::from_string("abcdef");
+        let mut reader = BufferReader::new(buf);
+        assert_eq!(reader.skip(3), 3);
+        assert_eq!(reader.position(), 3);
+        assert_eq!(reader.skip(100), 3); // only 3 left
+        assert!(reader.is_eof());
+    }
+
+    #[test]
+    fn reader_mark_and_reset() {
+        let buf = VsBuffer::from_string("abcdef");
+        let mut reader = BufferReader::new(buf);
+        reader.skip(2);
+        reader.set_mark();
+        reader.skip(3);
+        assert_eq!(reader.position(), 5);
+        assert!(reader.reset_to_mark());
+        assert_eq!(reader.position(), 2);
+    }
+
+    #[test]
+    fn reader_reset_without_mark() {
+        let buf = VsBuffer::from_string("ab");
+        let mut reader = BufferReader::new(buf);
+        assert!(!reader.reset_to_mark());
+    }
+
+    #[test]
+    fn reader_read_until() {
+        let buf = VsBuffer::from_string("key=value;rest");
+        let mut reader = BufferReader::new(buf);
+        let chunk = reader.read_until(b'=');
+        assert_eq!(chunk.to_string_lossy(), "key=");
+        assert_eq!(reader.position(), 4);
+    }
+
+    #[test]
+    fn reader_read_until_not_found() {
+        let buf = VsBuffer::from_string("no-delim");
+        let mut reader = BufferReader::new(buf);
+        let chunk = reader.read_until(b'!');
+        assert_eq!(chunk.to_string_lossy(), "no-delim");
+        assert!(reader.is_eof());
+    }
+
+    #[test]
+    fn reader_read_line() {
+        let buf = VsBuffer::from_string("line1\nline2\n");
+        let mut reader = BufferReader::new(buf);
+        let l1 = reader.read_line().unwrap();
+        assert_eq!(l1.to_string_lossy(), "line1\n");
+        let l2 = reader.read_line().unwrap();
+        assert_eq!(l2.to_string_lossy(), "line2\n");
+        assert!(reader.read_line().is_none());
+    }
+
+    #[test]
+    fn reader_seek() {
+        let buf = VsBuffer::from_string("abcdef");
+        let mut reader = BufferReader::new(buf);
+        assert!(reader.seek(3));
+        assert_eq!(reader.read_byte(), Some(b'd'));
+        assert!(!reader.seek(100)); // beyond end
+    }
+
+    // -----------------------------------------------------------------------
+    // buffer_concat / buffer_concat_with_str / buffer_join_lines tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn free_concat_no_separator() {
+        let bufs = vec![
+            VsBuffer::from_string("ab"),
+            VsBuffer::from_string("cd"),
+        ];
+        let result = super::buffer_concat(&bufs, None);
+        assert_eq!(result.to_string_lossy(), "abcd");
+    }
+
+    #[test]
+    fn free_concat_with_separator() {
+        let bufs = vec![
+            VsBuffer::from_string("a"),
+            VsBuffer::from_string("b"),
+            VsBuffer::from_string("c"),
+        ];
+        let result = super::buffer_concat(&bufs, Some(b","));
+        assert_eq!(result.to_string_lossy(), "a,b,c");
+    }
+
+    #[test]
+    fn free_concat_empty_list() {
+        let result = super::buffer_concat(&[], Some(b","));
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn free_concat_single_buffer() {
+        let bufs = vec![VsBuffer::from_string("only")];
+        let result = super::buffer_concat(&bufs, Some(b"-"));
+        assert_eq!(result.to_string_lossy(), "only");
+    }
+
+    #[test]
+    fn free_concat_with_str_separator() {
+        let bufs = vec![
+            VsBuffer::from_string("x"),
+            VsBuffer::from_string("y"),
+        ];
+        let result = buffer_concat_with_str(&bufs, " | ");
+        assert_eq!(result.to_string_lossy(), "x | y");
+    }
+
+    #[test]
+    fn free_concat_with_str_empty_sep() {
+        let bufs = vec![
+            VsBuffer::from_string("a"),
+            VsBuffer::from_string("b"),
+        ];
+        let result = buffer_concat_with_str(&bufs, "");
+        assert_eq!(result.to_string_lossy(), "ab");
+    }
+
+    #[test]
+    fn free_join_lines() {
+        let lines = vec![
+            VsBuffer::from_string("first"),
+            VsBuffer::from_string("second"),
+            VsBuffer::from_string("third"),
+        ];
+        let result = buffer_join_lines(&lines);
+        assert_eq!(result.to_string_lossy(), "first\nsecond\nthird");
+    }
+
+    #[test]
+    fn join_lines_single() {
+        let lines = vec![VsBuffer::from_string("only")];
+        let result = buffer_join_lines(&lines);
+        assert_eq!(result.to_string_lossy(), "only");
+    }
+
+    #[test]
+    fn free_concat_with_multi_byte_separator() {
+        let bufs = vec![
+            VsBuffer::from_string("a"),
+            VsBuffer::from_string("b"),
+        ];
+        let result = super::buffer_concat(&bufs, Some(b"<=>"));
+        assert_eq!(result.to_string_lossy(), "a<=>b");
     }
 }

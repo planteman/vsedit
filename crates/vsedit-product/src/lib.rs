@@ -612,6 +612,165 @@ impl Default for ProductValidator {
     }
 }
 
+/// Feature flags for enabling/disabling product features.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProductFeatureFlags {
+    flags: std::collections::HashMap<String, bool>,
+}
+
+impl ProductFeatureFlags {
+    pub fn new() -> Self {
+        Self {
+            flags: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Set a feature flag.
+    pub fn set(&mut self, name: impl Into<String>, enabled: bool) {
+        self.flags.insert(name.into(), enabled);
+    }
+
+    /// Check if a feature is enabled. Returns `false` for unknown flags.
+    pub fn is_enabled(&self, name: &str) -> bool {
+        self.flags.get(name).copied().unwrap_or(false)
+    }
+
+    /// Remove a flag, returning its previous value if it existed.
+    pub fn remove(&mut self, name: &str) -> Option<bool> {
+        self.flags.remove(name)
+    }
+
+    /// Return all enabled feature names.
+    pub fn enabled_features(&self) -> Vec<&str> {
+        self.flags
+            .iter()
+            .filter(|&(_, &v)| v)
+            .map(|(k, _)| k.as_str())
+            .collect()
+    }
+
+    /// Return all disabled feature names.
+    pub fn disabled_features(&self) -> Vec<&str> {
+        self.flags
+            .iter()
+            .filter(|&(_, &v)| !v)
+            .map(|(k, _)| k.as_str())
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.flags.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.flags.is_empty()
+    }
+}
+
+impl Default for ProductFeatureFlags {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ProductFeatureFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let enabled = self.enabled_features().len();
+        let total = self.flags.len();
+        write!(f, "FeatureFlags({}/{} enabled)", enabled, total)
+    }
+}
+
+/// Update channel that determines which release stream is used.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum UpdateChannel {
+    Stable,
+    Insiders,
+    Dev,
+}
+
+impl UpdateChannel {
+    /// Return the channel identifier string.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            UpdateChannel::Stable => "stable",
+            UpdateChannel::Insiders => "insiders",
+            UpdateChannel::Dev => "dev",
+        }
+    }
+
+    /// Parse a channel from a string. Returns `Stable` as default.
+    pub fn from_str_lossy(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "insiders" => UpdateChannel::Insiders,
+            "dev" | "development" => UpdateChannel::Dev,
+            _ => UpdateChannel::Stable,
+        }
+    }
+}
+
+impl fmt::Display for UpdateChannel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Determine the update channel from a product configuration.
+pub fn product_update_channel(config: &ProductConfiguration) -> UpdateChannel {
+    match config.quality.as_deref() {
+        Some("insider") | Some("insiders") => UpdateChannel::Insiders,
+        Some("dev") | Some("development") => UpdateChannel::Dev,
+        _ => UpdateChannel::Stable,
+    }
+}
+
+/// Telemetry configuration derived from product settings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TelemetryConfig {
+    pub enabled: bool,
+    pub level: TelemetryLevel,
+    pub endpoint: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TelemetryLevel {
+    Off,
+    Error,
+    Crash,
+    All,
+}
+
+impl TelemetryLevel {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TelemetryLevel::Off => "off",
+            TelemetryLevel::Error => "error",
+            TelemetryLevel::Crash => "crash",
+            TelemetryLevel::All => "all",
+        }
+    }
+}
+
+impl fmt::Display for TelemetryLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Build telemetry configuration from a product configuration.
+pub fn product_telemetry_config(config: &ProductConfiguration) -> TelemetryConfig {
+    TelemetryConfig {
+        enabled: config.enable_telemetry,
+        level: if config.enable_telemetry {
+            TelemetryLevel::All
+        } else {
+            TelemetryLevel::Off
+        },
+        endpoint: config.settings_sync_url.clone(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1034,5 +1193,75 @@ mod tests {
     fn product_is_ascii_printable() {
         assert!(ProductValidator::is_ascii_printable("Hello World 123"));
         assert!(!ProductValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn feature_flags_set_and_check() {
+        let mut flags = ProductFeatureFlags::new();
+        flags.set("copilot", true);
+        flags.set("ai-chat", false);
+        assert!(flags.is_enabled("copilot"));
+        assert!(!flags.is_enabled("ai-chat"));
+        assert!(!flags.is_enabled("unknown"));
+    }
+
+    #[test]
+    fn feature_flags_enabled_list() {
+        let mut flags = ProductFeatureFlags::new();
+        flags.set("a", true);
+        flags.set("b", false);
+        flags.set("c", true);
+        let enabled = flags.enabled_features();
+        assert_eq!(enabled.len(), 2);
+    }
+
+    #[test]
+    fn feature_flags_remove() {
+        let mut flags = ProductFeatureFlags::new();
+        flags.set("x", true);
+        assert_eq!(flags.remove("x"), Some(true));
+        assert_eq!(flags.len(), 0);
+    }
+
+    #[test]
+    fn feature_flags_display() {
+        let flags = ProductFeatureFlags::new();
+        assert_eq!(flags.to_string(), "FeatureFlags(0/0 enabled)");
+    }
+
+    #[test]
+    fn update_channel_from_quality() {
+        let mut config = ProductConfiguration::default_config();
+        config.quality = Some("insider".into());
+        assert_eq!(product_update_channel(&config), UpdateChannel::Insiders);
+        config.quality = Some("dev".into());
+        assert_eq!(product_update_channel(&config), UpdateChannel::Dev);
+        config.quality = None;
+        assert_eq!(product_update_channel(&config), UpdateChannel::Stable);
+    }
+
+    #[test]
+    fn update_channel_display() {
+        assert_eq!(UpdateChannel::Stable.to_string(), "stable");
+        assert_eq!(UpdateChannel::Insiders.to_string(), "insiders");
+        assert_eq!(UpdateChannel::Dev.to_string(), "dev");
+    }
+
+    #[test]
+    fn telemetry_config_enabled() {
+        let mut config = ProductConfiguration::default_config();
+        config.enable_telemetry = true;
+        let tc = product_telemetry_config(&config);
+        assert!(tc.enabled);
+        assert_eq!(tc.level, TelemetryLevel::All);
+    }
+
+    #[test]
+    fn telemetry_config_disabled() {
+        let mut config = ProductConfiguration::default_config();
+        config.enable_telemetry = false;
+        let tc = product_telemetry_config(&config);
+        assert!(!tc.enabled);
+        assert_eq!(tc.level, TelemetryLevel::Off);
     }
 }

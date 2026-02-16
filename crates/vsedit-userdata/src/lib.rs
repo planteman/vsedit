@@ -635,6 +635,212 @@ pub fn verify_integrity(user_path: &UserDataPath, existing_paths: &[&str]) -> In
     }
 }
 
+// ---------------------------------------------------------------------------
+// Settings import/export
+// ---------------------------------------------------------------------------
+
+/// Describes settings to export from user data.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UserDataExport {
+    pub version: u32,
+    pub profiles: Vec<ExportedProfile>,
+    pub global_settings: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExportedProfile {
+    pub id: String,
+    pub name: String,
+    pub settings: HashMap<String, String>,
+}
+
+impl UserDataExport {
+    pub fn new(version: u32) -> Self {
+        Self {
+            version,
+            profiles: Vec::new(),
+            global_settings: HashMap::new(),
+        }
+    }
+
+    pub fn add_profile(&mut self, profile: ExportedProfile) {
+        self.profiles.push(profile);
+    }
+
+    pub fn add_global_setting(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.global_settings.insert(key.into(), value.into());
+    }
+
+    pub fn profile_count(&self) -> usize {
+        self.profiles.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.profiles.is_empty() && self.global_settings.is_empty()
+    }
+
+    pub fn total_settings_count(&self) -> usize {
+        let profile_settings: usize = self.profiles.iter().map(|p| p.settings.len()).sum();
+        profile_settings + self.global_settings.len()
+    }
+}
+
+/// Describes settings to import into user data.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UserDataImport {
+    pub version: u32,
+    pub profiles: Vec<ExportedProfile>,
+    pub global_settings: HashMap<String, String>,
+    pub merge_strategy: ImportMergeStrategy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportMergeStrategy {
+    Replace,
+    MergeKeepLocal,
+    MergeKeepRemote,
+}
+
+impl UserDataImport {
+    pub fn from_export(export: UserDataExport, strategy: ImportMergeStrategy) -> Self {
+        Self {
+            version: export.version,
+            profiles: export.profiles,
+            global_settings: export.global_settings,
+            merge_strategy: strategy,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), UserDataError> {
+        if self.version == 0 {
+            return Err(UserDataError::InvalidBasePath(
+                "import version must be greater than 0".into(),
+            ));
+        }
+        if self.profiles.is_empty() && self.global_settings.is_empty() {
+            return Err(UserDataError::InvalidBasePath(
+                "import must contain at least one profile or global setting".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Backup descriptor
+// ---------------------------------------------------------------------------
+
+/// Descriptor for a backup archive of user data.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UserDataBackup {
+    pub timestamp: u64,
+    pub paths_included: Vec<String>,
+    pub total_size_bytes: usize,
+    pub profile_ids: Vec<String>,
+    pub backup_label: Option<String>,
+}
+
+impl UserDataBackup {
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.backup_label = Some(label.into());
+        self
+    }
+
+    pub fn includes_profile(&self, id: &str) -> bool {
+        self.profile_ids.iter().any(|p| p == id)
+    }
+
+    pub fn path_count(&self) -> usize {
+        self.paths_included.len()
+    }
+}
+
+/// Create a backup descriptor from a `UserDataService`, capturing all profile paths.
+pub fn user_data_backup(service: &UserDataService, timestamp: u64) -> UserDataBackup {
+    let profile_ids: Vec<String> = service.list_profiles().iter().map(|s| s.to_string()).collect();
+    let mut paths_included = service.ensure_dirs_exist();
+    let mut total_size_bytes = 0;
+    for id in &profile_ids {
+        if let Some(profile) = service.get_profile(id) {
+            for p in profile.all_paths() {
+                paths_included.push(p.to_string());
+                total_size_bytes += p.len();
+            }
+        }
+    }
+    UserDataBackup {
+        timestamp,
+        paths_included,
+        total_size_bytes,
+        profile_ids,
+        backup_label: None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Platform-specific path resolution
+// ---------------------------------------------------------------------------
+
+/// Represents platform-specific locations for user data.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UserDataLocation {
+    pub config_dir: String,
+    pub data_dir: String,
+    pub cache_dir: String,
+    pub log_dir: String,
+}
+
+impl UserDataLocation {
+    pub fn new(
+        config: impl Into<String>,
+        data: impl Into<String>,
+        cache: impl Into<String>,
+        log: impl Into<String>,
+    ) -> Self {
+        Self {
+            config_dir: config.into(),
+            data_dir: data.into(),
+            cache_dir: cache.into(),
+            log_dir: log.into(),
+        }
+    }
+
+    pub fn for_linux(app_name: &str) -> Self {
+        Self {
+            config_dir: format!("~/.config/{app_name}"),
+            data_dir: format!("~/.local/share/{app_name}"),
+            cache_dir: format!("~/.cache/{app_name}"),
+            log_dir: format!("~/.local/share/{app_name}/logs"),
+        }
+    }
+
+    pub fn for_macos(app_name: &str) -> Self {
+        Self {
+            config_dir: format!("~/Library/Application Support/{app_name}"),
+            data_dir: format!("~/Library/Application Support/{app_name}"),
+            cache_dir: format!("~/Library/Caches/{app_name}"),
+            log_dir: format!("~/Library/Logs/{app_name}"),
+        }
+    }
+
+    pub fn for_windows(app_name: &str) -> Self {
+        Self {
+            config_dir: format!("%APPDATA%/{app_name}"),
+            data_dir: format!("%APPDATA%/{app_name}"),
+            cache_dir: format!("%APPDATA%/{app_name}/cache"),
+            log_dir: format!("%APPDATA%/{app_name}/logs"),
+        }
+    }
+
+    pub fn resolve(&self, relative: &str) -> String {
+        format!("{}/{relative}", self.config_dir)
+    }
+
+    pub fn all_dirs(&self) -> Vec<&str> {
+        vec![&self.config_dir, &self.data_dir, &self.cache_dir, &self.log_dir]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1010,5 +1216,281 @@ mod tests {
         assert!(!report.is_healthy());
         assert_eq!(report.missing_paths.len(), 6);
         assert!(report.to_string().contains("6 missing"));
+    }
+
+    // -----------------------------------------------------------------------
+    // UserDataExport / UserDataImport tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn export_new_is_empty() {
+        let export = UserDataExport::new(1);
+        assert!(export.is_empty());
+        assert_eq!(export.profile_count(), 0);
+        assert_eq!(export.total_settings_count(), 0);
+        assert_eq!(export.version, 1);
+    }
+
+    #[test]
+    fn export_add_profile() {
+        let mut export = UserDataExport::new(2);
+        let profile = ExportedProfile {
+            id: "work".into(),
+            name: "Work".into(),
+            settings: HashMap::from([("theme".into(), "dark".into())]),
+        };
+        export.add_profile(profile);
+        assert_eq!(export.profile_count(), 1);
+        assert!(!export.is_empty());
+        assert_eq!(export.total_settings_count(), 1);
+    }
+
+    #[test]
+    fn export_add_global_setting() {
+        let mut export = UserDataExport::new(1);
+        export.add_global_setting("font-size", "14");
+        export.add_global_setting("locale", "en");
+        assert!(!export.is_empty());
+        assert_eq!(export.total_settings_count(), 2);
+        assert_eq!(export.profile_count(), 0);
+    }
+
+    #[test]
+    fn export_total_settings_mixed() {
+        let mut export = UserDataExport::new(1);
+        export.add_global_setting("k1", "v1");
+        let p = ExportedProfile {
+            id: "p1".into(),
+            name: "P1".into(),
+            settings: HashMap::from([("a".into(), "b".into()), ("c".into(), "d".into())]),
+        };
+        export.add_profile(p);
+        assert_eq!(export.total_settings_count(), 3);
+    }
+
+    #[test]
+    fn export_multiple_profiles() {
+        let mut export = UserDataExport::new(1);
+        for i in 0..5 {
+            export.add_profile(ExportedProfile {
+                id: format!("p{i}"),
+                name: format!("Profile {i}"),
+                settings: HashMap::new(),
+            });
+        }
+        assert_eq!(export.profile_count(), 5);
+        assert!(!export.is_empty());
+    }
+
+    #[test]
+    fn export_clone_eq() {
+        let mut export = UserDataExport::new(3);
+        export.add_global_setting("x", "y");
+        let cloned = export.clone();
+        assert_eq!(export, cloned);
+    }
+
+    #[test]
+    fn import_from_export_replace() {
+        let mut export = UserDataExport::new(1);
+        export.add_global_setting("k", "v");
+        let import = UserDataImport::from_export(export, ImportMergeStrategy::Replace);
+        assert_eq!(import.version, 1);
+        assert_eq!(import.merge_strategy, ImportMergeStrategy::Replace);
+        assert!(!import.global_settings.is_empty());
+    }
+
+    #[test]
+    fn import_from_export_merge_keep_local() {
+        let export = UserDataExport::new(2);
+        let import = UserDataImport::from_export(export, ImportMergeStrategy::MergeKeepLocal);
+        assert_eq!(import.merge_strategy, ImportMergeStrategy::MergeKeepLocal);
+    }
+
+    #[test]
+    fn import_validate_version_zero() {
+        let import = UserDataImport {
+            version: 0,
+            profiles: vec![],
+            global_settings: HashMap::new(),
+            merge_strategy: ImportMergeStrategy::Replace,
+        };
+        assert!(import.validate().is_err());
+    }
+
+    #[test]
+    fn import_validate_empty_content() {
+        let import = UserDataImport {
+            version: 1,
+            profiles: vec![],
+            global_settings: HashMap::new(),
+            merge_strategy: ImportMergeStrategy::Replace,
+        };
+        assert!(import.validate().is_err());
+    }
+
+    #[test]
+    fn import_validate_success_with_profiles() {
+        let import = UserDataImport {
+            version: 1,
+            profiles: vec![ExportedProfile {
+                id: "a".into(),
+                name: "A".into(),
+                settings: HashMap::new(),
+            }],
+            global_settings: HashMap::new(),
+            merge_strategy: ImportMergeStrategy::MergeKeepRemote,
+        };
+        assert!(import.validate().is_ok());
+    }
+
+    #[test]
+    fn import_validate_success_with_globals() {
+        let import = UserDataImport {
+            version: 5,
+            profiles: vec![],
+            global_settings: HashMap::from([("k".into(), "v".into())]),
+            merge_strategy: ImportMergeStrategy::Replace,
+        };
+        assert!(import.validate().is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // UserDataBackup tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn backup_empty_service() {
+        let svc = UserDataService::new("/base");
+        let backup = user_data_backup(&svc, 1000);
+        assert_eq!(backup.timestamp, 1000);
+        assert!(backup.profile_ids.is_empty());
+        assert!(backup.backup_label.is_none());
+    }
+
+    #[test]
+    fn backup_with_profiles() {
+        let mut svc = UserDataService::new("/base");
+        svc.create_profile("dev".into(), "Dev".into());
+        svc.create_profile("test".into(), "Test".into());
+        let backup = user_data_backup(&svc, 2000);
+        assert_eq!(backup.profile_ids.len(), 2);
+        assert!(backup.includes_profile("dev"));
+        assert!(backup.includes_profile("test"));
+        assert!(!backup.includes_profile("missing"));
+    }
+
+    #[test]
+    fn backup_with_label() {
+        let svc = UserDataService::new("/base");
+        let backup = user_data_backup(&svc, 500).with_label("nightly");
+        assert_eq!(backup.backup_label, Some("nightly".into()));
+    }
+
+    #[test]
+    fn backup_path_count() {
+        let mut svc = UserDataService::new("/base");
+        svc.create_profile("x".into(), "X".into());
+        let backup = user_data_backup(&svc, 0);
+        assert!(backup.path_count() > 0);
+    }
+
+    #[test]
+    fn backup_includes_service_dirs() {
+        let svc = UserDataService::new("/mydata");
+        let backup = user_data_backup(&svc, 100);
+        assert!(backup.paths_included.iter().any(|p| p.contains("/mydata")));
+    }
+
+    #[test]
+    fn backup_total_size_increases_with_profiles() {
+        let mut svc = UserDataService::new("/base");
+        let b1 = user_data_backup(&svc, 0);
+        svc.create_profile("big".into(), "Big Profile".into());
+        let b2 = user_data_backup(&svc, 1);
+        assert!(b2.total_size_bytes > b1.total_size_bytes);
+    }
+
+    #[test]
+    fn backup_timestamp_preserved() {
+        let svc = UserDataService::new("/d");
+        let backup = user_data_backup(&svc, u64::MAX);
+        assert_eq!(backup.timestamp, u64::MAX);
+    }
+
+    #[test]
+    fn backup_clone_eq() {
+        let svc = UserDataService::new("/d");
+        let backup = user_data_backup(&svc, 42);
+        let cloned = backup.clone();
+        assert_eq!(backup, cloned);
+    }
+
+    // -----------------------------------------------------------------------
+    // UserDataLocation tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn location_new() {
+        let loc = UserDataLocation::new("/cfg", "/dat", "/cch", "/log");
+        assert_eq!(loc.config_dir, "/cfg");
+        assert_eq!(loc.data_dir, "/dat");
+        assert_eq!(loc.cache_dir, "/cch");
+        assert_eq!(loc.log_dir, "/log");
+    }
+
+    #[test]
+    fn location_for_linux() {
+        let loc = UserDataLocation::for_linux("vsedit");
+        assert_eq!(loc.config_dir, "~/.config/vsedit");
+        assert_eq!(loc.data_dir, "~/.local/share/vsedit");
+        assert_eq!(loc.cache_dir, "~/.cache/vsedit");
+        assert_eq!(loc.log_dir, "~/.local/share/vsedit/logs");
+    }
+
+    #[test]
+    fn location_for_macos() {
+        let loc = UserDataLocation::for_macos("vsedit");
+        assert_eq!(loc.config_dir, "~/Library/Application Support/vsedit");
+        assert_eq!(loc.cache_dir, "~/Library/Caches/vsedit");
+        assert_eq!(loc.log_dir, "~/Library/Logs/vsedit");
+    }
+
+    #[test]
+    fn location_for_windows() {
+        let loc = UserDataLocation::for_windows("vsedit");
+        assert_eq!(loc.config_dir, "%APPDATA%/vsedit");
+        assert_eq!(loc.cache_dir, "%APPDATA%/vsedit/cache");
+        assert_eq!(loc.log_dir, "%APPDATA%/vsedit/logs");
+    }
+
+    #[test]
+    fn location_resolve() {
+        let loc = UserDataLocation::for_linux("myapp");
+        assert_eq!(loc.resolve("settings.json"), "~/.config/myapp/settings.json");
+    }
+
+    #[test]
+    fn location_all_dirs() {
+        let loc = UserDataLocation::new("/a", "/b", "/c", "/d");
+        let dirs = loc.all_dirs();
+        assert_eq!(dirs.len(), 4);
+        assert!(dirs.contains(&"/a"));
+        assert!(dirs.contains(&"/b"));
+        assert!(dirs.contains(&"/c"));
+        assert!(dirs.contains(&"/d"));
+    }
+
+    #[test]
+    fn location_clone_eq() {
+        let loc = UserDataLocation::for_linux("test");
+        let cloned = loc.clone();
+        assert_eq!(loc, cloned);
+    }
+
+    #[test]
+    fn location_resolve_nested() {
+        let loc = UserDataLocation::for_windows("app");
+        assert_eq!(loc.resolve("profiles/work/settings.json"), "%APPDATA%/app/profiles/work/settings.json");
     }
 }

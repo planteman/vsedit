@@ -8,6 +8,7 @@ pub mod service;
 pub mod snippets;
 pub mod state;
 
+use std::collections::HashMap;
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -487,6 +488,238 @@ impl Default for UserdatasyncValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SyncConflictResolver
+// ---------------------------------------------------------------------------
+
+/// Strategy for resolving sync conflicts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConflictStrategy {
+    UseLocal,
+    UseRemote,
+    Merge,
+    Manual,
+}
+
+/// Represents a sync conflict between local and remote values.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SyncConflict {
+    pub resource: SyncResource,
+    pub local_value: String,
+    pub remote_value: String,
+    pub timestamp_local: u64,
+    pub timestamp_remote: u64,
+}
+
+/// Resolves sync conflicts according to a chosen strategy.
+pub struct SyncConflictResolver {
+    default_strategy: ConflictStrategy,
+    per_resource_strategy: HashMap<SyncResource, ConflictStrategy>,
+    resolved_conflicts: Vec<(SyncConflict, ConflictStrategy)>,
+}
+
+impl SyncConflictResolver {
+    pub fn new(default_strategy: ConflictStrategy) -> Self {
+        Self {
+            default_strategy,
+            per_resource_strategy: HashMap::new(),
+            resolved_conflicts: Vec::new(),
+        }
+    }
+
+    pub fn set_strategy_for(&mut self, resource: SyncResource, strategy: ConflictStrategy) {
+        self.per_resource_strategy.insert(resource, strategy);
+    }
+
+    pub fn get_strategy(&self, resource: &SyncResource) -> ConflictStrategy {
+        self.per_resource_strategy
+            .get(resource)
+            .copied()
+            .unwrap_or(self.default_strategy)
+    }
+
+    /// Resolve a conflict and return the chosen value.
+    ///
+    /// * `UseLocal` — returns the local value.
+    /// * `UseRemote` — returns the remote value.
+    /// * `Merge` — concatenates local and remote with a separator.
+    /// * `Manual` — falls back to the local value.
+    pub fn resolve(&mut self, conflict: SyncConflict) -> String {
+        let strategy = self.get_strategy(&conflict.resource);
+        let result = match strategy {
+            ConflictStrategy::UseLocal | ConflictStrategy::Manual => {
+                conflict.local_value.clone()
+            }
+            ConflictStrategy::UseRemote => conflict.remote_value.clone(),
+            ConflictStrategy::Merge => {
+                format!("{}<<<>>>{}",conflict.local_value, conflict.remote_value)
+            }
+        };
+        self.resolved_conflicts.push((conflict, strategy));
+        result
+    }
+
+    pub fn resolved_count(&self) -> usize {
+        self.resolved_conflicts.len()
+    }
+
+    pub fn clear_resolved(&mut self) {
+        self.resolved_conflicts.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// sync_diff
+// ---------------------------------------------------------------------------
+
+/// Result of diffing local and remote sync state.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SyncDiff {
+    pub local_only: Vec<String>,
+    pub remote_only: Vec<String>,
+    pub modified: Vec<String>,
+    pub unchanged: Vec<String>,
+}
+
+impl SyncDiff {
+    /// Returns `true` when there are no differences at all.
+    pub fn is_in_sync(&self) -> bool {
+        self.local_only.is_empty()
+            && self.remote_only.is_empty()
+            && self.modified.is_empty()
+    }
+
+    /// Total number of changed keys (local-only + remote-only + modified).
+    pub fn total_changes(&self) -> usize {
+        self.local_only.len() + self.remote_only.len() + self.modified.len()
+    }
+
+    /// Returns `true` if there are modified keys (potential conflicts).
+    pub fn has_conflicts(&self) -> bool {
+        !self.modified.is_empty()
+    }
+}
+
+/// Compare local and remote key-value maps and produce a diff.
+pub fn sync_diff(
+    local: &HashMap<String, String>,
+    remote: &HashMap<String, String>,
+) -> SyncDiff {
+    let mut local_only = Vec::new();
+    let mut modified = Vec::new();
+    let mut unchanged = Vec::new();
+
+    for (key, local_val) in local {
+        match remote.get(key) {
+            Some(remote_val) if remote_val == local_val => {
+                unchanged.push(key.clone());
+            }
+            Some(_) => {
+                modified.push(key.clone());
+            }
+            None => {
+                local_only.push(key.clone());
+            }
+        }
+    }
+
+    let mut remote_only: Vec<String> = remote
+        .keys()
+        .filter(|k| !local.contains_key(*k))
+        .cloned()
+        .collect();
+
+    // Sort for deterministic output.
+    local_only.sort();
+    remote_only.sort();
+    modified.sort();
+    unchanged.sort();
+
+    SyncDiff {
+        local_only,
+        remote_only,
+        modified,
+        unchanged,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SyncLog
+// ---------------------------------------------------------------------------
+
+/// A single sync operation log entry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SyncLogEntry {
+    pub timestamp: u64,
+    pub resource: SyncResource,
+    pub operation: SyncOperation,
+    pub success: bool,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncOperation {
+    Push,
+    Pull,
+    Merge,
+    Resolve,
+}
+
+pub struct SyncLog {
+    entries: Vec<SyncLogEntry>,
+    max_entries: usize,
+}
+
+impl SyncLog {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+        }
+    }
+
+    /// Append a log entry, dropping the oldest if the log is at capacity.
+    pub fn log(&mut self, entry: SyncLogEntry) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(entry);
+    }
+
+    pub fn entries(&self) -> &[SyncLogEntry] {
+        &self.entries
+    }
+
+    pub fn entries_for_resource(&self, resource: &SyncResource) -> Vec<&SyncLogEntry> {
+        self.entries
+            .iter()
+            .filter(|e| &e.resource == resource)
+            .collect()
+    }
+
+    pub fn last_entry(&self) -> Option<&SyncLogEntry> {
+        self.entries.last()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Count of entries where `success` is `false`.
+    pub fn error_count(&self) -> usize {
+        self.entries.iter().filter(|e| !e.success).count()
+    }
+
+    /// Fraction of successful entries in `[0.0, 1.0]`, or `1.0` when empty.
+    pub fn success_rate(&self) -> f64 {
+        if self.entries.is_empty() {
+            return 1.0;
+        }
+        let ok = self.entries.iter().filter(|e| e.success).count();
+        ok as f64 / self.entries.len() as f64
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -723,148 +956,318 @@ mod tests {
         assert!(!SyncError::NotEnabled.to_string().is_empty());
     }
 
+    // -----------------------------------------------------------------------
+    // SyncConflictResolver tests
+    // -----------------------------------------------------------------------
+
     #[test]
-    fn behavior_check_0() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn conflict_resolver_default_strategy() {
+        let resolver = SyncConflictResolver::new(ConflictStrategy::UseLocal);
+        assert_eq!(
+            resolver.get_strategy(&SyncResource::Settings),
+            ConflictStrategy::UseLocal
+        );
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn conflict_resolver_per_resource_strategy() {
+        let mut resolver = SyncConflictResolver::new(ConflictStrategy::UseLocal);
+        resolver.set_strategy_for(SyncResource::Keybindings, ConflictStrategy::UseRemote);
+        assert_eq!(
+            resolver.get_strategy(&SyncResource::Keybindings),
+            ConflictStrategy::UseRemote
+        );
+        // Other resources still use the default.
+        assert_eq!(
+            resolver.get_strategy(&SyncResource::Settings),
+            ConflictStrategy::UseLocal
+        );
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn conflict_resolver_resolve_use_local() {
+        let mut resolver = SyncConflictResolver::new(ConflictStrategy::UseLocal);
+        let conflict = SyncConflict {
+            resource: SyncResource::Settings,
+            local_value: "local".into(),
+            remote_value: "remote".into(),
+            timestamp_local: 1,
+            timestamp_remote: 2,
+        };
+        assert_eq!(resolver.resolve(conflict), "local");
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn conflict_resolver_resolve_use_remote() {
+        let mut resolver = SyncConflictResolver::new(ConflictStrategy::UseRemote);
+        let conflict = SyncConflict {
+            resource: SyncResource::Extensions,
+            local_value: "local".into(),
+            remote_value: "remote".into(),
+            timestamp_local: 1,
+            timestamp_remote: 2,
+        };
+        assert_eq!(resolver.resolve(conflict), "remote");
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn conflict_resolver_resolve_merge() {
+        let mut resolver = SyncConflictResolver::new(ConflictStrategy::Merge);
+        let conflict = SyncConflict {
+            resource: SyncResource::Snippets,
+            local_value: "AAA".into(),
+            remote_value: "BBB".into(),
+            timestamp_local: 10,
+            timestamp_remote: 20,
+        };
+        assert_eq!(resolver.resolve(conflict), "AAA<<<>>>BBB");
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn conflict_resolver_resolve_manual_returns_local() {
+        let mut resolver = SyncConflictResolver::new(ConflictStrategy::Manual);
+        let conflict = SyncConflict {
+            resource: SyncResource::Profiles,
+            local_value: "mine".into(),
+            remote_value: "theirs".into(),
+            timestamp_local: 5,
+            timestamp_remote: 6,
+        };
+        assert_eq!(resolver.resolve(conflict), "mine");
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn conflict_resolver_resolved_count() {
+        let mut resolver = SyncConflictResolver::new(ConflictStrategy::UseLocal);
+        assert_eq!(resolver.resolved_count(), 0);
+        let conflict = SyncConflict {
+            resource: SyncResource::Settings,
+            local_value: "a".into(),
+            remote_value: "b".into(),
+            timestamp_local: 0,
+            timestamp_remote: 0,
+        };
+        resolver.resolve(conflict);
+        assert_eq!(resolver.resolved_count(), 1);
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn conflict_resolver_clear_resolved() {
+        let mut resolver = SyncConflictResolver::new(ConflictStrategy::UseLocal);
+        let conflict = SyncConflict {
+            resource: SyncResource::Settings,
+            local_value: "a".into(),
+            remote_value: "b".into(),
+            timestamp_local: 0,
+            timestamp_remote: 0,
+        };
+        resolver.resolve(conflict);
+        assert_eq!(resolver.resolved_count(), 1);
+        resolver.clear_resolved();
+        assert_eq!(resolver.resolved_count(), 0);
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn conflict_resolver_per_resource_overrides_default() {
+        let mut resolver = SyncConflictResolver::new(ConflictStrategy::UseLocal);
+        resolver.set_strategy_for(SyncResource::GlobalState, ConflictStrategy::Merge);
+        let conflict = SyncConflict {
+            resource: SyncResource::GlobalState,
+            local_value: "L".into(),
+            remote_value: "R".into(),
+            timestamp_local: 0,
+            timestamp_remote: 0,
+        };
+        assert_eq!(resolver.resolve(conflict), "L<<<>>>R");
+    }
+
+    // -----------------------------------------------------------------------
+    // sync_diff tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn sync_diff_identical_maps() {
+        let mut local = HashMap::new();
+        local.insert("a".into(), "1".into());
+        let diff = sync_diff(&local, &local);
+        assert!(diff.is_in_sync());
+        assert_eq!(diff.total_changes(), 0);
+        assert!(!diff.has_conflicts());
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_diff_local_only_keys() {
+        let mut local = HashMap::new();
+        local.insert("x".into(), "1".into());
+        let remote = HashMap::new();
+        let diff = sync_diff(&local, &remote);
+        assert_eq!(diff.local_only, vec!["x".to_string()]);
+        assert!(diff.remote_only.is_empty());
+        assert!(!diff.is_in_sync());
     }
 
     #[test]
-    fn behavior_check_10() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_diff_remote_only_keys() {
+        let local = HashMap::new();
+        let mut remote = HashMap::new();
+        remote.insert("y".into(), "2".into());
+        let diff = sync_diff(&local, &remote);
+        assert_eq!(diff.remote_only, vec!["y".to_string()]);
+        assert!(diff.local_only.is_empty());
     }
 
     #[test]
-    fn behavior_check_11() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_diff_modified_keys() {
+        let mut local = HashMap::new();
+        local.insert("k".into(), "old".into());
+        let mut remote = HashMap::new();
+        remote.insert("k".into(), "new".into());
+        let diff = sync_diff(&local, &remote);
+        assert_eq!(diff.modified, vec!["k".to_string()]);
+        assert!(diff.has_conflicts());
     }
 
     #[test]
-    fn behavior_check_12() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_diff_unchanged_keys() {
+        let mut local = HashMap::new();
+        local.insert("same".into(), "v".into());
+        let mut remote = HashMap::new();
+        remote.insert("same".into(), "v".into());
+        let diff = sync_diff(&local, &remote);
+        assert_eq!(diff.unchanged, vec!["same".to_string()]);
+        assert!(diff.is_in_sync());
     }
 
     #[test]
-    fn behavior_check_13() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_diff_total_changes() {
+        let mut local = HashMap::new();
+        local.insert("a".into(), "1".into());
+        local.insert("b".into(), "old".into());
+        let mut remote = HashMap::new();
+        remote.insert("b".into(), "new".into());
+        remote.insert("c".into(), "3".into());
+        let diff = sync_diff(&local, &remote);
+        // a is local-only, b is modified, c is remote-only
+        assert_eq!(diff.total_changes(), 3);
     }
 
     #[test]
-    fn behavior_check_14() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_diff_empty_maps() {
+        let diff = sync_diff(&HashMap::new(), &HashMap::new());
+        assert!(diff.is_in_sync());
+        assert_eq!(diff.total_changes(), 0);
     }
 
     #[test]
-    fn behavior_check_15() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_diff_mixed_scenario() {
+        let mut local = HashMap::new();
+        local.insert("keep".into(), "same".into());
+        local.insert("changed".into(), "v1".into());
+        local.insert("only_local".into(), "x".into());
+
+        let mut remote = HashMap::new();
+        remote.insert("keep".into(), "same".into());
+        remote.insert("changed".into(), "v2".into());
+        remote.insert("only_remote".into(), "y".into());
+
+        let diff = sync_diff(&local, &remote);
+        assert_eq!(diff.unchanged, vec!["keep".to_string()]);
+        assert_eq!(diff.modified, vec!["changed".to_string()]);
+        assert_eq!(diff.local_only, vec!["only_local".to_string()]);
+        assert_eq!(diff.remote_only, vec!["only_remote".to_string()]);
+        assert!(!diff.is_in_sync());
+    }
+
+    // -----------------------------------------------------------------------
+    // SyncLog tests
+    // -----------------------------------------------------------------------
+
+    fn make_entry(
+        ts: u64,
+        resource: SyncResource,
+        op: SyncOperation,
+        success: bool,
+    ) -> SyncLogEntry {
+        SyncLogEntry {
+            timestamp: ts,
+            resource,
+            operation: op,
+            success,
+            message: None,
+        }
     }
 
     #[test]
-    fn behavior_check_16() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_log_new_is_empty() {
+        let log = SyncLog::new(10);
+        assert!(log.entries().is_empty());
+        assert_eq!(log.last_entry(), None);
     }
 
     #[test]
-    fn behavior_check_17() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_log_log_and_entries() {
+        let mut log = SyncLog::new(10);
+        log.log(make_entry(1, SyncResource::Settings, SyncOperation::Push, true));
+        assert_eq!(log.entries().len(), 1);
     }
 
     #[test]
-    fn behavior_check_18() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_log_drops_oldest_at_capacity() {
+        let mut log = SyncLog::new(2);
+        log.log(make_entry(1, SyncResource::Settings, SyncOperation::Push, true));
+        log.log(make_entry(2, SyncResource::Settings, SyncOperation::Pull, true));
+        log.log(make_entry(3, SyncResource::Settings, SyncOperation::Merge, true));
+        assert_eq!(log.entries().len(), 2);
+        assert_eq!(log.entries()[0].timestamp, 2);
     }
 
     #[test]
-    fn behavior_check_19() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_log_entries_for_resource() {
+        let mut log = SyncLog::new(10);
+        log.log(make_entry(1, SyncResource::Settings, SyncOperation::Push, true));
+        log.log(make_entry(2, SyncResource::Keybindings, SyncOperation::Pull, true));
+        log.log(make_entry(3, SyncResource::Settings, SyncOperation::Merge, false));
+        let settings = log.entries_for_resource(&SyncResource::Settings);
+        assert_eq!(settings.len(), 2);
     }
 
     #[test]
-    fn behavior_check_20() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_log_last_entry() {
+        let mut log = SyncLog::new(10);
+        log.log(make_entry(1, SyncResource::Snippets, SyncOperation::Push, true));
+        log.log(make_entry(2, SyncResource::Extensions, SyncOperation::Resolve, false));
+        assert_eq!(log.last_entry().unwrap().timestamp, 2);
     }
 
     #[test]
-    fn behavior_check_21() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_log_clear() {
+        let mut log = SyncLog::new(10);
+        log.log(make_entry(1, SyncResource::Settings, SyncOperation::Push, true));
+        log.clear();
+        assert!(log.entries().is_empty());
     }
 
     #[test]
-    fn behavior_check_22() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_log_error_count() {
+        let mut log = SyncLog::new(10);
+        log.log(make_entry(1, SyncResource::Settings, SyncOperation::Push, true));
+        log.log(make_entry(2, SyncResource::Settings, SyncOperation::Pull, false));
+        log.log(make_entry(3, SyncResource::Settings, SyncOperation::Merge, false));
+        assert_eq!(log.error_count(), 2);
     }
 
     #[test]
-    fn behavior_check_23() {
-        let _svc = SyncService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn sync_log_success_rate() {
+        let mut log = SyncLog::new(10);
+        log.log(make_entry(1, SyncResource::Settings, SyncOperation::Push, true));
+        log.log(make_entry(2, SyncResource::Settings, SyncOperation::Pull, false));
+        assert!((log.success_rate() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn sync_log_success_rate_empty() {
+        let log = SyncLog::new(10);
+        assert!((log.success_rate() - 1.0).abs() < f64::EPSILON);
     }
 
     #[test]

@@ -639,6 +639,244 @@ impl Default for A11YFeaturesValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ScreenReaderMode
+// ---------------------------------------------------------------------------
+
+/// Verbosity level for screen reader announcements.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScreenReaderVerbosity {
+    Minimal,
+    Normal,
+    Verbose,
+}
+
+/// Configuration for screen reader optimized rendering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScreenReaderMode {
+    pub enabled: bool,
+    pub line_by_line_navigation: bool,
+    pub announce_cursor_position: bool,
+    pub announce_selections: bool,
+    pub announce_find_results: bool,
+    pub verbosity: ScreenReaderVerbosity,
+    pub page_size: u32,
+}
+
+impl ScreenReaderMode {
+    pub fn new() -> Self {
+        Self {
+            enabled: false,
+            line_by_line_navigation: true,
+            announce_cursor_position: true,
+            announce_selections: true,
+            announce_find_results: true,
+            verbosity: ScreenReaderVerbosity::Normal,
+            page_size: 10,
+        }
+    }
+
+    pub fn enable(&mut self) {
+        self.enabled = true;
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    pub fn set_verbosity(&mut self, v: ScreenReaderVerbosity) {
+        self.verbosity = v;
+    }
+
+    pub fn is_verbose(&self) -> bool {
+        self.verbosity == ScreenReaderVerbosity::Verbose
+    }
+
+    /// Returns whether the given event type should be announced.
+    ///
+    /// Known event types: `"cursor"`, `"selection"`, `"find"`.
+    /// Unknown event types are announced when the mode is enabled.
+    pub fn should_announce(&self, event_type: &str) -> bool {
+        if !self.enabled {
+            return false;
+        }
+        match event_type {
+            "cursor" => self.announce_cursor_position,
+            "selection" => self.announce_selections,
+            "find" => self.announce_find_results,
+            _ => true,
+        }
+    }
+
+    /// Generate a cursor-position announcement suitable for a screen reader.
+    pub fn generate_cursor_announcement(
+        &self,
+        line: u32,
+        col: u32,
+        line_content: &str,
+    ) -> Option<String> {
+        if !self.enabled || !self.announce_cursor_position {
+            return None;
+        }
+        match self.verbosity {
+            ScreenReaderVerbosity::Minimal => {
+                Some(format!("Line {line}, Column {col}"))
+            }
+            ScreenReaderVerbosity::Normal => {
+                Some(format!("Line {line}, Column {col}: {line_content}"))
+            }
+            ScreenReaderVerbosity::Verbose => {
+                let char_count = line_content.len();
+                Some(format!(
+                    "Line {line}, Column {col} ({char_count} characters): {line_content}"
+                ))
+            }
+        }
+    }
+}
+
+impl Default for ScreenReaderMode {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AccessibilityHelp
+// ---------------------------------------------------------------------------
+
+/// An entry in the accessibility help dialog.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccessibilityHelpEntry {
+    pub shortcut: String,
+    pub description: String,
+    pub category: String,
+}
+
+/// Manages the accessibility help/keyboard shortcut reference.
+pub struct AccessibilityHelp {
+    entries: Vec<AccessibilityHelpEntry>,
+}
+
+impl AccessibilityHelp {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Create an `AccessibilityHelp` pre-populated with common editor shortcuts.
+    pub fn with_defaults() -> Self {
+        let mut help = Self::new();
+        help.add_entry("Tab", "Indent", "Editing");
+        help.add_entry("Shift+Tab", "Outdent", "Editing");
+        help.add_entry("Ctrl+F", "Find", "Search");
+        help.add_entry("Ctrl+H", "Replace", "Search");
+        help.add_entry("Ctrl+G", "Go to Line", "Navigation");
+        help.add_entry("Ctrl+/", "Toggle Comment", "Editing");
+        help.add_entry("F1", "Command Palette", "General");
+        help.add_entry("Escape", "Close Dialog", "General");
+        help
+    }
+
+    pub fn add_entry(&mut self, shortcut: &str, description: &str, category: &str) {
+        self.entries.push(AccessibilityHelpEntry {
+            shortcut: shortcut.to_string(),
+            description: description.to_string(),
+            category: category.to_string(),
+        });
+    }
+
+    pub fn entries(&self) -> &[AccessibilityHelpEntry] {
+        &self.entries
+    }
+
+    pub fn entries_by_category(&self, category: &str) -> Vec<&AccessibilityHelpEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.category == category)
+            .collect()
+    }
+
+    /// Return a sorted, deduplicated list of categories.
+    pub fn categories(&self) -> Vec<&str> {
+        let mut cats: Vec<&str> = self.entries.iter().map(|e| e.category.as_str()).collect();
+        cats.sort_unstable();
+        cats.dedup();
+        cats
+    }
+
+    /// Case-insensitive search across shortcut and description fields.
+    pub fn search(&self, query: &str) -> Vec<&AccessibilityHelpEntry> {
+        let q = query.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|e| {
+                e.shortcut.to_lowercase().contains(&q)
+                    || e.description.to_lowercase().contains(&q)
+            })
+            .collect()
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+impl Default for AccessibilityHelp {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// A11yEvent & a11y_status_announcement
+// ---------------------------------------------------------------------------
+
+/// Accessibility events that should be announced to screen readers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum A11yEvent {
+    FileOpened { filename: String },
+    FileSaved { filename: String },
+    FileClosed { filename: String },
+    ErrorsChanged { error_count: usize, warning_count: usize },
+    SearchResult { current: usize, total: usize, query: String },
+    ModeChanged { mode: String },
+    IndentationChanged { use_spaces: bool, size: u32 },
+    LanguageChanged { language: String },
+    LineCountChanged { count: u32 },
+    SelectionChanged { lines: u32, chars: u32 },
+}
+
+/// Generate a screen reader announcement for important state changes.
+/// Returns a formatted announcement string suitable for the announcement queue.
+pub fn a11y_status_announcement(event: &A11yEvent) -> String {
+    match event {
+        A11yEvent::FileOpened { filename } => format!("Opened file: {filename}"),
+        A11yEvent::FileSaved { filename } => format!("Saved file: {filename}"),
+        A11yEvent::FileClosed { filename } => format!("Closed file: {filename}"),
+        A11yEvent::ErrorsChanged {
+            error_count,
+            warning_count,
+        } => format!("{error_count} errors, {warning_count} warnings"),
+        A11yEvent::SearchResult {
+            current,
+            total,
+            query,
+        } => format!("Result {current} of {total} for \"{query}\""),
+        A11yEvent::ModeChanged { mode } => format!("Mode changed to {mode}"),
+        A11yEvent::IndentationChanged { use_spaces, size } => {
+            let kind = if *use_spaces { "Spaces" } else { "Tabs" };
+            format!("Indentation: {kind}, size {size}")
+        }
+        A11yEvent::LanguageChanged { language } => format!("Language changed to {language}"),
+        A11yEvent::LineCountChanged { count } => format!("{count} lines"),
+        A11yEvent::SelectionChanged { lines, chars } => {
+            format!("Selected {lines} lines, {chars} characters")
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1045,5 +1283,248 @@ mod tests {
     fn a11y_features_is_ascii_printable() {
         assert!(A11YFeaturesValidator::is_ascii_printable("Hello World 123"));
         assert!(!A11YFeaturesValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // ScreenReaderMode tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn screen_reader_mode_defaults() {
+        let mode = ScreenReaderMode::new();
+        assert!(!mode.enabled);
+        assert!(mode.line_by_line_navigation);
+        assert!(mode.announce_cursor_position);
+        assert!(mode.announce_selections);
+        assert!(mode.announce_find_results);
+        assert_eq!(mode.verbosity, ScreenReaderVerbosity::Normal);
+        assert_eq!(mode.page_size, 10);
+    }
+
+    #[test]
+    fn screen_reader_mode_enable_disable() {
+        let mut mode = ScreenReaderMode::new();
+        mode.enable();
+        assert!(mode.enabled);
+        mode.disable();
+        assert!(!mode.enabled);
+    }
+
+    #[test]
+    fn screen_reader_mode_set_verbosity() {
+        let mut mode = ScreenReaderMode::new();
+        mode.set_verbosity(ScreenReaderVerbosity::Verbose);
+        assert!(mode.is_verbose());
+        mode.set_verbosity(ScreenReaderVerbosity::Minimal);
+        assert!(!mode.is_verbose());
+    }
+
+    #[test]
+    fn screen_reader_mode_should_announce_disabled() {
+        let mode = ScreenReaderMode::new(); // disabled by default
+        assert!(!mode.should_announce("cursor"));
+        assert!(!mode.should_announce("selection"));
+        assert!(!mode.should_announce("find"));
+    }
+
+    #[test]
+    fn screen_reader_mode_should_announce_enabled() {
+        let mut mode = ScreenReaderMode::new();
+        mode.enable();
+        assert!(mode.should_announce("cursor"));
+        assert!(mode.should_announce("selection"));
+        assert!(mode.should_announce("find"));
+        assert!(mode.should_announce("unknown_event"));
+    }
+
+    #[test]
+    fn screen_reader_mode_should_announce_selective() {
+        let mut mode = ScreenReaderMode::new();
+        mode.enable();
+        mode.announce_cursor_position = false;
+        assert!(!mode.should_announce("cursor"));
+        assert!(mode.should_announce("selection"));
+    }
+
+    #[test]
+    fn screen_reader_mode_cursor_announcement_disabled() {
+        let mode = ScreenReaderMode::new();
+        assert!(mode.generate_cursor_announcement(1, 1, "hello").is_none());
+    }
+
+    #[test]
+    fn screen_reader_mode_cursor_announcement_normal() {
+        let mut mode = ScreenReaderMode::new();
+        mode.enable();
+        let ann = mode.generate_cursor_announcement(5, 3, "let x = 1;");
+        assert_eq!(ann, Some("Line 5, Column 3: let x = 1;".to_string()));
+    }
+
+    #[test]
+    fn screen_reader_mode_cursor_announcement_minimal() {
+        let mut mode = ScreenReaderMode::new();
+        mode.enable();
+        mode.set_verbosity(ScreenReaderVerbosity::Minimal);
+        let ann = mode.generate_cursor_announcement(2, 7, "fn main()");
+        assert_eq!(ann, Some("Line 2, Column 7".to_string()));
+    }
+
+    #[test]
+    fn screen_reader_mode_cursor_announcement_verbose() {
+        let mut mode = ScreenReaderMode::new();
+        mode.enable();
+        mode.set_verbosity(ScreenReaderVerbosity::Verbose);
+        let ann = mode.generate_cursor_announcement(10, 1, "abc").unwrap();
+        assert!(ann.contains("3 characters"));
+        assert!(ann.contains("Line 10, Column 1"));
+    }
+
+    // -----------------------------------------------------------------------
+    // AccessibilityHelp tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn accessibility_help_new_is_empty() {
+        let help = AccessibilityHelp::new();
+        assert_eq!(help.entry_count(), 0);
+        assert!(help.entries().is_empty());
+    }
+
+    #[test]
+    fn accessibility_help_with_defaults_has_entries() {
+        let help = AccessibilityHelp::with_defaults();
+        assert!(help.entry_count() >= 8);
+    }
+
+    #[test]
+    fn accessibility_help_add_entry() {
+        let mut help = AccessibilityHelp::new();
+        help.add_entry("Ctrl+S", "Save File", "File");
+        assert_eq!(help.entry_count(), 1);
+        assert_eq!(help.entries()[0].shortcut, "Ctrl+S");
+        assert_eq!(help.entries()[0].description, "Save File");
+        assert_eq!(help.entries()[0].category, "File");
+    }
+
+    #[test]
+    fn accessibility_help_entries_by_category() {
+        let help = AccessibilityHelp::with_defaults();
+        let editing = help.entries_by_category("Editing");
+        assert!(editing.len() >= 2);
+        for e in &editing {
+            assert_eq!(e.category, "Editing");
+        }
+    }
+
+    #[test]
+    fn accessibility_help_categories_sorted_unique() {
+        let help = AccessibilityHelp::with_defaults();
+        let cats = help.categories();
+        assert!(cats.len() >= 3);
+        let mut sorted = cats.clone();
+        sorted.sort_unstable();
+        assert_eq!(cats, sorted);
+        // no duplicates
+        let mut deduped = cats.clone();
+        deduped.dedup();
+        assert_eq!(cats, deduped);
+    }
+
+    #[test]
+    fn accessibility_help_search_case_insensitive() {
+        let help = AccessibilityHelp::with_defaults();
+        let results = help.search("find");
+        assert!(!results.is_empty());
+        let results_upper = help.search("FIND");
+        assert_eq!(results.len(), results_upper.len());
+    }
+
+    #[test]
+    fn accessibility_help_search_by_shortcut() {
+        let help = AccessibilityHelp::with_defaults();
+        let results = help.search("Ctrl+G");
+        assert!(!results.is_empty());
+        assert!(results.iter().any(|e| e.description == "Go to Line"));
+    }
+
+    #[test]
+    fn accessibility_help_search_no_results() {
+        let help = AccessibilityHelp::with_defaults();
+        let results = help.search("zzzznonexistent");
+        assert!(results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // A11yEvent & a11y_status_announcement tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn a11y_event_file_opened() {
+        let event = A11yEvent::FileOpened { filename: "main.rs".into() };
+        assert_eq!(a11y_status_announcement(&event), "Opened file: main.rs");
+    }
+
+    #[test]
+    fn a11y_event_file_saved() {
+        let event = A11yEvent::FileSaved { filename: "lib.rs".into() };
+        assert_eq!(a11y_status_announcement(&event), "Saved file: lib.rs");
+    }
+
+    #[test]
+    fn a11y_event_file_closed() {
+        let event = A11yEvent::FileClosed { filename: "test.rs".into() };
+        assert_eq!(a11y_status_announcement(&event), "Closed file: test.rs");
+    }
+
+    #[test]
+    fn a11y_event_errors_changed() {
+        let event = A11yEvent::ErrorsChanged { error_count: 3, warning_count: 7 };
+        assert_eq!(a11y_status_announcement(&event), "3 errors, 7 warnings");
+    }
+
+    #[test]
+    fn a11y_event_search_result() {
+        let event = A11yEvent::SearchResult {
+            current: 2,
+            total: 15,
+            query: "foo".into(),
+        };
+        assert_eq!(a11y_status_announcement(&event), "Result 2 of 15 for \"foo\"");
+    }
+
+    #[test]
+    fn a11y_event_mode_changed() {
+        let event = A11yEvent::ModeChanged { mode: "Insert".into() };
+        assert_eq!(a11y_status_announcement(&event), "Mode changed to Insert");
+    }
+
+    #[test]
+    fn a11y_event_indentation_spaces() {
+        let event = A11yEvent::IndentationChanged { use_spaces: true, size: 4 };
+        assert_eq!(a11y_status_announcement(&event), "Indentation: Spaces, size 4");
+    }
+
+    #[test]
+    fn a11y_event_indentation_tabs() {
+        let event = A11yEvent::IndentationChanged { use_spaces: false, size: 2 };
+        assert_eq!(a11y_status_announcement(&event), "Indentation: Tabs, size 2");
+    }
+
+    #[test]
+    fn a11y_event_language_changed() {
+        let event = A11yEvent::LanguageChanged { language: "Rust".into() };
+        assert_eq!(a11y_status_announcement(&event), "Language changed to Rust");
+    }
+
+    #[test]
+    fn a11y_event_line_count_changed() {
+        let event = A11yEvent::LineCountChanged { count: 42 };
+        assert_eq!(a11y_status_announcement(&event), "42 lines");
+    }
+
+    #[test]
+    fn a11y_event_selection_changed() {
+        let event = A11yEvent::SelectionChanged { lines: 3, chars: 120 };
+        assert_eq!(a11y_status_announcement(&event), "Selected 3 lines, 120 characters");
     }
 }

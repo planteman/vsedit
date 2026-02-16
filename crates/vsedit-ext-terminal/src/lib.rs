@@ -2,6 +2,7 @@
 //!
 //! RPC bridge between the extension host and the main thread for terminal management.
 
+use std::collections::HashMap;
 use std::fmt;
 use serde::{Deserialize, Serialize};
 
@@ -672,6 +673,248 @@ impl Default for ExtTerminalValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TerminalProfileContribution – extension-provided terminal profiles
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TerminalProfileContribution {
+    pub id: String,
+    pub title: String,
+    pub shell_path: String,
+    pub shell_args: Vec<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+    pub env: HashMap<String, String>,
+}
+
+impl TerminalProfileContribution {
+    pub fn new(id: &str, title: &str, shell_path: &str) -> Self {
+        Self {
+            id: id.to_string(),
+            title: title.to_string(),
+            shell_path: shell_path.to_string(),
+            shell_args: Vec::new(),
+            icon: None,
+            color: None,
+            env: HashMap::new(),
+        }
+    }
+
+    pub fn with_args(mut self, args: Vec<String>) -> Self {
+        self.shell_args = args;
+        self
+    }
+
+    pub fn with_icon(mut self, icon: &str) -> Self {
+        self.icon = Some(icon.to_string());
+        self
+    }
+
+    pub fn with_color(mut self, color: &str) -> Self {
+        self.color = Some(color.to_string());
+        self
+    }
+
+    pub fn with_env(mut self, key: &str, value: &str) -> Self {
+        self.env.insert(key.to_string(), value.to_string());
+        self
+    }
+
+    /// Converts this profile contribution into a [`TerminalOptions`].
+    pub fn to_terminal_options(&self) -> TerminalOptions {
+        TerminalOptions {
+            name: Some(self.title.clone()),
+            shell_path: Some(self.shell_path.clone()),
+            shell_args: self.shell_args.clone(),
+            cwd: None,
+            env: self.env.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+            hide_from_user: false,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// terminal_env_from_extension – env injection helper
+// ---------------------------------------------------------------------------
+
+/// Builds an enriched environment map for an extension-spawned terminal.
+///
+/// * Keys that do not already start with `VSEDIT_EXT_` are prefixed.
+/// * The key `VSEDIT_EXT_ID` is always set to `ext_id`.
+pub fn terminal_env_from_extension(
+    ext_id: &str,
+    env_pairs: &[(String, String)],
+) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    for (key, value) in env_pairs {
+        let prefixed = if key.starts_with("VSEDIT_EXT_") {
+            key.clone()
+        } else {
+            format!("VSEDIT_EXT_{key}")
+        };
+        map.insert(prefixed, value.clone());
+    }
+    map.insert("VSEDIT_EXT_ID".to_string(), ext_id.to_string());
+    map
+}
+
+// ---------------------------------------------------------------------------
+// TerminalLinkDetector – regex-free link detection in terminal output
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Default)]
+pub struct TerminalLinkDetector;
+
+impl TerminalLinkDetector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Detects URLs (`http://` / `https://`) in `text`.
+    pub fn detect_links(text: &str) -> Vec<TerminalLink> {
+        let mut links = Vec::new();
+        for prefix in &["https://", "http://"] {
+            let mut start = 0;
+            while let Some(pos) = text[start..].find(prefix) {
+                let abs = start + pos;
+                let end = text[abs..]
+                    .find(|c: char| c.is_whitespace() || c == '>' || c == '"' || c == '\'')
+                    .map_or(text.len(), |e| abs + e);
+                let length = end - abs;
+                if length > prefix.len() {
+                    links.push(TerminalLink::new(abs as u32, length as u32));
+                }
+                start = end;
+            }
+        }
+        links
+    }
+
+    /// Detects file-path references matching `path:line` or `path:line:col`.
+    pub fn detect_file_links(text: &str) -> Vec<TerminalLink> {
+        let mut links = Vec::new();
+        let mut i = 0;
+        let bytes = text.as_bytes();
+        while i < bytes.len() {
+            // Look for a `/` or `./` that starts a file path.
+            if bytes[i] == b'/' || (bytes[i] == b'.' && i + 1 < bytes.len() && bytes[i + 1] == b'/') {
+                let path_start = i;
+                // Advance past non-whitespace to find the colon-separated suffix.
+                while i < bytes.len() && !bytes[i].is_ascii_whitespace() {
+                    i += 1;
+                }
+                let segment = &text[path_start..i];
+                // Must contain at least one `:` followed by a digit.
+                if let Some(colon) = segment.rfind(':') {
+                    // Try to find the *first* colon followed by a digit.
+                    let first_colon = segment.find(':').unwrap_or(colon);
+                    if first_colon + 1 < segment.len()
+                        && segment.as_bytes()[first_colon + 1].is_ascii_digit()
+                    {
+                        links.push(TerminalLink::new(path_start as u32, segment.len() as u32));
+                    }
+                }
+            } else {
+                i += 1;
+            }
+        }
+        links
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalProfileRegistry – manages contributed profiles
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Default)]
+pub struct TerminalProfileRegistry {
+    profiles: Vec<TerminalProfileContribution>,
+}
+
+impl TerminalProfileRegistry {
+    pub fn new() -> Self {
+        Self {
+            profiles: Vec::new(),
+        }
+    }
+
+    pub fn register(&mut self, profile: TerminalProfileContribution) {
+        self.profiles.push(profile);
+    }
+
+    pub fn unregister(&mut self, id: &str) -> bool {
+        let before = self.profiles.len();
+        self.profiles.retain(|p| p.id != id);
+        self.profiles.len() != before
+    }
+
+    pub fn get(&self, id: &str) -> Option<&TerminalProfileContribution> {
+        self.profiles.iter().find(|p| p.id == id)
+    }
+
+    pub fn all(&self) -> Vec<&TerminalProfileContribution> {
+        self.profiles.iter().collect()
+    }
+
+    pub fn count(&self) -> usize {
+        self.profiles.len()
+    }
+
+    /// Returns the first registered profile, if any.
+    pub fn default_profile(&self) -> Option<&TerminalProfileContribution> {
+        self.profiles.first()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalOutput – buffered terminal output
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct TerminalOutput {
+    terminal_id: String,
+    buffer: String,
+}
+
+impl TerminalOutput {
+    pub fn new(terminal_id: &str) -> Self {
+        Self {
+            terminal_id: terminal_id.to_string(),
+            buffer: String::new(),
+        }
+    }
+
+    pub fn append(&mut self, text: &str) {
+        self.buffer.push_str(text);
+    }
+
+    pub fn line_count(&self) -> usize {
+        if self.buffer.is_empty() {
+            return 0;
+        }
+        self.buffer.lines().count()
+    }
+
+    pub fn last_n_lines(&self, n: usize) -> Vec<&str> {
+        let lines: Vec<&str> = self.buffer.lines().collect();
+        let skip = lines.len().saturating_sub(n);
+        lines[skip..].to_vec()
+    }
+
+    pub fn total_bytes(&self) -> usize {
+        self.buffer.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.buffer.clear();
+    }
+
+    pub fn terminal_id(&self) -> &str {
+        &self.terminal_id
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1025,5 +1268,103 @@ mod tests {
     fn ext_terminal_is_ascii_printable() {
         assert!(ExtTerminalValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtTerminalValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for added functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn profile_contribution_creation_and_to_terminal_options() {
+        let profile = TerminalProfileContribution::new("my-shell", "My Shell", "/bin/zsh")
+            .with_args(vec!["-l".into()]);
+        let opts = profile.to_terminal_options();
+        assert_eq!(opts.name, Some("My Shell".into()));
+        assert_eq!(opts.shell_path, Some("/bin/zsh".into()));
+        assert_eq!(opts.shell_args, vec!["-l".to_string()]);
+        assert!(!opts.hide_from_user);
+    }
+
+    #[test]
+    fn profile_contribution_with_env() {
+        let profile = TerminalProfileContribution::new("p", "P", "/bin/sh")
+            .with_env("FOO", "bar")
+            .with_env("BAZ", "qux");
+        assert_eq!(profile.env.get("FOO"), Some(&"bar".to_string()));
+        assert_eq!(profile.env.get("BAZ"), Some(&"qux".to_string()));
+        let opts = profile.to_terminal_options();
+        assert!(opts.env.contains(&("FOO".into(), "bar".into())));
+    }
+
+    #[test]
+    fn terminal_env_from_extension_adds_prefix() {
+        let pairs = vec![("MY_VAR".into(), "value".into())];
+        let env = terminal_env_from_extension("ext.foo", &pairs);
+        assert_eq!(env.get("VSEDIT_EXT_MY_VAR"), Some(&"value".to_string()));
+        // Already-prefixed keys should not be double-prefixed.
+        let pairs2 = vec![("VSEDIT_EXT_KEEP".into(), "yes".into())];
+        let env2 = terminal_env_from_extension("ext.foo", &pairs2);
+        assert_eq!(env2.get("VSEDIT_EXT_KEEP"), Some(&"yes".to_string()));
+    }
+
+    #[test]
+    fn terminal_env_from_extension_adds_ext_id() {
+        let env = terminal_env_from_extension("my.extension", &[]);
+        assert_eq!(env.get("VSEDIT_EXT_ID"), Some(&"my.extension".to_string()));
+    }
+
+    #[test]
+    fn link_detector_detect_file_links() {
+        let text = "Error at /home/user/project/src/main.rs:42:10 something";
+        let links = TerminalLinkDetector::detect_file_links(text);
+        assert!(!links.is_empty());
+        let link = &links[0];
+        let matched = &text[link.start_index as usize..(link.start_index + link.length) as usize];
+        assert!(matched.contains("/home/user/project/src/main.rs:42:10"));
+    }
+
+    #[test]
+    fn profile_registry_register_and_get() {
+        let mut reg = TerminalProfileRegistry::new();
+        assert_eq!(reg.count(), 0);
+        reg.register(TerminalProfileContribution::new("bash", "Bash", "/bin/bash"));
+        reg.register(TerminalProfileContribution::new("zsh", "Zsh", "/bin/zsh"));
+        assert_eq!(reg.count(), 2);
+        assert_eq!(reg.get("bash").unwrap().shell_path, "/bin/bash");
+        assert!(reg.unregister("bash"));
+        assert_eq!(reg.count(), 1);
+        assert!(reg.get("bash").is_none());
+        assert_eq!(reg.default_profile().unwrap().id, "zsh");
+    }
+
+    #[test]
+    fn terminal_output_append_and_line_count() {
+        let mut out = TerminalOutput::new("t1");
+        assert_eq!(out.line_count(), 0);
+        assert_eq!(out.total_bytes(), 0);
+        out.append("hello\nworld\n");
+        assert_eq!(out.line_count(), 2);
+        assert_eq!(out.total_bytes(), 12);
+        assert_eq!(out.terminal_id(), "t1");
+    }
+
+    #[test]
+    fn terminal_output_last_n_lines() {
+        let mut out = TerminalOutput::new("t2");
+        out.append("line1\nline2\nline3\nline4\nline5");
+        let last2 = out.last_n_lines(2);
+        assert_eq!(last2, vec!["line4", "line5"]);
+        let last10 = out.last_n_lines(10);
+        assert_eq!(last10.len(), 5);
+    }
+
+    #[test]
+    fn terminal_output_clear() {
+        let mut out = TerminalOutput::new("t3");
+        out.append("data");
+        assert!(out.total_bytes() > 0);
+        out.clear();
+        assert_eq!(out.total_bytes(), 0);
+        assert_eq!(out.line_count(), 0);
     }
 }

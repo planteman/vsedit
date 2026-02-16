@@ -550,6 +550,194 @@ impl Default for ExtCommandsValidator {
     }
 }
 
+/// Rich metadata for a command, supporting builder-style construction.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CommandDescription {
+    pub command_id: String,
+    pub title: String,
+    pub category: Option<String>,
+    pub icon: Option<String>,
+    pub keybinding: Option<String>,
+    pub when_clause: Option<String>,
+}
+
+impl CommandDescription {
+    pub fn new(id: &str, title: &str) -> Self {
+        Self {
+            command_id: id.to_string(),
+            title: title.to_string(),
+            category: None,
+            icon: None,
+            keybinding: None,
+            when_clause: None,
+        }
+    }
+
+    pub fn with_category(mut self, cat: &str) -> Self {
+        self.category = Some(cat.to_string());
+        self
+    }
+
+    pub fn with_icon(mut self, icon: &str) -> Self {
+        self.icon = Some(icon.to_string());
+        self
+    }
+
+    pub fn with_keybinding(mut self, kb: &str) -> Self {
+        self.keybinding = Some(kb.to_string());
+        self
+    }
+
+    pub fn with_when(mut self, when: &str) -> Self {
+        self.when_clause = Some(when.to_string());
+        self
+    }
+
+    /// Returns "Category: Title" if a category is set, otherwise just "Title".
+    pub fn display_label(&self) -> String {
+        match &self.category {
+            Some(cat) => format!("{}: {}", cat, self.title),
+            None => self.title.clone(),
+        }
+    }
+
+    pub fn has_keybinding(&self) -> bool {
+        self.keybinding.is_some()
+    }
+}
+
+/// Generates a command-palette display string for a command description.
+pub fn command_palette_entry(desc: &CommandDescription) -> String {
+    let label = desc.display_label();
+    match &desc.keybinding {
+        Some(kb) => format!(">{label}  ({kb})"),
+        None => format!(">{label}"),
+    }
+}
+
+/// Tracks command invocation counts and durations for telemetry purposes.
+#[derive(Debug, Clone)]
+pub struct CommandTelemetry {
+    invocations: std::collections::HashMap<String, Vec<u64>>,
+}
+
+impl CommandTelemetry {
+    pub fn new() -> Self {
+        Self {
+            invocations: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn record_invocation(&mut self, command_id: &str, duration_ms: u64) {
+        self.invocations
+            .entry(command_id.to_string())
+            .or_default()
+            .push(duration_ms);
+    }
+
+    pub fn invocation_count(&self, command_id: &str) -> u64 {
+        self.invocations
+            .get(command_id)
+            .map_or(0, |v| v.len() as u64)
+    }
+
+    pub fn total_invocations(&self) -> u64 {
+        self.invocations.values().map(|v| v.len() as u64).sum()
+    }
+
+    pub fn average_duration_ms(&self, command_id: &str) -> Option<f64> {
+        self.invocations.get(command_id).and_then(|durations| {
+            if durations.is_empty() {
+                None
+            } else {
+                let sum: u64 = durations.iter().sum();
+                Some(sum as f64 / durations.len() as f64)
+            }
+        })
+    }
+
+    /// Returns the top `n` commands sorted by invocation count (descending).
+    pub fn most_used(&self, n: usize) -> Vec<(&str, u64)> {
+        let mut entries: Vec<(&str, u64)> = self
+            .invocations
+            .iter()
+            .map(|(id, v)| (id.as_str(), v.len() as u64))
+            .collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.truncate(n);
+        entries
+    }
+
+    pub fn unique_commands(&self) -> usize {
+        self.invocations.len()
+    }
+}
+
+impl Default for CommandTelemetry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Combines command descriptions and telemetry into a single registry.
+#[derive(Debug, Clone)]
+pub struct CommandRegistry {
+    descriptions: std::collections::HashMap<String, CommandDescription>,
+    pub telemetry: CommandTelemetry,
+}
+
+impl CommandRegistry {
+    pub fn new() -> Self {
+        Self {
+            descriptions: std::collections::HashMap::new(),
+            telemetry: CommandTelemetry::new(),
+        }
+    }
+
+    pub fn register_description(&mut self, desc: CommandDescription) {
+        self.descriptions.insert(desc.command_id.clone(), desc);
+    }
+
+    pub fn get_description(&self, id: &str) -> Option<&CommandDescription> {
+        self.descriptions.get(id)
+    }
+
+    /// Searches descriptions by substring match on title or category.
+    pub fn search(&self, query: &str) -> Vec<&CommandDescription> {
+        let q = query.to_lowercase();
+        self.descriptions
+            .values()
+            .filter(|d| {
+                d.title.to_lowercase().contains(&q)
+                    || d.category
+                        .as_ref()
+                        .is_some_and(|c| c.to_lowercase().contains(&q))
+            })
+            .collect()
+    }
+
+    pub fn all_descriptions(&self) -> Vec<&CommandDescription> {
+        self.descriptions.values().collect()
+    }
+
+    pub fn by_category(&self, category: &str) -> Vec<&CommandDescription> {
+        self.descriptions
+            .values()
+            .filter(|d| d.category.as_deref() == Some(category))
+            .collect()
+    }
+
+    pub fn description_count(&self) -> usize {
+        self.descriptions.len()
+    }
+}
+
+impl Default for CommandRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1041,5 +1229,110 @@ mod tests {
     fn ext_commands_is_ascii_printable() {
         assert!(ExtCommandsValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtCommandsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn command_description_builder() {
+        let desc = CommandDescription::new("editor.save", "Save File")
+            .with_category("File")
+            .with_icon("save-icon")
+            .with_keybinding("Ctrl+S")
+            .with_when("editorTextFocus");
+        assert_eq!(desc.command_id, "editor.save");
+        assert_eq!(desc.title, "Save File");
+        assert_eq!(desc.category.as_deref(), Some("File"));
+        assert_eq!(desc.icon.as_deref(), Some("save-icon"));
+        assert_eq!(desc.keybinding.as_deref(), Some("Ctrl+S"));
+        assert_eq!(desc.when_clause.as_deref(), Some("editorTextFocus"));
+        assert!(desc.has_keybinding());
+    }
+
+    #[test]
+    fn command_description_display_label_with_category() {
+        let desc = CommandDescription::new("fmt", "Format Document").with_category("Editor");
+        assert_eq!(desc.display_label(), "Editor: Format Document");
+    }
+
+    #[test]
+    fn command_description_display_label_without_category() {
+        let desc = CommandDescription::new("about", "About");
+        assert_eq!(desc.display_label(), "About");
+        assert!(!desc.has_keybinding());
+    }
+
+    #[test]
+    fn command_palette_entry_with_keybinding() {
+        let desc = CommandDescription::new("save", "Save")
+            .with_category("File")
+            .with_keybinding("Ctrl+S");
+        let entry = command_palette_entry(&desc);
+        assert_eq!(entry, ">File: Save  (Ctrl+S)");
+    }
+
+    #[test]
+    fn command_palette_entry_without_keybinding() {
+        let desc = CommandDescription::new("about", "About");
+        let entry = command_palette_entry(&desc);
+        assert_eq!(entry, ">About");
+    }
+
+    #[test]
+    fn telemetry_tracks_invocations() {
+        let mut t = CommandTelemetry::new();
+        t.record_invocation("cmd.a", 10);
+        t.record_invocation("cmd.a", 20);
+        t.record_invocation("cmd.b", 5);
+        assert_eq!(t.invocation_count("cmd.a"), 2);
+        assert_eq!(t.invocation_count("cmd.b"), 1);
+        assert_eq!(t.invocation_count("cmd.c"), 0);
+        assert_eq!(t.total_invocations(), 3);
+        assert_eq!(t.unique_commands(), 2);
+        let avg = t.average_duration_ms("cmd.a").unwrap();
+        assert!((avg - 15.0).abs() < f64::EPSILON);
+        assert!(t.average_duration_ms("cmd.c").is_none());
+    }
+
+    #[test]
+    fn telemetry_most_used_returns_sorted() {
+        let mut t = CommandTelemetry::new();
+        for _ in 0..5 {
+            t.record_invocation("cmd.x", 1);
+        }
+        for _ in 0..3 {
+            t.record_invocation("cmd.y", 1);
+        }
+        t.record_invocation("cmd.z", 1);
+        let top = t.most_used(2);
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0].0, "cmd.x");
+        assert_eq!(top[0].1, 5);
+        assert_eq!(top[1].0, "cmd.y");
+        assert_eq!(top[1].1, 3);
+    }
+
+    #[test]
+    fn registry_search_finds_by_title() {
+        let mut reg = CommandRegistry::new();
+        reg.register_description(CommandDescription::new("a", "Open File").with_category("File"));
+        reg.register_description(CommandDescription::new("b", "Close Editor"));
+        reg.register_description(CommandDescription::new("c", "Open Terminal"));
+        let results = reg.search("open");
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().any(|d| d.command_id == "a"));
+        assert!(results.iter().any(|d| d.command_id == "c"));
+    }
+
+    #[test]
+    fn registry_by_category_filters() {
+        let mut reg = CommandRegistry::new();
+        reg.register_description(CommandDescription::new("a", "Save").with_category("File"));
+        reg.register_description(CommandDescription::new("b", "Undo").with_category("Edit"));
+        reg.register_description(CommandDescription::new("c", "Open").with_category("File"));
+        let file_cmds = reg.by_category("File");
+        assert_eq!(file_cmds.len(), 2);
+        assert!(file_cmds.iter().all(|d| d.category.as_deref() == Some("File")));
+        assert_eq!(reg.description_count(), 3);
+        assert!(reg.get_description("b").is_some());
+        assert!(reg.get_description("missing").is_none());
     }
 }

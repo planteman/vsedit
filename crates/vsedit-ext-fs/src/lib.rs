@@ -639,6 +639,196 @@ impl Default for ExtFsValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// VirtualFileContent
+// ---------------------------------------------------------------------------
+
+/// Content descriptor for a virtual (in-memory) file.
+#[derive(Debug, Clone)]
+pub struct VirtualFileContent {
+    pub uri: String,
+    pub content: Vec<u8>,
+    pub encoding: String,
+    pub readonly: bool,
+}
+
+impl VirtualFileContent {
+    pub fn new(uri: &str, content: Vec<u8>) -> Self {
+        Self {
+            uri: uri.to_string(),
+            content,
+            encoding: "utf-8".to_string(),
+            readonly: false,
+        }
+    }
+
+    pub fn with_encoding(mut self, enc: &str) -> Self {
+        self.encoding = enc.to_string();
+        self
+    }
+
+    pub fn as_readonly(mut self) -> Self {
+        self.readonly = true;
+        self
+    }
+
+    pub fn text_content(&self) -> Option<String> {
+        std::str::from_utf8(&self.content).ok().map(String::from)
+    }
+
+    pub fn size(&self) -> u64 {
+        self.content.len() as u64
+    }
+
+    pub fn is_text(&self) -> bool {
+        std::str::from_utf8(&self.content).is_ok()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// file_system_watch_recursive
+// ---------------------------------------------------------------------------
+
+/// Generates URI glob patterns for recursive directory watching.
+///
+/// Returns patterns like `root_uri/*`, `root_uri/*/*`, etc. up to `depth`.
+/// A depth of 0 yields `root_uri/**`.
+pub fn file_system_watch_recursive(root_uri: &str, depth: u32) -> Vec<String> {
+    if validate_file_uri(root_uri).is_err() {
+        return Vec::new();
+    }
+    let base = root_uri.trim_end_matches('/');
+    if depth == 0 {
+        return vec![format!("{base}/**")];
+    }
+    let mut patterns = Vec::new();
+    let mut segment = String::new();
+    for _ in 0..depth {
+        segment.push_str("/*");
+        patterns.push(format!("{base}{segment}"));
+    }
+    patterns
+}
+
+// ---------------------------------------------------------------------------
+// fs_stat_to_file_type
+// ---------------------------------------------------------------------------
+
+/// Extracts the [`FileType`] from a [`FileStat`].
+pub fn fs_stat_to_file_type(stat: &FileStat) -> FileType {
+    stat.file_type.clone()
+}
+
+// ---------------------------------------------------------------------------
+// FileWatchEvent
+// ---------------------------------------------------------------------------
+
+/// Notification about a file-system change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FileWatchEvent {
+    Created { uri: String },
+    Changed { uri: String },
+    Deleted { uri: String },
+}
+
+impl FileWatchEvent {
+    pub fn uri(&self) -> &str {
+        match self {
+            Self::Created { uri } | Self::Changed { uri } | Self::Deleted { uri } => uri,
+        }
+    }
+
+    pub fn is_creation(&self) -> bool {
+        matches!(self, Self::Created { .. })
+    }
+
+    pub fn is_change(&self) -> bool {
+        matches!(self, Self::Changed { .. })
+    }
+
+    pub fn is_deletion(&self) -> bool {
+        matches!(self, Self::Deleted { .. })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileContentDiff
+// ---------------------------------------------------------------------------
+
+/// A simple content-level diff between two byte slices.
+#[derive(Debug, Clone)]
+pub struct FileContentDiff {
+    old_size: usize,
+    new_size: usize,
+    changed: bool,
+}
+
+impl FileContentDiff {
+    pub fn new(old: &[u8], new_content: &[u8]) -> Self {
+        Self {
+            old_size: old.len(),
+            new_size: new_content.len(),
+            changed: old != new_content,
+        }
+    }
+
+    pub fn has_changes(&self) -> bool {
+        self.changed
+    }
+
+    pub fn old_size(&self) -> usize {
+        self.old_size
+    }
+
+    pub fn new_size(&self) -> usize {
+        self.new_size
+    }
+
+    pub fn size_delta(&self) -> i64 {
+        self.new_size as i64 - self.old_size as i64
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VirtualFileStore
+// ---------------------------------------------------------------------------
+
+/// An in-memory store for [`VirtualFileContent`] entries, keyed by URI.
+#[derive(Debug, Clone, Default)]
+pub struct VirtualFileStore {
+    files: HashMap<String, VirtualFileContent>,
+}
+
+impl VirtualFileStore {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, content: VirtualFileContent) {
+        self.files.insert(content.uri.clone(), content);
+    }
+
+    pub fn get(&self, uri: &str) -> Option<&VirtualFileContent> {
+        self.files.get(uri)
+    }
+
+    pub fn remove(&mut self, uri: &str) -> bool {
+        self.files.remove(uri).is_some()
+    }
+
+    pub fn count(&self) -> usize {
+        self.files.len()
+    }
+
+    pub fn all_uris(&self) -> Vec<&str> {
+        self.files.keys().map(|s| s.as_str()).collect()
+    }
+
+    pub fn readonly_count(&self) -> usize {
+        self.files.values().filter(|f| f.readonly).count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1020,5 +1210,110 @@ mod tests {
     fn ext_fs_is_ascii_printable() {
         assert!(ExtFsValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtFsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn virtual_file_content_creation_and_size() {
+        let vf = VirtualFileContent::new("file:///test.txt", b"hello".to_vec());
+        assert_eq!(vf.uri, "file:///test.txt");
+        assert_eq!(vf.size(), 5);
+        assert_eq!(vf.encoding, "utf-8");
+        assert!(!vf.readonly);
+    }
+
+    #[test]
+    fn virtual_file_content_text_content_valid_utf8() {
+        let vf = VirtualFileContent::new("file:///a.txt", b"good text".to_vec());
+        assert_eq!(vf.text_content(), Some("good text".to_string()));
+        assert!(vf.is_text());
+    }
+
+    #[test]
+    fn virtual_file_content_text_content_invalid_utf8() {
+        let vf = VirtualFileContent::new("file:///b.bin", vec![0xFF, 0xFE, 0x00]);
+        assert!(vf.text_content().is_none());
+        assert!(!vf.is_text());
+    }
+
+    #[test]
+    fn file_system_watch_recursive_generates_patterns() {
+        let p0 = file_system_watch_recursive("file:///workspace", 0);
+        assert_eq!(p0, vec!["file:///workspace/**"]);
+
+        let p2 = file_system_watch_recursive("file:///workspace", 2);
+        assert_eq!(p2, vec![
+            "file:///workspace/*",
+            "file:///workspace/*/*",
+        ]);
+
+        let empty = file_system_watch_recursive("bad-uri", 1);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn fs_stat_to_file_type_extracts_type() {
+        let stat = FileStatBuilder::new(FileType::Directory).build().unwrap();
+        assert_eq!(fs_stat_to_file_type(&stat), FileType::Directory);
+
+        let stat2 = FileStatBuilder::new(FileType::SymbolicLink).build().unwrap();
+        assert_eq!(fs_stat_to_file_type(&stat2), FileType::SymbolicLink);
+    }
+
+    #[test]
+    fn file_watch_event_uri_and_type_checks() {
+        let created = FileWatchEvent::Created { uri: "file:///a.txt".into() };
+        assert_eq!(created.uri(), "file:///a.txt");
+        assert!(created.is_creation());
+        assert!(!created.is_change());
+        assert!(!created.is_deletion());
+
+        let changed = FileWatchEvent::Changed { uri: "file:///b.txt".into() };
+        assert!(changed.is_change());
+
+        let deleted = FileWatchEvent::Deleted { uri: "file:///c.txt".into() };
+        assert!(deleted.is_deletion());
+    }
+
+    #[test]
+    fn file_content_diff_detects_changes() {
+        let diff = FileContentDiff::new(b"hello", b"world!");
+        assert!(diff.has_changes());
+        assert_eq!(diff.old_size(), 5);
+        assert_eq!(diff.new_size(), 6);
+        assert_eq!(diff.size_delta(), 1);
+
+        let same = FileContentDiff::new(b"abc", b"abc");
+        assert!(!same.has_changes());
+        assert_eq!(same.size_delta(), 0);
+    }
+
+    #[test]
+    fn virtual_file_store_add_and_get() {
+        let mut store = VirtualFileStore::new();
+        assert_eq!(store.count(), 0);
+
+        let vf = VirtualFileContent::new("file:///x.txt", b"data".to_vec());
+        store.add(vf);
+        assert_eq!(store.count(), 1);
+        assert!(store.get("file:///x.txt").is_some());
+        assert_eq!(store.get("file:///x.txt").unwrap().size(), 4);
+
+        assert!(store.remove("file:///x.txt"));
+        assert_eq!(store.count(), 0);
+    }
+
+    #[test]
+    fn virtual_file_store_readonly_count() {
+        let mut store = VirtualFileStore::new();
+        store.add(VirtualFileContent::new("file:///a.txt", b"a".to_vec()));
+        store.add(VirtualFileContent::new("file:///b.txt", b"b".to_vec()).as_readonly());
+        store.add(VirtualFileContent::new("file:///c.txt", b"c".to_vec()).as_readonly());
+        assert_eq!(store.count(), 3);
+        assert_eq!(store.readonly_count(), 2);
+        assert_eq!(store.all_uris().len(), 3);
     }
 }

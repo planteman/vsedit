@@ -607,6 +607,251 @@ impl Default for WbTitleValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TitleBarContext – resolves variables from workspace state
+// ---------------------------------------------------------------------------
+
+/// Context for resolving title bar variables from workspace state.
+#[derive(Debug, Clone)]
+pub struct TitleBarContext {
+    pub active_file: Option<String>,
+    pub root_folder: Option<String>,
+    pub app_name: String,
+    pub is_dirty: bool,
+    pub remote_host: Option<String>,
+    pub workspace_name: Option<String>,
+    pub git_branch: Option<String>,
+}
+
+impl TitleBarContext {
+    pub fn new(app_name: &str) -> Self {
+        Self {
+            active_file: None,
+            root_folder: None,
+            app_name: app_name.to_string(),
+            is_dirty: false,
+            remote_host: None,
+            workspace_name: None,
+            git_branch: None,
+        }
+    }
+
+    pub fn with_active_file(mut self, file: &str) -> Self {
+        self.active_file = Some(file.to_string());
+        self
+    }
+
+    pub fn with_root_folder(mut self, folder: &str) -> Self {
+        self.root_folder = Some(folder.to_string());
+        self
+    }
+
+    pub fn with_dirty(mut self, dirty: bool) -> Self {
+        self.is_dirty = dirty;
+        self
+    }
+
+    pub fn with_remote_host(mut self, host: &str) -> Self {
+        self.remote_host = Some(host.to_string());
+        self
+    }
+
+    pub fn with_workspace_name(mut self, name: &str) -> Self {
+        self.workspace_name = Some(name.to_string());
+        self
+    }
+
+    pub fn with_git_branch(mut self, branch: &str) -> Self {
+        self.git_branch = Some(branch.to_string());
+        self
+    }
+
+    /// Resolve a variable to its string value from this context.
+    pub fn resolve_variable(&self, var: &TitleBarVariable) -> String {
+        match var {
+            TitleBarVariable::ActiveFile => {
+                self.active_file.clone().unwrap_or_default()
+            }
+            TitleBarVariable::RootFolder => {
+                self.root_folder.clone().unwrap_or_default()
+            }
+            TitleBarVariable::AppName => self.app_name.clone(),
+            TitleBarVariable::Separator => " - ".to_string(),
+            TitleBarVariable::Dirty => {
+                if self.is_dirty {
+                    "●".to_string()
+                } else {
+                    String::new()
+                }
+            }
+            TitleBarVariable::RemoteHost => {
+                self.remote_host.clone().unwrap_or_default()
+            }
+        }
+    }
+
+    /// Populate a HashMap of all variable values for template rendering.
+    pub fn to_variables(&self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        for var in TitleBarVariable::all_variants() {
+            map.insert(var.key().to_string(), self.resolve_variable(var));
+        }
+        // Extra context-only keys not in the enum.
+        if let Some(ref ws) = self.workspace_name {
+            map.insert("workspaceName".to_string(), ws.clone());
+        }
+        if let Some(ref branch) = self.git_branch {
+            map.insert("gitBranch".to_string(), branch.clone());
+        }
+        map
+    }
+}
+
+// ---------------------------------------------------------------------------
+// title_template_render / title_default_render
+// ---------------------------------------------------------------------------
+
+/// Render a title template string with variable substitution from a context.
+///
+/// Template uses `${varName}` syntax. Unknown variables are left as empty
+/// strings. Also supports `${varName:defaultValue}` for default values.
+pub fn title_template_render(template: &str, context: &TitleBarContext) -> String {
+    let vars = context.to_variables();
+    let mut result = String::with_capacity(template.len());
+    let mut rest = template;
+
+    while let Some(start) = rest.find("${") {
+        result.push_str(&rest[..start]);
+        rest = &rest[start + 2..];
+        if let Some(end) = rest.find('}') {
+            let expr = &rest[..end];
+            let (name, default) = match expr.find(':') {
+                Some(pos) => (&expr[..pos], &expr[pos + 1..]),
+                None => (expr, ""),
+            };
+            let value = vars.get(name).filter(|v| !v.is_empty());
+            match value {
+                Some(v) => result.push_str(v),
+                None => result.push_str(default),
+            }
+            rest = &rest[end + 1..];
+        } else {
+            // No closing brace – emit the literal `${` and continue.
+            result.push_str("${");
+        }
+    }
+    result.push_str(rest);
+    result
+}
+
+/// Render a title with the standard format: `[dirty] activeFile - rootFolder - appName`.
+pub fn title_default_render(context: &TitleBarContext) -> String {
+    let mut parts: Vec<String> = Vec::new();
+
+    if context.is_dirty {
+        parts.push("●".to_string());
+    }
+
+    if let Some(ref file) = context.active_file {
+        parts.push(file.clone());
+    }
+
+    if let Some(ref folder) = context.root_folder {
+        parts.push(folder.clone());
+    }
+
+    parts.push(context.app_name.clone());
+
+    parts.join(" - ")
+}
+
+// ---------------------------------------------------------------------------
+// TitleBarDirtyIndicator
+// ---------------------------------------------------------------------------
+
+/// Configurable dirty/modified indicator for the title bar.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TitleBarDirtyIndicator {
+    pub prefix: String,
+    pub suffix: String,
+    pub indicator: String,
+    pub show_when_clean: bool,
+    pub clean_indicator: String,
+}
+
+impl TitleBarDirtyIndicator {
+    pub fn new() -> Self {
+        Self {
+            prefix: String::new(),
+            suffix: " ".to_string(),
+            indicator: "●".to_string(),
+            show_when_clean: false,
+            clean_indicator: String::new(),
+        }
+    }
+
+    pub fn with_indicator(mut self, s: &str) -> Self {
+        self.indicator = s.to_string();
+        self
+    }
+
+    pub fn with_prefix(mut self, s: &str) -> Self {
+        self.prefix = s.to_string();
+        self
+    }
+
+    pub fn with_suffix(mut self, s: &str) -> Self {
+        self.suffix = s.to_string();
+        self
+    }
+
+    pub fn with_clean_indicator(mut self, s: &str) -> Self {
+        self.clean_indicator = s.to_string();
+        self.show_when_clean = true;
+        self
+    }
+
+    /// Render the indicator string. Returns the formatted indicator when dirty,
+    /// or the clean indicator (possibly empty) when not dirty.
+    pub fn render(&self, is_dirty: bool) -> String {
+        if is_dirty {
+            format!("{}{}{}", self.prefix, self.indicator, self.suffix)
+        } else if self.show_when_clean {
+            format!("{}{}{}", self.prefix, self.clean_indicator, self.suffix)
+        } else {
+            String::new()
+        }
+    }
+
+    /// VS Code–style indicator: `● ` prefix.
+    pub fn vscode_style() -> Self {
+        Self {
+            prefix: String::new(),
+            suffix: " ".to_string(),
+            indicator: "●".to_string(),
+            show_when_clean: false,
+            clean_indicator: String::new(),
+        }
+    }
+
+    /// Emacs-style indicator: `**` prefix.
+    pub fn emacs_style() -> Self {
+        Self {
+            prefix: String::new(),
+            suffix: " ".to_string(),
+            indicator: "**".to_string(),
+            show_when_clean: false,
+            clean_indicator: String::new(),
+        }
+    }
+}
+
+impl Default for TitleBarDirtyIndicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1014,5 +1259,266 @@ mod tests {
     fn wb_title_is_ascii_printable() {
         assert!(WbTitleValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbTitleValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // TitleBarContext tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn context_new_defaults() {
+        let ctx = TitleBarContext::new("VSEdit");
+        assert_eq!(ctx.app_name, "VSEdit");
+        assert!(ctx.active_file.is_none());
+        assert!(ctx.root_folder.is_none());
+        assert!(!ctx.is_dirty);
+        assert!(ctx.remote_host.is_none());
+        assert!(ctx.workspace_name.is_none());
+        assert!(ctx.git_branch.is_none());
+    }
+
+    #[test]
+    fn context_builder_chain() {
+        let ctx = TitleBarContext::new("App")
+            .with_active_file("main.rs")
+            .with_root_folder("/project")
+            .with_dirty(true)
+            .with_remote_host("ssh://host")
+            .with_workspace_name("my-ws")
+            .with_git_branch("main");
+        assert_eq!(ctx.active_file.as_deref(), Some("main.rs"));
+        assert_eq!(ctx.root_folder.as_deref(), Some("/project"));
+        assert!(ctx.is_dirty);
+        assert_eq!(ctx.remote_host.as_deref(), Some("ssh://host"));
+        assert_eq!(ctx.workspace_name.as_deref(), Some("my-ws"));
+        assert_eq!(ctx.git_branch.as_deref(), Some("main"));
+    }
+
+    #[test]
+    fn context_resolve_active_file() {
+        let ctx = TitleBarContext::new("App").with_active_file("lib.rs");
+        assert_eq!(
+            ctx.resolve_variable(&TitleBarVariable::ActiveFile),
+            "lib.rs"
+        );
+    }
+
+    #[test]
+    fn context_resolve_missing_active_file() {
+        let ctx = TitleBarContext::new("App");
+        assert_eq!(
+            ctx.resolve_variable(&TitleBarVariable::ActiveFile),
+            ""
+        );
+    }
+
+    #[test]
+    fn context_resolve_dirty() {
+        let dirty = TitleBarContext::new("A").with_dirty(true);
+        let clean = TitleBarContext::new("A").with_dirty(false);
+        assert_eq!(dirty.resolve_variable(&TitleBarVariable::Dirty), "●");
+        assert_eq!(clean.resolve_variable(&TitleBarVariable::Dirty), "");
+    }
+
+    #[test]
+    fn context_resolve_separator() {
+        let ctx = TitleBarContext::new("App");
+        assert_eq!(
+            ctx.resolve_variable(&TitleBarVariable::Separator),
+            " - "
+        );
+    }
+
+    #[test]
+    fn context_resolve_remote_host() {
+        let ctx = TitleBarContext::new("App").with_remote_host("myhost");
+        assert_eq!(
+            ctx.resolve_variable(&TitleBarVariable::RemoteHost),
+            "myhost"
+        );
+    }
+
+    #[test]
+    fn context_to_variables_includes_all() {
+        let ctx = TitleBarContext::new("App")
+            .with_active_file("f.rs")
+            .with_root_folder("/r")
+            .with_dirty(true)
+            .with_remote_host("h")
+            .with_workspace_name("ws")
+            .with_git_branch("dev");
+        let vars = ctx.to_variables();
+        assert_eq!(vars.get("activeFile").unwrap(), "f.rs");
+        assert_eq!(vars.get("rootFolder").unwrap(), "/r");
+        assert_eq!(vars.get("appName").unwrap(), "App");
+        assert_eq!(vars.get("dirty").unwrap(), "●");
+        assert_eq!(vars.get("remoteHost").unwrap(), "h");
+        assert_eq!(vars.get("workspaceName").unwrap(), "ws");
+        assert_eq!(vars.get("gitBranch").unwrap(), "dev");
+    }
+
+    #[test]
+    fn context_to_variables_omits_unset_extras() {
+        let ctx = TitleBarContext::new("App");
+        let vars = ctx.to_variables();
+        assert!(!vars.contains_key("workspaceName"));
+        assert!(!vars.contains_key("gitBranch"));
+    }
+
+    // -----------------------------------------------------------------------
+    // title_template_render / title_default_render tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn template_render_basic() {
+        let ctx = TitleBarContext::new("VSEdit")
+            .with_active_file("main.rs")
+            .with_root_folder("/proj");
+        let result = title_template_render("${activeFile} - ${rootFolder} - ${appName}", &ctx);
+        assert_eq!(result, "main.rs - /proj - VSEdit");
+    }
+
+    #[test]
+    fn template_render_default_value() {
+        let ctx = TitleBarContext::new("App");
+        let result = title_template_render("${activeFile:Untitled}", &ctx);
+        assert_eq!(result, "Untitled");
+    }
+
+    #[test]
+    fn template_render_default_not_used_when_set() {
+        let ctx = TitleBarContext::new("App").with_active_file("f.rs");
+        let result = title_template_render("${activeFile:Untitled}", &ctx);
+        assert_eq!(result, "f.rs");
+    }
+
+    #[test]
+    fn template_render_unknown_variable() {
+        let ctx = TitleBarContext::new("App");
+        let result = title_template_render("${unknownVar}", &ctx);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn template_render_unknown_with_default() {
+        let ctx = TitleBarContext::new("App");
+        let result = title_template_render("${unknownVar:fallback}", &ctx);
+        assert_eq!(result, "fallback");
+    }
+
+    #[test]
+    fn template_render_literal_text_preserved() {
+        let ctx = TitleBarContext::new("App");
+        let result = title_template_render("hello world", &ctx);
+        assert_eq!(result, "hello world");
+    }
+
+    #[test]
+    fn template_render_mixed_text_and_vars() {
+        let ctx = TitleBarContext::new("App").with_active_file("x.rs");
+        let result = title_template_render("[${activeFile}] ${appName}", &ctx);
+        assert_eq!(result, "[x.rs] App");
+    }
+
+    #[test]
+    fn template_render_unclosed_brace() {
+        let ctx = TitleBarContext::new("App");
+        let result = title_template_render("${appName", &ctx);
+        assert_eq!(result, "${appName");
+    }
+
+    #[test]
+    fn template_render_workspace_and_branch() {
+        let ctx = TitleBarContext::new("App")
+            .with_workspace_name("ws")
+            .with_git_branch("feat");
+        let result =
+            title_template_render("${workspaceName} (${gitBranch})", &ctx);
+        assert_eq!(result, "ws (feat)");
+    }
+
+    #[test]
+    fn default_render_all_parts() {
+        let ctx = TitleBarContext::new("VSEdit")
+            .with_active_file("main.rs")
+            .with_root_folder("/proj")
+            .with_dirty(true);
+        assert_eq!(title_default_render(&ctx), "● - main.rs - /proj - VSEdit");
+    }
+
+    #[test]
+    fn default_render_clean() {
+        let ctx = TitleBarContext::new("VSEdit")
+            .with_active_file("main.rs")
+            .with_root_folder("/proj");
+        assert_eq!(title_default_render(&ctx), "main.rs - /proj - VSEdit");
+    }
+
+    #[test]
+    fn default_render_minimal() {
+        let ctx = TitleBarContext::new("App");
+        assert_eq!(title_default_render(&ctx), "App");
+    }
+
+    // -----------------------------------------------------------------------
+    // TitleBarDirtyIndicator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn dirty_indicator_defaults() {
+        let d = TitleBarDirtyIndicator::new();
+        assert_eq!(d.indicator, "●");
+        assert_eq!(d.prefix, "");
+        assert_eq!(d.suffix, " ");
+        assert!(!d.show_when_clean);
+        assert_eq!(d.clean_indicator, "");
+    }
+
+    #[test]
+    fn dirty_indicator_render_dirty() {
+        let d = TitleBarDirtyIndicator::new();
+        assert_eq!(d.render(true), "● ");
+    }
+
+    #[test]
+    fn dirty_indicator_render_clean_hidden() {
+        let d = TitleBarDirtyIndicator::new();
+        assert_eq!(d.render(false), "");
+    }
+
+    #[test]
+    fn dirty_indicator_render_clean_shown() {
+        let d = TitleBarDirtyIndicator::new()
+            .with_clean_indicator("○");
+        assert_eq!(d.render(false), "○ ");
+    }
+
+    #[test]
+    fn dirty_indicator_custom() {
+        let d = TitleBarDirtyIndicator::new()
+            .with_indicator("*")
+            .with_prefix("[")
+            .with_suffix("]");
+        assert_eq!(d.render(true), "[*]");
+    }
+
+    #[test]
+    fn dirty_indicator_vscode_style() {
+        let d = TitleBarDirtyIndicator::vscode_style();
+        assert_eq!(d.render(true), "● ");
+        assert_eq!(d.render(false), "");
+    }
+
+    #[test]
+    fn dirty_indicator_emacs_style() {
+        let d = TitleBarDirtyIndicator::emacs_style();
+        assert_eq!(d.render(true), "** ");
+        assert_eq!(d.render(false), "");
+    }
+
+    #[test]
+    fn dirty_indicator_default_trait() {
+        let d = TitleBarDirtyIndicator::default();
+        assert_eq!(d, TitleBarDirtyIndicator::new());
     }
 }

@@ -632,6 +632,195 @@ impl Default for StorageValidator {
     }
 }
 
+/// An in-memory key-value storage backend backed by a HashMap.
+/// Useful for testing or ephemeral storage that doesn't need persistence.
+pub struct StorageDatabase {
+    data: HashMap<String, String>,
+    pub version: u32,
+}
+
+impl StorageDatabase {
+    /// Create a new empty in-memory database.
+    pub fn new() -> Self {
+        Self {
+            data: HashMap::new(),
+            version: 1,
+        }
+    }
+
+    /// Get a value by key.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.data.get(key).map(|s| s.as_str())
+    }
+
+    /// Set a value.
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.data.insert(key.into(), value.into());
+    }
+
+    /// Remove a key, returning its previous value.
+    pub fn remove(&mut self, key: &str) -> Option<String> {
+        self.data.remove(key)
+    }
+
+    /// Check if a key exists.
+    pub fn has(&self, key: &str) -> bool {
+        self.data.contains_key(key)
+    }
+
+    /// Get the number of stored items.
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Check if the database is empty.
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    /// Get all keys sorted alphabetically.
+    pub fn keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.data.keys().map(|k| k.as_str()).collect();
+        keys.sort_unstable();
+        keys
+    }
+
+    /// Clear all data.
+    pub fn clear(&mut self) {
+        self.data.clear();
+    }
+
+    /// Get the current schema version.
+    pub fn version(&self) -> u32 {
+        self.version
+    }
+
+    /// Export all data as a Vec of (key, value) pairs.
+    pub fn export(&self) -> Vec<(String, String)> {
+        let mut entries: Vec<(String, String)> = self
+            .data
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        entries
+    }
+}
+
+impl Default for StorageDatabase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for StorageDatabase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "StorageDatabase(v{}, {} entries)",
+            self.version,
+            self.data.len()
+        )
+    }
+}
+
+/// A namespaced view into a StorageDatabase. Keys are automatically prefixed.
+pub struct StorageNamespace<'a> {
+    db: &'a mut StorageDatabase,
+    prefix: String,
+}
+
+/// Create a namespaced accessor for a storage database.
+pub fn storage_namespace<'a>(
+    db: &'a mut StorageDatabase,
+    namespace: &str,
+) -> StorageNamespace<'a> {
+    StorageNamespace {
+        db,
+        prefix: format!("{}.", namespace),
+    }
+}
+
+impl<'a> StorageNamespace<'a> {
+    /// Get a value within this namespace.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        let full_key = format!("{}{}", self.prefix, key);
+        self.db.get(&full_key)
+    }
+
+    /// Set a value within this namespace.
+    pub fn set(&mut self, key: &str, value: impl Into<String>) {
+        let full_key = format!("{}{}", self.prefix, key);
+        self.db.set(full_key, value);
+    }
+
+    /// Remove a key within this namespace.
+    pub fn remove(&mut self, key: &str) -> Option<String> {
+        let full_key = format!("{}{}", self.prefix, key);
+        self.db.remove(&full_key)
+    }
+
+    /// Check if a key exists within this namespace.
+    pub fn has(&self, key: &str) -> bool {
+        let full_key = format!("{}{}", self.prefix, key);
+        self.db.has(&full_key)
+    }
+
+    /// Get all keys in this namespace (without the prefix).
+    pub fn keys(&self) -> Vec<String> {
+        self.db
+            .keys()
+            .iter()
+            .filter(|k| k.starts_with(&self.prefix))
+            .map(|k| k[self.prefix.len()..].to_string())
+            .collect()
+    }
+
+    /// The prefix used by this namespace.
+    pub fn prefix(&self) -> &str {
+        &self.prefix
+    }
+}
+
+/// A migration step that transforms data from one version to the next.
+pub struct StorageMigration {
+    pub from_version: u32,
+    pub to_version: u32,
+    pub description: String,
+}
+
+/// Apply migrations to a StorageDatabase to bring it up to `target_version`.
+/// `key_renames` is a list of (version, old_key, new_key) tuples describing
+/// key renames to apply at each version step.
+pub fn storage_migrate(
+    db: &mut StorageDatabase,
+    target_version: u32,
+    key_renames: &[(u32, &str, &str)],
+) -> Vec<StorageMigration> {
+    let mut applied = Vec::new();
+    let mut current = db.version();
+
+    while current < target_version {
+        let next = current + 1;
+        // Apply any key renames for this version step
+        for (ver, old_key, new_key) in key_renames {
+            if *ver == next {
+                if let Some(val) = db.remove(old_key) {
+                    db.set(new_key.to_string(), val);
+                }
+            }
+        }
+        applied.push(StorageMigration {
+            from_version: current,
+            to_version: next,
+            description: format!("Migrated v{} -> v{}", current, next),
+        });
+        current = next;
+    }
+    db.version = target_version;
+    applied
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1033,5 +1222,87 @@ mod tests {
     fn storage_is_ascii_printable() {
         assert!(StorageValidator::is_ascii_printable("Hello World 123"));
         assert!(!StorageValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn storage_database_basic() {
+        let mut db = StorageDatabase::new();
+        assert!(db.is_empty());
+        db.set("key1", "value1");
+        db.set("key2", "value2");
+        assert_eq!(db.len(), 2);
+        assert_eq!(db.get("key1"), Some("value1"));
+        assert!(db.has("key2"));
+    }
+
+    #[test]
+    fn storage_database_remove() {
+        let mut db = StorageDatabase::new();
+        db.set("a", "1");
+        assert_eq!(db.remove("a"), Some("1".to_string()));
+        assert!(!db.has("a"));
+    }
+
+    #[test]
+    fn storage_database_export() {
+        let mut db = StorageDatabase::new();
+        db.set("b", "2");
+        db.set("a", "1");
+        let exported = db.export();
+        assert_eq!(
+            exported,
+            vec![("a".into(), "1".into()), ("b".into(), "2".into())]
+        );
+    }
+
+    #[test]
+    fn storage_database_display() {
+        let db = StorageDatabase::new();
+        assert_eq!(db.to_string(), "StorageDatabase(v1, 0 entries)");
+    }
+
+    #[test]
+    fn storage_namespace_scoped_access() {
+        let mut db = StorageDatabase::new();
+        {
+            let mut ns = storage_namespace(&mut db, "editor");
+            ns.set("fontSize", "14");
+            ns.set("tabSize", "4");
+            assert_eq!(ns.get("fontSize"), Some("14"));
+            assert!(ns.has("tabSize"));
+        }
+        // Keys should be prefixed in the underlying database
+        assert_eq!(db.get("editor.fontSize"), Some("14"));
+    }
+
+    #[test]
+    fn storage_namespace_keys() {
+        let mut db = StorageDatabase::new();
+        db.set("ns1.a", "1");
+        db.set("ns1.b", "2");
+        db.set("ns2.c", "3");
+        let ns = storage_namespace(&mut db, "ns1");
+        let keys = ns.keys();
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains(&"a".to_string()));
+        assert!(keys.contains(&"b".to_string()));
+    }
+
+    #[test]
+    fn storage_migrate_renames_keys() {
+        let mut db = StorageDatabase::new();
+        db.set("old_setting", "value");
+        let migrations = storage_migrate(&mut db, 2, &[(2, "old_setting", "new_setting")]);
+        assert_eq!(migrations.len(), 1);
+        assert_eq!(db.get("new_setting"), Some("value"));
+        assert!(!db.has("old_setting"));
+        assert_eq!(db.version(), 2);
+    }
+
+    #[test]
+    fn storage_migrate_no_ops_if_current() {
+        let mut db = StorageDatabase::new();
+        let migrations = storage_migrate(&mut db, 1, &[]);
+        assert!(migrations.is_empty());
     }
 }

@@ -467,6 +467,272 @@ impl TranslationCoverage {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LanguagePackBundle – manage multiple translation bundles with fallback
+// ---------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub struct LanguagePackBundle {
+    packs: Vec<LanguagePack>,
+    fallback_locale: Locale,
+}
+
+impl LanguagePackBundle {
+    pub fn new(fallback_locale: Locale) -> Self {
+        Self {
+            packs: Vec::new(),
+            fallback_locale,
+        }
+    }
+
+    pub fn add_pack(&mut self, pack: LanguagePack) {
+        self.packs.push(pack);
+    }
+
+    /// Translate `key` for `target_locale`, falling back to the bundle's
+    /// fallback locale when the target does not contain the key.
+    pub fn translate(&self, key: &str, target_locale: &Locale) -> Option<String> {
+        // Try target locale first.
+        if let Some(val) = self
+            .packs
+            .iter()
+            .find(|p| &p.locale == target_locale)
+            .and_then(|p| p.translations.get(key))
+        {
+            return Some(val.clone());
+        }
+        // Try fallback locale.
+        self.packs
+            .iter()
+            .find(|p| p.locale == self.fallback_locale)
+            .and_then(|p| p.translations.get(key).cloned())
+    }
+
+    pub fn pack_count(&self) -> usize {
+        self.packs.len()
+    }
+
+    pub fn supported_locales(&self) -> Vec<String> {
+        let mut seen = Vec::new();
+        for p in &self.packs {
+            let id = p.locale.id();
+            if !seen.contains(&id) {
+                seen.push(id);
+            }
+        }
+        seen
+    }
+
+    /// Percentage of fallback-locale keys that `locale` covers (0.0–100.0).
+    pub fn coverage_for(&self, locale: &Locale) -> f64 {
+        let fallback_keys: Vec<&String> = self
+            .packs
+            .iter()
+            .filter(|p| p.locale == self.fallback_locale)
+            .flat_map(|p| p.translations.keys())
+            .collect();
+        if fallback_keys.is_empty() {
+            return 0.0;
+        }
+        let target_pack = self.packs.iter().find(|p| &p.locale == locale);
+        let covered = match target_pack {
+            Some(tp) => fallback_keys
+                .iter()
+                .filter(|k| tp.translations.contains_key(**k))
+                .count(),
+            None => 0,
+        };
+        (covered as f64 / fallback_keys.len() as f64) * 100.0
+    }
+
+    /// Merge all packs that match the fallback locale into a single pack.
+    pub fn merge_all(&self) -> LanguagePack {
+        let mut merged = LanguagePack {
+            locale: self.fallback_locale.clone(),
+            translations: HashMap::new(),
+        };
+        for p in &self.packs {
+            if p.locale == self.fallback_locale {
+                for (k, v) in &p.translations {
+                    merged.translations.entry(k.clone()).or_insert_with(|| v.clone());
+                }
+            }
+        }
+        merged
+    }
+
+    /// Remove the first pack whose locale matches. Returns `true` if removed.
+    pub fn remove_pack(&mut self, locale: &Locale) -> bool {
+        let before = self.packs.len();
+        self.packs.retain(|p| &p.locale != locale);
+        self.packs.len() < before
+    }
+}
+
+// ---------------------------------------------------------------------------
+// langpack_detect_system_locale – auto-detect locale from environment
+// ---------------------------------------------------------------------------
+
+/// Detect the system locale from environment variables (`LANG`, `LC_ALL`,
+/// `LANGUAGE`). Falls back to `en` when nothing is found.
+pub fn langpack_detect_system_locale() -> Locale {
+    let raw = std::env::var("LANG")
+        .or_else(|_| std::env::var("LC_ALL"))
+        .or_else(|_| std::env::var("LANGUAGE"))
+        .unwrap_or_default();
+    parse_posix_locale(&raw)
+}
+
+/// Parse a POSIX locale string like `"en_US.UTF-8"` or `"fr_FR"` into a
+/// `Locale`.
+fn parse_posix_locale(raw: &str) -> Locale {
+    if raw.is_empty() {
+        return Locale::parse("en");
+    }
+    // Strip encoding suffix (e.g. ".UTF-8").
+    let without_encoding = raw.split('.').next().unwrap_or(raw);
+    // Replace underscore with hyphen for Locale::parse.
+    let normalised = without_encoding.replace('_', "-");
+    Locale::parse(&normalised)
+}
+
+// ---------------------------------------------------------------------------
+// LocaleNegotiator – pick best locale from a set of available locales
+// ---------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub struct LocaleNegotiator {
+    available: Vec<String>,
+}
+
+impl LocaleNegotiator {
+    pub fn new(available: Vec<String>) -> Self {
+        Self { available }
+    }
+
+    /// Find the best match from `requested` against the available locales.
+    /// Returns the first exact match, then the first language-only match.
+    /// Returns an empty string when nothing matches.
+    pub fn negotiate(&self, requested: &[String]) -> String {
+        // Exact match pass.
+        for req in requested {
+            if self.available.iter().any(|a| a == req) {
+                return req.clone();
+            }
+        }
+        // Language-only match pass.
+        for req in requested {
+            let lang = req.split('-').next().unwrap_or(req);
+            if let Some(found) = self.available.iter().find(|a| {
+                let a_lang = a.split('-').next().unwrap_or(a);
+                a_lang == lang
+            }) {
+                return found.clone();
+            }
+        }
+        String::new()
+    }
+
+    /// Like `negotiate`, but returns `fallback` when no match is found.
+    pub fn negotiate_with_fallback(&self, requested: &[String], fallback: &str) -> String {
+        let result = self.negotiate(requested);
+        if result.is_empty() {
+            fallback.to_string()
+        } else {
+            result
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TranslationValidator – validate translation packs
+// ---------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub struct TranslationValidator;
+
+impl TranslationValidator {
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// Return a list of warning strings for potential issues in `pack`.
+    pub fn validate_pack(&self, pack: &LanguagePack) -> Vec<String> {
+        let mut warnings = Vec::new();
+        for (key, value) in &pack.translations {
+            if key.is_empty() {
+                warnings.push("empty translation key found".to_string());
+            }
+            if value.is_empty() {
+                warnings.push(format!("empty value for key '{key}'"));
+            }
+        }
+        warnings
+    }
+
+    /// Check that every placeholder (`{0}`, `{1}`, …) present in `template`
+    /// also appears in `translation` and vice-versa.
+    pub fn check_placeholders(&self, template: &str, translation: &str) -> bool {
+        let extract = |s: &str| -> Vec<String> {
+            let mut result = Vec::new();
+            let mut i = 0;
+            let bytes = s.as_bytes();
+            while i < bytes.len() {
+                if bytes[i] == b'{' {
+                    if let Some(end) = s[i..].find('}') {
+                        let token = &s[i..i + end + 1];
+                        if !result.contains(&token.to_string()) {
+                            result.push(token.to_string());
+                        }
+                        i += end + 1;
+                        continue;
+                    }
+                }
+                i += 1;
+            }
+            result.sort();
+            result
+        };
+        extract(template) == extract(translation)
+    }
+
+    /// Return keys present in `reference` but missing from `target`.
+    pub fn find_untranslated(
+        &self,
+        reference: &LanguagePack,
+        target: &LanguagePack,
+    ) -> Vec<String> {
+        let mut missing: Vec<String> = reference
+            .translations
+            .keys()
+            .filter(|k| !target.translations.contains_key(*k))
+            .cloned()
+            .collect();
+        missing.sort();
+        missing
+    }
+}
+
+// ---------------------------------------------------------------------------
+// localize_with_args – localize with argument substitution
+// ---------------------------------------------------------------------------
+
+/// Look up `key` in `pack`, substitute `{0}`, `{1}`, … with the provided
+/// `args`, and fall back to `default` when the key is missing.
+pub fn localize_with_args(pack: &LanguagePack, key: &str, args: &[&str], default: &str) -> String {
+    let template = pack
+        .translations
+        .get(key)
+        .map(|s| s.as_str())
+        .unwrap_or(default);
+    let mut result = template.to_string();
+    for (i, arg) in args.iter().enumerate() {
+        let placeholder = format!("{{{i}}}");
+        result = result.replace(&placeholder, arg);
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1033,5 +1299,136 @@ mod tests {
         };
         a.merge_with(&b);
         assert!(a.translations.is_empty());
+    }
+
+    // --- LanguagePackBundle tests ---
+
+    #[test]
+    fn bundle_translate_target_locale() {
+        let mut bundle = LanguagePackBundle::new(Locale::parse("en"));
+        let mut translations = HashMap::new();
+        translations.insert("hello".to_string(), "Bonjour".to_string());
+        bundle.add_pack(LanguagePack {
+            locale: Locale::parse("fr"),
+            translations,
+        });
+        let fr = Locale::parse("fr");
+        assert_eq!(
+            bundle.translate("hello", &fr),
+            Some("Bonjour".to_string())
+        );
+    }
+
+    #[test]
+    fn bundle_translate_falls_back() {
+        let mut bundle = LanguagePackBundle::new(Locale::parse("en"));
+        let mut en_trans = HashMap::new();
+        en_trans.insert("hello".to_string(), "Hello".to_string());
+        bundle.add_pack(LanguagePack {
+            locale: Locale::parse("en"),
+            translations: en_trans,
+        });
+        bundle.add_pack(LanguagePack {
+            locale: Locale::parse("fr"),
+            translations: HashMap::new(),
+        });
+        let fr = Locale::parse("fr");
+        assert_eq!(
+            bundle.translate("hello", &fr),
+            Some("Hello".to_string())
+        );
+    }
+
+    #[test]
+    fn bundle_coverage_for_calculation() {
+        let mut bundle = LanguagePackBundle::new(Locale::parse("en"));
+        let mut en_trans = HashMap::new();
+        en_trans.insert("a".to_string(), "A".to_string());
+        en_trans.insert("b".to_string(), "B".to_string());
+        bundle.add_pack(LanguagePack {
+            locale: Locale::parse("en"),
+            translations: en_trans,
+        });
+        let mut fr_trans = HashMap::new();
+        fr_trans.insert("a".to_string(), "A-fr".to_string());
+        bundle.add_pack(LanguagePack {
+            locale: Locale::parse("fr"),
+            translations: fr_trans,
+        });
+        let fr = Locale::parse("fr");
+        let cov = bundle.coverage_for(&fr);
+        assert!((cov - 50.0).abs() < f64::EPSILON);
+    }
+
+    // --- langpack_detect_system_locale tests ---
+
+    #[test]
+    fn detect_system_locale_from_env() {
+        // Save originals so we can restore them.
+        let orig = std::env::var("LANG").ok();
+        // SAFETY: test is single-threaded for this env var.
+        unsafe { std::env::set_var("LANG", "fr_FR.UTF-8") };
+        let locale = langpack_detect_system_locale();
+        // Restore.
+        match orig {
+            Some(v) => unsafe { std::env::set_var("LANG", v) },
+            None => unsafe { std::env::remove_var("LANG") },
+        }
+        assert_eq!(locale.language, "fr");
+        assert_eq!(locale.country.as_deref(), Some("FR"));
+    }
+
+    // --- LocaleNegotiator tests ---
+
+    #[test]
+    fn negotiator_exact_match() {
+        let neg = LocaleNegotiator::new(vec![
+            "en-US".to_string(),
+            "fr-FR".to_string(),
+            "de".to_string(),
+        ]);
+        let result = neg.negotiate(&["fr-FR".to_string()]);
+        assert_eq!(result, "fr-FR");
+    }
+
+    #[test]
+    fn negotiator_language_only_match() {
+        let neg = LocaleNegotiator::new(vec![
+            "en-US".to_string(),
+            "fr-FR".to_string(),
+        ]);
+        let result = neg.negotiate(&["fr".to_string()]);
+        assert_eq!(result, "fr-FR");
+    }
+
+    // --- TranslationValidator tests ---
+
+    #[test]
+    fn validator_check_placeholders_match() {
+        let v = TranslationValidator::new();
+        assert!(v.check_placeholders("Hello {0}, you have {1} items", "Bonjour {0}, vous avez {1} articles"));
+    }
+
+    #[test]
+    fn validator_check_placeholders_mismatch() {
+        let v = TranslationValidator::new();
+        assert!(!v.check_placeholders("Hello {0} {1}", "Bonjour {0}"));
+    }
+
+    // --- localize_with_args tests ---
+
+    #[test]
+    fn localize_with_args_substitutes() {
+        let mut translations = HashMap::new();
+        translations.insert(
+            "greet".to_string(),
+            "Hello {0}, welcome to {1}!".to_string(),
+        );
+        let pack = LanguagePack {
+            locale: Locale::parse("en"),
+            translations,
+        };
+        let result = localize_with_args(&pack, "greet", &["Alice", "Rust"], "fallback");
+        assert_eq!(result, "Hello Alice, welcome to Rust!");
     }
 }

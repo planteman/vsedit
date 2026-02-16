@@ -326,6 +326,218 @@ pub fn find_language_parent(svc: &LanguageService, lang_id: &str) -> Option<Lang
 }
 
 // ---------------------------------------------------------------------------
+// Language Feature Registry
+// ---------------------------------------------------------------------------
+
+/// Features that a language can support.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LanguageFeature {
+    Completion,
+    Hover,
+    SignatureHelp,
+    Definition,
+    References,
+    DocumentHighlight,
+    DocumentSymbol,
+    CodeAction,
+    Formatting,
+    RangeFormatting,
+    Rename,
+    FoldingRange,
+    SelectionRange,
+    InlayHints,
+}
+
+/// Registry tracking which features are available for each language.
+pub struct LanguageFeatureRegistry {
+    features: std::collections::HashMap<String, std::collections::HashSet<LanguageFeature>>,
+}
+
+impl LanguageFeatureRegistry {
+    /// Create an empty registry.
+    pub fn new() -> Self {
+        Self {
+            features: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Register a feature for the given language.
+    pub fn register_feature(&mut self, lang_id: &str, feature: LanguageFeature) {
+        self.features
+            .entry(lang_id.to_string())
+            .or_default()
+            .insert(feature);
+    }
+
+    /// Unregister a feature for the given language. Returns `true` if it was present.
+    pub fn unregister_feature(&mut self, lang_id: &str, feature: &LanguageFeature) -> bool {
+        self.features
+            .get_mut(lang_id)
+            .map_or(false, |set| set.remove(feature))
+    }
+
+    /// Check whether a language has a specific feature registered.
+    pub fn has_feature(&self, lang_id: &str, feature: &LanguageFeature) -> bool {
+        self.features
+            .get(lang_id)
+            .map_or(false, |set| set.contains(feature))
+    }
+
+    /// Return all features registered for a language.
+    pub fn features_for(&self, lang_id: &str) -> Vec<LanguageFeature> {
+        self.features
+            .get(lang_id)
+            .map_or_else(Vec::new, |set| set.iter().copied().collect())
+    }
+
+    /// Return all language IDs that have the given feature registered.
+    pub fn languages_with_feature(&self, feature: &LanguageFeature) -> Vec<&str> {
+        self.features
+            .iter()
+            .filter(|(_, set)| set.contains(feature))
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+
+    /// Return the number of features registered for a language.
+    pub fn feature_count(&self, lang_id: &str) -> usize {
+        self.features.get(lang_id).map_or(0, |set| set.len())
+    }
+
+    /// Remove all features for a language.
+    pub fn clear_language(&mut self, lang_id: &str) {
+        self.features.remove(lang_id);
+    }
+}
+
+impl Default for LanguageFeatureRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Language / file-extension icons
+// ---------------------------------------------------------------------------
+
+/// Return a terminal-friendly icon for the given language ID.
+/// Returns a default icon for unknown languages.
+pub fn language_icon(language_id: &str) -> &'static str {
+    match language_id {
+        "rust" => "🦀",
+        "python" => "🐍",
+        "javascript" => "📜",
+        "typescript" => "📘",
+        "go" => "🐹",
+        "java" => "☕",
+        "c" | "cpp" => "⚙",
+        "html" => "🌐",
+        "css" => "🎨",
+        "ruby" => "💎",
+        "shell" | "shellscript" => "🐚",
+        "markdown" => "📝",
+        "json" => "📋",
+        _ => "📄",
+    }
+}
+
+/// Return a short file icon based on file extension.
+pub fn file_icon_for_extension(ext: &str) -> &'static str {
+    match ext {
+        "rs" => "🦀",
+        "py" => "🐍",
+        "js" | "mjs" | "cjs" => "📜",
+        "ts" | "mts" | "cts" => "📘",
+        "go" => "🐹",
+        "java" => "☕",
+        "c" | "cpp" | "cc" | "cxx" | "h" | "hpp" => "⚙",
+        "html" | "htm" => "🌐",
+        "css" | "scss" | "less" => "🎨",
+        "rb" => "💎",
+        "sh" | "bash" | "zsh" => "🐚",
+        "md" | "markdown" => "📝",
+        "json" => "📋",
+        _ => "📄",
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Language Bracket Config
+// ---------------------------------------------------------------------------
+
+/// Configuration for colorized bracket pairs in a language.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LanguageBracketConfig {
+    pub pairs: Vec<(String, String)>,
+    pub colorized_pairs: Vec<(String, String)>,
+    pub enabled: bool,
+}
+
+impl LanguageBracketConfig {
+    /// Create a default configuration with `()`, `[]`, `{}` pairs and colorization enabled.
+    pub fn new() -> Self {
+        let default_pairs = vec![
+            ("(".to_string(), ")".to_string()),
+            ("[".to_string(), "]".to_string()),
+            ("{".to_string(), "}".to_string()),
+        ];
+        Self {
+            colorized_pairs: default_pairs.clone(),
+            pairs: default_pairs,
+            enabled: true,
+        }
+    }
+
+    /// Add a bracket pair.
+    pub fn add_pair(&mut self, open: &str, close: &str) {
+        self.pairs.push((open.to_string(), close.to_string()));
+    }
+
+    /// Check whether `ch` is a registered open bracket.
+    pub fn is_open_bracket(&self, ch: &str) -> bool {
+        self.pairs.iter().any(|(o, _)| o == ch)
+    }
+
+    /// Check whether `ch` is a registered close bracket.
+    pub fn is_close_bracket(&self, ch: &str) -> bool {
+        self.pairs.iter().any(|(_, c)| c == ch)
+    }
+
+    /// Return the matching close bracket for the given open bracket, if any.
+    pub fn matching_close(&self, open: &str) -> Option<&str> {
+        self.pairs
+            .iter()
+            .find(|(o, _)| o == open)
+            .map(|(_, c)| c.as_str())
+    }
+
+    /// Return the matching open bracket for the given close bracket, if any.
+    pub fn matching_open(&self, close: &str) -> Option<&str> {
+        self.pairs
+            .iter()
+            .find(|(_, c)| c == close)
+            .map(|(o, _)| o.as_str())
+    }
+
+    /// Return the total number of bracket pairs.
+    pub fn pair_count(&self) -> usize {
+        self.pairs.len()
+    }
+
+    /// Builder-style method to enable or disable colorization.
+    pub fn with_colorized(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+}
+
+impl Default for LanguageBracketConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1015,5 +1227,189 @@ mod tests {
     fn language_inheritance_unknown_language() {
         let svc = make_registry();
         assert!(find_language_parent(&svc, "nonexistent").is_none());
+    }
+
+    // -- LanguageFeatureRegistry ----------------------------------------------
+
+    #[test]
+    fn feature_registry_register_and_query() {
+        let mut reg = LanguageFeatureRegistry::new();
+        reg.register_feature("rust", LanguageFeature::Completion);
+        assert!(reg.has_feature("rust", &LanguageFeature::Completion));
+    }
+
+    #[test]
+    fn feature_registry_missing_feature() {
+        let reg = LanguageFeatureRegistry::new();
+        assert!(!reg.has_feature("rust", &LanguageFeature::Hover));
+    }
+
+    #[test]
+    fn feature_registry_unregister() {
+        let mut reg = LanguageFeatureRegistry::new();
+        reg.register_feature("python", LanguageFeature::Rename);
+        assert!(reg.unregister_feature("python", &LanguageFeature::Rename));
+        assert!(!reg.has_feature("python", &LanguageFeature::Rename));
+    }
+
+    #[test]
+    fn feature_registry_unregister_missing() {
+        let mut reg = LanguageFeatureRegistry::new();
+        assert!(!reg.unregister_feature("go", &LanguageFeature::Formatting));
+    }
+
+    #[test]
+    fn feature_registry_features_for() {
+        let mut reg = LanguageFeatureRegistry::new();
+        reg.register_feature("rust", LanguageFeature::Completion);
+        reg.register_feature("rust", LanguageFeature::Hover);
+        let feats = reg.features_for("rust");
+        assert_eq!(feats.len(), 2);
+        assert!(feats.contains(&LanguageFeature::Completion));
+        assert!(feats.contains(&LanguageFeature::Hover));
+    }
+
+    #[test]
+    fn feature_registry_features_for_unknown() {
+        let reg = LanguageFeatureRegistry::new();
+        assert!(reg.features_for("unknown").is_empty());
+    }
+
+    #[test]
+    fn feature_registry_languages_with_feature() {
+        let mut reg = LanguageFeatureRegistry::new();
+        reg.register_feature("rust", LanguageFeature::Definition);
+        reg.register_feature("python", LanguageFeature::Definition);
+        let langs = reg.languages_with_feature(&LanguageFeature::Definition);
+        assert_eq!(langs.len(), 2);
+    }
+
+    #[test]
+    fn feature_registry_feature_count_and_clear() {
+        let mut reg = LanguageFeatureRegistry::new();
+        reg.register_feature("java", LanguageFeature::CodeAction);
+        reg.register_feature("java", LanguageFeature::FoldingRange);
+        assert_eq!(reg.feature_count("java"), 2);
+        reg.clear_language("java");
+        assert_eq!(reg.feature_count("java"), 0);
+    }
+
+    // -- language_icon / file_icon_for_extension ------------------------------
+
+    #[test]
+    fn icon_rust() {
+        assert_eq!(language_icon("rust"), "🦀");
+    }
+
+    #[test]
+    fn icon_python() {
+        assert_eq!(language_icon("python"), "🐍");
+    }
+
+    #[test]
+    fn icon_javascript() {
+        assert_eq!(language_icon("javascript"), "📜");
+    }
+
+    #[test]
+    fn icon_unknown_default() {
+        assert_eq!(language_icon("brainfuck"), "📄");
+    }
+
+    #[test]
+    fn icon_shell_variants() {
+        assert_eq!(language_icon("shell"), "🐚");
+        assert_eq!(language_icon("shellscript"), "🐚");
+    }
+
+    #[test]
+    fn icon_c_cpp() {
+        assert_eq!(language_icon("c"), "⚙");
+        assert_eq!(language_icon("cpp"), "⚙");
+    }
+
+    #[test]
+    fn file_icon_rs() {
+        assert_eq!(file_icon_for_extension("rs"), "🦀");
+    }
+
+    #[test]
+    fn file_icon_ts_variants() {
+        assert_eq!(file_icon_for_extension("ts"), "📘");
+        assert_eq!(file_icon_for_extension("mts"), "📘");
+    }
+
+    #[test]
+    fn file_icon_unknown() {
+        assert_eq!(file_icon_for_extension("xyz"), "📄");
+    }
+
+    #[test]
+    fn file_icon_html() {
+        assert_eq!(file_icon_for_extension("html"), "🌐");
+        assert_eq!(file_icon_for_extension("htm"), "🌐");
+    }
+
+    // -- LanguageBracketConfig ------------------------------------------------
+
+    #[test]
+    fn bracket_config_defaults() {
+        let cfg = LanguageBracketConfig::new();
+        assert_eq!(cfg.pair_count(), 3);
+        assert!(cfg.enabled);
+    }
+
+    #[test]
+    fn bracket_config_is_open() {
+        let cfg = LanguageBracketConfig::new();
+        assert!(cfg.is_open_bracket("("));
+        assert!(cfg.is_open_bracket("["));
+        assert!(cfg.is_open_bracket("{"));
+        assert!(!cfg.is_open_bracket(")"));
+    }
+
+    #[test]
+    fn bracket_config_is_close() {
+        let cfg = LanguageBracketConfig::new();
+        assert!(cfg.is_close_bracket(")"));
+        assert!(!cfg.is_close_bracket("("));
+    }
+
+    #[test]
+    fn bracket_config_matching_close() {
+        let cfg = LanguageBracketConfig::new();
+        assert_eq!(cfg.matching_close("("), Some(")"));
+        assert_eq!(cfg.matching_close("["), Some("]"));
+        assert_eq!(cfg.matching_close("{"), Some("}"));
+        assert_eq!(cfg.matching_close("<"), None);
+    }
+
+    #[test]
+    fn bracket_config_matching_open() {
+        let cfg = LanguageBracketConfig::new();
+        assert_eq!(cfg.matching_open(")"), Some("("));
+        assert_eq!(cfg.matching_open(">"), None);
+    }
+
+    #[test]
+    fn bracket_config_add_pair() {
+        let mut cfg = LanguageBracketConfig::new();
+        cfg.add_pair("<", ">");
+        assert_eq!(cfg.pair_count(), 4);
+        assert!(cfg.is_open_bracket("<"));
+        assert_eq!(cfg.matching_close("<"), Some(">"));
+    }
+
+    #[test]
+    fn bracket_config_with_colorized() {
+        let cfg = LanguageBracketConfig::new().with_colorized(false);
+        assert!(!cfg.enabled);
+    }
+
+    #[test]
+    fn bracket_config_default_trait() {
+        let cfg = LanguageBracketConfig::default();
+        assert_eq!(cfg.pair_count(), 3);
+        assert!(cfg.enabled);
     }
 }

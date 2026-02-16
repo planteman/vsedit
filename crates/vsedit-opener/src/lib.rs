@@ -632,6 +632,141 @@ impl Default for OpenerValidator {
     }
 }
 
+/// Entry in the opener registry mapping a pattern to an opener name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenerRegistryEntry {
+    pub name: String,
+    pub scheme_pattern: String,
+    pub priority: i32,
+}
+
+/// Registry for custom URI openers that match based on scheme patterns.
+pub struct OpenerRegistry {
+    entries: Vec<OpenerRegistryEntry>,
+}
+
+impl OpenerRegistry {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Register an opener for a URI scheme pattern.
+    pub fn register(&mut self, name: impl Into<String>, scheme_pattern: impl Into<String>, priority: i32) {
+        self.entries.push(OpenerRegistryEntry {
+            name: name.into(),
+            scheme_pattern: scheme_pattern.into(),
+            priority,
+        });
+        self.entries.sort_by(|a, b| b.priority.cmp(&a.priority));
+    }
+
+    /// Unregister an opener by name.
+    pub fn unregister(&mut self, name: &str) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|e| e.name != name);
+        self.entries.len() < before
+    }
+
+    /// Find the best matching opener for a URI.
+    pub fn find_opener(&self, uri: &str) -> Option<&OpenerRegistryEntry> {
+        let scheme = extract_scheme(uri)?;
+        self.entries.iter().find(|e| {
+            e.scheme_pattern == "*" || e.scheme_pattern.eq_ignore_ascii_case(scheme)
+        })
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn entries(&self) -> &[OpenerRegistryEntry] {
+        &self.entries
+    }
+}
+
+impl Default for OpenerRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Result of attempting to open a URI with the platform default handler.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DefaultOpenResult {
+    /// The URI was dispatched to the default handler.
+    Dispatched(String),
+    /// No default handler was found for this scheme.
+    NoHandler(String),
+}
+
+/// Simulate opening a URI with the platform default handler.
+/// In a real implementation this would invoke `xdg-open`, `open`, or `start`.
+pub fn open_with_default(uri: &str) -> DefaultOpenResult {
+    match extract_scheme(uri) {
+        Some(scheme) => match scheme.to_ascii_lowercase().as_str() {
+            "http" | "https" | "mailto" | "file" => {
+                DefaultOpenResult::Dispatched(format!("default-handler:{}", uri))
+            }
+            _ => DefaultOpenResult::NoHandler(format!("no handler for scheme '{}'", scheme)),
+        },
+        None => DefaultOpenResult::NoHandler("no scheme found".to_string()),
+    }
+}
+
+/// A URI pattern for matching.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UriPattern {
+    pub scheme: Option<String>,
+    pub authority_contains: Option<String>,
+    pub path_prefix: Option<String>,
+}
+
+impl UriPattern {
+    pub fn scheme_only(scheme: impl Into<String>) -> Self {
+        Self {
+            scheme: Some(scheme.into()),
+            authority_contains: None,
+            path_prefix: None,
+        }
+    }
+
+    pub fn with_authority(mut self, authority: impl Into<String>) -> Self {
+        self.authority_contains = Some(authority.into());
+        self
+    }
+
+    pub fn with_path_prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.path_prefix = Some(prefix.into());
+        self
+    }
+
+    /// Check if this pattern matches a parsed URI.
+    pub fn matches(&self, components: &UriComponents) -> bool {
+        if let Some(ref s) = self.scheme {
+            if !s.eq_ignore_ascii_case(&components.scheme) {
+                return false;
+            }
+        }
+        if let Some(ref auth) = self.authority_contains {
+            if !components.authority.contains(auth.as_str()) {
+                return false;
+            }
+        }
+        if let Some(ref prefix) = self.path_prefix {
+            if !components.path.starts_with(prefix.as_str()) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+/// Match a URI string against a list of patterns, returning the index of the first match.
+pub fn opener_match(uri: &str, patterns: &[UriPattern]) -> Option<usize> {
+    let components = parse_uri(uri)?;
+    patterns.iter().position(|p| p.matches(&components))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1030,5 +1165,69 @@ mod tests {
     fn opener_is_ascii_printable() {
         assert!(OpenerValidator::is_ascii_printable("Hello World 123"));
         assert!(!OpenerValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn opener_registry_register_and_find() {
+        let mut reg = OpenerRegistry::new();
+        reg.register("browser", "https", 10);
+        reg.register("editor", "file", 5);
+        let entry = reg.find_opener("https://example.com").unwrap();
+        assert_eq!(entry.name, "browser");
+        let entry = reg.find_opener("file:///path").unwrap();
+        assert_eq!(entry.name, "editor");
+    }
+
+    #[test]
+    fn opener_registry_wildcard() {
+        let mut reg = OpenerRegistry::new();
+        reg.register("catch-all", "*", 0);
+        assert!(reg.find_opener("custom://something").is_some());
+    }
+
+    #[test]
+    fn opener_registry_unregister() {
+        let mut reg = OpenerRegistry::new();
+        reg.register("test", "http", 1);
+        assert!(reg.unregister("test"));
+        assert_eq!(reg.entry_count(), 0);
+    }
+
+    #[test]
+    fn open_with_default_http() {
+        let result = open_with_default("https://example.com");
+        assert!(matches!(result, DefaultOpenResult::Dispatched(_)));
+    }
+
+    #[test]
+    fn open_with_default_unknown_scheme() {
+        let result = open_with_default("custom://foo");
+        assert!(matches!(result, DefaultOpenResult::NoHandler(_)));
+    }
+
+    #[test]
+    fn uri_pattern_scheme_match() {
+        let p = UriPattern::scheme_only("https");
+        let c = parse_uri("https://example.com/path").unwrap();
+        assert!(p.matches(&c));
+    }
+
+    #[test]
+    fn uri_pattern_authority_match() {
+        let p = UriPattern::scheme_only("https").with_authority("github");
+        let c = parse_uri("https://github.com/repo").unwrap();
+        assert!(p.matches(&c));
+        let c2 = parse_uri("https://example.com/repo").unwrap();
+        assert!(!p.matches(&c2));
+    }
+
+    #[test]
+    fn opener_match_finds_first() {
+        let patterns = vec![
+            UriPattern::scheme_only("file"),
+            UriPattern::scheme_only("https"),
+        ];
+        assert_eq!(opener_match("https://x.com", &patterns), Some(1));
+        assert_eq!(opener_match("file:///a", &patterns), Some(0));
     }
 }

@@ -602,6 +602,187 @@ impl Default for WbViewsValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ViewDescriptor builder
+// ---------------------------------------------------------------------------
+
+impl ViewDescriptor {
+    /// Create a new view descriptor with required fields.
+    pub fn new(id: impl Into<String>, name: impl Into<String>, container_id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            container_id: container_id.into(),
+            when: None,
+            order: 0,
+            can_toggle_visibility: true,
+        }
+    }
+
+    /// Builder method to set the order.
+    pub fn with_order(mut self, order: i32) -> Self {
+        self.order = order;
+        self
+    }
+
+    /// Builder method to set the when condition.
+    pub fn with_when(mut self, when: ContextKeyExpr) -> Self {
+        self.when = Some(when);
+        self
+    }
+
+    /// Builder method to set toggleable visibility.
+    pub fn with_toggle_visibility(mut self, toggle: bool) -> Self {
+        self.can_toggle_visibility = toggle;
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewVisibilityState
+// ---------------------------------------------------------------------------
+
+/// Persisted visibility state for views across sessions.
+#[derive(Debug, Clone)]
+pub struct ViewVisibilityState {
+    state: HashMap<String, bool>,
+    dirty: bool,
+}
+
+impl ViewVisibilityState {
+    /// Create a new empty visibility state.
+    pub fn new() -> Self {
+        Self {
+            state: HashMap::new(),
+            dirty: false,
+        }
+    }
+
+    /// Load visibility state from a list of (view_id, visible) pairs.
+    pub fn load(pairs: &[(&str, bool)]) -> Self {
+        let state = pairs.iter().map(|(k, v)| (k.to_string(), *v)).collect();
+        Self { state, dirty: false }
+    }
+
+    /// Set visibility for a view.
+    pub fn set(&mut self, view_id: impl Into<String>, visible: bool) {
+        self.state.insert(view_id.into(), visible);
+        self.dirty = true;
+    }
+
+    /// Get visibility for a view (defaults to `true`).
+    pub fn get(&self, view_id: &str) -> bool {
+        self.state.get(view_id).copied().unwrap_or(true)
+    }
+
+    /// Toggle visibility for a view.
+    pub fn toggle(&mut self, view_id: &str) {
+        let current = self.get(view_id);
+        self.set(view_id.to_string(), !current);
+    }
+
+    /// Whether any changes have been made since load.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Export the state as a vector of (view_id, visible) pairs.
+    pub fn export(&self) -> Vec<(String, bool)> {
+        let mut pairs: Vec<(String, bool)> = self.state.iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        pairs
+    }
+
+    /// Number of tracked views.
+    pub fn tracked_count(&self) -> usize {
+        self.state.len()
+    }
+
+    /// Mark the state as clean (after persisting).
+    pub fn mark_clean(&mut self) {
+        self.dirty = false;
+    }
+}
+
+impl Default for ViewVisibilityState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Resolve visibility state for a view, returning true if visible.
+pub fn view_visibility_state(state: &ViewVisibilityState, view_id: &str) -> bool {
+    state.get(view_id)
+}
+
+// ---------------------------------------------------------------------------
+// ViewDragData
+// ---------------------------------------------------------------------------
+
+/// Data transferred during a view drag operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewDragData {
+    pub view_id: String,
+    pub source_container: String,
+    pub target_container: Option<String>,
+}
+
+impl ViewDragData {
+    /// Create new drag data for a view.
+    pub fn new(view_id: impl Into<String>, source_container: impl Into<String>) -> Self {
+        Self {
+            view_id: view_id.into(),
+            source_container: source_container.into(),
+            target_container: None,
+        }
+    }
+
+    /// Set the target container.
+    pub fn with_target(mut self, target: impl Into<String>) -> Self {
+        self.target_container = Some(target.into());
+        self
+    }
+
+    /// Check if the drag has a valid target (different from source).
+    pub fn is_valid_drop(&self) -> bool {
+        match &self.target_container {
+            Some(target) => target != &self.source_container,
+            None => false,
+        }
+    }
+}
+
+impl ViewsRegistry {
+    /// Move a view to a different container.
+    pub fn move_view_to_container(&mut self, view_id: &str, new_container_id: &str) -> bool {
+        if let Some(view) = self.views.iter_mut().find(|v| v.id == view_id) {
+            view.container_id = new_container_id.to_string();
+            self.on_did_change.fire(&());
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// Execute a view drag transfer operation on the registry.
+/// Moves the view from its current container to the target container.
+pub fn view_drag_transfer(
+    registry: &mut ViewsRegistry,
+    drag_data: &ViewDragData,
+) -> bool {
+    if !drag_data.is_valid_drop() {
+        return false;
+    }
+    let target = match &drag_data.target_container {
+        Some(t) => t.clone(),
+        None => return false,
+    };
+    registry.move_view_to_container(&drag_data.view_id, &target)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1040,5 +1221,88 @@ mod tests {
     fn wb_views_is_ascii_printable() {
         assert!(WbViewsValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbViewsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn view_descriptor_builder() {
+        let vd = ViewDescriptor::new("files", "Files", "explorer")
+            .with_order(1)
+            .with_toggle_visibility(false);
+        assert_eq!(vd.id, "files");
+        assert_eq!(vd.order, 1);
+        assert!(!vd.can_toggle_visibility);
+    }
+
+    #[test]
+    fn view_visibility_state_basic() {
+        let mut state = ViewVisibilityState::new();
+        assert!(state.get("any")); // default true
+        state.set("panel", false);
+        assert!(!state.get("panel"));
+        assert!(state.is_dirty());
+    }
+
+    #[test]
+    fn view_visibility_state_toggle() {
+        let mut state = ViewVisibilityState::new();
+        state.toggle("panel");
+        assert!(!state.get("panel")); // was true, now false
+        state.toggle("panel");
+        assert!(state.get("panel")); // back to true
+    }
+
+    #[test]
+    fn view_visibility_state_load_and_export() {
+        let state = ViewVisibilityState::load(&[("a", true), ("b", false)]);
+        let exported = state.export();
+        assert_eq!(exported.len(), 2);
+        assert!(!state.is_dirty());
+    }
+
+    #[test]
+    fn view_visibility_state_fn() {
+        let mut state = ViewVisibilityState::new();
+        state.set("panel", false);
+        assert!(!view_visibility_state(&state, "panel"));
+        assert!(view_visibility_state(&state, "unknown"));
+    }
+
+    #[test]
+    fn view_drag_data_valid_drop() {
+        let drag = ViewDragData::new("files", "explorer")
+            .with_target("panel");
+        assert!(drag.is_valid_drop());
+    }
+
+    #[test]
+    fn view_drag_data_same_container() {
+        let drag = ViewDragData::new("files", "explorer")
+            .with_target("explorer");
+        assert!(!drag.is_valid_drop());
+    }
+
+    #[test]
+    fn view_drag_transfer_moves_view() {
+        let mut registry = ViewsRegistry::new();
+        registry.register_container(ViewContainer {
+            id: "explorer".into(),
+            title: "Explorer".into(),
+            icon: None,
+            location: ViewContainerLocation::Sidebar,
+            order: 0,
+        });
+        registry.register_container(ViewContainer {
+            id: "panel".into(),
+            title: "Panel".into(),
+            icon: None,
+            location: ViewContainerLocation::Panel,
+            order: 0,
+        });
+        registry.register_view(ViewDescriptor::new("files", "Files", "explorer"));
+        let drag = ViewDragData::new("files", "explorer").with_target("panel");
+        assert!(view_drag_transfer(&mut registry, &drag));
+        let views = registry.get_views("panel");
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].id, "files");
     }
 }

@@ -554,6 +554,180 @@ impl Default for CancellationValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Hierarchical helpers for CancellationScope
+// ---------------------------------------------------------------------------
+
+impl CancellationScope {
+    /// Cancel this scope and every descendant, returning the total number of
+    /// scopes that were cancelled (including `self`).
+    pub fn cancel_all_recursive(&self) -> usize {
+        self.source.cancel();
+        let mut count = 1;
+        for child in &self.children {
+            count += child.cancel_all_recursive();
+        }
+        count
+    }
+
+    /// Find a direct child scope by name.
+    pub fn find_child(&self, name: &str) -> Option<&CancellationScope> {
+        self.children.iter().find(|c| c.name == name)
+    }
+
+    /// Return the depth of the scope tree rooted at `self`.
+    /// A leaf scope has depth 1.
+    pub fn depth(&self) -> usize {
+        if self.children.is_empty() {
+            1
+        } else {
+            1 + self.children.iter().map(|c| c.depth()).max().unwrap_or(0)
+        }
+    }
+
+    /// Collect all scopes in the tree rooted at `self` into a flat list
+    /// (pre-order traversal).
+    pub fn flatten(&self) -> Vec<&CancellationScope> {
+        let mut result = vec![self];
+        for child in &self.children {
+            result.extend(child.flatten());
+        }
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Convenience: timeout_token
+// ---------------------------------------------------------------------------
+
+/// Create a [`CancellationToken`] that auto-cancels after `duration`.
+///
+/// The backing [`CancellationTokenSource`] is kept alive inside the spawned
+/// task so the token remains valid.
+pub fn timeout_token(duration: Duration) -> CancellationToken {
+    let source = CancellationTokenSource::new();
+    let token = source.token();
+    tokio::spawn(async move {
+        tokio::time::sleep(duration).await;
+        source.cancel();
+        // `source` is dropped here, which is fine – cancel already fired.
+    });
+    token
+}
+
+// ---------------------------------------------------------------------------
+// is_cancelled_with_reason
+// ---------------------------------------------------------------------------
+
+/// Check whether `token` is cancelled.  If it is, return an error whose
+/// message includes `reason`.
+pub fn is_cancelled_with_reason(
+    token: &CancellationToken,
+    reason: &str,
+) -> Result<(), CancellationError> {
+    if token.is_cancelled() {
+        Err(CancellationError::AlreadyCancelled)
+    } else {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CancellationReason
+// ---------------------------------------------------------------------------
+
+/// A structured cancellation reason with an optional error code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CancellationReason {
+    reason: String,
+    code: Option<u32>,
+}
+
+impl CancellationReason {
+    /// Create a new reason with the given message.
+    pub fn new(reason: &str) -> Self {
+        Self {
+            reason: reason.to_string(),
+            code: None,
+        }
+    }
+
+    /// Attach an error code to this reason.
+    pub fn with_code(mut self, code: u32) -> Self {
+        self.code = Some(code);
+        self
+    }
+
+    /// Return the reason string.
+    pub fn reason(&self) -> &str {
+        &self.reason
+    }
+
+    /// Return the optional error code.
+    pub fn code(&self) -> Option<u32> {
+        self.code
+    }
+}
+
+impl fmt::Display for CancellationReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.code {
+            Some(code) => write!(f, "[{}] {}", code, self.reason),
+            None => write!(f, "{}", self.reason),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CancellationTokenGroup
+// ---------------------------------------------------------------------------
+
+/// Manages a collection of [`CancellationToken`]s and provides aggregate
+/// queries over their cancellation state.
+#[derive(Debug, Clone)]
+pub struct CancellationTokenGroup {
+    tokens: Vec<CancellationToken>,
+}
+
+impl CancellationTokenGroup {
+    /// Create an empty group.
+    pub fn new() -> Self {
+        Self { tokens: Vec::new() }
+    }
+
+    /// Add a token to the group.
+    pub fn add(&mut self, token: CancellationToken) {
+        self.tokens.push(token);
+    }
+
+    /// Return `true` if *any* token in the group is cancelled.
+    pub fn any_cancelled(&self) -> bool {
+        self.tokens.iter().any(|t| t.is_cancelled())
+    }
+
+    /// Return `true` if *all* tokens in the group are cancelled.
+    /// An empty group is considered fully cancelled.
+    pub fn all_cancelled(&self) -> bool {
+        self.tokens.iter().all(|t| t.is_cancelled())
+    }
+
+    /// Return the total number of tokens in the group.
+    pub fn count(&self) -> usize {
+        self.tokens.len()
+    }
+
+    /// Return the number of currently-cancelled tokens.
+    pub fn cancel_count(&self) -> usize {
+        self.tokens.iter().filter(|t| t.is_cancelled()).count()
+    }
+}
+
+impl Default for CancellationTokenGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1034,5 +1208,126 @@ mod tests {
     fn cancellation_is_ascii_printable() {
         assert!(CancellationValidator::is_ascii_printable("Hello World 123"));
         assert!(!CancellationValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn scope_find_child_works() {
+        let mut root = CancellationScope::new("root");
+        root.add_child("alpha");
+        root.add_child("beta");
+        let found = root.find_child("beta");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().name(), "beta");
+        assert!(root.find_child("gamma").is_none());
+    }
+
+    #[test]
+    fn scope_depth_calculation() {
+        let mut root = CancellationScope::new("root");
+        assert_eq!(root.depth(), 1);
+        {
+            let child = root.add_child("child");
+            child.add_child("grandchild");
+        }
+        assert_eq!(root.depth(), 3);
+    }
+
+    #[test]
+    fn scope_flatten_returns_all_nodes() {
+        let mut root = CancellationScope::new("root");
+        root.add_child("a");
+        {
+            let b = root.add_child("b");
+            b.add_child("b1");
+            b.add_child("b2");
+        }
+        let flat = root.flatten();
+        let names: Vec<&str> = flat.iter().map(|s| s.name()).collect();
+        assert_eq!(names, vec!["root", "a", "b", "b1", "b2"]);
+    }
+
+    #[test]
+    fn scope_cancel_all_recursive_returns_count() {
+        let mut root = CancellationScope::new("root");
+        root.add_child("c1");
+        {
+            let c2 = root.add_child("c2");
+            c2.add_child("c2a");
+        }
+        let count = root.cancel_all_recursive();
+        assert_eq!(count, 4);
+        assert!(root.is_cancelled());
+        assert!(root.find_child("c1").unwrap().is_cancelled());
+    }
+
+    #[tokio::test]
+    async fn timeout_token_auto_cancels() {
+        let token = timeout_token(Duration::from_millis(50));
+        assert!(!token.is_cancelled());
+        tokio::time::sleep(Duration::from_millis(120)).await;
+        assert!(token.is_cancelled());
+    }
+
+    #[test]
+    fn is_cancelled_with_reason_ok_for_active_token() {
+        let source = CancellationTokenSource::new();
+        let token = source.token();
+        let result = is_cancelled_with_reason(&token, "test reason");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn is_cancelled_with_reason_err_for_cancelled_token() {
+        let source = CancellationTokenSource::new();
+        let token = source.token();
+        source.cancel();
+        let result = is_cancelled_with_reason(&token, "timed out");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), CancellationError::AlreadyCancelled);
+    }
+
+    #[test]
+    fn cancellation_reason_display() {
+        let reason = CancellationReason::new("user requested");
+        assert_eq!(reason.to_string(), "user requested");
+        assert_eq!(reason.reason(), "user requested");
+        assert_eq!(reason.code(), None);
+    }
+
+    #[test]
+    fn cancellation_reason_with_code() {
+        let reason = CancellationReason::new("timeout").with_code(408);
+        assert_eq!(reason.to_string(), "[408] timeout");
+        assert_eq!(reason.code(), Some(408));
+    }
+
+    #[test]
+    fn token_group_any_all_cancelled() {
+        let s1 = CancellationTokenSource::new();
+        let s2 = CancellationTokenSource::new();
+        let s3 = CancellationTokenSource::new();
+
+        let mut group = CancellationTokenGroup::new();
+        group.add(s1.token());
+        group.add(s2.token());
+        group.add(s3.token());
+        assert_eq!(group.count(), 3);
+        assert_eq!(group.cancel_count(), 0);
+        assert!(!group.any_cancelled());
+        assert!(!group.all_cancelled());
+
+        s1.cancel();
+        assert!(group.any_cancelled());
+        assert!(!group.all_cancelled());
+        assert_eq!(group.cancel_count(), 1);
+
+        s2.cancel();
+        s3.cancel();
+        assert!(group.all_cancelled());
+        assert_eq!(group.cancel_count(), 3);
     }
 }

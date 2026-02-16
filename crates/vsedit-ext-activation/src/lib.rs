@@ -607,6 +607,176 @@ impl Default for ExtActivationValidator {
     }
 }
 
+/// A record of a single extension activation's performance.
+#[derive(Debug, Clone)]
+pub struct ActivationPerformanceRecord {
+    /// The extension that was activated.
+    pub extension_id: String,
+    /// Timestamp (ms) when activation started.
+    pub activation_start_ms: u64,
+    /// Timestamp (ms) when activation ended, if finished.
+    pub activation_end_ms: Option<u64>,
+    /// The event that triggered activation.
+    pub event: ActivationEvent,
+}
+
+impl ActivationPerformanceRecord {
+    /// Create a new performance record for an activation that has just started.
+    pub fn new(ext_id: &str, event: ActivationEvent, start_ms: u64) -> Self {
+        Self {
+            extension_id: ext_id.to_string(),
+            activation_start_ms: start_ms,
+            activation_end_ms: None,
+            event,
+        }
+    }
+
+    /// Mark the activation as finished at the given timestamp.
+    pub fn finish(&mut self, end_ms: u64) {
+        self.activation_end_ms = Some(end_ms);
+    }
+
+    /// Duration in milliseconds, or `None` if activation has not finished.
+    pub fn duration_ms(&self) -> Option<u64> {
+        self.activation_end_ms.map(|end| end.saturating_sub(self.activation_start_ms))
+    }
+
+    /// Returns `true` if the activation duration exceeds `threshold_ms`.
+    pub fn is_slow(&self, threshold_ms: u64) -> bool {
+        self.duration_ms().map_or(false, |d| d > threshold_ms)
+    }
+}
+
+impl fmt::Display for ActivationPerformanceRecord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.duration_ms() {
+            Some(ms) => write!(f, "{} activated in {}ms", self.extension_id, ms),
+            None => write!(f, "{} activation in progress", self.extension_id),
+        }
+    }
+}
+
+/// Convenience constructor for [`ActivationPerformanceRecord`].
+pub fn activation_performance_record(
+    ext_id: &str,
+    event: ActivationEvent,
+    start_ms: u64,
+) -> ActivationPerformanceRecord {
+    ActivationPerformanceRecord::new(ext_id, event, start_ms)
+}
+
+/// Tracks activation performance for multiple extensions.
+#[derive(Debug, Default)]
+pub struct ActivationPerformanceTracker {
+    records: Vec<ActivationPerformanceRecord>,
+}
+
+impl ActivationPerformanceTracker {
+    /// Create a new empty tracker.
+    pub fn new() -> Self {
+        Self { records: Vec::new() }
+    }
+
+    /// Begin tracking an activation and return the record index.
+    pub fn start_activation(&mut self, ext_id: &str, event: ActivationEvent, start_ms: u64) -> usize {
+        let idx = self.records.len();
+        self.records.push(ActivationPerformanceRecord::new(ext_id, event, start_ms));
+        idx
+    }
+
+    /// Mark a previously started activation as finished.
+    pub fn end_activation(&mut self, index: usize, end_ms: u64) {
+        if let Some(record) = self.records.get_mut(index) {
+            record.finish(end_ms);
+        }
+    }
+
+    /// Return references to all records whose activation duration exceeds `threshold_ms`.
+    pub fn slow_activations(&self, threshold_ms: u64) -> Vec<&ActivationPerformanceRecord> {
+        self.records.iter().filter(|r| r.is_slow(threshold_ms)).collect()
+    }
+
+    /// Average activation time in milliseconds across all finished records.
+    pub fn average_activation_ms(&self) -> Option<f64> {
+        let finished: Vec<u64> = self.records.iter().filter_map(|r| r.duration_ms()).collect();
+        if finished.is_empty() {
+            return None;
+        }
+        let total: u64 = finished.iter().sum();
+        Some(total as f64 / finished.len() as f64)
+    }
+
+    /// Total number of tracked activations (finished or not).
+    pub fn total_count(&self) -> usize {
+        self.records.len()
+    }
+}
+
+impl ActivationDependencyGraph {
+    /// Check whether the dependency graph contains a cycle among the given extension IDs.
+    pub fn has_cycle(&self, all_ids: &[String]) -> bool {
+        self.topological_sort(all_ids).is_err()
+    }
+
+    /// Reverse lookup: return the IDs of extensions that depend on `ext_id`.
+    pub fn dependents_of(&self, ext_id: &str) -> Vec<String> {
+        self.deps
+            .iter()
+            .filter(|(_, deps)| deps.contains(ext_id))
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+
+    /// Return extension IDs that have no dependencies at all.
+    pub fn independent_extensions(&self, all_ids: &[String]) -> Vec<String> {
+        all_ids
+            .iter()
+            .filter(|id| self.deps.get(id.as_str()).map_or(true, HashSet::is_empty))
+            .cloned()
+            .collect()
+    }
+}
+
+/// A filter for selecting activation events by type.
+#[derive(Debug, Default)]
+pub struct ActivationEventFilter {
+    languages: HashSet<String>,
+    commands: HashSet<String>,
+}
+
+impl ActivationEventFilter {
+    /// Create a new empty filter (matches nothing).
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Include events that activate on the given language.
+    pub fn include_language(mut self, lang: &str) -> Self {
+        self.languages.insert(lang.to_string());
+        self
+    }
+
+    /// Include events that activate on the given command.
+    pub fn include_command(mut self, cmd: &str) -> Self {
+        self.commands.insert(cmd.to_string());
+        self
+    }
+
+    /// Check whether a single event matches the filter.
+    pub fn matches(&self, event: &ActivationEvent) -> bool {
+        match event {
+            ActivationEvent::OnLanguage(lang) => self.languages.contains(lang),
+            ActivationEvent::OnCommand(cmd) => self.commands.contains(cmd),
+            _ => false,
+        }
+    }
+
+    /// Return only the events that match this filter.
+    pub fn filter<'a>(&self, events: &'a [ActivationEvent]) -> Vec<&'a ActivationEvent> {
+        events.iter().filter(|e| self.matches(e)).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1022,5 +1192,128 @@ mod tests {
     fn ext_activation_is_ascii_printable() {
         assert!(ExtActivationValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtActivationValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn perf_record_creation_and_duration() {
+        let mut rec = ActivationPerformanceRecord::new(
+            "ext.foo",
+            ActivationEvent::OnLanguage("rust".into()),
+            100,
+        );
+        assert_eq!(rec.duration_ms(), None);
+        rec.finish(250);
+        assert_eq!(rec.duration_ms(), Some(150));
+        assert_eq!(rec.extension_id, "ext.foo");
+    }
+
+    #[test]
+    fn perf_record_is_slow() {
+        let mut rec = activation_performance_record(
+            "ext.slow",
+            ActivationEvent::Star,
+            0,
+        );
+        rec.finish(500);
+        assert!(rec.is_slow(100));
+        assert!(!rec.is_slow(500));
+        assert!(!rec.is_slow(600));
+    }
+
+    #[test]
+    fn perf_record_display() {
+        let mut rec = ActivationPerformanceRecord::new("ext.a", ActivationEvent::Star, 10);
+        assert_eq!(format!("{rec}"), "ext.a activation in progress");
+        rec.finish(30);
+        assert_eq!(format!("{rec}"), "ext.a activated in 20ms");
+    }
+
+    #[test]
+    fn perf_tracker_tracks_multiple() {
+        let mut tracker = ActivationPerformanceTracker::new();
+        let i0 = tracker.start_activation("a", ActivationEvent::Star, 0);
+        let i1 = tracker.start_activation("b", ActivationEvent::OnCommand("cmd".into()), 10);
+        assert_eq!(tracker.total_count(), 2);
+        tracker.end_activation(i0, 50);
+        tracker.end_activation(i1, 110);
+        assert_eq!(tracker.average_activation_ms(), Some(75.0));
+    }
+
+    #[test]
+    fn perf_tracker_slow_activations_filter() {
+        let mut tracker = ActivationPerformanceTracker::new();
+        let i0 = tracker.start_activation("fast", ActivationEvent::Star, 0);
+        let i1 = tracker.start_activation("slow", ActivationEvent::Star, 0);
+        tracker.end_activation(i0, 10);
+        tracker.end_activation(i1, 500);
+        let slow = tracker.slow_activations(100);
+        assert_eq!(slow.len(), 1);
+        assert_eq!(slow[0].extension_id, "slow");
+    }
+
+    #[test]
+    fn dep_graph_has_cycle_detects_cycle() {
+        let mut g = ActivationDependencyGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "a");
+        let ids = vec!["a".to_string(), "b".to_string()];
+        assert!(g.has_cycle(&ids));
+    }
+
+    #[test]
+    fn dep_graph_has_cycle_no_cycle() {
+        let mut g = ActivationDependencyGraph::new();
+        g.add_dependency("a", "b");
+        let ids = vec!["a".to_string(), "b".to_string()];
+        assert!(!g.has_cycle(&ids));
+    }
+
+    #[test]
+    fn dep_graph_dependents_of_reverse() {
+        let mut g = ActivationDependencyGraph::new();
+        g.add_dependency("x", "base");
+        g.add_dependency("y", "base");
+        g.add_dependency("z", "other");
+        let mut deps = g.dependents_of("base");
+        deps.sort();
+        assert_eq!(deps, vec!["x", "y"]);
+        assert!(g.dependents_of("nonexistent").is_empty());
+    }
+
+    #[test]
+    fn dep_graph_independent_extensions() {
+        let mut g = ActivationDependencyGraph::new();
+        g.add_dependency("a", "b");
+        let ids = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let indep = g.independent_extensions(&ids);
+        assert_eq!(indep, vec!["b".to_string(), "c".to_string()]);
+    }
+
+    #[test]
+    fn event_filter_matches_language() {
+        let filter = ActivationEventFilter::new()
+            .include_language("rust")
+            .include_language("python");
+        assert!(filter.matches(&ActivationEvent::OnLanguage("rust".into())));
+        assert!(filter.matches(&ActivationEvent::OnLanguage("python".into())));
+        assert!(!filter.matches(&ActivationEvent::OnLanguage("go".into())));
+        assert!(!filter.matches(&ActivationEvent::Star));
+    }
+
+    #[test]
+    fn event_filter_returns_subset() {
+        let filter = ActivationEventFilter::new()
+            .include_language("rust")
+            .include_command("myCmd");
+        let events = vec![
+            ActivationEvent::OnLanguage("rust".into()),
+            ActivationEvent::OnLanguage("go".into()),
+            ActivationEvent::OnCommand("myCmd".into()),
+            ActivationEvent::Star,
+        ];
+        let matched = filter.filter(&events);
+        assert_eq!(matched.len(), 2);
+        assert_eq!(matched[0], &ActivationEvent::OnLanguage("rust".into()));
+        assert_eq!(matched[1], &ActivationEvent::OnCommand("myCmd".into()));
     }
 }

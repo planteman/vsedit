@@ -579,6 +579,254 @@ impl Default for ExtProgressValidator {
     }
 }
 
+// ── Nested Progress Stack ──
+
+/// An entry in a nested progress stack, representing one level of sub-task.
+#[derive(Debug, Clone)]
+pub struct ProgressStackEntry {
+    pub label: String,
+    pub percentage: f64,
+    pub weight: f64,
+}
+
+/// Tracks nested progress for hierarchical sub-tasks.
+///
+/// Each level has a label, a weight (relative importance), and a current
+/// percentage.  [`overall_percentage`](ProgressStack::overall_percentage)
+/// computes the weighted composite progress across all levels.
+#[derive(Debug)]
+pub struct ProgressStack {
+    stack: Vec<ProgressStackEntry>,
+}
+
+impl ProgressStack {
+    pub fn new() -> Self {
+        Self { stack: Vec::new() }
+    }
+
+    /// Push a new sub-task onto the stack with the given label and weight.
+    pub fn push(&mut self, label: &str, weight: f64) {
+        self.stack.push(ProgressStackEntry {
+            label: label.to_string(),
+            percentage: 0.0,
+            weight,
+        });
+    }
+
+    /// Pop (complete) the innermost sub-task, returning its entry.
+    pub fn pop(&mut self) -> Option<ProgressStackEntry> {
+        self.stack.pop()
+    }
+
+    /// Update the percentage of the innermost sub-task.
+    pub fn update_current(&mut self, percentage: f64) {
+        if let Some(entry) = self.stack.last_mut() {
+            entry.percentage = percentage.clamp(0.0, 100.0);
+        }
+    }
+
+    /// Compute the weighted overall percentage across all stack levels.
+    ///
+    /// Each level's contribution is scaled by its weight relative to the total
+    /// weight of all entries.
+    pub fn overall_percentage(&self) -> f64 {
+        if self.stack.is_empty() {
+            return 0.0;
+        }
+        let total_weight: f64 = self.stack.iter().map(|e| e.weight).sum();
+        if total_weight <= 0.0 {
+            return 0.0;
+        }
+        let weighted_sum: f64 = self
+            .stack
+            .iter()
+            .map(|e| e.percentage * e.weight / total_weight)
+            .sum();
+        weighted_sum.clamp(0.0, 100.0)
+    }
+
+    /// The current nesting depth.
+    pub fn depth(&self) -> usize {
+        self.stack.len()
+    }
+
+    /// The label of the innermost sub-task, if any.
+    pub fn current_label(&self) -> Option<&str> {
+        self.stack.last().map(|e| e.label.as_str())
+    }
+
+    /// Whether the stack has no entries.
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
+    }
+
+    /// A breadcrumb trail of all labels, e.g. `"task1 > subtask > leaf"`.
+    pub fn breadcrumb(&self) -> String {
+        self.stack
+            .iter()
+            .map(|e| e.label.as_str())
+            .collect::<Vec<_>>()
+            .join(" > ")
+    }
+}
+
+impl Default for ProgressStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Cancel Token ──
+
+/// A token that can be used to signal cancellation of a progress operation.
+#[derive(Debug)]
+pub struct ProgressCancelToken {
+    handle: u64,
+    cancelled: bool,
+    reason: Option<String>,
+}
+
+impl ProgressCancelToken {
+    pub fn new(handle: u64) -> Self {
+        Self {
+            handle,
+            cancelled: false,
+            reason: None,
+        }
+    }
+
+    /// Cancel without a specific reason.
+    pub fn cancel(&mut self) {
+        self.cancelled = true;
+    }
+
+    /// Cancel with a human-readable reason.
+    pub fn cancel_with_reason(&mut self, reason: &str) {
+        self.cancelled = true;
+        self.reason = Some(reason.to_string());
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancelled
+    }
+
+    pub fn reason(&self) -> Option<&str> {
+        self.reason.as_deref()
+    }
+
+    pub fn handle(&self) -> u64 {
+        self.handle
+    }
+}
+
+/// Convenience constructor for [`ProgressCancelToken`].
+pub fn progress_cancel_token(handle: u64) -> ProgressCancelToken {
+    ProgressCancelToken::new(handle)
+}
+
+// ── Format Helpers ──
+
+/// Render a human-readable progress bar for a [`ProgressState`].
+///
+/// * With a percentage: `[##########----------] 50% message`
+/// * Without meaningful percentage: `[...working...] message`
+/// * When complete: `[####################] 100% message (done)`
+pub fn progress_format_message(state: &ProgressState) -> String {
+    const BAR_WIDTH: usize = 20;
+
+    let msg = state.message.as_deref().unwrap_or("");
+
+    if state.is_done {
+        let bar = "#".repeat(BAR_WIDTH);
+        return if msg.is_empty() {
+            format!("[{}] 100% (done)", bar)
+        } else {
+            format!("[{}] 100% {} (done)", bar, msg)
+        };
+    }
+
+    if state.percentage <= 0.0 {
+        return if msg.is_empty() {
+            "[...working...]".to_string()
+        } else {
+            format!("[...working...] {}", msg)
+        };
+    }
+
+    let filled = ((state.percentage / 100.0) * BAR_WIDTH as f64)
+        .round()
+        .min(BAR_WIDTH as f64) as usize;
+    let empty = BAR_WIDTH - filled;
+    let bar = format!("{}{}", "#".repeat(filled), "-".repeat(empty));
+    let pct = state.percentage.round() as u32;
+
+    if msg.is_empty() {
+        format!("[{}] {}%", bar, pct)
+    } else {
+        format!("[{}] {}% {}", bar, pct, msg)
+    }
+}
+
+// ── Progress Summary ──
+
+/// An aggregate summary of all progress states held by a [`ProgressBridge`].
+#[derive(Debug)]
+pub struct ProgressSummary {
+    pub active: usize,
+    pub completed: usize,
+    pub overall_progress: f64,
+}
+
+impl ProgressSummary {
+    /// Build a summary by inspecting all states in the bridge.
+    pub fn from_bridge(bridge: &ProgressBridge) -> Self {
+        let mut active: usize = 0;
+        let mut completed: usize = 0;
+        let mut pct_sum: f64 = 0.0;
+
+        for state in &bridge.active {
+            if state.is_done {
+                completed += 1;
+            } else {
+                active += 1;
+                pct_sum += state.percentage;
+            }
+        }
+
+        let overall_progress = if active > 0 {
+            pct_sum / active as f64
+        } else {
+            0.0
+        };
+
+        Self {
+            active,
+            completed,
+            overall_progress,
+        }
+    }
+
+    pub fn total_active(&self) -> usize {
+        self.active
+    }
+
+    pub fn total_completed(&self) -> usize {
+        self.completed
+    }
+
+    pub fn overall_progress(&self) -> f64 {
+        self.overall_progress
+    }
+
+    /// A one-line human-readable summary string.
+    pub fn display(&self) -> String {
+        format!(
+            "{} active, {} completed, overall {:.1}%",
+            self.active, self.completed, self.overall_progress
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1027,5 +1275,157 @@ mod tests {
     fn ext_progress_is_ascii_printable() {
         assert!(ExtProgressValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtProgressValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ── ProgressStack tests ──
+
+    #[test]
+    fn progress_stack_push_and_depth() {
+        let mut stack = ProgressStack::new();
+        assert!(stack.is_empty());
+        assert_eq!(stack.depth(), 0);
+
+        stack.push("task1", 1.0);
+        assert_eq!(stack.depth(), 1);
+        assert!(!stack.is_empty());
+
+        stack.push("subtask", 2.0);
+        assert_eq!(stack.depth(), 2);
+        assert_eq!(stack.current_label(), Some("subtask"));
+    }
+
+    #[test]
+    fn progress_stack_update_current_and_overall() {
+        let mut stack = ProgressStack::new();
+        stack.push("a", 1.0);
+        stack.push("b", 1.0);
+
+        // Both at 0% → overall 0%
+        assert!((stack.overall_percentage() - 0.0).abs() < f64::EPSILON);
+
+        stack.update_current(80.0);
+        // a=0%, b=80%, equal weight → overall 40%
+        let overall = stack.overall_percentage();
+        assert!((overall - 40.0).abs() < 0.01, "expected ~40, got {overall}");
+    }
+
+    #[test]
+    fn progress_stack_breadcrumb() {
+        let mut stack = ProgressStack::new();
+        stack.push("build", 1.0);
+        stack.push("compile", 1.0);
+        stack.push("link", 1.0);
+        assert_eq!(stack.breadcrumb(), "build > compile > link");
+    }
+
+    #[test]
+    fn progress_stack_pop_returns_entry() {
+        let mut stack = ProgressStack::new();
+        stack.push("first", 3.0);
+        stack.push("second", 5.0);
+        stack.update_current(60.0);
+
+        let entry = stack.pop().unwrap();
+        assert_eq!(entry.label, "second");
+        assert!((entry.percentage - 60.0).abs() < f64::EPSILON);
+        assert!((entry.weight - 5.0).abs() < f64::EPSILON);
+        assert_eq!(stack.depth(), 1);
+    }
+
+    // ── ProgressCancelToken tests ──
+
+    #[test]
+    fn cancel_token_cancel() {
+        let mut token = progress_cancel_token(42);
+        assert!(!token.is_cancelled());
+        assert_eq!(token.handle(), 42);
+
+        token.cancel();
+        assert!(token.is_cancelled());
+        assert!(token.reason().is_none());
+    }
+
+    #[test]
+    fn cancel_token_cancel_with_reason() {
+        let mut token = ProgressCancelToken::new(99);
+        token.cancel_with_reason("user pressed Escape");
+        assert!(token.is_cancelled());
+        assert_eq!(token.reason(), Some("user pressed Escape"));
+    }
+
+    // ── progress_format_message tests ──
+
+    #[test]
+    fn format_message_with_percentage() {
+        let state = ProgressState {
+            handle: 1,
+            percentage: 50.0,
+            message: Some("loading".into()),
+            is_done: false,
+        };
+        let formatted = progress_format_message(&state);
+        assert!(formatted.contains("50%"), "expected 50% in: {formatted}");
+        assert!(formatted.contains("loading"));
+        // 10 filled, 10 empty
+        assert!(formatted.contains("##########----------"));
+    }
+
+    #[test]
+    fn format_message_without_percentage() {
+        let state = ProgressState {
+            handle: 2,
+            percentage: 0.0,
+            message: Some("starting".into()),
+            is_done: false,
+        };
+        let formatted = progress_format_message(&state);
+        assert!(
+            formatted.contains("...working..."),
+            "expected spinner in: {formatted}"
+        );
+        assert!(formatted.contains("starting"));
+    }
+
+    #[test]
+    fn format_message_done() {
+        let state = ProgressState {
+            handle: 3,
+            percentage: 100.0,
+            message: Some("finished".into()),
+            is_done: true,
+        };
+        let formatted = progress_format_message(&state);
+        assert!(formatted.contains("100%"));
+        assert!(formatted.contains("(done)"));
+    }
+
+    // ── ProgressSummary tests ──
+
+    #[test]
+    fn progress_summary_from_bridge() {
+        let mut bridge = ProgressBridge::new();
+        let opts = ProgressOptions {
+            location: ProgressLocation::Notification,
+            title: Some("task1".into()),
+            cancellable: false,
+        };
+        bridge.start(1, &opts);
+        bridge.start(2, &opts);
+        bridge.report(1, Some(40.0), None);
+        bridge.report(2, Some(60.0), None);
+        bridge.end(2);
+
+        let summary = ProgressSummary::from_bridge(&bridge);
+        assert_eq!(summary.total_active(), 1);
+        assert_eq!(summary.total_completed(), 1);
+        // Only handle 1 is active at 40%
+        assert!(
+            (summary.overall_progress() - 40.0).abs() < 0.01,
+            "expected ~40, got {}",
+            summary.overall_progress()
+        );
+        let display = summary.display();
+        assert!(display.contains("1 active"));
+        assert!(display.contains("1 completed"));
     }
 }

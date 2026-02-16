@@ -582,6 +582,163 @@ pub fn analyze_cell_dependencies(doc: &NotebookDocument) -> Vec<CellDependency> 
     deps
 }
 
+/// Represents an action available on the notebook toolbar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ToolbarAction {
+    RunCell(usize),
+    AddCellAbove(usize),
+    AddCellBelow(usize),
+    DeleteCell(usize),
+    MoveCellUp(usize),
+    MoveCellDown(usize),
+    ClearOutputs,
+    RunAll,
+}
+
+/// Toolbar that manages available cell actions based on notebook state.
+pub struct NotebookToolbar {
+    actions: Vec<ToolbarAction>,
+}
+
+impl NotebookToolbar {
+    pub fn new() -> Self {
+        Self { actions: Vec::new() }
+    }
+
+    /// Compute available actions for the cell at `index` in a notebook with `cell_count` cells.
+    pub fn compute_actions(&mut self, index: usize, cell_count: usize) {
+        self.actions.clear();
+        if cell_count == 0 {
+            return;
+        }
+        if index < cell_count {
+            self.actions.push(ToolbarAction::RunCell(index));
+            self.actions.push(ToolbarAction::AddCellAbove(index));
+            self.actions.push(ToolbarAction::AddCellBelow(index));
+            self.actions.push(ToolbarAction::DeleteCell(index));
+            if index > 0 {
+                self.actions.push(ToolbarAction::MoveCellUp(index));
+            }
+            if index + 1 < cell_count {
+                self.actions.push(ToolbarAction::MoveCellDown(index));
+            }
+        }
+        self.actions.push(ToolbarAction::ClearOutputs);
+        self.actions.push(ToolbarAction::RunAll);
+    }
+
+    pub fn available_actions(&self) -> &[ToolbarAction] {
+        &self.actions
+    }
+
+    pub fn has_action(&self, action: &ToolbarAction) -> bool {
+        self.actions.contains(action)
+    }
+
+    pub fn action_count(&self) -> usize {
+        self.actions.len()
+    }
+}
+
+/// Status information displayed next to a cell.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CellStatusLine {
+    pub cell_index: usize,
+    pub execution_order: Option<u32>,
+    pub status_text: String,
+    pub is_running: bool,
+}
+
+impl CellStatusLine {
+    /// Build a status line from the execution tracker for a given cell.
+    pub fn from_tracker(cell_index: usize, tracker: &CellExecutionTracker) -> Self {
+        let state = tracker.get_state(cell_index);
+        let (status_text, is_running) = match state {
+            CellExecutionState::Idle => ("Idle".to_string(), false),
+            CellExecutionState::Running => ("Running...".to_string(), true),
+            CellExecutionState::Succeeded { duration_ms } => {
+                (format!("Done ({}ms)", duration_ms), false)
+            }
+            CellExecutionState::Failed { duration_ms, error } => {
+                (format!("Failed ({}ms): {}", duration_ms, error), false)
+            }
+        };
+        Self {
+            cell_index,
+            execution_order: None,
+            status_text,
+            is_running,
+        }
+    }
+
+    pub fn with_execution_order(mut self, order: u32) -> Self {
+        self.execution_order = Some(order);
+        self
+    }
+}
+
+impl fmt::Display for CellStatusLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(order) = self.execution_order {
+            write!(f, "[{}] {}", order, self.status_text)
+        } else {
+            write!(f, "[ ] {}", self.status_text)
+        }
+    }
+}
+
+/// Export format for a notebook.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportFormat {
+    Python,
+    Markdown,
+}
+
+/// Export a notebook document to the specified format.
+pub fn notebook_export_format(doc: &NotebookDocument, format: ExportFormat) -> String {
+    let mut output = String::new();
+    match format {
+        ExportFormat::Python => {
+            for (i, cell) in doc.cells.iter().enumerate() {
+                match cell.kind {
+                    NotebookCellKind::Code => {
+                        if i > 0 { output.push('\n'); }
+                        output.push_str(&cell.source);
+                        output.push('\n');
+                    }
+                    NotebookCellKind::Markup => {
+                        if i > 0 { output.push('\n'); }
+                        for line in cell.source.lines() {
+                            output.push_str("# ");
+                            output.push_str(line);
+                            output.push('\n');
+                        }
+                    }
+                }
+            }
+        }
+        ExportFormat::Markdown => {
+            for (i, cell) in doc.cells.iter().enumerate() {
+                if i > 0 {
+                    output.push_str("\n\n");
+                }
+                match cell.kind {
+                    NotebookCellKind::Code => {
+                        output.push_str(&format!("```{}\n", cell.language));
+                        output.push_str(&cell.source);
+                        output.push_str("\n```");
+                    }
+                    NotebookCellKind::Markup => {
+                        output.push_str(&cell.source);
+                    }
+                }
+            }
+            output.push('\n');
+        }
+    }
+    output
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1015,5 +1172,76 @@ mod tests {
         let deps = analyze_cell_dependencies(&doc);
         assert!(deps.iter().any(|d| d.cell_index == 1 && d.depends_on == 0 && d.symbol == "data"));
         assert!(deps.iter().any(|d| d.cell_index == 3 && d.depends_on == 1 && d.symbol == "result"));
+    }
+
+    #[test]
+    fn toolbar_compute_middle_cell() {
+        let mut toolbar = NotebookToolbar::new();
+        toolbar.compute_actions(1, 3);
+        assert!(toolbar.has_action(&ToolbarAction::RunCell(1)));
+        assert!(toolbar.has_action(&ToolbarAction::MoveCellUp(1)));
+        assert!(toolbar.has_action(&ToolbarAction::MoveCellDown(1)));
+        assert!(toolbar.has_action(&ToolbarAction::RunAll));
+    }
+
+    #[test]
+    fn toolbar_first_cell_no_move_up() {
+        let mut toolbar = NotebookToolbar::new();
+        toolbar.compute_actions(0, 3);
+        assert!(!toolbar.has_action(&ToolbarAction::MoveCellUp(0)));
+        assert!(toolbar.has_action(&ToolbarAction::MoveCellDown(0)));
+    }
+
+    #[test]
+    fn toolbar_last_cell_no_move_down() {
+        let mut toolbar = NotebookToolbar::new();
+        toolbar.compute_actions(2, 3);
+        assert!(toolbar.has_action(&ToolbarAction::MoveCellUp(2)));
+        assert!(!toolbar.has_action(&ToolbarAction::MoveCellDown(2)));
+    }
+
+    #[test]
+    fn toolbar_empty_notebook() {
+        let mut toolbar = NotebookToolbar::new();
+        toolbar.compute_actions(0, 0);
+        assert_eq!(toolbar.action_count(), 0);
+    }
+
+    #[test]
+    fn cell_status_line_idle() {
+        let tracker = CellExecutionTracker::new();
+        let status = CellStatusLine::from_tracker(0, &tracker);
+        assert_eq!(status.status_text, "Idle");
+        assert!(!status.is_running);
+    }
+
+    #[test]
+    fn cell_status_line_running() {
+        let mut tracker = CellExecutionTracker::new();
+        tracker.mark_running(0);
+        let status = CellStatusLine::from_tracker(0, &tracker);
+        assert!(status.is_running);
+        assert_eq!(status.status_text, "Running...");
+    }
+
+    #[test]
+    fn export_python_format() {
+        let mut doc = NotebookDocument::new("test.ipynb");
+        doc.add_cell(markup_cell("# Title"));
+        doc.add_cell(code_cell("x = 1"));
+        let result = notebook_export_format(&doc, ExportFormat::Python);
+        assert!(result.contains("# # Title"));
+        assert!(result.contains("x = 1"));
+    }
+
+    #[test]
+    fn export_markdown_format() {
+        let mut doc = NotebookDocument::new("test.ipynb");
+        doc.add_cell(code_cell("x = 1"));
+        doc.add_cell(markup_cell("Some text"));
+        let result = notebook_export_format(&doc, ExportFormat::Markdown);
+        assert!(result.contains("```python"));
+        assert!(result.contains("x = 1"));
+        assert!(result.contains("Some text"));
     }
 }

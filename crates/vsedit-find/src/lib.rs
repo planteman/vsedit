@@ -640,6 +640,240 @@ impl Default for FindValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// FindReplaceState
+// ---------------------------------------------------------------------------
+
+/// Tracks the complete state of the find/replace UI widget.
+pub struct FindReplaceState {
+    pub is_visible: bool,
+    pub is_replace_visible: bool,
+    pub search_string: String,
+    pub replace_string: String,
+    pub use_regex: bool,
+    pub match_case: bool,
+    pub match_whole_word: bool,
+    pub preserve_case: bool,
+    pub is_in_selection: bool,
+    history: Vec<String>,
+    max_history: usize,
+}
+
+impl FindReplaceState {
+    /// Create a new default find/replace state.
+    pub fn new() -> Self {
+        Self {
+            is_visible: false,
+            is_replace_visible: false,
+            search_string: String::new(),
+            replace_string: String::new(),
+            use_regex: false,
+            match_case: false,
+            match_whole_word: false,
+            preserve_case: false,
+            is_in_selection: false,
+            history: Vec::new(),
+            max_history: 100,
+        }
+    }
+
+    /// Toggle the visibility of the find widget.
+    pub fn toggle_visibility(&mut self) {
+        self.is_visible = !self.is_visible;
+    }
+
+    /// Toggle the visibility of the replace input.
+    pub fn toggle_replace(&mut self) {
+        self.is_replace_visible = !self.is_replace_visible;
+    }
+
+    /// Set the search string, pushing it to history if it differs from the last entry.
+    pub fn set_search(&mut self, s: impl Into<String>) {
+        let s = s.into();
+        if self.history.last().map_or(true, |last| *last != s) && !s.is_empty() {
+            self.history.push(s.clone());
+            if self.history.len() > self.max_history {
+                self.history.remove(0);
+            }
+        }
+        self.search_string = s;
+    }
+
+    /// Set the replace string.
+    pub fn set_replace(&mut self, s: impl Into<String>) {
+        self.replace_string = s.into();
+    }
+
+    /// Toggle the regex option.
+    pub fn toggle_regex(&mut self) {
+        self.use_regex = !self.use_regex;
+    }
+
+    /// Toggle the case-sensitive option.
+    pub fn toggle_case(&mut self) {
+        self.match_case = !self.match_case;
+    }
+
+    /// Toggle the whole-word option.
+    pub fn toggle_whole_word(&mut self) {
+        self.match_whole_word = !self.match_whole_word;
+    }
+
+    /// Convert the current state to `FindOptions`.
+    pub fn to_find_options(&self) -> FindOptions {
+        FindOptions {
+            search_string: self.search_string.clone(),
+            is_regex: self.use_regex,
+            case_sensitive: self.match_case,
+            whole_word: self.match_whole_word,
+            preserve_case: self.preserve_case,
+        }
+    }
+
+    /// Return the search history.
+    pub fn history(&self) -> &[String] {
+        &self.history
+    }
+
+    /// Clear the search history.
+    pub fn clear_history(&mut self) {
+        self.history.clear();
+    }
+
+    /// Return the previous search string (the item before the current search in history).
+    pub fn previous_search(&self) -> Option<&str> {
+        if self.history.len() >= 2 {
+            Some(&self.history[self.history.len() - 2])
+        } else {
+            None
+        }
+    }
+}
+
+impl Default for FindReplaceState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// find_all_matches (with context)
+// ---------------------------------------------------------------------------
+
+/// A match with surrounding context lines.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FindMatchWithContext {
+    pub find_match: FindMatch,
+    pub context_before: String,
+    pub context_after: String,
+}
+
+/// Find all matches and include context from surrounding text.
+///
+/// For each match, extracts up to `context_chars` characters before and after the
+/// match text on the same line.
+pub fn find_all_matches(
+    text: &str,
+    options: &FindOptions,
+    context_chars: usize,
+) -> Vec<FindMatchWithContext> {
+    let matches = find_matches(text, options);
+    let lines: Vec<&str> = text.lines().collect();
+
+    matches
+        .into_iter()
+        .map(|m| {
+            let line_idx = (m.line - 1) as usize;
+            let line = lines.get(line_idx).copied().unwrap_or("");
+
+            // start_col and end_col are 1-based; convert to 0-based byte offsets
+            let start = (m.start_col - 1) as usize;
+            let end = (m.end_col - 1) as usize;
+
+            let before_start = start.saturating_sub(context_chars);
+            let after_end = (end + context_chars).min(line.len());
+
+            let context_before = line[before_start..start].to_string();
+            let context_after = line[end..after_end].to_string();
+
+            FindMatchWithContext {
+                find_match: m,
+                context_before,
+                context_after,
+            }
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// FindHighlightDecoration
+// ---------------------------------------------------------------------------
+
+/// The kind of highlight decoration applied to a find match.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FindHighlightKind {
+    /// A regular (non-current) match highlight.
+    Match,
+    /// The currently-focused match.
+    CurrentMatch,
+    /// A preview of what the replacement text would look like.
+    ReplacePreview,
+}
+
+/// A decoration range for highlighting a find match in the editor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FindHighlightDecoration {
+    pub line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+    pub is_current: bool,
+    pub kind: FindHighlightKind,
+}
+
+impl FindHighlightDecoration {
+    /// Create a new highlight decoration.
+    pub fn new(line: u32, start_col: u32, end_col: u32, kind: FindHighlightKind) -> Self {
+        let is_current = kind == FindHighlightKind::CurrentMatch;
+        Self {
+            line,
+            start_col,
+            end_col,
+            is_current,
+            kind,
+        }
+    }
+
+    /// Returns true if the given position is within this decoration.
+    pub fn contains_position(&self, line: u32, col: u32) -> bool {
+        self.line == line && col >= self.start_col && col < self.end_col
+    }
+
+    /// Returns the width (number of columns) of this decoration.
+    pub fn width(&self) -> u32 {
+        self.end_col - self.start_col
+    }
+}
+
+/// Generate highlight decorations for all matches, marking the current one.
+pub fn generate_highlight_decorations(
+    matches: &[FindMatch],
+    current_index: Option<usize>,
+) -> Vec<FindHighlightDecoration> {
+    matches
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            let is_current = current_index == Some(i);
+            let kind = if is_current {
+                FindHighlightKind::CurrentMatch
+            } else {
+                FindHighlightKind::Match
+            };
+            FindHighlightDecoration::new(m.line, m.start_col, m.end_col, kind)
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1007,5 +1241,294 @@ mod tests {
     fn find_is_ascii_printable() {
         assert!(FindValidator::is_ascii_printable("Hello World 123"));
         assert!(!FindValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // FindReplaceState tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn find_replace_state_new_defaults() {
+        let state = FindReplaceState::new();
+        assert!(!state.is_visible);
+        assert!(!state.is_replace_visible);
+        assert!(state.search_string.is_empty());
+        assert!(state.replace_string.is_empty());
+        assert!(!state.use_regex);
+        assert!(!state.match_case);
+        assert!(!state.match_whole_word);
+        assert!(!state.preserve_case);
+        assert!(!state.is_in_selection);
+        assert!(state.history().is_empty());
+    }
+
+    #[test]
+    fn find_replace_state_toggle_visibility() {
+        let mut state = FindReplaceState::new();
+        assert!(!state.is_visible);
+        state.toggle_visibility();
+        assert!(state.is_visible);
+        state.toggle_visibility();
+        assert!(!state.is_visible);
+    }
+
+    #[test]
+    fn find_replace_state_toggle_replace() {
+        let mut state = FindReplaceState::new();
+        assert!(!state.is_replace_visible);
+        state.toggle_replace();
+        assert!(state.is_replace_visible);
+        state.toggle_replace();
+        assert!(!state.is_replace_visible);
+    }
+
+    #[test]
+    fn find_replace_state_set_search_pushes_history() {
+        let mut state = FindReplaceState::new();
+        state.set_search("hello");
+        assert_eq!(state.search_string, "hello");
+        assert_eq!(state.history(), &["hello"]);
+
+        state.set_search("world");
+        assert_eq!(state.search_string, "world");
+        assert_eq!(state.history(), &["hello", "world"]);
+    }
+
+    #[test]
+    fn find_replace_state_set_search_no_duplicate() {
+        let mut state = FindReplaceState::new();
+        state.set_search("hello");
+        state.set_search("hello");
+        assert_eq!(state.history().len(), 1);
+    }
+
+    #[test]
+    fn find_replace_state_set_search_empty_not_added() {
+        let mut state = FindReplaceState::new();
+        state.set_search("");
+        assert!(state.history().is_empty());
+    }
+
+    #[test]
+    fn find_replace_state_toggle_options() {
+        let mut state = FindReplaceState::new();
+        state.toggle_regex();
+        assert!(state.use_regex);
+        state.toggle_case();
+        assert!(state.match_case);
+        state.toggle_whole_word();
+        assert!(state.match_whole_word);
+        // Toggle back
+        state.toggle_regex();
+        assert!(!state.use_regex);
+    }
+
+    #[test]
+    fn find_replace_state_to_find_options() {
+        let mut state = FindReplaceState::new();
+        state.set_search("test");
+        state.toggle_regex();
+        state.toggle_case();
+        state.toggle_whole_word();
+        state.preserve_case = true;
+
+        let opts = state.to_find_options();
+        assert_eq!(opts.search_string, "test");
+        assert!(opts.is_regex);
+        assert!(opts.case_sensitive);
+        assert!(opts.whole_word);
+        assert!(opts.preserve_case);
+    }
+
+    #[test]
+    fn find_replace_state_previous_search() {
+        let mut state = FindReplaceState::new();
+        assert!(state.previous_search().is_none());
+
+        state.set_search("first");
+        assert!(state.previous_search().is_none());
+
+        state.set_search("second");
+        assert_eq!(state.previous_search(), Some("first"));
+
+        state.set_search("third");
+        assert_eq!(state.previous_search(), Some("second"));
+    }
+
+    #[test]
+    fn find_replace_state_clear_history() {
+        let mut state = FindReplaceState::new();
+        state.set_search("a");
+        state.set_search("b");
+        assert_eq!(state.history().len(), 2);
+        state.clear_history();
+        assert!(state.history().is_empty());
+    }
+
+    #[test]
+    fn find_replace_state_set_replace() {
+        let mut state = FindReplaceState::new();
+        state.set_replace("replacement");
+        assert_eq!(state.replace_string, "replacement");
+    }
+
+    // -----------------------------------------------------------------------
+    // find_all_matches tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn find_all_matches_basic() {
+        let text = "hello world hello rust";
+        let opts = FindOptions::new("hello");
+        let results = find_all_matches(text, &opts, 5);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].find_match.text, "hello");
+        assert_eq!(results[0].context_before, "");
+        assert_eq!(results[0].context_after, " worl");
+    }
+
+    #[test]
+    fn find_all_matches_context_before() {
+        let text = "say hello there";
+        let opts = FindOptions::new("hello");
+        let results = find_all_matches(text, &opts, 4);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].context_before, "say ");
+        assert_eq!(results[0].context_after, " the");
+    }
+
+    #[test]
+    fn find_all_matches_context_clipped_at_line_boundary() {
+        let text = "hi";
+        let opts = FindOptions::new("hi");
+        let results = find_all_matches(text, &opts, 100);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].context_before, "");
+        assert_eq!(results[0].context_after, "");
+    }
+
+    #[test]
+    fn find_all_matches_multiline() {
+        let text = "first hello\nsecond hello";
+        let opts = FindOptions::new("hello");
+        let results = find_all_matches(text, &opts, 3);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].find_match.line, 1);
+        assert_eq!(results[0].context_before, "st ");
+        assert_eq!(results[1].find_match.line, 2);
+        assert_eq!(results[1].context_before, "nd ");
+    }
+
+    #[test]
+    fn find_all_matches_zero_context() {
+        let text = "find me here";
+        let opts = FindOptions::new("me");
+        let results = find_all_matches(text, &opts, 0);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].context_before, "");
+        assert_eq!(results[0].context_after, "");
+    }
+
+    #[test]
+    fn find_all_matches_regex() {
+        let text = "abc 123 def 456";
+        let opts = FindOptions::new(r"\d+").with_regex(true);
+        let results = find_all_matches(text, &opts, 2);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].find_match.text, "123");
+        assert_eq!(results[0].context_before, "c ");
+        assert_eq!(results[0].context_after, " d");
+    }
+
+    #[test]
+    fn find_all_matches_no_match() {
+        let text = "nothing here";
+        let opts = FindOptions::new("xyz");
+        let results = find_all_matches(text, &opts, 5);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn find_all_matches_at_end_of_line() {
+        let text = "the end";
+        let opts = FindOptions::new("end");
+        let results = find_all_matches(text, &opts, 10);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].context_before, "the ");
+        assert_eq!(results[0].context_after, "");
+    }
+
+    // -----------------------------------------------------------------------
+    // FindHighlightDecoration tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn highlight_decoration_new() {
+        let d = FindHighlightDecoration::new(1, 5, 10, FindHighlightKind::Match);
+        assert_eq!(d.line, 1);
+        assert_eq!(d.start_col, 5);
+        assert_eq!(d.end_col, 10);
+        assert!(!d.is_current);
+        assert_eq!(d.kind, FindHighlightKind::Match);
+    }
+
+    #[test]
+    fn highlight_decoration_current_match() {
+        let d = FindHighlightDecoration::new(1, 1, 5, FindHighlightKind::CurrentMatch);
+        assert!(d.is_current);
+        assert_eq!(d.kind, FindHighlightKind::CurrentMatch);
+    }
+
+    #[test]
+    fn highlight_decoration_contains_position() {
+        let d = FindHighlightDecoration::new(2, 5, 10, FindHighlightKind::Match);
+        assert!(d.contains_position(2, 5));
+        assert!(d.contains_position(2, 9));
+        assert!(!d.contains_position(2, 10)); // exclusive
+        assert!(!d.contains_position(1, 5)); // wrong line
+        assert!(!d.contains_position(2, 4)); // before start
+    }
+
+    #[test]
+    fn highlight_decoration_width() {
+        let d = FindHighlightDecoration::new(1, 3, 8, FindHighlightKind::Match);
+        assert_eq!(d.width(), 5);
+    }
+
+    #[test]
+    fn highlight_decoration_replace_preview_kind() {
+        let d = FindHighlightDecoration::new(1, 1, 4, FindHighlightKind::ReplacePreview);
+        assert!(!d.is_current);
+        assert_eq!(d.kind, FindHighlightKind::ReplacePreview);
+    }
+
+    #[test]
+    fn generate_highlight_decorations_basic() {
+        let matches = find_matches("hello world hello", &FindOptions::new("hello"));
+        let decorations = generate_highlight_decorations(&matches, Some(0));
+        assert_eq!(decorations.len(), 2);
+        assert!(decorations[0].is_current);
+        assert_eq!(decorations[0].kind, FindHighlightKind::CurrentMatch);
+        assert!(!decorations[1].is_current);
+        assert_eq!(decorations[1].kind, FindHighlightKind::Match);
+    }
+
+    #[test]
+    fn generate_highlight_decorations_no_current() {
+        let matches = find_matches("abc abc", &FindOptions::new("abc"));
+        let decorations = generate_highlight_decorations(&matches, None);
+        assert_eq!(decorations.len(), 2);
+        assert!(decorations.iter().all(|d| !d.is_current));
+        assert!(decorations.iter().all(|d| d.kind == FindHighlightKind::Match));
+    }
+
+    #[test]
+    fn generate_highlight_decorations_second_current() {
+        let matches = find_matches("ab ab ab", &FindOptions::new("ab"));
+        let decorations = generate_highlight_decorations(&matches, Some(1));
+        assert_eq!(decorations.len(), 3);
+        assert!(!decorations[0].is_current);
+        assert!(decorations[1].is_current);
+        assert!(!decorations[2].is_current);
     }
 }

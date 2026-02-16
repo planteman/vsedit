@@ -6,7 +6,7 @@
 
 use std::fmt;
 use vsedit_events::{Emitter, Event};
-use vsedit_keycodes::{KeyCode, KeyCodeChord};
+use vsedit_keycodes::{KeyChordParser, KeyCode, KeyCodeChord};
 
 // ---------------------------------------------------------------------------
 // MouseButton / MouseAction
@@ -501,6 +501,203 @@ impl Default for InputValidator {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// ---------------------------------------------------------------------------
+// InputEventBatcher
+// ---------------------------------------------------------------------------
+
+/// Batches rapid key events within a time window.
+pub struct InputEventBatcher {
+    pending: Vec<KeyInput>,
+    batch_window_ms: u64,
+    batch_start_ms: u64,
+    last_event_ms: u64,
+    total_batches: u64,
+    total_events: u64,
+}
+
+impl InputEventBatcher {
+    /// Create a new batcher with the given window in milliseconds.
+    pub fn new(batch_window_ms: u64) -> Self {
+        Self {
+            pending: Vec::new(),
+            batch_window_ms,
+            batch_start_ms: 0,
+            last_event_ms: 0,
+            total_batches: 0,
+            total_events: 0,
+        }
+    }
+
+    /// Push a key event. Returns `Some(batch)` if the new event falls outside
+    /// the window measured from the first pending event, flushing the previous
+    /// batch and starting a new one with the current event.
+    pub fn push(&mut self, key: KeyInput, timestamp_ms: u64) -> Option<Vec<KeyInput>> {
+        self.total_events += 1;
+        self.last_event_ms = timestamp_ms;
+
+        if self.pending.is_empty() {
+            self.batch_start_ms = timestamp_ms;
+            self.pending.push(key);
+            return None;
+        }
+
+        if timestamp_ms.saturating_sub(self.batch_start_ms) > self.batch_window_ms {
+            self.total_batches += 1;
+            let batch = std::mem::take(&mut self.pending);
+            self.batch_start_ms = timestamp_ms;
+            self.pending.push(key);
+            return Some(batch);
+        }
+
+        self.pending.push(key);
+        None
+    }
+
+    /// Drain all pending events.
+    pub fn flush(&mut self) -> Vec<KeyInput> {
+        if !self.pending.is_empty() {
+            self.total_batches += 1;
+        }
+        std::mem::take(&mut self.pending)
+    }
+
+    /// Number of events waiting in the current batch.
+    pub fn pending_count(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// Total batches produced so far.
+    pub fn total_batches(&self) -> u64 {
+        self.total_batches
+    }
+
+    /// Total events received so far.
+    pub fn total_events(&self) -> u64 {
+        self.total_events
+    }
+
+    /// Whether there are no pending events.
+    pub fn is_empty(&self) -> bool {
+        self.pending.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GestureRecognizer
+// ---------------------------------------------------------------------------
+
+/// Detected gesture types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Gesture {
+    SingleClick,
+    DoubleClick,
+    TripleClick,
+}
+
+/// Recognizes multi-click gestures from mouse down events.
+pub struct GestureRecognizer {
+    last_click_ms: u64,
+    second_click_ms: u64,
+    click_count: u32,
+    max_interval_ms: u64,
+    last_col: u16,
+    last_row: u16,
+    max_distance: u16,
+}
+
+impl GestureRecognizer {
+    /// Create a new recognizer with custom interval and distance thresholds.
+    pub fn new(max_interval_ms: u64, max_distance: u16) -> Self {
+        Self {
+            last_click_ms: 0,
+            second_click_ms: 0,
+            click_count: 0,
+            max_interval_ms,
+            last_col: 0,
+            last_row: 0,
+            max_distance,
+        }
+    }
+
+    /// Reset the recognizer state.
+    pub fn reset(&mut self) {
+        self.last_click_ms = 0;
+        self.second_click_ms = 0;
+        self.click_count = 0;
+        self.last_col = 0;
+        self.last_row = 0;
+    }
+
+    /// Current click count in the active gesture sequence.
+    pub fn click_count(&self) -> u32 {
+        self.click_count
+    }
+
+    /// Process a mouse-down event and return the detected gesture.
+    pub fn on_mouse_down(&mut self, col: u16, row: u16, timestamp_ms: u64) -> Gesture {
+        let col_diff = (col as i32 - self.last_col as i32).unsigned_abs() as u16;
+        let row_diff = (row as i32 - self.last_row as i32).unsigned_abs() as u16;
+        let distance = col_diff.max(row_diff);
+
+        let within_interval = timestamp_ms.saturating_sub(self.last_click_ms) <= self.max_interval_ms;
+        let within_distance = distance <= self.max_distance;
+
+        if within_interval && within_distance && self.click_count > 0 {
+            self.click_count += 1;
+        } else {
+            self.click_count = 1;
+        }
+
+        self.last_col = col;
+        self.last_row = row;
+
+        let gesture = match self.click_count {
+            2 => {
+                self.second_click_ms = timestamp_ms;
+                Gesture::DoubleClick
+            }
+            3 => {
+                self.click_count = 0; // reset after triple
+                Gesture::TripleClick
+            }
+            _ => Gesture::SingleClick,
+        };
+
+        self.last_click_ms = timestamp_ms;
+        gesture
+    }
+}
+
+impl Default for GestureRecognizer {
+    fn default() -> Self {
+        Self::new(300, 3)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// input_chord_builder
+// ---------------------------------------------------------------------------
+
+/// Builds a multi-key chord from a string representation.
+/// Format: `"ctrl+shift+k"` or `"ctrl+k ctrl+d"` (two-part chord).
+/// Returns the parsed chords or an error.
+pub fn input_chord_builder(chord_str: &str) -> Result<Vec<KeyCodeChord>, String> {
+    let chord_str = chord_str.trim();
+    if chord_str.is_empty() {
+        return Err("empty chord string".to_string());
+    }
+
+    let parts: Vec<&str> = chord_str.split_whitespace().collect();
+    let mut chords = Vec::with_capacity(parts.len());
+
+    for part in parts {
+        let chord = KeyChordParser::parse(part).map_err(|e| format!("{e:?}"))?;
+        chords.push(chord);
+    }
+
+    Ok(chords)
 }
 
 #[cfg(test)]
@@ -1012,5 +1209,276 @@ mod tests {
     fn input_is_ascii_printable() {
         assert!(InputValidator::is_ascii_printable("Hello World 123"));
         assert!(!InputValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // InputEventBatcher tests
+    // -----------------------------------------------------------------------
+
+    fn key_a() -> KeyInput {
+        KeyInput {
+            key_code: KeyCode::KeyA,
+            ctrl: false,
+            shift: false,
+            alt: false,
+            meta: false,
+        }
+    }
+
+    fn key_b() -> KeyInput {
+        KeyInput {
+            key_code: KeyCode::KeyB,
+            ctrl: false,
+            shift: false,
+            alt: false,
+            meta: false,
+        }
+    }
+
+    #[test]
+    fn batcher_new_is_empty() {
+        let b = InputEventBatcher::new(50);
+        assert!(b.is_empty());
+        assert_eq!(b.pending_count(), 0);
+        assert_eq!(b.total_batches(), 0);
+        assert_eq!(b.total_events(), 0);
+    }
+
+    #[test]
+    fn batcher_first_push_returns_none() {
+        let mut b = InputEventBatcher::new(50);
+        assert!(b.push(key_a(), 100).is_none());
+        assert_eq!(b.pending_count(), 1);
+        assert!(!b.is_empty());
+    }
+
+    #[test]
+    fn batcher_within_window_returns_none() {
+        let mut b = InputEventBatcher::new(50);
+        assert!(b.push(key_a(), 100).is_none());
+        assert!(b.push(key_b(), 130).is_none());
+        assert_eq!(b.pending_count(), 2);
+    }
+
+    #[test]
+    fn batcher_outside_window_returns_batch() {
+        let mut b = InputEventBatcher::new(50);
+        b.push(key_a(), 100);
+        b.push(key_b(), 120);
+        let batch = b.push(key_a(), 200); // 200 - 100 = 100 > 50
+        assert!(batch.is_some());
+        let batch = batch.unwrap();
+        assert_eq!(batch.len(), 2);
+        assert_eq!(batch[0].key_code, KeyCode::KeyA);
+        assert_eq!(batch[1].key_code, KeyCode::KeyB);
+        assert_eq!(b.pending_count(), 1); // new event started new batch
+    }
+
+    #[test]
+    fn batcher_flush_drains_pending() {
+        let mut b = InputEventBatcher::new(50);
+        b.push(key_a(), 10);
+        b.push(key_b(), 20);
+        let flushed = b.flush();
+        assert_eq!(flushed.len(), 2);
+        assert!(b.is_empty());
+    }
+
+    #[test]
+    fn batcher_flush_empty_returns_empty_vec() {
+        let mut b = InputEventBatcher::new(50);
+        let flushed = b.flush();
+        assert!(flushed.is_empty());
+        assert_eq!(b.total_batches(), 0);
+    }
+
+    #[test]
+    fn batcher_total_events_counted() {
+        let mut b = InputEventBatcher::new(50);
+        b.push(key_a(), 0);
+        b.push(key_b(), 10);
+        b.push(key_a(), 20);
+        assert_eq!(b.total_events(), 3);
+    }
+
+    #[test]
+    fn batcher_total_batches_counted() {
+        let mut b = InputEventBatcher::new(50);
+        b.push(key_a(), 0);
+        b.push(key_b(), 10);
+        // flush produces batch 1
+        b.flush();
+        assert_eq!(b.total_batches(), 1);
+        // push outside window produces batch 2
+        b.push(key_a(), 100);
+        b.push(key_b(), 200); // 200 - 100 = 100 > 50
+        assert_eq!(b.total_batches(), 2);
+    }
+
+    #[test]
+    fn batcher_boundary_exact_window() {
+        let mut b = InputEventBatcher::new(50);
+        b.push(key_a(), 100);
+        // exactly at boundary (100 + 50 = 150) is still within window
+        let result = b.push(key_b(), 150);
+        assert!(result.is_none());
+        assert_eq!(b.pending_count(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // GestureRecognizer tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn gesture_single_click() {
+        let mut g = GestureRecognizer::default();
+        assert_eq!(g.on_mouse_down(10, 5, 1000), Gesture::SingleClick);
+        assert_eq!(g.click_count(), 1);
+    }
+
+    #[test]
+    fn gesture_double_click() {
+        let mut g = GestureRecognizer::default();
+        g.on_mouse_down(10, 5, 1000);
+        assert_eq!(g.on_mouse_down(10, 5, 1100), Gesture::DoubleClick);
+    }
+
+    #[test]
+    fn gesture_triple_click() {
+        let mut g = GestureRecognizer::default();
+        g.on_mouse_down(10, 5, 1000);
+        g.on_mouse_down(10, 5, 1100);
+        assert_eq!(g.on_mouse_down(10, 5, 1200), Gesture::TripleClick);
+    }
+
+    #[test]
+    fn gesture_resets_after_triple() {
+        let mut g = GestureRecognizer::default();
+        g.on_mouse_down(10, 5, 1000);
+        g.on_mouse_down(10, 5, 1100);
+        g.on_mouse_down(10, 5, 1200); // triple, resets
+        // next click within interval is a fresh single
+        assert_eq!(g.on_mouse_down(10, 5, 1300), Gesture::SingleClick);
+    }
+
+    #[test]
+    fn gesture_too_slow_resets() {
+        let mut g = GestureRecognizer::default(); // 300ms max
+        g.on_mouse_down(10, 5, 1000);
+        // 400ms later, outside interval
+        assert_eq!(g.on_mouse_down(10, 5, 1400), Gesture::SingleClick);
+    }
+
+    #[test]
+    fn gesture_too_far_resets() {
+        let mut g = GestureRecognizer::default(); // 3px max distance
+        g.on_mouse_down(10, 5, 1000);
+        // moved 10 columns away
+        assert_eq!(g.on_mouse_down(20, 5, 1100), Gesture::SingleClick);
+    }
+
+    #[test]
+    fn gesture_reset_method() {
+        let mut g = GestureRecognizer::default();
+        g.on_mouse_down(10, 5, 1000);
+        g.on_mouse_down(10, 5, 1100);
+        g.reset();
+        assert_eq!(g.click_count(), 0);
+        assert_eq!(g.on_mouse_down(10, 5, 1200), Gesture::SingleClick);
+    }
+
+    #[test]
+    fn gesture_custom_interval() {
+        let mut g = GestureRecognizer::new(100, 3);
+        g.on_mouse_down(5, 5, 1000);
+        // 150ms > 100ms custom interval
+        assert_eq!(g.on_mouse_down(5, 5, 1150), Gesture::SingleClick);
+    }
+
+    #[test]
+    fn gesture_within_distance_threshold() {
+        let mut g = GestureRecognizer::new(300, 3);
+        g.on_mouse_down(10, 10, 1000);
+        // moved 2 cols and 1 row, max distance = 2 <= 3
+        assert_eq!(g.on_mouse_down(12, 11, 1100), Gesture::DoubleClick);
+    }
+
+    // -----------------------------------------------------------------------
+    // input_chord_builder tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn chord_single_key() {
+        let chords = input_chord_builder("a").unwrap();
+        assert_eq!(chords.len(), 1);
+        assert_eq!(chords[0].key_code, KeyCode::KeyA);
+        assert!(!chords[0].ctrl);
+    }
+
+    #[test]
+    fn chord_with_ctrl() {
+        let chords = input_chord_builder("ctrl+s").unwrap();
+        assert_eq!(chords.len(), 1);
+        assert!(chords[0].ctrl);
+        assert_eq!(chords[0].key_code, KeyCode::KeyS);
+    }
+
+    #[test]
+    fn chord_ctrl_shift() {
+        let chords = input_chord_builder("ctrl+shift+k").unwrap();
+        assert_eq!(chords.len(), 1);
+        assert!(chords[0].ctrl);
+        assert!(chords[0].shift);
+        assert_eq!(chords[0].key_code, KeyCode::KeyK);
+    }
+
+    #[test]
+    fn chord_two_part() {
+        let chords = input_chord_builder("ctrl+k ctrl+d").unwrap();
+        assert_eq!(chords.len(), 2);
+        assert!(chords[0].ctrl);
+        assert_eq!(chords[0].key_code, KeyCode::KeyK);
+        assert!(chords[1].ctrl);
+        assert_eq!(chords[1].key_code, KeyCode::KeyD);
+    }
+
+    #[test]
+    fn chord_function_key() {
+        let chords = input_chord_builder("f5").unwrap();
+        assert_eq!(chords.len(), 1);
+        assert_eq!(chords[0].key_code, KeyCode::F5);
+    }
+
+    #[test]
+    fn chord_escape() {
+        let chords = input_chord_builder("escape").unwrap();
+        assert_eq!(chords.len(), 1);
+        assert_eq!(chords[0].key_code, KeyCode::Escape);
+    }
+
+    #[test]
+    fn chord_empty_string_errors() {
+        assert!(input_chord_builder("").is_err());
+    }
+
+    #[test]
+    fn chord_unknown_key_errors() {
+        assert!(input_chord_builder("ctrl+nonsense_key_xyz").is_err());
+    }
+
+    #[test]
+    fn chord_alt_modifier() {
+        let chords = input_chord_builder("alt+tab").unwrap();
+        assert_eq!(chords.len(), 1);
+        assert!(chords[0].alt);
+        assert_eq!(chords[0].key_code, KeyCode::Tab);
+    }
+
+    #[test]
+    fn chord_digit_key() {
+        let chords = input_chord_builder("ctrl+1").unwrap();
+        assert_eq!(chords.len(), 1);
+        assert!(chords[0].ctrl);
+        assert_eq!(chords[0].key_code, KeyCode::Digit1);
     }
 }

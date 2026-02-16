@@ -634,6 +634,233 @@ impl Default for ExtDebugValidator {
     }
 }
 
+// ── Debug Variable Containers ──
+
+/// Represents a variable scope container in the debug view.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DebugVariableContainer {
+    pub name: String,
+    pub variables: Vec<DebugVariable>,
+    pub scope: VariableScope,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DebugVariable {
+    pub name: String,
+    pub value: String,
+    pub var_type: String,
+    pub children: Vec<DebugVariable>,
+    pub evaluate_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VariableScope {
+    Local,
+    Global,
+    Closure,
+    Arguments,
+}
+
+impl DebugVariableContainer {
+    pub fn new(name: impl Into<String>, scope: VariableScope) -> Self {
+        Self {
+            name: name.into(),
+            variables: Vec::new(),
+            scope,
+        }
+    }
+
+    pub fn add_variable(&mut self, var: DebugVariable) {
+        self.variables.push(var);
+    }
+
+    pub fn find_variable(&self, name: &str) -> Option<&DebugVariable> {
+        self.variables.iter().find(|v| v.name == name)
+    }
+
+    pub fn variable_count(&self) -> usize {
+        self.variables.len()
+    }
+
+    /// Flattens the variable tree, returning references to all variables including children.
+    pub fn flatten(&self) -> Vec<&DebugVariable> {
+        let mut result = Vec::new();
+        for var in &self.variables {
+            Self::flatten_var(var, &mut result);
+        }
+        result
+    }
+
+    fn flatten_var<'a>(var: &'a DebugVariable, out: &mut Vec<&'a DebugVariable>) {
+        out.push(var);
+        for child in &var.children {
+            Self::flatten_var(child, out);
+        }
+    }
+}
+
+impl DebugVariable {
+    pub fn new(name: impl Into<String>, value: impl Into<String>, var_type: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            value: value.into(),
+            var_type: var_type.into(),
+            children: Vec::new(),
+            evaluate_name: None,
+        }
+    }
+
+    pub fn add_child(&mut self, child: DebugVariable) {
+        self.children.push(child);
+    }
+
+    pub fn has_children(&self) -> bool {
+        !self.children.is_empty()
+    }
+
+    pub fn child_count(&self) -> usize {
+        self.children.len()
+    }
+
+    pub fn with_evaluate_name(mut self, name: impl Into<String>) -> Self {
+        self.evaluate_name = Some(name.into());
+        self
+    }
+}
+
+// ── Debug Watch Panel ──
+
+/// A watch expression tracked in the debug watch panel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DebugWatchExpression {
+    pub id: u64,
+    pub expression: String,
+    pub result: Option<String>,
+    pub error: Option<String>,
+    pub has_children: bool,
+}
+
+/// Manages a list of watch expressions.
+pub struct DebugWatchPanel {
+    expressions: Vec<DebugWatchExpression>,
+    next_id: u64,
+}
+
+impl DebugWatchPanel {
+    pub fn new() -> Self {
+        Self {
+            expressions: Vec::new(),
+            next_id: 1,
+        }
+    }
+
+    pub fn add_expression(&mut self, expr: &str) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.expressions.push(DebugWatchExpression {
+            id,
+            expression: expr.to_string(),
+            result: None,
+            error: None,
+            has_children: false,
+        });
+        id
+    }
+
+    pub fn remove_expression(&mut self, id: u64) -> bool {
+        let len_before = self.expressions.len();
+        self.expressions.retain(|e| e.id != id);
+        self.expressions.len() != len_before
+    }
+
+    pub fn update_result(&mut self, id: u64, result: String) {
+        if let Some(expr) = self.expressions.iter_mut().find(|e| e.id == id) {
+            expr.result = Some(result);
+            expr.error = None;
+        }
+    }
+
+    pub fn update_error(&mut self, id: u64, error: String) {
+        if let Some(expr) = self.expressions.iter_mut().find(|e| e.id == id) {
+            expr.error = Some(error);
+            expr.result = None;
+        }
+    }
+
+    pub fn get_expression(&self, id: u64) -> Option<&DebugWatchExpression> {
+        self.expressions.iter().find(|e| e.id == id)
+    }
+
+    pub fn expressions(&self) -> &[DebugWatchExpression] {
+        &self.expressions
+    }
+
+    pub fn clear(&mut self) {
+        self.expressions.clear();
+    }
+
+    pub fn expression_count(&self) -> usize {
+        self.expressions.len()
+    }
+}
+
+impl Default for DebugWatchPanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Debug Expression Evaluation ──
+
+/// Result of evaluating a debug expression.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EvalResult {
+    pub value: String,
+    pub var_type: String,
+    pub has_children: bool,
+}
+
+/// Evaluate a simple expression against a set of variable containers.
+/// Supports dot-notation for accessing children (e.g. "obj.field").
+/// Returns the value if found, or an error string.
+pub fn debug_evaluate(
+    containers: &[DebugVariableContainer],
+    expression: &str,
+) -> Result<EvalResult, String> {
+    let segments: Vec<&str> = expression.split('.').collect();
+    if segments.is_empty() || segments[0].is_empty() {
+        return Err("empty expression".to_string());
+    }
+
+    let root_name = segments[0];
+
+    // Search all containers for the root variable.
+    let mut current: Option<&DebugVariable> = None;
+    for container in containers {
+        if let Some(var) = container.find_variable(root_name) {
+            current = Some(var);
+            break;
+        }
+    }
+
+    let mut var = current.ok_or_else(|| format!("variable '{}' not found", root_name))?;
+
+    // Drill into children for subsequent segments.
+    for &seg in &segments[1..] {
+        var = var
+            .children
+            .iter()
+            .find(|c| c.name == seg)
+            .ok_or_else(|| format!("field '{}' not found on '{}'", seg, var.name))?;
+    }
+
+    Ok(EvalResult {
+        value: var.value.clone(),
+        var_type: var.var_type.clone(),
+        has_children: var.has_children(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1011,5 +1238,358 @@ mod tests {
     fn ext_debug_is_ascii_printable() {
         assert!(ExtDebugValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtDebugValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ── DebugVariableContainer tests ──
+
+    #[test]
+    fn variable_container_new() {
+        let c = DebugVariableContainer::new("Locals", VariableScope::Local);
+        assert_eq!(c.name, "Locals");
+        assert_eq!(c.scope, VariableScope::Local);
+        assert_eq!(c.variable_count(), 0);
+    }
+
+    #[test]
+    fn variable_container_add_and_count() {
+        let mut c = DebugVariableContainer::new("Globals", VariableScope::Global);
+        c.add_variable(DebugVariable::new("x", "42", "i32"));
+        c.add_variable(DebugVariable::new("y", "hello", "String"));
+        assert_eq!(c.variable_count(), 2);
+    }
+
+    #[test]
+    fn variable_container_find_variable() {
+        let mut c = DebugVariableContainer::new("Locals", VariableScope::Local);
+        c.add_variable(DebugVariable::new("x", "42", "i32"));
+        c.add_variable(DebugVariable::new("y", "hello", "String"));
+        assert_eq!(c.find_variable("x").unwrap().value, "42");
+        assert!(c.find_variable("z").is_none());
+    }
+
+    #[test]
+    fn variable_container_find_missing() {
+        let c = DebugVariableContainer::new("Empty", VariableScope::Closure);
+        assert!(c.find_variable("anything").is_none());
+    }
+
+    #[test]
+    fn variable_container_flatten_no_children() {
+        let mut c = DebugVariableContainer::new("Locals", VariableScope::Local);
+        c.add_variable(DebugVariable::new("a", "1", "i32"));
+        c.add_variable(DebugVariable::new("b", "2", "i32"));
+        let flat = c.flatten();
+        assert_eq!(flat.len(), 2);
+    }
+
+    #[test]
+    fn variable_container_flatten_with_children() {
+        let mut c = DebugVariableContainer::new("Locals", VariableScope::Local);
+        let mut parent = DebugVariable::new("obj", "{...}", "Object");
+        parent.add_child(DebugVariable::new("x", "1", "i32"));
+        parent.add_child(DebugVariable::new("y", "2", "i32"));
+        c.add_variable(parent);
+        c.add_variable(DebugVariable::new("z", "3", "i32"));
+        let flat = c.flatten();
+        assert_eq!(flat.len(), 4); // obj, x, y, z
+    }
+
+    #[test]
+    fn variable_container_flatten_nested_children() {
+        let mut c = DebugVariableContainer::new("Locals", VariableScope::Local);
+        let mut grandchild = DebugVariable::new("gc", "deep", "str");
+        grandchild.add_child(DebugVariable::new("leaf", "end", "str"));
+        let mut child = DebugVariable::new("child", "{}", "Object");
+        child.add_child(grandchild);
+        let mut root = DebugVariable::new("root", "{}", "Object");
+        root.add_child(child);
+        c.add_variable(root);
+        let flat = c.flatten();
+        assert_eq!(flat.len(), 4); // root, child, gc, leaf
+    }
+
+    #[test]
+    fn variable_container_scope_variants() {
+        assert_eq!(
+            DebugVariableContainer::new("a", VariableScope::Arguments).scope,
+            VariableScope::Arguments
+        );
+        assert_eq!(
+            DebugVariableContainer::new("c", VariableScope::Closure).scope,
+            VariableScope::Closure
+        );
+    }
+
+    // ── DebugVariable tests ──
+
+    #[test]
+    fn debug_variable_new() {
+        let v = DebugVariable::new("x", "42", "i32");
+        assert_eq!(v.name, "x");
+        assert_eq!(v.value, "42");
+        assert_eq!(v.var_type, "i32");
+        assert!(!v.has_children());
+        assert_eq!(v.child_count(), 0);
+        assert!(v.evaluate_name.is_none());
+    }
+
+    #[test]
+    fn debug_variable_add_child() {
+        let mut v = DebugVariable::new("obj", "{}", "Object");
+        v.add_child(DebugVariable::new("field", "10", "i32"));
+        assert!(v.has_children());
+        assert_eq!(v.child_count(), 1);
+    }
+
+    #[test]
+    fn debug_variable_with_evaluate_name() {
+        let v = DebugVariable::new("x", "42", "i32").with_evaluate_name("self.x");
+        assert_eq!(v.evaluate_name.as_deref(), Some("self.x"));
+    }
+
+    #[test]
+    fn debug_variable_multiple_children() {
+        let mut v = DebugVariable::new("arr", "[...]", "Vec");
+        v.add_child(DebugVariable::new("0", "a", "char"));
+        v.add_child(DebugVariable::new("1", "b", "char"));
+        v.add_child(DebugVariable::new("2", "c", "char"));
+        assert_eq!(v.child_count(), 3);
+    }
+
+    #[test]
+    fn debug_variable_has_children_false() {
+        let v = DebugVariable::new("simple", "val", "str");
+        assert!(!v.has_children());
+    }
+
+    #[test]
+    fn debug_variable_clone() {
+        let mut v = DebugVariable::new("x", "1", "i32");
+        v.add_child(DebugVariable::new("c", "2", "i32"));
+        let cloned = v.clone();
+        assert_eq!(v, cloned);
+    }
+
+    #[test]
+    fn debug_variable_with_evaluate_name_chained() {
+        let v = DebugVariable::new("field", "val", "str")
+            .with_evaluate_name("obj.field");
+        assert_eq!(v.name, "field");
+        assert_eq!(v.evaluate_name.as_deref(), Some("obj.field"));
+    }
+
+    #[test]
+    fn debug_variable_nested_children() {
+        let mut parent = DebugVariable::new("p", "{}", "Object");
+        let mut child = DebugVariable::new("c", "{}", "Object");
+        child.add_child(DebugVariable::new("gc", "1", "i32"));
+        parent.add_child(child);
+        assert_eq!(parent.child_count(), 1);
+        assert_eq!(parent.children[0].child_count(), 1);
+    }
+
+    // ── DebugWatchPanel tests ──
+
+    #[test]
+    fn watch_panel_new_is_empty() {
+        let panel = DebugWatchPanel::new();
+        assert_eq!(panel.expression_count(), 0);
+        assert!(panel.expressions().is_empty());
+    }
+
+    #[test]
+    fn watch_panel_add_expression() {
+        let mut panel = DebugWatchPanel::new();
+        let id = panel.add_expression("x + 1");
+        assert_eq!(id, 1);
+        assert_eq!(panel.expression_count(), 1);
+        let expr = panel.get_expression(id).unwrap();
+        assert_eq!(expr.expression, "x + 1");
+        assert!(expr.result.is_none());
+        assert!(expr.error.is_none());
+    }
+
+    #[test]
+    fn watch_panel_unique_ids() {
+        let mut panel = DebugWatchPanel::new();
+        let id1 = panel.add_expression("a");
+        let id2 = panel.add_expression("b");
+        let id3 = panel.add_expression("c");
+        assert_ne!(id1, id2);
+        assert_ne!(id2, id3);
+        assert_ne!(id1, id3);
+    }
+
+    #[test]
+    fn watch_panel_remove_expression() {
+        let mut panel = DebugWatchPanel::new();
+        let id = panel.add_expression("x");
+        assert!(panel.remove_expression(id));
+        assert_eq!(panel.expression_count(), 0);
+        assert!(!panel.remove_expression(id)); // already removed
+    }
+
+    #[test]
+    fn watch_panel_update_result() {
+        let mut panel = DebugWatchPanel::new();
+        let id = panel.add_expression("x");
+        panel.update_result(id, "42".into());
+        let expr = panel.get_expression(id).unwrap();
+        assert_eq!(expr.result.as_deref(), Some("42"));
+        assert!(expr.error.is_none());
+    }
+
+    #[test]
+    fn watch_panel_update_error() {
+        let mut panel = DebugWatchPanel::new();
+        let id = panel.add_expression("bad_expr");
+        panel.update_error(id, "undefined variable".into());
+        let expr = panel.get_expression(id).unwrap();
+        assert_eq!(expr.error.as_deref(), Some("undefined variable"));
+        assert!(expr.result.is_none());
+    }
+
+    #[test]
+    fn watch_panel_error_clears_result() {
+        let mut panel = DebugWatchPanel::new();
+        let id = panel.add_expression("x");
+        panel.update_result(id, "42".into());
+        panel.update_error(id, "err".into());
+        let expr = panel.get_expression(id).unwrap();
+        assert!(expr.result.is_none());
+        assert_eq!(expr.error.as_deref(), Some("err"));
+    }
+
+    #[test]
+    fn watch_panel_result_clears_error() {
+        let mut panel = DebugWatchPanel::new();
+        let id = panel.add_expression("x");
+        panel.update_error(id, "err".into());
+        panel.update_result(id, "ok".into());
+        let expr = panel.get_expression(id).unwrap();
+        assert_eq!(expr.result.as_deref(), Some("ok"));
+        assert!(expr.error.is_none());
+    }
+
+    #[test]
+    fn watch_panel_clear() {
+        let mut panel = DebugWatchPanel::new();
+        panel.add_expression("a");
+        panel.add_expression("b");
+        panel.clear();
+        assert_eq!(panel.expression_count(), 0);
+    }
+
+    #[test]
+    fn watch_panel_get_missing() {
+        let panel = DebugWatchPanel::new();
+        assert!(panel.get_expression(999).is_none());
+    }
+
+    #[test]
+    fn watch_panel_expressions_slice() {
+        let mut panel = DebugWatchPanel::new();
+        panel.add_expression("a");
+        panel.add_expression("b");
+        let exprs = panel.expressions();
+        assert_eq!(exprs.len(), 2);
+        assert_eq!(exprs[0].expression, "a");
+        assert_eq!(exprs[1].expression, "b");
+    }
+
+    // ── debug_evaluate tests ──
+
+    fn make_test_containers() -> Vec<DebugVariableContainer> {
+        let mut locals = DebugVariableContainer::new("Locals", VariableScope::Local);
+        locals.add_variable(DebugVariable::new("x", "42", "i32"));
+        let mut obj = DebugVariable::new("obj", "{...}", "Object");
+        obj.add_child(DebugVariable::new("name", "Alice", "String"));
+        let mut nested = DebugVariable::new("inner", "{...}", "Object");
+        nested.add_child(DebugVariable::new("val", "deep", "str"));
+        obj.add_child(nested);
+        locals.add_variable(obj);
+
+        let mut globals = DebugVariableContainer::new("Globals", VariableScope::Global);
+        globals.add_variable(DebugVariable::new("PI", "3.14", "f64"));
+
+        vec![locals, globals]
+    }
+
+    #[test]
+    fn eval_simple_variable() {
+        let containers = make_test_containers();
+        let result = debug_evaluate(&containers, "x").unwrap();
+        assert_eq!(result.value, "42");
+        assert_eq!(result.var_type, "i32");
+        assert!(!result.has_children);
+    }
+
+    #[test]
+    fn eval_dot_notation() {
+        let containers = make_test_containers();
+        let result = debug_evaluate(&containers, "obj.name").unwrap();
+        assert_eq!(result.value, "Alice");
+        assert_eq!(result.var_type, "String");
+    }
+
+    #[test]
+    fn eval_nested_dot_notation() {
+        let containers = make_test_containers();
+        let result = debug_evaluate(&containers, "obj.inner.val").unwrap();
+        assert_eq!(result.value, "deep");
+        assert_eq!(result.var_type, "str");
+        assert!(!result.has_children);
+    }
+
+    #[test]
+    fn eval_parent_has_children() {
+        let containers = make_test_containers();
+        let result = debug_evaluate(&containers, "obj").unwrap();
+        assert!(result.has_children);
+    }
+
+    #[test]
+    fn eval_global_variable() {
+        let containers = make_test_containers();
+        let result = debug_evaluate(&containers, "PI").unwrap();
+        assert_eq!(result.value, "3.14");
+        assert_eq!(result.var_type, "f64");
+    }
+
+    #[test]
+    fn eval_missing_variable() {
+        let containers = make_test_containers();
+        let result = debug_evaluate(&containers, "nonexistent");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn eval_missing_field() {
+        let containers = make_test_containers();
+        let result = debug_evaluate(&containers, "obj.missing");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
+    }
+
+    #[test]
+    fn eval_empty_expression() {
+        let containers = make_test_containers();
+        let result = debug_evaluate(&containers, "");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("empty"));
+    }
+
+    #[test]
+    fn eval_empty_containers() {
+        let result = debug_evaluate(&[], "x");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn eval_dot_on_leaf() {
+        let containers = make_test_containers();
+        let result = debug_evaluate(&containers, "x.field");
+        assert!(result.is_err());
     }
 }

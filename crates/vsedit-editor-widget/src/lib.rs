@@ -586,6 +586,222 @@ impl Widget for &EditorWidget {
     }
 }
 
+/// Controls cursor blink timing with configurable rates.
+pub struct EditorCursorBlink {
+    blink_rate_ms: u64,
+    is_visible: bool,
+    is_enabled: bool,
+    last_toggle_ms: u64,
+    blink_count: u64,
+}
+
+impl EditorCursorBlink {
+    /// Create a new blink controller with the given rate in milliseconds.
+    pub fn new(blink_rate_ms: u64) -> Self {
+        Self {
+            blink_rate_ms,
+            is_visible: true,
+            is_enabled: true,
+            last_toggle_ms: 0,
+            blink_count: 0,
+        }
+    }
+
+    /// Set the blink rate in milliseconds.
+    pub fn set_rate(&mut self, ms: u64) {
+        self.blink_rate_ms = ms;
+    }
+
+    /// Get the current blink rate in milliseconds.
+    pub fn rate(&self) -> u64 {
+        self.blink_rate_ms
+    }
+
+    /// Advance the blink timer by `elapsed_ms`. Returns `true` if visibility changed.
+    pub fn tick(&mut self, elapsed_ms: u64) -> bool {
+        if !self.is_enabled {
+            return false;
+        }
+        self.last_toggle_ms += elapsed_ms;
+        if self.last_toggle_ms >= self.blink_rate_ms {
+            self.last_toggle_ms -= self.blink_rate_ms;
+            self.is_visible = !self.is_visible;
+            self.blink_count += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Whether the cursor is currently visible.
+    pub fn is_visible(&self) -> bool {
+        self.is_visible
+    }
+
+    /// Reset blink state so the cursor is visible and the timer restarts.
+    pub fn reset(&mut self) {
+        self.is_visible = true;
+        self.last_toggle_ms = 0;
+    }
+
+    /// Enable blinking.
+    pub fn enable(&mut self) {
+        self.is_enabled = true;
+    }
+
+    /// Disable blinking and force the cursor visible.
+    pub fn disable(&mut self) {
+        self.is_enabled = false;
+        self.is_visible = true;
+    }
+
+    /// Whether blinking is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.is_enabled
+    }
+
+    /// Total number of blink toggles since creation.
+    pub fn blink_count(&self) -> u64 {
+        self.blink_count
+    }
+
+    /// Force the cursor visible without resetting the timer.
+    pub fn force_visible(&mut self) {
+        self.is_visible = true;
+    }
+}
+
+impl Default for EditorCursorBlink {
+    fn default() -> Self {
+        Self::new(530)
+    }
+}
+
+/// Synchronizes scroll positions between paired editor instances.
+pub struct EditorScrollSync {
+    source_scroll_top: u32,
+    source_scroll_left: u32,
+    target_scroll_top: u32,
+    target_scroll_left: u32,
+    vertical_enabled: bool,
+    horizontal_enabled: bool,
+    offset_lines: i32,
+    ratio: f64,
+}
+
+impl EditorScrollSync {
+    /// Create a new sync controller with both axes enabled, ratio 1.0, offset 0.
+    pub fn new() -> Self {
+        Self {
+            source_scroll_top: 0,
+            source_scroll_left: 0,
+            target_scroll_top: 0,
+            target_scroll_left: 0,
+            vertical_enabled: true,
+            horizontal_enabled: true,
+            offset_lines: 0,
+            ratio: 1.0,
+        }
+    }
+
+    /// Enable or disable vertical scroll syncing.
+    pub fn set_vertical_enabled(&mut self, v: bool) {
+        self.vertical_enabled = v;
+    }
+
+    /// Enable or disable horizontal scroll syncing.
+    pub fn set_horizontal_enabled(&mut self, v: bool) {
+        self.horizontal_enabled = v;
+    }
+
+    /// Set a fixed line offset applied to the target vertical scroll.
+    pub fn set_offset_lines(&mut self, offset: i32) {
+        self.offset_lines = offset;
+    }
+
+    /// Set the scroll ratio (clamped to 0.1..=10.0).
+    pub fn set_ratio(&mut self, ratio: f64) {
+        self.ratio = ratio.clamp(0.1, 10.0);
+    }
+
+    /// Update the target scroll positions based on the given source positions.
+    pub fn sync_from_source(&mut self, source_top: u32, source_left: u32) {
+        self.source_scroll_top = source_top;
+        self.source_scroll_left = source_left;
+
+        if self.vertical_enabled {
+            let scaled = (source_top as f64 * self.ratio) as i64 + self.offset_lines as i64;
+            self.target_scroll_top = scaled.max(0) as u32;
+        }
+
+        if self.horizontal_enabled {
+            self.target_scroll_left = (source_left as f64 * self.ratio) as u32;
+        }
+    }
+
+    /// The computed target vertical scroll position.
+    pub fn target_scroll_top(&self) -> u32 {
+        self.target_scroll_top
+    }
+
+    /// The computed target horizontal scroll position.
+    pub fn target_scroll_left(&self) -> u32 {
+        self.target_scroll_left
+    }
+
+    /// Returns `true` if source and target positions are equal.
+    pub fn is_synced(&self) -> bool {
+        self.source_scroll_top == self.target_scroll_top
+            && self.source_scroll_left == self.target_scroll_left
+    }
+
+    /// Reset all positions to zero.
+    pub fn reset(&mut self) {
+        self.source_scroll_top = 0;
+        self.source_scroll_left = 0;
+        self.target_scroll_top = 0;
+        self.target_scroll_left = 0;
+    }
+}
+
+impl Default for EditorScrollSync {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Extract the word under/around a given column in a line of text.
+/// Words are sequences of alphanumeric chars or underscores.
+/// Returns `(word, start_col_1based, end_col_1based)` or `None` if no word at position.
+pub fn editor_word_at_position(line: &str, column_1based: u32) -> Option<(String, u32, u32)> {
+    if line.is_empty() || column_1based == 0 {
+        return None;
+    }
+    let col = column_1based as usize;
+    let chars: Vec<char> = line.chars().collect();
+    if col > chars.len() {
+        return None;
+    }
+    // Index is 0-based; column_1based points to the character at col-1
+    let idx = col - 1;
+    let is_word_char = |c: char| c.is_alphanumeric() || c == '_';
+    if !is_word_char(chars[idx]) {
+        return None;
+    }
+    // Expand left
+    let mut start = idx;
+    while start > 0 && is_word_char(chars[start - 1]) {
+        start -= 1;
+    }
+    // Expand right
+    let mut end = idx;
+    while end + 1 < chars.len() && is_word_char(chars[end + 1]) {
+        end += 1;
+    }
+    let word: String = chars[start..=end].iter().collect();
+    Some((word, (start + 1) as u32, (end + 1) as u32))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1006,5 +1222,265 @@ mod tests {
         assert_eq!(w.current_match_index(), None);
         assert!(!w.show_find);
         assert!(!w.show_replace);
+    }
+
+    // ---- EditorCursorBlink tests ----
+
+    #[test]
+    fn cursor_blink_default_rate() {
+        let b = EditorCursorBlink::default();
+        assert_eq!(b.rate(), 530);
+        assert!(b.is_visible());
+        assert!(b.is_enabled());
+    }
+
+    #[test]
+    fn cursor_blink_custom_rate() {
+        let b = EditorCursorBlink::new(250);
+        assert_eq!(b.rate(), 250);
+    }
+
+    #[test]
+    fn cursor_blink_tick_toggles_visibility() {
+        let mut b = EditorCursorBlink::new(100);
+        assert!(b.is_visible());
+        let changed = b.tick(100);
+        assert!(changed);
+        assert!(!b.is_visible());
+    }
+
+    #[test]
+    fn cursor_blink_tick_no_toggle_before_rate() {
+        let mut b = EditorCursorBlink::new(100);
+        let changed = b.tick(50);
+        assert!(!changed);
+        assert!(b.is_visible());
+    }
+
+    #[test]
+    fn cursor_blink_multiple_ticks() {
+        let mut b = EditorCursorBlink::new(100);
+        b.tick(100); // visible -> hidden
+        b.tick(100); // hidden -> visible
+        assert!(b.is_visible());
+        assert_eq!(b.blink_count(), 2);
+    }
+
+    #[test]
+    fn cursor_blink_reset() {
+        let mut b = EditorCursorBlink::new(100);
+        b.tick(100);
+        assert!(!b.is_visible());
+        b.reset();
+        assert!(b.is_visible());
+    }
+
+    #[test]
+    fn cursor_blink_disable_forces_visible() {
+        let mut b = EditorCursorBlink::new(100);
+        b.tick(100);
+        assert!(!b.is_visible());
+        b.disable();
+        assert!(b.is_visible());
+        // Tick should not toggle while disabled
+        let changed = b.tick(200);
+        assert!(!changed);
+        assert!(b.is_visible());
+    }
+
+    #[test]
+    fn cursor_blink_enable_after_disable() {
+        let mut b = EditorCursorBlink::new(100);
+        b.disable();
+        b.enable();
+        assert!(b.is_enabled());
+        let changed = b.tick(100);
+        assert!(changed);
+    }
+
+    #[test]
+    fn cursor_blink_set_rate() {
+        let mut b = EditorCursorBlink::new(100);
+        b.set_rate(200);
+        assert_eq!(b.rate(), 200);
+        let changed = b.tick(100);
+        assert!(!changed); // Not enough time at new rate
+    }
+
+    #[test]
+    fn cursor_blink_force_visible() {
+        let mut b = EditorCursorBlink::new(100);
+        b.tick(100); // hidden
+        assert!(!b.is_visible());
+        b.force_visible();
+        assert!(b.is_visible());
+    }
+
+    // ---- EditorScrollSync tests ----
+
+    #[test]
+    fn scroll_sync_default_state() {
+        let s = EditorScrollSync::new();
+        assert_eq!(s.target_scroll_top(), 0);
+        assert_eq!(s.target_scroll_left(), 0);
+        assert!(s.is_synced());
+    }
+
+    #[test]
+    fn scroll_sync_basic_sync() {
+        let mut s = EditorScrollSync::new();
+        s.sync_from_source(10, 5);
+        assert_eq!(s.target_scroll_top(), 10);
+        assert_eq!(s.target_scroll_left(), 5);
+        assert!(s.is_synced());
+    }
+
+    #[test]
+    fn scroll_sync_with_ratio() {
+        let mut s = EditorScrollSync::new();
+        s.set_ratio(2.0);
+        s.sync_from_source(10, 4);
+        assert_eq!(s.target_scroll_top(), 20);
+        assert_eq!(s.target_scroll_left(), 8);
+    }
+
+    #[test]
+    fn scroll_sync_with_offset() {
+        let mut s = EditorScrollSync::new();
+        s.set_offset_lines(5);
+        s.sync_from_source(10, 0);
+        assert_eq!(s.target_scroll_top(), 15);
+    }
+
+    #[test]
+    fn scroll_sync_negative_offset_clamps_to_zero() {
+        let mut s = EditorScrollSync::new();
+        s.set_offset_lines(-20);
+        s.sync_from_source(5, 0);
+        assert_eq!(s.target_scroll_top(), 0);
+    }
+
+    #[test]
+    fn scroll_sync_vertical_disabled() {
+        let mut s = EditorScrollSync::new();
+        s.set_vertical_enabled(false);
+        s.sync_from_source(10, 5);
+        assert_eq!(s.target_scroll_top(), 0); // unchanged
+        assert_eq!(s.target_scroll_left(), 5);
+    }
+
+    #[test]
+    fn scroll_sync_horizontal_disabled() {
+        let mut s = EditorScrollSync::new();
+        s.set_horizontal_enabled(false);
+        s.sync_from_source(10, 5);
+        assert_eq!(s.target_scroll_top(), 10);
+        assert_eq!(s.target_scroll_left(), 0); // unchanged
+    }
+
+    #[test]
+    fn scroll_sync_ratio_clamped() {
+        let mut s = EditorScrollSync::new();
+        s.set_ratio(0.01);
+        s.sync_from_source(100, 0);
+        // ratio clamped to 0.1
+        assert_eq!(s.target_scroll_top(), 10);
+
+        s.set_ratio(20.0);
+        s.sync_from_source(1, 0);
+        // ratio clamped to 10.0
+        assert_eq!(s.target_scroll_top(), 10);
+    }
+
+    #[test]
+    fn scroll_sync_reset() {
+        let mut s = EditorScrollSync::new();
+        s.sync_from_source(50, 30);
+        s.reset();
+        assert_eq!(s.target_scroll_top(), 0);
+        assert_eq!(s.target_scroll_left(), 0);
+        assert!(s.is_synced());
+    }
+
+    #[test]
+    fn scroll_sync_is_synced_false_with_ratio() {
+        let mut s = EditorScrollSync::new();
+        s.set_ratio(2.0);
+        s.sync_from_source(10, 0);
+        assert!(!s.is_synced()); // source=10, target=20
+    }
+
+    // ---- editor_word_at_position tests ----
+
+    #[test]
+    fn word_at_position_middle_of_word() {
+        let result = editor_word_at_position("hello world", 3);
+        assert_eq!(result, Some(("hello".to_string(), 1, 5)));
+    }
+
+    #[test]
+    fn word_at_position_start_of_word() {
+        let result = editor_word_at_position("hello world", 1);
+        assert_eq!(result, Some(("hello".to_string(), 1, 5)));
+    }
+
+    #[test]
+    fn word_at_position_end_of_word() {
+        let result = editor_word_at_position("hello world", 5);
+        assert_eq!(result, Some(("hello".to_string(), 1, 5)));
+    }
+
+    #[test]
+    fn word_at_position_second_word() {
+        let result = editor_word_at_position("hello world", 8);
+        assert_eq!(result, Some(("world".to_string(), 7, 11)));
+    }
+
+    #[test]
+    fn word_at_position_on_space() {
+        let result = editor_word_at_position("hello world", 6);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn word_at_position_empty_line() {
+        let result = editor_word_at_position("", 1);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn word_at_position_beyond_line() {
+        let result = editor_word_at_position("hi", 5);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn word_at_position_underscore_word() {
+        let result = editor_word_at_position("my_var = 42", 3);
+        assert_eq!(result, Some(("my_var".to_string(), 1, 6)));
+    }
+
+    #[test]
+    fn word_at_position_on_punctuation() {
+        let result = editor_word_at_position("a.b", 2);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn word_at_position_single_char_word() {
+        let result = editor_word_at_position("a b c", 3);
+        assert_eq!(result, Some(("b".to_string(), 3, 3)));
+    }
+
+    #[test]
+    fn word_at_position_column_zero_returns_none() {
+        let result = editor_word_at_position("hello", 0);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn word_at_position_numeric_word() {
+        let result = editor_word_at_position("val = 12345;", 8);
+        assert_eq!(result, Some(("12345".to_string(), 7, 11)));
     }
 }

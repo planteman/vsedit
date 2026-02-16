@@ -557,6 +557,131 @@ impl Default for StickyscrollValidator {
     }
 }
 
+/// A display profile for the sticky scroll feature, combining visual options.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StickyScrollProfile {
+    /// Maximum number of sticky lines to show.
+    pub max_lines: usize,
+    /// Whether sticky scroll is enabled.
+    pub enabled: bool,
+    /// Strategy used to compute sticky lines.
+    pub strategy: StickyScrollStrategy,
+}
+
+/// Determines how sticky lines are computed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StickyScrollStrategy {
+    /// Compute from indentation levels.
+    Indentation,
+    /// Compute from language-specific scopes (e.g., function/class).
+    Scope,
+}
+
+impl Default for StickyScrollProfile {
+    fn default() -> Self {
+        Self {
+            max_lines: 5,
+            enabled: true,
+            strategy: StickyScrollStrategy::Indentation,
+        }
+    }
+}
+
+impl StickyScrollProfile {
+    pub fn new(max_lines: usize, enabled: bool, strategy: StickyScrollStrategy) -> Self {
+        Self { max_lines, enabled, strategy }
+    }
+
+    /// Apply this profile to a StickyScrollWidget.
+    pub fn apply(&self, widget: &mut StickyScrollWidget) {
+        widget.set_enabled(self.enabled);
+        widget.set_max_lines(self.max_lines);
+    }
+}
+
+impl fmt::Display for StickyScrollProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "StickyScrollProfile(max={}, enabled={}, strategy={:?})",
+            self.max_lines, self.enabled, self.strategy
+        )
+    }
+}
+
+impl fmt::Display for StickyScrollStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StickyScrollStrategy::Indentation => write!(f, "Indentation"),
+            StickyScrollStrategy::Scope => write!(f, "Scope"),
+        }
+    }
+}
+
+/// Compute sticky scroll lines from source text based on indentation.
+/// Each line that starts a new indentation scope (has greater indentation
+/// than the previous significant line) is a potential sticky header.
+/// The function finds ancestors of `cursor_line` in the indentation tree.
+pub fn sticky_scroll_compute(lines: &[&str], cursor_line: usize, max_depth: usize) -> Vec<StickyScrollLine> {
+    if lines.is_empty() || cursor_line >= lines.len() {
+        return Vec::new();
+    }
+
+    let indents: Vec<u32> = lines.iter().map(|l| {
+        let spaces = l.chars().take_while(|c| *c == ' ').count();
+        (spaces / 4) as u32
+    }).collect();
+
+    let mut headers: Vec<StickyScrollLine> = Vec::new();
+    let cursor_indent = indents[cursor_line];
+    let mut target_indent = cursor_indent;
+
+    let mut i = cursor_line;
+    loop {
+        if indents[i] < target_indent {
+            let text = lines[i].trim().to_string();
+            if !text.is_empty() {
+                headers.push(StickyScrollLine {
+                    line_number: i as u32 + 1,
+                    text,
+                    nesting_level: indents[i],
+                    collapsed: false,
+                });
+                target_indent = indents[i];
+            }
+        }
+        if i == 0 || headers.len() >= max_depth {
+            break;
+        }
+        i -= 1;
+    }
+
+    headers.reverse();
+    headers
+}
+
+/// Compute sticky lines from scope information (e.g., from a language server).
+/// `scopes` is a list of `(start_line, end_line, text, nesting_level)`.
+pub fn sticky_scroll_from_scopes(
+    scopes: &[(u32, u32, &str, u32)],
+    cursor_line: u32,
+    max_depth: usize,
+) -> Vec<StickyScrollLine> {
+    let mut active: Vec<&(u32, u32, &str, u32)> = scopes.iter()
+        .filter(|(start, end, _, _)| *start <= cursor_line && *end >= cursor_line)
+        .collect();
+    active.sort_by_key(|(_, _, _, level)| *level);
+    active.truncate(max_depth);
+    active.iter().map(|(start, _, text, level)| {
+        StickyScrollLine {
+            line_number: *start,
+            text: text.to_string(),
+            nesting_level: *level,
+            collapsed: false,
+        }
+    }).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1034,5 +1159,89 @@ mod tests {
     fn stickyscroll_is_ascii_printable() {
         assert!(StickyscrollValidator::is_ascii_printable("Hello World 123"));
         assert!(!StickyscrollValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn sticky_scroll_profile_default() {
+        let profile = StickyScrollProfile::default();
+        assert_eq!(profile.max_lines, 5);
+        assert!(profile.enabled);
+        assert_eq!(profile.strategy, StickyScrollStrategy::Indentation);
+    }
+
+    #[test]
+    fn sticky_scroll_profile_apply() {
+        let profile = StickyScrollProfile::new(3, false, StickyScrollStrategy::Scope);
+        let mut widget = StickyScrollWidget::new(10);
+        profile.apply(&mut widget);
+        assert!(!widget.is_enabled());
+        assert_eq!(widget.max_lines(), 3);
+    }
+
+    #[test]
+    fn sticky_scroll_profile_display() {
+        let profile = StickyScrollProfile::default();
+        let s = profile.to_string();
+        assert!(s.contains("max=5"));
+        assert!(s.contains("enabled=true"));
+    }
+
+    #[test]
+    fn sticky_scroll_compute_nested() {
+        let lines = vec![
+            "fn main() {",
+            "    let x = 1;",
+            "    if true {",
+            "        println!();",
+            "    }",
+            "}",
+        ];
+        let refs: Vec<&str> = lines.iter().map(|s| *s).collect();
+        let result = sticky_scroll_compute(&refs, 3, 5);
+        assert!(!result.is_empty());
+        assert!(result.iter().any(|l| l.text.contains("fn main")));
+    }
+
+    #[test]
+    fn sticky_scroll_compute_empty() {
+        let result = sticky_scroll_compute(&[], 0, 5);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn sticky_scroll_compute_max_depth() {
+        let lines = vec![
+            "level0",
+            "    level1",
+            "        level2",
+            "            level3",
+        ];
+        let refs: Vec<&str> = lines.iter().map(|s| *s).collect();
+        let result = sticky_scroll_compute(&refs, 3, 2);
+        assert!(result.len() <= 2);
+    }
+
+    #[test]
+    fn sticky_scroll_from_scopes_basic() {
+        let scopes = vec![
+            (1, 10, "fn main() {", 0),
+            (3, 8, "if condition {", 1),
+            (5, 7, "for x in items {", 2),
+        ];
+        let result = sticky_scroll_from_scopes(&scopes, 6, 5);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].nesting_level, 0);
+        assert_eq!(result[2].nesting_level, 2);
+    }
+
+    #[test]
+    fn sticky_scroll_from_scopes_limited() {
+        let scopes = vec![
+            (1, 10, "outer", 0),
+            (2, 9, "middle", 1),
+            (3, 8, "inner", 2),
+        ];
+        let result = sticky_scroll_from_scopes(&scopes, 5, 2);
+        assert_eq!(result.len(), 2);
     }
 }

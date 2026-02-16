@@ -594,6 +594,176 @@ impl Default for WbAuthValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// AuthSession
+// ---------------------------------------------------------------------------
+
+/// An authentication session with token and expiration management.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthSession {
+    pub session_id: String,
+    pub provider_id: String,
+    pub access_token: String,
+    pub refresh_token: Option<String>,
+    pub expires_at: Option<u64>,
+    pub scopes: Vec<String>,
+}
+
+impl AuthSession {
+    /// Create a new auth session.
+    pub fn new(
+        session_id: impl Into<String>,
+        provider_id: impl Into<String>,
+        access_token: impl Into<String>,
+    ) -> Self {
+        Self {
+            session_id: session_id.into(),
+            provider_id: provider_id.into(),
+            access_token: access_token.into(),
+            refresh_token: None,
+            expires_at: None,
+            scopes: Vec::new(),
+        }
+    }
+
+    /// Set the refresh token.
+    pub fn with_refresh_token(mut self, token: impl Into<String>) -> Self {
+        self.refresh_token = Some(token.into());
+        self
+    }
+
+    /// Set the expiration time (unix timestamp in seconds).
+    pub fn with_expires_at(mut self, ts: u64) -> Self {
+        self.expires_at = Some(ts);
+        self
+    }
+
+    /// Add scopes to this session.
+    pub fn with_scopes(mut self, scopes: Vec<String>) -> Self {
+        self.scopes = scopes;
+        self
+    }
+
+    /// Check if the session is expired at the given current time.
+    pub fn is_expired(&self, current_time: u64) -> bool {
+        match self.expires_at {
+            Some(exp) => current_time >= exp,
+            None => false,
+        }
+    }
+
+    /// Check if a specific scope is granted.
+    pub fn has_scope(&self, scope: &str) -> bool {
+        self.scopes.iter().any(|s| s == scope)
+    }
+
+    /// Time remaining in seconds before expiration, or None if no expiration.
+    pub fn time_remaining(&self, current_time: u64) -> Option<u64> {
+        self.expires_at.map(|exp| exp.saturating_sub(current_time))
+    }
+}
+
+impl fmt::Display for AuthSession {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "AuthSession({}, provider={})",
+            self.session_id, self.provider_id
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AuthProviderRegistry
+// ---------------------------------------------------------------------------
+
+/// Registry that manages authentication providers and their sessions.
+pub struct AuthProviderRegistry {
+    providers: Vec<AuthProvider>,
+    sessions: Vec<AuthSession>,
+}
+
+impl AuthProviderRegistry {
+    pub fn new() -> Self {
+        Self {
+            providers: Vec::new(),
+            sessions: Vec::new(),
+        }
+    }
+
+    /// Register a new provider.
+    pub fn register(&mut self, provider: AuthProvider) -> Result<(), AuthError> {
+        if self.providers.iter().any(|p| p.id == provider.id) {
+            return Err(AuthError::ProviderAlreadyRegistered(provider.id));
+        }
+        self.providers.push(provider);
+        Ok(())
+    }
+
+    /// Find a provider by id.
+    pub fn get_provider(&self, id: &str) -> Option<&AuthProvider> {
+        self.providers.iter().find(|p| p.id == id)
+    }
+
+    /// Add a session.
+    pub fn add_session(&mut self, session: AuthSession) {
+        self.sessions.push(session);
+    }
+
+    /// Get all sessions for a provider.
+    pub fn sessions_for_provider(&self, provider_id: &str) -> Vec<&AuthSession> {
+        self.sessions
+            .iter()
+            .filter(|s| s.provider_id == provider_id)
+            .collect()
+    }
+
+    /// Remove expired sessions given the current time.
+    pub fn remove_expired(&mut self, current_time: u64) -> usize {
+        let before = self.sessions.len();
+        self.sessions.retain(|s| !s.is_expired(current_time));
+        before - self.sessions.len()
+    }
+
+    /// Number of registered providers.
+    pub fn provider_count(&self) -> usize {
+        self.providers.len()
+    }
+
+    /// Number of active sessions.
+    pub fn session_count(&self) -> usize {
+        self.sessions.len()
+    }
+}
+
+impl Default for AuthProviderRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Attempt to refresh an auth token. Returns a new session with updated token.
+pub fn auth_token_refresh(
+    session: &AuthSession,
+    new_token: &str,
+    new_expires_at: Option<u64>,
+) -> Result<AuthSession, AuthError> {
+    if session.refresh_token.is_none() {
+        return Err(AuthError::SessionNotFound(format!(
+            "no refresh token for session {}",
+            session.session_id
+        )));
+    }
+    Ok(AuthSession {
+        session_id: session.session_id.clone(),
+        provider_id: session.provider_id.clone(),
+        access_token: new_token.to_string(),
+        refresh_token: session.refresh_token.clone(),
+        expires_at: new_expires_at,
+        scopes: session.scopes.clone(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1016,5 +1186,79 @@ mod tests {
     fn wb_auth_is_ascii_printable() {
         assert!(WbAuthValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbAuthValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn auth_session_basic() {
+        let session = AuthSession::new("s1", "github", "token123")
+            .with_expires_at(1000)
+            .with_scopes(vec!["read".into(), "write".into()]);
+        assert!(!session.is_expired(500));
+        assert!(session.is_expired(1000));
+        assert!(session.has_scope("read"));
+        assert!(!session.has_scope("admin"));
+    }
+
+    #[test]
+    fn auth_session_time_remaining() {
+        let session = AuthSession::new("s1", "github", "tok").with_expires_at(1000);
+        assert_eq!(session.time_remaining(800), Some(200));
+        assert_eq!(session.time_remaining(1200), Some(0));
+    }
+
+    #[test]
+    fn auth_session_no_expiry() {
+        let session = AuthSession::new("s1", "github", "tok");
+        assert!(!session.is_expired(9999));
+        assert_eq!(session.time_remaining(100), None);
+    }
+
+    #[test]
+    fn auth_session_display() {
+        let session = AuthSession::new("s1", "github", "tok");
+        assert!(session.to_string().contains("s1"));
+        assert!(session.to_string().contains("github"));
+    }
+
+    #[test]
+    fn auth_provider_registry_register() {
+        let mut reg = AuthProviderRegistry::new();
+        let provider = AuthProviderBuilder::new("github")
+            .label("GitHub")
+            .build()
+            .unwrap();
+        assert!(reg.register(provider.clone()).is_ok());
+        assert!(reg.register(provider).is_err()); // duplicate
+        assert_eq!(reg.provider_count(), 1);
+    }
+
+    #[test]
+    fn auth_provider_registry_sessions() {
+        let mut reg = AuthProviderRegistry::new();
+        reg.add_session(AuthSession::new("s1", "github", "tok1"));
+        reg.add_session(AuthSession::new("s2", "azure", "tok2"));
+        reg.add_session(AuthSession::new("s3", "github", "tok3"));
+        let gh = reg.sessions_for_provider("github");
+        assert_eq!(gh.len(), 2);
+    }
+
+    #[test]
+    fn auth_provider_registry_remove_expired() {
+        let mut reg = AuthProviderRegistry::new();
+        reg.add_session(AuthSession::new("s1", "gh", "t1").with_expires_at(100));
+        reg.add_session(AuthSession::new("s2", "gh", "t2").with_expires_at(200));
+        let removed = reg.remove_expired(150);
+        assert_eq!(removed, 1);
+        assert_eq!(reg.session_count(), 1);
+    }
+
+    #[test]
+    fn auth_token_refresh_works() {
+        let session =
+            AuthSession::new("s1", "github", "old_token").with_refresh_token("refresh_tok");
+        let refreshed = auth_token_refresh(&session, "new_token", Some(2000)).unwrap();
+        assert_eq!(refreshed.access_token, "new_token");
+        assert_eq!(refreshed.expires_at, Some(2000));
+        assert_eq!(refreshed.session_id, "s1");
     }
 }

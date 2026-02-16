@@ -649,6 +649,216 @@ impl Default for ErrorsValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ErrorChain – wrapping nested errors with context
+// ---------------------------------------------------------------------------
+
+/// A chain of errors with associated context messages, useful for tracing
+/// the path through which an error propagated.
+#[derive(Debug)]
+pub struct ErrorChain {
+    errors: Vec<(String, VsError)>,
+}
+
+impl ErrorChain {
+    /// Creates a new chain with the given root error.
+    pub fn new(error: VsError) -> Self {
+        Self {
+            errors: vec![(String::new(), error)],
+        }
+    }
+
+    /// Adds a contextual layer to the chain.
+    pub fn with_context(mut self, ctx: impl Into<String>, error: VsError) -> Self {
+        self.errors.push((ctx.into(), error));
+        self
+    }
+
+    /// Returns the first (root-cause) error in the chain.
+    pub fn root_cause(&self) -> Option<&VsError> {
+        self.errors.first().map(|(_, e)| e)
+    }
+
+    /// Returns the number of errors in the chain.
+    pub fn depth(&self) -> usize {
+        self.errors.len()
+    }
+
+    /// Returns all context strings in the chain.
+    pub fn contexts(&self) -> Vec<&str> {
+        self.errors.iter().map(|(ctx, _)| ctx.as_str()).collect()
+    }
+
+    /// Returns the highest (most severe) severity across all errors.
+    pub fn highest_severity(&self) -> ErrorSeverity {
+        self.errors
+            .iter()
+            .map(|(_, e)| e.severity())
+            .max_by_key(|s| severity_rank(*s))
+            .unwrap_or(ErrorSeverity::Info)
+    }
+}
+
+impl fmt::Display for ErrorChain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (i, (ctx, error)) in self.errors.iter().enumerate() {
+            if i > 0 {
+                write!(f, "\n  caused by: ")?;
+            }
+            if ctx.is_empty() {
+                write!(f, "{error}")?;
+            } else {
+                write!(f, "{ctx}: {error}")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// error_display_format – user-friendly terminal formatting
+// ---------------------------------------------------------------------------
+
+/// Formats a `VsError` for user-friendly terminal display.
+///
+/// The output includes the severity prefix (e.g. `[ERROR]`), the error code
+/// in parentheses, and a `"System error: "` prefix for I/O errors.
+pub fn error_display_format(error: &VsError) -> String {
+    let severity_label = match error.severity() {
+        ErrorSeverity::Info => "INFO",
+        ErrorSeverity::Warning => "WARN",
+        ErrorSeverity::Error => "ERROR",
+    };
+
+    let message = match error {
+        VsError::Io(e) => format!("System error: {e}"),
+        other => other.to_string(),
+    };
+
+    format!("[{severity_label}] {message} ({code})", code = error.code())
+}
+
+// ---------------------------------------------------------------------------
+// ErrorFilter – filter errors by criteria
+// ---------------------------------------------------------------------------
+
+/// Filters errors and error records by configurable criteria such as
+/// minimum severity and variant exclusions.
+#[derive(Debug, Clone)]
+pub struct ErrorFilter {
+    min_severity: Option<ErrorSeverity>,
+    exclude_cancelled: bool,
+}
+
+impl ErrorFilter {
+    /// Creates a new filter with no restrictions.
+    pub fn new() -> Self {
+        Self {
+            min_severity: None,
+            exclude_cancelled: false,
+        }
+    }
+
+    /// Sets the minimum severity an error must have to pass the filter.
+    pub fn min_severity(mut self, sev: ErrorSeverity) -> Self {
+        self.min_severity = Some(sev);
+        self
+    }
+
+    /// Excludes `Cancelled` errors from matching.
+    pub fn exclude_cancelled(mut self) -> Self {
+        self.exclude_cancelled = true;
+        self
+    }
+
+    /// Returns `true` if the given error passes all filter criteria.
+    pub fn matches(&self, error: &VsError) -> bool {
+        if self.exclude_cancelled && is_cancelled(error) {
+            return false;
+        }
+        if let Some(min) = self.min_severity {
+            if severity_rank(error.severity()) < severity_rank(min) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Filters a slice of [`ErrorRecord`]s, returning references to those
+    /// that pass all criteria.
+    pub fn filter_records<'a>(&self, records: &'a [ErrorRecord]) -> Vec<&'a ErrorRecord> {
+        records.iter().filter(|r| self.matches(&r.error)).collect()
+    }
+}
+
+impl Default for ErrorFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ErrorClassifier – categorise errors
+// ---------------------------------------------------------------------------
+
+/// Broad category of an error, useful for routing and retry logic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ErrorCategory {
+    /// Caused by user input or action.
+    User,
+    /// Caused by the operating system or environment.
+    System,
+    /// An internal logic error.
+    Internal,
+    /// A potentially transient failure that may succeed on retry.
+    Transient,
+}
+
+impl fmt::Display for ErrorCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::User => write!(f, "user"),
+            Self::System => write!(f, "system"),
+            Self::Internal => write!(f, "internal"),
+            Self::Transient => write!(f, "transient"),
+        }
+    }
+}
+
+/// Classifies errors and determines retry eligibility.
+pub struct ErrorClassifier;
+
+impl ErrorClassifier {
+    /// Returns the [`ErrorCategory`] for the given error.
+    pub fn classify(error: &VsError) -> ErrorCategory {
+        match error {
+            VsError::User(_)
+            | VsError::IllegalArgument(_)
+            | VsError::NotFound(_)
+            | VsError::ReadOnly(_)
+            | VsError::PermissionDenied(_) => ErrorCategory::User,
+
+            VsError::Io(_) => ErrorCategory::System,
+
+            VsError::Cancelled => ErrorCategory::Transient,
+
+            VsError::NotImplemented(_)
+            | VsError::NotSupported(_)
+            | VsError::IllegalState(_)
+            | VsError::Other(_) => ErrorCategory::Internal,
+        }
+    }
+
+    /// Returns `true` if the error is potentially transient and the
+    /// operation could succeed on retry.
+    pub fn is_retriable(error: &VsError) -> bool {
+        matches!(
+            Self::classify(error),
+            ErrorCategory::System | ErrorCategory::Transient
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1038,5 +1248,150 @@ mod tests {
     fn errors_is_ascii_printable() {
         assert!(ErrorsValidator::is_ascii_printable("Hello World 123"));
         assert!(!ErrorsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // ErrorChain tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn error_chain_creation_and_depth() {
+        let chain = ErrorChain::new(VsError::Cancelled);
+        assert_eq!(chain.depth(), 1);
+    }
+
+    #[test]
+    fn error_chain_with_context_adds_layers() {
+        let chain = ErrorChain::new(VsError::Cancelled)
+            .with_context("opening file", VsError::NotFound("foo.txt".into()))
+            .with_context("loading project", VsError::IllegalState("bad state".into()));
+        assert_eq!(chain.depth(), 3);
+        let ctxs = chain.contexts();
+        assert_eq!(ctxs[1], "opening file");
+        assert_eq!(ctxs[2], "loading project");
+    }
+
+    #[test]
+    fn error_chain_root_cause_returns_first() {
+        let chain = ErrorChain::new(VsError::Cancelled)
+            .with_context("wrap", VsError::NotFound("x".into()));
+        let root = chain.root_cause().unwrap();
+        assert!(matches!(root, VsError::Cancelled));
+    }
+
+    #[test]
+    fn error_chain_highest_severity_picks_most_severe() {
+        let chain = ErrorChain::new(VsError::Cancelled) // Info
+            .with_context("layer", VsError::NotSupported("a".into())) // Warning
+            .with_context("layer2", VsError::NotFound("b".into())); // Error
+        assert_eq!(chain.highest_severity(), ErrorSeverity::Error);
+    }
+
+    #[test]
+    fn error_chain_display_format() {
+        let chain = ErrorChain::new(VsError::Cancelled)
+            .with_context("opening file", VsError::NotFound("foo".into()));
+        let display = chain.to_string();
+        assert!(display.contains("Cancelled"));
+        assert!(display.contains("opening file"));
+    }
+
+    // -----------------------------------------------------------------------
+    // error_display_format tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn display_format_regular_error() {
+        let err = VsError::NotFound("config.json".into());
+        let formatted = error_display_format(&err);
+        assert!(formatted.starts_with("[ERROR]"));
+        assert!(formatted.contains("NOT_FOUND"));
+        assert!(formatted.contains("config.json"));
+    }
+
+    #[test]
+    fn display_format_io_error() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "no such file");
+        let err = VsError::Io(io_err);
+        let formatted = error_display_format(&err);
+        assert!(formatted.starts_with("[ERROR]"));
+        assert!(formatted.contains("System error:"));
+        assert!(formatted.contains("IO_ERROR"));
+    }
+
+    #[test]
+    fn display_format_warning() {
+        let err = VsError::NotSupported("feature X".into());
+        let formatted = error_display_format(&err);
+        assert!(formatted.starts_with("[WARN]"));
+    }
+
+    // -----------------------------------------------------------------------
+    // ErrorFilter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn error_filter_matches_by_severity() {
+        let filter = ErrorFilter::new().min_severity(ErrorSeverity::Warning);
+        assert!(filter.matches(&VsError::NotFound("x".into()))); // Error >= Warning
+        assert!(filter.matches(&VsError::NotSupported("y".into()))); // Warning >= Warning
+        assert!(!filter.matches(&VsError::Cancelled)); // Info < Warning
+    }
+
+    #[test]
+    fn error_filter_excludes_cancelled() {
+        let filter = ErrorFilter::new().exclude_cancelled();
+        assert!(!filter.matches(&VsError::Cancelled));
+        assert!(filter.matches(&VsError::NotFound("x".into())));
+    }
+
+    #[test]
+    fn error_filter_records() {
+        let records = vec![
+            ErrorRecord::new(VsError::Cancelled),
+            ErrorRecord::new(VsError::NotFound("a".into())),
+            ErrorRecord::new(VsError::NotSupported("b".into())),
+        ];
+        let filter = ErrorFilter::new().min_severity(ErrorSeverity::Warning);
+        let filtered = filter.filter_records(&records);
+        assert_eq!(filtered.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // ErrorClassifier tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn error_classifier_categories() {
+        assert_eq!(
+            ErrorClassifier::classify(&VsError::User("oops".into())),
+            ErrorCategory::User
+        );
+        assert_eq!(
+            ErrorClassifier::classify(&VsError::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "disk"
+            ))),
+            ErrorCategory::System
+        );
+        assert_eq!(
+            ErrorClassifier::classify(&VsError::Cancelled),
+            ErrorCategory::Transient
+        );
+        assert_eq!(
+            ErrorClassifier::classify(&VsError::IllegalState("bad".into())),
+            ErrorCategory::Internal
+        );
+    }
+
+    #[test]
+    fn error_classifier_retriable() {
+        assert!(ErrorClassifier::is_retriable(&VsError::Cancelled));
+        assert!(ErrorClassifier::is_retriable(&VsError::Io(
+            std::io::Error::new(std::io::ErrorKind::Other, "timeout")
+        )));
+        assert!(!ErrorClassifier::is_retriable(&VsError::NotFound(
+            "x".into()
+        )));
     }
 }

@@ -474,6 +474,197 @@ impl MarkerSummary {
 }
 
 // ---------------------------------------------------------------------------
+// MarkerCollection
+// ---------------------------------------------------------------------------
+
+/// A collection that aggregates markers from multiple owners for a single file.
+pub struct MarkerCollection {
+    uri: VsUri,
+    markers_by_owner: HashMap<String, Vec<MarkerData>>,
+}
+
+impl MarkerCollection {
+    pub fn new(uri: VsUri) -> Self {
+        Self {
+            uri,
+            markers_by_owner: HashMap::new(),
+        }
+    }
+
+    /// Set (replace) markers for the given owner.
+    pub fn set_markers(&mut self, owner: &str, markers: Vec<MarkerData>) {
+        if markers.is_empty() {
+            self.markers_by_owner.remove(owner);
+        } else {
+            self.markers_by_owner.insert(owner.to_string(), markers);
+        }
+    }
+
+    /// Remove an owner and its markers. Returns `true` if the owner existed.
+    pub fn remove_owner(&mut self, owner: &str) -> bool {
+        self.markers_by_owner.remove(owner).is_some()
+    }
+
+    /// Get the markers for a specific owner.
+    pub fn get_markers(&self, owner: &str) -> Option<&[MarkerData]> {
+        self.markers_by_owner.get(owner).map(|v| v.as_slice())
+    }
+
+    /// Return references to all markers from every owner, flattened.
+    pub fn all_markers(&self) -> Vec<&MarkerData> {
+        self.markers_by_owner.values().flat_map(|v| v.iter()).collect()
+    }
+
+    /// Total number of markers across all owners.
+    pub fn total_count(&self) -> usize {
+        self.markers_by_owner.values().map(|v| v.len()).sum()
+    }
+
+    /// Number of distinct owners.
+    pub fn owner_count(&self) -> usize {
+        self.markers_by_owner.len()
+    }
+
+    /// Count markers matching a given severity across all owners.
+    pub fn severity_count(&self, severity: MarkerSeverity) -> usize {
+        self.markers_by_owner
+            .values()
+            .flat_map(|v| v.iter())
+            .filter(|m| m.severity == severity)
+            .count()
+    }
+
+    /// Returns `true` if any marker has `Error` severity.
+    pub fn has_errors(&self) -> bool {
+        self.markers_by_owner
+            .values()
+            .flat_map(|v| v.iter())
+            .any(|m| m.severity == MarkerSeverity::Error)
+    }
+
+    /// Remove all owners and their markers.
+    pub fn clear(&mut self) {
+        self.markers_by_owner.clear();
+    }
+
+    /// The URI this collection belongs to.
+    pub fn uri(&self) -> &VsUri {
+        &self.uri
+    }
+
+    /// Returns `true` if there are no markers from any owner.
+    pub fn is_empty(&self) -> bool {
+        self.markers_by_owner.values().all(|v| v.is_empty())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Terminal rendering helpers
+// ---------------------------------------------------------------------------
+
+/// Return a terminal-friendly icon string for a marker severity.
+pub fn marker_severity_icon(severity: MarkerSeverity) -> &'static str {
+    match severity {
+        MarkerSeverity::Error => "✖",
+        MarkerSeverity::Warning => "⚠",
+        MarkerSeverity::Info => "ℹ",
+        MarkerSeverity::Hint => "💡",
+    }
+}
+
+/// Return a short label for a marker severity.
+pub fn marker_severity_label(severity: MarkerSeverity) -> &'static str {
+    match severity {
+        MarkerSeverity::Error => "error",
+        MarkerSeverity::Warning => "warning",
+        MarkerSeverity::Info => "info",
+        MarkerSeverity::Hint => "hint",
+    }
+}
+
+/// Format a marker for display in a terminal problems panel.
+pub fn format_marker_for_terminal(marker: &MarkerData, uri: &VsUri) -> String {
+    let icon = marker_severity_icon(marker.severity);
+    let source_part = match &marker.source {
+        Some(s) => format!(" [{s}]"),
+        None => String::new(),
+    };
+    format!(
+        "{icon} {uri}:{}:{} - {}{source_part}",
+        marker.start_line, marker.start_column, marker.message,
+    )
+}
+
+// ---------------------------------------------------------------------------
+// WorkspaceMarkerStats
+// ---------------------------------------------------------------------------
+
+/// Workspace-wide marker statistics across all files and owners.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceMarkerStats {
+    pub total_files: usize,
+    pub total_markers: usize,
+    pub errors: usize,
+    pub warnings: usize,
+    pub infos: usize,
+    pub hints: usize,
+    pub files_with_errors: usize,
+}
+
+impl std::fmt::Display for WorkspaceMarkerStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} errors, {} warnings, {} info in {} files",
+            self.errors, self.warnings, self.infos, self.total_files,
+        )
+    }
+}
+
+/// Compute workspace-wide marker statistics from a `MarkerService`.
+pub fn markers_stats(service: &MarkerService) -> WorkspaceMarkerStats {
+    let map = service.markers.lock().unwrap();
+
+    // Collect per-URI aggregated counts.
+    let mut per_uri: HashMap<&VsUri, (usize, usize, usize, usize)> = HashMap::new();
+
+    for ((_, uri), data) in map.iter() {
+        let entry = per_uri.entry(uri).or_insert((0, 0, 0, 0));
+        for m in data {
+            match m.severity {
+                MarkerSeverity::Error => entry.0 += 1,
+                MarkerSeverity::Warning => entry.1 += 1,
+                MarkerSeverity::Info => entry.2 += 1,
+                MarkerSeverity::Hint => entry.3 += 1,
+            }
+        }
+    }
+
+    let mut stats = WorkspaceMarkerStats {
+        total_files: per_uri.len(),
+        total_markers: 0,
+        errors: 0,
+        warnings: 0,
+        infos: 0,
+        hints: 0,
+        files_with_errors: 0,
+    };
+
+    for (e, w, i, h) in per_uri.values() {
+        stats.errors += e;
+        stats.warnings += w;
+        stats.infos += i;
+        stats.hints += h;
+        stats.total_markers += e + w + i + h;
+        if *e > 0 {
+            stats.files_with_errors += 1;
+        }
+    }
+
+    stats
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1011,5 +1202,340 @@ mod tests {
         assert_eq!(summary.count_by_source.get("rustc"), Some(&2));
         assert_eq!(summary.count_by_source.get("clippy"), Some(&1));
         assert_eq!(summary.count_by_source.get("(unknown)"), Some(&1));
+    }
+
+    // -- MarkerCollection tests --
+
+    fn info_marker(msg: &str, line: u32) -> MarkerData {
+        MarkerData {
+            severity: MarkerSeverity::Info,
+            message: msg.to_string(),
+            source: None,
+            code: None,
+            start_line: line,
+            start_column: 1,
+            end_line: line,
+            end_column: 1,
+            related_information: vec![],
+            tags: vec![],
+        }
+    }
+
+    fn hint_marker(msg: &str, line: u32) -> MarkerData {
+        MarkerData {
+            severity: MarkerSeverity::Hint,
+            message: msg.to_string(),
+            source: None,
+            code: None,
+            start_line: line,
+            start_column: 1,
+            end_line: line,
+            end_column: 1,
+            related_information: vec![],
+            tags: vec![],
+        }
+    }
+
+    #[test]
+    fn collection_new_is_empty() {
+        let col = MarkerCollection::new(VsUri::file("/test.rs"));
+        assert!(col.is_empty());
+        assert_eq!(col.total_count(), 0);
+        assert_eq!(col.owner_count(), 0);
+        assert_eq!(col.uri(), &VsUri::file("/test.rs"));
+    }
+
+    #[test]
+    fn collection_set_and_get_markers() {
+        let mut col = MarkerCollection::new(VsUri::file("/a.rs"));
+        col.set_markers("rustc", vec![error_marker("e1", 1), error_marker("e2", 2)]);
+        col.set_markers("clippy", vec![warning_marker("w1", 3)]);
+
+        assert_eq!(col.get_markers("rustc").unwrap().len(), 2);
+        assert_eq!(col.get_markers("clippy").unwrap().len(), 1);
+        assert!(col.get_markers("unknown").is_none());
+    }
+
+    #[test]
+    fn collection_all_markers_flattened() {
+        let mut col = MarkerCollection::new(VsUri::file("/b.rs"));
+        col.set_markers("rustc", vec![error_marker("e1", 1)]);
+        col.set_markers("clippy", vec![warning_marker("w1", 2), warning_marker("w2", 3)]);
+
+        let all = col.all_markers();
+        assert_eq!(all.len(), 3);
+    }
+
+    #[test]
+    fn collection_total_and_owner_count() {
+        let mut col = MarkerCollection::new(VsUri::file("/c.rs"));
+        col.set_markers("a", vec![error_marker("e", 1)]);
+        col.set_markers("b", vec![warning_marker("w", 2), info_marker("i", 3)]);
+
+        assert_eq!(col.total_count(), 3);
+        assert_eq!(col.owner_count(), 2);
+    }
+
+    #[test]
+    fn collection_remove_owner() {
+        let mut col = MarkerCollection::new(VsUri::file("/d.rs"));
+        col.set_markers("rustc", vec![error_marker("e1", 1)]);
+        col.set_markers("clippy", vec![warning_marker("w1", 2)]);
+
+        assert!(col.remove_owner("rustc"));
+        assert!(!col.remove_owner("rustc")); // already removed
+        assert!(col.get_markers("rustc").is_none());
+        assert_eq!(col.owner_count(), 1);
+    }
+
+    #[test]
+    fn collection_severity_count() {
+        let mut col = MarkerCollection::new(VsUri::file("/e.rs"));
+        col.set_markers("a", vec![error_marker("e1", 1), error_marker("e2", 2)]);
+        col.set_markers("b", vec![warning_marker("w1", 3), error_marker("e3", 4)]);
+
+        assert_eq!(col.severity_count(MarkerSeverity::Error), 3);
+        assert_eq!(col.severity_count(MarkerSeverity::Warning), 1);
+        assert_eq!(col.severity_count(MarkerSeverity::Info), 0);
+    }
+
+    #[test]
+    fn collection_has_errors() {
+        let mut col = MarkerCollection::new(VsUri::file("/f.rs"));
+        col.set_markers("a", vec![warning_marker("w", 1)]);
+        assert!(!col.has_errors());
+
+        col.set_markers("b", vec![error_marker("e", 2)]);
+        assert!(col.has_errors());
+    }
+
+    #[test]
+    fn marker_collection_clear() {
+        let mut col = MarkerCollection::new(VsUri::file("/g.rs"));
+        col.set_markers("a", vec![error_marker("e", 1)]);
+        col.set_markers("b", vec![warning_marker("w", 2)]);
+        col.clear();
+
+        assert!(col.is_empty());
+        assert_eq!(col.owner_count(), 0);
+        assert_eq!(col.total_count(), 0);
+    }
+
+    #[test]
+    fn collection_set_empty_removes_owner() {
+        let mut col = MarkerCollection::new(VsUri::file("/h.rs"));
+        col.set_markers("rustc", vec![error_marker("e", 1)]);
+        assert_eq!(col.owner_count(), 1);
+
+        col.set_markers("rustc", vec![]);
+        assert_eq!(col.owner_count(), 0);
+        assert!(col.get_markers("rustc").is_none());
+    }
+
+    // -- Terminal rendering helper tests --
+
+    #[test]
+    fn severity_icon_error() {
+        assert_eq!(marker_severity_icon(MarkerSeverity::Error), "✖");
+    }
+
+    #[test]
+    fn severity_icon_warning() {
+        assert_eq!(marker_severity_icon(MarkerSeverity::Warning), "⚠");
+    }
+
+    #[test]
+    fn severity_icon_info() {
+        assert_eq!(marker_severity_icon(MarkerSeverity::Info), "ℹ");
+    }
+
+    #[test]
+    fn severity_icon_hint() {
+        assert_eq!(marker_severity_icon(MarkerSeverity::Hint), "💡");
+    }
+
+    #[test]
+    fn severity_label_all() {
+        assert_eq!(marker_severity_label(MarkerSeverity::Error), "error");
+        assert_eq!(marker_severity_label(MarkerSeverity::Warning), "warning");
+        assert_eq!(marker_severity_label(MarkerSeverity::Info), "info");
+        assert_eq!(marker_severity_label(MarkerSeverity::Hint), "hint");
+    }
+
+    #[test]
+    fn format_marker_with_source() {
+        let m = MarkerData {
+            severity: MarkerSeverity::Error,
+            message: "unused variable".to_string(),
+            source: Some("rustc".to_string()),
+            code: None,
+            start_line: 10,
+            start_column: 5,
+            end_line: 10,
+            end_column: 15,
+            related_information: vec![],
+            tags: vec![],
+        };
+        let uri = VsUri::file("/src/main.rs");
+        let formatted = format_marker_for_terminal(&m, &uri);
+        assert!(formatted.starts_with("✖"));
+        assert!(formatted.contains("10:5"));
+        assert!(formatted.contains("unused variable"));
+        assert!(formatted.contains("[rustc]"));
+    }
+
+    #[test]
+    fn format_marker_without_source() {
+        let m = MarkerData {
+            severity: MarkerSeverity::Warning,
+            message: "something fishy".to_string(),
+            source: None,
+            code: None,
+            start_line: 3,
+            start_column: 1,
+            end_line: 3,
+            end_column: 1,
+            related_information: vec![],
+            tags: vec![],
+        };
+        let uri = VsUri::file("/lib.rs");
+        let formatted = format_marker_for_terminal(&m, &uri);
+        assert!(formatted.starts_with("⚠"));
+        assert!(formatted.contains("3:1"));
+        assert!(formatted.contains("something fishy"));
+        assert!(!formatted.contains("["));
+    }
+
+    #[test]
+    fn format_marker_info_severity() {
+        let m = info_marker("just info", 42);
+        let uri = VsUri::file("/info.rs");
+        let formatted = format_marker_for_terminal(&m, &uri);
+        assert!(formatted.starts_with("ℹ"));
+        assert!(formatted.contains("42:1"));
+    }
+
+    // -- WorkspaceMarkerStats tests --
+
+    #[test]
+    fn workspace_stats_empty_service() {
+        let svc = MarkerService::new();
+        let stats = markers_stats(&svc);
+        assert_eq!(stats.total_files, 0);
+        assert_eq!(stats.total_markers, 0);
+        assert_eq!(stats.errors, 0);
+        assert_eq!(stats.warnings, 0);
+        assert_eq!(stats.infos, 0);
+        assert_eq!(stats.hints, 0);
+        assert_eq!(stats.files_with_errors, 0);
+    }
+
+    #[test]
+    fn workspace_stats_single_file() {
+        let svc = MarkerService::new();
+        let uri = VsUri::file("/ws1.rs");
+        svc.change_one("rustc", &uri, vec![
+            error_marker("e1", 1),
+            error_marker("e2", 2),
+            warning_marker("w1", 3),
+        ]);
+
+        let stats = markers_stats(&svc);
+        assert_eq!(stats.total_files, 1);
+        assert_eq!(stats.total_markers, 3);
+        assert_eq!(stats.errors, 2);
+        assert_eq!(stats.warnings, 1);
+        assert_eq!(stats.files_with_errors, 1);
+    }
+
+    #[test]
+    fn workspace_stats_multiple_files() {
+        let svc = MarkerService::new();
+        svc.change_one("rustc", &VsUri::file("/a.rs"), vec![error_marker("e", 1)]);
+        svc.change_one("clippy", &VsUri::file("/b.rs"), vec![warning_marker("w", 1)]);
+        svc.change_one("rustc", &VsUri::file("/c.rs"), vec![
+            info_marker("i", 1),
+            hint_marker("h", 2),
+        ]);
+
+        let stats = markers_stats(&svc);
+        assert_eq!(stats.total_files, 3);
+        assert_eq!(stats.total_markers, 4);
+        assert_eq!(stats.errors, 1);
+        assert_eq!(stats.warnings, 1);
+        assert_eq!(stats.infos, 1);
+        assert_eq!(stats.hints, 1);
+        assert_eq!(stats.files_with_errors, 1);
+    }
+
+    #[test]
+    fn workspace_stats_multiple_owners_same_file() {
+        let svc = MarkerService::new();
+        let uri = VsUri::file("/shared.rs");
+        svc.change_one("rustc", &uri, vec![error_marker("e", 1)]);
+        svc.change_one("clippy", &uri, vec![warning_marker("w", 2)]);
+
+        let stats = markers_stats(&svc);
+        assert_eq!(stats.total_files, 1);
+        assert_eq!(stats.total_markers, 2);
+        assert_eq!(stats.errors, 1);
+        assert_eq!(stats.warnings, 1);
+        assert_eq!(stats.files_with_errors, 1);
+    }
+
+    #[test]
+    fn workspace_stats_files_with_errors_count() {
+        let svc = MarkerService::new();
+        svc.change_one("r", &VsUri::file("/x.rs"), vec![error_marker("e", 1)]);
+        svc.change_one("r", &VsUri::file("/y.rs"), vec![warning_marker("w", 1)]);
+        svc.change_one("r", &VsUri::file("/z.rs"), vec![error_marker("e", 1)]);
+
+        let stats = markers_stats(&svc);
+        assert_eq!(stats.files_with_errors, 2);
+        assert_eq!(stats.total_files, 3);
+    }
+
+    #[test]
+    fn workspace_stats_display_format() {
+        let stats = WorkspaceMarkerStats {
+            total_files: 5,
+            total_markers: 12,
+            errors: 3,
+            warnings: 7,
+            infos: 2,
+            hints: 0,
+            files_with_errors: 2,
+        };
+        let display = format!("{stats}");
+        assert_eq!(display, "3 errors, 7 warnings, 2 info in 5 files");
+    }
+
+    #[test]
+    fn workspace_stats_display_zeros() {
+        let stats = WorkspaceMarkerStats {
+            total_files: 0,
+            total_markers: 0,
+            errors: 0,
+            warnings: 0,
+            infos: 0,
+            hints: 0,
+            files_with_errors: 0,
+        };
+        assert_eq!(format!("{stats}"), "0 errors, 0 warnings, 0 info in 0 files");
+    }
+
+    #[test]
+    fn workspace_stats_hints_counted() {
+        let svc = MarkerService::new();
+        svc.change_one("r", &VsUri::file("/h.rs"), vec![
+            hint_marker("h1", 1),
+            hint_marker("h2", 2),
+            hint_marker("h3", 3),
+        ]);
+
+        let stats = markers_stats(&svc);
+        assert_eq!(stats.hints, 3);
+        assert_eq!(stats.total_markers, 3);
+        assert_eq!(stats.files_with_errors, 0);
     }
 }

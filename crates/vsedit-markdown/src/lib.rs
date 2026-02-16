@@ -716,6 +716,165 @@ pub fn detect_block_structure(text: &str) -> Vec<BlockKind> {
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Front matter
+// ---------------------------------------------------------------------------
+
+/// Parsed YAML-like front matter from a markdown document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkdownFrontMatter {
+    pub fields: Vec<(String, String)>,
+}
+
+impl MarkdownFrontMatter {
+    /// Parse front matter delimited by `---` at the start of a document.
+    /// Returns `None` if no front matter is found.
+    pub fn parse(text: &str) -> Option<Self> {
+        let text = text.trim_start();
+        if !text.starts_with("---") {
+            return None;
+        }
+        let after_opening = &text[3..];
+        let end = after_opening.find("\n---")?;
+        let block = &after_opening[..end];
+        let mut fields = Vec::new();
+        for line in block.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            if let Some(colon) = line.find(':') {
+                let key = line[..colon].trim().to_string();
+                let value = line[colon + 1..].trim().to_string();
+                if !key.is_empty() {
+                    fields.push((key, value));
+                }
+            }
+        }
+        Some(Self { fields })
+    }
+
+    /// Get the value for a given key.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.fields
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// Number of fields in the front matter.
+    pub fn len(&self) -> usize {
+        self.fields.len()
+    }
+
+    /// Whether the front matter has no fields.
+    pub fn is_empty(&self) -> bool {
+        self.fields.is_empty()
+    }
+
+    /// Return only the body text after the front matter block.
+    pub fn strip_front_matter(text: &str) -> &str {
+        let text = text.trim_start();
+        if !text.starts_with("---") {
+            return text;
+        }
+        let after_opening = &text[3..];
+        match after_opening.find("\n---") {
+            Some(end) => {
+                let rest = &after_opening[end + 4..];
+                rest.trim_start_matches('\n')
+            }
+            None => text,
+        }
+    }
+}
+
+impl std::fmt::Display for MarkdownFrontMatter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FrontMatter({} fields)", self.fields.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Table of contents
+// ---------------------------------------------------------------------------
+
+/// Generate a table of contents string from a markdown document.
+/// Each heading becomes an indented entry. H1 = no indent, H2 = 2 spaces, etc.
+pub fn markdown_toc(text: &str) -> String {
+    let mut toc = String::new();
+    for line in text.lines() {
+        if line.starts_with('#') {
+            let level = line.chars().take_while(|&c| c == '#').count().min(6);
+            let title = line[level..].trim();
+            if !title.is_empty() {
+                let indent = "  ".repeat(level.saturating_sub(1));
+                let slug = title
+                    .to_lowercase()
+                    .chars()
+                    .map(|c| if c.is_alphanumeric() { c } else { '-' })
+                    .collect::<String>();
+                toc.push_str(&format!("{indent}- [{title}](#{slug})\n"));
+            }
+        }
+    }
+    toc
+}
+
+// ---------------------------------------------------------------------------
+// Document statistics
+// ---------------------------------------------------------------------------
+
+/// Statistics about a markdown document.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct MarkdownDocStats {
+    pub words: usize,
+    pub lines: usize,
+    pub chars: usize,
+    pub code_block_lines: usize,
+}
+
+impl std::fmt::Display for MarkdownDocStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} words, {} lines, {} chars",
+            self.words, self.lines, self.chars
+        )
+    }
+}
+
+/// Count words in a markdown document, excluding front matter and code blocks.
+pub fn markdown_word_count(text: &str) -> MarkdownDocStats {
+    let body = MarkdownFrontMatter::strip_front_matter(text);
+    let mut total_words = 0usize;
+    let mut total_lines = 0usize;
+    let mut total_chars = 0usize;
+    let mut in_code_block = false;
+    let mut code_block_lines = 0usize;
+
+    for line in body.lines() {
+        total_lines += 1;
+        total_chars += line.len();
+        if line.trim_start().starts_with("```") {
+            in_code_block = !in_code_block;
+            continue;
+        }
+        if in_code_block {
+            code_block_lines += 1;
+            continue;
+        }
+        total_words += line.split_whitespace().count();
+    }
+
+    MarkdownDocStats {
+        words: total_words,
+        lines: total_lines,
+        chars: total_chars,
+        code_block_lines,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1017,5 +1176,63 @@ mod tests {
     #[test]
     fn extract_headings_from_text_empty() {
         assert!(extract_headings_from_text("no headings").is_empty());
+    }
+
+    #[test]
+    fn front_matter_parse_basic() {
+        let doc = "---\ntitle: Hello World\nauthor: Alice\n---\n# Heading\nBody text";
+        let fm = MarkdownFrontMatter::parse(doc).unwrap();
+        assert_eq!(fm.len(), 2);
+        assert_eq!(fm.get("title"), Some("Hello World"));
+        assert_eq!(fm.get("author"), Some("Alice"));
+    }
+
+    #[test]
+    fn front_matter_parse_none_when_missing() {
+        assert!(MarkdownFrontMatter::parse("# Just a heading").is_none());
+    }
+
+    #[test]
+    fn front_matter_strip() {
+        let doc = "---\ntitle: Test\n---\n# Heading\nBody";
+        let body = MarkdownFrontMatter::strip_front_matter(doc);
+        assert!(body.starts_with("# Heading"));
+    }
+
+    #[test]
+    fn front_matter_display() {
+        let fm = MarkdownFrontMatter {
+            fields: vec![("a".into(), "b".into())],
+        };
+        assert_eq!(fm.to_string(), "FrontMatter(1 fields)");
+    }
+
+    #[test]
+    fn markdown_toc_generates_entries() {
+        let doc = "# Title\n## Section A\n## Section B\n### Subsection";
+        let toc = markdown_toc(doc);
+        assert!(toc.contains("- [Title]"));
+        assert!(toc.contains("  - [Section A]"));
+        assert!(toc.contains("    - [Subsection]"));
+    }
+
+    #[test]
+    fn markdown_toc_empty_for_no_headings() {
+        assert!(markdown_toc("just text\nmore text").is_empty());
+    }
+
+    #[test]
+    fn markdown_word_count_basic() {
+        let doc = "# Title\n\nHello world this is a test.\n\n```\ncode here\n```\n\nMore words.";
+        let stats = markdown_word_count(doc);
+        assert_eq!(stats.words, 10); // # Title (2) + Hello world this is a test (6) + More words (2)
+        assert!(stats.code_block_lines > 0);
+    }
+
+    #[test]
+    fn markdown_word_count_with_front_matter() {
+        let doc = "---\ntitle: Test\n---\nHello world.";
+        let stats = markdown_word_count(doc);
+        assert_eq!(stats.words, 2);
     }
 }

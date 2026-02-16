@@ -635,6 +635,340 @@ impl Default for LayoutValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LayoutConstraint – min/max/preferred sizing
+// ---------------------------------------------------------------------------
+
+/// Describes minimum, maximum, and preferred sizing constraints for a region.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LayoutConstraint {
+    pub min_width: u16,
+    pub min_height: u16,
+    pub max_width: u16,
+    pub max_height: u16,
+    pub preferred_width: Option<u16>,
+    pub preferred_height: Option<u16>,
+}
+
+impl LayoutConstraint {
+    /// Create a new unconstrained `LayoutConstraint`.
+    pub fn new() -> Self {
+        Self {
+            min_width: 0,
+            min_height: 0,
+            max_width: u16::MAX,
+            max_height: u16::MAX,
+            preferred_width: None,
+            preferred_height: None,
+        }
+    }
+
+    /// Set the minimum width and height.
+    pub fn with_min(mut self, w: u16, h: u16) -> Self {
+        self.min_width = w;
+        self.min_height = h;
+        self
+    }
+
+    /// Set the maximum width and height.
+    pub fn with_max(mut self, w: u16, h: u16) -> Self {
+        self.max_width = w;
+        self.max_height = h;
+        self
+    }
+
+    /// Set the preferred width and height.
+    pub fn with_preferred(mut self, w: u16, h: u16) -> Self {
+        self.preferred_width = Some(w);
+        self.preferred_height = Some(h);
+        self
+    }
+
+    /// Clamp `w` to the min/max width range.
+    pub fn clamp_width(&self, w: u16) -> u16 {
+        w.clamp(self.min_width, self.max_width)
+    }
+
+    /// Clamp `h` to the min/max height range.
+    pub fn clamp_height(&self, h: u16) -> u16 {
+        h.clamp(self.min_height, self.max_height)
+    }
+
+    /// Clamp both dimensions of a [`Rect`], preserving position.
+    pub fn clamp_rect(&self, rect: Rect) -> Rect {
+        Rect::new(
+            rect.x,
+            rect.y,
+            self.clamp_width(rect.width),
+            self.clamp_height(rect.height),
+        )
+    }
+
+    /// Return `true` when `rect` satisfies the min/max constraints.
+    pub fn is_satisfied_by(&self, rect: Rect) -> bool {
+        rect.width >= self.min_width
+            && rect.width <= self.max_width
+            && rect.height >= self.min_height
+            && rect.height <= self.max_height
+    }
+
+    /// Validate that min values do not exceed max values.
+    pub fn validate(&self) -> Result<(), LayoutError> {
+        if self.min_width > self.max_width {
+            return Err(LayoutError::OverflowFixed {
+                total_fixed: self.min_width,
+                available: self.max_width,
+            });
+        }
+        if self.min_height > self.max_height {
+            return Err(LayoutError::OverflowFixed {
+                total_fixed: self.min_height,
+                available: self.max_height,
+            });
+        }
+        Ok(())
+    }
+}
+
+impl Default for LayoutConstraint {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SplitView – adjustable split panels
+// ---------------------------------------------------------------------------
+
+/// A two-panel split with an adjustable ratio.
+#[derive(Debug, Clone)]
+pub struct SplitView {
+    direction: Direction,
+    ratio: f64,
+    min_first: u16,
+    min_second: u16,
+}
+
+impl SplitView {
+    /// Create a horizontal split (left | right).
+    pub fn horizontal(ratio: f64) -> Self {
+        Self {
+            direction: Direction::Horizontal,
+            ratio: ratio.clamp(0.0, 1.0),
+            min_first: 0,
+            min_second: 0,
+        }
+    }
+
+    /// Create a vertical split (top / bottom).
+    pub fn vertical(ratio: f64) -> Self {
+        Self {
+            direction: Direction::Vertical,
+            ratio: ratio.clamp(0.0, 1.0),
+            min_first: 0,
+            min_second: 0,
+        }
+    }
+
+    /// Set the minimum size of the first panel.
+    pub fn with_min_first(mut self, min: u16) -> Self {
+        self.min_first = min;
+        self
+    }
+
+    /// Set the minimum size of the second panel.
+    pub fn with_min_second(mut self, min: u16) -> Self {
+        self.min_second = min;
+        self
+    }
+
+    /// Compute the two panel rectangles from `area`.
+    pub fn split(&self, area: Rect) -> (Rect, Rect) {
+        match self.direction {
+            Direction::Horizontal => {
+                let total = area.width;
+                let first_w = (total as f64 * self.ratio) as u16;
+                let first_w = first_w.max(self.min_first);
+                let second_w = total.saturating_sub(first_w);
+                let second_w = second_w.max(self.min_second);
+                let first_w = total.saturating_sub(second_w);
+                (
+                    Rect::new(area.x, area.y, first_w, area.height),
+                    Rect::new(area.x.saturating_add(first_w), area.y, second_w, area.height),
+                )
+            }
+            Direction::Vertical => {
+                let total = area.height;
+                let first_h = (total as f64 * self.ratio) as u16;
+                let first_h = first_h.max(self.min_first);
+                let second_h = total.saturating_sub(first_h);
+                let second_h = second_h.max(self.min_second);
+                let first_h = total.saturating_sub(second_h);
+                (
+                    Rect::new(area.x, area.y, area.width, first_h),
+                    Rect::new(area.x, area.y.saturating_add(first_h), area.width, second_h),
+                )
+            }
+        }
+    }
+
+    /// Update the split ratio, clamped to `0.0..=1.0`.
+    pub fn set_ratio(&mut self, ratio: f64) {
+        self.ratio = ratio.clamp(0.0, 1.0);
+    }
+
+    /// Return the current ratio.
+    pub fn ratio(&self) -> f64 {
+        self.ratio
+    }
+
+    /// Adjust the ratio by a pixel delta relative to `total` size.
+    pub fn resize_by(&mut self, delta: i16, total: u16) {
+        if total == 0 {
+            return;
+        }
+        let shift = delta as f64 / total as f64;
+        self.ratio = (self.ratio + shift).clamp(0.0, 1.0);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// layout_reflow – recalculate layouts on resize
+// ---------------------------------------------------------------------------
+
+/// Reflow a slice of [`LayoutNode`]s into a new `area`.
+///
+/// Returns one `Vec<Rect>` per node, each being the result of
+/// [`LayoutNode::split`] applied to `area`.
+pub fn layout_reflow(nodes: &[LayoutNode], area: Rect) -> Vec<Vec<Rect>> {
+    nodes.iter().map(|node| node.split(area)).collect()
+}
+
+// ---------------------------------------------------------------------------
+// LayoutGrid – grid-based layouts
+// ---------------------------------------------------------------------------
+
+/// A simple uniform grid layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LayoutGrid {
+    cols: u16,
+    rows: u16,
+}
+
+impl LayoutGrid {
+    /// Create a new grid with the given number of columns and rows.
+    pub fn new(cols: u16, rows: u16) -> Self {
+        Self { cols, rows }
+    }
+
+    /// Width of a single column within `area`.
+    pub fn col_width(&self, area: Rect) -> u16 {
+        if self.cols == 0 {
+            return 0;
+        }
+        area.width / self.cols
+    }
+
+    /// Height of a single row within `area`.
+    pub fn row_height(&self, area: Rect) -> u16 {
+        if self.rows == 0 {
+            return 0;
+        }
+        area.height / self.rows
+    }
+
+    /// Return the [`Rect`] for the cell at (`col`, `row`), or `None` if out of bounds.
+    pub fn cell(&self, area: Rect, col: u16, row: u16) -> Option<Rect> {
+        if col >= self.cols || row >= self.rows {
+            return None;
+        }
+        let cw = self.col_width(area);
+        let rh = self.row_height(area);
+        Some(Rect::new(
+            area.x.saturating_add(col.saturating_mul(cw)),
+            area.y.saturating_add(row.saturating_mul(rh)),
+            cw,
+            rh,
+        ))
+    }
+
+    /// Number of columns.
+    pub fn cols(&self) -> u16 {
+        self.cols
+    }
+
+    /// Number of rows.
+    pub fn rows(&self) -> u16 {
+        self.rows
+    }
+
+    /// Total number of cells.
+    pub fn total_cells(&self) -> u16 {
+        self.cols.saturating_mul(self.rows)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Padding
+// ---------------------------------------------------------------------------
+
+/// Padding values for all four sides of a rectangle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Padding {
+    pub top: u16,
+    pub right: u16,
+    pub bottom: u16,
+    pub left: u16,
+}
+
+impl Padding {
+    /// Create uniform padding on all sides.
+    pub fn uniform(v: u16) -> Self {
+        Self {
+            top: v,
+            right: v,
+            bottom: v,
+            left: v,
+        }
+    }
+
+    /// Create symmetric padding: `h` for left/right, `v` for top/bottom.
+    pub fn symmetric(h: u16, v: u16) -> Self {
+        Self {
+            top: v,
+            right: h,
+            bottom: v,
+            left: h,
+        }
+    }
+
+    /// Total horizontal padding (`left + right`).
+    pub fn horizontal(&self) -> u16 {
+        self.left.saturating_add(self.right)
+    }
+
+    /// Total vertical padding (`top + bottom`).
+    pub fn vertical(&self) -> u16 {
+        self.top.saturating_add(self.bottom)
+    }
+
+    /// Shrink `area` by this padding. Returns a zero-size rect when padding
+    /// exceeds the area dimensions.
+    pub fn apply(&self, area: Rect) -> Rect {
+        let h = self.horizontal();
+        let v = self.vertical();
+        if area.width <= h || area.height <= v {
+            return Rect::new(area.x, area.y, 0, 0);
+        }
+        Rect::new(
+            area.x.saturating_add(self.left),
+            area.y.saturating_add(self.top),
+            area.width - h,
+            area.height - v,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1020,5 +1354,116 @@ mod tests {
     fn layout_is_ascii_printable() {
         assert!(LayoutValidator::is_ascii_printable("Hello World 123"));
         assert!(!LayoutValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // LayoutConstraint tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn layout_constraint_clamp_width() {
+        let c = LayoutConstraint::new().with_min(10, 0).with_max(50, 100);
+        assert_eq!(c.clamp_width(5), 10);
+        assert_eq!(c.clamp_width(30), 30);
+        assert_eq!(c.clamp_width(80), 50);
+    }
+
+    #[test]
+    fn layout_constraint_is_satisfied_by() {
+        let c = LayoutConstraint::new().with_min(10, 5).with_max(100, 50);
+        assert!(c.is_satisfied_by(rect(0, 0, 50, 25)));
+        assert!(!c.is_satisfied_by(rect(0, 0, 5, 25)));
+        assert!(!c.is_satisfied_by(rect(0, 0, 50, 60)));
+    }
+
+    #[test]
+    fn layout_constraint_validate_min_gt_max_fails() {
+        let c = LayoutConstraint::new().with_min(100, 0).with_max(50, 100);
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn layout_constraint_clamp_rect() {
+        let c = LayoutConstraint::new().with_min(10, 10).with_max(80, 40);
+        let r = c.clamp_rect(rect(5, 5, 200, 3));
+        assert_eq!(r, rect(5, 5, 80, 10));
+    }
+
+    // -----------------------------------------------------------------------
+    // SplitView tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn split_view_horizontal() {
+        let sv = SplitView::horizontal(0.5);
+        let (a, b) = sv.split(rect(0, 0, 100, 50));
+        assert_eq!(a, rect(0, 0, 50, 50));
+        assert_eq!(b, rect(50, 0, 50, 50));
+    }
+
+    #[test]
+    fn split_view_vertical() {
+        let sv = SplitView::vertical(0.25);
+        let (a, b) = sv.split(rect(0, 0, 80, 40));
+        assert_eq!(a, rect(0, 0, 80, 10));
+        assert_eq!(b, rect(0, 10, 80, 30));
+    }
+
+    #[test]
+    fn split_view_resize_by_adjusts_ratio() {
+        let mut sv = SplitView::horizontal(0.5);
+        sv.resize_by(10, 100);
+        assert!((sv.ratio() - 0.6).abs() < 1e-9);
+        sv.resize_by(-20, 100);
+        assert!((sv.ratio() - 0.4).abs() < 1e-9);
+    }
+
+    // -----------------------------------------------------------------------
+    // layout_reflow test
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn layout_reflow_returns_correct_structure() {
+        let nodes = vec![
+            LayoutNode::horizontal(vec![Constraint::Fixed(20), Constraint::Fixed(30)]),
+            LayoutNode::vertical(vec![Constraint::Fixed(5)]),
+        ];
+        let area = rect(0, 0, 100, 50);
+        let result = layout_reflow(&nodes, area);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].len(), 2);
+        assert_eq!(result[1].len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // LayoutGrid tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn layout_grid_cell_calculation() {
+        let grid = LayoutGrid::new(4, 2);
+        assert_eq!(grid.total_cells(), 8);
+        let area = rect(0, 0, 80, 40);
+        let cell = grid.cell(area, 1, 0).unwrap();
+        assert_eq!(cell, rect(20, 0, 20, 20));
+        assert!(grid.cell(area, 5, 0).is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Padding tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn padding_apply_shrinks_area() {
+        let p = Padding::uniform(5);
+        let r = p.apply(rect(0, 0, 100, 50));
+        assert_eq!(r, rect(5, 5, 90, 40));
+    }
+
+    #[test]
+    fn padding_apply_zero_when_too_large() {
+        let p = Padding::uniform(30);
+        let r = p.apply(rect(0, 0, 50, 50));
+        assert_eq!(r, rect(0, 0, 0, 0));
     }
 }

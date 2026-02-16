@@ -643,6 +643,139 @@ impl Default for StreamValidator {
     }
 }
 
+/// A buffer that accumulates string chunks and can be read back.
+pub struct StreamBuffer {
+    chunks: Vec<String>,
+    total_bytes: usize,
+}
+
+impl StreamBuffer {
+    /// Create a new empty stream buffer.
+    pub fn new() -> Self {
+        Self {
+            chunks: Vec::new(),
+            total_bytes: 0,
+        }
+    }
+
+    /// Append a chunk to the buffer.
+    pub fn push(&mut self, chunk: impl Into<String>) {
+        let s = chunk.into();
+        self.total_bytes += s.len();
+        self.chunks.push(s);
+    }
+
+    /// Get all accumulated chunks.
+    pub fn chunks(&self) -> &[String] {
+        &self.chunks
+    }
+
+    /// Get total byte count across all chunks.
+    pub fn total_bytes(&self) -> usize {
+        self.total_bytes
+    }
+
+    /// Drain all chunks, returning them and resetting the buffer.
+    pub fn drain(&mut self) -> Vec<String> {
+        self.total_bytes = 0;
+        std::mem::take(&mut self.chunks)
+    }
+
+    /// Concatenate all chunks into a single string.
+    pub fn concat(&self) -> String {
+        self.chunks.join("")
+    }
+
+    /// Number of chunks accumulated.
+    pub fn chunk_count(&self) -> usize {
+        self.chunks.len()
+    }
+
+    /// Whether the buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.chunks.is_empty()
+    }
+}
+
+impl Default for StreamBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for StreamBuffer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "StreamBuffer({} chunks, {} bytes)", self.chunks.len(), self.total_bytes)
+    }
+}
+
+/// A transform that processes string chunks through a transformation function.
+pub struct StreamTransform {
+    transforms: Vec<Box<dyn Fn(&str) -> String + Send>>,
+}
+
+impl StreamTransform {
+    /// Create a new empty transform pipeline.
+    pub fn new() -> Self {
+        Self { transforms: Vec::new() }
+    }
+
+    /// Add a transform step to the pipeline.
+    pub fn pipe(mut self, f: impl Fn(&str) -> String + Send + 'static) -> Self {
+        self.transforms.push(Box::new(f));
+        self
+    }
+
+    /// Apply all transforms to a single chunk.
+    pub fn apply(&self, input: &str) -> String {
+        let mut result = input.to_string();
+        for transform in &self.transforms {
+            result = transform(&result);
+        }
+        result
+    }
+
+    /// Apply all transforms to a stream of chunks.
+    pub fn apply_all(&self, chunks: &[String]) -> Vec<String> {
+        chunks.iter().map(|c| self.apply(c)).collect()
+    }
+
+    /// Number of transform steps in the pipeline.
+    pub fn step_count(&self) -> usize {
+        self.transforms.len()
+    }
+}
+
+impl Default for StreamTransform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Split a stream of string chunks into complete lines.
+/// Handles chunks that span line boundaries (a chunk might end mid-line).
+pub fn stream_lines(chunks: &[String]) -> Vec<String> {
+    let combined: String = chunks.join("");
+    combined.lines().map(|l| l.to_string()).collect()
+}
+
+/// Split a stream of string chunks into lines, preserving partial last line.
+/// Returns (complete_lines, pending_partial).
+pub fn stream_lines_with_pending(chunks: &[String]) -> (Vec<String>, Option<String>) {
+    let combined: String = chunks.join("");
+    if combined.is_empty() {
+        return (Vec::new(), None);
+    }
+    let ends_with_newline = combined.ends_with('\n');
+    let mut lines: Vec<String> = combined.lines().map(|l| l.to_string()).collect();
+    if ends_with_newline || lines.is_empty() {
+        (lines, None)
+    } else {
+        let pending = lines.pop();
+        (lines, pending)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1019,5 +1152,71 @@ mod tests {
     fn stream_is_ascii_printable() {
         assert!(StreamValidator::is_ascii_printable("Hello World 123"));
         assert!(!StreamValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn stream_buffer_push_and_concat() {
+        let mut buf = StreamBuffer::new();
+        buf.push("hello ");
+        buf.push("world");
+        assert_eq!(buf.concat(), "hello world");
+        assert_eq!(buf.chunk_count(), 2);
+        assert_eq!(buf.total_bytes(), 11);
+    }
+
+    #[test]
+    fn stream_buffer_drain() {
+        let mut buf = StreamBuffer::new();
+        buf.push("a");
+        buf.push("b");
+        let drained = buf.drain();
+        assert_eq!(drained, vec!["a", "b"]);
+        assert!(buf.is_empty());
+        assert_eq!(buf.total_bytes(), 0);
+    }
+
+    #[test]
+    fn stream_buffer_display() {
+        let buf = StreamBuffer::new();
+        assert_eq!(buf.to_string(), "StreamBuffer(0 chunks, 0 bytes)");
+    }
+
+    #[test]
+    fn stream_transform_single() {
+        let t = StreamTransform::new()
+            .pipe(|s| s.to_uppercase());
+        assert_eq!(t.apply("hello"), "HELLO");
+    }
+
+    #[test]
+    fn stream_transform_chained() {
+        let t = StreamTransform::new()
+            .pipe(|s| s.trim().to_string())
+            .pipe(|s| s.to_uppercase());
+        assert_eq!(t.apply("  hello  "), "HELLO");
+        assert_eq!(t.step_count(), 2);
+    }
+
+    #[test]
+    fn stream_transform_apply_all() {
+        let t = StreamTransform::new()
+            .pipe(|s| s.to_uppercase());
+        let result = t.apply_all(&["hello".into(), "world".into()]);
+        assert_eq!(result, vec!["HELLO", "WORLD"]);
+    }
+
+    #[test]
+    fn stream_lines_basic() {
+        let chunks = vec!["hello\nworld".to_string()];
+        let lines = stream_lines(&chunks);
+        assert_eq!(lines, vec!["hello", "world"]);
+    }
+
+    #[test]
+    fn stream_lines_with_pending_partial() {
+        let chunks = vec!["line1\nline2\npartial".to_string()];
+        let (complete, pending) = stream_lines_with_pending(&chunks);
+        assert_eq!(complete, vec!["line1", "line2"]);
+        assert_eq!(pending, Some("partial".to_string()));
     }
 }

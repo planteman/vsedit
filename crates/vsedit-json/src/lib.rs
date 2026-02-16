@@ -582,6 +582,217 @@ impl Default for JsonValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// JsonPath – dot-notation access
+// ---------------------------------------------------------------------------
+
+/// Provides dot-notation path access to JSON values (e.g., "editor.fontSize").
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JsonPath {
+    segments: Vec<String>,
+}
+
+impl JsonPath {
+    /// Parse a dot-separated path string into a `JsonPath`.
+    pub fn parse(path: &str) -> Self {
+        let segments = if path.is_empty() {
+            Vec::new()
+        } else {
+            path.split('.').map(String::from).collect()
+        };
+        Self { segments }
+    }
+
+    /// Return the path segments.
+    pub fn segments(&self) -> &[String] {
+        &self.segments
+    }
+
+    /// Return the depth (number of segments).
+    pub fn depth(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// Return the parent path (all segments except the last), or `None` if empty.
+    pub fn parent(&self) -> Option<JsonPath> {
+        if self.segments.is_empty() {
+            return None;
+        }
+        Some(JsonPath {
+            segments: self.segments[..self.segments.len() - 1].to_vec(),
+        })
+    }
+
+    /// Return a new path with `segment` appended.
+    pub fn child(&self, segment: &str) -> JsonPath {
+        let mut segments = self.segments.clone();
+        segments.push(segment.to_string());
+        JsonPath { segments }
+    }
+
+    /// Traverse into `value` following the path segments, returning a reference.
+    pub fn get<'a>(&self, value: &'a Value) -> Option<&'a Value> {
+        let mut current = value;
+        for seg in &self.segments {
+            match current {
+                Value::Object(map) => {
+                    current = map.get(seg.as_str())?;
+                }
+                _ => return None,
+            }
+        }
+        Some(current)
+    }
+
+    /// Set a value at this path, creating intermediate objects as needed.
+    pub fn set(&self, root: &mut Value, val: Value) {
+        if self.segments.is_empty() {
+            *root = val;
+            return;
+        }
+        let mut current = root;
+        for seg in &self.segments[..self.segments.len() - 1] {
+            if !current.is_object() {
+                *current = Value::Object(serde_json::Map::new());
+            }
+            current = current
+                .as_object_mut()
+                .unwrap()
+                .entry(seg.as_str())
+                .or_insert_with(|| Value::Object(serde_json::Map::new()));
+        }
+        if !current.is_object() {
+            *current = Value::Object(serde_json::Map::new());
+        }
+        let last = self.segments.last().unwrap();
+        current.as_object_mut().unwrap().insert(last.clone(), val);
+    }
+
+    /// Remove the value at this path. Returns `true` if a value was removed.
+    pub fn remove(&self, root: &mut Value) -> bool {
+        if self.segments.is_empty() {
+            return false;
+        }
+        let mut current = root;
+        for seg in &self.segments[..self.segments.len() - 1] {
+            match current {
+                Value::Object(map) => match map.get_mut(seg.as_str()) {
+                    Some(v) => current = v,
+                    None => return false,
+                },
+                _ => return false,
+            }
+        }
+        let last = self.segments.last().unwrap();
+        match current {
+            Value::Object(map) => map.remove(last.as_str()).is_some(),
+            _ => false,
+        }
+    }
+
+    /// Return `true` if the path has no segments.
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+}
+
+impl fmt::Display for JsonPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.segments.join("."))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// JSON Patch (simplified RFC 6902)
+// ---------------------------------------------------------------------------
+
+/// A single JSON Patch operation (simplified RFC 6902).
+#[derive(Debug, Clone, PartialEq)]
+pub enum JsonPatchOp {
+    Add { path: String, value: Value },
+    Remove { path: String },
+    Replace { path: String, value: Value },
+    Test { path: String, value: Value },
+}
+
+/// Apply a sequence of JSON Patch operations to a value.
+/// Returns `Ok(())` on success, or an error describing the first failing operation.
+pub fn json_patch_apply(target: &mut Value, ops: &[JsonPatchOp]) -> Result<(), String> {
+    for (i, op) in ops.iter().enumerate() {
+        match op {
+            JsonPatchOp::Add { path, value } => {
+                let jp = JsonPath::parse(path);
+                jp.set(target, value.clone());
+            }
+            JsonPatchOp::Remove { path } => {
+                let jp = JsonPath::parse(path);
+                if !jp.remove(target) {
+                    return Err(format!(
+                        "operation {i}: remove failed – path \"{}\" not found",
+                        path
+                    ));
+                }
+            }
+            JsonPatchOp::Replace { path, value } => {
+                let jp = JsonPath::parse(path);
+                if jp.get(target).is_none() {
+                    return Err(format!(
+                        "operation {i}: replace failed – path \"{}\" not found",
+                        path
+                    ));
+                }
+                jp.set(target, value.clone());
+            }
+            JsonPatchOp::Test { path, value } => {
+                let jp = JsonPath::parse(path);
+                match jp.get(target) {
+                    Some(actual) if actual == value => {}
+                    Some(actual) => {
+                        return Err(format!(
+                            "operation {i}: test failed at \"{}\" – expected {}, got {}",
+                            path, value, actual
+                        ));
+                    }
+                    None => {
+                        return Err(format!(
+                            "operation {i}: test failed – path \"{}\" not found",
+                            path
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// json_merge – deep merge
+// ---------------------------------------------------------------------------
+
+/// Deep merge two JSON values. The `patch` value is overlaid onto `base`.
+/// - Objects are merged recursively.
+/// - Arrays and scalars from `patch` replace those in `base`.
+/// - Null values in patch remove keys from base.
+pub fn json_merge(base: &Value, patch: &Value) -> Value {
+    match (base, patch) {
+        (Value::Object(base_map), Value::Object(patch_map)) => {
+            let mut result = base_map.clone();
+            for (key, patch_val) in patch_map {
+                if patch_val.is_null() {
+                    result.remove(key);
+                } else if let Some(base_val) = base_map.get(key) {
+                    result.insert(key.clone(), json_merge(base_val, patch_val));
+                } else {
+                    result.insert(key.clone(), patch_val.clone());
+                }
+            }
+            Value::Object(result)
+        }
+        (_, patch_val) => patch_val.clone(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1014,5 +1225,289 @@ mod tests {
     fn json_is_ascii_printable() {
         assert!(JsonValidator::is_ascii_printable("Hello World 123"));
         assert!(!JsonValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- JsonPath -----------------------------------------------------------
+
+    #[test]
+    fn json_path_parse_simple() {
+        let p = JsonPath::parse("editor.fontSize");
+        assert_eq!(p.segments(), &["editor", "fontSize"]);
+        assert_eq!(p.depth(), 2);
+    }
+
+    #[test]
+    fn json_path_parse_single() {
+        let p = JsonPath::parse("key");
+        assert_eq!(p.segments(), &["key"]);
+        assert_eq!(p.depth(), 1);
+    }
+
+    #[test]
+    fn json_path_parse_empty() {
+        let p = JsonPath::parse("");
+        assert!(p.is_empty());
+        assert_eq!(p.depth(), 0);
+    }
+
+    #[test]
+    fn json_path_parent_and_child() {
+        let p = JsonPath::parse("a.b.c");
+        let parent = p.parent().unwrap();
+        assert_eq!(parent.to_string(), "a.b");
+        let child = parent.child("d");
+        assert_eq!(child.to_string(), "a.b.d");
+    }
+
+    #[test]
+    fn json_path_parent_of_single_is_empty() {
+        let p = JsonPath::parse("only");
+        let parent = p.parent().unwrap();
+        assert!(parent.is_empty());
+    }
+
+    #[test]
+    fn json_path_parent_of_empty_is_none() {
+        let p = JsonPath::parse("");
+        assert!(p.parent().is_none());
+    }
+
+    #[test]
+    fn json_path_get_nested() {
+        let val = json!({"a": {"b": {"c": 42}}});
+        let p = JsonPath::parse("a.b.c");
+        assert_eq!(p.get(&val), Some(&json!(42)));
+    }
+
+    #[test]
+    fn json_path_get_missing() {
+        let val = json!({"a": 1});
+        let p = JsonPath::parse("a.b.c");
+        assert_eq!(p.get(&val), None);
+    }
+
+    #[test]
+    fn json_path_set_creates_intermediates() {
+        let mut val = json!({});
+        let p = JsonPath::parse("a.b.c");
+        p.set(&mut val, json!(99));
+        assert_eq!(val, json!({"a": {"b": {"c": 99}}}));
+    }
+
+    #[test]
+    fn json_path_set_overwrites() {
+        let mut val = json!({"x": 1});
+        let p = JsonPath::parse("x");
+        p.set(&mut val, json!(2));
+        assert_eq!(val, json!({"x": 2}));
+    }
+
+    #[test]
+    fn json_path_remove_existing() {
+        let mut val = json!({"a": {"b": 1, "c": 2}});
+        let p = JsonPath::parse("a.b");
+        assert!(p.remove(&mut val));
+        assert_eq!(val, json!({"a": {"c": 2}}));
+    }
+
+    #[test]
+    fn json_path_remove_missing() {
+        let mut val = json!({"a": 1});
+        let p = JsonPath::parse("z");
+        assert!(!p.remove(&mut val));
+    }
+
+    #[test]
+    fn json_path_to_string_roundtrip() {
+        let p = JsonPath::parse("editor.tabSize");
+        assert_eq!(p.to_string(), "editor.tabSize");
+    }
+
+    // -- json_patch_apply ---------------------------------------------------
+
+    #[test]
+    fn patch_add_new_key() {
+        let mut v = json!({"a": 1});
+        let ops = [JsonPatchOp::Add {
+            path: "b".into(),
+            value: json!(2),
+        }];
+        assert!(json_patch_apply(&mut v, &ops).is_ok());
+        assert_eq!(v, json!({"a": 1, "b": 2}));
+    }
+
+    #[test]
+    fn patch_add_nested() {
+        let mut v = json!({});
+        let ops = [JsonPatchOp::Add {
+            path: "x.y".into(),
+            value: json!(true),
+        }];
+        assert!(json_patch_apply(&mut v, &ops).is_ok());
+        assert_eq!(v, json!({"x": {"y": true}}));
+    }
+
+    #[test]
+    fn patch_remove_existing() {
+        let mut v = json!({"a": 1, "b": 2});
+        let ops = [JsonPatchOp::Remove {
+            path: "b".into(),
+        }];
+        assert!(json_patch_apply(&mut v, &ops).is_ok());
+        assert_eq!(v, json!({"a": 1}));
+    }
+
+    #[test]
+    fn patch_remove_missing_fails() {
+        let mut v = json!({"a": 1});
+        let ops = [JsonPatchOp::Remove {
+            path: "z".into(),
+        }];
+        assert!(json_patch_apply(&mut v, &ops).is_err());
+    }
+
+    #[test]
+    fn patch_replace_existing() {
+        let mut v = json!({"a": 1});
+        let ops = [JsonPatchOp::Replace {
+            path: "a".into(),
+            value: json!(99),
+        }];
+        assert!(json_patch_apply(&mut v, &ops).is_ok());
+        assert_eq!(v, json!({"a": 99}));
+    }
+
+    #[test]
+    fn patch_replace_missing_fails() {
+        let mut v = json!({"a": 1});
+        let ops = [JsonPatchOp::Replace {
+            path: "nope".into(),
+            value: json!(0),
+        }];
+        let err = json_patch_apply(&mut v, &ops).unwrap_err();
+        assert!(err.contains("not found"));
+    }
+
+    #[test]
+    fn patch_test_pass() {
+        let mut v = json!({"a": 1});
+        let ops = [JsonPatchOp::Test {
+            path: "a".into(),
+            value: json!(1),
+        }];
+        assert!(json_patch_apply(&mut v, &ops).is_ok());
+    }
+
+    #[test]
+    fn patch_test_fail_value() {
+        let mut v = json!({"a": 1});
+        let ops = [JsonPatchOp::Test {
+            path: "a".into(),
+            value: json!(2),
+        }];
+        let err = json_patch_apply(&mut v, &ops).unwrap_err();
+        assert!(err.contains("test failed"));
+    }
+
+    #[test]
+    fn patch_test_fail_missing() {
+        let mut v = json!({});
+        let ops = [JsonPatchOp::Test {
+            path: "x".into(),
+            value: json!(1),
+        }];
+        assert!(json_patch_apply(&mut v, &ops).is_err());
+    }
+
+    #[test]
+    fn patch_multiple_ops() {
+        let mut v = json!({"a": 1});
+        let ops = [
+            JsonPatchOp::Add { path: "b".into(), value: json!(2) },
+            JsonPatchOp::Replace { path: "a".into(), value: json!(10) },
+            JsonPatchOp::Test { path: "b".into(), value: json!(2) },
+        ];
+        assert!(json_patch_apply(&mut v, &ops).is_ok());
+        assert_eq!(v, json!({"a": 10, "b": 2}));
+    }
+
+    // -- json_merge ---------------------------------------------------------
+
+    #[test]
+    fn merge_flat_objects() {
+        let base = json!({"a": 1, "b": 2});
+        let patch = json!({"b": 20, "c": 30});
+        let result = json_merge(&base, &patch);
+        assert_eq!(result, json!({"a": 1, "b": 20, "c": 30}));
+    }
+
+    #[test]
+    fn merge_nested_objects() {
+        let base = json!({"editor": {"fontSize": 14, "tabSize": 4}});
+        let patch = json!({"editor": {"fontSize": 16}});
+        let result = json_merge(&base, &patch);
+        assert_eq!(
+            result,
+            json!({"editor": {"fontSize": 16, "tabSize": 4}})
+        );
+    }
+
+    #[test]
+    fn merge_null_removes_key() {
+        let base = json!({"a": 1, "b": 2});
+        let patch = json!({"b": null});
+        let result = json_merge(&base, &patch);
+        assert_eq!(result, json!({"a": 1}));
+    }
+
+    #[test]
+    fn merge_array_replaces() {
+        let base = json!({"list": [1, 2]});
+        let patch = json!({"list": [3, 4, 5]});
+        let result = json_merge(&base, &patch);
+        assert_eq!(result, json!({"list": [3, 4, 5]}));
+    }
+
+    #[test]
+    fn merge_scalar_replaces() {
+        let base = json!({"a": "old"});
+        let patch = json!({"a": "new"});
+        let result = json_merge(&base, &patch);
+        assert_eq!(result, json!({"a": "new"}));
+    }
+
+    #[test]
+    fn merge_patch_adds_new_keys() {
+        let base = json!({"x": 1});
+        let patch = json!({"y": 2});
+        let result = json_merge(&base, &patch);
+        assert_eq!(result, json!({"x": 1, "y": 2}));
+    }
+
+    #[test]
+    fn merge_non_object_base_replaced() {
+        let base = json!(42);
+        let patch = json!({"a": 1});
+        let result = json_merge(&base, &patch);
+        assert_eq!(result, json!({"a": 1}));
+    }
+
+    #[test]
+    fn merge_deeply_nested() {
+        let base = json!({"a": {"b": {"c": 1, "d": 2}}});
+        let patch = json!({"a": {"b": {"c": 10, "e": 30}}});
+        let result = json_merge(&base, &patch);
+        assert_eq!(
+            result,
+            json!({"a": {"b": {"c": 10, "d": 2, "e": 30}}})
+        );
+    }
+
+    #[test]
+    fn merge_empty_patch_is_noop() {
+        let base = json!({"a": 1});
+        let patch = json!({});
+        let result = json_merge(&base, &patch);
+        assert_eq!(result, json!({"a": 1}));
     }
 }

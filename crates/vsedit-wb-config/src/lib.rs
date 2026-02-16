@@ -579,6 +579,178 @@ impl Default for WbConfigValidator {
     }
 }
 
+/// A configuration editor that tracks changes and supports undo.
+pub struct ConfigEditor {
+    model: ConfigurationModel,
+    undo_stack: Vec<ConfigEditOp>,
+}
+
+/// A single edit operation for undo support.
+#[derive(Debug, Clone)]
+pub enum ConfigEditOp {
+    Set {
+        key: String,
+        old_value: Option<String>,
+        old_scope: Option<ConfigurationScope>,
+    },
+    Remove {
+        key: String,
+        old_value: String,
+        old_scope: ConfigurationScope,
+    },
+}
+
+impl ConfigEditor {
+    /// Create a new editor wrapping a configuration model.
+    pub fn new(model: ConfigurationModel) -> Self {
+        Self {
+            model,
+            undo_stack: Vec::new(),
+        }
+    }
+
+    /// Set a configuration value, recording the change for undo.
+    pub fn set(&mut self, key: String, value: String, scope: ConfigurationScope) {
+        let old = self.model.get(&key).map(|v| v.to_string());
+        let old_scope = self.model.get_with_scope(&key).map(|(_, s)| *s);
+        self.undo_stack.push(ConfigEditOp::Set {
+            key: key.clone(),
+            old_value: old,
+            old_scope,
+        });
+        self.model.set(key, value, scope);
+    }
+
+    /// Remove a configuration key, recording the change for undo.
+    pub fn remove(&mut self, key: &str) -> bool {
+        if let Some((val, scope)) = self
+            .model
+            .get_with_scope(key)
+            .map(|(v, s)| (v.to_string(), *s))
+        {
+            self.undo_stack.push(ConfigEditOp::Remove {
+                key: key.to_string(),
+                old_value: val,
+                old_scope: scope,
+            });
+            self.model.remove(key)
+        } else {
+            false
+        }
+    }
+
+    /// Undo the last edit operation.
+    pub fn undo(&mut self) -> bool {
+        match self.undo_stack.pop() {
+            Some(ConfigEditOp::Set {
+                key,
+                old_value,
+                old_scope,
+            }) => {
+                match (old_value, old_scope) {
+                    (Some(val), Some(scope)) => {
+                        self.model.set(key, val, scope);
+                    }
+                    _ => {
+                        self.model.remove(&key);
+                    }
+                }
+                true
+            }
+            Some(ConfigEditOp::Remove {
+                key,
+                old_value,
+                old_scope,
+            }) => {
+                self.model.set(key, old_value, old_scope);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Number of undoable operations.
+    pub fn undo_count(&self) -> usize {
+        self.undo_stack.len()
+    }
+
+    /// Get a reference to the underlying model.
+    pub fn model(&self) -> &ConfigurationModel {
+        &self.model
+    }
+
+    /// Consume the editor and return the model.
+    pub fn into_model(self) -> ConfigurationModel {
+        self.model
+    }
+}
+
+impl ConfigurationModel {
+    /// Search for entries whose key or description contains the keyword (case-insensitive).
+    pub fn search(&self, keyword: &str) -> Vec<&ConfigurationEntry> {
+        let lower = keyword.to_lowercase();
+        self.entries
+            .values()
+            .filter(|e| {
+                e.key.to_lowercase().contains(&lower)
+                    || e.value.to_lowercase().contains(&lower)
+                    || e.description
+                        .as_deref()
+                        .unwrap_or("")
+                        .to_lowercase()
+                        .contains(&lower)
+            })
+            .collect()
+    }
+}
+
+/// Search for configuration entries by keyword.
+pub fn config_search<'a>(
+    model: &'a ConfigurationModel,
+    keyword: &str,
+) -> Vec<&'a ConfigurationEntry> {
+    model.search(keyword)
+}
+
+/// Expected type for a configuration value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigValueType {
+    String,
+    Integer,
+    Float,
+    Boolean,
+}
+
+impl fmt::Display for ConfigValueType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConfigValueType::String => write!(f, "string"),
+            ConfigValueType::Integer => write!(f, "integer"),
+            ConfigValueType::Float => write!(f, "float"),
+            ConfigValueType::Boolean => write!(f, "boolean"),
+        }
+    }
+}
+
+/// Validate that a configuration value matches the expected type.
+pub fn config_validate_value(value: &str, expected_type: ConfigValueType) -> Result<(), String> {
+    match expected_type {
+        ConfigValueType::String => Ok(()),
+        ConfigValueType::Integer => value
+            .parse::<i64>()
+            .map(|_| ())
+            .map_err(|_| format!("'{}' is not a valid integer", value)),
+        ConfigValueType::Float => value
+            .parse::<f64>()
+            .map(|_| ())
+            .map_err(|_| format!("'{}' is not a valid float", value)),
+        ConfigValueType::Boolean => match value {
+            "true" | "false" | "1" | "0" => Ok(()),
+            _ => Err(format!("'{}' is not a valid boolean", value)),
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1038,5 +1210,71 @@ mod tests {
     fn wb_config_is_ascii_printable() {
         assert!(WbConfigValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbConfigValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn config_editor_set_and_undo() {
+        let model = ConfigurationModel::new();
+        let mut editor = ConfigEditor::new(model);
+        editor.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        assert_eq!(editor.model().get("editor.fontSize"), Some("14"));
+        assert!(editor.undo());
+        assert_eq!(editor.model().get("editor.fontSize"), None);
+    }
+
+    #[test]
+    fn config_editor_remove_and_undo() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.tabSize".into(), "4".into(), ConfigurationScope::User);
+        let mut editor = ConfigEditor::new(model);
+        assert!(editor.remove("editor.tabSize"));
+        assert_eq!(editor.model().get("editor.tabSize"), None);
+        assert!(editor.undo());
+        assert_eq!(editor.model().get("editor.tabSize"), Some("4"));
+    }
+
+    #[test]
+    fn config_editor_undo_empty() {
+        let mut editor = ConfigEditor::new(ConfigurationModel::new());
+        assert!(!editor.undo());
+    }
+
+    #[test]
+    fn config_editor_undo_count() {
+        let mut editor = ConfigEditor::new(ConfigurationModel::new());
+        editor.set("a.b".into(), "1".into(), ConfigurationScope::Default);
+        editor.set("c.d".into(), "2".into(), ConfigurationScope::User);
+        assert_eq!(editor.undo_count(), 2);
+    }
+
+    #[test]
+    fn config_search_by_key() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        model.set("editor.tabSize".into(), "4".into(), ConfigurationScope::User);
+        model.set("terminal.fontSize".into(), "12".into(), ConfigurationScope::User);
+        let results = config_search(&model, "editor");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn config_search_case_insensitive() {
+        let mut model = ConfigurationModel::new();
+        model.set("Editor.FontSize".into(), "14".into(), ConfigurationScope::User);
+        let results = config_search(&model, "editor");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn config_validate_value_integer() {
+        assert!(config_validate_value("42", ConfigValueType::Integer).is_ok());
+        assert!(config_validate_value("abc", ConfigValueType::Integer).is_err());
+    }
+
+    #[test]
+    fn config_validate_value_boolean() {
+        assert!(config_validate_value("true", ConfigValueType::Boolean).is_ok());
+        assert!(config_validate_value("false", ConfigValueType::Boolean).is_ok());
+        assert!(config_validate_value("yes", ConfigValueType::Boolean).is_err());
     }
 }
