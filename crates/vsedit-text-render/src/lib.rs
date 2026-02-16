@@ -3,10 +3,37 @@
 //! Equivalent to VS Code's text rendering pipeline, adapted for terminal output.
 //! Handles wide characters, tab expansion, and control characters.
 
+use std::fmt;
+
 use unicode_width::UnicodeWidthChar;
 
+/// Errors that can occur during text rendering operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RenderError {
+    /// Tab size must be at least 1.
+    InvalidTabSize(u32),
+    /// The requested column is out of bounds.
+    ColumnOutOfBounds { requested: usize, max: usize },
+    /// The requested width is zero.
+    ZeroWidth,
+}
+
+impl fmt::Display for RenderError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RenderError::InvalidTabSize(n) => write!(f, "invalid tab size: {} (must be >= 1)", n),
+            RenderError::ColumnOutOfBounds { requested, max } => {
+                write!(f, "column {} out of bounds (max {})", requested, max)
+            }
+            RenderError::ZeroWidth => write!(f, "width must be greater than zero"),
+        }
+    }
+}
+
+impl std::error::Error for RenderError {}
+
 /// Result of rendering a line for terminal display.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderedLine {
     /// The display string (with tabs expanded, control chars replaced).
     pub text: String,
@@ -171,6 +198,187 @@ pub fn render_whitespace(text: &str, mode: WhitespaceRender) -> String {
     result
 }
 
+impl fmt::Display for RenderedLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.text)
+    }
+}
+
+impl RenderedLine {
+    /// Return the source byte offset for a given display column.
+    pub fn offset_at_column(&self, col: usize) -> Result<usize, RenderError> {
+        self.column_to_offset.get(col).copied().ok_or(RenderError::ColumnOutOfBounds {
+            requested: col,
+            max: self.column_to_offset.len().saturating_sub(1),
+        })
+    }
+
+    /// Return a substring of the rendered text spanning the given display columns.
+    pub fn slice_columns(&self, start: usize, end: usize) -> &str {
+        let byte_start = start.min(self.text.len());
+        let byte_end = end.min(self.text.len());
+        &self.text[byte_start..byte_end]
+    }
+
+    /// True when the rendered line contains no visible characters.
+    pub fn is_empty(&self) -> bool {
+        self.display_width == 0
+    }
+}
+
+/// Configuration for line rendering behaviour.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderConfig {
+    /// Number of spaces per tab stop.
+    pub tab_size: u32,
+    /// Maximum display width (0 = unlimited).
+    pub max_width: usize,
+    /// How to render whitespace.
+    pub whitespace_mode: WhitespaceRender,
+}
+
+impl Default for RenderConfig {
+    fn default() -> Self {
+        Self {
+            tab_size: 4,
+            max_width: 0,
+            whitespace_mode: WhitespaceRender::None,
+        }
+    }
+}
+
+impl RenderConfig {
+    /// Create a new builder for `RenderConfig`.
+    pub fn builder() -> RenderConfigBuilder {
+        RenderConfigBuilder::default()
+    }
+
+    /// Validate the configuration, returning an error for invalid values.
+    pub fn validate(&self) -> Result<(), RenderError> {
+        if self.tab_size == 0 {
+            return Err(RenderError::InvalidTabSize(0));
+        }
+        Ok(())
+    }
+
+    /// Render a line using this configuration.
+    pub fn render(&self, text: &str) -> Result<RenderedLine, RenderError> {
+        self.validate()?;
+        let mut rendered = render_line(text, self.tab_size);
+        if self.max_width > 0 && rendered.display_width > self.max_width {
+            rendered.text = truncate_to_width(text, self.max_width, self.tab_size);
+            rendered.display_width = display_width(&rendered.text, self.tab_size);
+            rendered.column_to_offset.truncate(rendered.display_width);
+        }
+        if self.whitespace_mode != WhitespaceRender::None {
+            rendered.text = render_whitespace(&rendered.text, self.whitespace_mode);
+        }
+        Ok(rendered)
+    }
+}
+
+/// Builder for [`RenderConfig`].
+#[derive(Debug, Clone, Default)]
+pub struct RenderConfigBuilder {
+    tab_size: Option<u32>,
+    max_width: Option<usize>,
+    whitespace_mode: Option<WhitespaceRender>,
+}
+
+impl RenderConfigBuilder {
+    pub fn tab_size(mut self, size: u32) -> Self {
+        self.tab_size = Some(size);
+        self
+    }
+
+    pub fn max_width(mut self, width: usize) -> Self {
+        self.max_width = Some(width);
+        self
+    }
+
+    pub fn whitespace_mode(mut self, mode: WhitespaceRender) -> Self {
+        self.whitespace_mode = Some(mode);
+        self
+    }
+
+    /// Build the configuration, validating all values.
+    pub fn build(self) -> Result<RenderConfig, RenderError> {
+        let config = RenderConfig {
+            tab_size: self.tab_size.unwrap_or(4),
+            max_width: self.max_width.unwrap_or(0),
+            whitespace_mode: self.whitespace_mode.unwrap_or(WhitespaceRender::None),
+        };
+        config.validate()?;
+        Ok(config)
+    }
+}
+
+/// Compute the display column for a given byte offset in a line.
+pub fn byte_offset_to_column(text: &str, byte_offset: usize, tab_size: u32) -> usize {
+    let mut col: usize = 0;
+    for (i, ch) in text.char_indices() {
+        if i >= byte_offset {
+            break;
+        }
+        match ch {
+            '\t' => {
+                col += tab_size as usize - (col % tab_size as usize);
+            }
+            '\r' | '\n' => {}
+            c if c.is_control() => {
+                col += 1;
+            }
+            c => {
+                col += UnicodeWidthChar::width(c).unwrap_or(0);
+            }
+        }
+    }
+    col
+}
+
+/// Compute the byte offset for a given display column in a line.
+///
+/// Returns `None` if the column exceeds the line's display width.
+pub fn column_to_byte_offset(text: &str, target_col: usize, tab_size: u32) -> Option<usize> {
+    let mut col: usize = 0;
+    for (i, ch) in text.char_indices() {
+        if col >= target_col {
+            return Some(i);
+        }
+        match ch {
+            '\t' => {
+                col += tab_size as usize - (col % tab_size as usize);
+            }
+            '\r' | '\n' => {}
+            c if c.is_control() => {
+                col += 1;
+            }
+            c => {
+                col += UnicodeWidthChar::width(c).unwrap_or(0);
+            }
+        }
+    }
+    if col >= target_col {
+        Some(text.len())
+    } else {
+        None
+    }
+}
+
+/// Pad (or truncate) a rendered string to exactly `width` display columns.
+pub fn pad_to_width(text: &str, width: usize, tab_size: u32) -> String {
+    let current = display_width(text, tab_size);
+    if current >= width {
+        truncate_to_width(text, width, tab_size)
+    } else {
+        let mut s = text.to_string();
+        for _ in 0..(width - current) {
+            s.push(' ');
+        }
+        s
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,5 +449,105 @@ mod tests {
             render_whitespace("a b  ", WhitespaceRender::None),
             "a b  "
         );
+    }
+
+    #[test]
+    fn render_error_display() {
+        let e = RenderError::InvalidTabSize(0);
+        assert_eq!(e.to_string(), "invalid tab size: 0 (must be >= 1)");
+        let e2 = RenderError::ColumnOutOfBounds {
+            requested: 10,
+            max: 5,
+        };
+        assert!(e2.to_string().contains("out of bounds"));
+        assert_eq!(RenderError::ZeroWidth.to_string(), "width must be greater than zero");
+    }
+
+    #[test]
+    fn rendered_line_display_trait() {
+        let r = render_line("abc", 4);
+        assert_eq!(format!("{}", r), "abc");
+    }
+
+    #[test]
+    fn rendered_line_offset_at_column() {
+        let r = render_line("a\tb", 4);
+        assert_eq!(r.offset_at_column(0), Ok(0));
+        // columns 1-3 map back to the tab
+        assert_eq!(r.offset_at_column(1), Ok(1));
+        assert_eq!(r.offset_at_column(4), Ok(2));
+        assert!(r.offset_at_column(99).is_err());
+    }
+
+    #[test]
+    fn rendered_line_is_empty() {
+        let r = render_line("", 4);
+        assert!(r.is_empty());
+        let r2 = render_line("x", 4);
+        assert!(!r2.is_empty());
+    }
+
+    #[test]
+    fn byte_offset_to_column_basic() {
+        assert_eq!(byte_offset_to_column("hello", 3, 4), 3);
+        assert_eq!(byte_offset_to_column("a\tb", 2, 4), 4);
+    }
+
+    #[test]
+    fn column_to_byte_offset_basic() {
+        assert_eq!(column_to_byte_offset("hello", 3, 4), Some(3));
+        assert_eq!(column_to_byte_offset("a\tb", 4, 4), Some(2));
+        assert_eq!(column_to_byte_offset("hi", 99, 4), None);
+    }
+
+    #[test]
+    fn pad_to_width_pads_short() {
+        let s = pad_to_width("hi", 6, 4);
+        assert_eq!(s, "hi    ");
+        assert_eq!(display_width(&s, 4), 6);
+    }
+
+    #[test]
+    fn pad_to_width_truncates_long() {
+        let s = pad_to_width("hello world", 5, 4);
+        assert_eq!(s, "hello");
+    }
+
+    #[test]
+    fn render_config_builder_valid() {
+        let cfg = RenderConfig::builder()
+            .tab_size(2)
+            .max_width(80)
+            .whitespace_mode(WhitespaceRender::All)
+            .build()
+            .unwrap();
+        assert_eq!(cfg.tab_size, 2);
+        assert_eq!(cfg.max_width, 80);
+        assert_eq!(cfg.whitespace_mode, WhitespaceRender::All);
+    }
+
+    #[test]
+    fn render_config_builder_invalid_tab() {
+        let err = RenderConfig::builder().tab_size(0).build();
+        assert!(err.is_err());
+        assert_eq!(err.unwrap_err(), RenderError::InvalidTabSize(0));
+    }
+
+    #[test]
+    fn render_config_render_with_max_width() {
+        let cfg = RenderConfig::builder()
+            .tab_size(4)
+            .max_width(5)
+            .build()
+            .unwrap();
+        let r = cfg.render("hello world").unwrap();
+        assert!(r.display_width <= 5);
+    }
+
+    #[test]
+    fn render_control_character() {
+        let r = render_line("\x01", 4);
+        assert_eq!(r.text, "\u{2401}");
+        assert_eq!(r.display_width, 1);
     }
 }

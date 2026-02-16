@@ -148,6 +148,283 @@ pub fn normalize_indentation(text: &str, target: IndentStyle) -> String {
     convert_indentation(text, detected, target)
 }
 
+// ---------------------------------------------------------------------------
+// Error types
+// ---------------------------------------------------------------------------
+
+/// Errors that can occur during indentation operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IndentError {
+    /// The requested space width is zero or exceeds the maximum (8).
+    InvalidSpaceWidth(u32),
+    /// The indent level would overflow the maximum allowed depth.
+    MaxDepthExceeded { depth: u32, max: u32 },
+    /// The input text contains mixed indentation that cannot be resolved.
+    MixedIndentation,
+}
+
+impl std::fmt::Display for IndentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IndentError::InvalidSpaceWidth(w) => {
+                write!(f, "invalid space width {}: must be 1..=8", w)
+            }
+            IndentError::MaxDepthExceeded { depth, max } => {
+                write!(f, "indent depth {} exceeds maximum {}", depth, max)
+            }
+            IndentError::MixedIndentation => {
+                write!(f, "text contains mixed tabs and spaces")
+            }
+        }
+    }
+}
+
+impl std::error::Error for IndentError {}
+
+// ---------------------------------------------------------------------------
+// IndentStyle — additional helpers
+// ---------------------------------------------------------------------------
+
+impl IndentStyle {
+    /// Create a `Spaces` variant, validating width is 1..=8.
+    pub fn spaces(width: u32) -> Result<Self, IndentError> {
+        if width == 0 || width > 8 {
+            return Err(IndentError::InvalidSpaceWidth(width));
+        }
+        Ok(IndentStyle::Spaces(width))
+    }
+
+    /// Return the visual width of a single indent level.
+    pub fn visual_width(&self) -> u32 {
+        match self {
+            IndentStyle::Spaces(n) => *n,
+            IndentStyle::Tabs => 4, // conventional tab display width
+        }
+    }
+
+    /// Return `true` if this style uses spaces.
+    pub fn is_spaces(&self) -> bool {
+        matches!(self, IndentStyle::Spaces(_))
+    }
+
+    /// Return `true` if this style uses tabs.
+    pub fn is_tabs(&self) -> bool {
+        matches!(self, IndentStyle::Tabs)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IndentConfig — builder pattern
+// ---------------------------------------------------------------------------
+
+/// Configuration for indentation operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndentConfig {
+    pub style: IndentStyle,
+    pub max_depth: u32,
+    pub trim_trailing_whitespace: bool,
+    pub final_newline: bool,
+}
+
+impl Default for IndentConfig {
+    fn default() -> Self {
+        Self {
+            style: IndentStyle::Spaces(4),
+            max_depth: 20,
+            trim_trailing_whitespace: true,
+            final_newline: true,
+        }
+    }
+}
+
+impl std::fmt::Display for IndentConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "IndentConfig(style={}, max_depth={}, trim_ws={}, final_nl={})",
+            self.style, self.max_depth, self.trim_trailing_whitespace, self.final_newline
+        )
+    }
+}
+
+/// Builder for [`IndentConfig`].
+#[derive(Debug, Clone)]
+pub struct IndentConfigBuilder {
+    config: IndentConfig,
+}
+
+impl IndentConfigBuilder {
+    pub fn new() -> Self {
+        Self {
+            config: IndentConfig::default(),
+        }
+    }
+
+    pub fn style(mut self, style: IndentStyle) -> Self {
+        self.config.style = style;
+        self
+    }
+
+    pub fn max_depth(mut self, max: u32) -> Self {
+        self.config.max_depth = max;
+        self
+    }
+
+    pub fn trim_trailing_whitespace(mut self, trim: bool) -> Self {
+        self.config.trim_trailing_whitespace = trim;
+        self
+    }
+
+    pub fn final_newline(mut self, nl: bool) -> Self {
+        self.config.final_newline = nl;
+        self
+    }
+
+    /// Validate and build the configuration.
+    pub fn build(self) -> Result<IndentConfig, IndentError> {
+        if let IndentStyle::Spaces(w) = self.config.style {
+            if w == 0 || w > 8 {
+                return Err(IndentError::InvalidSpaceWidth(w));
+            }
+        }
+        Ok(self.config)
+    }
+}
+
+impl Default for IndentConfigBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Business-logic helpers
+// ---------------------------------------------------------------------------
+
+/// Statistics about indentation in a text buffer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndentStats {
+    pub total_lines: usize,
+    pub blank_lines: usize,
+    pub tab_indented_lines: usize,
+    pub space_indented_lines: usize,
+    pub max_indent_depth: u32,
+    pub mixed: bool,
+}
+
+impl std::fmt::Display for IndentStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} lines ({} blank), tabs={}, spaces={}, max_depth={}, mixed={}",
+            self.total_lines,
+            self.blank_lines,
+            self.tab_indented_lines,
+            self.space_indented_lines,
+            self.max_indent_depth,
+            self.mixed,
+        )
+    }
+}
+
+/// Analyse the indentation present in `text`.
+pub fn analyse_indentation(text: &str) -> IndentStats {
+    let mut stats = IndentStats {
+        total_lines: 0,
+        blank_lines: 0,
+        tab_indented_lines: 0,
+        space_indented_lines: 0,
+        max_indent_depth: 0,
+        mixed: false,
+    };
+
+    for line in text.lines() {
+        stats.total_lines += 1;
+        if line.trim().is_empty() {
+            stats.blank_lines += 1;
+            continue;
+        }
+        let has_tab = line.starts_with('\t');
+        let has_space = line.starts_with(' ');
+        if has_tab {
+            stats.tab_indented_lines += 1;
+            let depth = line.bytes().take_while(|&b| b == b'\t').count() as u32;
+            stats.max_indent_depth = stats.max_indent_depth.max(depth);
+        }
+        if has_space {
+            stats.space_indented_lines += 1;
+            let spaces = line.bytes().take_while(|&b| b == b' ').count() as u32;
+            stats.max_indent_depth = stats.max_indent_depth.max(spaces / 4);
+        }
+    }
+
+    if stats.tab_indented_lines > 0 && stats.space_indented_lines > 0 {
+        stats.mixed = true;
+    }
+    stats
+}
+
+/// Validate that `text` uses only the given style, returning an error if mixed.
+pub fn validate_indentation(text: &str, expected: IndentStyle) -> Result<(), IndentError> {
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        match expected {
+            IndentStyle::Tabs => {
+                let leading_ws = &line[..line.len() - line.trim_start().len()];
+                if leading_ws.contains(' ') {
+                    return Err(IndentError::MixedIndentation);
+                }
+            }
+            IndentStyle::Spaces(_) => {
+                let leading_ws = &line[..line.len() - line.trim_start().len()];
+                if leading_ws.contains('\t') {
+                    return Err(IndentError::MixedIndentation);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Apply an [`IndentConfig`] to reformat `text`.
+///
+/// This normalises indentation to the configured style, enforces max depth,
+/// optionally trims trailing whitespace, and appends a final newline.
+pub fn apply_config(text: &str, config: &IndentConfig) -> Result<String, IndentError> {
+    let mut normalised = normalize_indentation(text, config.style);
+
+    // Clamp indent depth
+    let lines: Vec<&str> = normalised.lines().collect();
+    let mut clamped = Vec::with_capacity(lines.len());
+    for line in &lines {
+        let depth = get_line_indent_level(line, config.style);
+        if depth > config.max_depth {
+            let trimmed = line.trim_start();
+            let new_indent = config.style.indent_string_n(config.max_depth);
+            clamped.push(format!("{}{}", new_indent, trimmed));
+        } else {
+            clamped.push(line.to_string());
+        }
+    }
+    normalised = clamped.join("\n");
+
+    if config.trim_trailing_whitespace {
+        normalised = normalised
+            .lines()
+            .map(|l| l.trim_end().to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
+
+    if config.final_newline && !normalised.ends_with('\n') {
+        normalised.push('\n');
+    }
+
+    Ok(normalised)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -217,5 +494,143 @@ mod tests {
         let input = "fn main() {\n\tlet x = 1;\n\t\tnested();\n}\n";
         let result = normalize_indentation(input, IndentStyle::Spaces(4));
         assert_eq!(result, "fn main() {\n    let x = 1;\n        nested();\n}");
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn indent_style_spaces_validates_width() {
+        assert!(IndentStyle::spaces(4).is_ok());
+        assert!(IndentStyle::spaces(1).is_ok());
+        assert!(IndentStyle::spaces(8).is_ok());
+        assert_eq!(IndentStyle::spaces(0), Err(IndentError::InvalidSpaceWidth(0)));
+        assert_eq!(IndentStyle::spaces(9), Err(IndentError::InvalidSpaceWidth(9)));
+    }
+
+    #[test]
+    fn indent_style_queries() {
+        assert!(IndentStyle::Spaces(2).is_spaces());
+        assert!(!IndentStyle::Spaces(2).is_tabs());
+        assert!(IndentStyle::Tabs.is_tabs());
+        assert!(!IndentStyle::Tabs.is_spaces());
+    }
+
+    #[test]
+    fn visual_width() {
+        assert_eq!(IndentStyle::Spaces(2).visual_width(), 2);
+        assert_eq!(IndentStyle::Tabs.visual_width(), 4);
+    }
+
+    #[test]
+    fn indent_config_builder_defaults() {
+        let cfg = IndentConfigBuilder::new().build().unwrap();
+        assert_eq!(cfg.style, IndentStyle::Spaces(4));
+        assert_eq!(cfg.max_depth, 20);
+        assert!(cfg.trim_trailing_whitespace);
+        assert!(cfg.final_newline);
+    }
+
+    #[test]
+    fn indent_config_builder_custom() {
+        let cfg = IndentConfigBuilder::new()
+            .style(IndentStyle::Tabs)
+            .max_depth(10)
+            .trim_trailing_whitespace(false)
+            .final_newline(false)
+            .build()
+            .unwrap();
+        assert_eq!(cfg.style, IndentStyle::Tabs);
+        assert_eq!(cfg.max_depth, 10);
+        assert!(!cfg.trim_trailing_whitespace);
+        assert!(!cfg.final_newline);
+    }
+
+    #[test]
+    fn indent_config_builder_rejects_bad_width() {
+        let result = IndentConfigBuilder::new()
+            .style(IndentStyle::Spaces(0))
+            .build();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn analyse_indentation_spaces() {
+        let text = "fn f() {\n    a;\n        b;\n\n    c;\n}\n";
+        let stats = analyse_indentation(text);
+        assert_eq!(stats.total_lines, 6);
+        assert_eq!(stats.blank_lines, 1);
+        assert_eq!(stats.tab_indented_lines, 0);
+        assert_eq!(stats.space_indented_lines, 3);
+        assert!(!stats.mixed);
+    }
+
+    #[test]
+    fn analyse_indentation_mixed() {
+        let text = "\tline1\n    line2\n";
+        let stats = analyse_indentation(text);
+        assert!(stats.mixed);
+        assert_eq!(stats.tab_indented_lines, 1);
+        assert_eq!(stats.space_indented_lines, 1);
+    }
+
+    #[test]
+    fn validate_indentation_ok() {
+        let text = "fn f() {\n    a;\n    b;\n}\n";
+        assert!(validate_indentation(text, IndentStyle::Spaces(4)).is_ok());
+    }
+
+    #[test]
+    fn validate_indentation_mixed_error() {
+        let text = "\tline1\n    line2\n";
+        assert_eq!(
+            validate_indentation(text, IndentStyle::Tabs),
+            Err(IndentError::MixedIndentation)
+        );
+    }
+
+    #[test]
+    fn apply_config_trims_and_adds_newline() {
+        let cfg = IndentConfig {
+            style: IndentStyle::Spaces(4),
+            max_depth: 20,
+            trim_trailing_whitespace: true,
+            final_newline: true,
+        };
+        let input = "hello   \nworld  ";
+        let result = apply_config(input, &cfg).unwrap();
+        assert!(result.ends_with('\n'));
+        assert!(!result.contains("   \n"));
+    }
+
+    #[test]
+    fn apply_config_clamps_depth() {
+        let cfg = IndentConfig {
+            style: IndentStyle::Spaces(2),
+            max_depth: 2,
+            trim_trailing_whitespace: false,
+            final_newline: false,
+        };
+        let input = "      deeply_nested"; // 6 spaces = 3 levels at width 2
+        let result = apply_config(input, &cfg).unwrap();
+        // max depth 2 → 4 leading spaces
+        assert_eq!(result, "    deeply_nested");
+    }
+
+    #[test]
+    fn indent_error_display() {
+        let e = IndentError::InvalidSpaceWidth(0);
+        assert!(format!("{}", e).contains("invalid space width 0"));
+        let e2 = IndentError::MaxDepthExceeded { depth: 25, max: 20 };
+        assert!(format!("{}", e2).contains("25"));
+        let e3 = IndentError::MixedIndentation;
+        assert!(format!("{}", e3).contains("mixed"));
+    }
+
+    #[test]
+    fn indent_config_display() {
+        let cfg = IndentConfig::default();
+        let s = format!("{}", cfg);
+        assert!(s.contains("Spaces(4)"));
+        assert!(s.contains("max_depth=20"));
     }
 }

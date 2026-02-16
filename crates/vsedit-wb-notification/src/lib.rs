@@ -2,11 +2,41 @@
 
 use std::fmt;
 
+/// Errors that can occur during notification operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NotificationError {
+    /// Notification with the given ID was not found.
+    NotFound(u64),
+    /// The notification message was empty.
+    EmptyMessage,
+    /// Progress value was outside the valid 0.0..=1.0 range.
+    InvalidProgress(String),
+    /// The notification has already been closed.
+    AlreadyClosed(u64),
+}
+
+impl fmt::Display for NotificationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NotificationError::NotFound(id) => write!(f, "notification {id} not found"),
+            NotificationError::EmptyMessage => write!(f, "notification message must not be empty"),
+            NotificationError::InvalidProgress(v) => {
+                write!(f, "progress value {v} is outside 0.0..=1.0")
+            }
+            NotificationError::AlreadyClosed(id) => {
+                write!(f, "notification {id} is already closed")
+            }
+        }
+    }
+}
+
+impl std::error::Error for NotificationError {}
+
 /// Priority level for a notification.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NotificationPriority {
-    Default,
     Silent,
+    Default,
     Urgent,
 }
 
@@ -21,21 +51,33 @@ impl fmt::Display for NotificationPriority {
 }
 
 /// Source of a notification.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotificationSource {
     pub id: String,
     pub label: String,
 }
 
+impl fmt::Display for NotificationSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.label, self.id)
+    }
+}
+
 /// An action that can be attached to a notification.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotificationAction {
     pub label: String,
     pub id: String,
 }
 
+impl fmt::Display for NotificationAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}]", self.label)
+    }
+}
+
 /// A workbench notification.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct WorkbenchNotification {
     pub id: u64,
     pub message: String,
@@ -50,6 +92,114 @@ pub struct WorkbenchNotification {
 impl fmt::Display for WorkbenchNotification {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[{}] {}", self.priority, self.message)
+    }
+}
+
+impl WorkbenchNotification {
+    /// Returns `true` if this notification is urgent.
+    pub fn is_urgent(&self) -> bool {
+        self.priority == NotificationPriority::Urgent
+    }
+
+    /// Returns `true` if the notification has at least one action.
+    pub fn has_actions(&self) -> bool {
+        !self.actions.is_empty()
+    }
+
+    /// Returns the progress percentage (0–100), or `None` if unset.
+    pub fn progress_percent(&self) -> Option<u8> {
+        self.progress.map(|p| (p.clamp(0.0, 1.0) * 100.0) as u8)
+    }
+
+    /// Returns `true` if progress has reached 1.0.
+    pub fn is_complete(&self) -> bool {
+        matches!(self.progress, Some(p) if p >= 1.0)
+    }
+
+    /// Finds an action by its id.
+    pub fn find_action(&self, action_id: &str) -> Option<&NotificationAction> {
+        self.actions.iter().find(|a| a.id == action_id)
+    }
+
+    /// Returns a summary string including source and progress info.
+    pub fn summary(&self) -> String {
+        let mut s = format!("[{}] {}", self.priority, self.message);
+        if let Some(src) = &self.source {
+            s.push_str(&format!(" (from {})", src));
+        }
+        if let Some(pct) = self.progress_percent() {
+            s.push_str(&format!(" — {}%", pct));
+        }
+        if self.closed {
+            s.push_str(" [closed]");
+        }
+        s
+    }
+}
+
+/// Builder for constructing a `WorkbenchNotification` with validation.
+#[derive(Debug, Clone)]
+pub struct NotificationBuilder {
+    message: String,
+    priority: NotificationPriority,
+    source: Option<NotificationSource>,
+    actions: Vec<NotificationAction>,
+    closeable: bool,
+}
+
+impl NotificationBuilder {
+    /// Creates a new builder. `message` must not be empty.
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            priority: NotificationPriority::Default,
+            source: None,
+            actions: Vec::new(),
+            closeable: true,
+        }
+    }
+
+    pub fn priority(mut self, priority: NotificationPriority) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn source(mut self, source: NotificationSource) -> Self {
+        self.source = Some(source);
+        self
+    }
+
+    pub fn action(mut self, action: NotificationAction) -> Self {
+        self.actions.push(action);
+        self
+    }
+
+    pub fn closeable(mut self, closeable: bool) -> Self {
+        self.closeable = closeable;
+        self
+    }
+
+    /// Validates and sends the notification through the service, returning its id.
+    pub fn send(
+        self,
+        service: &mut NotificationWorkbenchService,
+    ) -> Result<u64, NotificationError> {
+        if self.message.is_empty() {
+            return Err(NotificationError::EmptyMessage);
+        }
+        let id = service.next_id;
+        service.next_id += 1;
+        service.notifications.push(WorkbenchNotification {
+            id,
+            message: self.message,
+            priority: self.priority,
+            source: self.source,
+            progress: None,
+            closeable: self.closeable,
+            closed: false,
+            actions: self.actions,
+        });
+        Ok(id)
     }
 }
 
@@ -175,6 +325,66 @@ impl NotificationWorkbenchService {
             n.closed = true;
         }
     }
+
+    /// Validates progress is in 0.0..=1.0 before updating.
+    pub fn update_progress_checked(
+        &mut self,
+        id: u64,
+        progress: f64,
+    ) -> Result<(), NotificationError> {
+        if !(0.0..=1.0).contains(&progress) {
+            return Err(NotificationError::InvalidProgress(progress.to_string()));
+        }
+        let n = self
+            .notifications
+            .iter_mut()
+            .find(|n| n.id == id)
+            .ok_or(NotificationError::NotFound(id))?;
+        if n.closed {
+            return Err(NotificationError::AlreadyClosed(id));
+        }
+        n.progress = Some(progress);
+        Ok(())
+    }
+
+    /// Close a notification, returning an error if not found or already closed.
+    pub fn close_checked(&mut self, id: u64) -> Result<(), NotificationError> {
+        let n = self
+            .notifications
+            .iter_mut()
+            .find(|n| n.id == id)
+            .ok_or(NotificationError::NotFound(id))?;
+        if n.closed {
+            return Err(NotificationError::AlreadyClosed(id));
+        }
+        n.closed = true;
+        Ok(())
+    }
+
+    /// Returns the highest-priority active notification, if any.
+    pub fn most_urgent(&self) -> Option<&WorkbenchNotification> {
+        self.notifications
+            .iter()
+            .filter(|n| !n.closed)
+            .max_by_key(|n| n.priority)
+    }
+
+    /// Removes all closed notifications from storage, returning how many were removed.
+    pub fn purge_closed(&mut self) -> usize {
+        let before = self.notifications.len();
+        self.notifications.retain(|n| !n.closed);
+        before - self.notifications.len()
+    }
+
+    /// Returns active notifications from a specific source id.
+    pub fn get_by_source(&self, source_id: &str) -> Vec<&WorkbenchNotification> {
+        self.notifications
+            .iter()
+            .filter(|n| {
+                !n.closed && n.source.as_ref().map_or(false, |s| s.id == source_id)
+            })
+            .collect()
+    }
 }
 
 impl Default for NotificationWorkbenchService {
@@ -289,5 +499,180 @@ mod tests {
         let id = svc.notify("something happened", NotificationPriority::Urgent);
         let n = svc.get_notification(id).unwrap();
         assert_eq!(format!("{}", n), "[Urgent] something happened");
+    }
+
+    #[test]
+    fn builder_sends_notification() {
+        let mut svc = NotificationWorkbenchService::new();
+        let id = NotificationBuilder::new("build started")
+            .priority(NotificationPriority::Silent)
+            .closeable(false)
+            .send(&mut svc)
+            .unwrap();
+        let n = svc.get_notification(id).unwrap();
+        assert_eq!(n.message, "build started");
+        assert_eq!(n.priority, NotificationPriority::Silent);
+        assert!(!n.closeable);
+    }
+
+    #[test]
+    fn builder_rejects_empty_message() {
+        let mut svc = NotificationWorkbenchService::new();
+        let result = NotificationBuilder::new("").send(&mut svc);
+        assert_eq!(result, Err(NotificationError::EmptyMessage));
+        assert_eq!(svc.total_count(), 0);
+    }
+
+    #[test]
+    fn builder_with_source_and_action() {
+        let mut svc = NotificationWorkbenchService::new();
+        let id = NotificationBuilder::new("lint warning")
+            .priority(NotificationPriority::Default)
+            .source(NotificationSource {
+                id: "linter".into(),
+                label: "Linter".into(),
+            })
+            .action(NotificationAction {
+                label: "Fix".into(),
+                id: "fix".into(),
+            })
+            .send(&mut svc)
+            .unwrap();
+        let n = svc.get_notification(id).unwrap();
+        assert_eq!(n.source.as_ref().unwrap().label, "Linter");
+        assert_eq!(n.actions.len(), 1);
+    }
+
+    #[test]
+    fn update_progress_checked_validates_range() {
+        let mut svc = NotificationWorkbenchService::new();
+        let id = svc.notify("task", NotificationPriority::Default);
+        assert!(svc.update_progress_checked(id, 0.5).is_ok());
+        assert!(svc.update_progress_checked(id, 1.5).is_err());
+        assert!(svc.update_progress_checked(id, -0.1).is_err());
+    }
+
+    #[test]
+    fn update_progress_checked_not_found() {
+        let mut svc = NotificationWorkbenchService::new();
+        assert_eq!(
+            svc.update_progress_checked(999, 0.5),
+            Err(NotificationError::NotFound(999))
+        );
+    }
+
+    #[test]
+    fn close_checked_errors() {
+        let mut svc = NotificationWorkbenchService::new();
+        assert_eq!(
+            svc.close_checked(42),
+            Err(NotificationError::NotFound(42))
+        );
+        let id = svc.notify("x", NotificationPriority::Default);
+        assert!(svc.close_checked(id).is_ok());
+        assert_eq!(
+            svc.close_checked(id),
+            Err(NotificationError::AlreadyClosed(id))
+        );
+    }
+
+    #[test]
+    fn most_urgent_returns_highest_priority() {
+        let mut svc = NotificationWorkbenchService::new();
+        svc.notify("low", NotificationPriority::Silent);
+        svc.notify("high", NotificationPriority::Urgent);
+        svc.notify("mid", NotificationPriority::Default);
+        let top = svc.most_urgent().unwrap();
+        assert_eq!(top.message, "high");
+    }
+
+    #[test]
+    fn purge_closed_removes_only_closed() {
+        let mut svc = NotificationWorkbenchService::new();
+        let a = svc.notify("a", NotificationPriority::Default);
+        svc.notify("b", NotificationPriority::Default);
+        svc.close(a);
+        let purged = svc.purge_closed();
+        assert_eq!(purged, 1);
+        assert_eq!(svc.total_count(), 1);
+        assert_eq!(svc.active_count(), 1);
+    }
+
+    #[test]
+    fn get_by_source_filters_correctly() {
+        let mut svc = NotificationWorkbenchService::new();
+        let src = NotificationSource { id: "ext.a".into(), label: "A".into() };
+        svc.notify_with_source("from a", NotificationPriority::Default, src.clone());
+        svc.notify("no source", NotificationPriority::Default);
+        let src_b = NotificationSource { id: "ext.b".into(), label: "B".into() };
+        svc.notify_with_source("from b", NotificationPriority::Default, src_b);
+        let results = svc.get_by_source("ext.a");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].message, "from a");
+    }
+
+    #[test]
+    fn notification_helper_methods() {
+        let mut svc = NotificationWorkbenchService::new();
+        let actions = vec![NotificationAction { label: "Ok".into(), id: "ok".into() }];
+        let id = svc.notify_with_actions("err", NotificationPriority::Urgent, actions);
+        let n = svc.get_notification(id).unwrap();
+        assert!(n.is_urgent());
+        assert!(n.has_actions());
+        assert!(n.find_action("ok").is_some());
+        assert!(n.find_action("missing").is_none());
+        assert_eq!(n.progress_percent(), None);
+    }
+
+    #[test]
+    fn progress_percent_and_completion() {
+        let mut svc = NotificationWorkbenchService::new();
+        let id = svc.notify("dl", NotificationPriority::Default);
+        svc.update_progress(id, 0.75);
+        let n = svc.get_notification(id).unwrap();
+        assert_eq!(n.progress_percent(), Some(75));
+        assert!(!n.is_complete());
+        svc.update_progress(id, 1.0);
+        let n = svc.get_notification(id).unwrap();
+        assert!(n.is_complete());
+    }
+
+    #[test]
+    fn notification_summary_formatting() {
+        let mut svc = NotificationWorkbenchService::new();
+        let src = NotificationSource { id: "ci".into(), label: "CI".into() };
+        let id = svc.notify_with_source("building", NotificationPriority::Default, src);
+        svc.update_progress(id, 0.5);
+        let n = svc.get_notification(id).unwrap();
+        let s = n.summary();
+        assert!(s.contains("building"));
+        assert!(s.contains("CI (ci)"));
+        assert!(s.contains("50%"));
+    }
+
+    #[test]
+    fn error_display_messages() {
+        let e1 = NotificationError::NotFound(7);
+        assert_eq!(e1.to_string(), "notification 7 not found");
+        let e2 = NotificationError::EmptyMessage;
+        assert!(e2.to_string().contains("empty"));
+        let e3 = NotificationError::InvalidProgress("2.0".into());
+        assert!(e3.to_string().contains("2.0"));
+        let e4 = NotificationError::AlreadyClosed(3);
+        assert!(e4.to_string().contains("already closed"));
+    }
+
+    #[test]
+    fn display_source_and_action() {
+        let src = NotificationSource { id: "x".into(), label: "X Ext".into() };
+        assert_eq!(format!("{src}"), "X Ext (x)");
+        let act = NotificationAction { id: "a".into(), label: "Apply".into() };
+        assert_eq!(format!("{act}"), "[Apply]");
+    }
+
+    #[test]
+    fn priority_ordering() {
+        assert!(NotificationPriority::Silent < NotificationPriority::Default);
+        assert!(NotificationPriority::Default < NotificationPriority::Urgent);
     }
 }

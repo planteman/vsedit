@@ -3,10 +3,37 @@
 //! Equivalent to VS Code's `vs/editor/contrib/find`.
 //! Provides text search with regex, case sensitivity, whole word, and replace.
 
+use std::fmt;
+
 use regex::Regex;
 
+/// Errors that can occur during find/replace operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FindError {
+    /// The regex pattern is invalid.
+    InvalidRegex(String),
+    /// The search string is empty when it shouldn't be.
+    EmptySearch,
+    /// The match index is out of bounds.
+    MatchOutOfBounds { index: usize, total: usize },
+}
+
+impl fmt::Display for FindError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FindError::InvalidRegex(msg) => write!(f, "invalid regex pattern: {}", msg),
+            FindError::EmptySearch => write!(f, "search string is empty"),
+            FindError::MatchOutOfBounds { index, total } => {
+                write!(f, "match index {} out of bounds (total: {})", index, total)
+            }
+        }
+    }
+}
+
+impl std::error::Error for FindError {}
+
 /// Options for a find operation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FindOptions {
     pub search_string: String,
     pub is_regex: bool,
@@ -42,6 +69,76 @@ impl FindOptions {
     }
 }
 
+impl fmt::Display for FindOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "\"{}\"", self.search_string)?;
+        let mut flags = Vec::new();
+        if self.is_regex {
+            flags.push("regex");
+        }
+        if self.case_sensitive {
+            flags.push("case-sensitive");
+        }
+        if self.whole_word {
+            flags.push("whole-word");
+        }
+        if self.preserve_case {
+            flags.push("preserve-case");
+        }
+        if !flags.is_empty() {
+            write!(f, " [{}]", flags.join(", "))?;
+        }
+        Ok(())
+    }
+}
+
+impl FindOptions {
+    /// Validate that the search options are well-formed.
+    /// Returns `Err` if the search string is empty or an invalid regex.
+    pub fn validate(&self) -> Result<(), FindError> {
+        if self.search_string.is_empty() {
+            return Err(FindError::EmptySearch);
+        }
+        if self.is_regex {
+            Regex::new(&self.search_string).map_err(|e| FindError::InvalidRegex(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Builder method to set preserve_case.
+    pub fn with_preserve_case(mut self, v: bool) -> Self {
+        self.preserve_case = v;
+        self
+    }
+
+    /// Build the compiled regex pattern for this search configuration.
+    pub fn compile_pattern(&self) -> Result<Regex, FindError> {
+        if self.search_string.is_empty() {
+            return Err(FindError::EmptySearch);
+        }
+
+        let pattern = if self.is_regex {
+            self.search_string.clone()
+        } else {
+            regex::escape(&self.search_string)
+        };
+
+        let pattern = if self.whole_word {
+            format!(r"\b{}\b", pattern)
+        } else {
+            pattern
+        };
+
+        let pattern = if self.case_sensitive {
+            pattern
+        } else {
+            format!("(?i){}", pattern)
+        };
+
+        Regex::new(&pattern).map_err(|e| FindError::InvalidRegex(e.to_string()))
+    }
+}
+
 /// A match found in the text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FindMatch {
@@ -49,6 +146,79 @@ pub struct FindMatch {
     pub start_col: u32, // 1-based
     pub end_col: u32,   // 1-based, exclusive
     pub text: String,
+}
+
+impl fmt::Display for FindMatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "\"{}\" at line {}:{}-{}",
+            self.text, self.line, self.start_col, self.end_col
+        )
+    }
+}
+
+impl FindMatch {
+    /// Length of the matched text in columns.
+    pub fn match_len(&self) -> u32 {
+        self.end_col - self.start_col
+    }
+
+    /// Returns true if this match is on the given line.
+    pub fn is_on_line(&self, line: u32) -> bool {
+        self.line == line
+    }
+}
+
+/// Find all matches, returning an error for invalid patterns.
+pub fn find_matches_checked(text: &str, options: &FindOptions) -> Result<Vec<FindMatch>, FindError> {
+    if options.search_string.is_empty() {
+        return Err(FindError::EmptySearch);
+    }
+
+    let re = options.compile_pattern()?;
+    let mut matches = Vec::new();
+    for (line_idx, line) in text.lines().enumerate() {
+        for m in re.find_iter(line) {
+            matches.push(FindMatch {
+                line: (line_idx + 1) as u32,
+                start_col: (m.start() + 1) as u32,
+                end_col: (m.end() + 1) as u32,
+                text: m.as_str().to_string(),
+            });
+        }
+    }
+    Ok(matches)
+}
+
+/// Replace only the nth occurrence (0-based) in the text.
+pub fn replace_nth(text: &str, options: &FindOptions, replacement: &str, n: usize) -> Result<String, FindError> {
+    let re = options.compile_pattern()?;
+    let mut count = 0usize;
+    let mut result = String::with_capacity(text.len());
+    let mut last_end = 0;
+
+    for m in re.find_iter(text) {
+        if count == n {
+            result.push_str(&text[last_end..m.start()]);
+            result.push_str(replacement);
+            last_end = m.end();
+            // Append the rest and return
+            result.push_str(&text[last_end..]);
+            return Ok(result);
+        }
+        count += 1;
+    }
+
+    Err(FindError::MatchOutOfBounds {
+        index: n,
+        total: count,
+    })
+}
+
+/// Count all occurrences of the search pattern in text.
+pub fn count_matches(text: &str, options: &FindOptions) -> usize {
+    find_matches(text, options).len()
 }
 
 /// Find all matches in text.
@@ -126,7 +296,7 @@ pub fn replace_all(text: &str, options: &FindOptions, replacement: &str) -> Stri
 }
 
 /// Find state for incremental search.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FindState {
     pub options: FindOptions,
     pub matches: Vec<FindMatch>,
@@ -180,6 +350,53 @@ impl FindState {
 
     pub fn current(&self) -> Option<&FindMatch> {
         self.current_match.and_then(|i| self.matches.get(i))
+    }
+
+    /// Jump to a specific match by index.
+    pub fn goto_match(&mut self, index: usize) -> Result<(), FindError> {
+        if index >= self.matches.len() {
+            return Err(FindError::MatchOutOfBounds {
+                index,
+                total: self.matches.len(),
+            });
+        }
+        self.current_match = Some(index);
+        Ok(())
+    }
+
+    /// Returns true if the state has an active search with results.
+    pub fn has_matches(&self) -> bool {
+        !self.matches.is_empty()
+    }
+
+    /// Return all matches on a given line (1-based).
+    pub fn matches_on_line(&self, line: u32) -> Vec<&FindMatch> {
+        self.matches.iter().filter(|m| m.is_on_line(line)).collect()
+    }
+
+    /// Replace the current match in the provided text, returning the new text.
+    pub fn replace_current(&self, text: &str) -> Result<String, FindError> {
+        let idx = self.current_match.ok_or(FindError::MatchOutOfBounds {
+            index: 0,
+            total: self.matches.len(),
+        })?;
+        replace_nth(text, &self.options, &self.replace_string, idx)
+    }
+}
+
+impl fmt::Display for FindState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let current = self
+            .current_match
+            .map(|i| i + 1) // display as 1-based
+            .unwrap_or(0);
+        write!(
+            f,
+            "Find {}: {}/{} matches",
+            self.options,
+            current,
+            self.matches.len()
+        )
     }
 }
 
@@ -266,5 +483,153 @@ mod tests {
     fn empty_search() {
         let matches = find_matches("hello", &FindOptions::new(""));
         assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn find_options_validate_ok() {
+        let opts = FindOptions::new("hello");
+        assert!(opts.validate().is_ok());
+    }
+
+    #[test]
+    fn find_options_validate_empty() {
+        let opts = FindOptions::new("");
+        assert_eq!(opts.validate(), Err(FindError::EmptySearch));
+    }
+
+    #[test]
+    fn find_options_validate_bad_regex() {
+        let opts = FindOptions::new("[invalid").with_regex(true);
+        assert!(matches!(opts.validate(), Err(FindError::InvalidRegex(_))));
+    }
+
+    #[test]
+    fn find_options_display() {
+        let opts = FindOptions::new("foo").with_regex(true).with_case_sensitive(true);
+        let s = format!("{}", opts);
+        assert!(s.contains("foo"));
+        assert!(s.contains("regex"));
+        assert!(s.contains("case-sensitive"));
+    }
+
+    #[test]
+    fn find_match_display_and_len() {
+        let m = FindMatch {
+            line: 3,
+            start_col: 5,
+            end_col: 10,
+            text: "world".to_string(),
+        };
+        assert_eq!(m.match_len(), 5);
+        assert!(m.is_on_line(3));
+        assert!(!m.is_on_line(1));
+        let s = format!("{}", m);
+        assert!(s.contains("world"));
+        assert!(s.contains("line 3"));
+    }
+
+    #[test]
+    fn find_matches_checked_error() {
+        let opts = FindOptions::new("[bad").with_regex(true);
+        let result = find_matches_checked("some text", &opts);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn find_matches_checked_ok() {
+        let opts = FindOptions::new("ok");
+        let result = find_matches_checked("ok then ok", &opts);
+        assert_eq!(result.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn replace_nth_match() {
+        let opts = FindOptions::new("a");
+        let result = replace_nth("a b a c a", &opts, "X", 1).unwrap();
+        assert_eq!(result, "a b X c a");
+    }
+
+    #[test]
+    fn replace_nth_out_of_bounds() {
+        let opts = FindOptions::new("a");
+        let result = replace_nth("a b a", &opts, "X", 5);
+        assert!(matches!(result, Err(FindError::MatchOutOfBounds { .. })));
+    }
+
+    #[test]
+    fn count_matches_basic() {
+        let opts = FindOptions::new("ab");
+        assert_eq!(count_matches("ab cd ab ef ab", &opts), 3);
+    }
+
+    #[test]
+    fn find_state_goto_and_display() {
+        let mut state = FindState::new();
+        state.options = FindOptions::new("x");
+        state.search("x y x z x");
+        assert_eq!(state.match_count(), 3);
+
+        assert!(state.goto_match(2).is_ok());
+        assert_eq!(state.current().unwrap().start_col, 9);
+
+        assert!(state.goto_match(5).is_err());
+
+        let s = format!("{}", state);
+        assert!(s.contains("3/3 matches"));
+    }
+
+    #[test]
+    fn find_state_matches_on_line() {
+        let mut state = FindState::new();
+        state.options = FindOptions::new("a");
+        state.search("a b a\nc d\na");
+        assert_eq!(state.matches_on_line(1).len(), 2);
+        assert_eq!(state.matches_on_line(2).len(), 0);
+        assert_eq!(state.matches_on_line(3).len(), 1);
+    }
+
+    #[test]
+    fn find_state_replace_current() {
+        let mut state = FindState::new();
+        state.options = FindOptions::new("cat");
+        state.replace_string = "dog".to_string();
+        let text = "the cat sat on the cat mat";
+        state.search(text);
+        state.next_match(); // move to second "cat"
+        let result = state.replace_current(text).unwrap();
+        assert_eq!(result, "the cat sat on the dog mat");
+    }
+
+    #[test]
+    fn find_state_has_matches() {
+        let mut state = FindState::new();
+        state.options = FindOptions::new("z");
+        state.search("abc");
+        assert!(!state.has_matches());
+        state.search("xyz");
+        assert!(state.has_matches());
+    }
+
+    #[test]
+    fn find_error_display() {
+        let e = FindError::EmptySearch;
+        assert_eq!(format!("{}", e), "search string is empty");
+        let e = FindError::MatchOutOfBounds { index: 3, total: 2 };
+        assert!(format!("{}", e).contains("3"));
+    }
+
+    #[test]
+    fn find_options_with_preserve_case() {
+        let opts = FindOptions::new("test").with_preserve_case(true);
+        assert!(opts.preserve_case);
+        let s = format!("{}", opts);
+        assert!(s.contains("preserve-case"));
+    }
+
+    #[test]
+    fn replace_case_insensitive() {
+        let opts = FindOptions::new("HELLO").with_case_sensitive(false);
+        let result = replace_all("hello Hello HELLO", &opts, "hi");
+        assert_eq!(result, "hi hi hi");
     }
 }

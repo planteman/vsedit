@@ -3,7 +3,209 @@
 //! Equivalent to VS Code's `vs/base/common/functional.ts`.
 
 use std::collections::HashMap;
+use std::fmt;
 
+/// Error type for functional operations that can fail.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FunctionalError {
+    /// A validation check failed with the given message.
+    ValidationFailed(String),
+    /// An operation was invoked on an exhausted or empty pipeline.
+    EmptyPipeline,
+    /// A predicate matched no elements.
+    NoMatch,
+}
+
+impl fmt::Display for FunctionalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FunctionalError::ValidationFailed(msg) => write!(f, "validation failed: {msg}"),
+            FunctionalError::EmptyPipeline => write!(f, "pipeline is empty"),
+            FunctionalError::NoMatch => write!(f, "no matching element found"),
+        }
+    }
+}
+
+impl std::error::Error for FunctionalError {}
+
+/// A composable transformation pipeline that chains operations on a value.
+///
+/// Supports building a sequence of `T -> T` transformations and applying them
+/// in order.
+#[derive(Clone)]
+pub struct Pipeline<T: 'static> {
+    steps: Vec<Box<dyn CloneFn<T>>>,
+}
+
+/// Helper trait so we can clone boxed closures inside `Pipeline`.
+trait CloneFn<T>: Fn(T) -> T {
+    fn clone_box(&self) -> Box<dyn CloneFn<T>>;
+}
+
+impl<T, F: Fn(T) -> T + Clone + 'static> CloneFn<T> for F {
+    fn clone_box(&self) -> Box<dyn CloneFn<T>> {
+        Box::new(self.clone())
+    }
+}
+
+impl<T: 'static> Clone for Box<dyn CloneFn<T>> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
+}
+
+impl<T: 'static> Pipeline<T> {
+    /// Create an empty pipeline.
+    pub fn new() -> Self {
+        Self { steps: Vec::new() }
+    }
+
+    /// Append a transformation step.
+    pub fn then(mut self, f: impl Fn(T) -> T + Clone + 'static) -> Self {
+        self.steps.push(Box::new(f));
+        self
+    }
+
+    /// Execute all steps in order on `value`.
+    pub fn execute(&self, value: T) -> T {
+        self.steps.iter().fold(value, |acc, step| step(acc))
+    }
+
+    /// Return the number of steps in the pipeline.
+    pub fn len(&self) -> usize {
+        self.steps.len()
+    }
+
+    /// Return `true` if the pipeline has no steps.
+    pub fn is_empty(&self) -> bool {
+        self.steps.is_empty()
+    }
+
+    /// Try to execute; returns an error if the pipeline is empty.
+    pub fn try_execute(&self, value: T) -> Result<T, FunctionalError> {
+        if self.steps.is_empty() {
+            return Err(FunctionalError::EmptyPipeline);
+        }
+        Ok(self.execute(value))
+    }
+}
+
+impl<T: 'static> Default for Pipeline<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> fmt::Debug for Pipeline<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Pipeline")
+            .field("steps", &self.steps.len())
+            .finish()
+    }
+}
+
+/// A builder for constructing validated values of type `T`.
+///
+/// Validators are predicate functions paired with an error message; the value
+/// is only produced when all validators pass.
+#[derive(Clone)]
+pub struct ValidatedBuilder<T: Clone + 'static> {
+    value: T,
+    validators: Vec<(Box<dyn ClonePredicate<T>>, String)>,
+}
+
+trait ClonePredicate<T>: Fn(&T) -> bool {
+    fn clone_box(&self) -> Box<dyn ClonePredicate<T>>;
+}
+
+impl<T, F: Fn(&T) -> bool + Clone + 'static> ClonePredicate<T> for F {
+    fn clone_box(&self) -> Box<dyn ClonePredicate<T>> {
+        Box::new(self.clone())
+    }
+}
+
+impl<T: 'static> Clone for Box<dyn ClonePredicate<T>> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
+}
+
+impl<T: Clone + 'static> ValidatedBuilder<T> {
+    /// Start building from an initial value.
+    pub fn new(value: T) -> Self {
+        Self {
+            value,
+            validators: Vec::new(),
+        }
+    }
+
+    /// Add a validation rule.
+    pub fn validate(
+        mut self,
+        predicate: impl Fn(&T) -> bool + Clone + 'static,
+        message: impl Into<String>,
+    ) -> Self {
+        self.validators.push((Box::new(predicate), message.into()));
+        self
+    }
+
+    /// Run all validators and return the value, or the first error.
+    pub fn build(self) -> Result<T, FunctionalError> {
+        for (pred, msg) in &self.validators {
+            if !pred(&self.value) {
+                return Err(FunctionalError::ValidationFailed(msg.clone()));
+            }
+        }
+        Ok(self.value)
+    }
+}
+
+impl<T: Clone + fmt::Debug> fmt::Debug for ValidatedBuilder<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ValidatedBuilder")
+            .field("value", &self.value)
+            .field("validators", &self.validators.len())
+            .finish()
+    }
+}
+
+/// Applies a function to each element, returning the first `Ok` result.
+pub fn find_map_result<T, R, E>(
+    items: impl IntoIterator<Item = T>,
+    f: impl Fn(T) -> Result<R, E>,
+) -> Result<R, FunctionalError> {
+    for item in items {
+        if let Ok(r) = f(item) {
+            return Ok(r);
+        }
+    }
+    Err(FunctionalError::NoMatch)
+}
+
+/// Partition items into `(matching, non_matching)` based on a predicate.
+pub fn partition<T>(
+    items: impl IntoIterator<Item = T>,
+    predicate: impl Fn(&T) -> bool,
+) -> (Vec<T>, Vec<T>) {
+    let mut yes = Vec::new();
+    let mut no = Vec::new();
+    for item in items {
+        if predicate(&item) {
+            yes.push(item);
+        } else {
+            no.push(item);
+        }
+    }
+    (yes, no)
+}
+
+/// Returns a closure that applies `f` and clamps the result to `[min, max]`.
+pub fn clamp_result<F>(f: F, min: f64, max: f64) -> impl Fn(f64) -> f64
+where
+    F: Fn(f64) -> f64,
+{
+    move |x| f(x).clamp(min, max)
+}
 
 /// Creates a function that can only be called once. Subsequent calls return the
 /// first result.
@@ -225,5 +427,112 @@ mod tests {
         assert_eq!(cached(4), 16); // cached
         assert_eq!(cached(5), 25);
         assert_eq!(cached(4), 16); // still cached
+    }
+
+    #[test]
+    fn test_constant() {
+        let always_42 = constant(42);
+        assert_eq!(always_42(), 42);
+        assert_eq!(always_42(), 42);
+        let always_hello = constant("hello".to_string());
+        assert_eq!(always_hello(), "hello");
+    }
+
+    #[test]
+    fn test_pipeline_execute() {
+        let p = Pipeline::new()
+            .then(|x: i32| x + 1)
+            .then(|x: i32| x * 3);
+        assert_eq!(p.execute(5), 18); // (5+1)*3
+        assert_eq!(p.len(), 2);
+        assert!(!p.is_empty());
+    }
+
+    #[test]
+    fn test_pipeline_empty() {
+        let p = Pipeline::<i32>::new();
+        assert!(p.is_empty());
+        assert_eq!(p.try_execute(10), Err(FunctionalError::EmptyPipeline));
+    }
+
+    #[test]
+    fn test_pipeline_try_execute_ok() {
+        let p = Pipeline::new().then(|x: i32| x * 2);
+        assert_eq!(p.try_execute(7), Ok(14));
+    }
+
+    #[test]
+    fn test_pipeline_debug() {
+        let p = Pipeline::new().then(|x: i32| x + 1);
+        let dbg = format!("{:?}", p);
+        assert!(dbg.contains("Pipeline"));
+        assert!(dbg.contains("1"));
+    }
+
+    #[test]
+    fn test_validated_builder_success() {
+        let result = ValidatedBuilder::new(42)
+            .validate(|v| *v > 0, "must be positive")
+            .validate(|v| *v < 100, "must be less than 100")
+            .build();
+        assert_eq!(result, Ok(42));
+    }
+
+    #[test]
+    fn test_validated_builder_failure() {
+        let result = ValidatedBuilder::new(-5)
+            .validate(|v| *v > 0, "must be positive")
+            .build();
+        assert_eq!(
+            result,
+            Err(FunctionalError::ValidationFailed("must be positive".into()))
+        );
+    }
+
+    #[test]
+    fn test_validated_builder_debug() {
+        let b = ValidatedBuilder::new(10)
+            .validate(|v| *v > 0, "positive");
+        let dbg = format!("{:?}", b);
+        assert!(dbg.contains("ValidatedBuilder"));
+    }
+
+    #[test]
+    fn test_find_map_result_found() {
+        let items = vec![1, 2, 3, 4];
+        let result = find_map_result(items, |x| {
+            if x > 2 { Ok(x * 10) } else { Err(()) }
+        });
+        assert_eq!(result, Ok(30));
+    }
+
+    #[test]
+    fn test_find_map_result_none() {
+        let items = vec![1, 2];
+        let result: Result<i32, _> = find_map_result(items, |_| Err::<i32, ()>(()));
+        assert_eq!(result, Err(FunctionalError::NoMatch));
+    }
+
+    #[test]
+    fn test_partition() {
+        let (evens, odds) = partition(vec![1, 2, 3, 4, 5], |x| x % 2 == 0);
+        assert_eq!(evens, vec![2, 4]);
+        assert_eq!(odds, vec![1, 3, 5]);
+    }
+
+    #[test]
+    fn test_clamp_result() {
+        let f = clamp_result(|x| x * 3.0, 0.0, 10.0);
+        assert!((f(5.0) - 10.0).abs() < f64::EPSILON); // 15 clamped to 10
+        assert!((f(-1.0) - 0.0).abs() < f64::EPSILON); // -3 clamped to 0
+        assert!((f(2.0) - 6.0).abs() < f64::EPSILON); // 6 within range
+    }
+
+    #[test]
+    fn test_functional_error_display() {
+        let e = FunctionalError::ValidationFailed("bad".into());
+        assert_eq!(e.to_string(), "validation failed: bad");
+        assert_eq!(FunctionalError::EmptyPipeline.to_string(), "pipeline is empty");
+        assert_eq!(FunctionalError::NoMatch.to_string(), "no matching element found");
     }
 }

@@ -74,11 +74,136 @@ pub fn derive_key(input: &str, salt: &str) -> String {
     sha256_string(&combined)
 }
 
+/// Errors that can occur in hash operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HashError {
+    /// The input was empty when a non-empty value was required.
+    EmptyInput(&'static str),
+    /// A hex string had an invalid length or characters.
+    InvalidHex(String),
+    /// A content address string was malformed.
+    InvalidContentAddress(String),
+}
+
+impl std::fmt::Display for HashError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HashError::EmptyInput(field) => write!(f, "empty input: {field}"),
+            HashError::InvalidHex(msg) => write!(f, "invalid hex: {msg}"),
+            HashError::InvalidContentAddress(msg) => write!(f, "invalid content address: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for HashError {}
+
+/// A parsed content address consisting of a SHA-256 digest and a byte length.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentAddress {
+    digest: String,
+    length: usize,
+}
+
+impl ContentAddress {
+    /// Create a content address from raw content.
+    pub fn from_content(content: &str) -> Self {
+        let digest = sha256_string(content);
+        Self {
+            digest,
+            length: content.len(),
+        }
+    }
+
+    /// Parse a content address string of the form `<hex-digest>:<length>`.
+    pub fn parse(s: &str) -> Result<Self, HashError> {
+        let (hex_part, len_part) = s
+            .split_once(':')
+            .ok_or_else(|| HashError::InvalidContentAddress("missing ':' separator".into()))?;
+
+        if hex_part.len() != 64 {
+            return Err(HashError::InvalidContentAddress(format!(
+                "digest must be 64 hex chars, got {}",
+                hex_part.len()
+            )));
+        }
+        if !hex_part.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(HashError::InvalidHex("non-hex character in digest".into()));
+        }
+
+        let length: usize = len_part.parse().map_err(|_| {
+            HashError::InvalidContentAddress(format!("invalid length: {len_part}"))
+        })?;
+
+        Ok(Self {
+            digest: hex_part.to_string(),
+            length,
+        })
+    }
+
+    /// Verify that the given content matches this content address.
+    pub fn verify(&self, content: &str) -> bool {
+        content.len() == self.length && sha256_string(content) == self.digest
+    }
+
+    /// Return the SHA-256 digest portion.
+    pub fn digest(&self) -> &str {
+        &self.digest
+    }
+
+    /// Return the content length portion.
+    pub fn length(&self) -> usize {
+        self.length
+    }
+}
+
+impl std::fmt::Display for ContentAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.digest, self.length)
+    }
+}
+
+/// Validate and parse a hex string into bytes.
+pub fn hex_decode(s: &str) -> Result<Vec<u8>, HashError> {
+    if s.len() % 2 != 0 {
+        return Err(HashError::InvalidHex("odd-length hex string".into()));
+    }
+    (0..s.len())
+        .step_by(2)
+        .map(|i| {
+            u8::from_str_radix(&s[i..i + 2], 16)
+                .map_err(|_| HashError::InvalidHex(format!("invalid byte at position {i}")))
+        })
+        .collect()
+}
+
+/// Derive a key with multiple rounds of SHA-256 hashing for added strength.
+pub fn derive_key_rounds(input: &str, salt: &str, rounds: u32) -> Result<String, HashError> {
+    if input.is_empty() {
+        return Err(HashError::EmptyInput("input"));
+    }
+    if rounds == 0 {
+        return Err(HashError::EmptyInput("rounds must be > 0"));
+    }
+    let mut current = format!("{input}{salt}");
+    for _ in 0..rounds {
+        current = sha256_string(&current);
+    }
+    Ok(current)
+}
+
+/// Compute an HMAC-like keyed hash using SHA-256: `H(key || message)`.
+///
+/// Note: this is a simplified construction, not a standards-compliant HMAC.
+pub fn keyed_hash(key: &str, message: &str) -> String {
+    sha256_string(&format!("{key}{message}"))
+}
+
 fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 /// A simple hash combiner for combining multiple hash values.
+#[derive(Clone, PartialEq, Eq)]
 pub struct HashCombiner {
     hash: u32,
 }
@@ -155,6 +280,14 @@ impl std::fmt::Display for HashCombiner {
 impl Default for HashCombiner {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl std::fmt::Debug for HashCombiner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HashCombiner")
+            .field("hash", &format_args!("{:#010x}", self.hash))
+            .finish()
     }
 }
 
@@ -282,5 +415,105 @@ mod tests {
         c.add_number(1);
         let display = format!("{c}");
         assert_eq!(display.len(), 8);
+    }
+
+    #[test]
+    fn test_content_address_roundtrip() {
+        let content = "fn main() { println!(\"hello\"); }";
+        let addr = ContentAddress::from_content(content);
+        let serialized = addr.to_string();
+        let parsed = ContentAddress::parse(&serialized).unwrap();
+        assert_eq!(addr, parsed);
+        assert!(parsed.verify(content));
+        assert!(!parsed.verify("different content"));
+    }
+
+    #[test]
+    fn test_content_address_parse_errors() {
+        // Missing separator
+        assert!(ContentAddress::parse("abc123").is_err());
+        // Digest too short
+        assert!(ContentAddress::parse("abcd:10").is_err());
+        // Invalid length
+        let bad = format!("{}:notanum", "a".repeat(64));
+        assert!(ContentAddress::parse(&bad).is_err());
+        // Non-hex chars in digest
+        let bad_hex = format!("{}:10", "g".repeat(64));
+        assert!(ContentAddress::parse(&bad_hex).is_err());
+    }
+
+    #[test]
+    fn test_content_address_accessors() {
+        let addr = ContentAddress::from_content("test");
+        assert_eq!(addr.length(), 4);
+        assert_eq!(addr.digest().len(), 64);
+    }
+
+    #[test]
+    fn test_hex_decode_valid() {
+        let hex = sha256_hex(b"hello");
+        let bytes = hex_decode(&hex).unwrap();
+        assert_eq!(bytes.len(), 32);
+        assert_eq!(bytes, sha256_bytes(b"hello").to_vec());
+    }
+
+    #[test]
+    fn test_hex_decode_errors() {
+        // Odd length
+        assert!(hex_decode("abc").is_err());
+        // Invalid char
+        assert!(hex_decode("zz").is_err());
+    }
+
+    #[test]
+    fn test_derive_key_rounds() {
+        let k = derive_key_rounds("secret", "salt", 3).unwrap();
+        assert_eq!(k.len(), 64);
+        // Deterministic
+        assert_eq!(k, derive_key_rounds("secret", "salt", 3).unwrap());
+        // Different from single-round derive_key
+        assert_ne!(k, derive_key("secret", "salt"));
+    }
+
+    #[test]
+    fn test_derive_key_rounds_errors() {
+        assert!(derive_key_rounds("", "salt", 1).is_err());
+        assert!(derive_key_rounds("input", "salt", 0).is_err());
+    }
+
+    #[test]
+    fn test_keyed_hash() {
+        let h1 = keyed_hash("key", "message");
+        assert_eq!(h1.len(), 64);
+        assert_eq!(h1, keyed_hash("key", "message"));
+        assert_ne!(h1, keyed_hash("other", "message"));
+        assert_ne!(h1, keyed_hash("key", "other"));
+    }
+
+    #[test]
+    fn test_hash_error_display() {
+        let e = HashError::EmptyInput("field");
+        assert_eq!(format!("{e}"), "empty input: field");
+        let e2 = HashError::InvalidHex("bad".into());
+        assert_eq!(format!("{e2}"), "invalid hex: bad");
+        let e3 = HashError::InvalidContentAddress("missing".into());
+        assert_eq!(format!("{e3}"), "invalid content address: missing");
+    }
+
+    #[test]
+    fn test_combiner_clone_and_eq() {
+        let mut c = HashCombiner::new();
+        c.add_string("hello").add_number(42);
+        let c2 = c.clone();
+        assert_eq!(c, c2);
+        assert_eq!(c.value(), c2.value());
+    }
+
+    #[test]
+    fn test_combiner_debug() {
+        let c = HashCombiner::new();
+        let dbg = format!("{c:?}");
+        assert!(dbg.contains("HashCombiner"));
+        assert!(dbg.contains("0x"));
     }
 }

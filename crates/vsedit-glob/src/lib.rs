@@ -2,12 +2,61 @@
 //!
 //! Wraps the `globset` crate to provide VS Code-compatible glob matching.
 
+use std::fmt;
+
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
+
+/// Error type for glob operations.
+#[derive(Debug)]
+pub enum GlobError {
+    /// A glob pattern failed to compile.
+    InvalidPattern(globset::Error),
+    /// An empty pattern was supplied where one is required.
+    EmptyPattern,
+}
+
+impl fmt::Display for GlobError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GlobError::InvalidPattern(e) => write!(f, "invalid glob pattern: {e}"),
+            GlobError::EmptyPattern => write!(f, "glob pattern must not be empty"),
+        }
+    }
+}
+
+impl std::error::Error for GlobError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            GlobError::InvalidPattern(e) => Some(e),
+            GlobError::EmptyPattern => None,
+        }
+    }
+}
+
+impl From<globset::Error> for GlobError {
+    fn from(err: globset::Error) -> Self {
+        GlobError::InvalidPattern(err)
+    }
+}
 
 /// A compiled glob pattern for matching file paths.
 pub struct GlobPattern {
     matcher: GlobMatcher,
     pattern: String,
+}
+
+impl fmt::Debug for GlobPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GlobPattern")
+            .field("pattern", &self.pattern)
+            .finish()
+    }
+}
+
+impl fmt::Display for GlobPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.pattern)
+    }
 }
 
 impl GlobPattern {
@@ -40,12 +89,41 @@ impl GlobPattern {
     pub fn strip_negation(pattern: &str) -> &str {
         pattern.strip_prefix('!').unwrap_or(pattern)
     }
+
+    /// Compile a glob pattern, returning a [`GlobError`] if the pattern is
+    /// empty or invalid.
+    pub fn new_validated(pattern: &str) -> Result<Self, GlobError> {
+        if pattern.is_empty() {
+            return Err(GlobError::EmptyPattern);
+        }
+        Ok(Self::new(pattern)?)
+    }
+
+    /// Returns `true` if the underlying pattern contains glob metacharacters.
+    pub fn has_meta(&self) -> bool {
+        const META: &[char] = &['*', '?', '[', '{'];
+        self.pattern.contains(META)
+    }
 }
 
 /// A set of glob patterns compiled for efficient matching.
 pub struct GlobPatternSet {
     set: GlobSet,
     patterns: Vec<String>,
+}
+
+impl fmt::Debug for GlobPatternSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GlobPatternSet")
+            .field("patterns", &self.patterns)
+            .finish()
+    }
+}
+
+impl fmt::Display for GlobPatternSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "GlobPatternSet({})", self.patterns.join(", "))
+    }
 }
 
 impl GlobPatternSet {
@@ -86,6 +164,20 @@ impl GlobPatternSet {
     /// Return true if the set contains no patterns.
     pub fn is_empty(&self) -> bool {
         self.patterns.is_empty()
+    }
+
+    /// Return the original pattern strings for every matching pattern.
+    pub fn matching_pattern_strings(&self, path: &str) -> Vec<&str> {
+        self.set
+            .matches(path)
+            .into_iter()
+            .filter_map(|i| self.patterns.get(i).map(|s| s.as_str()))
+            .collect()
+    }
+
+    /// Return `true` if the set contains the given pattern string.
+    pub fn contains_pattern(&self, pattern: &str) -> bool {
+        self.patterns.iter().any(|p| p == pattern)
     }
 }
 
@@ -142,6 +234,60 @@ pub struct FileFilter {
     excludes: GlobPatternSet,
 }
 
+impl fmt::Debug for FileFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FileFilter")
+            .field("includes", &self.includes)
+            .field("excludes", &self.excludes)
+            .finish()
+    }
+}
+
+/// Builder for constructing a [`FileFilter`] incrementally.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct FileFilterBuilder {
+    includes: Vec<String>,
+    excludes: Vec<String>,
+}
+
+impl FileFilterBuilder {
+    /// Create a new empty builder.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add an include pattern.
+    pub fn include(mut self, pattern: &str) -> Self {
+        self.includes.push(pattern.to_string());
+        self
+    }
+
+    /// Add an exclude pattern.
+    pub fn exclude(mut self, pattern: &str) -> Self {
+        self.excludes.push(pattern.to_string());
+        self
+    }
+
+    /// Add multiple include patterns at once.
+    pub fn includes(mut self, patterns: &[&str]) -> Self {
+        self.includes.extend(patterns.iter().map(|s| s.to_string()));
+        self
+    }
+
+    /// Add multiple exclude patterns at once.
+    pub fn excludes(mut self, patterns: &[&str]) -> Self {
+        self.excludes.extend(patterns.iter().map(|s| s.to_string()));
+        self
+    }
+
+    /// Compile the builder into a [`FileFilter`].
+    pub fn build(self) -> Result<FileFilter, globset::Error> {
+        let inc_refs: Vec<&str> = self.includes.iter().map(|s| s.as_str()).collect();
+        let exc_refs: Vec<&str> = self.excludes.iter().map(|s| s.as_str()).collect();
+        FileFilter::new(&inc_refs, &exc_refs)
+    }
+}
+
 impl FileFilter {
     /// Create a new `FileFilter` from explicit include and exclude patterns.
     pub fn new(includes: &[&str], excludes: &[&str]) -> Result<Self, globset::Error> {
@@ -173,6 +319,58 @@ impl FileFilter {
         let included = self.includes.is_empty() || self.includes.matches_any(path);
         included && !self.excludes.matches_any(path)
     }
+
+    /// Filter an iterator of paths, returning only accepted paths.
+    pub fn filter_paths<'a, I>(&self, paths: I) -> Vec<String>
+    where
+        I: IntoIterator<Item = &'a str>,
+    {
+        paths.into_iter().filter(|p| self.accepts(p)).map(|p| p.to_string()).collect()
+    }
+
+    /// Return `true` if this filter has no include or exclude patterns.
+    pub fn is_empty(&self) -> bool {
+        self.includes.is_empty() && self.excludes.is_empty()
+    }
+
+    /// Return a new builder for constructing a `FileFilter`.
+    pub fn builder() -> FileFilterBuilder {
+        FileFilterBuilder::new()
+    }
+}
+
+/// Validate that all supplied patterns compile successfully.
+///
+/// Returns `Ok(())` if every pattern is valid, or the first error encountered.
+pub fn validate_patterns(patterns: &[&str]) -> Result<(), GlobError> {
+    for pat in patterns {
+        if pat.is_empty() {
+            return Err(GlobError::EmptyPattern);
+        }
+        Glob::new(pat)?;
+    }
+    Ok(())
+}
+
+/// Expand brace alternatives in a simple glob pattern.
+///
+/// Given a pattern like `*.{rs,toml}`, returns `["*.rs", "*.toml"]`.
+/// If the pattern contains no brace alternatives, returns it unchanged.
+pub fn expand_braces(pattern: &str) -> Vec<String> {
+    let Some(open) = pattern.find('{') else {
+        return vec![pattern.to_string()];
+    };
+    let Some(close) = pattern[open..].find('}') else {
+        return vec![pattern.to_string()];
+    };
+    let close = open + close;
+    let prefix = &pattern[..open];
+    let suffix = &pattern[close + 1..];
+    let alternatives = &pattern[open + 1..close];
+    alternatives
+        .split(',')
+        .map(|alt| format!("{prefix}{alt}{suffix}"))
+        .collect()
 }
 
 #[cfg(test)]
@@ -263,5 +461,150 @@ mod tests {
         assert!(filter.accepts("lib.rs"));
         assert!(!filter.accepts("test_lib.rs"));
         assert!(!filter.accepts("readme.md"));
+    }
+
+    // --- New tests ---
+
+    #[test]
+    fn test_glob_error_display() {
+        let err = GlobError::EmptyPattern;
+        assert_eq!(err.to_string(), "glob pattern must not be empty");
+
+        let err2 = GlobPattern::new_validated("").unwrap_err();
+        assert!(err2.to_string().contains("empty"));
+    }
+
+    #[test]
+    fn test_new_validated_empty() {
+        assert!(matches!(
+            GlobPattern::new_validated(""),
+            Err(GlobError::EmptyPattern)
+        ));
+    }
+
+    #[test]
+    fn test_new_validated_ok() {
+        let pat = GlobPattern::new_validated("*.rs").unwrap();
+        assert!(pat.matches("lib.rs"));
+    }
+
+    #[test]
+    fn test_has_meta() {
+        let star = GlobPattern::new("*.rs").unwrap();
+        assert!(star.has_meta());
+
+        let literal = GlobPattern::new("Cargo.toml").unwrap();
+        assert!(!literal.has_meta());
+    }
+
+    #[test]
+    fn test_glob_pattern_display_debug() {
+        let pat = GlobPattern::new("src/**/*.rs").unwrap();
+        assert_eq!(format!("{pat}"), "src/**/*.rs");
+        assert!(format!("{pat:?}").contains("src/**/*.rs"));
+    }
+
+    #[test]
+    fn test_pattern_set_display_debug() {
+        let set = GlobPatternSet::new(&["*.rs", "*.toml"]).unwrap();
+        let display = format!("{set}");
+        assert!(display.contains("*.rs"));
+        assert!(display.contains("*.toml"));
+        assert!(format!("{set:?}").contains("GlobPatternSet"));
+    }
+
+    #[test]
+    fn test_matching_pattern_strings() {
+        let set = GlobPatternSet::new(&["*.rs", "*.toml", "src/**"]).unwrap();
+        let matched = set.matching_pattern_strings("src/lib.rs");
+        assert!(matched.contains(&"*.rs"));
+        assert!(matched.contains(&"src/**"));
+        assert!(!matched.contains(&"*.toml"));
+    }
+
+    #[test]
+    fn test_contains_pattern() {
+        let set = GlobPatternSet::new(&["*.rs", "*.toml"]).unwrap();
+        assert!(set.contains_pattern("*.rs"));
+        assert!(!set.contains_pattern("*.py"));
+    }
+
+    #[test]
+    fn test_file_filter_builder() {
+        let filter = FileFilter::builder()
+            .include("*.rs")
+            .include("*.toml")
+            .exclude("test_*")
+            .build()
+            .unwrap();
+        assert!(filter.accepts("main.rs"));
+        assert!(filter.accepts("Cargo.toml"));
+        assert!(!filter.accepts("test_main.rs"));
+        assert!(!filter.accepts("readme.md"));
+    }
+
+    #[test]
+    fn test_file_filter_builder_batch() {
+        let filter = FileFilter::builder()
+            .includes(&["*.rs", "*.toml"])
+            .excludes(&["test_*", "bench_*"])
+            .build()
+            .unwrap();
+        assert!(filter.accepts("lib.rs"));
+        assert!(!filter.accepts("bench_sort.rs"));
+    }
+
+    #[test]
+    fn test_filter_paths() {
+        let filter = FileFilter::new(&["*.rs"], &["test_*.rs"]).unwrap();
+        let paths = vec!["main.rs", "test_main.rs", "lib.rs", "readme.md"];
+        let accepted = filter.filter_paths(paths.into_iter());
+        assert_eq!(accepted, vec!["main.rs", "lib.rs"]);
+    }
+
+    #[test]
+    fn test_file_filter_is_empty() {
+        let empty = FileFilter::new(&[], &[]).unwrap();
+        assert!(empty.is_empty());
+
+        let non_empty = FileFilter::new(&["*.rs"], &[]).unwrap();
+        assert!(!non_empty.is_empty());
+    }
+
+    #[test]
+    fn test_validate_patterns_ok() {
+        assert!(validate_patterns(&["*.rs", "src/**/*.toml"]).is_ok());
+    }
+
+    #[test]
+    fn test_validate_patterns_empty() {
+        let err = validate_patterns(&["*.rs", ""]).unwrap_err();
+        assert!(matches!(err, GlobError::EmptyPattern));
+    }
+
+    #[test]
+    fn test_expand_braces_single() {
+        let expanded = expand_braces("*.{rs,toml}");
+        assert_eq!(expanded, vec!["*.rs", "*.toml"]);
+    }
+
+    #[test]
+    fn test_expand_braces_no_braces() {
+        let expanded = expand_braces("*.rs");
+        assert_eq!(expanded, vec!["*.rs"]);
+    }
+
+    #[test]
+    fn test_expand_braces_three_alternatives() {
+        let expanded = expand_braces("src/*.{rs,toml,lock}");
+        assert_eq!(expanded, vec!["src/*.rs", "src/*.toml", "src/*.lock"]);
+    }
+
+    #[test]
+    fn test_file_filter_debug() {
+        let filter = FileFilter::new(&["*.rs"], &["test_*"]).unwrap();
+        let dbg = format!("{filter:?}");
+        assert!(dbg.contains("FileFilter"));
+        assert!(dbg.contains("*.rs"));
     }
 }

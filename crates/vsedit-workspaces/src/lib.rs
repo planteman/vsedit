@@ -1,6 +1,40 @@
 //! Workspace folders, configuration, and trust management.
 
 use std::collections::HashMap;
+use std::fmt;
+
+/// Errors that can occur during workspace operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WorkspaceError {
+    /// A folder with the given URI already exists.
+    DuplicateFolder(String),
+    /// The requested folder index is out of range.
+    FolderIndexOutOfRange(u32),
+    /// A required setting key was empty.
+    EmptySettingKey,
+    /// The workspace name failed validation.
+    InvalidName(String),
+    /// The folder URI is empty or invalid.
+    InvalidUri(String),
+}
+
+impl fmt::Display for WorkspaceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WorkspaceError::DuplicateFolder(uri) => write!(f, "folder already exists: {}", uri),
+            WorkspaceError::FolderIndexOutOfRange(idx) => {
+                write!(f, "folder index out of range: {}", idx)
+            }
+            WorkspaceError::EmptySettingKey => write!(f, "setting key must not be empty"),
+            WorkspaceError::InvalidName(reason) => {
+                write!(f, "invalid workspace name: {}", reason)
+            }
+            WorkspaceError::InvalidUri(uri) => write!(f, "invalid folder URI: {}", uri),
+        }
+    }
+}
+
+impl std::error::Error for WorkspaceError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceFolder {
@@ -98,6 +132,176 @@ impl Default for WorkspaceConfiguration {
     }
 }
 
+impl Clone for WorkspaceConfiguration {
+    fn clone(&self) -> Self {
+        Self {
+            folders: self.folders.clone(),
+            settings: self.settings.clone(),
+            name: self.name.clone(),
+        }
+    }
+}
+
+impl PartialEq for WorkspaceConfiguration {
+    fn eq(&self, other: &Self) -> bool {
+        self.folders == other.folders
+            && self.settings == other.settings
+            && self.name == other.name
+    }
+}
+
+impl fmt::Debug for WorkspaceConfiguration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WorkspaceConfiguration")
+            .field("name", &self.name)
+            .field("folders", &self.folders.len())
+            .field("settings", &self.settings.len())
+            .finish()
+    }
+}
+
+impl fmt::Display for WorkspaceConfiguration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = self.name.as_deref().unwrap_or("<unnamed>");
+        write!(
+            f,
+            "Workspace '{}' ({} folder(s), {} setting(s))",
+            label,
+            self.folders.len(),
+            self.settings.len()
+        )
+    }
+}
+
+impl WorkspaceConfiguration {
+    /// Try to add a folder, returning an error if the URI is empty or already present.
+    pub fn try_add_folder(
+        &mut self,
+        uri: String,
+        name: String,
+    ) -> Result<&WorkspaceFolder, WorkspaceError> {
+        if uri.is_empty() {
+            return Err(WorkspaceError::InvalidUri(uri));
+        }
+        if self.contains_uri(&uri) {
+            return Err(WorkspaceError::DuplicateFolder(uri));
+        }
+        self.add_folder(uri, name);
+        Ok(self.folders.last().unwrap())
+    }
+
+    /// Try to remove a folder by index, returning an error if not found.
+    pub fn try_remove_folder(&mut self, index: u32) -> Result<WorkspaceFolder, WorkspaceError> {
+        let pos = self
+            .folders
+            .iter()
+            .position(|f| f.index == index)
+            .ok_or(WorkspaceError::FolderIndexOutOfRange(index))?;
+        let removed = self.folders.remove(pos);
+        for (i, folder) in self.folders.iter_mut().enumerate() {
+            folder.index = i as u32;
+        }
+        Ok(removed)
+    }
+
+    /// Set a setting, returning an error if the key is empty.
+    pub fn try_set_setting(
+        &mut self,
+        key: String,
+        value: String,
+    ) -> Result<Option<String>, WorkspaceError> {
+        if key.is_empty() {
+            return Err(WorkspaceError::EmptySettingKey);
+        }
+        Ok(self.settings.insert(key, value))
+    }
+
+    /// Set the workspace name with validation.
+    pub fn set_name(&mut self, name: String) -> Result<(), WorkspaceError> {
+        if name.trim().is_empty() {
+            return Err(WorkspaceError::InvalidName(
+                "name must not be blank".to_string(),
+            ));
+        }
+        if name.len() > 255 {
+            return Err(WorkspaceError::InvalidName(
+                "name must be 255 characters or fewer".to_string(),
+            ));
+        }
+        self.name = Some(name);
+        Ok(())
+    }
+
+    /// Return all folder URIs as a vector of string slices.
+    pub fn folder_uris(&self) -> Vec<&str> {
+        self.folders.iter().map(|f| f.uri.as_str()).collect()
+    }
+
+    /// Merge settings from another configuration, overwriting on conflict.
+    pub fn merge_settings(&mut self, other: &WorkspaceConfiguration) {
+        for (k, v) in &other.settings {
+            self.settings.insert(k.clone(), v.clone());
+        }
+    }
+
+    /// Clear all settings.
+    pub fn clear_settings(&mut self) {
+        self.settings.clear();
+    }
+}
+
+/// Builder for creating a [`WorkspaceConfiguration`] step by step.
+pub struct WorkspaceConfigurationBuilder {
+    name: Option<String>,
+    folders: Vec<(String, String)>,
+    settings: Vec<(String, String)>,
+}
+
+impl WorkspaceConfigurationBuilder {
+    pub fn new() -> Self {
+        Self {
+            name: None,
+            folders: Vec::new(),
+            settings: Vec::new(),
+        }
+    }
+
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    pub fn folder(mut self, uri: impl Into<String>, name: impl Into<String>) -> Self {
+        self.folders.push((uri.into(), name.into()));
+        self
+    }
+
+    pub fn setting(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.settings.push((key.into(), value.into()));
+        self
+    }
+
+    pub fn build(self) -> Result<WorkspaceConfiguration, WorkspaceError> {
+        let mut config = WorkspaceConfiguration::new();
+        if let Some(name) = self.name {
+            config.set_name(name)?;
+        }
+        for (uri, name) in self.folders {
+            config.try_add_folder(uri, name)?;
+        }
+        for (key, value) in self.settings {
+            config.try_set_setting(key, value)?;
+        }
+        Ok(config)
+    }
+}
+
+impl Default for WorkspaceConfigurationBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorkspaceTrust {
     Trusted,
@@ -150,6 +354,76 @@ impl WorkspaceTrustService {
 impl Default for WorkspaceTrustService {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Clone for WorkspaceTrustService {
+    fn clone(&self) -> Self {
+        Self {
+            trust_state: self.trust_state,
+            trusted_folders: self.trusted_folders.clone(),
+        }
+    }
+}
+
+impl PartialEq for WorkspaceTrustService {
+    fn eq(&self, other: &Self) -> bool {
+        self.trust_state == other.trust_state && self.trusted_folders == other.trusted_folders
+    }
+}
+
+impl fmt::Debug for WorkspaceTrustService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WorkspaceTrustService")
+            .field("trust_state", &self.trust_state)
+            .field("trusted_folders", &self.trusted_folders.len())
+            .finish()
+    }
+}
+
+impl fmt::Display for WorkspaceTrustService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "TrustService({}, {} trusted folder(s))",
+            self.trust_state,
+            self.trusted_folders.len()
+        )
+    }
+}
+
+impl WorkspaceTrustService {
+    /// Remove a folder from the trusted list. Returns `true` if it was present.
+    pub fn remove_trusted_folder(&mut self, uri: &str) -> bool {
+        let len = self.trusted_folders.len();
+        self.trusted_folders.retain(|f| f != uri);
+        self.trusted_folders.len() < len
+    }
+
+    /// Number of explicitly trusted folders.
+    pub fn trusted_folder_count(&self) -> usize {
+        self.trusted_folders.len()
+    }
+
+    /// Check whether a workspace configuration is fully trusted (all folders trusted).
+    pub fn is_workspace_fully_trusted(&self, config: &WorkspaceConfiguration) -> bool {
+        config.folders.iter().all(|f| self.is_folder_trusted(&f.uri))
+    }
+
+    /// Return the list of untrusted folder URIs from a workspace configuration.
+    pub fn untrusted_folders<'a>(&self, config: &'a WorkspaceConfiguration) -> Vec<&'a str> {
+        config
+            .folders
+            .iter()
+            .filter(|f| !self.is_folder_trusted(&f.uri))
+            .map(|f| f.uri.as_str())
+            .collect()
+    }
+
+    /// Reset to the default unknown state and clear all trusted folders.
+    pub fn reset(&mut self) {
+        self.trust_state = WorkspaceTrust::Unknown;
+        self.trusted_folders.clear();
     }
 }
 
@@ -275,5 +549,161 @@ mod tests {
         assert_eq!(format!("{}", WorkspaceTrust::Trusted), "Trusted");
         assert_eq!(format!("{}", WorkspaceTrust::Untrusted), "Untrusted");
         assert_eq!(format!("{}", WorkspaceTrust::Unknown), "Unknown");
+    }
+
+    #[test]
+    fn workspace_error_display() {
+        let err = WorkspaceError::DuplicateFolder("/a".into());
+        assert_eq!(format!("{}", err), "folder already exists: /a");
+        let err = WorkspaceError::FolderIndexOutOfRange(5);
+        assert_eq!(format!("{}", err), "folder index out of range: 5");
+        let err = WorkspaceError::EmptySettingKey;
+        assert_eq!(format!("{}", err), "setting key must not be empty");
+    }
+
+    #[test]
+    fn try_add_folder_rejects_duplicates() {
+        let mut ws = WorkspaceConfiguration::new();
+        ws.try_add_folder("/a".into(), "a".into()).unwrap();
+        let err = ws.try_add_folder("/a".into(), "a2".into()).unwrap_err();
+        assert_eq!(err, WorkspaceError::DuplicateFolder("/a".into()));
+    }
+
+    #[test]
+    fn try_add_folder_rejects_empty_uri() {
+        let mut ws = WorkspaceConfiguration::new();
+        let err = ws.try_add_folder("".into(), "x".into()).unwrap_err();
+        assert_eq!(err, WorkspaceError::InvalidUri("".into()));
+    }
+
+    #[test]
+    fn try_remove_folder_error_on_missing() {
+        let mut ws = WorkspaceConfiguration::new();
+        ws.add_folder("/a".into(), "a".into());
+        let err = ws.try_remove_folder(99).unwrap_err();
+        assert_eq!(err, WorkspaceError::FolderIndexOutOfRange(99));
+        let removed = ws.try_remove_folder(0).unwrap();
+        assert_eq!(removed.uri, "/a");
+        assert_eq!(ws.folder_count(), 0);
+    }
+
+    #[test]
+    fn try_set_setting_rejects_empty_key() {
+        let mut ws = WorkspaceConfiguration::new();
+        let err = ws.try_set_setting("".into(), "val".into()).unwrap_err();
+        assert_eq!(err, WorkspaceError::EmptySettingKey);
+    }
+
+    #[test]
+    fn set_name_validation() {
+        let mut ws = WorkspaceConfiguration::new();
+        assert!(ws.set_name("  ".into()).is_err());
+        assert!(ws.set_name("x".repeat(256)).is_err());
+        assert!(ws.set_name("My Project".into()).is_ok());
+        assert_eq!(ws.name.as_deref(), Some("My Project"));
+    }
+
+    #[test]
+    fn builder_creates_valid_config() {
+        let config = WorkspaceConfigurationBuilder::new()
+            .name("test-ws")
+            .folder("/src", "source")
+            .folder("/lib", "library")
+            .setting("editor.tabSize", "2")
+            .build()
+            .unwrap();
+        assert_eq!(config.name.as_deref(), Some("test-ws"));
+        assert_eq!(config.folder_count(), 2);
+        assert_eq!(config.get_setting("editor.tabSize"), Some("2"));
+    }
+
+    #[test]
+    fn builder_rejects_duplicate_folders() {
+        let result = WorkspaceConfigurationBuilder::new()
+            .folder("/a", "a")
+            .folder("/a", "a-dup")
+            .build();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn workspace_display_and_debug() {
+        let mut ws = WorkspaceConfiguration::new();
+        ws.add_folder("/p".into(), "p".into());
+        ws.set_setting("k".into(), "v".into());
+        ws.name = Some("demo".into());
+        let display = format!("{}", ws);
+        assert!(display.contains("demo"));
+        assert!(display.contains("1 folder(s)"));
+        let debug = format!("{:?}", ws);
+        assert!(debug.contains("WorkspaceConfiguration"));
+    }
+
+    #[test]
+    fn folder_uris_and_merge_settings() {
+        let mut ws1 = WorkspaceConfiguration::new();
+        ws1.add_folder("/a".into(), "a".into());
+        ws1.add_folder("/b".into(), "b".into());
+        assert_eq!(ws1.folder_uris(), vec!["/a", "/b"]);
+
+        let mut ws2 = WorkspaceConfiguration::new();
+        ws2.set_setting("x".into(), "1".into());
+        ws2.set_setting("y".into(), "2".into());
+        ws1.merge_settings(&ws2);
+        assert_eq!(ws1.get_setting("x"), Some("1"));
+        assert_eq!(ws1.get_setting("y"), Some("2"));
+
+        ws1.clear_settings();
+        assert_eq!(ws1.setting_count(), 0);
+    }
+
+    #[test]
+    fn trust_service_remove_and_reset() {
+        let mut svc = WorkspaceTrustService::new();
+        svc.set_trust(WorkspaceTrust::Trusted);
+        svc.add_trusted_folder("/a".into());
+        svc.add_trusted_folder("/b".into());
+        assert!(svc.remove_trusted_folder("/a"));
+        assert!(!svc.remove_trusted_folder("/a"));
+        assert_eq!(svc.trusted_folder_count(), 1);
+        svc.reset();
+        assert_eq!(svc.trust_state, WorkspaceTrust::Unknown);
+        assert_eq!(svc.trusted_folder_count(), 0);
+    }
+
+    #[test]
+    fn trust_service_workspace_integration() {
+        let mut svc = WorkspaceTrustService::new();
+        svc.add_trusted_folder("/safe".into());
+
+        let mut ws = WorkspaceConfiguration::new();
+        ws.add_folder("/safe".into(), "safe".into());
+        assert!(svc.is_workspace_fully_trusted(&ws));
+
+        ws.add_folder("/unsafe".into(), "unsafe".into());
+        assert!(!svc.is_workspace_fully_trusted(&ws));
+        assert_eq!(svc.untrusted_folders(&ws), vec!["/unsafe"]);
+    }
+
+    #[test]
+    fn trust_service_display_and_debug() {
+        let mut svc = WorkspaceTrustService::new();
+        svc.add_trusted_folder("/x".into());
+        let display = format!("{}", svc);
+        assert!(display.contains("1 trusted folder(s)"));
+        let debug = format!("{:?}", svc);
+        assert!(debug.contains("WorkspaceTrustService"));
+    }
+
+    #[test]
+    fn workspace_config_clone_and_eq() {
+        let config = WorkspaceConfigurationBuilder::new()
+            .name("ws")
+            .folder("/a", "a")
+            .setting("k", "v")
+            .build()
+            .unwrap();
+        let cloned = config.clone();
+        assert_eq!(config, cloned);
     }
 }

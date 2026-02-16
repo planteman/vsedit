@@ -1,7 +1,43 @@
 //! AI chat service.
 
+use std::fmt;
+
+/// Errors that can occur within the chat service.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ChatError {
+    /// A participant with this ID already exists.
+    DuplicateParticipant(String),
+    /// A variable with this name already exists.
+    DuplicateVariable(String),
+    /// The referenced participant was not found.
+    ParticipantNotFound(String),
+    /// A required field was empty or invalid.
+    ValidationError(String),
+}
+
+impl fmt::Display for ChatError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ChatError::DuplicateParticipant(id) => {
+                write!(f, "participant already registered: {id}")
+            }
+            ChatError::DuplicateVariable(name) => {
+                write!(f, "variable already registered: {name}")
+            }
+            ChatError::ParticipantNotFound(id) => {
+                write!(f, "participant not found: {id}")
+            }
+            ChatError::ValidationError(msg) => {
+                write!(f, "validation error: {msg}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ChatError {}
+
 /// A participant that can respond in the chat.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ChatParticipant {
     pub id: String,
     pub name: String,
@@ -22,20 +58,86 @@ impl std::fmt::Display for ChatParticipant {
     }
 }
 
+/// Builder for constructing a `ChatParticipant` with validation.
+#[derive(Debug, Default)]
+pub struct ChatParticipantBuilder {
+    id: Option<String>,
+    name: Option<String>,
+    description: Option<String>,
+    is_default: bool,
+}
+
+impl ChatParticipantBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
+    }
+
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    pub fn description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+
+    pub fn is_default(mut self, val: bool) -> Self {
+        self.is_default = val;
+        self
+    }
+
+    /// Build the participant, returning a `ChatError::ValidationError` if
+    /// required fields are missing or empty.
+    pub fn build(self) -> Result<ChatParticipant, ChatError> {
+        let id = self
+            .id
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| ChatError::ValidationError("id is required".into()))?;
+        let name = self
+            .name
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| ChatError::ValidationError("name is required".into()))?;
+        Ok(ChatParticipant {
+            id,
+            name,
+            description: self.description,
+            is_default: self.is_default,
+        })
+    }
+}
+
 /// A slash command available within a chat participant.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ChatSlashCommand {
     pub name: String,
     pub description: String,
     pub participant_id: String,
 }
 
+impl fmt::Display for ChatSlashCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "/{} ({})", self.name, self.participant_id)
+    }
+}
+
 /// A variable that can be referenced in chat messages.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ChatVariable {
     pub name: String,
     pub description: String,
     pub value: String,
+}
+
+impl fmt::Display for ChatVariable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "${{{}}}", self.name)
+    }
 }
 
 /// Service for managing chat participants and commands.
@@ -116,6 +218,70 @@ impl ChatWorkbenchService {
 
     pub fn command_count(&self) -> usize {
         self.commands.len()
+    }
+
+    /// Register a participant, rejecting duplicates.
+    pub fn try_register_participant(
+        &mut self,
+        participant: ChatParticipant,
+    ) -> Result<(), ChatError> {
+        if self.participants.iter().any(|p| p.id == participant.id) {
+            return Err(ChatError::DuplicateParticipant(participant.id));
+        }
+        self.participants.push(participant);
+        Ok(())
+    }
+
+    /// Register a variable, rejecting duplicates.
+    pub fn try_register_variable(
+        &mut self,
+        variable: ChatVariable,
+    ) -> Result<(), ChatError> {
+        if self.variables.iter().any(|v| v.name == variable.name) {
+            return Err(ChatError::DuplicateVariable(variable.name));
+        }
+        self.variables.push(variable);
+        Ok(())
+    }
+
+    /// Get all participant IDs as a collected vector.
+    pub fn participant_ids(&self) -> Vec<&str> {
+        self.participants.iter().map(|p| p.id.as_str()).collect()
+    }
+
+    /// Resolve `${variable}` placeholders in a template string using
+    /// registered variables. Unknown variables are left as-is.
+    pub fn resolve_variables(&self, template: &str) -> String {
+        let mut result = template.to_string();
+        for var in &self.variables {
+            let placeholder = format!("${{{}}}", var.name);
+            result = result.replace(&placeholder, &var.value);
+        }
+        result
+    }
+
+    /// Returns true when `name` looks like a valid slash-command reference
+    /// (non-empty, ASCII alphanumeric or hyphen, no leading hyphen).
+    pub fn is_valid_command_name(name: &str) -> bool {
+        !name.is_empty()
+            && !name.starts_with('-')
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-')
+    }
+
+    /// Unregister a variable by name, returning whether it was present.
+    pub fn unregister_variable(&mut self, name: &str) -> bool {
+        let before = self.variables.len();
+        self.variables.retain(|v| v.name != name);
+        self.variables.len() < before
+    }
+
+    /// Clear every registration (participants, commands, variables).
+    pub fn clear(&mut self) {
+        self.participants.clear();
+        self.commands.clear();
+        self.variables.clear();
     }
 }
 
@@ -237,5 +403,137 @@ mod tests {
     fn participant_display_trait() {
         let p = make_participant("copilot", true);
         assert_eq!(format!("{p}"), "Participant copilot (copilot)");
+    }
+
+    #[test]
+    fn slash_command_display() {
+        let cmd = make_command("explain", "copilot");
+        assert_eq!(format!("{cmd}"), "/explain (copilot)");
+    }
+
+    #[test]
+    fn variable_display() {
+        let v = make_variable("file", "main.rs");
+        assert_eq!(format!("{v}"), "${file}");
+    }
+
+    #[test]
+    fn builder_creates_participant() {
+        let p = ChatParticipantBuilder::new()
+            .id("copilot")
+            .name("Copilot")
+            .description("AI pair programmer")
+            .is_default(true)
+            .build()
+            .unwrap();
+        assert_eq!(p.id, "copilot");
+        assert_eq!(p.name, "Copilot");
+        assert_eq!(p.description.as_deref(), Some("AI pair programmer"));
+        assert!(p.is_default);
+    }
+
+    #[test]
+    fn builder_rejects_missing_id() {
+        let res = ChatParticipantBuilder::new().name("Copilot").build();
+        assert_eq!(
+            res,
+            Err(ChatError::ValidationError("id is required".into()))
+        );
+    }
+
+    #[test]
+    fn builder_rejects_empty_name() {
+        let res = ChatParticipantBuilder::new().id("x").name("").build();
+        assert_eq!(
+            res,
+            Err(ChatError::ValidationError("name is required".into()))
+        );
+    }
+
+    #[test]
+    fn try_register_duplicate_participant() {
+        let mut svc = ChatWorkbenchService::new();
+        svc.try_register_participant(make_participant("copilot", true))
+            .unwrap();
+        let err = svc
+            .try_register_participant(make_participant("copilot", false))
+            .unwrap_err();
+        assert_eq!(err, ChatError::DuplicateParticipant("copilot".into()));
+    }
+
+    #[test]
+    fn try_register_duplicate_variable() {
+        let mut svc = ChatWorkbenchService::new();
+        svc.try_register_variable(make_variable("file", "a.rs"))
+            .unwrap();
+        let err = svc
+            .try_register_variable(make_variable("file", "b.rs"))
+            .unwrap_err();
+        assert_eq!(err, ChatError::DuplicateVariable("file".into()));
+    }
+
+    #[test]
+    fn resolve_variables_in_template() {
+        let mut svc = ChatWorkbenchService::new();
+        svc.register_variable(make_variable("file", "main.rs"));
+        svc.register_variable(make_variable("lang", "Rust"));
+        let result = svc.resolve_variables("Open ${file} in ${lang}, ${unknown} stays");
+        assert_eq!(result, "Open main.rs in Rust, ${unknown} stays");
+    }
+
+    #[test]
+    fn is_valid_command_name_checks() {
+        assert!(ChatWorkbenchService::is_valid_command_name("explain"));
+        assert!(ChatWorkbenchService::is_valid_command_name("my-cmd"));
+        assert!(!ChatWorkbenchService::is_valid_command_name(""));
+        assert!(!ChatWorkbenchService::is_valid_command_name("-bad"));
+        assert!(!ChatWorkbenchService::is_valid_command_name("no spaces"));
+    }
+
+    #[test]
+    fn participant_ids_returns_all() {
+        let mut svc = ChatWorkbenchService::new();
+        svc.register_participant(make_participant("a", false));
+        svc.register_participant(make_participant("b", false));
+        let ids = svc.participant_ids();
+        assert_eq!(ids, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn clear_removes_everything() {
+        let mut svc = ChatWorkbenchService::new();
+        svc.register_participant(make_participant("copilot", true));
+        svc.register_command(make_command("fix", "copilot"));
+        svc.register_variable(make_variable("file", "x.rs"));
+        svc.clear();
+        assert_eq!(svc.participant_count(), 0);
+        assert_eq!(svc.command_count(), 0);
+        assert_eq!(svc.get_all_variables().len(), 0);
+    }
+
+    #[test]
+    fn unregister_variable() {
+        let mut svc = ChatWorkbenchService::new();
+        svc.register_variable(make_variable("file", "a.rs"));
+        assert!(svc.unregister_variable("file"));
+        assert!(!svc.unregister_variable("file"));
+        assert_eq!(svc.get_all_variables().len(), 0);
+    }
+
+    #[test]
+    fn chat_error_display() {
+        let e = ChatError::ParticipantNotFound("abc".into());
+        assert_eq!(e.to_string(), "participant not found: abc");
+        let e2 = ChatError::ValidationError("bad".into());
+        assert_eq!(e2.to_string(), "validation error: bad");
+    }
+
+    #[test]
+    fn participant_equality() {
+        let a = make_participant("copilot", true);
+        let b = make_participant("copilot", true);
+        assert_eq!(a, b);
+        let c = make_participant("other", true);
+        assert_ne!(a, c);
     }
 }

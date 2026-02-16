@@ -3,9 +3,43 @@
 //! Equivalent to VS Code's `vs/platform/environment/common/environment.ts`.
 //! Provides well-known paths and CLI arguments for vsedit.
 
-use std::path::PathBuf;
+use std::fmt;
+use std::path::{Path, PathBuf};
+
+/// Errors that can occur in the environment service.
+#[derive(Debug, Clone, PartialEq)]
+pub enum EnvironmentError {
+    /// A required path was empty or invalid.
+    InvalidPath(String),
+    /// The goto specification is malformed.
+    InvalidGoto(String),
+    /// Conflicting CLI flags were specified.
+    ConflictingFlags(String),
+    /// A directory operation failed.
+    IoError(String),
+}
+
+impl fmt::Display for EnvironmentError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidPath(msg) => write!(f, "invalid path: {msg}"),
+            Self::InvalidGoto(msg) => write!(f, "invalid goto: {msg}"),
+            Self::ConflictingFlags(msg) => write!(f, "conflicting flags: {msg}"),
+            Self::IoError(msg) => write!(f, "io error: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for EnvironmentError {}
+
+impl From<std::io::Error> for EnvironmentError {
+    fn from(e: std::io::Error) -> Self {
+        Self::IoError(e.to_string())
+    }
+}
 
 /// Well-known directory paths for vsedit data.
+#[derive(Debug, Clone, PartialEq)]
 pub struct AppPaths {
     /// User data directory (~/.config/vsedit on Linux).
     pub user_data: PathBuf,
@@ -80,10 +114,49 @@ impl AppPaths {
         }
         Ok(())
     }
+
+    /// Return all directory paths managed by this instance.
+    pub fn all_directories(&self) -> Vec<&Path> {
+        vec![
+            &self.user_data,
+            &self.extensions,
+            &self.snippets,
+            &self.global_storage,
+            &self.workspace_storage,
+            &self.logs,
+            &self.tmp,
+        ]
+    }
+
+    /// Check whether every managed directory already exists on disk.
+    pub fn all_dirs_exist(&self) -> bool {
+        self.all_directories().iter().all(|p| p.is_dir())
+    }
+
+    /// Return the path for a named extension inside the extensions directory.
+    pub fn extension_path(&self, extension_id: &str) -> PathBuf {
+        self.extensions.join(extension_id)
+    }
+
+    /// Return the workspace-specific storage path for a given workspace id.
+    pub fn workspace_storage_for(&self, workspace_id: &str) -> PathBuf {
+        self.workspace_storage.join(workspace_id)
+    }
+
+    /// Return the log file path for a given session identifier.
+    pub fn log_file_for(&self, session_id: &str) -> PathBuf {
+        self.logs.join(format!("{session_id}.log"))
+    }
+}
+
+impl fmt::Display for AppPaths {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "AppPaths({})", self.user_data.display())
+    }
 }
 
 /// Parsed CLI arguments.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct CliArgs {
     /// Files or folders to open.
     pub paths: Vec<PathBuf>,
@@ -107,6 +180,135 @@ pub struct CliArgs {
     pub disable_extensions: bool,
     /// Verbose output.
     pub verbose: bool,
+}
+
+impl CliArgs {
+    /// Validate that flags do not conflict.
+    pub fn validate(&self) -> Result<(), EnvironmentError> {
+        if self.new_window && self.reuse_window {
+            return Err(EnvironmentError::ConflictingFlags(
+                "cannot specify both --new-window and --reuse-window".into(),
+            ));
+        }
+        if self.diff && self.paths.len() != 2 {
+            return Err(EnvironmentError::ConflictingFlags(
+                "diff mode requires exactly two paths".into(),
+            ));
+        }
+        if let Some((line, col)) = self.goto {
+            if line == 0 || col == 0 {
+                return Err(EnvironmentError::InvalidGoto(
+                    "line and column must be >= 1".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Parse a "line:column" string into a goto tuple.
+    pub fn parse_goto(s: &str) -> Result<(u32, u32), EnvironmentError> {
+        let parts: Vec<&str> = s.split(':').collect();
+        if parts.len() != 2 {
+            return Err(EnvironmentError::InvalidGoto(format!(
+                "expected line:column, got '{s}'"
+            )));
+        }
+        let line: u32 = parts[0]
+            .parse()
+            .map_err(|_| EnvironmentError::InvalidGoto(format!("invalid line number: '{}'", parts[0])))?;
+        let col: u32 = parts[1]
+            .parse()
+            .map_err(|_| EnvironmentError::InvalidGoto(format!("invalid column number: '{}'", parts[1])))?;
+        if line == 0 || col == 0 {
+            return Err(EnvironmentError::InvalidGoto(
+                "line and column must be >= 1".into(),
+            ));
+        }
+        Ok((line, col))
+    }
+
+    /// Return the number of file/folder paths specified.
+    pub fn path_count(&self) -> usize {
+        self.paths.len()
+    }
+
+    /// Whether this invocation requests opening specific files or folders.
+    pub fn has_paths(&self) -> bool {
+        !self.paths.is_empty()
+    }
+}
+
+/// Builder for constructing [`CliArgs`] incrementally.
+#[derive(Debug, Default)]
+pub struct CliArgsBuilder {
+    inner: CliArgs,
+}
+
+impl CliArgsBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn path(mut self, p: impl Into<PathBuf>) -> Self {
+        self.inner.paths.push(p.into());
+        self
+    }
+
+    pub fn goto(mut self, line: u32, col: u32) -> Self {
+        self.inner.goto = Some((line, col));
+        self
+    }
+
+    pub fn diff(mut self, enabled: bool) -> Self {
+        self.inner.diff = enabled;
+        self
+    }
+
+    pub fn wait(mut self, enabled: bool) -> Self {
+        self.inner.wait = enabled;
+        self
+    }
+
+    pub fn new_window(mut self, enabled: bool) -> Self {
+        self.inner.new_window = enabled;
+        self
+    }
+
+    pub fn reuse_window(mut self, enabled: bool) -> Self {
+        self.inner.reuse_window = enabled;
+        self
+    }
+
+    pub fn verbose(mut self, enabled: bool) -> Self {
+        self.inner.verbose = enabled;
+        self
+    }
+
+    pub fn disable_extensions(mut self, enabled: bool) -> Self {
+        self.inner.disable_extensions = enabled;
+        self
+    }
+
+    pub fn log_level(mut self, level: impl Into<String>) -> Self {
+        self.inner.log_level = Some(level.into());
+        self
+    }
+
+    pub fn extensions_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.inner.extensions_dir = Some(dir.into());
+        self
+    }
+
+    pub fn user_data_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.inner.user_data_dir = Some(dir.into());
+        self
+    }
+
+    /// Validate and build the [`CliArgs`].
+    pub fn build(self) -> Result<CliArgs, EnvironmentError> {
+        self.inner.validate()?;
+        Ok(self.inner)
+    }
 }
 
 /// The environment service providing runtime information.
@@ -147,6 +349,41 @@ impl EnvironmentService {
 
     pub fn is_extensions_disabled(&self) -> bool {
         self.args.disable_extensions
+    }
+
+    /// Return the resolved log level, defaulting to `"info"`.
+    pub fn log_level(&self) -> &str {
+        self.args.log_level.as_deref().unwrap_or("info")
+    }
+
+    /// Return a summary string suitable for startup logging.
+    pub fn startup_summary(&self) -> String {
+        format!(
+            "{} v{} | data={} | extensions={} | verbose={} | log_level={}",
+            self.app_name,
+            self.app_version,
+            self.paths.user_data.display(),
+            if self.is_extensions_disabled() { "disabled" } else { "enabled" },
+            self.is_verbose(),
+            self.log_level(),
+        )
+    }
+}
+
+impl fmt::Display for EnvironmentService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} v{}", self.app_name, self.app_version)
+    }
+}
+
+impl fmt::Debug for EnvironmentService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EnvironmentService")
+            .field("app_name", &self.app_name)
+            .field("app_version", &self.app_version)
+            .field("paths", &self.paths)
+            .field("args", &self.args)
+            .finish()
     }
 }
 
@@ -205,5 +442,161 @@ mod tests {
         assert!(!args.diff);
         assert!(!args.wait);
         assert!(!args.disable_extensions);
+    }
+
+    #[test]
+    fn cli_args_validate_conflicting_windows() {
+        let args = CliArgs {
+            new_window: true,
+            reuse_window: true,
+            ..Default::default()
+        };
+        let err = args.validate().unwrap_err();
+        assert_eq!(
+            err,
+            EnvironmentError::ConflictingFlags(
+                "cannot specify both --new-window and --reuse-window".into()
+            )
+        );
+    }
+
+    #[test]
+    fn cli_args_validate_diff_requires_two_paths() {
+        let args = CliArgs {
+            diff: true,
+            paths: vec![PathBuf::from("a.txt")],
+            ..Default::default()
+        };
+        assert!(args.validate().is_err());
+
+        let args_ok = CliArgs {
+            diff: true,
+            paths: vec![PathBuf::from("a.txt"), PathBuf::from("b.txt")],
+            ..Default::default()
+        };
+        assert!(args_ok.validate().is_ok());
+    }
+
+    #[test]
+    fn cli_args_validate_goto_zero_rejected() {
+        let args = CliArgs {
+            goto: Some((0, 5)),
+            ..Default::default()
+        };
+        assert!(args.validate().is_err());
+    }
+
+    #[test]
+    fn parse_goto_valid() {
+        assert_eq!(CliArgs::parse_goto("10:5").unwrap(), (10, 5));
+        assert_eq!(CliArgs::parse_goto("1:1").unwrap(), (1, 1));
+    }
+
+    #[test]
+    fn parse_goto_invalid_format() {
+        assert!(CliArgs::parse_goto("10").is_err());
+        assert!(CliArgs::parse_goto("abc:def").is_err());
+        assert!(CliArgs::parse_goto("0:1").is_err());
+    }
+
+    #[test]
+    fn builder_produces_valid_args() {
+        let args = CliArgsBuilder::new()
+            .path("/tmp/file.rs")
+            .verbose(true)
+            .log_level("debug")
+            .build()
+            .unwrap();
+        assert_eq!(args.paths, vec![PathBuf::from("/tmp/file.rs")]);
+        assert!(args.verbose);
+        assert_eq!(args.log_level.as_deref(), Some("debug"));
+    }
+
+    #[test]
+    fn builder_rejects_conflicting_flags() {
+        let result = CliArgsBuilder::new()
+            .new_window(true)
+            .reuse_window(true)
+            .build();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn app_paths_extension_path() {
+        let paths = AppPaths::from_user_data(PathBuf::from("/data"));
+        assert_eq!(
+            paths.extension_path("my-ext"),
+            PathBuf::from("/data/extensions/my-ext")
+        );
+    }
+
+    #[test]
+    fn app_paths_workspace_storage_for() {
+        let paths = AppPaths::from_user_data(PathBuf::from("/data"));
+        assert_eq!(
+            paths.workspace_storage_for("abc123"),
+            PathBuf::from("/data/workspaceStorage/abc123")
+        );
+    }
+
+    #[test]
+    fn app_paths_log_file_for() {
+        let paths = AppPaths::from_user_data(PathBuf::from("/data"));
+        assert_eq!(
+            paths.log_file_for("session-42"),
+            PathBuf::from("/data/logs/session-42.log")
+        );
+    }
+
+    #[test]
+    fn app_paths_display() {
+        let paths = AppPaths::from_user_data(PathBuf::from("/home/user/.config/vsedit"));
+        let display = format!("{paths}");
+        assert!(display.contains("/home/user/.config/vsedit"));
+    }
+
+    #[test]
+    fn environment_service_log_level_default() {
+        let env_svc = EnvironmentService::new(CliArgs::default());
+        assert_eq!(env_svc.log_level(), "info");
+    }
+
+    #[test]
+    fn environment_service_startup_summary() {
+        let args = CliArgs {
+            verbose: true,
+            log_level: Some("debug".into()),
+            ..Default::default()
+        };
+        let env_svc = EnvironmentService::new(args);
+        let summary = env_svc.startup_summary();
+        assert!(summary.contains("vsedit"));
+        assert!(summary.contains("verbose=true"));
+        assert!(summary.contains("log_level=debug"));
+    }
+
+    #[test]
+    fn environment_service_display_and_debug() {
+        let env_svc = EnvironmentService::new(CliArgs::default());
+        let display = format!("{env_svc}");
+        assert!(display.starts_with("vsedit v"));
+        let debug = format!("{env_svc:?}");
+        assert!(debug.contains("EnvironmentService"));
+    }
+
+    #[test]
+    fn error_display_messages() {
+        let e = EnvironmentError::InvalidPath("empty".into());
+        assert_eq!(format!("{e}"), "invalid path: empty");
+
+        let e2 = EnvironmentError::ConflictingFlags("oops".into());
+        assert_eq!(format!("{e2}"), "conflicting flags: oops");
+    }
+
+    #[test]
+    fn app_paths_clone_equality() {
+        let a = AppPaths::from_user_data(PathBuf::from("/x"));
+        let b = a.clone();
+        assert_eq!(a, b);
     }
 }

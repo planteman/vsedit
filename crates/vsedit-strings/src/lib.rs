@@ -166,6 +166,339 @@ pub fn pad_right(s: &str, width: usize, pad_char: char) -> String {
     format!("{s}{padding}")
 }
 
+/// Check if `haystack` ends with `needle`, case-insensitive.
+pub fn ends_with_ignore_case(haystack: &str, needle: &str) -> bool {
+    if needle.len() > haystack.len() {
+        return false;
+    }
+    haystack[haystack.len() - needle.len()..].eq_ignore_ascii_case(needle)
+}
+
+/// Extract all words from a string, splitting on word separators.
+pub fn extract_words(s: &str) -> Vec<&str> {
+    let mut words = Vec::new();
+    let mut start: Option<usize> = None;
+    for (i, c) in s.char_indices() {
+        if is_word_separator(c) || c.is_whitespace() {
+            if let Some(s_idx) = start {
+                words.push(&s[s_idx..i]);
+                start = None;
+            }
+        } else if start.is_none() {
+            start = Some(i);
+        }
+    }
+    if let Some(s_idx) = start {
+        words.push(&s[s_idx..]);
+    }
+    words
+}
+
+/// Count occurrences of a substring within a string.
+pub fn count_occurrences(haystack: &str, needle: &str) -> usize {
+    if needle.is_empty() {
+        return 0;
+    }
+    haystack.matches(needle).count()
+}
+
+/// Replace the first occurrence of `from` with `to`.
+pub fn replace_first(s: &str, from: &str, to: &str) -> String {
+    match s.find(from) {
+        Some(idx) => {
+            let mut result = String::with_capacity(s.len() - from.len() + to.len());
+            result.push_str(&s[..idx]);
+            result.push_str(to);
+            result.push_str(&s[idx + from.len()..]);
+            result
+        }
+        None => s.to_string(),
+    }
+}
+
+/// Errors that can occur during string operations.
+#[derive(Debug, Clone, PartialEq)]
+pub enum StringError {
+    /// The input string was empty when a non-empty string was required.
+    EmptyInput,
+    /// A width or length parameter was invalid.
+    InvalidWidth { requested: usize, reason: &'static str },
+    /// An index was out of the string's grapheme bounds.
+    GraphemeIndexOutOfBounds { index: usize, count: usize },
+    /// A regex pattern string was invalid.
+    InvalidPattern(String),
+}
+
+impl std::fmt::Display for StringError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StringError::EmptyInput => write!(f, "input string must not be empty"),
+            StringError::InvalidWidth { requested, reason } => {
+                write!(f, "invalid width {requested}: {reason}")
+            }
+            StringError::GraphemeIndexOutOfBounds { index, count } => {
+                write!(
+                    f,
+                    "grapheme index {index} out of bounds for string with {count} graphemes"
+                )
+            }
+            StringError::InvalidPattern(p) => write!(f, "invalid pattern: {p}"),
+        }
+    }
+}
+
+impl std::error::Error for StringError {}
+
+/// A measured string that caches its display width and grapheme count.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MeasuredString {
+    text: String,
+    width: usize,
+    grapheme_len: usize,
+}
+
+impl MeasuredString {
+    /// Create a new `MeasuredString`, computing width and grapheme count once.
+    pub fn new(text: impl Into<String>) -> Self {
+        let text = text.into();
+        let width = display_width(&text);
+        let grapheme_len = grapheme_count(&text);
+        Self {
+            text,
+            width,
+            grapheme_len,
+        }
+    }
+
+    /// The raw text.
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Cached display width in terminal columns.
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    /// Cached number of grapheme clusters.
+    pub fn grapheme_len(&self) -> usize {
+        self.grapheme_len
+    }
+
+    /// Return a truncated copy that fits within `max_width` columns.
+    pub fn truncated(&self, max_width: usize) -> String {
+        truncate_to_width(&self.text, max_width)
+    }
+
+    /// Slice by grapheme indices (start inclusive, end exclusive).
+    pub fn grapheme_slice(&self, start: usize, end: usize) -> Result<String, StringError> {
+        if start > self.grapheme_len || end > self.grapheme_len {
+            return Err(StringError::GraphemeIndexOutOfBounds {
+                index: start.max(end),
+                count: self.grapheme_len,
+            });
+        }
+        Ok(self
+            .text
+            .graphemes(true)
+            .skip(start)
+            .take(end.saturating_sub(start))
+            .collect())
+    }
+
+    /// Check whether the measured string is empty.
+    pub fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+}
+
+impl std::fmt::Display for MeasuredString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.text)
+    }
+}
+
+impl From<&str> for MeasuredString {
+    fn from(s: &str) -> Self {
+        Self::new(s)
+    }
+}
+
+/// Builder for constructing formatted, width-constrained display lines.
+#[derive(Debug, Clone)]
+pub struct LineBuilder {
+    parts: Vec<String>,
+    separator: String,
+    max_width: Option<usize>,
+}
+
+impl LineBuilder {
+    /// Create a new `LineBuilder`.
+    pub fn new() -> Self {
+        Self {
+            parts: Vec::new(),
+            separator: String::new(),
+            max_width: None,
+        }
+    }
+
+    /// Set the separator inserted between parts.
+    pub fn separator(mut self, sep: &str) -> Self {
+        self.separator = sep.to_string();
+        self
+    }
+
+    /// Set the maximum display width for the final line.
+    pub fn max_width(mut self, width: usize) -> Self {
+        self.max_width = Some(width);
+        self
+    }
+
+    /// Append a part to the line.
+    pub fn push(mut self, part: &str) -> Self {
+        self.parts.push(part.to_string());
+        self
+    }
+
+    /// Build the final line string, truncating if a max width was set.
+    pub fn build(self) -> String {
+        let joined = self.parts.join(&self.separator);
+        match self.max_width {
+            Some(w) => truncate_to_width(&joined, w),
+            None => joined,
+        }
+    }
+
+    /// Return the number of parts currently in the builder.
+    pub fn len(&self) -> usize {
+        self.parts.len()
+    }
+
+    /// Return whether the builder has no parts.
+    pub fn is_empty(&self) -> bool {
+        self.parts.is_empty()
+    }
+}
+
+impl Default for LineBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Convert a byte offset in a string to a grapheme cluster index.
+pub fn byte_offset_to_grapheme_index(s: &str, byte_offset: usize) -> Option<usize> {
+    let mut idx = 0;
+    for (gi, grapheme) in s.grapheme_indices(true) {
+        if gi == byte_offset {
+            return Some(idx);
+        }
+        if gi + grapheme.len() > byte_offset {
+            return None; // byte_offset falls inside a grapheme
+        }
+        idx += 1;
+    }
+    if byte_offset == s.len() {
+        Some(idx)
+    } else {
+        None
+    }
+}
+
+/// Convert a grapheme cluster index to a byte offset.
+pub fn grapheme_index_to_byte_offset(s: &str, grapheme_idx: usize) -> Option<usize> {
+    for (gi, (byte_pos, _)) in s.grapheme_indices(true).enumerate() {
+        if gi == grapheme_idx {
+            return Some(byte_pos);
+        }
+    }
+    if grapheme_idx == grapheme_count(s) {
+        Some(s.len())
+    } else {
+        None
+    }
+}
+
+/// Compute the Levenshtein edit distance between two strings.
+pub fn edit_distance(a: &str, b: &str) -> usize {
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let m = a_chars.len();
+    let n = b_chars.len();
+
+    let mut prev = (0..=n).collect::<Vec<_>>();
+    let mut curr = vec![0; n + 1];
+
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                0
+            } else {
+                1
+            };
+            curr[j] = (prev[j] + 1)
+                .min(curr[j - 1] + 1)
+                .min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
+}
+
+/// Normalize whitespace: collapse runs of whitespace into a single space and trim.
+pub fn normalize_whitespace(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut prev_ws = true; // treat start as whitespace to trim leading
+    for c in s.chars() {
+        if c.is_whitespace() {
+            if !prev_ws {
+                result.push(' ');
+            }
+            prev_ws = true;
+        } else {
+            result.push(c);
+            prev_ws = false;
+        }
+    }
+    // trim trailing space
+    if result.ends_with(' ') {
+        result.pop();
+    }
+    result
+}
+
+/// Compute the longest common substring length between two strings.
+pub fn longest_common_substring_len(a: &str, b: &str) -> usize {
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let m = a_chars.len();
+    let n = b_chars.len();
+    if m == 0 || n == 0 {
+        return 0;
+    }
+
+    let mut prev = vec![0usize; n + 1];
+    let mut curr = vec![0usize; n + 1];
+    let mut max_len = 0;
+
+    for i in 1..=m {
+        for j in 1..=n {
+            if a_chars[i - 1] == b_chars[j - 1] {
+                curr[j] = prev[j - 1] + 1;
+                if curr[j] > max_len {
+                    max_len = curr[j];
+                }
+            } else {
+                curr[j] = 0;
+            }
+        }
+        std::mem::swap(&mut prev, &mut curr);
+        curr.iter_mut().for_each(|v| *v = 0);
+    }
+    max_len
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,5 +543,163 @@ mod tests {
     fn test_pad() {
         assert_eq!(pad_left("42", 5, '0'), "00042");
         assert_eq!(pad_right("hi", 5, ' '), "hi   ");
+    }
+
+    #[test]
+    fn test_ends_with_ignore_case() {
+        assert!(ends_with_ignore_case("Hello World", "WORLD"));
+        assert!(ends_with_ignore_case("test.TXT", "txt"));
+        assert!(!ends_with_ignore_case("abc", "abcd"));
+        assert!(!ends_with_ignore_case("hello", "xyz"));
+    }
+
+    #[test]
+    fn test_extract_words() {
+        assert_eq!(extract_words("hello world"), vec!["hello", "world"]);
+        assert_eq!(extract_words("foo.bar+baz"), vec!["foo", "bar", "baz"]);
+        assert!(extract_words("   ").is_empty());
+        assert_eq!(extract_words("single"), vec!["single"]);
+    }
+
+    #[test]
+    fn test_count_occurrences() {
+        assert_eq!(count_occurrences("abcabcabc", "abc"), 3);
+        assert_eq!(count_occurrences("hello", "xyz"), 0);
+        assert_eq!(count_occurrences("aaa", "a"), 3);
+        assert_eq!(count_occurrences("anything", ""), 0);
+    }
+
+    #[test]
+    fn test_replace_first() {
+        assert_eq!(replace_first("aabaa", "a", "x"), "xabaa");
+        assert_eq!(replace_first("hello", "xyz", "q"), "hello");
+        assert_eq!(replace_first("foo bar foo", "foo", "baz"), "baz bar foo");
+    }
+
+    #[test]
+    fn test_string_error_display() {
+        let e = StringError::EmptyInput;
+        assert_eq!(e.to_string(), "input string must not be empty");
+
+        let e2 = StringError::InvalidWidth {
+            requested: 0,
+            reason: "must be positive",
+        };
+        assert!(e2.to_string().contains("invalid width 0"));
+
+        let e3 = StringError::GraphemeIndexOutOfBounds {
+            index: 10,
+            count: 5,
+        };
+        assert!(e3.to_string().contains("out of bounds"));
+    }
+
+    #[test]
+    fn test_measured_string() {
+        let ms = MeasuredString::new("hello");
+        assert_eq!(ms.width(), 5);
+        assert_eq!(ms.grapheme_len(), 5);
+        assert_eq!(ms.text(), "hello");
+        assert!(!ms.is_empty());
+        assert_eq!(ms.to_string(), "hello");
+
+        let ms2 = MeasuredString::new("日本語");
+        assert_eq!(ms2.width(), 6);
+        assert_eq!(ms2.grapheme_len(), 3);
+
+        // grapheme slicing
+        assert_eq!(ms.grapheme_slice(1, 3).unwrap(), "el");
+        assert!(ms.grapheme_slice(0, 10).is_err());
+
+        // Clone + PartialEq
+        let ms3 = ms.clone();
+        assert_eq!(ms, ms3);
+
+        // From<&str>
+        let ms4: MeasuredString = "test".into();
+        assert_eq!(ms4.text(), "test");
+    }
+
+    #[test]
+    fn test_line_builder() {
+        let line = LineBuilder::new()
+            .separator(" | ")
+            .push("Name")
+            .push("Age")
+            .push("City")
+            .build();
+        assert_eq!(line, "Name | Age | City");
+
+        let truncated = LineBuilder::new()
+            .separator(", ")
+            .max_width(10)
+            .push("hello")
+            .push("world")
+            .build();
+        assert_eq!(display_width(&truncated), 10);
+        assert!(truncated.ends_with('…'));
+
+        let builder = LineBuilder::new();
+        assert!(builder.is_empty());
+        assert_eq!(builder.len(), 0);
+    }
+
+    #[test]
+    fn test_edit_distance() {
+        assert_eq!(edit_distance("kitten", "sitting"), 3);
+        assert_eq!(edit_distance("", "abc"), 3);
+        assert_eq!(edit_distance("abc", "abc"), 0);
+        assert_eq!(edit_distance("abc", ""), 3);
+        assert_eq!(edit_distance("flaw", "lawn"), 2);
+    }
+
+    #[test]
+    fn test_normalize_whitespace() {
+        assert_eq!(normalize_whitespace("  hello   world  "), "hello world");
+        assert_eq!(normalize_whitespace("no\textra \n spaces"), "no extra spaces");
+        assert_eq!(normalize_whitespace(""), "");
+        assert_eq!(normalize_whitespace("single"), "single");
+    }
+
+    #[test]
+    fn test_grapheme_byte_conversions() {
+        // ASCII: each char is 1 byte
+        assert_eq!(byte_offset_to_grapheme_index("hello", 0), Some(0));
+        assert_eq!(byte_offset_to_grapheme_index("hello", 3), Some(3));
+        assert_eq!(byte_offset_to_grapheme_index("hello", 5), Some(5));
+
+        assert_eq!(grapheme_index_to_byte_offset("hello", 0), Some(0));
+        assert_eq!(grapheme_index_to_byte_offset("hello", 5), Some(5));
+        assert_eq!(grapheme_index_to_byte_offset("hello", 6), None);
+
+        // Multi-byte: "日本語" — each char is 3 bytes
+        assert_eq!(byte_offset_to_grapheme_index("日本語", 0), Some(0));
+        assert_eq!(byte_offset_to_grapheme_index("日本語", 3), Some(1));
+        assert_eq!(byte_offset_to_grapheme_index("日本語", 1), None); // mid-grapheme
+    }
+
+    #[test]
+    fn test_longest_common_substring() {
+        assert_eq!(longest_common_substring_len("abcdef", "xbcdx"), 3);
+        assert_eq!(longest_common_substring_len("abc", "xyz"), 0);
+        assert_eq!(longest_common_substring_len("", "abc"), 0);
+        assert_eq!(longest_common_substring_len("abcabc", "abc"), 3);
+    }
+
+    #[test]
+    fn test_common_suffix_length() {
+        assert_eq!(common_suffix_length("abcdef", "xyzdef"), 3);
+        assert_eq!(common_suffix_length("abc", "xyz"), 0);
+        assert_eq!(common_suffix_length("test", "best"), 3);
+    }
+
+    #[test]
+    fn test_surrogates() {
+        assert!(is_high_surrogate(0xD800));
+        assert!(is_high_surrogate(0xDBFF));
+        assert!(!is_high_surrogate(0xDC00));
+        assert!(is_low_surrogate(0xDC00));
+        assert!(is_low_surrogate(0xDFFF));
+        assert!(!is_low_surrogate(0xD800));
     }
 }

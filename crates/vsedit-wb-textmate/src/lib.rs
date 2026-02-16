@@ -1,10 +1,147 @@
 //! TextMate grammar loading and syntax highlighting via syntect.
 
+use std::fmt;
 use std::path::Path;
 
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{Style as SyntectStyle, Theme, ThemeSet};
 use syntect::parsing::{SyntaxReference, SyntaxSet};
+
+// ---------------------------------------------------------------------------
+// Error types
+// ---------------------------------------------------------------------------
+
+/// Errors returned by the TextMate service.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TextMateError {
+    /// The requested theme was not found.
+    ThemeNotFound(String),
+    /// No syntax matched the given query.
+    SyntaxNotFound(String),
+    /// Highlighting failed for the given line.
+    HighlightError(String),
+}
+
+impl fmt::Display for TextMateError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ThemeNotFound(name) => write!(f, "theme not found: {name}"),
+            Self::SyntaxNotFound(query) => write!(f, "syntax not found: {query}"),
+            Self::HighlightError(msg) => write!(f, "highlight error: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for TextMateError {}
+
+// ---------------------------------------------------------------------------
+// HighlightedSegment – a single styled piece of text
+// ---------------------------------------------------------------------------
+
+/// A segment of highlighted text with its foreground colour.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HighlightedSegment {
+    /// Foreground colour as (r, g, b).
+    pub fg: (u8, u8, u8),
+    /// The text content.
+    pub text: String,
+}
+
+impl HighlightedSegment {
+    /// Create a new segment.
+    pub fn new(fg: (u8, u8, u8), text: impl Into<String>) -> Self {
+        Self {
+            fg,
+            text: text.into(),
+        }
+    }
+
+    /// Return `true` if the segment contains only whitespace.
+    pub fn is_whitespace(&self) -> bool {
+        self.text.chars().all(char::is_whitespace)
+    }
+
+    /// Byte length of the text content.
+    pub fn len(&self) -> usize {
+        self.text.len()
+    }
+
+    /// Return `true` when the text is empty.
+    pub fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+
+    /// Convert to a ratatui `Span`.
+    pub fn to_ratatui_span(&self) -> ratatui::text::Span<'_> {
+        ratatui::text::Span::styled(
+            self.text.as_str(),
+            ratatui::style::Style::default()
+                .fg(ratatui::style::Color::Rgb(self.fg.0, self.fg.1, self.fg.2)),
+        )
+    }
+}
+
+impl fmt::Display for HighlightedSegment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.text)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HighlightedLine – a full highlighted source line
+// ---------------------------------------------------------------------------
+
+/// A complete highlighted line composed of segments.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HighlightedLine {
+    segments: Vec<HighlightedSegment>,
+}
+
+impl HighlightedLine {
+    /// Build from a list of syntect (Style, String) pairs.
+    pub fn from_syntect_ranges(ranges: &[(SyntectStyle, String)]) -> Self {
+        Self {
+            segments: ranges
+                .iter()
+                .map(|(s, t)| HighlightedSegment::new(syntect_to_rgb(*s), t.clone()))
+                .collect(),
+        }
+    }
+
+    /// Number of segments.
+    pub fn segment_count(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// Total byte length of the line text.
+    pub fn text_len(&self) -> usize {
+        self.segments.iter().map(|s| s.len()).sum()
+    }
+
+    /// Concatenate all segment texts.
+    pub fn plain_text(&self) -> String {
+        self.segments.iter().map(|s| s.text.as_str()).collect()
+    }
+
+    /// Iterate over the segments.
+    pub fn segments(&self) -> &[HighlightedSegment] {
+        &self.segments
+    }
+
+    /// Convert the whole line to ratatui `Spans`.
+    pub fn to_ratatui_spans(&self) -> Vec<ratatui::text::Span<'_>> {
+        self.segments.iter().map(|s| s.to_ratatui_span()).collect()
+    }
+}
+
+impl fmt::Display for HighlightedLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for seg in &self.segments {
+            write!(f, "{seg}")?;
+        }
+        Ok(())
+    }
+}
 
 /// Manages loaded TextMate grammars and themes.
 pub struct TextMateService {
@@ -87,6 +224,93 @@ impl TextMateService {
     /// Get a reference to the syntax set.
     pub fn syntax_set(&self) -> &SyntaxSet {
         &self.syntax_set
+    }
+
+    /// Return the name of the currently active theme.
+    pub fn active_theme_name(&self) -> &str {
+        &self.active_theme
+    }
+
+    /// Try to set the theme, returning an error when the name is unknown.
+    pub fn try_set_theme(&mut self, name: &str) -> Result<(), TextMateError> {
+        if self.theme_set.themes.contains_key(name) {
+            self.active_theme = name.to_string();
+            Ok(())
+        } else {
+            Err(TextMateError::ThemeNotFound(name.to_string()))
+        }
+    }
+
+    /// Find a syntax definition by extension, returning a `TextMateError` on miss.
+    pub fn require_syntax_by_extension<'a>(
+        &'a self,
+        ext: &str,
+    ) -> Result<&'a SyntaxReference, TextMateError> {
+        self.find_syntax_by_extension(ext)
+            .ok_or_else(|| TextMateError::SyntaxNotFound(ext.to_string()))
+    }
+
+    /// Find a syntax definition by name, returning a `TextMateError` on miss.
+    pub fn require_syntax_by_name<'a>(
+        &'a self,
+        name: &str,
+    ) -> Result<&'a SyntaxReference, TextMateError> {
+        self.find_syntax_by_name(name)
+            .ok_or_else(|| TextMateError::SyntaxNotFound(name.to_string()))
+    }
+
+    /// Highlight a single line and return a `HighlightedLine`.
+    pub fn highlight_line_structured<'a>(
+        &self,
+        highlighter: &mut HighlightLines<'a>,
+        line: &str,
+    ) -> HighlightedLine {
+        let raw = self.highlight_line(highlighter, line);
+        HighlightedLine::from_syntect_ranges(&raw)
+    }
+
+    /// Highlight multiple lines at once, returning a `Vec<HighlightedLine>`.
+    pub fn highlight_lines<'a>(
+        &self,
+        highlighter: &mut HighlightLines<'a>,
+        lines: &[&str],
+    ) -> Vec<HighlightedLine> {
+        lines
+            .iter()
+            .map(|line| self.highlight_line_structured(highlighter, line))
+            .collect()
+    }
+
+    /// Return the number of loaded syntax definitions.
+    pub fn syntax_count(&self) -> usize {
+        self.syntax_set.syntaxes().len()
+    }
+
+    /// Return the number of loaded themes.
+    pub fn theme_count(&self) -> usize {
+        self.theme_set.themes.len()
+    }
+}
+
+impl fmt::Debug for TextMateService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TextMateService")
+            .field("active_theme", &self.active_theme)
+            .field("syntax_count", &self.syntax_count())
+            .field("theme_count", &self.theme_count())
+            .finish()
+    }
+}
+
+impl fmt::Display for TextMateService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "TextMateService(theme={}, syntaxes={}, themes={})",
+            self.active_theme,
+            self.syntax_count(),
+            self.theme_count(),
+        )
     }
 }
 
@@ -248,5 +472,141 @@ mod tests {
         let svc = TextMateService::new();
         let ss = svc.syntax_set();
         assert!(!ss.syntaxes().is_empty());
+    }
+
+    // ---- new tests ----
+
+    #[test]
+    fn textmate_error_display() {
+        let e = TextMateError::ThemeNotFound("bad".into());
+        assert_eq!(e.to_string(), "theme not found: bad");
+
+        let e = TextMateError::SyntaxNotFound("xyz".into());
+        assert_eq!(e.to_string(), "syntax not found: xyz");
+
+        let e = TextMateError::HighlightError("oops".into());
+        assert_eq!(e.to_string(), "highlight error: oops");
+    }
+
+    #[test]
+    fn textmate_error_is_std_error() {
+        let e: Box<dyn std::error::Error> =
+            Box::new(TextMateError::ThemeNotFound("x".into()));
+        assert!(e.to_string().contains("theme not found"));
+    }
+
+    #[test]
+    fn try_set_theme_ok() {
+        let mut svc = TextMateService::new();
+        let name = svc.available_themes()[0].to_string();
+        assert!(svc.try_set_theme(&name).is_ok());
+        assert_eq!(svc.active_theme_name(), name);
+    }
+
+    #[test]
+    fn try_set_theme_err() {
+        let mut svc = TextMateService::new();
+        let result = svc.try_set_theme("no-such-theme");
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            TextMateError::ThemeNotFound("no-such-theme".into())
+        );
+    }
+
+    #[test]
+    fn require_syntax_by_extension_ok() {
+        let svc = TextMateService::new();
+        let syn = svc.require_syntax_by_extension("rs");
+        assert!(syn.is_ok());
+        assert_eq!(syn.unwrap().name, "Rust");
+    }
+
+    #[test]
+    fn require_syntax_by_extension_err() {
+        let svc = TextMateService::new();
+        let syn = svc.require_syntax_by_extension("zzzzz");
+        assert_eq!(
+            syn.unwrap_err(),
+            TextMateError::SyntaxNotFound("zzzzz".into())
+        );
+    }
+
+    #[test]
+    fn require_syntax_by_name_ok_and_err() {
+        let svc = TextMateService::new();
+        assert!(svc.require_syntax_by_name("Rust").is_ok());
+        assert!(svc.require_syntax_by_name("NoLang").is_err());
+    }
+
+    #[test]
+    fn syntax_and_theme_counts() {
+        let svc = TextMateService::new();
+        assert!(svc.syntax_count() > 0);
+        assert!(svc.theme_count() > 0);
+    }
+
+    #[test]
+    fn debug_and_display_impls() {
+        let svc = TextMateService::new();
+        let dbg = format!("{:?}", svc);
+        assert!(dbg.contains("TextMateService"));
+        assert!(dbg.contains("active_theme"));
+
+        let disp = format!("{}", svc);
+        assert!(disp.contains("base16-ocean.dark"));
+    }
+
+    #[test]
+    fn highlighted_segment_basics() {
+        let seg = HighlightedSegment::new((255, 0, 0), "hello");
+        assert_eq!(seg.len(), 5);
+        assert!(!seg.is_empty());
+        assert!(!seg.is_whitespace());
+        assert_eq!(seg.to_string(), "hello");
+
+        let ws = HighlightedSegment::new((0, 0, 0), "  ");
+        assert!(ws.is_whitespace());
+    }
+
+    #[test]
+    fn highlighted_line_from_ranges() {
+        let style = SyntectStyle {
+            foreground: Color { r: 100, g: 200, b: 50, a: 255 },
+            background: Color { r: 0, g: 0, b: 0, a: 255 },
+            font_style: Default::default(),
+        };
+        let ranges = vec![
+            (style, "fn ".to_string()),
+            (style, "main".to_string()),
+        ];
+        let line = HighlightedLine::from_syntect_ranges(&ranges);
+        assert_eq!(line.segment_count(), 2);
+        assert_eq!(line.text_len(), 7);
+        assert_eq!(line.plain_text(), "fn main");
+        assert_eq!(line.to_string(), "fn main");
+    }
+
+    #[test]
+    fn highlight_lines_structured() {
+        let svc = TextMateService::new();
+        let syn = svc.find_syntax_by_extension("rs").unwrap();
+        let mut hl = svc.create_highlighter(syn);
+        let lines = svc.highlight_lines(&mut hl, &["fn main() {\n", "}\n"]);
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].plain_text().contains("fn"));
+    }
+
+    #[test]
+    fn highlighted_line_to_ratatui_spans() {
+        let style = SyntectStyle {
+            foreground: Color { r: 10, g: 20, b: 30, a: 255 },
+            background: Color { r: 0, g: 0, b: 0, a: 255 },
+            font_style: Default::default(),
+        };
+        let ranges = vec![(style, "code".to_string())];
+        let line = HighlightedLine::from_syntect_ranges(&ranges);
+        let spans = line.to_ratatui_spans();
+        assert_eq!(spans.len(), 1);
     }
 }

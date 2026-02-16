@@ -1,6 +1,36 @@
 //! Resource label formatting – path manipulation and label templates.
 
-#[derive(Debug, Clone)]
+use std::fmt;
+
+/// Errors that can occur during label formatting and validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LabelError {
+    /// The format pattern contains no recognized placeholders.
+    NoPlaceholders,
+    /// The path string is empty.
+    EmptyPath,
+    /// The label name exceeds the maximum allowed length.
+    NameTooLong { max: usize, actual: usize },
+    /// An unknown placeholder was found in the pattern.
+    UnknownPlaceholder(String),
+}
+
+impl fmt::Display for LabelError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LabelError::NoPlaceholders => write!(f, "format pattern contains no placeholders"),
+            LabelError::EmptyPath => write!(f, "path must not be empty"),
+            LabelError::NameTooLong { max, actual } => {
+                write!(f, "name length {actual} exceeds maximum {max}")
+            }
+            LabelError::UnknownPlaceholder(p) => write!(f, "unknown placeholder: {p}"),
+        }
+    }
+}
+
+impl std::error::Error for LabelError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LabelFormat {
     pub pattern: String,
 }
@@ -18,12 +48,118 @@ pub enum LabelDetail {
     Full,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourceLabel {
     pub name: String,
     pub path: String,
     pub description: Option<String>,
     pub icon: Option<String>,
+}
+
+impl fmt::Display for ResourceLabel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(ref desc) = self.description {
+            write!(f, "{} — {}", self.name, desc)
+        } else {
+            write!(f, "{}", self.name)
+        }
+    }
+}
+
+impl fmt::Display for LabelFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LabelFormat({})", self.pattern)
+    }
+}
+
+impl fmt::Display for LabelDetail {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LabelDetail::Short => write!(f, "short"),
+            LabelDetail::Medium => write!(f, "medium"),
+            LabelDetail::Long => write!(f, "long"),
+            LabelDetail::Full => write!(f, "full"),
+        }
+    }
+}
+
+/// Builder for constructing a [`ResourceLabel`] with validation.
+#[derive(Debug, Clone, Default)]
+pub struct ResourceLabelBuilder {
+    name: Option<String>,
+    path: Option<String>,
+    description: Option<String>,
+    icon: Option<String>,
+}
+
+impl ResourceLabelBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    pub fn path(mut self, path: impl Into<String>) -> Self {
+        self.path = Some(path.into());
+        self
+    }
+
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = Some(description.into());
+        self
+    }
+
+    pub fn icon(mut self, icon: impl Into<String>) -> Self {
+        self.icon = Some(icon.into());
+        self
+    }
+
+    /// Build the label, deriving the name from the path filename if not set.
+    pub fn build(self) -> Result<ResourceLabel, LabelError> {
+        let path = self.path.ok_or(LabelError::EmptyPath)?;
+        if path.is_empty() {
+            return Err(LabelError::EmptyPath);
+        }
+        let name = self.name.unwrap_or_else(|| extract_filename(&path).to_string());
+        const MAX_NAME_LEN: usize = 255;
+        if name.len() > MAX_NAME_LEN {
+            return Err(LabelError::NameTooLong {
+                max: MAX_NAME_LEN,
+                actual: name.len(),
+            });
+        }
+        Ok(ResourceLabel {
+            name,
+            path,
+            description: self.description,
+            icon: self.icon,
+        })
+    }
+}
+
+impl ResourceLabel {
+    /// Create a builder for this type.
+    pub fn builder() -> ResourceLabelBuilder {
+        ResourceLabelBuilder::new()
+    }
+
+    /// Format this label at the given detail level.
+    pub fn format(&self, detail: LabelDetail) -> String {
+        format_file_label(&self.path, detail)
+    }
+
+    /// Return the file extension of this label's path, if any.
+    pub fn extension(&self) -> Option<&str> {
+        extract_extension(&self.path)
+    }
+
+    /// Return the parent directory portion of this label's path.
+    pub fn parent_dir(&self) -> &str {
+        self.path.rfind('/').map(|i| &self.path[..i]).unwrap_or("")
+    }
 }
 
 /// A segment of a highlighted label (for fuzzy match rendering).
@@ -174,6 +310,61 @@ pub fn extract_extension(path: &str) -> Option<&str> {
     filename.rfind('.').map(|i| &filename[i + 1..])
 }
 
+/// Validate a format pattern, returning an error if it contains no known placeholders.
+pub fn validate_format(format: &LabelFormat) -> Result<(), LabelError> {
+    let known = ["${filename}", "${dirname}", "${extname}"];
+    if !known.iter().any(|p| format.pattern.contains(p)) {
+        return Err(LabelError::NoPlaceholders);
+    }
+    Ok(())
+}
+
+/// Extract the stem (filename without extension) from a path.
+pub fn extract_stem(path: &str) -> &str {
+    let filename = extract_filename(path);
+    match filename.rfind('.') {
+        Some(i) if i > 0 => &filename[..i],
+        _ => filename,
+    }
+}
+
+/// Count the depth (number of path segments) of a path.
+pub fn path_depth(path: &str) -> usize {
+    if path.is_empty() {
+        return 0;
+    }
+    path.split('/').filter(|s| !s.is_empty()).count()
+}
+
+/// Compute a common prefix shared by all given paths.
+pub fn common_path_prefix<'a>(paths: &[&'a str]) -> &'a str {
+    if paths.is_empty() {
+        return "";
+    }
+    let first = paths[0];
+    let mut end = first.len();
+    for p in &paths[1..] {
+        end = end.min(p.len());
+        for (i, (a, b)) in first.bytes().zip(p.bytes()).enumerate() {
+            if a != b {
+                end = end.min(i);
+                break;
+            }
+        }
+    }
+    // Snap back to the last '/' boundary so we don't split mid-segment.
+    if let Some(pos) = first[..end].rfind('/') {
+        &first[..=pos]
+    } else {
+        ""
+    }
+}
+
+/// Strip a prefix from a path, returning the relative remainder.
+pub fn strip_prefix<'a>(path: &'a str, prefix: &str) -> &'a str {
+    path.strip_prefix(prefix).unwrap_or(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,5 +454,148 @@ mod tests {
         let segments = highlight_label("hello", "");
         assert_eq!(segments.len(), 1);
         assert!(!segments[0].highlighted);
+    }
+
+    // --- New tests ---
+
+    #[test]
+    fn validate_format_ok() {
+        let fmt = LabelFormat {
+            pattern: "${filename}".to_string(),
+        };
+        assert!(validate_format(&fmt).is_ok());
+    }
+
+    #[test]
+    fn validate_format_no_placeholders() {
+        let fmt = LabelFormat {
+            pattern: "just text".to_string(),
+        };
+        assert_eq!(validate_format(&fmt), Err(LabelError::NoPlaceholders));
+    }
+
+    #[test]
+    fn extract_stem_basic() {
+        assert_eq!(extract_stem("/foo/bar/baz.txt"), "baz");
+        assert_eq!(extract_stem("noext"), "noext");
+        assert_eq!(extract_stem("/a/.hidden"), ".hidden");
+    }
+
+    #[test]
+    fn path_depth_counts_segments() {
+        assert_eq!(path_depth(""), 0);
+        assert_eq!(path_depth("file.rs"), 1);
+        assert_eq!(path_depth("/home/user/file.rs"), 3);
+        assert_eq!(path_depth("/a/b/c/d/"), 4);
+    }
+
+    #[test]
+    fn common_path_prefix_basic() {
+        let paths = vec!["/home/user/a/foo.rs", "/home/user/b/bar.rs"];
+        assert_eq!(common_path_prefix(&paths), "/home/user/");
+    }
+
+    #[test]
+    fn common_path_prefix_empty() {
+        assert_eq!(common_path_prefix(&[]), "");
+    }
+
+    #[test]
+    fn common_path_prefix_no_shared() {
+        let paths = vec!["alpha/one.rs", "beta/two.rs"];
+        assert_eq!(common_path_prefix(&paths), "");
+    }
+
+    #[test]
+    fn strip_prefix_removes_prefix() {
+        assert_eq!(strip_prefix("/home/user/file.rs", "/home/user/"), "file.rs");
+        assert_eq!(strip_prefix("file.rs", "/nope/"), "file.rs");
+    }
+
+    #[test]
+    fn resource_label_builder_success() {
+        let label = ResourceLabel::builder()
+            .path("/src/main.rs")
+            .description("Entry point")
+            .icon("rs-icon")
+            .build()
+            .unwrap();
+        assert_eq!(label.name, "main.rs");
+        assert_eq!(label.description.as_deref(), Some("Entry point"));
+        assert_eq!(label.icon.as_deref(), Some("rs-icon"));
+    }
+
+    #[test]
+    fn resource_label_builder_empty_path_error() {
+        let result = ResourceLabel::builder().path("").build();
+        assert_eq!(result, Err(LabelError::EmptyPath));
+    }
+
+    #[test]
+    fn resource_label_builder_no_path_error() {
+        let result = ResourceLabel::builder().name("test").build();
+        assert_eq!(result, Err(LabelError::EmptyPath));
+    }
+
+    #[test]
+    fn resource_label_display() {
+        let label = ResourceLabel {
+            name: "main.rs".into(),
+            path: "/src/main.rs".into(),
+            description: Some("Rust source".into()),
+            icon: None,
+        };
+        assert_eq!(format!("{label}"), "main.rs — Rust source");
+
+        let no_desc = ResourceLabel {
+            name: "lib.rs".into(),
+            path: "/src/lib.rs".into(),
+            description: None,
+            icon: None,
+        };
+        assert_eq!(format!("{no_desc}"), "lib.rs");
+    }
+
+    #[test]
+    fn resource_label_helpers() {
+        let label = ResourceLabel {
+            name: "main.rs".into(),
+            path: "/home/user/src/main.rs".into(),
+            description: None,
+            icon: None,
+        };
+        assert_eq!(label.extension(), Some("rs"));
+        assert_eq!(label.parent_dir(), "/home/user/src");
+        assert_eq!(label.format(LabelDetail::Short), "main.rs");
+    }
+
+    #[test]
+    fn label_error_display() {
+        assert_eq!(
+            LabelError::EmptyPath.to_string(),
+            "path must not be empty"
+        );
+        assert_eq!(
+            LabelError::NameTooLong { max: 10, actual: 20 }.to_string(),
+            "name length 20 exceeds maximum 10"
+        );
+        assert_eq!(
+            LabelError::UnknownPlaceholder("${bad}".into()).to_string(),
+            "unknown placeholder: ${bad}"
+        );
+    }
+
+    #[test]
+    fn label_detail_display() {
+        assert_eq!(LabelDetail::Short.to_string(), "short");
+        assert_eq!(LabelDetail::Full.to_string(), "full");
+    }
+
+    #[test]
+    fn label_format_display() {
+        let fmt = LabelFormat {
+            pattern: "${filename}".to_string(),
+        };
+        assert_eq!(format!("{fmt}"), "LabelFormat(${filename})");
     }
 }

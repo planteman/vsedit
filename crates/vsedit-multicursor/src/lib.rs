@@ -4,6 +4,40 @@
 //! and column-selection mode utilities that complement the lower-level
 //! [`vsedit_cursor::CursorController`].
 
+use std::fmt;
+
+/// Errors that can occur during multi-cursor operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MultiCursorError {
+    /// Position has a zero line or column (must be 1-based).
+    InvalidPosition { line: u32, column: u32 },
+    /// Cursor index is out of bounds.
+    IndexOutOfBounds { index: usize, len: usize },
+    /// Attempted to create an empty session when at least one cursor is required.
+    EmptyCursors,
+    /// Selection range is invalid (start_line > line_count, etc.).
+    InvalidRange { start: u32, end: u32, max: u32 },
+}
+
+impl fmt::Display for MultiCursorError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidPosition { line, column } => {
+                write!(f, "invalid position ({line}, {column}): line and column must be >= 1")
+            }
+            Self::IndexOutOfBounds { index, len } => {
+                write!(f, "cursor index {index} out of bounds (len {len})")
+            }
+            Self::EmptyCursors => write!(f, "at least one cursor is required"),
+            Self::InvalidRange { start, end, max } => {
+                write!(f, "invalid range {start}..={end} (max {max})")
+            }
+        }
+    }
+}
+
+impl std::error::Error for MultiCursorError {}
+
 /// A position in a text document (1-based line and column).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CursorPosition {
@@ -14,6 +48,35 @@ pub struct CursorPosition {
 impl CursorPosition {
     pub fn new(line: u32, column: u32) -> Self {
         Self { line, column }
+    }
+
+    /// Create a position, returning an error if line or column is zero.
+    pub fn try_new(line: u32, column: u32) -> Result<Self, MultiCursorError> {
+        if line == 0 || column == 0 {
+            Err(MultiCursorError::InvalidPosition { line, column })
+        } else {
+            Ok(Self { line, column })
+        }
+    }
+
+    /// Offset this position by the given signed deltas, clamping to 1.
+    pub fn offset(&self, line_delta: i64, column_delta: i64) -> Self {
+        let new_line = (self.line as i64 + line_delta).max(1) as u32;
+        let new_col = (self.column as i64 + column_delta).max(1) as u32;
+        Self { line: new_line, column: new_col }
+    }
+
+    /// Manhattan distance between two positions (useful for heuristics).
+    pub fn distance_to(&self, other: &CursorPosition) -> u64 {
+        let dl = (self.line as i64 - other.line as i64).unsigned_abs();
+        let dc = (self.column as i64 - other.column as i64).unsigned_abs();
+        dl + dc
+    }
+}
+
+impl fmt::Display for CursorPosition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.line, self.column)
     }
 }
 
@@ -33,10 +96,44 @@ impl Selection {
     pub fn is_empty(&self) -> bool {
         self.start == self.end
     }
+
+    /// Returns a normalized selection where `start <= end`.
+    pub fn normalized(&self) -> Self {
+        if self.start <= self.end {
+            *self
+        } else {
+            Self { start: self.end, end: self.start }
+        }
+    }
+
+    /// Number of lines spanned by this selection (at least 1).
+    pub fn line_span(&self) -> u32 {
+        let n = self.normalized();
+        n.end.line - n.start.line + 1
+    }
+
+    /// Returns `true` if the given position falls within this selection (inclusive).
+    pub fn contains(&self, pos: &CursorPosition) -> bool {
+        let n = self.normalized();
+        *pos >= n.start && *pos <= n.end
+    }
+
+    /// Returns `true` if this selection overlaps with `other`.
+    pub fn overlaps(&self, other: &Selection) -> bool {
+        let a = self.normalized();
+        let b = other.normalized();
+        a.start <= b.end && b.start <= a.end
+    }
+}
+
+impl fmt::Display for Selection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{} -> {}]", self.start, self.end)
+    }
 }
 
 /// Manages a set of cursors and their associated selections.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MultiCursorSession {
     pub cursors: Vec<CursorPosition>,
     pub selections: Vec<Selection>,
@@ -114,6 +211,135 @@ impl MultiCursorSession {
     pub fn has_multiple_cursors(&self) -> bool {
         self.cursors.len() > 1
     }
+
+    /// Validated cursor addition — rejects zero line/column.
+    pub fn try_add_cursor(&mut self, pos: CursorPosition) -> Result<(), MultiCursorError> {
+        if pos.line == 0 || pos.column == 0 {
+            return Err(MultiCursorError::InvalidPosition {
+                line: pos.line,
+                column: pos.column,
+            });
+        }
+        self.cursors.push(pos);
+        Ok(())
+    }
+
+    /// Validated cursor removal.
+    pub fn try_remove_cursor(&mut self, index: usize) -> Result<CursorPosition, MultiCursorError> {
+        if index >= self.cursors.len() {
+            Err(MultiCursorError::IndexOutOfBounds {
+                index,
+                len: self.cursors.len(),
+            })
+        } else {
+            Ok(self.cursors.remove(index))
+        }
+    }
+
+    /// Move every cursor by the given signed deltas, clamping to 1.
+    pub fn move_all(&mut self, line_delta: i64, column_delta: i64) {
+        for c in &mut self.cursors {
+            *c = c.offset(line_delta, column_delta);
+        }
+    }
+
+    /// Returns the bounding box of all cursors as `(top_left, bottom_right)`,
+    /// or `None` if there are no cursors.
+    pub fn bounding_box(&self) -> Option<(CursorPosition, CursorPosition)> {
+        if self.cursors.is_empty() {
+            return None;
+        }
+        let min_line = self.cursors.iter().map(|c| c.line).min().unwrap();
+        let max_line = self.cursors.iter().map(|c| c.line).max().unwrap();
+        let min_col = self.cursors.iter().map(|c| c.column).min().unwrap();
+        let max_col = self.cursors.iter().map(|c| c.column).max().unwrap();
+        Some((
+            CursorPosition::new(min_line, min_col),
+            CursorPosition::new(max_line, max_col),
+        ))
+    }
+
+    /// Merge overlapping selections in-place.
+    pub fn merge_overlapping_selections(&mut self) {
+        if self.selections.len() < 2 {
+            return;
+        }
+        // Normalize and sort by start position.
+        let mut sels: Vec<Selection> = self.selections.iter().map(|s| s.normalized()).collect();
+        sels.sort_by_key(|s| (s.start.line, s.start.column));
+
+        let mut merged: Vec<Selection> = vec![sels[0]];
+        for s in &sels[1..] {
+            let last = merged.last_mut().unwrap();
+            if last.overlaps(s) || last.end >= s.start {
+                if s.end > last.end {
+                    last.end = s.end;
+                }
+            } else {
+                merged.push(*s);
+            }
+        }
+        self.selections = merged;
+    }
+}
+
+impl fmt::Display for MultiCursorSession {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "MultiCursorSession({} cursors, {} selections)",
+            self.cursors.len(),
+            self.selections.len(),
+        )
+    }
+}
+
+/// Builder for constructing a [`MultiCursorSession`] with validation.
+#[derive(Debug, Clone, Default)]
+pub struct MultiCursorSessionBuilder {
+    cursors: Vec<CursorPosition>,
+    selections: Vec<Selection>,
+    deduplicate: bool,
+}
+
+impl MultiCursorSessionBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a cursor, returning an error if the position is invalid.
+    pub fn cursor(mut self, line: u32, column: u32) -> Result<Self, MultiCursorError> {
+        let pos = CursorPosition::try_new(line, column)?;
+        self.cursors.push(pos);
+        Ok(self)
+    }
+
+    /// Add a selection.
+    pub fn selection(mut self, sel: Selection) -> Self {
+        self.selections.push(sel);
+        self
+    }
+
+    /// Enable automatic deduplication on build.
+    pub fn deduplicate(mut self, yes: bool) -> Self {
+        self.deduplicate = yes;
+        self
+    }
+
+    /// Build the session.
+    pub fn build(self) -> Result<MultiCursorSession, MultiCursorError> {
+        if self.cursors.is_empty() {
+            return Err(MultiCursorError::EmptyCursors);
+        }
+        let mut session = MultiCursorSession {
+            cursors: self.cursors,
+            selections: self.selections,
+        };
+        if self.deduplicate {
+            session.sort_and_deduplicate();
+        }
+        Ok(session)
+    }
 }
 
 impl Default for MultiCursorSession {
@@ -123,7 +349,7 @@ impl Default for MultiCursorSession {
 }
 
 /// Utility for computing column-aligned selections across a range of lines.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColumnSelectionMode {
     pub anchor_column: u32,
 }
@@ -161,6 +387,48 @@ impl ColumnSelectionMode {
                     CursorPosition::new(line, start),
                     CursorPosition::new(line, end),
                 )
+            })
+            .collect()
+    }
+
+    /// Like [`compute_selections`](Self::compute_selections) but validates inputs first.
+    pub fn try_compute_selections(
+        &self,
+        start_line: u32,
+        end_line: u32,
+        target_column: u32,
+        line_count: u32,
+        max_column_fn: impl Fn(u32) -> u32,
+    ) -> Result<Vec<Selection>, MultiCursorError> {
+        let lo = start_line.min(end_line);
+        let hi = start_line.max(end_line);
+        if lo == 0 || hi > line_count {
+            return Err(MultiCursorError::InvalidRange {
+                start: lo,
+                end: hi,
+                max: line_count,
+            });
+        }
+        Ok(self.compute_selections(start_line, end_line, target_column, max_column_fn))
+    }
+
+    /// Extract cursor positions (one per line at `target_column`, clamped).
+    pub fn cursor_positions(
+        &self,
+        start_line: u32,
+        end_line: u32,
+        target_column: u32,
+        max_column_fn: impl Fn(u32) -> u32,
+    ) -> Vec<CursorPosition> {
+        let (lo, hi) = if start_line <= end_line {
+            (start_line, end_line)
+        } else {
+            (end_line, start_line)
+        };
+        (lo..=hi)
+            .map(|line| {
+                let col = target_column.min(max_column_fn(line));
+                CursorPosition::new(line, col)
             })
             .collect()
     }
@@ -240,5 +508,191 @@ mod tests {
         session.clear();
         assert_eq!(session.cursor_count(), 0);
         assert!(session.selections.is_empty());
+    }
+
+    #[test]
+    fn cursor_position_try_new_rejects_zero() {
+        assert!(CursorPosition::try_new(0, 1).is_err());
+        assert!(CursorPosition::try_new(1, 0).is_err());
+        assert!(CursorPosition::try_new(0, 0).is_err());
+        assert_eq!(CursorPosition::try_new(1, 1).unwrap(), CursorPosition::new(1, 1));
+    }
+
+    #[test]
+    fn cursor_position_offset_clamps() {
+        let p = CursorPosition::new(3, 5);
+        assert_eq!(p.offset(-10, -10), CursorPosition::new(1, 1));
+        assert_eq!(p.offset(2, 3), CursorPosition::new(5, 8));
+    }
+
+    #[test]
+    fn cursor_position_distance() {
+        let a = CursorPosition::new(1, 1);
+        let b = CursorPosition::new(4, 6);
+        assert_eq!(a.distance_to(&b), 8);
+        assert_eq!(b.distance_to(&a), 8);
+    }
+
+    #[test]
+    fn cursor_position_display() {
+        assert_eq!(format!("{}", CursorPosition::new(10, 25)), "10:25");
+    }
+
+    #[test]
+    fn selection_normalized_and_contains() {
+        let sel = Selection::new(CursorPosition::new(3, 8), CursorPosition::new(1, 2));
+        let n = sel.normalized();
+        assert_eq!(n.start, CursorPosition::new(1, 2));
+        assert_eq!(n.end, CursorPosition::new(3, 8));
+        assert!(sel.contains(&CursorPosition::new(2, 5)));
+        assert!(!sel.contains(&CursorPosition::new(4, 1)));
+    }
+
+    #[test]
+    fn selection_line_span() {
+        let sel = Selection::new(CursorPosition::new(2, 1), CursorPosition::new(5, 3));
+        assert_eq!(sel.line_span(), 4);
+        let single = Selection::new(CursorPosition::new(7, 1), CursorPosition::new(7, 10));
+        assert_eq!(single.line_span(), 1);
+    }
+
+    #[test]
+    fn selection_overlaps() {
+        let a = Selection::new(CursorPosition::new(1, 1), CursorPosition::new(3, 5));
+        let b = Selection::new(CursorPosition::new(3, 3), CursorPosition::new(5, 1));
+        assert!(a.overlaps(&b));
+        let c = Selection::new(CursorPosition::new(4, 1), CursorPosition::new(6, 1));
+        assert!(!a.overlaps(&c));
+    }
+
+    #[test]
+    fn selection_display() {
+        let sel = Selection::new(CursorPosition::new(1, 1), CursorPosition::new(2, 3));
+        assert_eq!(format!("{sel}"), "[1:1 -> 2:3]");
+    }
+
+    #[test]
+    fn try_add_cursor_validates() {
+        let mut session = MultiCursorSession::new();
+        assert!(session.try_add_cursor(CursorPosition::new(0, 5)).is_err());
+        assert!(session.try_add_cursor(CursorPosition::new(1, 1)).is_ok());
+        assert_eq!(session.cursor_count(), 1);
+    }
+
+    #[test]
+    fn try_remove_cursor_out_of_bounds() {
+        let mut session = MultiCursorSession::new();
+        session.add_cursor(CursorPosition::new(1, 1));
+        assert!(session.try_remove_cursor(5).is_err());
+        assert!(session.try_remove_cursor(0).is_ok());
+    }
+
+    #[test]
+    fn move_all_cursors() {
+        let mut session = MultiCursorSession::new();
+        session.add_cursor(CursorPosition::new(2, 3));
+        session.add_cursor(CursorPosition::new(4, 1));
+        session.move_all(1, 2);
+        assert_eq!(session.cursors[0], CursorPosition::new(3, 5));
+        assert_eq!(session.cursors[1], CursorPosition::new(5, 3));
+    }
+
+    #[test]
+    fn bounding_box_computation() {
+        let mut session = MultiCursorSession::new();
+        assert!(session.bounding_box().is_none());
+        session.add_cursor(CursorPosition::new(5, 10));
+        session.add_cursor(CursorPosition::new(2, 3));
+        session.add_cursor(CursorPosition::new(8, 7));
+        let (tl, br) = session.bounding_box().unwrap();
+        assert_eq!(tl, CursorPosition::new(2, 3));
+        assert_eq!(br, CursorPosition::new(8, 10));
+    }
+
+    #[test]
+    fn merge_overlapping_selections() {
+        let mut session = MultiCursorSession::new();
+        session.add_cursor(CursorPosition::new(1, 1));
+        session.selections.push(Selection::new(
+            CursorPosition::new(1, 1),
+            CursorPosition::new(3, 5),
+        ));
+        session.selections.push(Selection::new(
+            CursorPosition::new(3, 3),
+            CursorPosition::new(5, 2),
+        ));
+        session.selections.push(Selection::new(
+            CursorPosition::new(7, 1),
+            CursorPosition::new(8, 1),
+        ));
+        session.merge_overlapping_selections();
+        assert_eq!(session.selections.len(), 2);
+        assert_eq!(session.selections[0].end, CursorPosition::new(5, 2));
+        assert_eq!(session.selections[1].start, CursorPosition::new(7, 1));
+    }
+
+    #[test]
+    fn builder_validates_and_builds() {
+        // Empty builder should fail.
+        let res = MultiCursorSessionBuilder::new().build();
+        assert!(res.is_err());
+
+        // Invalid position should fail.
+        let res = MultiCursorSessionBuilder::new().cursor(0, 1);
+        assert!(res.is_err());
+
+        // Valid build with dedup.
+        let session = MultiCursorSessionBuilder::new()
+            .cursor(3, 1).unwrap()
+            .cursor(1, 1).unwrap()
+            .cursor(3, 1).unwrap()
+            .deduplicate(true)
+            .build()
+            .unwrap();
+        assert_eq!(session.cursor_count(), 2);
+        assert_eq!(session.cursors[0], CursorPosition::new(1, 1));
+    }
+
+    #[test]
+    fn session_display() {
+        let mut session = MultiCursorSession::new();
+        session.add_cursor(CursorPosition::new(1, 1));
+        assert_eq!(
+            format!("{session}"),
+            "MultiCursorSession(1 cursors, 0 selections)"
+        );
+    }
+
+    #[test]
+    fn column_selection_try_compute_validates() {
+        let csm = ColumnSelectionMode::new(3);
+        // start_line 0 is invalid.
+        assert!(csm.try_compute_selections(0, 3, 5, 10, |_| 10).is_err());
+        // end_line exceeds line_count.
+        assert!(csm.try_compute_selections(1, 11, 5, 10, |_| 10).is_err());
+        // Valid.
+        let sels = csm.try_compute_selections(1, 3, 5, 10, |_| 10).unwrap();
+        assert_eq!(sels.len(), 3);
+    }
+
+    #[test]
+    fn column_selection_cursor_positions() {
+        let csm = ColumnSelectionMode::new(1);
+        let positions = csm.cursor_positions(2, 5, 8, |line| if line == 3 { 4 } else { 10 });
+        assert_eq!(positions.len(), 4);
+        assert_eq!(positions[1], CursorPosition::new(3, 4)); // clamped
+        assert_eq!(positions[0], CursorPosition::new(2, 8));
+    }
+
+    #[test]
+    fn error_display_messages() {
+        let e = MultiCursorError::InvalidPosition { line: 0, column: 5 };
+        assert!(format!("{e}").contains("invalid position"));
+        let e = MultiCursorError::IndexOutOfBounds { index: 3, len: 2 };
+        assert!(format!("{e}").contains("out of bounds"));
+        let e = MultiCursorError::EmptyCursors;
+        assert!(format!("{e}").contains("at least one cursor"));
+        let e = MultiCursorError::InvalidRange { start: 0, end: 5, max: 10 };
+        assert!(format!("{e}").contains("invalid range"));
     }
 }

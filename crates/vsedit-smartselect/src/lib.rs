@@ -2,6 +2,42 @@
 
 use std::fmt;
 
+/// Errors that can occur when constructing or manipulating selection ranges.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SelectionError {
+    /// The end position is before the start position.
+    InvalidRange {
+        start_line: u32,
+        start_col: u32,
+        end_line: u32,
+        end_col: u32,
+    },
+    /// An empty list of ranges was provided where at least one is required.
+    EmptyRanges,
+    /// A child range is not contained within its parent.
+    ChildExceedsParent,
+}
+
+impl fmt::Display for SelectionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidRange { start_line, start_col, end_line, end_col } => {
+                write!(
+                    f,
+                    "invalid range: start {}:{} is after end {}:{}",
+                    start_line, start_col, end_line, end_col
+                )
+            }
+            Self::EmptyRanges => write!(f, "ranges must not be empty"),
+            Self::ChildExceedsParent => {
+                write!(f, "child range is not contained within its parent")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SelectionError {}
+
 /// A hierarchical selection range with an optional parent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectionRange {
@@ -137,6 +173,126 @@ pub fn build_selection_chain(ranges: Vec<(u32, u32, u32, u32)>) -> SelectionRang
         current = SelectionRange::new(sl, sc, el, ec).with_parent(current);
     }
     current
+}
+
+/// Validated version of [`build_selection_chain`] that returns an error on
+/// invalid input instead of panicking.
+pub fn try_build_selection_chain(
+    ranges: Vec<(u32, u32, u32, u32)>,
+) -> Result<SelectionRange, SelectionError> {
+    if ranges.is_empty() {
+        return Err(SelectionError::EmptyRanges);
+    }
+    for &(sl, sc, el, ec) in &ranges {
+        if (sl, sc) > (el, ec) {
+            return Err(SelectionError::InvalidRange {
+                start_line: sl,
+                start_col: sc,
+                end_line: el,
+                end_col: ec,
+            });
+        }
+    }
+    Ok(build_selection_chain(ranges))
+}
+
+/// Compute the smallest range that contains both `a` and `b`.
+pub fn selection_union(a: &SelectionRange, b: &SelectionRange) -> SelectionRange {
+    let start = std::cmp::min((a.start_line, a.start_col), (b.start_line, b.start_col));
+    let end = std::cmp::max((a.end_line, a.end_col), (b.end_line, b.end_col));
+    SelectionRange::new(start.0, start.1, end.0, end.1)
+}
+
+/// Compute the intersection of two ranges, or `None` if they don't overlap.
+pub fn selection_intersection(
+    a: &SelectionRange,
+    b: &SelectionRange,
+) -> Option<SelectionRange> {
+    if !selection_intersects(a, b) {
+        return None;
+    }
+    let start = std::cmp::max((a.start_line, a.start_col), (b.start_line, b.start_col));
+    let end = std::cmp::min((a.end_line, a.end_col), (b.end_line, b.end_col));
+    Some(SelectionRange::new(start.0, start.1, end.0, end.1))
+}
+
+/// Collect all ranges in the parent chain into a `Vec`, innermost first.
+pub fn collect_chain(range: &SelectionRange) -> Vec<&SelectionRange> {
+    let mut out = Vec::new();
+    let mut cur = range;
+    out.push(cur);
+    while let Some(ref p) = cur.parent {
+        out.push(p);
+        cur = p;
+    }
+    out
+}
+
+impl SelectionRange {
+    /// Validated constructor that returns an error if start is after end.
+    pub fn try_new(
+        start_line: u32,
+        start_col: u32,
+        end_line: u32,
+        end_col: u32,
+    ) -> Result<Self, SelectionError> {
+        if (start_line, start_col) > (end_line, end_col) {
+            return Err(SelectionError::InvalidRange {
+                start_line,
+                start_col,
+                end_line,
+                end_col,
+            });
+        }
+        Ok(Self::new(start_line, start_col, end_line, end_col))
+    }
+
+    /// Attach a parent, validating that the parent fully contains this range.
+    pub fn try_with_parent(
+        self,
+        parent: SelectionRange,
+    ) -> Result<Self, SelectionError> {
+        if !selection_contains(&parent, &self) {
+            return Err(SelectionError::ChildExceedsParent);
+        }
+        Ok(self.with_parent(parent))
+    }
+
+    /// Returns `true` if this range fully contains `other`.
+    pub fn contains(&self, other: &SelectionRange) -> bool {
+        selection_contains(self, other)
+    }
+
+    /// Returns `true` if this range overlaps with `other`.
+    pub fn intersects(&self, other: &SelectionRange) -> bool {
+        selection_intersects(self, other)
+    }
+
+    /// Translate this range by a line delta (may be negative).
+    pub fn translate_lines(&self, delta: i64) -> Option<SelectionRange> {
+        let sl = (self.start_line as i64).checked_add(delta)?;
+        let el = (self.end_line as i64).checked_add(delta)?;
+        if sl < 0 || el < 0 {
+            return None;
+        }
+        Some(SelectionRange {
+            start_line: sl as u32,
+            start_col: self.start_col,
+            end_line: el as u32,
+            end_col: self.end_col,
+            parent: None,
+        })
+    }
+
+    /// Returns the (line, col) of the start position as a tuple.
+    pub fn start(&self) -> (u32, u32) {
+        (self.start_line, self.start_col)
+    }
+
+    /// Returns the (line, col) of the end position as a tuple.
+    pub fn end(&self) -> (u32, u32) {
+        (self.end_line, self.end_col)
+    }
 }
 
 #[cfg(test)]
@@ -281,5 +437,138 @@ mod tests {
     fn display_format() {
         let r = SelectionRange::new(1, 5, 3, 10);
         assert_eq!(format!("{r}"), "[1:5 - 3:10]");
+    }
+
+    #[test]
+    fn try_new_valid() {
+        let r = SelectionRange::try_new(1, 0, 5, 10).unwrap();
+        assert_eq!(r.start(), (1, 0));
+        assert_eq!(r.end(), (5, 10));
+    }
+
+    #[test]
+    fn try_new_invalid() {
+        let err = SelectionRange::try_new(5, 10, 3, 0).unwrap_err();
+        assert_eq!(
+            err,
+            SelectionError::InvalidRange {
+                start_line: 5,
+                start_col: 10,
+                end_line: 3,
+                end_col: 0
+            }
+        );
+        assert!(format!("{err}").contains("invalid range"));
+    }
+
+    #[test]
+    fn try_with_parent_ok() {
+        let parent = SelectionRange::new(0, 0, 10, 0);
+        let child = SelectionRange::new(2, 5, 4, 10);
+        let result = child.try_with_parent(parent).unwrap();
+        assert_eq!(result.depth(), 1);
+    }
+
+    #[test]
+    fn try_with_parent_err() {
+        let parent = SelectionRange::new(3, 0, 4, 0);
+        let child = SelectionRange::new(1, 0, 10, 0);
+        let err = child.try_with_parent(parent).unwrap_err();
+        assert_eq!(err, SelectionError::ChildExceedsParent);
+    }
+
+    #[test]
+    fn try_build_chain_empty() {
+        let err = try_build_selection_chain(vec![]).unwrap_err();
+        assert_eq!(err, SelectionError::EmptyRanges);
+    }
+
+    #[test]
+    fn try_build_chain_invalid_range() {
+        let err = try_build_selection_chain(vec![(5, 0, 3, 0)]).unwrap_err();
+        matches!(err, SelectionError::InvalidRange { .. });
+    }
+
+    #[test]
+    fn try_build_chain_valid() {
+        let chain = try_build_selection_chain(vec![
+            (5, 10, 5, 15),
+            (5, 0, 5, 40),
+        ])
+        .unwrap();
+        assert_eq!(chain.depth(), 1);
+        assert_eq!(chain.start_col, 10);
+    }
+
+    #[test]
+    fn union_of_ranges() {
+        let a = SelectionRange::new(3, 5, 6, 10);
+        let b = SelectionRange::new(1, 0, 4, 20);
+        let u = selection_union(&a, &b);
+        assert_eq!(u.start(), (1, 0));
+        assert_eq!(u.end(), (6, 10));
+    }
+
+    #[test]
+    fn intersection_overlapping() {
+        let a = SelectionRange::new(1, 0, 5, 10);
+        let b = SelectionRange::new(3, 5, 8, 0);
+        let i = selection_intersection(&a, &b).unwrap();
+        assert_eq!(i.start(), (3, 5));
+        assert_eq!(i.end(), (5, 10));
+    }
+
+    #[test]
+    fn intersection_disjoint() {
+        let a = SelectionRange::new(1, 0, 3, 0);
+        let b = SelectionRange::new(5, 0, 8, 0);
+        assert!(selection_intersection(&a, &b).is_none());
+    }
+
+    #[test]
+    fn collect_chain_vec() {
+        let chain = sample_chain();
+        let collected = collect_chain(&chain);
+        assert_eq!(collected.len(), 3);
+        assert_eq!(collected[0].start_col, 10); // innermost
+        assert_eq!(collected[2].start_line, 3); // outermost
+    }
+
+    #[test]
+    fn translate_lines_positive() {
+        let r = SelectionRange::new(3, 5, 7, 10);
+        let t = r.translate_lines(2).unwrap();
+        assert_eq!(t.start(), (5, 5));
+        assert_eq!(t.end(), (9, 10));
+    }
+
+    #[test]
+    fn translate_lines_negative_underflow() {
+        let r = SelectionRange::new(1, 0, 3, 0);
+        assert!(r.translate_lines(-5).is_none());
+    }
+
+    #[test]
+    fn contains_method_on_struct() {
+        let outer = SelectionRange::new(0, 0, 10, 0);
+        let inner = SelectionRange::new(2, 5, 4, 10);
+        assert!(outer.contains(&inner));
+        assert!(!inner.contains(&outer));
+    }
+
+    #[test]
+    fn intersects_method_on_struct() {
+        let a = SelectionRange::new(1, 0, 5, 0);
+        let b = SelectionRange::new(4, 0, 8, 0);
+        assert!(a.intersects(&b));
+    }
+
+    #[test]
+    fn error_display() {
+        let e = SelectionError::EmptyRanges;
+        assert_eq!(format!("{e}"), "ranges must not be empty");
+
+        let e2 = SelectionError::ChildExceedsParent;
+        assert!(format!("{e2}").contains("child range"));
     }
 }

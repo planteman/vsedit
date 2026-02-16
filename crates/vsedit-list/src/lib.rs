@@ -31,7 +31,103 @@ impl ListItem {
             selected: false,
         }
     }
+
+    /// Builder: set the description.
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+
+    /// Builder: set the icon.
+    pub fn with_icon(mut self, icon: impl Into<String>) -> Self {
+        self.icon = Some(icon.into());
+        self
+    }
+
+    /// Builder: add a child item.
+    pub fn with_child(mut self, child: ListItem) -> Self {
+        self.children.push(child);
+        self
+    }
+
+    /// Builder: set the expanded state.
+    pub fn with_expanded(mut self, expanded: bool) -> Self {
+        self.expanded = expanded;
+        self
+    }
+
+    /// Returns the depth of the deepest nested child (0 if leaf).
+    pub fn depth(&self) -> usize {
+        if self.children.is_empty() {
+            0
+        } else {
+            1 + self.children.iter().map(|c| c.depth()).max().unwrap_or(0)
+        }
+    }
+
+    /// Returns total number of descendants (not counting self).
+    pub fn descendant_count(&self) -> usize {
+        self.children
+            .iter()
+            .map(|c| 1 + c.descendant_count())
+            .sum()
+    }
+
+    /// Returns true if this item is a leaf (has no children).
+    pub fn is_leaf(&self) -> bool {
+        self.children.is_empty()
+    }
+
+    /// Find a descendant by id (depth-first).
+    pub fn find_descendant(&self, id: &str) -> Option<&ListItem> {
+        for child in &self.children {
+            if child.id == id {
+                return Some(child);
+            }
+            if let Some(found) = child.find_descendant(id) {
+                return Some(found);
+            }
+        }
+        None
+    }
 }
+
+impl std::fmt::Display for ListItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(ref desc) = self.description {
+            write!(f, "{} ({})", self.label, desc)
+        } else {
+            write!(f, "{}", self.label)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Error types
+// ---------------------------------------------------------------------------
+
+/// Errors that can occur during list-view operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ListError {
+    /// The requested item id was not found.
+    ItemNotFound(String),
+    /// An item with this id already exists.
+    DuplicateId(String),
+    /// A validation constraint was violated.
+    ValidationError(String),
+}
+
+impl std::fmt::Display for ListError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ItemNotFound(id) => write!(f, "item not found: {id}"),
+            Self::DuplicateId(id) => write!(f, "duplicate item id: {id}"),
+            Self::ValidationError(msg) => write!(f, "validation error: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for ListError {}
 
 /// Options controlling list-view behaviour.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,7 +148,7 @@ impl Default for ListOptions {
 }
 
 /// The list-view widget state.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ListView {
     pub items: Vec<ListItem>,
     pub options: ListOptions,
@@ -196,11 +292,120 @@ impl ListView {
         }
         count(&self.items)
     }
+
+    /// Try to select an item, returning an error if the id is not found.
+    pub fn try_select(&mut self, id: &str) -> Result<(), ListError> {
+        if find_item_mut(&mut self.items, id).is_none() {
+            return Err(ListError::ItemNotFound(id.to_string()));
+        }
+        self.select(id);
+        Ok(())
+    }
+
+    /// Add an item, rejecting duplicates.
+    pub fn try_add_item(&mut self, item: ListItem) -> Result<(), ListError> {
+        if self.find_item(&item.id).is_some() {
+            return Err(ListError::DuplicateId(item.id.clone()));
+        }
+        if item.id.is_empty() {
+            return Err(ListError::ValidationError("id must not be empty".into()));
+        }
+        self.items.push(item);
+        Ok(())
+    }
+
+    /// Find an item by id (immutable).
+    pub fn find_item(&self, id: &str) -> Option<&ListItem> {
+        fn find_recursive<'a>(items: &'a [ListItem], id: &str) -> Option<&'a ListItem> {
+            for item in items {
+                if item.id == id {
+                    return Some(item);
+                }
+                if let Some(found) = find_recursive(&item.children, id) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        find_recursive(&self.items, id)
+    }
+
+    /// Returns the currently focused item, if any.
+    pub fn focused_item(&self) -> Option<&ListItem> {
+        let flat = flatten(&self.items);
+        self.focused_index.and_then(|i| flat.get(i).copied())
+    }
+
+    /// Returns the maximum nesting depth across all items.
+    pub fn max_depth(&self) -> usize {
+        self.items.iter().map(|i| i.depth()).max().unwrap_or(0)
+    }
+
+    /// Returns a count of only the visible (flattened) items.
+    pub fn visible_count(&self) -> usize {
+        flatten(&self.items).len()
+    }
+
+    /// Expand all items recursively.
+    pub fn expand_all(&mut self) {
+        fn expand_recursive(items: &mut [ListItem]) {
+            for item in items.iter_mut() {
+                if !item.children.is_empty() {
+                    item.expanded = true;
+                }
+                expand_recursive(&mut item.children);
+            }
+        }
+        expand_recursive(&mut self.items);
+    }
+
+    /// Collapse all items recursively.
+    pub fn collapse_all(&mut self) {
+        fn collapse_recursive(items: &mut [ListItem]) {
+            for item in items.iter_mut() {
+                item.expanded = false;
+                collapse_recursive(&mut item.children);
+            }
+        }
+        collapse_recursive(&mut self.items);
+    }
+
+    /// Select the currently focused item (if any).
+    pub fn select_focused(&mut self) {
+        if let Some(item) = self.focused_item() {
+            let id = item.id.clone();
+            self.select(&id);
+        }
+    }
+
+    /// Returns ids of all selected items.
+    pub fn selected_ids(&self) -> Vec<&str> {
+        self.get_selected().iter().map(|i| i.id.as_str()).collect()
+    }
 }
 
 impl Default for ListView {
     fn default() -> Self {
         Self::new(ListOptions::default())
+    }
+}
+
+impl std::fmt::Display for ListView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let total = self.item_count();
+        let visible = self.visible_count();
+        let selected = self.get_selected().len();
+        write!(f, "ListView({total} items, {visible} visible, {selected} selected)")
+    }
+}
+
+impl std::fmt::Display for ListOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ListOptions(multi_select={}, keyboard_nav={}, smooth_scroll={})",
+            self.multi_select, self.keyboard_navigation, self.smooth_scrolling
+        )
     }
 }
 
@@ -256,5 +461,168 @@ mod tests {
         lv.focus_next(); // 1
         lv.focus_next(); // wraps to 0
         assert_eq!(lv.focused_index, Some(0));
+    }
+
+    #[test]
+    fn focus_prev_wraps_around() {
+        let mut lv = ListView::new(ListOptions::default());
+        lv.add_item(ListItem::new("a", "A"));
+        lv.add_item(ListItem::new("b", "B"));
+        lv.focus_prev(); // wraps to 1
+        assert_eq!(lv.focused_index, Some(1));
+        lv.focus_prev(); // 0
+        assert_eq!(lv.focused_index, Some(0));
+    }
+
+    #[test]
+    fn builder_pattern() {
+        let item = ListItem::new("x", "X")
+            .with_description("desc")
+            .with_icon("file")
+            .with_expanded(true)
+            .with_child(ListItem::new("y", "Y"));
+        assert_eq!(item.description.as_deref(), Some("desc"));
+        assert_eq!(item.icon.as_deref(), Some("file"));
+        assert!(item.expanded);
+        assert_eq!(item.children.len(), 1);
+    }
+
+    #[test]
+    fn list_item_depth() {
+        let leaf = ListItem::new("l", "Leaf");
+        assert_eq!(leaf.depth(), 0);
+        assert!(leaf.is_leaf());
+
+        let nested = ListItem::new("a", "A")
+            .with_child(ListItem::new("b", "B").with_child(ListItem::new("c", "C")));
+        assert_eq!(nested.depth(), 2);
+        assert!(!nested.is_leaf());
+    }
+
+    #[test]
+    fn descendant_count() {
+        let item = ListItem::new("a", "A")
+            .with_child(ListItem::new("b", "B"))
+            .with_child(
+                ListItem::new("c", "C").with_child(ListItem::new("d", "D")),
+            );
+        assert_eq!(item.descendant_count(), 3);
+    }
+
+    #[test]
+    fn find_descendant() {
+        let item = ListItem::new("root", "Root")
+            .with_child(
+                ListItem::new("mid", "Mid").with_child(ListItem::new("deep", "Deep")),
+            );
+        assert!(item.find_descendant("deep").is_some());
+        assert!(item.find_descendant("nonexistent").is_none());
+    }
+
+    #[test]
+    fn try_add_rejects_duplicate() {
+        let mut lv = ListView::default();
+        lv.add_item(ListItem::new("a", "A"));
+        let result = lv.try_add_item(ListItem::new("a", "Dup"));
+        assert_eq!(result, Err(ListError::DuplicateId("a".into())));
+    }
+
+    #[test]
+    fn try_add_rejects_empty_id() {
+        let mut lv = ListView::default();
+        let result = lv.try_add_item(ListItem::new("", "Empty"));
+        assert_eq!(result, Err(ListError::ValidationError("id must not be empty".into())));
+    }
+
+    #[test]
+    fn try_select_returns_error() {
+        let mut lv = ListView::default();
+        lv.add_item(ListItem::new("a", "A"));
+        assert!(lv.try_select("a").is_ok());
+        assert_eq!(
+            lv.try_select("missing"),
+            Err(ListError::ItemNotFound("missing".into()))
+        );
+    }
+
+    #[test]
+    fn expand_and_collapse_all() {
+        let mut lv = sample_tree();
+        lv.expand_all();
+        assert_eq!(lv.visible_count(), 4); // all 4 items visible
+        lv.collapse_all();
+        assert_eq!(lv.visible_count(), 2); // only top-level
+    }
+
+    #[test]
+    fn select_focused_item() {
+        let mut lv = ListView::default();
+        lv.add_item(ListItem::new("a", "A"));
+        lv.add_item(ListItem::new("b", "B"));
+        lv.focus_next(); // focus on "a"
+        lv.select_focused();
+        assert_eq!(lv.selected_ids(), vec!["a"]);
+    }
+
+    #[test]
+    fn multi_select_mode() {
+        let mut lv = ListView::new(ListOptions {
+            multi_select: true,
+            ..Default::default()
+        });
+        lv.add_item(ListItem::new("a", "A"));
+        lv.add_item(ListItem::new("b", "B"));
+        lv.select("a");
+        lv.select("b");
+        assert_eq!(lv.get_selected().len(), 2);
+    }
+
+    #[test]
+    fn display_impls() {
+        let item = ListItem::new("x", "Hello").with_description("world");
+        assert_eq!(format!("{item}"), "Hello (world)");
+
+        let item2 = ListItem::new("y", "Bare");
+        assert_eq!(format!("{item2}"), "Bare");
+
+        let lv = ListView::default();
+        assert!(format!("{lv}").contains("ListView("));
+
+        let opts = ListOptions::default();
+        assert!(format!("{opts}").contains("ListOptions("));
+    }
+
+    #[test]
+    fn remove_item_resets_focus() {
+        let mut lv = ListView::default();
+        lv.add_item(ListItem::new("a", "A"));
+        lv.add_item(ListItem::new("b", "B"));
+        lv.focus_next(); // 0
+        lv.focus_next(); // 1
+        lv.remove_item("b");
+        assert_eq!(lv.focused_index, Some(0));
+    }
+
+    #[test]
+    fn find_item_in_list_view() {
+        let mut lv = sample_tree();
+        assert!(lv.find_item("c1").is_some());
+        assert!(lv.find_item("nonexistent").is_none());
+        assert_eq!(lv.max_depth(), 1);
+
+        lv.toggle_expand("p1");
+        assert_eq!(lv.focused_item(), None);
+    }
+
+    #[test]
+    fn list_error_display() {
+        let e1 = ListError::ItemNotFound("abc".into());
+        assert_eq!(format!("{e1}"), "item not found: abc");
+        let e2 = ListError::DuplicateId("xyz".into());
+        assert_eq!(format!("{e2}"), "duplicate item id: xyz");
+        let e3 = ListError::ValidationError("bad".into());
+        assert_eq!(format!("{e3}"), "validation error: bad");
+        // Verify it implements std::error::Error
+        let _: &dyn std::error::Error = &e1;
     }
 }

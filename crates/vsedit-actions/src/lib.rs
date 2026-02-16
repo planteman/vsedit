@@ -4,10 +4,41 @@
 //! Provides action registration with menu contributions, keybindings, and when-clause guards.
 
 use std::collections::HashMap;
+use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
 
 use vsedit_commands::{CommandHandler, CommandRegistration, CommandRegistry};
 use vsedit_contextkey::ContextKeyExpr;
+
+/// Errors that can occur in the action system.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ActionError {
+    /// The action ID was not found in the registry.
+    NotFound(String),
+    /// The action's precondition is not satisfied.
+    PreconditionFailed(String),
+    /// A validation error when building an action.
+    ValidationError(String),
+    /// A menu item references a command that does not exist.
+    OrphanedMenuItem { menu_id: MenuId, command_id: String },
+}
+
+impl fmt::Display for ActionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ActionError::NotFound(id) => write!(f, "action not found: {id}"),
+            ActionError::PreconditionFailed(id) => {
+                write!(f, "precondition not satisfied for action: {id}")
+            }
+            ActionError::ValidationError(msg) => write!(f, "validation error: {msg}"),
+            ActionError::OrphanedMenuItem { menu_id, command_id } => {
+                write!(f, "menu item {command_id} references unknown action in {menu_id}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ActionError {}
 
 /// Identifies a menu location.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -36,7 +67,7 @@ pub enum MenuId {
 }
 
 /// An item within a menu group.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MenuItem {
     pub command_id: String,
     pub title: String,
@@ -53,6 +84,100 @@ struct ActionMeta {
     tooltip: Option<String>,
     icon: Option<String>,
     precondition: Option<ContextKeyExpr>,
+}
+
+impl fmt::Display for MenuId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            MenuId::CommandPalette => "Command Palette",
+            MenuId::EditorContext => "Editor Context",
+            MenuId::EditorTitle => "Editor Title",
+            MenuId::EditorTitleContext => "Editor Title Context",
+            MenuId::ExplorerContext => "Explorer Context",
+            MenuId::MenubarFile => "File",
+            MenuId::MenubarEdit => "Edit",
+            MenuId::MenubarSelection => "Selection",
+            MenuId::MenubarView => "View",
+            MenuId::MenubarGo => "Go",
+            MenuId::MenubarRun => "Run",
+            MenuId::MenubarTerminal => "Terminal",
+            MenuId::MenubarHelp => "Help",
+            MenuId::StatusBarItem => "Status Bar",
+            MenuId::ViewTitle => "View Title",
+            MenuId::ViewItemContext => "View Item Context",
+            MenuId::SCMTitle => "SCM Title",
+            MenuId::SCMContext => "SCM Context",
+            MenuId::TerminalContext => "Terminal Context",
+            MenuId::DebugCallStackContext => "Debug Call Stack Context",
+            MenuId::TouchBar => "Touch Bar",
+        };
+        write!(f, "{name}")
+    }
+}
+
+/// Builder for constructing `MenuItem` instances with a fluent API.
+#[derive(Debug)]
+pub struct MenuItemBuilder {
+    command_id: String,
+    title: String,
+    group: Option<String>,
+    order: Option<i32>,
+    when: Option<ContextKeyExpr>,
+}
+
+impl MenuItemBuilder {
+    pub fn new(command_id: impl Into<String>, title: impl Into<String>) -> Self {
+        Self {
+            command_id: command_id.into(),
+            title: title.into(),
+            group: None,
+            order: None,
+            when: None,
+        }
+    }
+
+    pub fn group(mut self, group: impl Into<String>) -> Self {
+        self.group = Some(group.into());
+        self
+    }
+
+    pub fn order(mut self, order: i32) -> Self {
+        self.order = Some(order);
+        self
+    }
+
+    pub fn when(mut self, expr: ContextKeyExpr) -> Self {
+        self.when = Some(expr);
+        self
+    }
+
+    /// Parse and set a when-clause from a string expression.
+    pub fn when_expr(mut self, expr: &str) -> Result<Self, ActionError> {
+        let parsed = ContextKeyExpr::parse(expr)
+            .map_err(|e| ActionError::ValidationError(format!("invalid when clause: {e}")))?;
+        self.when = Some(parsed);
+        Ok(self)
+    }
+
+    pub fn build(self) -> Result<MenuItem, ActionError> {
+        if self.command_id.is_empty() {
+            return Err(ActionError::ValidationError(
+                "command_id must not be empty".into(),
+            ));
+        }
+        if self.title.is_empty() {
+            return Err(ActionError::ValidationError(
+                "title must not be empty".into(),
+            ));
+        }
+        Ok(MenuItem {
+            command_id: self.command_id,
+            title: self.title,
+            group: self.group,
+            order: self.order,
+            when: self.when,
+        })
+    }
 }
 
 /// Registry for actions (commands with UI metadata).
@@ -159,6 +284,105 @@ impl ActionRegistry {
             },
             None => false,
         }
+    }
+
+    /// Return the number of registered actions.
+    pub fn action_count(&self) -> usize {
+        self.actions.read().unwrap().len()
+    }
+
+    /// Return the number of menu items registered under `menu_id`.
+    pub fn menu_item_count(&self, menu_id: MenuId) -> usize {
+        let menus = self.menus.read().unwrap();
+        menus.get(&menu_id).map_or(0, |v| v.len())
+    }
+
+    /// Check whether an action with the given `id` exists.
+    pub fn has_action(&self, id: &str) -> bool {
+        self.actions.read().unwrap().contains_key(id)
+    }
+
+    /// Get the category of a registered action, if any.
+    pub fn get_action_category(&self, id: &str) -> Option<String> {
+        self.actions.read().unwrap().get(id).and_then(|a| a.category.clone())
+    }
+
+    /// Set the tooltip for an existing action. Returns an error if the action is not found.
+    pub fn set_action_tooltip(
+        &self,
+        id: &str,
+        tooltip: impl Into<String>,
+    ) -> Result<(), ActionError> {
+        let mut actions = self.actions.write().unwrap();
+        match actions.get_mut(id) {
+            Some(meta) => {
+                meta.tooltip = Some(tooltip.into());
+                Ok(())
+            }
+            None => Err(ActionError::NotFound(id.to_string())),
+        }
+    }
+
+    /// Set the icon for an existing action. Returns an error if the action is not found.
+    pub fn set_action_icon(
+        &self,
+        id: &str,
+        icon: impl Into<String>,
+    ) -> Result<(), ActionError> {
+        let mut actions = self.actions.write().unwrap();
+        match actions.get_mut(id) {
+            Some(meta) => {
+                meta.icon = Some(icon.into());
+                Ok(())
+            }
+            None => Err(ActionError::NotFound(id.to_string())),
+        }
+    }
+
+    /// Execute an action if its precondition is satisfied.
+    pub fn execute_if_enabled(
+        &self,
+        id: &str,
+        context: &dyn vsedit_contextkey::IContext,
+        args: vsedit_commands::CommandArgs,
+    ) -> Result<Option<Box<dyn std::any::Any + Send>>, ActionError> {
+        if !self.has_action(id) {
+            return Err(ActionError::NotFound(id.to_string()));
+        }
+        if !self.is_action_enabled(id, context) {
+            return Err(ActionError::PreconditionFailed(id.to_string()));
+        }
+        self.command_registry
+            .execute(id, args)
+            .map_err(|e| ActionError::ValidationError(e.to_string()))
+    }
+
+    /// Get all menu IDs that have at least one registered item.
+    pub fn get_populated_menus(&self) -> Vec<MenuId> {
+        let menus = self.menus.read().unwrap();
+        menus
+            .iter()
+            .filter(|(_, items)| !items.is_empty())
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    /// Validate that every menu item references a registered action.
+    pub fn validate_menu_integrity(&self) -> Vec<ActionError> {
+        let menus = self.menus.read().unwrap();
+        let actions = self.actions.read().unwrap();
+        let mut errors = Vec::new();
+        for (&menu_id, items) in menus.iter() {
+            for item in items {
+                if !actions.contains_key(&item.command_id) {
+                    errors.push(ActionError::OrphanedMenuItem {
+                        menu_id,
+                        command_id: item.command_id.clone(),
+                    });
+                }
+            }
+        }
+        errors
     }
 }
 
@@ -271,5 +495,204 @@ mod tests {
         let registry = ActionRegistry::new(cmds);
         let ctx = vsedit_contextkey::ContextKeyService::new();
         assert!(!registry.is_action_enabled("nonexistent", &ctx));
+    }
+
+    #[test]
+    fn action_count_and_has_action() {
+        let cmds = Arc::new(CommandRegistry::new());
+        let registry = ActionRegistry::new(cmds);
+        assert_eq!(registry.action_count(), 0);
+        assert!(!registry.has_action("x"));
+
+        registry.register_action("x", "X", None, noop_handler(), vec![], None);
+        registry.register_action("y", "Y", None, noop_handler(), vec![], None);
+
+        assert_eq!(registry.action_count(), 2);
+        assert!(registry.has_action("x"));
+        assert!(registry.has_action("y"));
+        assert!(!registry.has_action("z"));
+    }
+
+    #[test]
+    fn menu_item_count() {
+        let cmds = Arc::new(CommandRegistry::new());
+        let registry = ActionRegistry::new(cmds);
+        assert_eq!(registry.menu_item_count(MenuId::CommandPalette), 0);
+
+        let item = MenuItem {
+            command_id: "a".into(),
+            title: "A".into(),
+            group: None,
+            order: None,
+            when: None,
+        };
+        registry.register_action(
+            "a", "A", None, noop_handler(),
+            vec![(MenuId::CommandPalette, item)], None,
+        );
+        assert_eq!(registry.menu_item_count(MenuId::CommandPalette), 1);
+        assert_eq!(registry.menu_item_count(MenuId::EditorContext), 0);
+    }
+
+    #[test]
+    fn action_title_without_category() {
+        let cmds = Arc::new(CommandRegistry::new());
+        let registry = ActionRegistry::new(cmds);
+        registry.register_action("open", "Open", None, noop_handler(), vec![], None);
+        assert_eq!(registry.get_action_title("open"), Some("Open".to_string()));
+        assert_eq!(registry.get_action_title("missing"), None);
+    }
+
+    #[test]
+    fn set_tooltip_and_icon() {
+        let cmds = Arc::new(CommandRegistry::new());
+        let registry = ActionRegistry::new(cmds);
+        registry.register_action("a", "A", None, noop_handler(), vec![], None);
+
+        assert!(registry.set_action_tooltip("a", "my tip").is_ok());
+        assert!(registry.set_action_icon("a", "save-icon").is_ok());
+
+        assert_eq!(
+            registry.set_action_tooltip("missing", "x"),
+            Err(ActionError::NotFound("missing".into()))
+        );
+        assert_eq!(
+            registry.set_action_icon("missing", "x"),
+            Err(ActionError::NotFound("missing".into()))
+        );
+    }
+
+    #[test]
+    fn get_action_category() {
+        let cmds = Arc::new(CommandRegistry::new());
+        let registry = ActionRegistry::new(cmds);
+        registry.register_action("a", "A", Some("Cat".into()), noop_handler(), vec![], None);
+        registry.register_action("b", "B", None, noop_handler(), vec![], None);
+
+        assert_eq!(registry.get_action_category("a"), Some("Cat".to_string()));
+        assert_eq!(registry.get_action_category("b"), None);
+        assert_eq!(registry.get_action_category("missing"), None);
+    }
+
+    #[test]
+    fn execute_if_enabled_not_found() {
+        let cmds = Arc::new(CommandRegistry::new());
+        let registry = ActionRegistry::new(cmds);
+        let ctx = vsedit_contextkey::ContextKeyService::new();
+        let result = registry.execute_if_enabled("nope", &ctx, vec![]);
+        assert_eq!(result.unwrap_err(), ActionError::NotFound("nope".into()));
+    }
+
+    #[test]
+    fn execute_if_enabled_precondition_failed() {
+        use vsedit_contextkey::ContextKeyExpr;
+
+        let cmds = Arc::new(CommandRegistry::new());
+        let registry = ActionRegistry::new(cmds);
+        let when = ContextKeyExpr::parse("isDebugMode").unwrap();
+        registry.register_action("dbg", "Debug", None, noop_handler(), vec![], Some(when));
+
+        let ctx = vsedit_contextkey::ContextKeyService::new();
+        let result = registry.execute_if_enabled("dbg", &ctx, vec![]);
+        assert_eq!(
+            result.unwrap_err(),
+            ActionError::PreconditionFailed("dbg".into())
+        );
+    }
+
+    #[test]
+    fn execute_if_enabled_success() {
+        use vsedit_contextkey::ContextKeyExpr;
+
+        let cmds = Arc::new(CommandRegistry::new());
+        let registry = ActionRegistry::new(cmds);
+        registry.register_action("run", "Run", None, noop_handler(), vec![], None);
+
+        let ctx = vsedit_contextkey::ContextKeyService::new();
+        let result = registry.execute_if_enabled("run", &ctx, vec![]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn menu_item_builder_success() {
+        let item = MenuItemBuilder::new("cmd.save", "Save File")
+            .group("file_ops")
+            .order(5)
+            .build()
+            .unwrap();
+
+        assert_eq!(item.command_id, "cmd.save");
+        assert_eq!(item.title, "Save File");
+        assert_eq!(item.group, Some("file_ops".to_string()));
+        assert_eq!(item.order, Some(5));
+        assert!(item.when.is_none());
+    }
+
+    #[test]
+    fn menu_item_builder_validation_errors() {
+        let err = MenuItemBuilder::new("", "Title").build().unwrap_err();
+        assert!(matches!(err, ActionError::ValidationError(_)));
+
+        let err = MenuItemBuilder::new("cmd", "").build().unwrap_err();
+        assert!(matches!(err, ActionError::ValidationError(_)));
+    }
+
+    #[test]
+    fn menu_item_builder_with_when_expr() {
+        let item = MenuItemBuilder::new("cmd.fmt", "Format")
+            .when_expr("editorHasSelection")
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(item.when.is_some());
+
+        let err = MenuItemBuilder::new("cmd.x", "X")
+            .when_expr("&&")
+            .unwrap_err();
+        assert!(matches!(err, ActionError::ValidationError(_)));
+    }
+
+    #[test]
+    fn action_error_display() {
+        let e = ActionError::NotFound("x".into());
+        assert_eq!(e.to_string(), "action not found: x");
+
+        let e = ActionError::PreconditionFailed("y".into());
+        assert_eq!(e.to_string(), "precondition not satisfied for action: y");
+
+        let e = ActionError::OrphanedMenuItem {
+            menu_id: MenuId::CommandPalette,
+            command_id: "z".into(),
+        };
+        assert!(e.to_string().contains("Command Palette"));
+    }
+
+    #[test]
+    fn menu_id_display() {
+        assert_eq!(MenuId::CommandPalette.to_string(), "Command Palette");
+        assert_eq!(MenuId::MenubarFile.to_string(), "File");
+        assert_eq!(MenuId::TouchBar.to_string(), "Touch Bar");
+    }
+
+    #[test]
+    fn get_populated_menus() {
+        let cmds = Arc::new(CommandRegistry::new());
+        let registry = ActionRegistry::new(cmds);
+        assert!(registry.get_populated_menus().is_empty());
+
+        let item = MenuItem {
+            command_id: "a".into(),
+            title: "A".into(),
+            group: None,
+            order: None,
+            when: None,
+        };
+        registry.register_action(
+            "a", "A", None, noop_handler(),
+            vec![(MenuId::EditorTitle, item)], None,
+        );
+        let populated = registry.get_populated_menus();
+        assert_eq!(populated.len(), 1);
+        assert_eq!(populated[0], MenuId::EditorTitle);
     }
 }

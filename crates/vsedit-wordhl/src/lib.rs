@@ -11,6 +11,16 @@ pub enum DocumentHighlightKind {
     Write,
 }
 
+impl std::fmt::Display for DocumentHighlightKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Text => write!(f, "text"),
+            Self::Read => write!(f, "read"),
+            Self::Write => write!(f, "write"),
+        }
+    }
+}
+
 /// Convenience alias.
 pub type HighlightKind = DocumentHighlightKind;
 
@@ -35,6 +45,39 @@ impl DocumentHighlight {
 
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// Returns true if this highlight is on the given line.
+    pub fn is_on_line(&self, line: u32) -> bool {
+        self.line == line
+    }
+
+    /// Returns true if the given column falls within this highlight range.
+    pub fn contains_column(&self, column: u32) -> bool {
+        column >= self.start_column && column < self.end_column
+    }
+
+    /// Returns true if two highlights overlap on the same line.
+    pub fn overlaps(&self, other: &Self) -> bool {
+        self.line == other.line
+            && self.start_column < other.end_column
+            && other.start_column < self.end_column
+    }
+
+    /// Change the kind of this highlight, returning a new instance.
+    pub fn with_kind(mut self, kind: DocumentHighlightKind) -> Self {
+        self.kind = kind;
+        self
+    }
+}
+
+impl std::fmt::Display for DocumentHighlight {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}:{}..{} ({})",
+            self.line, self.start_column, self.end_column, self.kind
+        )
     }
 }
 
@@ -106,6 +149,150 @@ pub trait DocumentHighlightProvider: Send + Sync {
 /// Alias for the provider trait.
 pub trait WordHighlightProvider: Send + Sync {
     fn highlight(&self, uri: &str, line: u32, column: u32) -> Vec<DocumentHighlight>;
+}
+
+/// Errors that can occur during highlight operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WordHighlightError {
+    /// The requested line is out of range.
+    LineOutOfRange { line: u32, max_line: u32 },
+    /// The requested column is out of range.
+    ColumnOutOfRange { column: u32, line_length: u32 },
+    /// The position does not point to a word character.
+    NotAWordChar { line: u32, column: u32 },
+    /// An empty word was supplied.
+    EmptyWord,
+}
+
+impl std::fmt::Display for WordHighlightError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LineOutOfRange { line, max_line } => {
+                write!(f, "line {} is out of range (max {})", line, max_line)
+            }
+            Self::ColumnOutOfRange { column, line_length } => {
+                write!(f, "column {} is out of range (line length {})", column, line_length)
+            }
+            Self::NotAWordChar { line, column } => {
+                write!(f, "position {}:{} is not a word character", line, column)
+            }
+            Self::EmptyWord => write!(f, "empty word"),
+        }
+    }
+}
+
+impl std::error::Error for WordHighlightError {}
+
+/// Find the word at a position, returning a detailed error on failure.
+pub fn try_find_word_at_position(
+    lines: &[&str],
+    line: u32,
+    column: u32,
+) -> Result<(String, u32, u32), WordHighlightError> {
+    if line == 0 || line as usize > lines.len() {
+        return Err(WordHighlightError::LineOutOfRange {
+            line,
+            max_line: lines.len() as u32,
+        });
+    }
+    let text = lines[(line - 1) as usize];
+    if column == 0 || column as usize > text.len() {
+        return Err(WordHighlightError::ColumnOutOfRange {
+            column,
+            line_length: text.len() as u32,
+        });
+    }
+    let col_idx = (column - 1) as usize;
+    let bytes = text.as_bytes();
+    if !is_word_char(bytes[col_idx]) {
+        return Err(WordHighlightError::NotAWordChar { line, column });
+    }
+
+    let mut start = col_idx;
+    while start > 0 && is_word_char(bytes[start - 1]) {
+        start -= 1;
+    }
+    let mut end = col_idx;
+    while end < bytes.len() && is_word_char(bytes[end]) {
+        end += 1;
+    }
+    let word = text[start..end].to_string();
+    Ok((word, (start + 1) as u32, (end + 1) as u32))
+}
+
+/// A collection of highlights with helper methods.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct HighlightSet {
+    highlights: Vec<DocumentHighlight>,
+}
+
+impl HighlightSet {
+    pub fn new() -> Self {
+        Self { highlights: Vec::new() }
+    }
+
+    pub fn from_highlights(highlights: Vec<DocumentHighlight>) -> Self {
+        Self { highlights }
+    }
+
+    pub fn push(&mut self, highlight: DocumentHighlight) {
+        self.highlights.push(highlight);
+    }
+
+    pub fn len(&self) -> usize {
+        self.highlights.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.highlights.is_empty()
+    }
+
+    /// Return all highlights on a specific line.
+    pub fn on_line(&self, line: u32) -> Vec<&DocumentHighlight> {
+        self.highlights.iter().filter(|h| h.line == line).collect()
+    }
+
+    /// Return highlights filtered by kind.
+    pub fn by_kind(&self, kind: DocumentHighlightKind) -> Vec<&DocumentHighlight> {
+        self.highlights.iter().filter(|h| h.kind == kind).collect()
+    }
+
+    /// Count of distinct lines that contain at least one highlight.
+    pub fn distinct_line_count(&self) -> usize {
+        let mut lines: Vec<u32> = self.highlights.iter().map(|h| h.line).collect();
+        lines.sort_unstable();
+        lines.dedup();
+        lines.len()
+    }
+
+    /// Return highlights sorted by position (line, then start_column).
+    pub fn sorted(&self) -> Vec<&DocumentHighlight> {
+        let mut refs: Vec<&DocumentHighlight> = self.highlights.iter().collect();
+        refs.sort_by_key(|h| (h.line, h.start_column));
+        refs
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, DocumentHighlight> {
+        self.highlights.iter()
+    }
+
+    pub fn into_inner(self) -> Vec<DocumentHighlight> {
+        self.highlights
+    }
+}
+
+impl IntoIterator for HighlightSet {
+    type Item = DocumentHighlight;
+    type IntoIter = std::vec::IntoIter<DocumentHighlight>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.highlights.into_iter()
+    }
+}
+
+impl std::fmt::Display for HighlightSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "HighlightSet({} items)", self.highlights.len())
+    }
 }
 
 /// Service that manages word highlight providers and resolves highlights.
@@ -242,5 +429,118 @@ mod tests {
         let lines = vec!["my_var = my_var + 1"];
         let hl = find_word_highlights(&lines, "my_var");
         assert_eq!(hl.len(), 2);
+    }
+
+    #[test]
+    fn try_find_word_line_out_of_range() {
+        let lines = vec!["hello"];
+        let err = try_find_word_at_position(&lines, 5, 1).unwrap_err();
+        assert_eq!(
+            err,
+            WordHighlightError::LineOutOfRange { line: 5, max_line: 1 }
+        );
+        assert!(err.to_string().contains("out of range"));
+    }
+
+    #[test]
+    fn try_find_word_column_out_of_range() {
+        let lines = vec!["hi"];
+        let err = try_find_word_at_position(&lines, 1, 10).unwrap_err();
+        assert!(matches!(err, WordHighlightError::ColumnOutOfRange { .. }));
+    }
+
+    #[test]
+    fn try_find_word_not_a_word_char() {
+        let lines = vec!["a = b"];
+        let err = try_find_word_at_position(&lines, 1, 3).unwrap_err();
+        assert!(matches!(err, WordHighlightError::NotAWordChar { .. }));
+    }
+
+    #[test]
+    fn try_find_word_success() {
+        let lines = vec!["fn main() {}"];
+        let (word, start, end) = try_find_word_at_position(&lines, 1, 4).unwrap();
+        assert_eq!(word, "main");
+        assert_eq!(start, 4);
+        assert_eq!(end, 8);
+    }
+
+    #[test]
+    fn highlight_contains_column() {
+        let h = DocumentHighlight::new(1, 5, 10, DocumentHighlightKind::Read);
+        assert!(h.contains_column(5));
+        assert!(h.contains_column(9));
+        assert!(!h.contains_column(10));
+        assert!(!h.contains_column(4));
+    }
+
+    #[test]
+    fn highlight_overlaps() {
+        let a = DocumentHighlight::new(1, 5, 10, DocumentHighlightKind::Text);
+        let b = DocumentHighlight::new(1, 8, 15, DocumentHighlightKind::Text);
+        let c = DocumentHighlight::new(1, 10, 15, DocumentHighlightKind::Text);
+        let d = DocumentHighlight::new(2, 5, 10, DocumentHighlightKind::Text);
+        assert!(a.overlaps(&b));
+        assert!(!a.overlaps(&c)); // adjacent, not overlapping
+        assert!(!a.overlaps(&d)); // different lines
+    }
+
+    #[test]
+    fn highlight_with_kind() {
+        let h = DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text);
+        let h2 = h.with_kind(DocumentHighlightKind::Write);
+        assert_eq!(h2.kind, DocumentHighlightKind::Write);
+        assert_eq!(h2.line, 1);
+    }
+
+    #[test]
+    fn highlight_display() {
+        let h = DocumentHighlight::new(3, 5, 10, DocumentHighlightKind::Read);
+        assert_eq!(h.to_string(), "3:5..10 (read)");
+    }
+
+    #[test]
+    fn highlight_kind_display() {
+        assert_eq!(DocumentHighlightKind::Text.to_string(), "text");
+        assert_eq!(DocumentHighlightKind::Read.to_string(), "read");
+        assert_eq!(DocumentHighlightKind::Write.to_string(), "write");
+    }
+
+    #[test]
+    fn highlight_set_operations() {
+        let mut set = HighlightSet::new();
+        assert!(set.is_empty());
+        set.push(DocumentHighlight::new(1, 1, 4, DocumentHighlightKind::Text));
+        set.push(DocumentHighlight::new(1, 8, 11, DocumentHighlightKind::Read));
+        set.push(DocumentHighlight::new(3, 2, 6, DocumentHighlightKind::Text));
+        assert_eq!(set.len(), 3);
+        assert_eq!(set.on_line(1).len(), 2);
+        assert_eq!(set.on_line(2).len(), 0);
+        assert_eq!(set.by_kind(DocumentHighlightKind::Text).len(), 2);
+        assert_eq!(set.distinct_line_count(), 2);
+        assert_eq!(set.to_string(), "HighlightSet(3 items)");
+    }
+
+    #[test]
+    fn highlight_set_sorted() {
+        let set = HighlightSet::from_highlights(vec![
+            DocumentHighlight::new(3, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 10, 15, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+        ]);
+        let sorted = set.sorted();
+        assert_eq!(sorted[0].line, 1);
+        assert_eq!(sorted[0].start_column, 1);
+        assert_eq!(sorted[1].line, 1);
+        assert_eq!(sorted[1].start_column, 10);
+        assert_eq!(sorted[2].line, 3);
+    }
+
+    #[test]
+    fn error_display_messages() {
+        let e1 = WordHighlightError::EmptyWord;
+        assert_eq!(e1.to_string(), "empty word");
+        let e2 = WordHighlightError::NotAWordChar { line: 2, column: 5 };
+        assert!(e2.to_string().contains("2:5"));
     }
 }

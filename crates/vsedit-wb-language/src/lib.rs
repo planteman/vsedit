@@ -1,7 +1,35 @@
 //! Language registration service.
 
+use std::fmt;
+
+/// Errors that can occur during language registration and lookup.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LanguageError {
+    /// The language id is empty.
+    EmptyId,
+    /// The language name is empty.
+    EmptyName,
+    /// A language with this id is already registered.
+    DuplicateId(String),
+    /// No language found for the given query.
+    NotFound(String),
+}
+
+impl fmt::Display for LanguageError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LanguageError::EmptyId => write!(f, "language id must not be empty"),
+            LanguageError::EmptyName => write!(f, "language name must not be empty"),
+            LanguageError::DuplicateId(id) => write!(f, "language '{}' is already registered", id),
+            LanguageError::NotFound(q) => write!(f, "no language found for '{}'", q),
+        }
+    }
+}
+
+impl std::error::Error for LanguageError {}
+
 /// Metadata for a single language.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LanguageInfo {
     pub id: String,
     pub name: String,
@@ -23,11 +51,103 @@ impl LanguageInfo {
     pub fn has_alias(&self, alias: &str) -> bool {
         self.aliases.iter().any(|a| a == alias)
     }
+
+    /// Validates that id and name are non-empty.
+    pub fn validate(&self) -> Result<(), LanguageError> {
+        if self.id.trim().is_empty() {
+            return Err(LanguageError::EmptyId);
+        }
+        if self.name.trim().is_empty() {
+            return Err(LanguageError::EmptyName);
+        }
+        Ok(())
+    }
+
+    /// Returns the primary file extension, if any.
+    pub fn primary_extension(&self) -> Option<&str> {
+        self.extensions.first().map(|s| s.as_str())
+    }
+
+    /// Returns the primary MIME type, if any.
+    pub fn primary_mime_type(&self) -> Option<&str> {
+        self.mime_types.first().map(|s| s.as_str())
+    }
+
+    /// Returns the total count of extensions, aliases, and mime types.
+    pub fn metadata_count(&self) -> usize {
+        self.extensions.len() + self.aliases.len() + self.mime_types.len()
+    }
+
+    /// Returns `true` if this language has any registered MIME type.
+    pub fn has_mime_types(&self) -> bool {
+        !self.mime_types.is_empty()
+    }
 }
 
 impl std::fmt::Display for LanguageInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} ({})", self.name, self.id)
+    }
+}
+
+/// Builder for constructing a [`LanguageInfo`] step by step.
+#[derive(Debug, Clone, Default)]
+pub struct LanguageInfoBuilder {
+    id: String,
+    name: String,
+    extensions: Vec<String>,
+    aliases: Vec<String>,
+    mime_types: Vec<String>,
+    first_line_pattern: Option<String>,
+}
+
+impl LanguageInfoBuilder {
+    pub fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            ..Default::default()
+        }
+    }
+
+    pub fn extension(mut self, ext: impl Into<String>) -> Self {
+        self.extensions.push(ext.into());
+        self
+    }
+
+    pub fn alias(mut self, alias: impl Into<String>) -> Self {
+        self.aliases.push(alias.into());
+        self
+    }
+
+    pub fn mime_type(mut self, mime: impl Into<String>) -> Self {
+        self.mime_types.push(mime.into());
+        self
+    }
+
+    pub fn first_line_pattern(mut self, pattern: impl Into<String>) -> Self {
+        self.first_line_pattern = Some(pattern.into());
+        self
+    }
+
+    /// Builds and validates the [`LanguageInfo`].
+    pub fn build(self) -> Result<LanguageInfo, LanguageError> {
+        let info = LanguageInfo {
+            id: self.id,
+            name: self.name,
+            extensions: self.extensions,
+            aliases: self.aliases,
+            mime_types: self.mime_types,
+            first_line_pattern: self.first_line_pattern,
+        };
+        info.validate()?;
+        Ok(info)
+    }
+}
+
+impl fmt::Display for LanguageInfoBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LanguageInfoBuilder({}, {})", self.id, self.name)
     }
 }
 
@@ -119,6 +239,50 @@ impl LanguageRegistry {
                     || l.aliases.iter().any(|a| a.to_lowercase().contains(&q))
             })
             .collect()
+    }
+
+    /// Registers a language after validating it and checking for duplicate ids.
+    pub fn try_register(&mut self, info: LanguageInfo) -> Result<(), LanguageError> {
+        info.validate()?;
+        if self.has_language(&info.id) {
+            return Err(LanguageError::DuplicateId(info.id.clone()));
+        }
+        self.languages.push(info);
+        Ok(())
+    }
+
+    /// Returns a language by id, or an error if not found.
+    pub fn require_language(&self, id: &str) -> Result<&LanguageInfo, LanguageError> {
+        self.get_language(id)
+            .ok_or_else(|| LanguageError::NotFound(id.to_string()))
+    }
+
+    /// Returns all unique MIME types across registered languages.
+    pub fn get_all_mime_types(&self) -> Vec<&str> {
+        let mut mimes: Vec<&str> = self
+            .languages
+            .iter()
+            .flat_map(|l| l.mime_types.iter().map(|m| m.as_str()))
+            .collect();
+        mimes.sort();
+        mimes.dedup();
+        mimes
+    }
+
+    /// Returns languages sorted alphabetically by name.
+    pub fn sorted_by_name(&self) -> Vec<&LanguageInfo> {
+        let mut sorted: Vec<&LanguageInfo> = self.languages.iter().collect();
+        sorted.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        sorted
+    }
+
+    /// Merges all languages from `other` into this registry, skipping duplicates.
+    pub fn merge(&mut self, other: &LanguageRegistry) {
+        for lang in &other.languages {
+            if !self.has_language(&lang.id) {
+                self.languages.push(lang.clone());
+            }
+        }
     }
 }
 
@@ -276,5 +440,155 @@ mod tests {
 
         // query matching nothing
         assert!(reg.search("java").is_empty());
+    }
+
+    #[test]
+    fn builder_creates_valid_language() {
+        let info = LanguageInfoBuilder::new("go", "Go")
+            .extension(".go")
+            .alias("golang")
+            .mime_type("text/x-go")
+            .first_line_pattern("//go:")
+            .build()
+            .unwrap();
+
+        assert_eq!(info.id, "go");
+        assert_eq!(info.name, "Go");
+        assert_eq!(info.extensions, vec![".go"]);
+        assert_eq!(info.aliases, vec!["golang"]);
+        assert_eq!(info.first_line_pattern.as_deref(), Some("//go:"));
+    }
+
+    #[test]
+    fn builder_rejects_empty_id() {
+        let err = LanguageInfoBuilder::new("", "Name")
+            .build()
+            .unwrap_err();
+        assert_eq!(err, LanguageError::EmptyId);
+    }
+
+    #[test]
+    fn builder_rejects_empty_name() {
+        let err = LanguageInfoBuilder::new("id", "")
+            .build()
+            .unwrap_err();
+        assert_eq!(err, LanguageError::EmptyName);
+    }
+
+    #[test]
+    fn try_register_validates_and_rejects_duplicates() {
+        let mut reg = LanguageRegistry::new();
+        let rust = sample_rust();
+        reg.try_register(rust.clone()).unwrap();
+        assert_eq!(reg.language_count(), 1);
+
+        let err = reg.try_register(rust).unwrap_err();
+        assert_eq!(err, LanguageError::DuplicateId("rust".into()));
+    }
+
+    #[test]
+    fn try_register_rejects_invalid_language() {
+        let mut reg = LanguageRegistry::new();
+        let bad = LanguageInfo {
+            id: "".into(),
+            name: "Bad".into(),
+            extensions: vec![],
+            aliases: vec![],
+            mime_types: vec![],
+            first_line_pattern: None,
+        };
+        assert_eq!(reg.try_register(bad).unwrap_err(), LanguageError::EmptyId);
+    }
+
+    #[test]
+    fn require_language_returns_error_on_missing() {
+        let reg = LanguageRegistry::new();
+        let err = reg.require_language("go").unwrap_err();
+        assert_eq!(err, LanguageError::NotFound("go".into()));
+    }
+
+    #[test]
+    fn primary_extension_and_mime() {
+        let rust = sample_rust();
+        assert_eq!(rust.primary_extension(), Some(".rs"));
+        assert_eq!(rust.primary_mime_type(), Some("text/x-rust"));
+        assert!(rust.has_mime_types());
+
+        let empty = LanguageInfo {
+            id: "plain".into(),
+            name: "Plain".into(),
+            extensions: vec![],
+            aliases: vec![],
+            mime_types: vec![],
+            first_line_pattern: None,
+        };
+        assert_eq!(empty.primary_extension(), None);
+        assert!(!empty.has_mime_types());
+    }
+
+    #[test]
+    fn metadata_count_sums_all_fields() {
+        let py = sample_python();
+        // 2 extensions + 1 alias + 1 mime = 4
+        assert_eq!(py.metadata_count(), 4);
+    }
+
+    #[test]
+    fn get_all_mime_types_deduplicates() {
+        let mut reg = LanguageRegistry::new();
+        reg.register(sample_rust());
+        reg.register(sample_python());
+
+        let mimes = reg.get_all_mime_types();
+        assert_eq!(mimes, vec!["text/x-python", "text/x-rust"]);
+    }
+
+    #[test]
+    fn sorted_by_name_alphabetical() {
+        let mut reg = LanguageRegistry::new();
+        reg.register(sample_rust());
+        reg.register(sample_python());
+
+        let sorted = reg.sorted_by_name();
+        assert_eq!(sorted[0].id, "python");
+        assert_eq!(sorted[1].id, "rust");
+    }
+
+    #[test]
+    fn merge_skips_duplicates() {
+        let mut reg1 = LanguageRegistry::new();
+        reg1.register(sample_rust());
+
+        let mut reg2 = LanguageRegistry::new();
+        reg2.register(sample_rust());
+        reg2.register(sample_python());
+
+        reg1.merge(&reg2);
+        assert_eq!(reg1.language_count(), 2);
+        assert!(reg1.has_language("rust"));
+        assert!(reg1.has_language("python"));
+    }
+
+    #[test]
+    fn language_error_display() {
+        assert_eq!(LanguageError::EmptyId.to_string(), "language id must not be empty");
+        assert_eq!(
+            LanguageError::DuplicateId("rs".into()).to_string(),
+            "language 'rs' is already registered"
+        );
+        assert_eq!(
+            LanguageError::NotFound("x".into()).to_string(),
+            "no language found for 'x'"
+        );
+    }
+
+    #[test]
+    fn language_info_partial_eq() {
+        let a = sample_rust();
+        let b = sample_rust();
+        assert_eq!(a, b);
+
+        let c = sample_python();
+        assert_ne!(a, c);
     }
 }

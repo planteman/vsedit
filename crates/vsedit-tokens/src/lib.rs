@@ -102,14 +102,14 @@ impl std::ops::BitOr for FontStyle {
 }
 
 /// A token: start offset and metadata.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Token {
     pub start_offset: u32,
     pub metadata: TokenMetadata,
 }
 
 /// Result of tokenizing a line.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LineTokens {
     pub tokens: Vec<Token>,
 }
@@ -155,6 +155,352 @@ pub struct TokenizationState(pub u64);
 impl TokenizationState {
     pub fn initial() -> Self {
         Self(0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Error types
+// ---------------------------------------------------------------------------
+
+/// Errors that can occur during token operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TokenError {
+    /// A foreground color index exceeded the 9-bit maximum (0..=511).
+    ForegroundOutOfRange(u16),
+    /// A background color index exceeded the 8-bit maximum (0..=255).
+    BackgroundOutOfRange(u16),
+    /// Token offsets in a line are not monotonically non-decreasing.
+    OffsetsNotSorted,
+    /// Attempted to access a token index that does not exist.
+    IndexOutOfBounds { index: usize, len: usize },
+}
+
+impl std::fmt::Display for TokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ForegroundOutOfRange(v) => {
+                write!(f, "foreground color index {v} exceeds 9-bit max (511)")
+            }
+            Self::BackgroundOutOfRange(v) => {
+                write!(f, "background color index {v} exceeds 8-bit max (255)")
+            }
+            Self::OffsetsNotSorted => write!(f, "token offsets are not sorted"),
+            Self::IndexOutOfBounds { index, len } => {
+                write!(f, "token index {index} out of bounds (len {len})")
+            }
+        }
+    }
+}
+
+impl std::error::Error for TokenError {}
+
+// ---------------------------------------------------------------------------
+// Display implementations
+// ---------------------------------------------------------------------------
+
+impl std::fmt::Display for StandardTokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Other => write!(f, "Other"),
+            Self::Comment => write!(f, "Comment"),
+            Self::String => write!(f, "String"),
+            Self::RegExp => write!(f, "RegExp"),
+        }
+    }
+}
+
+impl std::fmt::Display for FontStyle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0 == 0 {
+            return write!(f, "None");
+        }
+        let mut parts = Vec::new();
+        if self.is_italic() {
+            parts.push("Italic");
+        }
+        if self.is_bold() {
+            parts.push("Bold");
+        }
+        if self.is_underline() {
+            parts.push("Underline");
+        }
+        if self.is_strikethrough() {
+            parts.push("Strikethrough");
+        }
+        write!(f, "{}", parts.join("|"))
+    }
+}
+
+impl std::fmt::Display for TokenMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "lang={} type={} style={} fg={} bg={}",
+            self.language_id(),
+            self.token_type(),
+            self.font_style(),
+            self.foreground(),
+            self.background(),
+        )
+    }
+}
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "@{}: {}", self.start_offset, self.metadata)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FontStyle helpers
+// ---------------------------------------------------------------------------
+
+impl FontStyle {
+    /// Returns `true` if the strikethrough flag is set.
+    pub fn is_strikethrough(&self) -> bool {
+        self.contains(Self::STRIKETHROUGH)
+    }
+
+    /// Returns a new `FontStyle` with the given flag toggled.
+    pub fn toggle(self, flag: Self) -> Self {
+        Self(self.0 ^ flag.0)
+    }
+
+    /// Removes the specified flag.
+    pub fn remove(self, flag: Self) -> Self {
+        Self(self.0 & !flag.0)
+    }
+
+    /// Returns `true` when no style flags are set.
+    pub fn is_none(&self) -> bool {
+        self.0 == 0
+    }
+}
+
+impl std::ops::BitAnd for FontStyle {
+    type Output = Self;
+    fn bitand(self, rhs: Self) -> Self {
+        Self(self.0 & rhs.0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TokenMetadata – validated constructor & builder
+// ---------------------------------------------------------------------------
+
+impl TokenMetadata {
+    /// Creates `TokenMetadata` with range-validated color indices.
+    pub fn try_new(
+        language_id: u8,
+        token_type: StandardTokenType,
+        font_style: FontStyle,
+        foreground: u16,
+        background: u16,
+    ) -> Result<Self, TokenError> {
+        if foreground > 0x1FF {
+            return Err(TokenError::ForegroundOutOfRange(foreground));
+        }
+        if background > 0xFF {
+            return Err(TokenError::BackgroundOutOfRange(background));
+        }
+        Ok(Self::new(language_id, token_type, font_style, foreground, background))
+    }
+
+    /// Returns a copy with only the `font_style` changed.
+    pub fn with_font_style(&self, font_style: FontStyle) -> Self {
+        Self::new(
+            self.language_id(),
+            self.token_type(),
+            font_style,
+            self.foreground(),
+            self.background(),
+        )
+    }
+
+    /// Returns a copy with only the `foreground` changed.
+    pub fn with_foreground(&self, foreground: u16) -> Self {
+        Self::new(
+            self.language_id(),
+            self.token_type(),
+            self.font_style(),
+            foreground,
+            self.background(),
+        )
+    }
+
+    /// Returns a copy with only the `background` changed.
+    pub fn with_background(&self, background: u16) -> Self {
+        Self::new(
+            self.language_id(),
+            self.token_type(),
+            self.font_style(),
+            self.foreground(),
+            background,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TokenMetadataBuilder
+// ---------------------------------------------------------------------------
+
+/// Builder for constructing `TokenMetadata` incrementally.
+#[derive(Debug, Clone)]
+pub struct TokenMetadataBuilder {
+    language_id: u8,
+    token_type: StandardTokenType,
+    font_style: FontStyle,
+    foreground: u16,
+    background: u16,
+}
+
+impl Default for TokenMetadataBuilder {
+    fn default() -> Self {
+        Self {
+            language_id: 0,
+            token_type: StandardTokenType::Other,
+            font_style: FontStyle::NONE,
+            foreground: 0,
+            background: 0,
+        }
+    }
+}
+
+impl TokenMetadataBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn language_id(mut self, id: u8) -> Self {
+        self.language_id = id;
+        self
+    }
+
+    pub fn token_type(mut self, tt: StandardTokenType) -> Self {
+        self.token_type = tt;
+        self
+    }
+
+    pub fn font_style(mut self, fs: FontStyle) -> Self {
+        self.font_style = fs;
+        self
+    }
+
+    pub fn foreground(mut self, fg: u16) -> Self {
+        self.foreground = fg;
+        self
+    }
+
+    pub fn background(mut self, bg: u16) -> Self {
+        self.background = bg;
+        self
+    }
+
+    /// Build the metadata, returning an error if color indices are out of range.
+    pub fn build(self) -> Result<TokenMetadata, TokenError> {
+        TokenMetadata::try_new(
+            self.language_id,
+            self.token_type,
+            self.font_style,
+            self.foreground,
+            self.background,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LineTokens – additional business-logic methods
+// ---------------------------------------------------------------------------
+
+impl LineTokens {
+    /// Validates that token offsets are sorted in non-decreasing order.
+    pub fn validate(&self) -> Result<(), TokenError> {
+        for w in self.tokens.windows(2) {
+            if w[1].start_offset < w[0].start_offset {
+                return Err(TokenError::OffsetsNotSorted);
+            }
+        }
+        Ok(())
+    }
+
+    /// Returns the token at the given positional index, or an error.
+    pub fn get(&self, index: usize) -> Result<&Token, TokenError> {
+        self.tokens.get(index).ok_or(TokenError::IndexOutOfBounds {
+            index,
+            len: self.tokens.len(),
+        })
+    }
+
+    /// Returns the byte range `[start, end)` covered by the token at `index`.
+    /// `line_len` is the total length of the line (used for the last token).
+    pub fn token_range(&self, index: usize, line_len: u32) -> Result<(u32, u32), TokenError> {
+        let tok = self.get(index)?;
+        let end = self
+            .tokens
+            .get(index + 1)
+            .map(|t| t.start_offset)
+            .unwrap_or(line_len);
+        Ok((tok.start_offset, end))
+    }
+
+    /// Returns an iterator over `(start_offset, end_offset, &TokenMetadata)`.
+    pub fn iter_ranges(&self, line_len: u32) -> impl Iterator<Item = (u32, u32, &TokenMetadata)> {
+        let tokens = &self.tokens;
+        tokens.iter().enumerate().map(move |(i, tok)| {
+            let end = tokens
+                .get(i + 1)
+                .map(|t| t.start_offset)
+                .unwrap_or(line_len);
+            (tok.start_offset, end, &tok.metadata)
+        })
+    }
+
+    /// Merges two sorted `LineTokens` sequences by start offset.
+    pub fn merge(&self, other: &LineTokens) -> LineTokens {
+        let mut merged = Vec::with_capacity(self.tokens.len() + other.tokens.len());
+        let (mut i, mut j) = (0, 0);
+        while i < self.tokens.len() && j < other.tokens.len() {
+            if self.tokens[i].start_offset <= other.tokens[j].start_offset {
+                merged.push(self.tokens[i]);
+                i += 1;
+            } else {
+                merged.push(other.tokens[j]);
+                j += 1;
+            }
+        }
+        merged.extend_from_slice(&self.tokens[i..]);
+        merged.extend_from_slice(&other.tokens[j..]);
+        LineTokens::new(merged)
+    }
+
+    /// Returns `true` if any token has the given `StandardTokenType`.
+    pub fn contains_type(&self, tt: StandardTokenType) -> bool {
+        self.tokens.iter().any(|t| t.metadata.token_type() == tt)
+    }
+
+    /// Returns the number of tokens whose type matches `tt`.
+    pub fn count_type(&self, tt: StandardTokenType) -> usize {
+        self.tokens
+            .iter()
+            .filter(|t| t.metadata.token_type() == tt)
+            .count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TokenizationState helpers
+// ---------------------------------------------------------------------------
+
+impl std::fmt::Display for TokenizationState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "State({})", self.0)
+    }
+}
+
+impl TokenizationState {
+    /// Returns `true` if this is the initial (zero) state.
+    pub fn is_initial(&self) -> bool {
+        self.0 == 0
     }
 }
 
@@ -215,5 +561,158 @@ mod tests {
     fn tokenization_state() {
         let s = TokenizationState::initial();
         assert_eq!(s, TokenizationState(0));
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn token_metadata_try_new_valid() {
+        let meta = TokenMetadata::try_new(1, StandardTokenType::String, FontStyle::ITALIC, 511, 255);
+        assert!(meta.is_ok());
+        let meta = meta.unwrap();
+        assert_eq!(meta.language_id(), 1);
+        assert_eq!(meta.token_type(), StandardTokenType::String);
+        assert!(meta.font_style().is_italic());
+        assert_eq!(meta.foreground(), 511);
+        assert_eq!(meta.background(), 255);
+    }
+
+    #[test]
+    fn token_metadata_try_new_fg_out_of_range() {
+        let err = TokenMetadata::try_new(0, StandardTokenType::Other, FontStyle::NONE, 512, 0);
+        assert_eq!(err, Err(TokenError::ForegroundOutOfRange(512)));
+    }
+
+    #[test]
+    fn token_metadata_try_new_bg_out_of_range() {
+        let err = TokenMetadata::try_new(0, StandardTokenType::Other, FontStyle::NONE, 0, 256);
+        assert_eq!(err, Err(TokenError::BackgroundOutOfRange(256)));
+    }
+
+    #[test]
+    fn token_metadata_builder() {
+        let meta = TokenMetadataBuilder::new()
+            .language_id(3)
+            .token_type(StandardTokenType::RegExp)
+            .font_style(FontStyle::UNDERLINE)
+            .foreground(42)
+            .background(7)
+            .build()
+            .unwrap();
+        assert_eq!(meta.language_id(), 3);
+        assert_eq!(meta.token_type(), StandardTokenType::RegExp);
+        assert!(meta.font_style().is_underline());
+        assert_eq!(meta.foreground(), 42);
+        assert_eq!(meta.background(), 7);
+    }
+
+    #[test]
+    fn token_metadata_with_helpers() {
+        let base = TokenMetadata::new(1, StandardTokenType::Comment, FontStyle::BOLD, 10, 20);
+        let changed = base.with_foreground(99);
+        assert_eq!(changed.foreground(), 99);
+        assert_eq!(changed.background(), 20);
+        assert_eq!(changed.language_id(), 1);
+
+        let styled = base.with_font_style(FontStyle::ITALIC);
+        assert!(styled.font_style().is_italic());
+        assert!(!styled.font_style().is_bold());
+    }
+
+    #[test]
+    fn font_style_toggle_and_remove() {
+        let style = FontStyle::BOLD | FontStyle::ITALIC;
+        let toggled = style.toggle(FontStyle::BOLD);
+        assert!(!toggled.is_bold());
+        assert!(toggled.is_italic());
+
+        let removed = style.remove(FontStyle::ITALIC);
+        assert!(removed.is_bold());
+        assert!(!removed.is_italic());
+    }
+
+    #[test]
+    fn font_style_display() {
+        assert_eq!(FontStyle::NONE.to_string(), "None");
+        assert_eq!((FontStyle::BOLD | FontStyle::UNDERLINE).to_string(), "Bold|Underline");
+    }
+
+    #[test]
+    fn line_tokens_validate_sorted() {
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: TokenMetadata(0) },
+            Token { start_offset: 5, metadata: TokenMetadata(0) },
+        ]);
+        assert!(lt.validate().is_ok());
+    }
+
+    #[test]
+    fn line_tokens_validate_unsorted() {
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 5, metadata: TokenMetadata(0) },
+            Token { start_offset: 2, metadata: TokenMetadata(0) },
+        ]);
+        assert_eq!(lt.validate(), Err(TokenError::OffsetsNotSorted));
+    }
+
+    #[test]
+    fn line_tokens_token_range() {
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: TokenMetadata(0) },
+            Token { start_offset: 5, metadata: TokenMetadata(1) },
+            Token { start_offset: 10, metadata: TokenMetadata(2) },
+        ]);
+        assert_eq!(lt.token_range(0, 20).unwrap(), (0, 5));
+        assert_eq!(lt.token_range(1, 20).unwrap(), (5, 10));
+        assert_eq!(lt.token_range(2, 20).unwrap(), (10, 20));
+        assert!(lt.token_range(3, 20).is_err());
+    }
+
+    #[test]
+    fn line_tokens_merge() {
+        let a = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: TokenMetadata(0) },
+            Token { start_offset: 10, metadata: TokenMetadata(2) },
+        ]);
+        let b = LineTokens::new(vec![
+            Token { start_offset: 5, metadata: TokenMetadata(1) },
+        ]);
+        let merged = a.merge(&b);
+        assert_eq!(merged.count(), 3);
+        assert_eq!(merged.tokens[0].start_offset, 0);
+        assert_eq!(merged.tokens[1].start_offset, 5);
+        assert_eq!(merged.tokens[2].start_offset, 10);
+    }
+
+    #[test]
+    fn line_tokens_contains_and_count_type() {
+        let comment_meta = TokenMetadata::new(0, StandardTokenType::Comment, FontStyle::NONE, 0, 0);
+        let string_meta = TokenMetadata::new(0, StandardTokenType::String, FontStyle::NONE, 0, 0);
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: comment_meta },
+            Token { start_offset: 5, metadata: string_meta },
+            Token { start_offset: 10, metadata: comment_meta },
+        ]);
+        assert!(lt.contains_type(StandardTokenType::Comment));
+        assert!(!lt.contains_type(StandardTokenType::RegExp));
+        assert_eq!(lt.count_type(StandardTokenType::Comment), 2);
+        assert_eq!(lt.count_type(StandardTokenType::String), 1);
+    }
+
+    #[test]
+    fn token_error_display() {
+        let err = TokenError::ForegroundOutOfRange(600);
+        assert!(err.to_string().contains("600"));
+        let err2 = TokenError::IndexOutOfBounds { index: 5, len: 3 };
+        assert!(err2.to_string().contains("5"));
+    }
+
+    #[test]
+    fn tokenization_state_display_and_is_initial() {
+        let s = TokenizationState::initial();
+        assert!(s.is_initial());
+        assert_eq!(s.to_string(), "State(0)");
+        let s2 = TokenizationState(42);
+        assert!(!s2.is_initial());
     }
 }

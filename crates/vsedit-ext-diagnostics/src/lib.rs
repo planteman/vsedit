@@ -3,6 +3,7 @@
 //! RPC bridge between the extension host and the main thread for diagnostics.
 
 use std::collections::HashMap;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
@@ -140,6 +141,322 @@ impl DiagnosticBridge {
     }
 }
 
+// ── Error types ──
+
+/// Errors that can occur during diagnostic operations.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DiagnosticError {
+    /// The diagnostic span is invalid (end before start).
+    InvalidSpan { start_line: u32, start_col: u32, end_line: u32, end_col: u32 },
+    /// The collection name is empty.
+    EmptyCollectionName,
+    /// The URI is empty or invalid.
+    InvalidUri(String),
+    /// The diagnostic message is empty.
+    EmptyMessage,
+}
+
+impl fmt::Display for DiagnosticError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiagnosticError::InvalidSpan { start_line, start_col, end_line, end_col } => {
+                write!(
+                    f,
+                    "invalid span: ({}, {}) to ({}, {})",
+                    start_line, start_col, end_line, end_col
+                )
+            }
+            DiagnosticError::EmptyCollectionName => write!(f, "collection name must not be empty"),
+            DiagnosticError::InvalidUri(uri) => write!(f, "invalid URI: '{}'", uri),
+            DiagnosticError::EmptyMessage => write!(f, "diagnostic message must not be empty"),
+        }
+    }
+}
+
+impl std::error::Error for DiagnosticError {}
+
+// ── Display impls ──
+
+impl fmt::Display for DiagnosticSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiagnosticSeverity::Error => write!(f, "error"),
+            DiagnosticSeverity::Warning => write!(f, "warning"),
+            DiagnosticSeverity::Information => write!(f, "info"),
+            DiagnosticSeverity::Hint => write!(f, "hint"),
+        }
+    }
+}
+
+impl fmt::Display for DiagnosticTag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiagnosticTag::Unnecessary => write!(f, "unnecessary"),
+            DiagnosticTag::Deprecated => write!(f, "deprecated"),
+        }
+    }
+}
+
+impl fmt::Display for Diagnostic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[{}] {}:{}-{}:{}: {}",
+            self.severity, self.start_line, self.start_col, self.end_line, self.end_col, self.message
+        )
+    }
+}
+
+// ── Diagnostic severity helpers ──
+
+impl DiagnosticSeverity {
+    /// Returns a numeric weight for ordering (lower is more severe).
+    pub fn weight(self) -> u8 {
+        match self {
+            DiagnosticSeverity::Error => 0,
+            DiagnosticSeverity::Warning => 1,
+            DiagnosticSeverity::Information => 2,
+            DiagnosticSeverity::Hint => 3,
+        }
+    }
+
+    /// Returns `true` if this severity blocks a build (error only).
+    pub fn is_blocking(self) -> bool {
+        matches!(self, DiagnosticSeverity::Error)
+    }
+}
+
+impl PartialOrd for DiagnosticSeverity {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.weight().cmp(&other.weight()))
+    }
+}
+
+impl Ord for DiagnosticSeverity {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.weight().cmp(&other.weight())
+    }
+}
+
+// ── Diagnostic validation ──
+
+impl Diagnostic {
+    /// Validate that this diagnostic has a well-formed span and non-empty message.
+    pub fn validate(&self) -> Result<(), DiagnosticError> {
+        if self.message.is_empty() {
+            return Err(DiagnosticError::EmptyMessage);
+        }
+        if self.end_line < self.start_line
+            || (self.end_line == self.start_line && self.end_col < self.start_col)
+        {
+            return Err(DiagnosticError::InvalidSpan {
+                start_line: self.start_line,
+                start_col: self.start_col,
+                end_line: self.end_line,
+                end_col: self.end_col,
+            });
+        }
+        Ok(())
+    }
+
+    /// Returns `true` if this diagnostic spans multiple lines.
+    pub fn is_multiline(&self) -> bool {
+        self.end_line > self.start_line
+    }
+
+    /// Returns the span length in columns (only meaningful for single-line diagnostics).
+    pub fn span_length(&self) -> Option<u32> {
+        if self.is_multiline() {
+            None
+        } else {
+            Some(self.end_col.saturating_sub(self.start_col))
+        }
+    }
+
+    /// Returns `true` if the diagnostic has any tags.
+    pub fn has_tags(&self) -> bool {
+        !self.tags.is_empty()
+    }
+}
+
+// ── Diagnostic builder ──
+
+/// Builder for constructing `Diagnostic` instances.
+#[derive(Debug, Clone)]
+pub struct DiagnosticBuilder {
+    start_line: u32,
+    start_col: u32,
+    end_line: u32,
+    end_col: u32,
+    message: String,
+    severity: DiagnosticSeverity,
+    code: Option<String>,
+    source: Option<String>,
+    related_info: Vec<DiagnosticRelatedInfo>,
+    tags: Vec<DiagnosticTag>,
+}
+
+impl DiagnosticBuilder {
+    pub fn new(message: impl Into<String>, severity: DiagnosticSeverity) -> Self {
+        Self {
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 0,
+            message: message.into(),
+            severity,
+            code: None,
+            source: None,
+            related_info: Vec::new(),
+            tags: Vec::new(),
+        }
+    }
+
+    pub fn span(mut self, start_line: u32, start_col: u32, end_line: u32, end_col: u32) -> Self {
+        self.start_line = start_line;
+        self.start_col = start_col;
+        self.end_line = end_line;
+        self.end_col = end_col;
+        self
+    }
+
+    pub fn code(mut self, code: impl Into<String>) -> Self {
+        self.code = Some(code.into());
+        self
+    }
+
+    pub fn source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    pub fn tag(mut self, tag: DiagnosticTag) -> Self {
+        self.tags.push(tag);
+        self
+    }
+
+    pub fn related(mut self, info: DiagnosticRelatedInfo) -> Self {
+        self.related_info.push(info);
+        self
+    }
+
+    /// Build and validate the diagnostic.
+    pub fn build(self) -> Result<Diagnostic, DiagnosticError> {
+        let diag = Diagnostic {
+            start_line: self.start_line,
+            start_col: self.start_col,
+            end_line: self.end_line,
+            end_col: self.end_col,
+            message: self.message,
+            severity: self.severity,
+            code: self.code,
+            source: self.source,
+            related_info: self.related_info,
+            tags: self.tags,
+        };
+        diag.validate()?;
+        Ok(diag)
+    }
+}
+
+// ── DiagnosticCollection helpers ──
+
+impl PartialEq for DiagnosticCollection {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.entries == other.entries
+    }
+}
+
+impl DiagnosticCollection {
+    /// Create a new named collection.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into(), entries: HashMap::new() }
+    }
+
+    /// Total number of diagnostics in this collection.
+    pub fn diagnostic_count(&self) -> usize {
+        self.entries.values().map(Vec::len).sum()
+    }
+
+    /// Number of distinct URIs with diagnostics.
+    pub fn uri_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns all diagnostics with the given severity across all URIs.
+    pub fn filter_by_severity(&self, severity: DiagnosticSeverity) -> Vec<(&str, &Diagnostic)> {
+        self.entries
+            .iter()
+            .flat_map(|(uri, diags)| {
+                diags.iter().filter(move |d| d.severity == severity).map(move |d| (uri.as_str(), d))
+            })
+            .collect()
+    }
+
+    /// Returns the most severe diagnostic level present, if any.
+    pub fn worst_severity(&self) -> Option<DiagnosticSeverity> {
+        self.entries
+            .values()
+            .flat_map(|diags| diags.iter().map(|d| d.severity))
+            .min()
+    }
+
+    /// Returns `true` if any diagnostic in this collection is an error.
+    pub fn has_errors(&self) -> bool {
+        self.worst_severity() == Some(DiagnosticSeverity::Error)
+    }
+}
+
+// ── DiagnosticBridge extensions ──
+
+impl DiagnosticBridge {
+    /// Validate and then process a message; returns an error if the message
+    /// contains invalid data.
+    pub fn handle_validated(
+        &mut self,
+        msg: DiagnosticMessage,
+    ) -> Result<DiagnosticResponse, DiagnosticError> {
+        match &msg {
+            DiagnosticMessage::SetDiagnostics { collection, uri, diagnostics } => {
+                if collection.is_empty() {
+                    return Err(DiagnosticError::EmptyCollectionName);
+                }
+                if uri.is_empty() {
+                    return Err(DiagnosticError::InvalidUri(uri.clone()));
+                }
+                for d in diagnostics {
+                    d.validate()?;
+                }
+            }
+            DiagnosticMessage::ClearDiagnostics { collection, .. } => {
+                if collection.is_empty() {
+                    return Err(DiagnosticError::EmptyCollectionName);
+                }
+            }
+            DiagnosticMessage::GetDiagnostics { .. } => {}
+        }
+        Ok(self.handle(msg))
+    }
+
+    /// Returns all collection names.
+    pub fn collection_names(&self) -> Vec<&str> {
+        self.collections.keys().map(String::as_str).collect()
+    }
+
+    /// Returns `true` if any collection contains errors.
+    pub fn has_errors(&self) -> bool {
+        self.collections.values().any(|c| c.has_errors())
+    }
+
+    /// Count diagnostics of a specific severity across all collections.
+    pub fn count_by_severity(&self, severity: DiagnosticSeverity) -> usize {
+        self.collections
+            .values()
+            .map(|c| c.filter_by_severity(severity).len())
+            .sum()
+    }
+}
+
 /// Initialize the diagnostics extension API bridge.
 pub fn register() {
     // Registration will connect RPC handlers when extension host starts
@@ -259,5 +576,170 @@ mod tests {
         let json = serde_json::to_string(&msg).unwrap();
         let parsed: DiagnosticMessage = serde_json::from_str(&json).unwrap();
         assert_eq!(msg, parsed);
+    }
+
+    // ── New tests ──
+
+    fn make_diag(msg: &str, severity: DiagnosticSeverity) -> Diagnostic {
+        DiagnosticBuilder::new(msg, severity)
+            .span(1, 0, 1, 5)
+            .build()
+            .unwrap()
+    }
+
+    #[test]
+    fn builder_creates_valid_diagnostic() {
+        let diag = DiagnosticBuilder::new("test error", DiagnosticSeverity::Error)
+            .span(3, 0, 3, 10)
+            .code("E001")
+            .source("test-lint")
+            .tag(DiagnosticTag::Deprecated)
+            .build()
+            .unwrap();
+        assert_eq!(diag.message, "test error");
+        assert_eq!(diag.severity, DiagnosticSeverity::Error);
+        assert_eq!(diag.code.as_deref(), Some("E001"));
+        assert_eq!(diag.source.as_deref(), Some("test-lint"));
+        assert_eq!(diag.tags, vec![DiagnosticTag::Deprecated]);
+    }
+
+    #[test]
+    fn builder_rejects_empty_message() {
+        let result = DiagnosticBuilder::new("", DiagnosticSeverity::Warning)
+            .span(0, 0, 0, 1)
+            .build();
+        assert_eq!(result, Err(DiagnosticError::EmptyMessage));
+    }
+
+    #[test]
+    fn builder_rejects_invalid_span() {
+        let result = DiagnosticBuilder::new("bad span", DiagnosticSeverity::Error)
+            .span(5, 10, 3, 0)
+            .build();
+        assert!(matches!(result, Err(DiagnosticError::InvalidSpan { .. })));
+    }
+
+    #[test]
+    fn diagnostic_display() {
+        let diag = make_diag("something wrong", DiagnosticSeverity::Error);
+        let text = format!("{}", diag);
+        assert!(text.contains("error"));
+        assert!(text.contains("something wrong"));
+    }
+
+    #[test]
+    fn severity_ordering() {
+        assert!(DiagnosticSeverity::Error < DiagnosticSeverity::Warning);
+        assert!(DiagnosticSeverity::Warning < DiagnosticSeverity::Information);
+        assert!(DiagnosticSeverity::Information < DiagnosticSeverity::Hint);
+    }
+
+    #[test]
+    fn severity_is_blocking() {
+        assert!(DiagnosticSeverity::Error.is_blocking());
+        assert!(!DiagnosticSeverity::Warning.is_blocking());
+        assert!(!DiagnosticSeverity::Information.is_blocking());
+        assert!(!DiagnosticSeverity::Hint.is_blocking());
+    }
+
+    #[test]
+    fn diagnostic_span_helpers() {
+        let single = DiagnosticBuilder::new("x", DiagnosticSeverity::Warning)
+            .span(1, 2, 1, 8)
+            .build()
+            .unwrap();
+        assert!(!single.is_multiline());
+        assert_eq!(single.span_length(), Some(6));
+
+        let multi = DiagnosticBuilder::new("y", DiagnosticSeverity::Warning)
+            .span(1, 0, 3, 5)
+            .build()
+            .unwrap();
+        assert!(multi.is_multiline());
+        assert_eq!(multi.span_length(), None);
+    }
+
+    #[test]
+    fn collection_filter_by_severity() {
+        let mut col = DiagnosticCollection::new("test");
+        col.entries.insert(
+            "file:///a.rs".into(),
+            vec![
+                make_diag("err1", DiagnosticSeverity::Error),
+                make_diag("warn1", DiagnosticSeverity::Warning),
+            ],
+        );
+        col.entries.insert(
+            "file:///b.rs".into(),
+            vec![make_diag("err2", DiagnosticSeverity::Error)],
+        );
+
+        let errors = col.filter_by_severity(DiagnosticSeverity::Error);
+        assert_eq!(errors.len(), 2);
+        let warnings = col.filter_by_severity(DiagnosticSeverity::Warning);
+        assert_eq!(warnings.len(), 1);
+        assert!(col.has_errors());
+        assert_eq!(col.worst_severity(), Some(DiagnosticSeverity::Error));
+    }
+
+    #[test]
+    fn handle_validated_rejects_empty_collection() {
+        let mut bridge = DiagnosticBridge::new();
+        let result = bridge.handle_validated(DiagnosticMessage::SetDiagnostics {
+            collection: "".into(),
+            uri: "file:///a.rs".into(),
+            diagnostics: vec![],
+        });
+        assert_eq!(result, Err(DiagnosticError::EmptyCollectionName));
+    }
+
+    #[test]
+    fn handle_validated_rejects_empty_uri() {
+        let mut bridge = DiagnosticBridge::new();
+        let result = bridge.handle_validated(DiagnosticMessage::SetDiagnostics {
+            collection: "test".into(),
+            uri: "".into(),
+            diagnostics: vec![],
+        });
+        assert!(matches!(result, Err(DiagnosticError::InvalidUri(_))));
+    }
+
+    #[test]
+    fn bridge_count_by_severity() {
+        let mut bridge = DiagnosticBridge::new();
+        bridge.handle(DiagnosticMessage::SetDiagnostics {
+            collection: "a".into(),
+            uri: "file:///x.rs".into(),
+            diagnostics: vec![
+                make_diag("e1", DiagnosticSeverity::Error),
+                make_diag("w1", DiagnosticSeverity::Warning),
+            ],
+        });
+        bridge.handle(DiagnosticMessage::SetDiagnostics {
+            collection: "b".into(),
+            uri: "file:///y.rs".into(),
+            diagnostics: vec![make_diag("e2", DiagnosticSeverity::Error)],
+        });
+        assert_eq!(bridge.count_by_severity(DiagnosticSeverity::Error), 2);
+        assert_eq!(bridge.count_by_severity(DiagnosticSeverity::Warning), 1);
+        assert!(bridge.has_errors());
+        assert_eq!(bridge.collection_names().len(), 2);
+    }
+
+    #[test]
+    fn error_display_messages() {
+        let e = DiagnosticError::EmptyCollectionName;
+        assert_eq!(e.to_string(), "collection name must not be empty");
+
+        let e = DiagnosticError::EmptyMessage;
+        assert_eq!(e.to_string(), "diagnostic message must not be empty");
+
+        let e = DiagnosticError::InvalidUri("".into());
+        assert!(e.to_string().contains("invalid URI"));
+
+        let e = DiagnosticError::InvalidSpan {
+            start_line: 5, start_col: 10, end_line: 3, end_col: 0,
+        };
+        assert!(e.to_string().contains("invalid span"));
     }
 }

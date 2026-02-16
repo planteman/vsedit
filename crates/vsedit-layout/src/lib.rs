@@ -1,5 +1,47 @@
 //! Flexbox-like terminal layout engine.
+use std::fmt;
+
 use vsedit_tui::Rect;
+
+// ---------------------------------------------------------------------------
+// Error types
+// ---------------------------------------------------------------------------
+
+/// Errors that can occur during layout operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LayoutError {
+    /// A percentage constraint exceeded 100.
+    InvalidPercentage(u16),
+    /// The sum of fixed constraints exceeds the available space.
+    OverflowFixed { total_fixed: u16, available: u16 },
+    /// A flex factor of zero was provided (would cause division issues).
+    ZeroFlexFactor,
+    /// No constraints were provided when at least one was expected.
+    EmptyConstraints,
+}
+
+impl fmt::Display for LayoutError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidPercentage(p) => write!(f, "percentage {p} exceeds 100"),
+            Self::OverflowFixed {
+                total_fixed,
+                available,
+            } => write!(
+                f,
+                "total fixed size {total_fixed} exceeds available space {available}"
+            ),
+            Self::ZeroFlexFactor => write!(f, "flex factor must be non-zero"),
+            Self::EmptyConstraints => write!(f, "at least one constraint is required"),
+        }
+    }
+}
+
+impl std::error::Error for LayoutError {}
+
+// ---------------------------------------------------------------------------
+// Direction
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
@@ -7,7 +49,30 @@ pub enum Direction {
     Vertical,
 }
 
-#[derive(Debug, Clone, Copy)]
+impl Direction {
+    /// Returns the perpendicular direction.
+    pub fn perpendicular(self) -> Self {
+        match self {
+            Self::Horizontal => Self::Vertical,
+            Self::Vertical => Self::Horizontal,
+        }
+    }
+}
+
+impl fmt::Display for Direction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Horizontal => write!(f, "horizontal"),
+            Self::Vertical => write!(f, "vertical"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Constraint
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Constraint {
     Fixed(u16),
     Percentage(u16),
@@ -17,9 +82,58 @@ pub enum Constraint {
     Flex(u16),
 }
 
+impl Constraint {
+    /// Validate that the constraint values are sensible.
+    pub fn validate(&self) -> Result<(), LayoutError> {
+        match *self {
+            Self::Percentage(p) if p > 100 => Err(LayoutError::InvalidPercentage(p)),
+            Self::Flex(0) => Err(LayoutError::ZeroFlexFactor),
+            _ => Ok(()),
+        }
+    }
+
+    /// Returns `true` when this constraint consumes a fixed amount of space
+    /// (i.e. is not flex-based).
+    pub fn is_fixed_size(&self) -> bool {
+        !matches!(self, Self::Flex(_))
+    }
+
+    /// Returns the explicit size hint, if any.
+    pub fn size_hint(&self) -> Option<u16> {
+        match *self {
+            Self::Fixed(v) | Self::Min(v) | Self::Max(v) => Some(v),
+            Self::Percentage(p) => Some(p),
+            Self::Flex(_) => None,
+        }
+    }
+}
+
+impl fmt::Display for Constraint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Fixed(v) => write!(f, "fixed({v})"),
+            Self::Percentage(p) => write!(f, "{p}%"),
+            Self::Min(v) => write!(f, "min({v})"),
+            Self::Max(v) => write!(f, "max({v})"),
+            Self::Flex(g) => write!(f, "flex({g})"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutNode
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct LayoutNode {
     pub direction: Direction,
     pub constraints: Vec<Constraint>,
+}
+
+impl fmt::Display for LayoutNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LayoutNode({}, {} constraints)", self.direction, self.constraints.len())
+    }
 }
 
 impl LayoutNode {
@@ -35,6 +149,53 @@ impl LayoutNode {
             direction: Direction::Vertical,
             constraints,
         }
+    }
+
+    /// Validate every constraint in this node.
+    pub fn validate(&self) -> Result<(), LayoutError> {
+        if self.constraints.is_empty() {
+            return Err(LayoutError::EmptyConstraints);
+        }
+        for c in &self.constraints {
+            c.validate()?;
+        }
+        let total_fixed: u32 = self
+            .constraints
+            .iter()
+            .filter_map(|c| match c {
+                Constraint::Fixed(v) => Some(*v as u32),
+                _ => None,
+            })
+            .sum();
+        // We report overflow but don't prevent split — it clamps gracefully.
+        if total_fixed > u16::MAX as u32 {
+            return Err(LayoutError::OverflowFixed {
+                total_fixed: u16::MAX,
+                available: u16::MAX,
+            });
+        }
+        Ok(())
+    }
+
+    /// Return the number of constraints.
+    pub fn len(&self) -> usize {
+        self.constraints.len()
+    }
+
+    /// Returns `true` when there are no constraints.
+    pub fn is_empty(&self) -> bool {
+        self.constraints.is_empty()
+    }
+
+    /// Compute the total area consumed by the split rectangles.
+    pub fn total_consumed(&self, area: Rect) -> u16 {
+        self.split(area)
+            .iter()
+            .map(|r| match self.direction {
+                Direction::Horizontal => r.width,
+                Direction::Vertical => r.height,
+            })
+            .sum()
     }
 
     /// Split `area` according to the configured constraints.
@@ -128,6 +289,118 @@ impl LayoutNode {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Builder
+// ---------------------------------------------------------------------------
+
+/// Ergonomic builder for constructing a [`LayoutNode`].
+#[derive(Debug, Clone)]
+pub struct LayoutBuilder {
+    direction: Direction,
+    constraints: Vec<Constraint>,
+}
+
+impl LayoutBuilder {
+    /// Start building a horizontal layout.
+    pub fn horizontal() -> Self {
+        Self {
+            direction: Direction::Horizontal,
+            constraints: Vec::new(),
+        }
+    }
+
+    /// Start building a vertical layout.
+    pub fn vertical() -> Self {
+        Self {
+            direction: Direction::Vertical,
+            constraints: Vec::new(),
+        }
+    }
+
+    /// Add a constraint to the builder.
+    pub fn constraint(mut self, c: Constraint) -> Self {
+        self.constraints.push(c);
+        self
+    }
+
+    /// Add a fixed-size constraint.
+    pub fn fixed(self, size: u16) -> Self {
+        self.constraint(Constraint::Fixed(size))
+    }
+
+    /// Add a percentage constraint.
+    pub fn percentage(self, pct: u16) -> Self {
+        self.constraint(Constraint::Percentage(pct))
+    }
+
+    /// Add a flex constraint.
+    pub fn flex(self, factor: u16) -> Self {
+        self.constraint(Constraint::Flex(factor))
+    }
+
+    /// Add a min constraint.
+    pub fn min(self, value: u16) -> Self {
+        self.constraint(Constraint::Min(value))
+    }
+
+    /// Add a max constraint.
+    pub fn max(self, value: u16) -> Self {
+        self.constraint(Constraint::Max(value))
+    }
+
+    /// Validate and build the [`LayoutNode`].
+    pub fn build(self) -> Result<LayoutNode, LayoutError> {
+        let node = LayoutNode {
+            direction: self.direction,
+            constraints: self.constraints,
+        };
+        node.validate()?;
+        Ok(node)
+    }
+
+    /// Build without validation.
+    pub fn build_unchecked(self) -> LayoutNode {
+        LayoutNode {
+            direction: self.direction,
+            constraints: self.constraints,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Margin helper
+// ---------------------------------------------------------------------------
+
+/// Inset an area by the given margin on all sides.
+pub fn inset(area: Rect, margin: u16) -> Rect {
+    let double = margin.saturating_mul(2);
+    if area.width <= double || area.height <= double {
+        return Rect::new(area.x, area.y, 0, 0);
+    }
+    Rect::new(
+        area.x.saturating_add(margin),
+        area.y.saturating_add(margin),
+        area.width - double,
+        area.height - double,
+    )
+}
+
+/// Compute the center point of a [`Rect`].
+pub fn center(area: Rect) -> (u16, u16) {
+    (
+        area.x.saturating_add(area.width / 2),
+        area.y.saturating_add(area.height / 2),
+    )
+}
+
+/// Return `true` when `inner` is fully contained within `outer`.
+pub fn contains(outer: Rect, inner: Rect) -> bool {
+    inner.x >= outer.x
+        && inner.y >= outer.y
+        && inner.x.saturating_add(inner.width) <= outer.x.saturating_add(outer.width)
+        && inner.y.saturating_add(inner.height) <= outer.y.saturating_add(outer.height)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -218,5 +491,158 @@ mod tests {
         let rects = node.split(rect(5, 3, 100, 50));
         assert_eq!(rects[0], rect(5, 3, 10, 50));
         assert_eq!(rects[1], rect(15, 3, 10, 50));
+    }
+
+    // ---- new tests ----
+
+    #[test]
+    fn direction_perpendicular() {
+        assert_eq!(Direction::Horizontal.perpendicular(), Direction::Vertical);
+        assert_eq!(Direction::Vertical.perpendicular(), Direction::Horizontal);
+    }
+
+    #[test]
+    fn direction_display() {
+        assert_eq!(Direction::Horizontal.to_string(), "horizontal");
+        assert_eq!(Direction::Vertical.to_string(), "vertical");
+    }
+
+    #[test]
+    fn constraint_display() {
+        assert_eq!(Constraint::Fixed(10).to_string(), "fixed(10)");
+        assert_eq!(Constraint::Percentage(50).to_string(), "50%");
+        assert_eq!(Constraint::Min(5).to_string(), "min(5)");
+        assert_eq!(Constraint::Max(80).to_string(), "max(80)");
+        assert_eq!(Constraint::Flex(2).to_string(), "flex(2)");
+    }
+
+    #[test]
+    fn constraint_validate_percentage_over_100() {
+        assert_eq!(
+            Constraint::Percentage(101).validate(),
+            Err(LayoutError::InvalidPercentage(101))
+        );
+        assert!(Constraint::Percentage(100).validate().is_ok());
+    }
+
+    #[test]
+    fn constraint_validate_zero_flex() {
+        assert_eq!(
+            Constraint::Flex(0).validate(),
+            Err(LayoutError::ZeroFlexFactor)
+        );
+        assert!(Constraint::Flex(1).validate().is_ok());
+    }
+
+    #[test]
+    fn constraint_is_fixed_size() {
+        assert!(Constraint::Fixed(10).is_fixed_size());
+        assert!(Constraint::Percentage(50).is_fixed_size());
+        assert!(Constraint::Min(5).is_fixed_size());
+        assert!(!Constraint::Flex(1).is_fixed_size());
+    }
+
+    #[test]
+    fn constraint_size_hint() {
+        assert_eq!(Constraint::Fixed(42).size_hint(), Some(42));
+        assert_eq!(Constraint::Flex(3).size_hint(), None);
+    }
+
+    #[test]
+    fn layout_node_len_and_display() {
+        let node = LayoutNode::horizontal(vec![Constraint::Fixed(10), Constraint::Flex(1)]);
+        assert_eq!(node.len(), 2);
+        assert!(!node.is_empty());
+        assert_eq!(node.to_string(), "LayoutNode(horizontal, 2 constraints)");
+    }
+
+    #[test]
+    fn layout_node_validate_empty() {
+        let node = LayoutNode::horizontal(vec![]);
+        assert_eq!(node.validate(), Err(LayoutError::EmptyConstraints));
+    }
+
+    #[test]
+    fn layout_node_total_consumed() {
+        let node = LayoutNode::horizontal(vec![Constraint::Fixed(10), Constraint::Fixed(20)]);
+        assert_eq!(node.total_consumed(rect(0, 0, 100, 50)), 30);
+    }
+
+    #[test]
+    fn builder_horizontal() {
+        let node = LayoutBuilder::horizontal()
+            .fixed(20)
+            .flex(1)
+            .flex(1)
+            .build()
+            .unwrap();
+        let rects = node.split(rect(0, 0, 100, 50));
+        assert_eq!(rects.len(), 3);
+        assert_eq!(rects[0].width, 20);
+        assert_eq!(rects[1].width, 40);
+        assert_eq!(rects[2].width, 40);
+    }
+
+    #[test]
+    fn builder_validation_rejects_bad_percentage() {
+        let result = LayoutBuilder::horizontal().percentage(120).build();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn inset_normal() {
+        let area = rect(10, 10, 100, 50);
+        let inner = inset(area, 5);
+        assert_eq!(inner, rect(15, 15, 90, 40));
+    }
+
+    #[test]
+    fn inset_too_large() {
+        let area = rect(0, 0, 10, 10);
+        let inner = inset(area, 6);
+        assert_eq!(inner.width, 0);
+        assert_eq!(inner.height, 0);
+    }
+
+    #[test]
+    fn center_calculation() {
+        assert_eq!(center(rect(0, 0, 100, 50)), (50, 25));
+        assert_eq!(center(rect(10, 20, 40, 60)), (30, 50));
+    }
+
+    #[test]
+    fn contains_check() {
+        let outer = rect(0, 0, 100, 100);
+        let inner = rect(10, 10, 20, 20);
+        assert!(contains(outer, inner));
+        assert!(!contains(inner, outer));
+    }
+
+    #[test]
+    fn layout_error_display() {
+        let err = LayoutError::InvalidPercentage(150);
+        assert_eq!(err.to_string(), "percentage 150 exceeds 100");
+        let err2 = LayoutError::ZeroFlexFactor;
+        assert_eq!(err2.to_string(), "flex factor must be non-zero");
+    }
+
+    #[test]
+    fn layout_node_clone_and_eq() {
+        let a = LayoutNode::horizontal(vec![Constraint::Fixed(10)]);
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn three_way_vertical_flex() {
+        let node = LayoutNode::vertical(vec![
+            Constraint::Flex(1),
+            Constraint::Flex(2),
+            Constraint::Flex(1),
+        ]);
+        let rects = node.split(rect(0, 0, 80, 40));
+        assert_eq!(rects[0].height, 10);
+        assert_eq!(rects[1].height, 20);
+        assert_eq!(rects[2].height, 10);
     }
 }

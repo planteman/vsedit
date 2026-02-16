@@ -4,9 +4,43 @@
 //! Contains metadata about the product (name, version, URLs, etc.).
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
+
+/// Errors that can occur when working with product configuration.
+#[derive(Debug)]
+pub enum ProductError {
+    /// JSON parsing or serialization failed.
+    Json(serde_json::Error),
+    /// A required field is missing or empty.
+    ValidationError(String),
+}
+
+impl fmt::Display for ProductError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ProductError::Json(e) => write!(f, "JSON error: {}", e),
+            ProductError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for ProductError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ProductError::Json(e) => Some(e),
+            ProductError::ValidationError(_) => None,
+        }
+    }
+}
+
+impl From<serde_json::Error> for ProductError {
+    fn from(e: serde_json::Error) -> Self {
+        ProductError::Json(e)
+    }
+}
 
 /// Product configuration loaded from product.json or compiled defaults.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProductConfiguration {
     pub name_short: String,
@@ -44,7 +78,7 @@ pub struct ProductConfiguration {
 }
 
 /// Extension gallery configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExtensionsGallery {
     pub service_url: String,
@@ -146,6 +180,201 @@ impl ExtensionsGallery {
     /// Builds a search URL by appending a query to the service URL.
     pub fn search_url(&self, query: &str) -> String {
         format!("{}/extensionquery?query={}", self.service_url, query)
+    }
+
+    /// Builds a URL for a specific extension item by identifier.
+    pub fn item_detail_url(&self, identifier: &str) -> String {
+        format!("{}?itemName={}", self.item_url, identifier)
+    }
+}
+
+impl fmt::Display for ExtensionsGallery {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Gallery({})", self.service_url)
+    }
+}
+
+/// Builder for constructing a [`ProductConfiguration`] step by step.
+#[derive(Debug, Default)]
+pub struct ProductConfigurationBuilder {
+    name_short: Option<String>,
+    name_long: Option<String>,
+    application_name: Option<String>,
+    data_folder_name: Option<String>,
+    version: Option<String>,
+    quality: Option<String>,
+    extensions_gallery: Option<ExtensionsGallery>,
+    enable_telemetry: bool,
+}
+
+impl ProductConfigurationBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn name_short(mut self, v: impl Into<String>) -> Self {
+        self.name_short = Some(v.into());
+        self
+    }
+
+    pub fn name_long(mut self, v: impl Into<String>) -> Self {
+        self.name_long = Some(v.into());
+        self
+    }
+
+    pub fn application_name(mut self, v: impl Into<String>) -> Self {
+        self.application_name = Some(v.into());
+        self
+    }
+
+    pub fn data_folder_name(mut self, v: impl Into<String>) -> Self {
+        self.data_folder_name = Some(v.into());
+        self
+    }
+
+    pub fn version(mut self, v: impl Into<String>) -> Self {
+        self.version = Some(v.into());
+        self
+    }
+
+    pub fn quality(mut self, v: impl Into<String>) -> Self {
+        self.quality = Some(v.into());
+        self
+    }
+
+    pub fn extensions_gallery(mut self, v: ExtensionsGallery) -> Self {
+        self.extensions_gallery = Some(v);
+        self
+    }
+
+    pub fn enable_telemetry(mut self, v: bool) -> Self {
+        self.enable_telemetry = v;
+        self
+    }
+
+    /// Build the configuration, returning an error if required fields are missing.
+    pub fn build(self) -> Result<ProductConfiguration, ProductError> {
+        let name_short = self.name_short.ok_or_else(|| {
+            ProductError::ValidationError("name_short is required".into())
+        })?;
+        let name_long = self.name_long.ok_or_else(|| {
+            ProductError::ValidationError("name_long is required".into())
+        })?;
+        let application_name = self.application_name.ok_or_else(|| {
+            ProductError::ValidationError("application_name is required".into())
+        })?;
+        let version = self.version.ok_or_else(|| {
+            ProductError::ValidationError("version is required".into())
+        })?;
+
+        if name_short.is_empty() {
+            return Err(ProductError::ValidationError(
+                "name_short must not be empty".into(),
+            ));
+        }
+
+        let data_folder_name = self
+            .data_folder_name
+            .unwrap_or_else(|| format!(".{}", application_name));
+
+        Ok(ProductConfiguration {
+            name_short,
+            name_long,
+            application_name,
+            data_folder_name,
+            version,
+            quality: self.quality,
+            commit: None,
+            date: None,
+            extensions_gallery: self.extensions_gallery,
+            enable_telemetry: self.enable_telemetry,
+            report_issue_url: None,
+            documentation_url: None,
+            release_notes_url: None,
+            update_url: None,
+            license_url: None,
+            settings_sync_url: None,
+        })
+    }
+}
+
+impl ProductConfiguration {
+    /// Create a builder for `ProductConfiguration`.
+    pub fn builder() -> ProductConfigurationBuilder {
+        ProductConfigurationBuilder::new()
+    }
+
+    /// Validate that the configuration has all required non-empty fields.
+    pub fn validate(&self) -> Result<(), ProductError> {
+        if self.name_short.is_empty() {
+            return Err(ProductError::ValidationError(
+                "name_short must not be empty".into(),
+            ));
+        }
+        if self.name_long.is_empty() {
+            return Err(ProductError::ValidationError(
+                "name_long must not be empty".into(),
+            ));
+        }
+        if self.version.is_empty() {
+            return Err(ProductError::ValidationError(
+                "version must not be empty".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Parse a semver-style version string into (major, minor, patch) components.
+    /// Returns `None` if the version string is not in the expected format.
+    pub fn version_tuple(&self) -> Option<(u32, u32, u32)> {
+        let parts: Vec<&str> = self.version.split('.').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+        let major = parts[0].parse().ok()?;
+        let minor = parts[1].parse().ok()?;
+        let patch = parts[2].parse().ok()?;
+        Some((major, minor, patch))
+    }
+
+    /// Returns `true` if this version is newer than the given version string.
+    pub fn is_newer_than(&self, other_version: &str) -> Option<bool> {
+        let self_tuple = self.version_tuple()?;
+        let parts: Vec<&str> = other_version.split('.').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+        let other_tuple: (u32, u32, u32) = (
+            parts[0].parse().ok()?,
+            parts[1].parse().ok()?,
+            parts[2].parse().ok()?,
+        );
+        Some(self_tuple > other_tuple)
+    }
+
+    /// Returns a user-agent string suitable for HTTP requests.
+    pub fn user_agent(&self) -> String {
+        let quality_suffix = self
+            .quality
+            .as_deref()
+            .map(|q| format!("-{}", q))
+            .unwrap_or_default();
+        format!("{}/{}{}", self.application_name, self.version, quality_suffix)
+    }
+
+    /// Count how many optional URL fields are configured.
+    pub fn configured_url_count(&self) -> usize {
+        [
+            &self.report_issue_url,
+            &self.documentation_url,
+            &self.release_notes_url,
+            &self.update_url,
+            &self.license_url,
+            &self.settings_sync_url,
+        ]
+        .iter()
+        .filter(|u| u.is_some())
+        .count()
     }
 }
 
@@ -285,5 +514,149 @@ mod tests {
         assert!(cfg.update_url.is_none());
         assert!(cfg.license_url.is_none());
         assert!(cfg.settings_sync_url.is_none());
+    }
+
+    #[test]
+    fn builder_success() {
+        let cfg = ProductConfiguration::builder()
+            .name_short("myapp")
+            .name_long("My Application")
+            .application_name("myapp")
+            .version("1.2.3")
+            .quality("stable")
+            .build()
+            .unwrap();
+        assert_eq!(cfg.name_short, "myapp");
+        assert_eq!(cfg.data_folder_name, ".myapp");
+        assert!(cfg.is_stable());
+    }
+
+    #[test]
+    fn builder_missing_required_field() {
+        let result = ProductConfiguration::builder()
+            .name_short("myapp")
+            .build();
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("name_long is required"));
+    }
+
+    #[test]
+    fn builder_empty_name_short() {
+        let result = ProductConfiguration::builder()
+            .name_short("")
+            .name_long("Test")
+            .application_name("test")
+            .version("1.0.0")
+            .build();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("must not be empty"));
+    }
+
+    #[test]
+    fn validate_default_config() {
+        let cfg = ProductConfiguration::default_config();
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_empty_name() {
+        let mut cfg = ProductConfiguration::default_config();
+        cfg.name_short = String::new();
+        assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn version_tuple_parsing() {
+        let cfg = ProductConfiguration::builder()
+            .name_short("t")
+            .name_long("T")
+            .application_name("t")
+            .version("3.14.159")
+            .build()
+            .unwrap();
+        assert_eq!(cfg.version_tuple(), Some((3, 14, 159)));
+    }
+
+    #[test]
+    fn version_tuple_invalid() {
+        let mut cfg = ProductConfiguration::default_config();
+        cfg.version = "not-a-version".to_string();
+        assert_eq!(cfg.version_tuple(), None);
+    }
+
+    #[test]
+    fn is_newer_than_comparison() {
+        let mut cfg = ProductConfiguration::default_config();
+        cfg.version = "2.0.0".to_string();
+        assert_eq!(cfg.is_newer_than("1.9.99"), Some(true));
+        assert_eq!(cfg.is_newer_than("2.0.0"), Some(false));
+        assert_eq!(cfg.is_newer_than("3.0.0"), Some(false));
+        assert_eq!(cfg.is_newer_than("bad"), None);
+    }
+
+    #[test]
+    fn user_agent_format() {
+        let cfg = ProductConfiguration::default_config();
+        let ua = cfg.user_agent();
+        assert!(ua.starts_with("vsedit/"));
+        assert!(ua.ends_with("-stable"));
+    }
+
+    #[test]
+    fn user_agent_no_quality() {
+        let mut cfg = ProductConfiguration::default_config();
+        cfg.quality = None;
+        let ua = cfg.user_agent();
+        assert!(!ua.contains('-'));
+    }
+
+    #[test]
+    fn configured_url_count_default() {
+        let cfg = ProductConfiguration::default_config();
+        assert_eq!(cfg.configured_url_count(), 0);
+    }
+
+    #[test]
+    fn configured_url_count_with_urls() {
+        let mut cfg = ProductConfiguration::default_config();
+        cfg.report_issue_url = Some("https://example.com/issues".into());
+        cfg.license_url = Some("https://example.com/license".into());
+        assert_eq!(cfg.configured_url_count(), 2);
+    }
+
+    #[test]
+    fn product_error_display() {
+        let err = ProductError::ValidationError("test error".into());
+        assert_eq!(err.to_string(), "Validation error: test error");
+    }
+
+    #[test]
+    fn partial_eq_configs() {
+        let a = ProductConfiguration::default_config();
+        let b = ProductConfiguration::default_config();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn gallery_display_trait() {
+        let gallery = ExtensionsGallery {
+            service_url: "https://example.com/gallery".to_string(),
+            item_url: "https://example.com/items".to_string(),
+            control_url: None,
+        };
+        let display = format!("{}", gallery);
+        assert!(display.contains("example.com/gallery"));
+    }
+
+    #[test]
+    fn gallery_item_detail_url() {
+        let gallery = ExtensionsGallery {
+            service_url: "https://example.com".to_string(),
+            item_url: "https://example.com/items".to_string(),
+            control_url: None,
+        };
+        let url = gallery.item_detail_url("publisher.extension");
+        assert_eq!(url, "https://example.com/items?itemName=publisher.extension");
     }
 }

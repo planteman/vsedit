@@ -2,6 +2,8 @@
 //!
 //! RPC bridge between the extension host and the main thread for editor decorations.
 
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 /// Proxy identifier for this extension API namespace.
@@ -117,6 +119,270 @@ impl Default for DecorationBridge {
     }
 }
 
+// ── Error Types ──
+
+/// Errors that can occur when working with decorations.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DecorationError {
+    /// The decoration type key was not registered.
+    UnknownType(String),
+    /// A decoration range is invalid (start after end).
+    InvalidRange {
+        start_line: u32,
+        start_character: u32,
+        end_line: u32,
+        end_character: u32,
+    },
+    /// The decoration type key is empty.
+    EmptyKey,
+    /// The URI is empty or invalid.
+    InvalidUri(String),
+}
+
+impl fmt::Display for DecorationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnknownType(key) => write!(f, "unknown decoration type: {key}"),
+            Self::InvalidRange {
+                start_line,
+                start_character,
+                end_line,
+                end_character,
+            } => write!(
+                f,
+                "invalid range: ({start_line}:{start_character}) > ({end_line}:{end_character})"
+            ),
+            Self::EmptyKey => write!(f, "decoration type key must not be empty"),
+            Self::InvalidUri(uri) => write!(f, "invalid uri: {uri}"),
+        }
+    }
+}
+
+impl std::error::Error for DecorationError {}
+
+// ── Display implementations ──
+
+impl fmt::Display for DecorationRenderOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RenderOptions(whole_line={}", self.is_whole_line)?;
+        if let Some(bg) = &self.background_color {
+            write!(f, ", bg={bg}")?;
+        }
+        if let Some(c) = &self.color {
+            write!(f, ", color={c}")?;
+        }
+        write!(f, ")")
+    }
+}
+
+impl fmt::Display for DecorationOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}:{}-{}:{}",
+            self.start_line, self.start_character, self.end_line, self.end_character
+        )
+    }
+}
+
+impl fmt::Display for DecorationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DecorationType({}, {})", self.key, self.options)
+    }
+}
+
+// ── Builder for DecorationRenderOptions ──
+
+/// Fluent builder for constructing `DecorationRenderOptions`.
+#[derive(Debug, Clone, Default)]
+pub struct RenderOptionsBuilder {
+    background_color: Option<String>,
+    border: Option<String>,
+    color: Option<String>,
+    font_style: Option<String>,
+    font_weight: Option<String>,
+    is_whole_line: bool,
+}
+
+impl RenderOptionsBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn background_color(mut self, color: impl Into<String>) -> Self {
+        self.background_color = Some(color.into());
+        self
+    }
+
+    pub fn border(mut self, border: impl Into<String>) -> Self {
+        self.border = Some(border.into());
+        self
+    }
+
+    pub fn color(mut self, color: impl Into<String>) -> Self {
+        self.color = Some(color.into());
+        self
+    }
+
+    pub fn font_style(mut self, style: impl Into<String>) -> Self {
+        self.font_style = Some(style.into());
+        self
+    }
+
+    pub fn font_weight(mut self, weight: impl Into<String>) -> Self {
+        self.font_weight = Some(weight.into());
+        self
+    }
+
+    pub fn whole_line(mut self, whole: bool) -> Self {
+        self.is_whole_line = whole;
+        self
+    }
+
+    pub fn build(self) -> DecorationRenderOptions {
+        DecorationRenderOptions {
+            background_color: self.background_color,
+            border: self.border,
+            color: self.color,
+            font_style: self.font_style,
+            font_weight: self.font_weight,
+            is_whole_line: self.is_whole_line,
+        }
+    }
+}
+
+// ── Validation & helpers ──
+
+impl DecorationOptions {
+    /// Validate that the range is well-formed (start <= end).
+    pub fn validate(&self) -> Result<(), DecorationError> {
+        if self.start_line > self.end_line
+            || (self.start_line == self.end_line
+                && self.start_character > self.end_character)
+        {
+            return Err(DecorationError::InvalidRange {
+                start_line: self.start_line,
+                start_character: self.start_character,
+                end_line: self.end_line,
+                end_character: self.end_character,
+            });
+        }
+        Ok(())
+    }
+
+    /// Returns the number of lines this decoration spans (at least 1).
+    pub fn line_span(&self) -> u32 {
+        self.end_line - self.start_line + 1
+    }
+
+    /// Returns true if this decoration covers only a single line.
+    pub fn is_single_line(&self) -> bool {
+        self.start_line == self.end_line
+    }
+
+    /// Returns true if this range overlaps with `other`.
+    pub fn overlaps(&self, other: &DecorationOptions) -> bool {
+        if self.end_line < other.start_line || self.start_line > other.end_line {
+            return false;
+        }
+        if self.end_line == other.start_line
+            && self.end_character <= other.start_character
+        {
+            return false;
+        }
+        if self.start_line == other.end_line
+            && self.start_character >= other.end_character
+        {
+            return false;
+        }
+        true
+    }
+}
+
+impl DecorationBridge {
+    /// Validate a key before use.
+    fn validate_key(key: &str) -> Result<(), DecorationError> {
+        if key.is_empty() {
+            return Err(DecorationError::EmptyKey);
+        }
+        Ok(())
+    }
+
+    /// Register a type with validation.
+    pub fn try_register_type(
+        &mut self,
+        key: &str,
+        options: DecorationRenderOptions,
+    ) -> Result<bool, DecorationError> {
+        Self::validate_key(key)?;
+        if self.types.iter().any(|t| t.key == key) {
+            return Ok(false);
+        }
+        self.types.push(DecorationType {
+            key: key.to_string(),
+            options,
+        });
+        Ok(true)
+    }
+
+    /// Set decorations with validation: the type must be registered and
+    /// all ranges must be well-formed.
+    pub fn try_set_decorations(
+        &mut self,
+        key: &str,
+        uri: &str,
+        ranges: Vec<DecorationOptions>,
+    ) -> Result<usize, DecorationError> {
+        Self::validate_key(key)?;
+        if !self.has_type(key) {
+            return Err(DecorationError::UnknownType(key.to_string()));
+        }
+        if uri.is_empty() {
+            return Err(DecorationError::InvalidUri(uri.to_string()));
+        }
+        for r in &ranges {
+            r.validate()?;
+        }
+        let count = ranges.len();
+        self.set_decorations(key, uri, ranges);
+        Ok(count)
+    }
+
+    /// Return how many decoration types are registered.
+    pub fn type_count(&self) -> usize {
+        self.types.len()
+    }
+
+    /// Return how many (key, uri) decoration sets are currently applied.
+    pub fn applied_count(&self) -> usize {
+        self.applied.len()
+    }
+
+    /// Total number of individual decoration ranges across all applied sets.
+    pub fn total_ranges(&self) -> usize {
+        self.applied.iter().map(|(_, _, r)| r.len()).sum()
+    }
+
+    /// Get all decoration ranges applied for a given URI.
+    pub fn decorations_for_uri(&self, uri: &str) -> Vec<(&str, &[DecorationOptions])> {
+        self.applied
+            .iter()
+            .filter(|(_, u, _)| u == uri)
+            .map(|(k, _, r)| (k.as_str(), r.as_slice()))
+            .collect()
+    }
+
+    /// Lookup the render options for a given decoration type key.
+    pub fn get_render_options(&self, key: &str) -> Option<&DecorationRenderOptions> {
+        self.types.iter().find(|t| t.key == key).map(|t| &t.options)
+    }
+
+    /// Remove all applied decorations for a given URI across all types.
+    pub fn clear_uri(&mut self, uri: &str) {
+        self.applied.retain(|(_, u, _)| u != uri);
+    }
+}
+
 /// Initialize the decorations extension API bridge.
 pub fn register() {
     // Registration will connect RPC handlers when extension host starts
@@ -222,5 +488,193 @@ mod tests {
         );
         bridge.unregister_type("k");
         assert!(bridge.applied.is_empty());
+    }
+
+    #[test]
+    fn render_options_builder() {
+        let opts = RenderOptionsBuilder::new()
+            .background_color("red")
+            .color("white")
+            .font_weight("bold")
+            .whole_line(true)
+            .build();
+        assert_eq!(opts.background_color.as_deref(), Some("red"));
+        assert_eq!(opts.color.as_deref(), Some("white"));
+        assert_eq!(opts.font_weight.as_deref(), Some("bold"));
+        assert!(opts.is_whole_line);
+        assert!(opts.border.is_none());
+    }
+
+    #[test]
+    fn decoration_options_validate_ok() {
+        let opt = DecorationOptions {
+            start_line: 1,
+            start_character: 0,
+            end_line: 1,
+            end_character: 5,
+            hover_message: None,
+        };
+        assert!(opt.validate().is_ok());
+    }
+
+    #[test]
+    fn decoration_options_validate_bad_range() {
+        let opt = DecorationOptions {
+            start_line: 5,
+            start_character: 0,
+            end_line: 3,
+            end_character: 0,
+            hover_message: None,
+        };
+        assert!(matches!(
+            opt.validate(),
+            Err(DecorationError::InvalidRange { .. })
+        ));
+    }
+
+    #[test]
+    fn decoration_options_line_span() {
+        let opt = DecorationOptions {
+            start_line: 2,
+            start_character: 0,
+            end_line: 5,
+            end_character: 10,
+            hover_message: None,
+        };
+        assert_eq!(opt.line_span(), 4);
+        assert!(!opt.is_single_line());
+    }
+
+    #[test]
+    fn decoration_options_overlap_detection() {
+        let a = DecorationOptions {
+            start_line: 1,
+            start_character: 0,
+            end_line: 1,
+            end_character: 10,
+            hover_message: None,
+        };
+        let b = DecorationOptions {
+            start_line: 1,
+            start_character: 5,
+            end_line: 1,
+            end_character: 15,
+            hover_message: None,
+        };
+        let c = DecorationOptions {
+            start_line: 2,
+            start_character: 0,
+            end_line: 2,
+            end_character: 5,
+            hover_message: None,
+        };
+        assert!(a.overlaps(&b));
+        assert!(!a.overlaps(&c));
+    }
+
+    #[test]
+    fn try_register_rejects_empty_key() {
+        let mut bridge = DecorationBridge::new();
+        let res = bridge.try_register_type("", RenderOptionsBuilder::new().build());
+        assert_eq!(res, Err(DecorationError::EmptyKey));
+    }
+
+    #[test]
+    fn try_set_decorations_rejects_unknown_type() {
+        let mut bridge = DecorationBridge::new();
+        let res = bridge.try_set_decorations("missing", "file:///a", vec![]);
+        assert_eq!(res, Err(DecorationError::UnknownType("missing".into())));
+    }
+
+    #[test]
+    fn try_set_decorations_validates_ranges() {
+        let mut bridge = DecorationBridge::new();
+        bridge
+            .try_register_type("k", RenderOptionsBuilder::new().build())
+            .unwrap();
+        let bad_range = DecorationOptions {
+            start_line: 10,
+            start_character: 0,
+            end_line: 5,
+            end_character: 0,
+            hover_message: None,
+        };
+        let res = bridge.try_set_decorations("k", "file:///a", vec![bad_range]);
+        assert!(matches!(res, Err(DecorationError::InvalidRange { .. })));
+    }
+
+    #[test]
+    fn bridge_counts_and_clear_uri() {
+        let mut bridge = DecorationBridge::new();
+        bridge
+            .try_register_type("k", RenderOptionsBuilder::new().build())
+            .unwrap();
+        bridge
+            .try_register_type("k2", RenderOptionsBuilder::new().color("blue").build())
+            .unwrap();
+        assert_eq!(bridge.type_count(), 2);
+
+        let r = DecorationOptions {
+            start_line: 0,
+            start_character: 0,
+            end_line: 0,
+            end_character: 1,
+            hover_message: None,
+        };
+        bridge.try_set_decorations("k", "file:///a", vec![r.clone()]).unwrap();
+        bridge.try_set_decorations("k2", "file:///a", vec![r.clone()]).unwrap();
+        bridge.try_set_decorations("k", "file:///b", vec![r]).unwrap();
+        assert_eq!(bridge.applied_count(), 3);
+        assert_eq!(bridge.total_ranges(), 3);
+        assert_eq!(bridge.decorations_for_uri("file:///a").len(), 2);
+
+        bridge.clear_uri("file:///a");
+        assert_eq!(bridge.applied_count(), 1);
+    }
+
+    #[test]
+    fn display_implementations() {
+        let opts = RenderOptionsBuilder::new()
+            .background_color("yellow")
+            .color("black")
+            .build();
+        let display = format!("{opts}");
+        assert!(display.contains("bg=yellow"));
+        assert!(display.contains("color=black"));
+
+        let dec = DecorationOptions {
+            start_line: 1,
+            start_character: 2,
+            end_line: 3,
+            end_character: 4,
+            hover_message: None,
+        };
+        assert_eq!(format!("{dec}"), "1:2-3:4");
+
+        let dt = DecorationType {
+            key: "err".into(),
+            options: opts,
+        };
+        let dt_display = format!("{dt}");
+        assert!(dt_display.contains("err"));
+    }
+
+    #[test]
+    fn error_display() {
+        let e = DecorationError::EmptyKey;
+        assert_eq!(format!("{e}"), "decoration type key must not be empty");
+
+        let e2 = DecorationError::UnknownType("foo".into());
+        assert!(format!("{e2}").contains("foo"));
+    }
+
+    #[test]
+    fn get_render_options() {
+        let mut bridge = DecorationBridge::new();
+        let opts = RenderOptionsBuilder::new().background_color("green").build();
+        bridge.try_register_type("k", opts.clone()).unwrap();
+        let retrieved = bridge.get_render_options("k").unwrap();
+        assert_eq!(retrieved, &opts);
+        assert!(bridge.get_render_options("missing").is_none());
     }
 }

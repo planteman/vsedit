@@ -1,15 +1,60 @@
 //! Editor group and tab management.
 
-/// Layout direction for editor groups.
+use std::fmt;
+
+/// Errors that can occur during editor group operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EditorError {
+    /// The specified group was not found.
+    GroupNotFound(u64),
+    /// The specified tab URI was not found in the group.
+    TabNotFound { group_id: u64, uri: String },
+    /// Cannot close a tab that has unsaved changes without force.
+    UnsavedChanges { uri: String },
+    /// The tab index is out of bounds.
+    IndexOutOfBounds { index: usize, len: usize },
+    /// A validation error from the builder.
+    ValidationError(String),
+}
+
+impl fmt::Display for EditorError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EditorError::GroupNotFound(id) => write!(f, "editor group {id} not found"),
+            EditorError::TabNotFound { group_id, uri } => {
+                write!(f, "tab '{uri}' not found in group {group_id}")
+            }
+            EditorError::UnsavedChanges { uri } => {
+                write!(f, "tab '{uri}' has unsaved changes")
+            }
+            EditorError::IndexOutOfBounds { index, len } => {
+                write!(f, "index {index} out of bounds (len {len})")
+            }
+            EditorError::ValidationError(msg) => write!(f, "validation error: {msg}"),
+        }
+    }
+}
+
+/// Layout direction for editor groups.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EditorGroupLayout {
     Horizontal,
     Vertical,
     Grid,
 }
 
+impl fmt::Display for EditorGroupLayout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EditorGroupLayout::Horizontal => write!(f, "Horizontal"),
+            EditorGroupLayout::Vertical => write!(f, "Vertical"),
+            EditorGroupLayout::Grid => write!(f, "Grid"),
+        }
+    }
+}
+
 /// Metadata for a single editor tab.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EditorTabInfo {
     pub uri: String,
     pub label: String,
@@ -18,12 +63,153 @@ pub struct EditorTabInfo {
     pub preview: bool,
 }
 
-/// A group of editor tabs.
+/// Builder for constructing an [`EditorTabInfo`] with validation.
 #[derive(Debug, Clone)]
+pub struct EditorTabBuilder {
+    uri: Option<String>,
+    label: Option<String>,
+    dirty: bool,
+    pinned: bool,
+    preview: bool,
+}
+
+impl EditorTabBuilder {
+    pub fn new() -> Self {
+        Self {
+            uri: None,
+            label: None,
+            dirty: false,
+            pinned: false,
+            preview: false,
+        }
+    }
+
+    pub fn uri(mut self, uri: impl Into<String>) -> Self {
+        self.uri = Some(uri.into());
+        self
+    }
+
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    pub fn dirty(mut self, dirty: bool) -> Self {
+        self.dirty = dirty;
+        self
+    }
+
+    pub fn pinned(mut self, pinned: bool) -> Self {
+        self.pinned = pinned;
+        self
+    }
+
+    pub fn preview(mut self, preview: bool) -> Self {
+        self.preview = preview;
+        self
+    }
+
+    /// Builds the [`EditorTabInfo`], returning an error if required fields are missing.
+    pub fn build(self) -> Result<EditorTabInfo, EditorError> {
+        let uri = self.uri.ok_or_else(|| {
+            EditorError::ValidationError("uri is required".into())
+        })?;
+        if uri.is_empty() {
+            return Err(EditorError::ValidationError("uri must not be empty".into()));
+        }
+        let label = self.label.unwrap_or_else(|| {
+            uri.rsplit('/').next().unwrap_or(&uri).to_string()
+        });
+        Ok(EditorTabInfo {
+            uri,
+            label,
+            dirty: self.dirty,
+            pinned: self.pinned,
+            preview: self.preview,
+        })
+    }
+}
+
+impl Default for EditorTabBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for EditorTabInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let markers = [
+            if self.dirty { Some("dirty") } else { None },
+            if self.pinned { Some("pinned") } else { None },
+            if self.preview { Some("preview") } else { None },
+        ];
+        let flags: Vec<&str> = markers.iter().filter_map(|m| *m).collect();
+        if flags.is_empty() {
+            write!(f, "{}", self.label)
+        } else {
+            write!(f, "{} [{}]", self.label, flags.join(", "))
+        }
+    }
+}
+
+/// A group of editor tabs.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EditorGroup {
     pub id: u64,
     pub editors: Vec<EditorTabInfo>,
     pub active_editor: Option<usize>,
+}
+
+impl EditorGroup {
+    /// Returns the currently active tab, if any.
+    pub fn active_tab(&self) -> Option<&EditorTabInfo> {
+        self.active_editor.and_then(|i| self.editors.get(i))
+    }
+
+    /// Returns `true` if any tab in this group has unsaved changes.
+    pub fn has_dirty_tabs(&self) -> bool {
+        self.editors.iter().any(|e| e.dirty)
+    }
+
+    /// Returns the URIs of all dirty tabs.
+    pub fn dirty_uris(&self) -> Vec<&str> {
+        self.editors.iter().filter(|e| e.dirty).map(|e| e.uri.as_str()).collect()
+    }
+
+    /// Returns the number of tabs in this group.
+    pub fn tab_count(&self) -> usize {
+        self.editors.len()
+    }
+
+    /// Moves a tab from one index to another within the group.
+    pub fn move_tab(&mut self, from: usize, to: usize) -> Result<(), EditorError> {
+        let len = self.editors.len();
+        if from >= len {
+            return Err(EditorError::IndexOutOfBounds { index: from, len });
+        }
+        if to >= len {
+            return Err(EditorError::IndexOutOfBounds { index: to, len });
+        }
+        let tab = self.editors.remove(from);
+        self.editors.insert(to, tab);
+        // Adjust active editor index to follow the moved tab.
+        if let Some(active) = self.active_editor {
+            if active == from {
+                self.active_editor = Some(to);
+            } else if from < active && active <= to {
+                self.active_editor = Some(active - 1);
+            } else if to <= active && active < from {
+                self.active_editor = Some(active + 1);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for EditorGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Group {} ({} tabs)", self.id, self.editors.len())
+    }
 }
 
 /// Service that manages editor groups and their tabs.
@@ -129,11 +315,113 @@ impl EditorGroupService {
     pub fn group_count(&self) -> usize {
         self.groups.len()
     }
+
+    /// Finds a group by its id.
+    pub fn find_group(&self, id: u64) -> Result<&EditorGroup, EditorError> {
+        self.groups
+            .iter()
+            .find(|g| g.id == id)
+            .ok_or(EditorError::GroupNotFound(id))
+    }
+
+    /// Finds a mutable reference to a group by its id.
+    pub fn find_group_mut(&mut self, id: u64) -> Result<&mut EditorGroup, EditorError> {
+        self.groups
+            .iter_mut()
+            .find(|g| g.id == id)
+            .ok_or(EditorError::GroupNotFound(id))
+    }
+
+    /// Marks a tab as dirty (unsaved changes). Returns an error if group or tab not found.
+    pub fn set_dirty(&mut self, group_id: u64, uri: &str, dirty: bool) -> Result<(), EditorError> {
+        let group = self.find_group_mut(group_id)?;
+        let tab = group
+            .editors
+            .iter_mut()
+            .find(|e| e.uri == uri)
+            .ok_or_else(|| EditorError::TabNotFound {
+                group_id,
+                uri: uri.to_string(),
+            })?;
+        tab.dirty = dirty;
+        Ok(())
+    }
+
+    /// Pins or unpins a tab. Returns an error if group or tab not found.
+    pub fn set_pinned(&mut self, group_id: u64, uri: &str, pinned: bool) -> Result<(), EditorError> {
+        let group = self.find_group_mut(group_id)?;
+        let tab = group
+            .editors
+            .iter_mut()
+            .find(|e| e.uri == uri)
+            .ok_or_else(|| EditorError::TabNotFound {
+                group_id,
+                uri: uri.to_string(),
+            })?;
+        tab.pinned = pinned;
+        Ok(())
+    }
+
+    /// Closes a tab only if it is not dirty. Returns an error on unsaved changes.
+    pub fn safe_close_editor(&mut self, group_id: u64, uri: &str) -> Result<(), EditorError> {
+        let group = self.find_group_mut(group_id)?;
+        let pos = group
+            .editors
+            .iter()
+            .position(|e| e.uri == uri)
+            .ok_or_else(|| EditorError::TabNotFound {
+                group_id,
+                uri: uri.to_string(),
+            })?;
+        if group.editors[pos].dirty {
+            return Err(EditorError::UnsavedChanges {
+                uri: uri.to_string(),
+            });
+        }
+        group.editors.remove(pos);
+        if group.editors.is_empty() {
+            group.active_editor = None;
+        } else if let Some(active) = group.active_editor {
+            if active >= group.editors.len() {
+                group.active_editor = Some(group.editors.len() - 1);
+            }
+        }
+        Ok(())
+    }
+
+    /// Returns a flat list of all URIs across all groups that have unsaved changes.
+    pub fn all_dirty_uris(&self) -> Vec<(u64, &str)> {
+        self.groups
+            .iter()
+            .flat_map(|g| {
+                g.editors
+                    .iter()
+                    .filter(|e| e.dirty)
+                    .map(move |e| (g.id, e.uri.as_str()))
+            })
+            .collect()
+    }
+
+    /// Returns the total number of open tabs across all groups.
+    pub fn total_tab_count(&self) -> usize {
+        self.groups.iter().map(|g| g.editors.len()).sum()
+    }
 }
 
 impl Default for EditorGroupService {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl fmt::Display for EditorGroupService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "EditorGroupService({} groups, {} total tabs)",
+            self.group_count(),
+            self.total_tab_count(),
+        )
     }
 }
 
@@ -197,5 +485,193 @@ mod tests {
         let layout = EditorGroupLayout::Grid;
         let cloned = layout.clone();
         assert_eq!(layout, cloned);
+    }
+
+    // --- New tests ---
+
+    #[test]
+    fn editor_tab_builder_success() {
+        let tab = EditorTabBuilder::new()
+            .uri("file:///main.rs")
+            .label("main.rs")
+            .dirty(true)
+            .pinned(true)
+            .build()
+            .unwrap();
+        assert_eq!(tab.uri, "file:///main.rs");
+        assert_eq!(tab.label, "main.rs");
+        assert!(tab.dirty);
+        assert!(tab.pinned);
+        assert!(!tab.preview);
+    }
+
+    #[test]
+    fn editor_tab_builder_auto_label() {
+        let tab = EditorTabBuilder::new()
+            .uri("file:///src/utils.rs")
+            .build()
+            .unwrap();
+        assert_eq!(tab.label, "utils.rs");
+    }
+
+    #[test]
+    fn editor_tab_builder_missing_uri() {
+        let result = EditorTabBuilder::new().build();
+        assert_eq!(
+            result,
+            Err(EditorError::ValidationError("uri is required".into()))
+        );
+    }
+
+    #[test]
+    fn editor_tab_builder_empty_uri() {
+        let result = EditorTabBuilder::new().uri("").build();
+        assert_eq!(
+            result,
+            Err(EditorError::ValidationError("uri must not be empty".into()))
+        );
+    }
+
+    #[test]
+    fn set_dirty_and_safe_close() {
+        let mut svc = EditorGroupService::new();
+        let gid = svc.create_group();
+        svc.open_editor(gid, "file:///x.rs".into(), "x.rs".into());
+
+        svc.set_dirty(gid, "file:///x.rs", true).unwrap();
+        assert!(svc.find_group(gid).unwrap().has_dirty_tabs());
+
+        // safe_close should fail because tab is dirty.
+        let err = svc.safe_close_editor(gid, "file:///x.rs").unwrap_err();
+        assert_eq!(
+            err,
+            EditorError::UnsavedChanges {
+                uri: "file:///x.rs".into()
+            }
+        );
+
+        // Mark clean, then safe close should succeed.
+        svc.set_dirty(gid, "file:///x.rs", false).unwrap();
+        svc.safe_close_editor(gid, "file:///x.rs").unwrap();
+        assert_eq!(svc.find_group(gid).unwrap().tab_count(), 0);
+    }
+
+    #[test]
+    fn find_group_errors() {
+        let svc = EditorGroupService::new();
+        assert_eq!(svc.find_group(42), Err(EditorError::GroupNotFound(42)));
+    }
+
+    #[test]
+    fn set_dirty_on_missing_tab() {
+        let mut svc = EditorGroupService::new();
+        let gid = svc.create_group();
+        let err = svc.set_dirty(gid, "file:///nope.rs", true).unwrap_err();
+        assert_eq!(
+            err,
+            EditorError::TabNotFound {
+                group_id: gid,
+                uri: "file:///nope.rs".into()
+            }
+        );
+    }
+
+    #[test]
+    fn pin_and_unpin_tab() {
+        let mut svc = EditorGroupService::new();
+        let gid = svc.create_group();
+        svc.open_editor(gid, "file:///p.rs".into(), "p.rs".into());
+
+        svc.set_pinned(gid, "file:///p.rs", true).unwrap();
+        assert!(svc.find_group(gid).unwrap().editors[0].pinned);
+
+        svc.set_pinned(gid, "file:///p.rs", false).unwrap();
+        assert!(!svc.find_group(gid).unwrap().editors[0].pinned);
+    }
+
+    #[test]
+    fn move_tab_within_group() {
+        let mut svc = EditorGroupService::new();
+        let gid = svc.create_group();
+        svc.open_editor(gid, "file:///a.rs".into(), "a.rs".into());
+        svc.open_editor(gid, "file:///b.rs".into(), "b.rs".into());
+        svc.open_editor(gid, "file:///c.rs".into(), "c.rs".into());
+
+        // Active is c.rs (index 2). Move a.rs from 0 to 2.
+        let group = svc.find_group_mut(gid).unwrap();
+        group.move_tab(0, 2).unwrap();
+        assert_eq!(group.editors[0].uri, "file:///b.rs");
+        assert_eq!(group.editors[1].uri, "file:///c.rs");
+        assert_eq!(group.editors[2].uri, "file:///a.rs");
+    }
+
+    #[test]
+    fn move_tab_out_of_bounds() {
+        let mut svc = EditorGroupService::new();
+        let gid = svc.create_group();
+        svc.open_editor(gid, "file:///a.rs".into(), "a.rs".into());
+
+        let group = svc.find_group_mut(gid).unwrap();
+        let err = group.move_tab(0, 5).unwrap_err();
+        assert_eq!(err, EditorError::IndexOutOfBounds { index: 5, len: 1 });
+    }
+
+    #[test]
+    fn total_tab_count_across_groups() {
+        let mut svc = EditorGroupService::new();
+        let g1 = svc.create_group();
+        let g2 = svc.create_group();
+        svc.open_editor(g1, "file:///a.rs".into(), "a.rs".into());
+        svc.open_editor(g1, "file:///b.rs".into(), "b.rs".into());
+        svc.open_editor(g2, "file:///c.rs".into(), "c.rs".into());
+        assert_eq!(svc.total_tab_count(), 3);
+    }
+
+    #[test]
+    fn all_dirty_uris_across_groups() {
+        let mut svc = EditorGroupService::new();
+        let g1 = svc.create_group();
+        let g2 = svc.create_group();
+        svc.open_editor(g1, "file:///a.rs".into(), "a.rs".into());
+        svc.open_editor(g1, "file:///b.rs".into(), "b.rs".into());
+        svc.open_editor(g2, "file:///c.rs".into(), "c.rs".into());
+
+        svc.set_dirty(g1, "file:///a.rs", true).unwrap();
+        svc.set_dirty(g2, "file:///c.rs", true).unwrap();
+
+        let dirty = svc.all_dirty_uris();
+        assert_eq!(dirty.len(), 2);
+        assert!(dirty.contains(&(g1, "file:///a.rs")));
+        assert!(dirty.contains(&(g2, "file:///c.rs")));
+    }
+
+    #[test]
+    fn display_impls() {
+        let tab = EditorTabBuilder::new()
+            .uri("file:///test.rs")
+            .label("test.rs")
+            .dirty(true)
+            .pinned(true)
+            .build()
+            .unwrap();
+        assert_eq!(format!("{tab}"), "test.rs [dirty, pinned]");
+
+        let clean_tab = EditorTabBuilder::new()
+            .uri("file:///clean.rs")
+            .build()
+            .unwrap();
+        assert_eq!(format!("{clean_tab}"), "clean.rs");
+
+        let layout = EditorGroupLayout::Horizontal;
+        assert_eq!(format!("{layout}"), "Horizontal");
+
+        let svc = EditorGroupService::new();
+        assert_eq!(
+            format!("{svc}"),
+            "EditorGroupService(0 groups, 0 total tabs)"
+        );
+
+        let err = EditorError::GroupNotFound(7);
+        assert_eq!(format!("{err}"), "editor group 7 not found");
     }
 }

@@ -3,14 +3,45 @@
 //! Provides an output panel with named channels, scrollable content,
 //! search, and auto-scroll — rendered via ratatui.
 
+use std::fmt;
+
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Widget;
 
+// ---------------------------------------------------------------------------
+// Error types
+// ---------------------------------------------------------------------------
+
+/// Errors that can occur when manipulating the output panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OutputError {
+    /// The requested channel index does not exist.
+    ChannelNotFound(usize),
+    /// A channel with the given name already exists.
+    DuplicateChannelName(String),
+    /// The provided channel name is empty or blank.
+    InvalidChannelName,
+}
+
+impl fmt::Display for OutputError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OutputError::ChannelNotFound(idx) => write!(f, "channel index {idx} not found"),
+            OutputError::DuplicateChannelName(name) => {
+                write!(f, "channel '{name}' already exists")
+            }
+            OutputError::InvalidChannelName => write!(f, "channel name must not be empty"),
+        }
+    }
+}
+
+impl std::error::Error for OutputError {}
+
 /// A named output channel containing lines of text.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct OutputChannel {
     pub name: String,
     pub content: Vec<String>,
@@ -27,10 +58,55 @@ impl OutputChannel {
             show_timestamp: false,
         }
     }
+
+    /// Return the number of lines in this channel.
+    pub fn line_count(&self) -> usize {
+        self.content.len()
+    }
+
+    /// Return true when the channel has no content.
+    pub fn is_empty(&self) -> bool {
+        self.content.is_empty()
+    }
+
+    /// Return the last `n` lines (or fewer if the channel is shorter).
+    pub fn tail(&self, n: usize) -> &[String] {
+        let start = self.content.len().saturating_sub(n);
+        &self.content[start..]
+    }
+
+    /// Count lines that contain the given substring (case-insensitive).
+    pub fn count_matches(&self, query: &str) -> usize {
+        if query.is_empty() {
+            return 0;
+        }
+        let lower = query.to_lowercase();
+        self.content
+            .iter()
+            .filter(|l| l.to_lowercase().contains(&lower))
+            .count()
+    }
+
+    /// Return total byte size of all content lines (excluding newlines).
+    pub fn byte_size(&self) -> usize {
+        self.content.iter().map(|l| l.len()).sum()
+    }
+}
+
+impl fmt::Display for OutputChannel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "OutputChannel({}, {} lines, visible={})",
+            self.name,
+            self.content.len(),
+            self.is_visible
+        )
+    }
 }
 
 /// Output panel with multiple named channels.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct OutputPanel {
     pub channels: Vec<OutputChannel>,
     pub active_channel_index: usize,
@@ -120,6 +196,78 @@ impl OutputPanel {
         self.channels.get(self.active_channel_index)
     }
 
+    /// Create a channel, returning an error on duplicate or empty names.
+    pub fn create_channel_checked(
+        &mut self,
+        name: impl Into<String>,
+    ) -> Result<usize, OutputError> {
+        let name = name.into();
+        if name.trim().is_empty() {
+            return Err(OutputError::InvalidChannelName);
+        }
+        if self.channels.iter().any(|ch| ch.name == name) {
+            return Err(OutputError::DuplicateChannelName(name));
+        }
+        Ok(self.create_channel(name))
+    }
+
+    /// Append a line, returning an error when the channel does not exist.
+    pub fn append_line_checked(
+        &mut self,
+        channel_index: usize,
+        line: impl Into<String>,
+    ) -> Result<(), OutputError> {
+        if self.append_line(channel_index, line) {
+            Ok(())
+        } else {
+            Err(OutputError::ChannelNotFound(channel_index))
+        }
+    }
+
+    /// Find a channel index by name (case-sensitive).
+    pub fn find_channel(&self, name: &str) -> Option<usize> {
+        self.channels.iter().position(|ch| ch.name == name)
+    }
+
+    /// Return the total number of lines across all channels.
+    pub fn total_line_count(&self) -> usize {
+        self.channels.iter().map(|ch| ch.line_count()).sum()
+    }
+
+    /// Return channel names in order.
+    pub fn channel_names(&self) -> Vec<&str> {
+        self.channels.iter().map(|ch| ch.name.as_str()).collect()
+    }
+
+    /// Scroll up by `n` lines, clamping at zero.
+    pub fn scroll_up(&mut self, n: usize) {
+        self.scroll_offset = self.scroll_offset.saturating_sub(n);
+        self.auto_scroll = false;
+    }
+
+    /// Scroll down by `n` lines, clamping at end.
+    pub fn scroll_down(&mut self, n: usize) {
+        if let Some(ch) = self.active_channel() {
+            let max = ch.content.len().saturating_sub(1);
+            self.scroll_offset = (self.scroll_offset + n).min(max);
+        }
+    }
+
+    /// Remove a channel by index, adjusting active index if needed.
+    pub fn remove_channel(&mut self, index: usize) -> Result<OutputChannel, OutputError> {
+        if index >= self.channels.len() {
+            return Err(OutputError::ChannelNotFound(index));
+        }
+        let ch = self.channels.remove(index);
+        if self.channels.is_empty() {
+            self.active_channel_index = 0;
+        } else if self.active_channel_index >= self.channels.len() {
+            self.active_channel_index = self.channels.len() - 1;
+        }
+        self.scroll_offset = 0;
+        Ok(ch)
+    }
+
     fn scroll_to_bottom(&mut self) {
         if let Some(ch) = self.channels.get(self.active_channel_index) {
             self.scroll_offset = ch.content.len().saturating_sub(1);
@@ -192,6 +340,19 @@ impl OutputPanel {
             };
             line.render(row, buf);
         }
+    }
+}
+
+impl fmt::Display for OutputPanel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "OutputPanel({} channels, active={}, scroll={}, auto_scroll={})",
+            self.channels.len(),
+            self.active_channel_index,
+            self.scroll_offset,
+            self.auto_scroll,
+        )
     }
 }
 
@@ -285,5 +446,148 @@ mod tests {
     fn default_impl() {
         let p = OutputPanel::default();
         assert!(p.channels.is_empty());
+    }
+
+    // ---- New tests ----
+
+    #[test]
+    fn output_error_display() {
+        assert_eq!(
+            OutputError::ChannelNotFound(3).to_string(),
+            "channel index 3 not found"
+        );
+        assert_eq!(
+            OutputError::DuplicateChannelName("Git".into()).to_string(),
+            "channel 'Git' already exists"
+        );
+        assert_eq!(
+            OutputError::InvalidChannelName.to_string(),
+            "channel name must not be empty"
+        );
+    }
+
+    #[test]
+    fn create_channel_checked_rejects_duplicate() {
+        let mut p = OutputPanel::new();
+        assert!(p.create_channel_checked("Log").is_ok());
+        assert_eq!(
+            p.create_channel_checked("Log"),
+            Err(OutputError::DuplicateChannelName("Log".into()))
+        );
+    }
+
+    #[test]
+    fn create_channel_checked_rejects_empty() {
+        let mut p = OutputPanel::new();
+        assert_eq!(
+            p.create_channel_checked(""),
+            Err(OutputError::InvalidChannelName)
+        );
+        assert_eq!(
+            p.create_channel_checked("   "),
+            Err(OutputError::InvalidChannelName)
+        );
+    }
+
+    #[test]
+    fn append_line_checked_error() {
+        let mut p = OutputPanel::new();
+        assert_eq!(
+            p.append_line_checked(0, "nope"),
+            Err(OutputError::ChannelNotFound(0))
+        );
+    }
+
+    #[test]
+    fn find_channel_by_name() {
+        let mut p = OutputPanel::new();
+        p.create_channel("Alpha");
+        p.create_channel("Beta");
+        assert_eq!(p.find_channel("Beta"), Some(1));
+        assert_eq!(p.find_channel("Gamma"), None);
+    }
+
+    #[test]
+    fn channel_helpers() {
+        let mut ch = OutputChannel::new("Test");
+        assert!(ch.is_empty());
+        ch.content.push("hello world".into());
+        ch.content.push("foo".into());
+        assert_eq!(ch.line_count(), 2);
+        assert!(!ch.is_empty());
+        assert_eq!(ch.tail(1), &["foo".to_string()]);
+        assert_eq!(ch.tail(10).len(), 2);
+        assert_eq!(ch.count_matches("HELLO"), 1);
+        assert_eq!(ch.count_matches(""), 0);
+        assert_eq!(ch.byte_size(), 14); // 11 + 3
+    }
+
+    #[test]
+    fn channel_display() {
+        let ch = OutputChannel::new("Git");
+        assert_eq!(ch.to_string(), "OutputChannel(Git, 0 lines, visible=true)");
+    }
+
+    #[test]
+    fn panel_display() {
+        let p = OutputPanel::new();
+        assert!(p.to_string().contains("0 channels"));
+    }
+
+    #[test]
+    fn total_line_count() {
+        let mut p = OutputPanel::new();
+        p.create_channel("A");
+        p.create_channel("B");
+        p.append_line(0, "l1");
+        p.append_line(0, "l2");
+        p.append_line(1, "l3");
+        assert_eq!(p.total_line_count(), 3);
+    }
+
+    #[test]
+    fn channel_names() {
+        let mut p = OutputPanel::new();
+        p.create_channel("X");
+        p.create_channel("Y");
+        assert_eq!(p.channel_names(), vec!["X", "Y"]);
+    }
+
+    #[test]
+    fn scroll_up_down() {
+        let mut p = OutputPanel::new();
+        p.create_channel("Log");
+        for i in 0..20 {
+            p.append_line(0, format!("line {i}"));
+        }
+        p.scroll_offset = 10;
+        p.scroll_up(3);
+        assert_eq!(p.scroll_offset, 7);
+        assert!(!p.auto_scroll);
+        p.scroll_up(100);
+        assert_eq!(p.scroll_offset, 0);
+        p.scroll_down(5);
+        assert_eq!(p.scroll_offset, 5);
+        p.scroll_down(1000);
+        assert_eq!(p.scroll_offset, 19);
+    }
+
+    #[test]
+    fn remove_channel() {
+        let mut p = OutputPanel::new();
+        p.create_channel("A");
+        p.create_channel("B");
+        p.select_channel(1);
+        let removed = p.remove_channel(1).unwrap();
+        assert_eq!(removed.name, "B");
+        assert_eq!(p.active_channel_index, 0);
+        assert!(p.remove_channel(99).is_err());
+    }
+
+    #[test]
+    fn partial_eq_panel() {
+        let a = OutputPanel::new();
+        let b = OutputPanel::new();
+        assert_eq!(a, b);
     }
 }
