@@ -290,6 +290,116 @@ impl EditorOptions {
     pub fn to_json(&self) -> Value {
         serde_json::to_value(self).expect("EditorOptions serialization should never fail")
     }
+
+    /// Returns true if rulers is empty.
+    pub fn is_rulers_empty(&self) -> bool {
+        self.rulers.is_empty()
+    }
+
+    /// Get the first ruler, if any.
+    pub fn first_ruler(&self) -> Option<&u32> {
+        self.rulers.first()
+    }
+
+    /// Get the last ruler, if any.
+    pub fn last_ruler(&self) -> Option<&u32> {
+        self.rulers.last()
+    }
+
+    /// Retain only rulers matching the predicate.
+    pub fn retain_rulers(&mut self, f: impl Fn(&u32) -> bool) {
+        self.rulers.retain(|item| f(item));
+    }
+
+    /// Toggle the `insert_spaces` flag.
+    pub fn toggle_insert_spaces(&mut self) {
+        self.insert_spaces = !self.insert_spaces;
+    }
+
+    /// Toggle the `detect_indentation` flag.
+    pub fn toggle_detect_indentation(&mut self) {
+        self.detect_indentation = !self.detect_indentation;
+    }
+
+    /// Toggle the `trim_auto_whitespace` flag.
+    pub fn toggle_trim_auto_whitespace(&mut self) {
+        self.trim_auto_whitespace = !self.trim_auto_whitespace;
+    }
+
+    /// Toggle the `minimap_enabled` flag.
+    pub fn toggle_minimap_enabled(&mut self) {
+        self.minimap_enabled = !self.minimap_enabled;
+    }
+
+    /// Toggle the `scroll_beyond_last_line` flag.
+    pub fn toggle_scroll_beyond_last_line(&mut self) {
+        self.scroll_beyond_last_line = !self.scroll_beyond_last_line;
+    }
+
+    /// Toggle the `smooth_scrolling` flag.
+    pub fn toggle_smooth_scrolling(&mut self) {
+        self.smooth_scrolling = !self.smooth_scrolling;
+    }
+
+    /// Toggle the `render_control_characters` flag.
+    pub fn toggle_render_control_characters(&mut self) {
+        self.render_control_characters = !self.render_control_characters;
+    }
+
+    /// Toggle the `format_on_paste` flag.
+    pub fn toggle_format_on_paste(&mut self) {
+        self.format_on_paste = !self.format_on_paste;
+    }
+
+    /// Toggle the `format_on_type` flag.
+    pub fn toggle_format_on_type(&mut self) {
+        self.format_on_type = !self.format_on_type;
+    }
+
+    /// Toggle the `format_on_save` flag.
+    pub fn toggle_format_on_save(&mut self) {
+        self.format_on_save = !self.format_on_save;
+    }
+
+    /// Toggle the `suggest_on_trigger_characters` flag.
+    pub fn toggle_suggest_on_trigger_characters(&mut self) {
+        self.suggest_on_trigger_characters = !self.suggest_on_trigger_characters;
+    }
+
+    /// Toggle the `quick_suggestions` flag.
+    pub fn toggle_quick_suggestions(&mut self) {
+        self.quick_suggestions = !self.quick_suggestions;
+    }
+
+    /// Toggle the `bracket_pair_colorization` flag.
+    pub fn toggle_bracket_pair_colorization(&mut self) {
+        self.bracket_pair_colorization = !self.bracket_pair_colorization;
+    }
+
+    /// Toggle the `guides_indentation` flag.
+    pub fn toggle_guides_indentation(&mut self) {
+        self.guides_indentation = !self.guides_indentation;
+    }
+
+    /// Toggle the `guides_bracket_pairs` flag.
+    pub fn toggle_guides_bracket_pairs(&mut self) {
+        self.guides_bracket_pairs = !self.guides_bracket_pairs;
+    }
+
+    /// Toggle the `folding_enabled` flag.
+    pub fn toggle_folding_enabled(&mut self) {
+        self.folding_enabled = !self.folding_enabled;
+    }
+
+    /// Toggle the `links` flag.
+    pub fn toggle_links(&mut self) {
+        self.links = !self.links;
+    }
+
+    /// Toggle the `sticky_scroll_enabled` flag.
+    pub fn toggle_sticky_scroll_enabled(&mut self) {
+        self.sticky_scroll_enabled = !self.sticky_scroll_enabled;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -456,5 +566,125 @@ mod tests {
         let json_str = serde_json::to_string(&original).unwrap();
         let deserialized: EditorOptions = serde_json::from_str(&json_str).unwrap();
         assert_eq!(original, deserialized);
+    }
+
+    #[test]
+    fn eq_wordwrap_same() {
+        assert_eq!(WordWrap::Off, WordWrap::Off);
+    }
+
+    #[test]
+    fn ne_wordwrap_diff() {
+        assert_ne!(WordWrap::Off, WordWrap::On);
+    }
+
+    #[test]
+    fn eq_linenumberstype_same() {
+        assert_eq!(LineNumbersType::Off, LineNumbersType::Off);
+    }
+
+    #[test]
+    fn ne_linenumberstype_diff() {
+        assert_ne!(LineNumbersType::Off, LineNumbersType::On);
+    }
+
+    #[test]
+    fn eq_cursorstyle_same() {
+        assert_eq!(CursorStyle::Line, CursorStyle::Line);
+    }
+
+    #[test]
+    fn ne_cursorstyle_diff() {
+        assert_ne!(CursorStyle::Line, CursorStyle::Block);
+    }
+
+    #[test]
+    fn eq_cursorblinking_same() {
+        assert_eq!(CursorBlinking::Blink, CursorBlinking::Blink);
+    }
+
+    #[test]
+    fn ne_cursorblinking_diff() {
+        assert_ne!(CursorBlinking::Blink, CursorBlinking::Smooth);
+    }
+
+    #[test]
+    fn eq_renderwhitespace_same() {
+        assert_eq!(RenderWhitespace::None, RenderWhitespace::None);
+    }
+
+    #[test]
+    fn ne_renderwhitespace_diff() {
+        assert_ne!(RenderWhitespace::None, RenderWhitespace::Boundary);
+    }
+
+    #[test]
+    fn eq_autoclosing_same() {
+        assert_eq!(AutoClosing::Always, AutoClosing::Always);
+    }
+
+    #[test]
+    fn ne_autoclosing_diff() {
+        assert_ne!(AutoClosing::Always, AutoClosing::LanguageDefined);
+    }
+
+    #[test]
+    fn eq_autosurround_same() {
+        assert_eq!(AutoSurround::LanguageDefined, AutoSurround::LanguageDefined);
+    }
+
+    #[test]
+    fn ne_autosurround_diff() {
+        assert_ne!(AutoSurround::LanguageDefined, AutoSurround::Quotes);
+    }
+
+    #[test]
+    fn eq_autoindent_same() {
+        assert_eq!(AutoIndent::None, AutoIndent::None);
+    }
+
+    #[test]
+    fn ne_autoindent_diff() {
+        assert_ne!(AutoIndent::None, AutoIndent::Keep);
+    }
+
+    #[test]
+    fn eq_acceptsuggestiononenter_same() {
+        assert_eq!(AcceptSuggestionOnEnter::On, AcceptSuggestionOnEnter::On);
+    }
+
+    #[test]
+    fn ne_acceptsuggestiononenter_diff() {
+        assert_ne!(AcceptSuggestionOnEnter::On, AcceptSuggestionOnEnter::Smart);
+    }
+
+    #[test]
+    fn eq_snippetsuggestions_same() {
+        assert_eq!(SnippetSuggestions::Top, SnippetSuggestions::Top);
+    }
+
+    #[test]
+    fn ne_snippetsuggestions_diff() {
+        assert_ne!(SnippetSuggestions::Top, SnippetSuggestions::Bottom);
+    }
+
+    #[test]
+    fn eq_minimapside_same() {
+        assert_eq!(MinimapSide::Left, MinimapSide::Left);
+    }
+
+    #[test]
+    fn ne_minimapside_diff() {
+        assert_ne!(MinimapSide::Left, MinimapSide::Right);
+    }
+
+    #[test]
+    fn eq_diffalgorithm_same() {
+        assert_eq!(DiffAlgorithm::Legacy, DiffAlgorithm::Legacy);
+    }
+
+    #[test]
+    fn ne_diffalgorithm_diff() {
+        assert_ne!(DiffAlgorithm::Legacy, DiffAlgorithm::Advanced);
     }
 }
