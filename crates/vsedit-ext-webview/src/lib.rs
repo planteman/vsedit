@@ -587,6 +587,201 @@ impl WebviewBridge {
     }
 }
 
+// ── HTML to Terminal Text ──
+
+/// Converts simple HTML to plain text suitable for terminal display.
+///
+/// Handles: tag stripping, `<br>` → newline, `<p>` → double newline,
+/// `<b>` content → UPPERCASE, and basic entity decoding.
+pub fn html_to_terminal_text(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut chars = html.chars().peekable();
+    let mut in_bold = false;
+
+    while let Some(ch) = chars.next() {
+        if ch == '&' {
+            // Decode HTML entities.
+            let mut entity = String::new();
+            for ec in chars.by_ref() {
+                if ec == ';' {
+                    break;
+                }
+                entity.push(ec);
+            }
+            let decoded = match entity.as_str() {
+                "amp" => "&",
+                "lt" => "<",
+                "gt" => ">",
+                "quot" => "\"",
+                _ => "",
+            };
+            if in_bold {
+                out.push_str(&decoded.to_uppercase());
+            } else {
+                out.push_str(decoded);
+            }
+        } else if ch == '<' {
+            // Read the tag name.
+            let mut tag = String::new();
+            for tc in chars.by_ref() {
+                if tc == '>' {
+                    break;
+                }
+                tag.push(tc);
+            }
+            let tag_lower = tag.trim().to_lowercase();
+            if tag_lower == "br" || tag_lower == "br/" || tag_lower == "br /" {
+                out.push('\n');
+            } else if tag_lower == "p" {
+                out.push_str("\n\n");
+            } else if tag_lower == "b" {
+                in_bold = true;
+            } else if tag_lower == "/b" {
+                in_bold = false;
+            }
+            // All other tags are silently stripped.
+        } else if in_bold {
+            for upper in ch.to_uppercase() {
+                out.push(upper);
+            }
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+// ── Webview Message Bus ──
+
+/// A publish/subscribe message bus for extension↔webview communication.
+///
+/// Subscribers register on named channels. Published messages are held as
+/// pending until drained by a specific webview handle.
+pub struct WebviewMessageBus {
+    subscribers: Vec<(String, u64)>,
+    pending: Vec<(String, serde_json::Value)>,
+}
+
+impl WebviewMessageBus {
+    pub fn new() -> Self {
+        Self {
+            subscribers: Vec::new(),
+            pending: Vec::new(),
+        }
+    }
+
+    pub fn subscribe(&mut self, channel: &str, handle: u64) {
+        let entry = (channel.to_string(), handle);
+        if !self.subscribers.contains(&entry) {
+            self.subscribers.push(entry);
+        }
+    }
+
+    pub fn unsubscribe(&mut self, channel: &str, handle: u64) {
+        self.subscribers.retain(|(c, h)| !(c == channel && *h == handle));
+    }
+
+    pub fn publish(&mut self, channel: &str, message: serde_json::Value) {
+        self.pending.push((channel.to_string(), message));
+    }
+
+    /// Drain all pending messages whose channel the given handle is subscribed to.
+    pub fn drain_for_handle(&mut self, handle: u64) -> Vec<(String, serde_json::Value)> {
+        let subscribed_channels: Vec<String> = self
+            .subscribers
+            .iter()
+            .filter(|(_, h)| *h == handle)
+            .map(|(c, _)| c.clone())
+            .collect();
+
+        let mut delivered = Vec::new();
+        let mut remaining = Vec::new();
+
+        for (ch, msg) in self.pending.drain(..) {
+            if subscribed_channels.contains(&ch) {
+                delivered.push((ch, msg));
+            } else {
+                remaining.push((ch, msg));
+            }
+        }
+        self.pending = remaining;
+        delivered
+    }
+
+    pub fn subscriber_count(&self, channel: &str) -> usize {
+        self.subscribers.iter().filter(|(c, _)| c == channel).count()
+    }
+
+    pub fn channel_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .subscribers
+            .iter()
+            .map(|(c, _)| c.clone())
+            .collect();
+        names.sort();
+        names.dedup();
+        names
+    }
+}
+
+impl Default for WebviewMessageBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Webview Persistence ──
+
+/// Stores serializable state for webview panels so it can be saved/restored.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WebviewPersistenceStore {
+    states: Vec<(u64, serde_json::Value)>,
+}
+
+impl WebviewPersistenceStore {
+    pub fn new() -> Self {
+        Self { states: Vec::new() }
+    }
+
+    /// Save (or overwrite) the state for the given handle.
+    pub fn save_state(&mut self, handle: u64, state: serde_json::Value) {
+        if let Some(entry) = self.states.iter_mut().find(|(h, _)| *h == handle) {
+            entry.1 = state;
+        } else {
+            self.states.push((handle, state));
+        }
+    }
+
+    pub fn load_state(&self, handle: u64) -> Option<&serde_json::Value> {
+        self.states.iter().find(|(h, _)| *h == handle).map(|(_, v)| v)
+    }
+
+    /// Remove the state for a handle. Returns `true` if it existed.
+    pub fn remove_state(&mut self, handle: u64) -> bool {
+        let before = self.states.len();
+        self.states.retain(|(h, _)| *h != handle);
+        self.states.len() < before
+    }
+
+    pub fn handles(&self) -> Vec<u64> {
+        self.states.iter().map(|(h, _)| *h).collect()
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("WebviewPersistenceStore is always serializable")
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
+impl Default for WebviewPersistenceStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -968,5 +1163,127 @@ mod tests {
             message: serde_json::json!("b"),
         });
         assert_eq!(bridge.total_pending_messages(), 2);
+    }
+
+    // ── html_to_terminal_text tests ──
+
+    #[test]
+    fn html_to_text_strips_tags() {
+        assert_eq!(html_to_terminal_text("<div>hello</div>"), "hello");
+        assert_eq!(html_to_terminal_text("<span>a</span><span>b</span>"), "ab");
+    }
+
+    #[test]
+    fn html_to_text_br_and_p() {
+        assert_eq!(html_to_terminal_text("a<br>b"), "a\nb");
+        assert_eq!(html_to_terminal_text("a<br/>b"), "a\nb");
+        assert_eq!(html_to_terminal_text("a<br />b"), "a\nb");
+        assert_eq!(html_to_terminal_text("x<p>y"), "x\n\ny");
+    }
+
+    #[test]
+    fn html_to_text_bold_uppercases() {
+        assert_eq!(html_to_terminal_text("say <b>hello</b> world"), "say HELLO world");
+    }
+
+    #[test]
+    fn html_to_text_decodes_entities() {
+        assert_eq!(html_to_terminal_text("a &amp; b"), "a & b");
+        assert_eq!(html_to_terminal_text("&lt;tag&gt;"), "<tag>");
+        assert_eq!(html_to_terminal_text("&quot;hi&quot;"), "\"hi\"");
+    }
+
+    // ── WebviewMessageBus tests ──
+
+    #[test]
+    fn message_bus_subscribe_and_publish() {
+        let mut bus = WebviewMessageBus::new();
+        bus.subscribe("events", 1);
+        bus.subscribe("events", 2);
+        bus.publish("events", serde_json::json!("hello"));
+
+        assert_eq!(bus.subscriber_count("events"), 2);
+        let msgs = bus.drain_for_handle(1);
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0].0, "events");
+        assert_eq!(msgs[0].1, serde_json::json!("hello"));
+    }
+
+    #[test]
+    fn message_bus_unsubscribe() {
+        let mut bus = WebviewMessageBus::new();
+        bus.subscribe("ch", 1);
+        bus.subscribe("ch", 2);
+        assert_eq!(bus.subscriber_count("ch"), 2);
+
+        bus.unsubscribe("ch", 1);
+        assert_eq!(bus.subscriber_count("ch"), 1);
+
+        bus.publish("ch", serde_json::json!(42));
+        let msgs = bus.drain_for_handle(1);
+        assert!(msgs.is_empty());
+    }
+
+    #[test]
+    fn message_bus_channel_names() {
+        let mut bus = WebviewMessageBus::new();
+        bus.subscribe("beta", 1);
+        bus.subscribe("alpha", 2);
+        bus.subscribe("beta", 3);
+        let names = bus.channel_names();
+        assert_eq!(names, vec!["alpha", "beta"]);
+    }
+
+    #[test]
+    fn message_bus_drain_leaves_other_channels() {
+        let mut bus = WebviewMessageBus::new();
+        bus.subscribe("a", 1);
+        bus.subscribe("b", 2);
+        bus.publish("a", serde_json::json!("for-a"));
+        bus.publish("b", serde_json::json!("for-b"));
+
+        let msgs = bus.drain_for_handle(1);
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0].1, serde_json::json!("for-a"));
+
+        // "for-b" should still be pending
+        let msgs2 = bus.drain_for_handle(2);
+        assert_eq!(msgs2.len(), 1);
+        assert_eq!(msgs2[0].1, serde_json::json!("for-b"));
+    }
+
+    // ── WebviewPersistenceStore tests ──
+
+    #[test]
+    fn persistence_save_load_remove() {
+        let mut store = WebviewPersistenceStore::new();
+        store.save_state(1, serde_json::json!({"scroll": 100}));
+        store.save_state(2, serde_json::json!({"scroll": 200}));
+
+        assert_eq!(store.load_state(1), Some(&serde_json::json!({"scroll": 100})));
+        assert_eq!(store.load_state(3), None);
+        assert!(store.remove_state(1));
+        assert!(!store.remove_state(1));
+        assert_eq!(store.handles(), vec![2]);
+    }
+
+    #[test]
+    fn persistence_overwrite_state() {
+        let mut store = WebviewPersistenceStore::new();
+        store.save_state(1, serde_json::json!("old"));
+        store.save_state(1, serde_json::json!("new"));
+        assert_eq!(store.load_state(1), Some(&serde_json::json!("new")));
+        assert_eq!(store.handles().len(), 1);
+    }
+
+    #[test]
+    fn persistence_json_roundtrip() {
+        let mut store = WebviewPersistenceStore::new();
+        store.save_state(5, serde_json::json!({"theme": "dark"}));
+        store.save_state(10, serde_json::json!([1, 2, 3]));
+
+        let json = store.to_json();
+        let restored = WebviewPersistenceStore::from_json(&json).unwrap();
+        assert_eq!(store, restored);
     }
 }

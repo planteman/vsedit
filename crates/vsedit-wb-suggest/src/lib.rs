@@ -440,6 +440,236 @@ impl Default for AutoTriggerConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CompletionScoring
+// ---------------------------------------------------------------------------
+
+/// Fuzzy match scoring for completion items.
+pub struct CompletionScoring;
+
+impl CompletionScoring {
+    const PREFIX_MATCH_BONUS: u32 = 10;
+    const CONTIGUOUS_BONUS: u32 = 5;
+    const CASE_MATCH_BONUS: u32 = 2;
+    const POSITION_PENALTY: u32 = 1;
+
+    /// Compute a fuzzy match score of `query` against `candidate`.
+    ///
+    /// Returns 0 when not all query characters are found in order.
+    pub fn score(query: &str, candidate: &str) -> u32 {
+        if query.is_empty() {
+            return 0;
+        }
+
+        let query_lower: Vec<char> = query.chars().map(|c| c.to_ascii_lowercase()).collect();
+        let candidate_chars: Vec<char> = candidate.chars().collect();
+        let candidate_lower: Vec<char> = candidate_chars.iter().map(|c| c.to_ascii_lowercase()).collect();
+
+        let mut score: u32 = 0;
+        let mut cand_idx: usize = 0;
+        let mut last_match_idx: Option<usize> = None;
+
+        for qc in query_lower.iter() {
+            let mut found = false;
+            while cand_idx < candidate_lower.len() {
+                if candidate_lower[cand_idx] == *qc {
+                    // Gap penalty
+                    if let Some(prev) = last_match_idx {
+                        let gap = cand_idx - prev - 1;
+                        score = score.saturating_sub(gap as u32 * Self::POSITION_PENALTY);
+                    }
+
+                    // Contiguous bonus
+                    if let Some(prev) = last_match_idx {
+                        if cand_idx == prev + 1 {
+                            score += Self::CONTIGUOUS_BONUS;
+                        }
+                    }
+
+                    last_match_idx = Some(cand_idx);
+                    cand_idx += 1;
+                    found = true;
+                    break;
+                }
+                cand_idx += 1;
+            }
+            if !found {
+                return 0;
+            }
+        }
+
+        // Case match bonus — compare original characters
+        let query_chars: Vec<char> = query.chars().collect();
+        let mut ci = 0usize;
+        for qc in &query_chars {
+            while ci < candidate_chars.len() {
+                if candidate_chars[ci].to_ascii_lowercase() == qc.to_ascii_lowercase() {
+                    if candidate_chars[ci] == *qc {
+                        score += Self::CASE_MATCH_BONUS;
+                    }
+                    ci += 1;
+                    break;
+                }
+                ci += 1;
+            }
+        }
+
+        // Prefix bonus
+        let candidate_prefix: String = candidate_lower.iter().take(query_lower.len()).collect();
+        let query_str: String = query_lower.iter().collect();
+        if candidate_prefix == query_str {
+            score += Self::PREFIX_MATCH_BONUS;
+        }
+
+        // Ensure a match always returns at least 1
+        if score == 0 { 1 } else { score }
+    }
+
+    /// Score a completion item, using `filter_text` if present, otherwise `label`.
+    pub fn score_item(query: &str, item: &CompletionItem) -> u32 {
+        let text = item.filter_text.as_deref().unwrap_or(&item.label);
+        Self::score(query, text)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestionFilter
+// ---------------------------------------------------------------------------
+
+/// Filters a set of completion items by kind and/or label prefix.
+pub struct SuggestionFilter {
+    kinds: Vec<CompletionItemKind>,
+    label_prefix: Option<String>,
+}
+
+impl SuggestionFilter {
+    pub fn new() -> Self {
+        Self {
+            kinds: Vec::new(),
+            label_prefix: None,
+        }
+    }
+
+    pub fn with_kind(mut self, kind: CompletionItemKind) -> Self {
+        self.kinds.push(kind);
+        self
+    }
+
+    pub fn with_kinds(mut self, kinds: &[CompletionItemKind]) -> Self {
+        self.kinds.extend_from_slice(kinds);
+        self
+    }
+
+    pub fn with_label_prefix(mut self, prefix: &str) -> Self {
+        self.label_prefix = Some(prefix.to_string());
+        self
+    }
+
+    pub fn apply<'a>(&self, items: &'a [CompletionItem]) -> Vec<&'a CompletionItem> {
+        items
+            .iter()
+            .filter(|item| {
+                if !self.kinds.is_empty() && !self.kinds.contains(&item.kind) {
+                    return false;
+                }
+                if let Some(ref prefix) = self.label_prefix {
+                    if !item.label.starts_with(prefix.as_str()) {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect()
+    }
+}
+
+impl Default for SuggestionFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestionSorter
+// ---------------------------------------------------------------------------
+
+/// Multi-criteria sorter for completion items.
+pub struct SuggestionSorter {
+    query: Option<String>,
+    by_kind_priority: bool,
+    by_label: bool,
+}
+
+impl SuggestionSorter {
+    pub fn new() -> Self {
+        Self {
+            query: None,
+            by_kind_priority: false,
+            by_label: false,
+        }
+    }
+
+    pub fn by_score(mut self, query: &str) -> Self {
+        self.query = Some(query.to_string());
+        self
+    }
+
+    /// Methods first, then Functions, then everything else.
+    pub fn by_kind_priority(mut self) -> Self {
+        self.by_kind_priority = true;
+        self
+    }
+
+    pub fn by_label(mut self) -> Self {
+        self.by_label = true;
+        self
+    }
+
+    fn kind_priority(kind: &CompletionItemKind) -> u32 {
+        match kind {
+            CompletionItemKind::Method => 0,
+            CompletionItemKind::Function => 1,
+            _ => 2,
+        }
+    }
+
+    pub fn sort(&self, items: &mut Vec<CompletionItem>) {
+        let query = self.query.clone();
+        let by_kind = self.by_kind_priority;
+        let by_label = self.by_label;
+
+        items.sort_by(|a, b| {
+            // Score (higher is better → reverse order)
+            if let Some(ref q) = query {
+                let sa = CompletionScoring::score_item(q, a);
+                let sb = CompletionScoring::score_item(q, b);
+                let cmp = sb.cmp(&sa);
+                if cmp != std::cmp::Ordering::Equal {
+                    return cmp;
+                }
+            }
+            // Kind priority (lower is better)
+            if by_kind {
+                let cmp = Self::kind_priority(&a.kind).cmp(&Self::kind_priority(&b.kind));
+                if cmp != std::cmp::Ordering::Equal {
+                    return cmp;
+                }
+            }
+            // Label (alphabetical)
+            if by_label {
+                return a.label.cmp(&b.label);
+            }
+            std::cmp::Ordering::Equal
+        });
+    }
+}
+
+impl Default for SuggestionSorter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -949,5 +1179,144 @@ mod tests {
     fn behavior_check_21() {
         let _svc = SuggestWidget::new();
         assert!(std::mem::size_of::<usize>() > 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // CompletionScoring tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn scoring_empty_query_returns_zero() {
+        assert_eq!(CompletionScoring::score("", "anything"), 0);
+    }
+
+    #[test]
+    fn scoring_no_match_returns_zero() {
+        assert_eq!(CompletionScoring::score("xyz", "abc"), 0);
+    }
+
+    #[test]
+    fn scoring_exact_match_returns_nonzero() {
+        let s = CompletionScoring::score("foo", "foo");
+        assert!(s > 0);
+    }
+
+    #[test]
+    fn scoring_prefix_bonus() {
+        let prefix = CompletionScoring::score("fo", "format");
+        let no_prefix = CompletionScoring::score("fo", "info");
+        assert!(prefix > no_prefix);
+    }
+
+    #[test]
+    fn scoring_case_match_bonus() {
+        let exact_case = CompletionScoring::score("Foo", "Foobar");
+        let wrong_case = CompletionScoring::score("foo", "Foobar");
+        assert!(exact_case > wrong_case);
+    }
+
+    #[test]
+    fn scoring_item_uses_filter_text() {
+        let item = CompletionItem {
+            label: "display".to_string(),
+            kind: CompletionItemKind::Property,
+            detail: None,
+            insert_text: None,
+            sort_text: None,
+            filter_text: Some("css-display".to_string()),
+            preselect: false,
+        };
+        let s = CompletionScoring::score_item("css", &item);
+        assert!(s > 0);
+    }
+
+    #[test]
+    fn scoring_item_falls_back_to_label() {
+        let item = make_item("forEach", CompletionItemKind::Method);
+        let s = CompletionScoring::score_item("for", &item);
+        assert!(s > 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // SuggestionFilter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn filter_by_kind() {
+        let items = vec![
+            make_item("foo", CompletionItemKind::Function),
+            make_item("bar", CompletionItemKind::Variable),
+            make_item("baz", CompletionItemKind::Function),
+        ];
+        let result = SuggestionFilter::new()
+            .with_kind(CompletionItemKind::Function)
+            .apply(&items);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].label, "foo");
+        assert_eq!(result[1].label, "baz");
+    }
+
+    #[test]
+    fn filter_by_label_prefix() {
+        let items = vec![
+            make_item("forEach", CompletionItemKind::Method),
+            make_item("format", CompletionItemKind::Function),
+            make_item("bar", CompletionItemKind::Variable),
+        ];
+        let result = SuggestionFilter::new()
+            .with_label_prefix("for")
+            .apply(&items);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn filter_no_criteria_returns_all() {
+        let items = vec![
+            make_item("a", CompletionItemKind::Text),
+            make_item("b", CompletionItemKind::Text),
+        ];
+        let result = SuggestionFilter::new().apply(&items);
+        assert_eq!(result.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // SuggestionSorter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn sorter_by_label() {
+        let mut items = vec![
+            make_item("zebra", CompletionItemKind::Variable),
+            make_item("apple", CompletionItemKind::Variable),
+            make_item("mango", CompletionItemKind::Variable),
+        ];
+        SuggestionSorter::new().by_label().sort(&mut items);
+        assert_eq!(items[0].label, "apple");
+        assert_eq!(items[1].label, "mango");
+        assert_eq!(items[2].label, "zebra");
+    }
+
+    #[test]
+    fn sorter_by_kind_priority() {
+        let mut items = vec![
+            make_item("var1", CompletionItemKind::Variable),
+            make_item("func1", CompletionItemKind::Function),
+            make_item("meth1", CompletionItemKind::Method),
+        ];
+        SuggestionSorter::new().by_kind_priority().sort(&mut items);
+        assert_eq!(items[0].label, "meth1");
+        assert_eq!(items[1].label, "func1");
+        assert_eq!(items[2].label, "var1");
+    }
+
+    #[test]
+    fn sorter_by_score() {
+        let mut items = vec![
+            make_item("xformat", CompletionItemKind::Function),
+            make_item("format", CompletionItemKind::Function),
+        ];
+        SuggestionSorter::new().by_score("for").sort(&mut items);
+        // "format" has prefix match so should come first
+        assert_eq!(items[0].label, "format");
     }
 }

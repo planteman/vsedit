@@ -510,6 +510,213 @@ pub fn snap_to_line_boundaries(range: &SelectionRange) -> SelectionRange {
     SelectionRange::new(range.start_line, 0, range.end_line + 1, 0)
 }
 
+/// A stack for progressive expand/shrink selection through predefined levels.
+#[derive(Debug, Clone)]
+pub struct SelectionExpansionStack {
+    levels: Vec<SelectionRange>,
+    current_level: usize,
+}
+
+impl SelectionExpansionStack {
+    /// Create an empty expansion stack.
+    pub fn new() -> Self {
+        Self { levels: Vec::new(), current_level: 0 }
+    }
+
+    /// Push a wider selection level onto the stack.
+    pub fn push_level(&mut self, range: SelectionRange) {
+        self.levels.push(range);
+    }
+
+    /// Move to the next wider level and return it.
+    pub fn expand(&mut self) -> Option<&SelectionRange> {
+        if self.current_level + 1 < self.levels.len() {
+            self.current_level += 1;
+            Some(&self.levels[self.current_level])
+        } else {
+            None
+        }
+    }
+
+    /// Move to the next narrower level and return it.
+    pub fn shrink(&mut self) -> Option<&SelectionRange> {
+        if self.current_level > 0 {
+            self.current_level -= 1;
+            Some(&self.levels[self.current_level])
+        } else {
+            None
+        }
+    }
+
+    /// Return the current level, if any.
+    pub fn current(&self) -> Option<&SelectionRange> {
+        self.levels.get(self.current_level)
+    }
+
+    /// Whether there is a wider level available.
+    pub fn can_expand(&self) -> bool {
+        self.current_level + 1 < self.levels.len()
+    }
+
+    /// Whether there is a narrower level available.
+    pub fn can_shrink(&self) -> bool {
+        self.current_level > 0
+    }
+
+    /// Total number of levels in the stack.
+    pub fn level_count(&self) -> usize {
+        self.levels.len()
+    }
+
+    /// Reset the cursor to the narrowest (first) level.
+    pub fn reset(&mut self) {
+        self.current_level = 0;
+    }
+}
+
+impl Default for SelectionExpansionStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Trait for smart-select providers that produce selection ranges from text.
+pub trait SmartSelectProvider {
+    /// Return a chain of selection ranges from narrowest to widest for the
+    /// given position.
+    fn provide_ranges(&self, text: &str, line: u32, col: u32) -> Vec<SelectionRange>;
+}
+
+/// Find the word boundaries around the given position and return a range.
+///
+/// A "word" is a contiguous run of alphanumeric or underscore characters.
+pub fn find_word_at(text: &str, line: u32, col: u32) -> Option<SelectionRange> {
+    let target_line = text.lines().nth(line as usize)?;
+    let col = col as usize;
+    if col > target_line.len() {
+        return None;
+    }
+    let bytes = target_line.as_bytes();
+    // Check that the cursor is on or adjacent to a word character.
+    let at_word = col < bytes.len() && is_word_byte(bytes[col]);
+    let before_word = col > 0 && is_word_byte(bytes[col - 1]);
+    if !at_word && !before_word {
+        return None;
+    }
+    let anchor = if at_word { col } else { col - 1 };
+    let mut start = anchor;
+    while start > 0 && is_word_byte(bytes[start - 1]) {
+        start -= 1;
+    }
+    let mut end = anchor;
+    while end < bytes.len() && is_word_byte(bytes[end]) {
+        end += 1;
+    }
+    if start == end {
+        return None;
+    }
+    Some(SelectionRange::new(line, start as u32, line, end as u32))
+}
+
+fn is_word_byte(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+/// Return a range covering the entire line (including trailing newline position).
+pub fn find_line_range(text: &str, line: u32) -> SelectionRange {
+    let mut col_end = 0u32;
+    if let Some(l) = text.lines().nth(line as usize) {
+        col_end = l.len() as u32;
+    }
+    SelectionRange::new(line, 0, line, col_end)
+}
+
+/// Return a range covering the entire document.
+pub fn find_document_range(text: &str) -> SelectionRange {
+    let line_count = text.lines().count();
+    if line_count == 0 {
+        return SelectionRange::new(0, 0, 0, 0);
+    }
+    let last_line = (line_count - 1) as u32;
+    let last_len = text.lines().last().map_or(0, |l| l.len()) as u32;
+    SelectionRange::new(0, 0, last_line, last_len)
+}
+
+/// Find an indentation-based block around `line`.
+///
+/// The block includes all contiguous lines whose indentation is ≥ the
+/// indentation of the anchor line, expanding outward until a less-indented
+/// (or empty) line is found.
+fn find_block_range(text: &str, line: u32) -> Option<SelectionRange> {
+    let lines: Vec<&str> = text.lines().collect();
+    let idx = line as usize;
+    if idx >= lines.len() {
+        return None;
+    }
+    let anchor_indent = indent_level(lines[idx]);
+    if anchor_indent == 0 {
+        return None; // top-level, no meaningful block
+    }
+    let mut start = idx;
+    while start > 0 && indent_level(lines[start - 1]) >= anchor_indent {
+        start -= 1;
+    }
+    let mut end = idx;
+    while end + 1 < lines.len() && indent_level(lines[end + 1]) >= anchor_indent {
+        end += 1;
+    }
+    let end_col = lines[end].len() as u32;
+    Some(SelectionRange::new(start as u32, 0, end as u32, end_col))
+}
+
+fn indent_level(line: &str) -> usize {
+    line.len() - line.trim_start().len()
+}
+
+/// A basic provider that builds word → line → block → document ranges.
+pub struct BasicSmartSelectProvider;
+
+impl SmartSelectProvider for BasicSmartSelectProvider {
+    fn provide_ranges(&self, text: &str, line: u32, col: u32) -> Vec<SelectionRange> {
+        let mut ranges: Vec<SelectionRange> = Vec::new();
+        if let Some(word) = find_word_at(text, line, col) {
+            ranges.push(word);
+        }
+        let line_range = find_line_range(text, line);
+        // Only add if it differs from the last pushed range.
+        if ranges.last().map_or(true, |r| r != &line_range) {
+            ranges.push(line_range);
+        }
+        if let Some(block) = find_block_range(text, line) {
+            if ranges.last().map_or(true, |r| r != &block) {
+                ranges.push(block);
+            }
+        }
+        let doc = find_document_range(text);
+        if ranges.last().map_or(true, |r| r != &doc) {
+            ranges.push(doc);
+        }
+        ranges
+    }
+}
+
+/// Build a syntax-aware selection chain from word → line → block → document.
+///
+/// Returns the innermost `SelectionRange` whose parent chain progresses to
+/// progressively wider ranges.
+pub fn syntax_aware_selection(text: &str, line: u32, col: u32) -> SelectionRange {
+    let provider = BasicSmartSelectProvider;
+    let ranges = provider.provide_ranges(text, line, col);
+    if ranges.is_empty() {
+        return find_document_range(text);
+    }
+    let tuples: Vec<(u32, u32, u32, u32)> = ranges
+        .into_iter()
+        .map(|r| (r.start_line, r.start_col, r.end_line, r.end_col))
+        .collect();
+    build_selection_chain(tuples)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -969,5 +1176,126 @@ mod tests {
         assert_eq!(stats.max_selection_length, 1005);
         assert_eq!(stats.total_expansions, 2);
         assert_eq!(stats.total_contractions, 0);
+    }
+
+    // ---- SelectionExpansionStack tests ----
+
+    #[test]
+    fn expansion_stack_expand_and_shrink() {
+        let mut stack = SelectionExpansionStack::new();
+        stack.push_level(SelectionRange::new(1, 0, 1, 5));
+        stack.push_level(SelectionRange::new(1, 0, 1, 20));
+        stack.push_level(SelectionRange::new(0, 0, 3, 0));
+
+        assert_eq!(stack.level_count(), 3);
+        assert_eq!(stack.current().unwrap(), &SelectionRange::new(1, 0, 1, 5));
+
+        assert!(stack.can_expand());
+        let r = stack.expand().unwrap();
+        assert_eq!(r, &SelectionRange::new(1, 0, 1, 20));
+
+        let r = stack.expand().unwrap();
+        assert_eq!(r, &SelectionRange::new(0, 0, 3, 0));
+        assert!(!stack.can_expand());
+        assert!(stack.expand().is_none());
+
+        assert!(stack.can_shrink());
+        let r = stack.shrink().unwrap();
+        assert_eq!(r, &SelectionRange::new(1, 0, 1, 20));
+
+        stack.reset();
+        assert_eq!(stack.current().unwrap(), &SelectionRange::new(1, 0, 1, 5));
+        assert!(!stack.can_shrink());
+    }
+
+    #[test]
+    fn expansion_stack_empty() {
+        let stack = SelectionExpansionStack::new();
+        assert_eq!(stack.level_count(), 0);
+        assert!(stack.current().is_none());
+        assert!(!stack.can_expand());
+        assert!(!stack.can_shrink());
+    }
+
+    // ---- find_word_at tests ----
+
+    #[test]
+    fn find_word_at_simple() {
+        let text = "hello world_foo bar";
+        let r = find_word_at(text, 0, 7).unwrap();
+        assert_eq!(r, SelectionRange::new(0, 6, 0, 15)); // "world_foo"
+    }
+
+    #[test]
+    fn find_word_at_start_of_line() {
+        let text = "abc def";
+        let r = find_word_at(text, 0, 0).unwrap();
+        assert_eq!(r, SelectionRange::new(0, 0, 0, 3));
+    }
+
+    #[test]
+    fn find_word_at_no_word() {
+        let text = "   ";
+        assert!(find_word_at(text, 0, 1).is_none());
+    }
+
+    // ---- find_line_range / find_document_range tests ----
+
+    #[test]
+    fn find_line_range_basic() {
+        let text = "first\nsecond\nthird";
+        let r = find_line_range(text, 1);
+        assert_eq!(r, SelectionRange::new(1, 0, 1, 6));
+    }
+
+    #[test]
+    fn find_document_range_basic() {
+        let text = "aaa\nbb\nc";
+        let r = find_document_range(text);
+        assert_eq!(r, SelectionRange::new(0, 0, 2, 1));
+    }
+
+    // ---- syntax_aware_selection tests ----
+
+    #[test]
+    fn syntax_aware_selection_builds_chain() {
+        let text = "fn main() {\n    let x = 42;\n}\n";
+        let sel = syntax_aware_selection(text, 1, 8);
+        // innermost should be a word
+        assert!(sel.is_single_line());
+        // should have a parent chain
+        assert!(sel.depth() >= 2, "expected depth >= 2, got {}", sel.depth());
+        // outermost should be the document
+        let outer = sel.outermost();
+        assert_eq!(outer.start_line, 0);
+        assert_eq!(outer.start_col, 0);
+    }
+
+    #[test]
+    fn syntax_aware_selection_no_word() {
+        // cursor on whitespace — should still produce line → doc chain
+        let text = "hello\n    \nworld";
+        let sel = syntax_aware_selection(text, 1, 2);
+        assert!(sel.depth() >= 1);
+    }
+
+    // ---- BasicSmartSelectProvider tests ----
+
+    #[test]
+    fn basic_provider_ranges_ordering() {
+        let provider = BasicSmartSelectProvider;
+        let text = "fn foo() {\n    bar();\n}\n";
+        let ranges = provider.provide_ranges(text, 1, 5);
+        // Each successive range should be at least as wide as the previous.
+        for window in ranges.windows(2) {
+            let a = &window[0];
+            let b = &window[1];
+            assert!(
+                selection_contains(b, a),
+                "range {} should contain {}",
+                b,
+                a,
+            );
+        }
     }
 }

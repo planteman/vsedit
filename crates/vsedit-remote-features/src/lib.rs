@@ -559,6 +559,255 @@ impl RemoteConnectionHealth {
     }
 }
 
+/// Runtime environment for containers.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ContainerRuntime {
+    Docker,
+    Podman,
+    Devcontainer,
+}
+
+impl fmt::Display for ContainerRuntime {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Docker => write!(f, "docker"),
+            Self::Podman => write!(f, "podman"),
+            Self::Devcontainer => write!(f, "devcontainer"),
+        }
+    }
+}
+
+/// Describes a remote connection target.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RemoteConnection {
+    Ssh {
+        host: String,
+        port: u16,
+        user: String,
+        identity_file: Option<String>,
+    },
+    Tunnel {
+        tunnel_id: String,
+        endpoint: String,
+    },
+    Container {
+        container_id: String,
+        container_name: String,
+        runtime: ContainerRuntime,
+    },
+}
+
+impl RemoteConnection {
+    /// Human-readable name for this connection.
+    pub fn display_name(&self) -> String {
+        match self {
+            Self::Ssh { host, user, .. } => format!("{user}@{host}"),
+            Self::Tunnel { tunnel_id, .. } => format!("tunnel:{tunnel_id}"),
+            Self::Container {
+                container_name,
+                runtime,
+                ..
+            } => format!("{runtime}:{container_name}"),
+        }
+    }
+
+    /// Connection string suitable for establishing the connection.
+    pub fn connection_string(&self) -> String {
+        match self {
+            Self::Ssh {
+                host,
+                port,
+                user,
+                identity_file,
+            } => match identity_file {
+                Some(key) => format!("ssh -i {key} -p {port} {user}@{host}"),
+                None => format!("ssh -p {port} {user}@{host}"),
+            },
+            Self::Tunnel {
+                tunnel_id,
+                endpoint,
+            } => format!("tunnel://{tunnel_id}@{endpoint}"),
+            Self::Container {
+                container_id,
+                runtime,
+                ..
+            } => format!("{runtime}://{container_id}"),
+        }
+    }
+
+    pub fn is_ssh(&self) -> bool {
+        matches!(self, Self::Ssh { .. })
+    }
+
+    pub fn is_tunnel(&self) -> bool {
+        matches!(self, Self::Tunnel { .. })
+    }
+
+    pub fn is_container(&self) -> bool {
+        matches!(self, Self::Container { .. })
+    }
+}
+
+impl fmt::Display for RemoteConnection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.display_name())
+    }
+}
+
+/// An entry in a remote file system listing.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RemoteFsEntry {
+    pub path: String,
+    pub is_dir: bool,
+    pub size: u64,
+    pub modified_epoch: u64,
+}
+
+/// Provides file-system operations over a remote connection.
+#[derive(Debug, Clone)]
+pub struct RemoteFileSystem {
+    #[allow(dead_code)]
+    connection_id: String,
+    #[allow(dead_code)]
+    root_path: String,
+    entries: Vec<RemoteFsEntry>,
+}
+
+impl RemoteFileSystem {
+    pub fn new(connection_id: impl Into<String>, root_path: impl Into<String>) -> Self {
+        Self {
+            connection_id: connection_id.into(),
+            root_path: root_path.into(),
+            entries: Vec::new(),
+        }
+    }
+
+    pub fn add_entry(&mut self, entry: RemoteFsEntry) {
+        self.entries.push(entry);
+    }
+
+    /// List entries whose path starts with the given directory prefix.
+    pub fn list_dir(&self, path: &str) -> Vec<&RemoteFsEntry> {
+        let prefix = if path.ends_with('/') {
+            path.to_string()
+        } else {
+            format!("{path}/")
+        };
+        self.entries
+            .iter()
+            .filter(|e| e.path.starts_with(&prefix) && e.path != prefix)
+            .filter(|e| {
+                // Only direct children: no additional '/' after the prefix.
+                let rest = &e.path[prefix.len()..];
+                !rest.contains('/')
+            })
+            .collect()
+    }
+
+    pub fn find_entry(&self, path: &str) -> Option<&RemoteFsEntry> {
+        self.entries.iter().find(|e| e.path == path)
+    }
+
+    pub fn total_size(&self) -> u64 {
+        self.entries.iter().map(|e| e.size).sum()
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Remove the first entry matching `path`. Returns `true` if found.
+    pub fn remove_entry(&mut self, path: &str) -> bool {
+        if let Some(idx) = self.entries.iter().position(|e| e.path == path) {
+            self.entries.remove(idx);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// Status of a tracked port forward.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PortForwardStatus {
+    Active,
+    Inactive,
+    Error(String),
+}
+
+/// A port forward together with its runtime status.
+#[derive(Debug, Clone)]
+pub struct TrackedPortForward {
+    pub forward: PortForward,
+    pub status: PortForwardStatus,
+    pub bytes_transferred: u64,
+}
+
+/// Tracks active port forwards and their transfer statistics.
+#[derive(Debug, Clone)]
+pub struct RemotePortForwardTracker {
+    forwards: Vec<TrackedPortForward>,
+}
+
+impl RemotePortForwardTracker {
+    pub fn new() -> Self {
+        Self {
+            forwards: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, forward: PortForward) {
+        self.forwards.push(TrackedPortForward {
+            forward,
+            status: PortForwardStatus::Active,
+            bytes_transferred: 0,
+        });
+    }
+
+    pub fn set_status(&mut self, local_port: u16, status: PortForwardStatus) {
+        if let Some(t) = self
+            .forwards
+            .iter_mut()
+            .find(|t| t.forward.local_port == local_port)
+        {
+            t.status = status;
+        }
+    }
+
+    pub fn active_count(&self) -> usize {
+        self.forwards
+            .iter()
+            .filter(|t| t.status == PortForwardStatus::Active)
+            .count()
+    }
+
+    pub fn total_bytes(&self) -> u64 {
+        self.forwards.iter().map(|t| t.bytes_transferred).sum()
+    }
+
+    pub fn get_by_port(&self, local_port: u16) -> Option<&TrackedPortForward> {
+        self.forwards
+            .iter()
+            .find(|t| t.forward.local_port == local_port)
+    }
+
+    pub fn record_bytes(&mut self, local_port: u16, bytes: u64) {
+        if let Some(t) = self
+            .forwards
+            .iter_mut()
+            .find(|t| t.forward.local_port == local_port)
+        {
+            t.bytes_transferred += bytes;
+        }
+    }
+}
+
+impl Default for RemotePortForwardTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -969,5 +1218,151 @@ mod tests {
         assert_eq!(h.last_ping_time, 42);
         h.record_failure(99);
         assert_eq!(h.last_ping_time, 99);
+    }
+
+    // ── RemoteConnection ──────────────────────────────────────────
+
+    #[test]
+    fn remote_connection_ssh_display_and_string() {
+        let conn = RemoteConnection::Ssh {
+            host: "dev.example.com".into(),
+            port: 22,
+            user: "alice".into(),
+            identity_file: Some("/home/alice/.ssh/id_ed25519".into()),
+        };
+        assert_eq!(conn.display_name(), "alice@dev.example.com");
+        assert_eq!(
+            conn.connection_string(),
+            "ssh -i /home/alice/.ssh/id_ed25519 -p 22 alice@dev.example.com"
+        );
+        assert!(conn.is_ssh());
+        assert!(!conn.is_tunnel());
+        assert!(!conn.is_container());
+        assert_eq!(format!("{conn}"), "alice@dev.example.com");
+    }
+
+    #[test]
+    fn remote_connection_tunnel_variant() {
+        let conn = RemoteConnection::Tunnel {
+            tunnel_id: "t-42".into(),
+            endpoint: "relay.example.com:443".into(),
+        };
+        assert_eq!(conn.display_name(), "tunnel:t-42");
+        assert_eq!(
+            conn.connection_string(),
+            "tunnel://t-42@relay.example.com:443"
+        );
+        assert!(conn.is_tunnel());
+        assert!(!conn.is_ssh());
+    }
+
+    #[test]
+    fn remote_connection_container_variant() {
+        let conn = RemoteConnection::Container {
+            container_id: "abc123".into(),
+            container_name: "my-app".into(),
+            runtime: ContainerRuntime::Podman,
+        };
+        assert_eq!(conn.display_name(), "podman:my-app");
+        assert_eq!(conn.connection_string(), "podman://abc123");
+        assert!(conn.is_container());
+    }
+
+    // ── RemoteFileSystem ──────────────────────────────────────────
+
+    #[test]
+    fn remote_fs_add_find_remove() {
+        let mut fs = RemoteFileSystem::new("conn-1", "/workspace");
+        fs.add_entry(RemoteFsEntry {
+            path: "/workspace/src/main.rs".into(),
+            is_dir: false,
+            size: 1024,
+            modified_epoch: 1_700_000_000,
+        });
+        fs.add_entry(RemoteFsEntry {
+            path: "/workspace/src/lib.rs".into(),
+            is_dir: false,
+            size: 2048,
+            modified_epoch: 1_700_000_100,
+        });
+
+        assert_eq!(fs.entry_count(), 2);
+        assert_eq!(fs.total_size(), 3072);
+        assert!(fs.find_entry("/workspace/src/main.rs").is_some());
+        assert!(fs.find_entry("/workspace/missing.rs").is_none());
+
+        assert!(fs.remove_entry("/workspace/src/main.rs"));
+        assert_eq!(fs.entry_count(), 1);
+        assert!(!fs.remove_entry("/workspace/src/main.rs"));
+    }
+
+    #[test]
+    fn remote_fs_list_dir() {
+        let mut fs = RemoteFileSystem::new("conn-2", "/project");
+        fs.add_entry(RemoteFsEntry {
+            path: "/project/src/a.rs".into(),
+            is_dir: false,
+            size: 100,
+            modified_epoch: 0,
+        });
+        fs.add_entry(RemoteFsEntry {
+            path: "/project/src/b.rs".into(),
+            is_dir: false,
+            size: 200,
+            modified_epoch: 0,
+        });
+        fs.add_entry(RemoteFsEntry {
+            path: "/project/src/sub/c.rs".into(),
+            is_dir: false,
+            size: 50,
+            modified_epoch: 0,
+        });
+        fs.add_entry(RemoteFsEntry {
+            path: "/project/README.md".into(),
+            is_dir: false,
+            size: 10,
+            modified_epoch: 0,
+        });
+
+        let src_entries = fs.list_dir("/project/src");
+        assert_eq!(src_entries.len(), 2); // a.rs, b.rs — not sub/c.rs
+    }
+
+    // ── RemotePortForwardTracker ──────────────────────────────────
+
+    #[test]
+    fn tracker_add_and_count() {
+        let mut tracker = RemotePortForwardTracker::new();
+        tracker.add(PortForwardBuilder::new(8080, 80).build());
+        tracker.add(PortForwardBuilder::new(3000, 3000).build());
+        assert_eq!(tracker.active_count(), 2);
+    }
+
+    #[test]
+    fn tracker_set_status_and_bytes() {
+        let mut tracker = RemotePortForwardTracker::new();
+        tracker.add(PortForwardBuilder::new(8080, 80).build());
+        tracker.add(PortForwardBuilder::new(3000, 3000).build());
+
+        tracker.set_status(8080, PortForwardStatus::Inactive);
+        assert_eq!(tracker.active_count(), 1);
+
+        tracker.record_bytes(3000, 500);
+        tracker.record_bytes(3000, 250);
+        assert_eq!(tracker.total_bytes(), 750);
+
+        let t = tracker.get_by_port(3000).unwrap();
+        assert_eq!(t.bytes_transferred, 750);
+        assert_eq!(t.status, PortForwardStatus::Active);
+    }
+
+    #[test]
+    fn tracker_error_status() {
+        let mut tracker = RemotePortForwardTracker::new();
+        tracker.add(PortForwardBuilder::new(4000, 4000).build());
+        tracker.set_status(4000, PortForwardStatus::Error("timeout".into()));
+        assert_eq!(tracker.active_count(), 0);
+        let t = tracker.get_by_port(4000).unwrap();
+        assert_eq!(t.status, PortForwardStatus::Error("timeout".into()));
     }
 }

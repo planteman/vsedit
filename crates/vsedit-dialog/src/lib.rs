@@ -675,6 +675,181 @@ impl DialogTheme {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DialogButtonWithShortcut
+// ---------------------------------------------------------------------------
+
+/// A dialog button extended with an optional keyboard shortcut and tooltip.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DialogButtonWithShortcut {
+    pub button: DialogButton,
+    pub shortcut: Option<char>,
+    pub tooltip: Option<String>,
+}
+
+impl DialogButtonWithShortcut {
+    pub fn new(button: DialogButton) -> Self {
+        Self {
+            button,
+            shortcut: None,
+            tooltip: None,
+        }
+    }
+
+    pub fn with_shortcut(mut self, key: char) -> Self {
+        self.shortcut = Some(key);
+        self
+    }
+
+    pub fn with_tooltip(mut self, tip: impl Into<String>) -> Self {
+        self.tooltip = Some(tip.into());
+        self
+    }
+
+    /// Returns `true` if `c` (case-insensitive) matches the shortcut key.
+    pub fn matches_key(&self, c: char) -> bool {
+        match self.shortcut {
+            Some(k) => k.to_ascii_lowercase() == c.to_ascii_lowercase(),
+            None => false,
+        }
+    }
+
+    /// Returns a display label that indicates the shortcut key, e.g.
+    /// label "OK" with shortcut 'O' → "OK [O]".
+    pub fn display_label(&self) -> String {
+        match self.shortcut {
+            Some(k) => format!("{} [{}]", self.button.label, k.to_ascii_uppercase()),
+            None => self.button.label.clone(),
+        }
+    }
+}
+
+impl fmt::Display for DialogButtonWithShortcut {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.display_label())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileDialogFilter / FileDialogOptions
+// ---------------------------------------------------------------------------
+
+/// A single file-type filter entry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FileDialogFilter {
+    pub name: String,
+    pub extensions: Vec<String>,
+}
+
+impl FileDialogFilter {
+    pub fn new(name: impl Into<String>, extensions: Vec<String>) -> Self {
+        Self {
+            name: name.into(),
+            extensions,
+        }
+    }
+
+    /// Case-insensitive check whether `filename` matches one of the
+    /// extensions in this filter.
+    pub fn matches(&self, filename: &str) -> bool {
+        let lower = filename.to_ascii_lowercase();
+        self.extensions
+            .iter()
+            .any(|ext| lower.ends_with(&format!(".{}", ext.to_ascii_lowercase())))
+    }
+
+    /// Human-readable representation, e.g. "Rust files (*.rs)".
+    pub fn display(&self) -> String {
+        let exts: Vec<String> = self.extensions.iter().map(|e| format!("*.{e}")).collect();
+        format!("{} ({})", self.name, exts.join(", "))
+    }
+}
+
+impl fmt::Display for FileDialogFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.display())
+    }
+}
+
+/// Options for a file-open / file-save dialog.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FileDialogOptions {
+    pub title: String,
+    pub filters: Vec<FileDialogFilter>,
+    pub initial_dir: Option<String>,
+}
+
+impl FileDialogOptions {
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            filters: Vec::new(),
+            initial_dir: None,
+        }
+    }
+
+    /// Returns the first filter that matches `filename`, if any.
+    pub fn find_matching_filter(&self, filename: &str) -> Option<&FileDialogFilter> {
+        self.filters.iter().find(|f| f.matches(filename))
+    }
+
+    /// Collects every extension from all filters.
+    pub fn all_extensions(&self) -> Vec<&str> {
+        self.filters
+            .iter()
+            .flat_map(|f| f.extensions.iter().map(String::as_str))
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DialogOutcome
+// ---------------------------------------------------------------------------
+
+/// A richer result type for dialog interactions.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DialogOutcome {
+    Confirmed(String),
+    Cancelled,
+    TimedOut,
+    Custom { key: String, data: Option<String> },
+}
+
+impl DialogOutcome {
+    pub fn is_confirmed(&self) -> bool {
+        matches!(self, DialogOutcome::Confirmed(_))
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        matches!(self, DialogOutcome::Cancelled)
+    }
+
+    /// Returns the inner value for `Confirmed` and `Custom` variants.
+    pub fn value(&self) -> Option<&str> {
+        match self {
+            DialogOutcome::Confirmed(v) => Some(v.as_str()),
+            DialogOutcome::Custom { data: Some(d), .. } => Some(d.as_str()),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for DialogOutcome {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DialogOutcome::Confirmed(v) => write!(f, "Confirmed: {v}"),
+            DialogOutcome::Cancelled => write!(f, "Cancelled"),
+            DialogOutcome::TimedOut => write!(f, "Timed out"),
+            DialogOutcome::Custom { key, data: Some(d) } => {
+                write!(f, "Custom({key}): {d}")
+            }
+            DialogOutcome::Custom { key, data: None } => {
+                write!(f, "Custom({key})")
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -965,5 +1140,99 @@ mod tests {
         assert_eq!(tr, "╮");
         assert_eq!(bl, "╰");
         assert_eq!(br, "╯");
+    }
+
+    // -- DialogButtonWithShortcut tests --
+
+    #[test]
+    fn button_with_shortcut_display_label() {
+        let btn = DialogButtonWithShortcut::new(DialogButton::new("OK", "ok"))
+            .with_shortcut('o');
+        assert_eq!(btn.display_label(), "OK [O]");
+    }
+
+    #[test]
+    fn button_with_shortcut_no_shortcut() {
+        let btn = DialogButtonWithShortcut::new(DialogButton::new("Cancel", "cancel"));
+        assert_eq!(btn.display_label(), "Cancel");
+        assert!(!btn.matches_key('c'));
+    }
+
+    #[test]
+    fn button_with_shortcut_matches_case_insensitive() {
+        let btn = DialogButtonWithShortcut::new(DialogButton::primary("Save", "save"))
+            .with_shortcut('s')
+            .with_tooltip("Save the file");
+        assert!(btn.matches_key('s'));
+        assert!(btn.matches_key('S'));
+        assert!(!btn.matches_key('x'));
+        assert_eq!(btn.tooltip.as_deref(), Some("Save the file"));
+    }
+
+    // -- FileDialogFilter tests --
+
+    #[test]
+    fn file_filter_matches_extension() {
+        let f = FileDialogFilter::new("Rust files", vec!["rs".into()]);
+        assert!(f.matches("main.rs"));
+        assert!(f.matches("LIB.RS")); // case-insensitive
+        assert!(!f.matches("main.py"));
+        assert_eq!(f.display(), "Rust files (*.rs)");
+    }
+
+    #[test]
+    fn file_filter_multiple_extensions() {
+        let f = FileDialogFilter::new("Images", vec!["png".into(), "jpg".into(), "gif".into()]);
+        assert!(f.matches("photo.JPG"));
+        assert!(f.matches("icon.png"));
+        assert!(!f.matches("doc.pdf"));
+        assert_eq!(f.display(), "Images (*.png, *.jpg, *.gif)");
+    }
+
+    #[test]
+    fn file_dialog_options_find_and_all() {
+        let opts = FileDialogOptions {
+            title: "Open".into(),
+            filters: vec![
+                FileDialogFilter::new("Rust", vec!["rs".into()]),
+                FileDialogFilter::new("TOML", vec!["toml".into()]),
+            ],
+            initial_dir: Some("/home".into()),
+        };
+        assert_eq!(opts.find_matching_filter("Cargo.toml").unwrap().name, "TOML");
+        assert!(opts.find_matching_filter("image.png").is_none());
+        assert_eq!(opts.all_extensions(), vec!["rs", "toml"]);
+    }
+
+    // -- DialogOutcome tests --
+
+    #[test]
+    fn dialog_outcome_confirmed() {
+        let o = DialogOutcome::Confirmed("yes".into());
+        assert!(o.is_confirmed());
+        assert!(!o.is_cancelled());
+        assert_eq!(o.value(), Some("yes"));
+        assert_eq!(o.to_string(), "Confirmed: yes");
+    }
+
+    #[test]
+    fn dialog_outcome_variants() {
+        assert!(DialogOutcome::Cancelled.is_cancelled());
+        assert_eq!(DialogOutcome::Cancelled.value(), None);
+        assert_eq!(DialogOutcome::TimedOut.to_string(), "Timed out");
+
+        let custom = DialogOutcome::Custom {
+            key: "retry".into(),
+            data: Some("3".into()),
+        };
+        assert_eq!(custom.value(), Some("3"));
+        assert_eq!(custom.to_string(), "Custom(retry): 3");
+
+        let custom_no_data = DialogOutcome::Custom {
+            key: "skip".into(),
+            data: None,
+        };
+        assert_eq!(custom_no_data.value(), None);
+        assert_eq!(custom_no_data.to_string(), "Custom(skip)");
     }
 }

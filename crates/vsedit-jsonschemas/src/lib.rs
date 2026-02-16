@@ -428,6 +428,140 @@ pub fn validate_type(value: &str, expected: SchemaType) -> bool {
     }
 }
 
+/// A JSON-like value for schema validation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum JsonValue {
+    Null,
+    Bool(bool),
+    Number(f64),
+    Str(String),
+    Array(Vec<JsonValue>),
+    Object(Vec<(String, JsonValue)>),
+}
+
+/// An error produced when validating a `JsonValue` against a `JsonSchema`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValidationError {
+    pub path: String,
+    pub message: String,
+    pub expected_type: Option<SchemaType>,
+}
+
+/// Validates `JsonValue` instances against a `JsonSchema`.
+pub struct SchemaValidator;
+
+impl SchemaValidator {
+    /// Validate a value against a schema, returning all errors found.
+    pub fn validate(schema: &JsonSchema, value: &JsonValue) -> Vec<ValidationError> {
+        let mut errors = Vec::new();
+
+        // Top-level type check.
+        if !Self::validate_type(value, schema.schema_type) {
+            errors.push(ValidationError {
+                path: String::new(),
+                message: format!(
+                    "expected type {}, got {}",
+                    schema.schema_type,
+                    Self::type_name(value)
+                ),
+                expected_type: Some(schema.schema_type),
+            });
+            return errors;
+        }
+
+        // For objects, validate required fields and per-property types / enums.
+        if let JsonValue::Object(fields) = value {
+            errors.extend(Self::validate_required(schema, fields));
+
+            for (key, val) in fields {
+                if let Some(prop) = schema.get_property(key) {
+                    let prop_path = key.clone();
+
+                    if !Self::validate_type(val, prop.schema_type) {
+                        errors.push(ValidationError {
+                            path: prop_path.clone(),
+                            message: format!(
+                                "expected type {}, got {}",
+                                prop.schema_type,
+                                Self::type_name(val)
+                            ),
+                            expected_type: Some(prop.schema_type),
+                        });
+                    }
+
+                    // Enum validation would be invoked here when constraints
+                    // are attached to properties. Use validate_enum directly.
+                    let _ = &prop_path;
+                }
+            }
+        }
+
+        errors
+    }
+
+    /// Returns `true` if `value` matches the expected `SchemaType`.
+    pub fn validate_type(value: &JsonValue, expected: SchemaType) -> bool {
+        matches!(
+            (value, expected),
+            (JsonValue::Str(_), SchemaType::String)
+                | (JsonValue::Number(_), SchemaType::Number)
+                | (JsonValue::Number(_), SchemaType::Integer)
+                | (JsonValue::Bool(_), SchemaType::Boolean)
+                | (JsonValue::Array(_), SchemaType::Array)
+                | (JsonValue::Object(_), SchemaType::Object)
+                | (JsonValue::Null, SchemaType::Null)
+        )
+    }
+
+    /// Check that every required property in `schema` is present in `fields`.
+    pub fn validate_required(
+        schema: &JsonSchema,
+        fields: &[(String, JsonValue)],
+    ) -> Vec<ValidationError> {
+        schema
+            .get_required_properties()
+            .into_iter()
+            .filter(|prop| !fields.iter().any(|(k, _)| k == &prop.name))
+            .map(|prop| ValidationError {
+                path: prop.name.clone(),
+                message: format!("missing required property \"{}\"", prop.name),
+                expected_type: Some(prop.schema_type),
+            })
+            .collect()
+    }
+
+    /// Check whether `value` is one of the `allowed` enum variants.
+    /// Returns an error if `value` is not in the list.
+    pub fn validate_enum(
+        path: &str,
+        value: &str,
+        allowed: &[String],
+    ) -> Vec<ValidationError> {
+        if allowed.is_empty() || allowed.iter().any(|a| a == value) {
+            return Vec::new();
+        }
+        vec![ValidationError {
+            path: path.to_string(),
+            message: format!(
+                "value \"{}\" is not one of the allowed values: {:?}",
+                value, allowed
+            ),
+            expected_type: Some(SchemaType::String),
+        }]
+    }
+
+    fn type_name(value: &JsonValue) -> &'static str {
+        match value {
+            JsonValue::Null => "null",
+            JsonValue::Bool(_) => "boolean",
+            JsonValue::Number(_) => "number",
+            JsonValue::Str(_) => "string",
+            JsonValue::Array(_) => "array",
+            JsonValue::Object(_) => "object",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -950,5 +1084,160 @@ mod tests {
         .with_default("default_val");
         assert_eq!(prop.description.as_deref(), Some("A description"));
         assert_eq!(prop.default_value.as_deref(), Some("default_val"));
+    }
+
+    // ── SchemaValidator tests ──────────────────────────────────────────
+
+    fn validator_schema() -> JsonSchema {
+        JsonSchema {
+            id: Some("test".to_string()),
+            title: None,
+            description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty {
+                    name: "name".to_string(),
+                    schema_type: SchemaType::String,
+                    description: None,
+                    required: true,
+                    default_value: None,
+                },
+                SchemaProperty {
+                    name: "age".to_string(),
+                    schema_type: SchemaType::Number,
+                    description: None,
+                    required: false,
+                    default_value: None,
+                },
+            ],
+            file_match: vec![],
+        }
+    }
+
+    #[test]
+    fn validate_type_string() {
+        assert!(SchemaValidator::validate_type(
+            &JsonValue::Str("hi".into()),
+            SchemaType::String
+        ));
+        assert!(!SchemaValidator::validate_type(
+            &JsonValue::Number(1.0),
+            SchemaType::String
+        ));
+    }
+
+    #[test]
+    fn validate_type_number() {
+        assert!(SchemaValidator::validate_type(
+            &JsonValue::Number(3.14),
+            SchemaType::Number
+        ));
+        assert!(!SchemaValidator::validate_type(
+            &JsonValue::Bool(true),
+            SchemaType::Number
+        ));
+    }
+
+    #[test]
+    fn validate_type_boolean() {
+        assert!(SchemaValidator::validate_type(
+            &JsonValue::Bool(false),
+            SchemaType::Boolean
+        ));
+        assert!(!SchemaValidator::validate_type(
+            &JsonValue::Null,
+            SchemaType::Boolean
+        ));
+    }
+
+    #[test]
+    fn validate_type_null_array_object() {
+        assert!(SchemaValidator::validate_type(&JsonValue::Null, SchemaType::Null));
+        assert!(SchemaValidator::validate_type(
+            &JsonValue::Array(vec![]),
+            SchemaType::Array
+        ));
+        assert!(SchemaValidator::validate_type(
+            &JsonValue::Object(vec![]),
+            SchemaType::Object
+        ));
+    }
+
+    #[test]
+    fn validate_valid_object() {
+        let schema = validator_schema();
+        let value = JsonValue::Object(vec![
+            ("name".into(), JsonValue::Str("Alice".into())),
+            ("age".into(), JsonValue::Number(30.0)),
+        ]);
+        let errors = SchemaValidator::validate(&schema, &value);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn validate_missing_required_property() {
+        let schema = validator_schema();
+        let value = JsonValue::Object(vec![
+            ("age".into(), JsonValue::Number(25.0)),
+        ]);
+        let errors = SchemaValidator::validate(&schema, &value);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].message.contains("missing required"));
+        assert_eq!(errors[0].path, "name");
+    }
+
+    #[test]
+    fn validate_wrong_property_type() {
+        let schema = validator_schema();
+        let value = JsonValue::Object(vec![
+            ("name".into(), JsonValue::Str("Bob".into())),
+            ("age".into(), JsonValue::Str("not a number".into())),
+        ]);
+        let errors = SchemaValidator::validate(&schema, &value);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].path, "age");
+        assert_eq!(errors[0].expected_type, Some(SchemaType::Number));
+    }
+
+    #[test]
+    fn validate_top_level_type_mismatch() {
+        let schema = validator_schema();
+        let value = JsonValue::Str("not an object".into());
+        let errors = SchemaValidator::validate(&schema, &value);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].message.contains("expected type object"));
+    }
+
+    #[test]
+    fn validate_enum_allowed_value() {
+        let allowed = vec!["red".to_string(), "green".to_string(), "blue".to_string()];
+        let errors = SchemaValidator::validate_enum("color", "green", &allowed);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn validate_enum_disallowed_value() {
+        let allowed = vec!["red".to_string(), "green".to_string()];
+        let errors = SchemaValidator::validate_enum("color", "purple", &allowed);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].message.contains("purple"));
+        assert!(errors[0].message.contains("not one of the allowed"));
+    }
+
+    #[test]
+    fn validate_enum_empty_allows_any() {
+        let errors = SchemaValidator::validate_enum("x", "anything", &[]);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn validate_required_all_present() {
+        let schema = validator_schema();
+        let fields = vec![
+            ("name".to_string(), JsonValue::Str("ok".into())),
+            ("age".to_string(), JsonValue::Number(1.0)),
+        ];
+        let errors = SchemaValidator::validate_required(&schema, &fields);
+        assert!(errors.is_empty());
     }
 }

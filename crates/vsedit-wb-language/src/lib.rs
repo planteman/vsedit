@@ -460,6 +460,124 @@ pub fn resolve_language_by_extension(
         .map(|a| a.language_id.clone())
 }
 
+/// A first-line pattern rule mapping a prefix to a language ID.
+#[derive(Debug, Clone)]
+struct FirstLineRule {
+    pattern: String,
+    language_id: String,
+}
+
+/// Guesses a language from the first line of a file using pattern matching.
+#[derive(Debug, Clone)]
+pub struct LanguageDetector {
+    rules: Vec<FirstLineRule>,
+}
+
+impl LanguageDetector {
+    /// Creates a detector with built-in rules for common shebangs and file headers.
+    pub fn new() -> Self {
+        let rules = vec![
+            FirstLineRule {
+                pattern: "#!/usr/bin/env python".into(),
+                language_id: "python".into(),
+            },
+            FirstLineRule {
+                pattern: "#!/bin/bash".into(),
+                language_id: "shellscript".into(),
+            },
+            FirstLineRule {
+                pattern: "#!/usr/bin/env node".into(),
+                language_id: "javascript".into(),
+            },
+            FirstLineRule {
+                pattern: "<?xml".into(),
+                language_id: "xml".into(),
+            },
+            FirstLineRule {
+                pattern: "<!DOCTYPE html".into(),
+                language_id: "html".into(),
+            },
+            FirstLineRule {
+                pattern: "{".into(),
+                language_id: "json".into(),
+            },
+        ];
+        Self { rules }
+    }
+
+    /// Detects a language from a single first line.
+    pub fn detect_from_first_line(&self, line: &str) -> Option<String> {
+        let trimmed = line.trim();
+        for rule in &self.rules {
+            if trimmed.starts_with(&rule.pattern) {
+                return Some(rule.language_id.clone());
+            }
+        }
+        None
+    }
+
+    /// Detects a language from file content by inspecting the first line.
+    pub fn detect_from_content(&self, content: &str) -> Option<String> {
+        let first_line = content.lines().next().unwrap_or("");
+        self.detect_from_first_line(first_line)
+    }
+}
+
+impl Default for LanguageDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Given a slice of associations, find extensions that map to multiple language IDs.
+///
+/// Returns a list of `(extension, [language_ids])` tuples sorted by extension,
+/// including only extensions with two or more associated languages.
+pub fn language_overlap(associations: &[LanguageAssociation]) -> Vec<(String, Vec<String>)> {
+    use std::collections::BTreeMap;
+    let mut map: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for assoc in associations {
+        let ext = assoc.extension.to_lowercase();
+        let entry = map.entry(ext).or_default();
+        if !entry.contains(&assoc.language_id) {
+            entry.push(assoc.language_id.clone());
+        }
+    }
+    map.into_iter().filter(|(_, ids)| ids.len() > 1).collect()
+}
+
+/// Tracks which editor features a language supports.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct LanguageFeatureSupport {
+    pub completion: bool,
+    pub hover: bool,
+    pub formatting: bool,
+    pub diagnostics: bool,
+    pub go_to_definition: bool,
+    pub references: bool,
+    pub rename: bool,
+    pub code_actions: bool,
+}
+
+impl LanguageFeatureSupport {
+    /// Returns how many features are enabled.
+    pub fn supports_count(&self) -> usize {
+        [
+            self.completion,
+            self.hover,
+            self.formatting,
+            self.diagnostics,
+            self.go_to_definition,
+            self.references,
+            self.rename,
+            self.code_actions,
+        ]
+        .iter()
+        .filter(|&&v| v)
+        .count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -948,5 +1066,143 @@ mod tests {
         let a = LanguageAssociation::new(".go", "go");
         assert_eq!(a.extension, ".go");
         assert_eq!(a.language_id, "go");
+    }
+
+    // -- LanguageDetector tests --------------------------------------------
+
+    #[test]
+    fn detector_shebang_python() {
+        let d = LanguageDetector::new();
+        assert_eq!(
+            d.detect_from_first_line("#!/usr/bin/env python3"),
+            Some("python".into())
+        );
+    }
+
+    #[test]
+    fn detector_shebang_bash() {
+        let d = LanguageDetector::new();
+        assert_eq!(
+            d.detect_from_first_line("#!/bin/bash"),
+            Some("shellscript".into())
+        );
+    }
+
+    #[test]
+    fn detector_shebang_node() {
+        let d = LanguageDetector::new();
+        assert_eq!(
+            d.detect_from_first_line("#!/usr/bin/env node"),
+            Some("javascript".into())
+        );
+    }
+
+    #[test]
+    fn detector_xml_declaration() {
+        let d = LanguageDetector::new();
+        assert_eq!(
+            d.detect_from_first_line("<?xml version=\"1.0\"?>"),
+            Some("xml".into())
+        );
+    }
+
+    #[test]
+    fn detector_html_doctype() {
+        let d = LanguageDetector::new();
+        assert_eq!(
+            d.detect_from_first_line("<!DOCTYPE html>"),
+            Some("html".into())
+        );
+    }
+
+    #[test]
+    fn detector_json_brace() {
+        let d = LanguageDetector::new();
+        assert_eq!(
+            d.detect_from_first_line("{"),
+            Some("json".into())
+        );
+    }
+
+    #[test]
+    fn detector_no_match() {
+        let d = LanguageDetector::new();
+        assert_eq!(d.detect_from_first_line("fn main() {}"), None);
+    }
+
+    #[test]
+    fn detector_from_content() {
+        let d = LanguageDetector::new();
+        let content = "#!/bin/bash\necho hello\n";
+        assert_eq!(d.detect_from_content(content), Some("shellscript".into()));
+    }
+
+    #[test]
+    fn detector_from_empty_content() {
+        let d = LanguageDetector::new();
+        assert_eq!(d.detect_from_content(""), None);
+    }
+
+    // -- language_overlap tests --------------------------------------------
+
+    #[test]
+    fn overlap_finds_shared_extensions() {
+        let assocs = vec![
+            LanguageAssociation::new(".ts", "typescript"),
+            LanguageAssociation::new(".ts", "typescriptreact"),
+            LanguageAssociation::new(".rs", "rust"),
+        ];
+        let overlaps = language_overlap(&assocs);
+        assert_eq!(overlaps.len(), 1);
+        assert_eq!(overlaps[0].0, ".ts");
+        assert_eq!(overlaps[0].1, vec!["typescript", "typescriptreact"]);
+    }
+
+    #[test]
+    fn overlap_no_duplicates() {
+        let assocs = vec![
+            LanguageAssociation::new(".rs", "rust"),
+            LanguageAssociation::new(".py", "python"),
+        ];
+        let overlaps = language_overlap(&assocs);
+        assert!(overlaps.is_empty());
+    }
+
+    // -- LanguageFeatureSupport tests --------------------------------------
+
+    #[test]
+    fn feature_support_default_zero() {
+        let fs = LanguageFeatureSupport::default();
+        assert_eq!(fs.supports_count(), 0);
+    }
+
+    #[test]
+    fn feature_support_counts_enabled() {
+        let fs = LanguageFeatureSupport {
+            completion: true,
+            hover: true,
+            formatting: false,
+            diagnostics: true,
+            go_to_definition: false,
+            references: false,
+            rename: true,
+            code_actions: false,
+        };
+        assert_eq!(fs.supports_count(), 4);
+    }
+
+    #[test]
+    fn feature_support_all_enabled() {
+        let fs = LanguageFeatureSupport {
+            completion: true,
+            hover: true,
+            formatting: true,
+            diagnostics: true,
+            go_to_definition: true,
+            references: true,
+            rename: true,
+            code_actions: true,
+        };
+        assert_eq!(fs.supports_count(), 8);
     }
 }

@@ -667,6 +667,119 @@ impl StringMatcher {
     }
 }
 
+/// Result of a fuzzy match, containing the score and the byte positions of matched characters.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FuzzyMatchResult {
+    pub score: u32,
+    pub positions: Vec<usize>,
+}
+
+/// Fuzzy-match `query` against `target`.
+///
+/// Returns `None` if not every character in `query` can be found (in order) in `target`.
+/// Scoring: +1 per match, +3 consecutive bonus, +5 word-start bonus (first char or char
+/// after a separator such as ` `, `_`, `-`, `/`, `.`).
+pub fn fuzzy_match(query: &str, target: &str) -> Option<FuzzyMatchResult> {
+    if query.is_empty() {
+        return None;
+    }
+
+    let target_lower: Vec<char> = target.chars().flat_map(|c| c.to_lowercase()).collect();
+    let target_chars: Vec<char> = target.chars().collect();
+    let query_lower: Vec<char> = query.chars().flat_map(|c| c.to_lowercase()).collect();
+
+    let mut positions = Vec::with_capacity(query_lower.len());
+    let mut score: u32 = 0;
+    let mut t_idx = 0;
+    let mut prev_matched_idx: Option<usize> = None;
+
+    for qch in &query_lower {
+        let mut found = false;
+        while t_idx < target_lower.len() {
+            if target_lower[t_idx] == *qch {
+                score += 1;
+
+                // Consecutive bonus
+                if let Some(prev) = prev_matched_idx {
+                    if t_idx == prev + 1 {
+                        score += 3;
+                    }
+                }
+
+                // Word-start bonus
+                if t_idx == 0 || matches!(target_chars[t_idx - 1], ' ' | '_' | '-' | '/' | '.') {
+                    score += 5;
+                }
+
+                // Record byte position
+                let byte_pos: usize = target_chars[..t_idx]
+                    .iter()
+                    .map(|c| c.len_utf8())
+                    .sum();
+                positions.push(byte_pos);
+
+                prev_matched_idx = Some(t_idx);
+                t_idx += 1;
+                found = true;
+                break;
+            }
+            t_idx += 1;
+        }
+        if !found {
+            return None;
+        }
+    }
+
+    Some(FuzzyMatchResult { score, positions })
+}
+
+/// Truncate a string in the middle, preserving the start and end with `…` in between.
+///
+/// If the string's character count is already within `max_len`, it is returned as-is.
+/// `max_len` must be at least 2; otherwise the original string is returned.
+pub fn truncate_middle(s: &str, max_len: usize) -> String {
+    let char_count = s.chars().count();
+    if char_count <= max_len || max_len < 2 {
+        return s.to_string();
+    }
+    // The ellipsis `…` takes 1 character position
+    let remaining = max_len - 1;
+    let head_len = (remaining + 1) / 2;
+    let tail_len = remaining - head_len;
+
+    let head: String = s.chars().take(head_len).collect();
+    let tail: String = s.chars().skip(char_count - tail_len).collect();
+    format!("{head}\u{2026}{tail}")
+}
+
+/// Count the number of whitespace-separated words in a string.
+pub fn word_count(s: &str) -> usize {
+    s.split_whitespace().count()
+}
+
+/// Count the number of Unicode characters (scalar values) in a string.
+pub fn char_count(s: &str) -> usize {
+    s.chars().count()
+}
+
+/// Convert a string to title case, capitalising the first letter of each whitespace-separated word.
+pub fn title_case(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    for (i, word) in s.split_whitespace().enumerate() {
+        if i > 0 {
+            result.push(' ');
+        }
+        let mut chars = word.chars();
+        if let Some(first) = chars.next() {
+            for c in first.to_uppercase() {
+                result.push(c);
+            }
+            result.extend(chars);
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -961,5 +1074,95 @@ mod tests {
     fn matcher_empty_query() {
         let m = StringMatcher::new("");
         assert_eq!(m.score("anything"), 0);
+    }
+
+    // --- fuzzy_match tests ---
+
+    #[test]
+    fn fuzzy_match_basic() {
+        let result = fuzzy_match("fb", "foo bar").unwrap();
+        assert!(result.score > 0);
+        assert_eq!(result.positions.len(), 2);
+        assert_eq!(result.positions[0], 0); // 'f' at byte 0
+        assert_eq!(result.positions[1], 4); // 'b' at byte 4
+    }
+
+    #[test]
+    fn fuzzy_match_no_match() {
+        assert!(fuzzy_match("xyz", "hello").is_none());
+    }
+
+    #[test]
+    fn fuzzy_match_empty_query() {
+        assert!(fuzzy_match("", "anything").is_none());
+    }
+
+    #[test]
+    fn fuzzy_match_consecutive_scores_higher() {
+        let consecutive = fuzzy_match("ab", "xab").unwrap().score;
+        let spread = fuzzy_match("ab", "xaxb").unwrap().score;
+        assert!(consecutive > spread);
+    }
+
+    #[test]
+    fn fuzzy_match_word_start_bonus() {
+        // 'b' at word start should score higher than 'b' mid-word
+        let word_start = fuzzy_match("b", "foo bar").unwrap().score;
+        let mid_word = fuzzy_match("b", "abc").unwrap().score;
+        assert!(word_start > mid_word);
+    }
+
+    // --- truncate_middle tests ---
+
+    #[test]
+    fn truncate_middle_short_string() {
+        assert_eq!(truncate_middle("hello", 10), "hello");
+    }
+
+    #[test]
+    fn truncate_middle_long_string() {
+        let result = truncate_middle("hello world foo bar", 15);
+        assert!(result.chars().count() <= 15);
+        assert!(result.contains('\u{2026}'));
+        // Should preserve start and end
+        assert!(result.starts_with("hello"));
+        assert!(result.ends_with("oo bar"));
+    }
+
+    #[test]
+    fn truncate_middle_exact_fit() {
+        let s = "abcde";
+        assert_eq!(truncate_middle(s, 5), "abcde");
+    }
+
+    // --- word_count / char_count tests ---
+
+    #[test]
+    fn word_and_char_count() {
+        assert_eq!(word_count("hello world"), 2);
+        assert_eq!(word_count(""), 0);
+        assert_eq!(word_count("  spaces  "), 1);
+        assert_eq!(char_count("hello"), 5);
+        assert_eq!(char_count("日本語"), 3);
+        assert_eq!(char_count(""), 0);
+    }
+
+    // --- title_case tests ---
+
+    #[test]
+    fn title_case_basic() {
+        assert_eq!(title_case("hello world"), "Hello World");
+        assert_eq!(title_case("HELLO WORLD"), "HELLO WORLD");
+        assert_eq!(title_case("a b c"), "A B C");
+    }
+
+    #[test]
+    fn title_case_empty() {
+        assert_eq!(title_case(""), "");
+    }
+
+    #[test]
+    fn title_case_unicode() {
+        assert_eq!(title_case("über cool"), "Über Cool");
     }
 }

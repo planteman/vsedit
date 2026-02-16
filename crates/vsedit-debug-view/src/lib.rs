@@ -667,6 +667,239 @@ impl BreakpointManager {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CallStackFrameInfo
+// ---------------------------------------------------------------------------
+
+/// Extended call stack frame with source location and module metadata.
+#[derive(Debug, Clone)]
+pub struct CallStackFrameInfo {
+    pub frame_id: u64,
+    pub function_name: String,
+    pub source_file: Option<String>,
+    pub line: u32,
+    pub column: u32,
+    pub module_name: Option<String>,
+    pub is_external: bool,
+}
+
+impl CallStackFrameInfo {
+    pub fn new(
+        frame_id: u64,
+        function_name: impl Into<String>,
+        line: u32,
+        column: u32,
+    ) -> Self {
+        Self {
+            frame_id,
+            function_name: function_name.into(),
+            source_file: None,
+            line,
+            column,
+            module_name: None,
+            is_external: false,
+        }
+    }
+
+    /// Display the source location, e.g. `"main.rs:42:1"`.
+    /// Returns `"<unknown>"` when no source file is set.
+    pub fn display_location(&self) -> String {
+        match &self.source_file {
+            Some(path) => format!("{}:{}:{}", path, self.line, self.column),
+            None => "<unknown>".to_string(),
+        }
+    }
+
+    /// Return the short function name (last segment after `::` if any).
+    pub fn short_name(&self) -> &str {
+        self.function_name
+            .rsplit("::")
+            .next()
+            .unwrap_or(&self.function_name)
+    }
+
+    /// Returns `true` when this frame represents user (non-external) code.
+    pub fn is_user_code(&self) -> bool {
+        !self.is_external
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VariableInspector
+// ---------------------------------------------------------------------------
+
+/// Tracks expand/collapse state for a tree of debug variables and provides
+/// a flattened view suitable for list rendering.
+#[derive(Debug, Clone, Default)]
+pub struct VariableInspector {
+    variables: Vec<DebugVariable>,
+    expanded_paths: Vec<String>,
+}
+
+impl VariableInspector {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Replace the variable tree.
+    pub fn set_variables(&mut self, variables: Vec<DebugVariable>) {
+        self.variables = variables;
+    }
+
+    /// Toggle a variable path between expanded and collapsed.
+    pub fn toggle_path(&mut self, path: &str) {
+        if let Some(idx) = self.expanded_paths.iter().position(|p| p == path) {
+            self.expanded_paths.remove(idx);
+        } else {
+            self.expanded_paths.push(path.to_string());
+        }
+    }
+
+    /// Returns `true` if the given path is currently expanded.
+    pub fn is_expanded(&self, path: &str) -> bool {
+        self.expanded_paths.iter().any(|p| p == path)
+    }
+
+    /// Total number of top-level variables.
+    pub fn variable_count(&self) -> usize {
+        self.variables.len()
+    }
+
+    /// Produce a flat list of `(depth, &DebugVariable)` pairs by walking the
+    /// tree and expanding nodes whose path is in `expanded_paths`.
+    pub fn flatten(&self) -> Vec<(usize, &DebugVariable)> {
+        let mut out = Vec::new();
+        for var in &self.variables {
+            self.flatten_rec(var, &var.name, 0, &mut out);
+        }
+        out
+    }
+
+    fn flatten_rec<'a>(
+        &'a self,
+        var: &'a DebugVariable,
+        path: &str,
+        depth: usize,
+        out: &mut Vec<(usize, &'a DebugVariable)>,
+    ) {
+        out.push((depth, var));
+        if self.is_expanded(path) {
+            for child in &var.children {
+                let child_path = format!("{}.{}", path, child.name);
+                self.flatten_rec(child, &child_path, depth + 1, out);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BreakpointList
+// ---------------------------------------------------------------------------
+
+/// A list of breakpoints with selection and bulk-toggle support.
+#[derive(Debug, Clone, Default)]
+pub struct BreakpointList {
+    breakpoints: Vec<Breakpoint>,
+    selected: Option<usize>,
+}
+
+impl BreakpointList {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a breakpoint to the list.
+    pub fn add(&mut self, bp: Breakpoint) {
+        self.breakpoints.push(bp);
+        if self.selected.is_none() {
+            self.selected = Some(0);
+        }
+    }
+
+    /// Remove a breakpoint by id. Returns `true` if it existed.
+    pub fn remove(&mut self, id: u64) -> bool {
+        let before = self.breakpoints.len();
+        self.breakpoints.retain(|bp| bp.id != id);
+        let removed = self.breakpoints.len() < before;
+        if removed {
+            // Fix up selected index
+            if self.breakpoints.is_empty() {
+                self.selected = None;
+            } else if let Some(sel) = self.selected {
+                if sel >= self.breakpoints.len() {
+                    self.selected = Some(self.breakpoints.len() - 1);
+                }
+            }
+        }
+        removed
+    }
+
+    /// Toggle the enabled state of a breakpoint by id.
+    pub fn toggle(&mut self, id: u64) -> bool {
+        if let Some(bp) = self.breakpoints.iter_mut().find(|bp| bp.id == id) {
+            bp.enabled = !bp.enabled;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Enable all breakpoints.
+    pub fn enable_all(&mut self) {
+        for bp in &mut self.breakpoints {
+            bp.enabled = true;
+        }
+    }
+
+    /// Disable all breakpoints.
+    pub fn disable_all(&mut self) {
+        for bp in &mut self.breakpoints {
+            bp.enabled = false;
+        }
+    }
+
+    /// Number of enabled breakpoints.
+    pub fn enabled_count(&self) -> usize {
+        self.breakpoints.iter().filter(|bp| bp.enabled).count()
+    }
+
+    /// Move the selection to the next breakpoint.
+    pub fn select_next(&mut self) {
+        if self.breakpoints.is_empty() {
+            return;
+        }
+        self.selected = Some(match self.selected {
+            Some(i) if i + 1 < self.breakpoints.len() => i + 1,
+            Some(i) => i,
+            None => 0,
+        });
+    }
+
+    /// Move the selection to the previous breakpoint.
+    pub fn select_previous(&mut self) {
+        if self.breakpoints.is_empty() {
+            return;
+        }
+        self.selected = Some(match self.selected {
+            Some(i) => i.saturating_sub(1),
+            None => 0,
+        });
+    }
+
+    /// Return a reference to the currently selected breakpoint.
+    pub fn selected_breakpoint(&self) -> Option<&Breakpoint> {
+        self.selected.and_then(|i| self.breakpoints.get(i))
+    }
+
+    /// Return all breakpoints whose file path matches `path`.
+    pub fn breakpoints_for_file(&self, path: &str) -> Vec<&Breakpoint> {
+        self.breakpoints
+            .iter()
+            .filter(|bp| bp.file_path == path)
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -966,5 +1199,142 @@ mod tests {
         mgr.add("a.rs", 42);
         assert!(mgr.find_by_file_line("a.rs", 42).is_some());
         assert!(mgr.find_by_file_line("a.rs", 99).is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // CallStackFrameInfo tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn call_stack_frame_info_display_location() {
+        let mut frame = CallStackFrameInfo::new(1, "main", 42, 1);
+        assert_eq!(frame.display_location(), "<unknown>");
+
+        frame.source_file = Some("main.rs".into());
+        assert_eq!(frame.display_location(), "main.rs:42:1");
+    }
+
+    #[test]
+    fn call_stack_frame_info_short_name() {
+        let frame = CallStackFrameInfo::new(1, "mymod::inner::run", 1, 0);
+        assert_eq!(frame.short_name(), "run");
+
+        let simple = CallStackFrameInfo::new(2, "main", 1, 0);
+        assert_eq!(simple.short_name(), "main");
+    }
+
+    #[test]
+    fn call_stack_frame_info_is_user_code() {
+        let mut frame = CallStackFrameInfo::new(1, "f", 1, 0);
+        assert!(frame.is_user_code());
+
+        frame.is_external = true;
+        assert!(!frame.is_user_code());
+    }
+
+    // -----------------------------------------------------------------------
+    // VariableInspector tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn variable_inspector_toggle_and_flatten() {
+        let child = DebugVariable::new("x", "42", "i32");
+        let parent = DebugVariable::new("obj", "{...}", "MyStruct")
+            .with_children(vec![child]);
+
+        let mut inspector = VariableInspector::new();
+        inspector.set_variables(vec![parent]);
+        assert_eq!(inspector.variable_count(), 1);
+
+        // Collapsed: only root visible
+        let flat = inspector.flatten();
+        assert_eq!(flat.len(), 1);
+        assert_eq!(flat[0].0, 0);
+        assert_eq!(flat[0].1.name, "obj");
+
+        // Expand root
+        inspector.toggle_path("obj");
+        assert!(inspector.is_expanded("obj"));
+        let flat = inspector.flatten();
+        assert_eq!(flat.len(), 2);
+        assert_eq!(flat[1].0, 1);
+        assert_eq!(flat[1].1.name, "x");
+
+        // Collapse again
+        inspector.toggle_path("obj");
+        assert!(!inspector.is_expanded("obj"));
+        assert_eq!(inspector.flatten().len(), 1);
+    }
+
+    #[test]
+    fn variable_inspector_nested_expand() {
+        let grandchild = DebugVariable::new("z", "true", "bool");
+        let child = DebugVariable::new("inner", "{}", "Sub").with_children(vec![grandchild]);
+        let root = DebugVariable::new("root", "{}", "Top").with_children(vec![child]);
+
+        let mut inspector = VariableInspector::new();
+        inspector.set_variables(vec![root]);
+
+        inspector.toggle_path("root");
+        inspector.toggle_path("root.inner");
+        let flat = inspector.flatten();
+        assert_eq!(flat.len(), 3);
+        assert_eq!(flat[0].0, 0); // root  depth 0
+        assert_eq!(flat[1].0, 1); // inner depth 1
+        assert_eq!(flat[2].0, 2); // z     depth 2
+    }
+
+    // -----------------------------------------------------------------------
+    // BreakpointList tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn breakpoint_list_add_select_remove() {
+        let mut list = BreakpointList::new();
+        assert!(list.selected_breakpoint().is_none());
+
+        list.add(Breakpoint::new(1, "a.rs", 10));
+        list.add(Breakpoint::new(2, "b.rs", 20));
+
+        assert_eq!(list.selected_breakpoint().unwrap().id, 1);
+        list.select_next();
+        assert_eq!(list.selected_breakpoint().unwrap().id, 2);
+        list.select_previous();
+        assert_eq!(list.selected_breakpoint().unwrap().id, 1);
+
+        assert!(list.remove(1));
+        assert_eq!(list.selected_breakpoint().unwrap().id, 2);
+        assert!(!list.remove(999));
+    }
+
+    #[test]
+    fn breakpoint_list_toggle_enable_disable() {
+        let mut list = BreakpointList::new();
+        list.add(Breakpoint::new(1, "a.rs", 1));
+        list.add(Breakpoint::new(2, "b.rs", 2));
+        assert_eq!(list.enabled_count(), 2);
+
+        list.toggle(1);
+        assert_eq!(list.enabled_count(), 1);
+
+        list.disable_all();
+        assert_eq!(list.enabled_count(), 0);
+
+        list.enable_all();
+        assert_eq!(list.enabled_count(), 2);
+
+        assert!(!list.toggle(999));
+    }
+
+    #[test]
+    fn breakpoint_list_for_file() {
+        let mut list = BreakpointList::new();
+        list.add(Breakpoint::new(1, "a.rs", 1));
+        list.add(Breakpoint::new(2, "a.rs", 5));
+        list.add(Breakpoint::new(3, "b.rs", 10));
+
+        assert_eq!(list.breakpoints_for_file("a.rs").len(), 2);
+        assert_eq!(list.breakpoints_for_file("b.rs").len(), 1);
+        assert!(list.breakpoints_for_file("c.rs").is_empty());
     }
 }

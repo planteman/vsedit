@@ -1,5 +1,6 @@
 //! AI chat service.
 
+use std::collections::HashMap;
 use std::fmt;
 
 /// Errors that can occur within the chat service.
@@ -524,6 +525,187 @@ impl Default for ChatConversation {
     }
 }
 
+// ── ChatHistory ──
+
+/// Persistent conversation history with querying capabilities.
+pub struct ChatHistory {
+    messages: Vec<ChatMessage>,
+}
+
+impl ChatHistory {
+    pub fn new() -> Self {
+        Self {
+            messages: Vec::new(),
+        }
+    }
+
+    /// Append a message to the history.
+    pub fn add_message(&mut self, role: MessageRole, content: impl Into<String>, timestamp: u64) {
+        self.messages.push(ChatMessage {
+            role,
+            content: content.into(),
+            timestamp,
+        });
+    }
+
+    /// Return all messages as a slice.
+    pub fn get_messages(&self) -> &[ChatMessage] {
+        &self.messages
+    }
+
+    /// Remove all messages.
+    pub fn clear(&mut self) {
+        self.messages.clear();
+    }
+
+    /// Return messages matching the given role.
+    pub fn get_messages_by_role(&self, role: &MessageRole) -> Vec<&ChatMessage> {
+        self.messages.iter().filter(|m| m.role == *role).collect()
+    }
+
+    /// Total number of stored messages.
+    pub fn message_count(&self) -> usize {
+        self.messages.len()
+    }
+
+    /// Return the last `n` messages (or fewer if the history is shorter).
+    pub fn last_n_messages(&self, n: usize) -> &[ChatMessage] {
+        let start = self.messages.len().saturating_sub(n);
+        &self.messages[start..]
+    }
+
+    /// Return messages with `timestamp >= since`.
+    pub fn messages_since(&self, since: u64) -> Vec<&ChatMessage> {
+        self.messages.iter().filter(|m| m.timestamp >= since).collect()
+    }
+
+    /// Convert the history into a `ChatConversation`.
+    pub fn to_conversation(&self) -> ChatConversation {
+        let mut conv = ChatConversation::new();
+        for msg in &self.messages {
+            conv.add_message(msg.role.clone(), msg.content.clone(), msg.timestamp);
+        }
+        conv
+    }
+}
+
+impl Default for ChatHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── ChatPromptTemplate ──
+
+/// A template that produces a `ChatMessage` by replacing `{variable}` placeholders.
+#[derive(Debug, Clone)]
+pub struct ChatPromptTemplate {
+    template: String,
+    role: MessageRole,
+}
+
+impl ChatPromptTemplate {
+    pub fn new(template: impl Into<String>, role: MessageRole) -> Self {
+        Self {
+            template: template.into(),
+            role,
+        }
+    }
+
+    /// Render the template by substituting `{key}` with values from `vars`.
+    pub fn render(&self, vars: &HashMap<String, String>) -> ChatMessage {
+        let mut result = self.template.clone();
+        for (key, value) in vars {
+            let placeholder = format!("{{{key}}}");
+            result = result.replace(&placeholder, value);
+        }
+        ChatMessage {
+            role: self.role.clone(),
+            content: result,
+            timestamp: 0,
+        }
+    }
+
+    /// Return a copy of this template with a different role.
+    pub fn with_role(mut self, role: MessageRole) -> Self {
+        self.role = role;
+        self
+    }
+}
+
+/// Chain of prompt templates rendered in sequence.
+pub struct ChatPromptChain {
+    templates: Vec<ChatPromptTemplate>,
+}
+
+impl ChatPromptChain {
+    pub fn new() -> Self {
+        Self {
+            templates: Vec::new(),
+        }
+    }
+
+    /// Append a template to the chain.
+    pub fn push(mut self, template: ChatPromptTemplate) -> Self {
+        self.templates.push(template);
+        self
+    }
+
+    /// Render all templates with the provided variables.
+    pub fn render(&self, vars: &HashMap<String, String>) -> Vec<ChatMessage> {
+        self.templates.iter().map(|t| t.render(vars)).collect()
+    }
+}
+
+impl Default for ChatPromptChain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── ChatTokenCounter ──
+
+/// Approximate token counting utilities using a word-based heuristic.
+pub struct ChatTokenCounter;
+
+impl ChatTokenCounter {
+    /// Estimate token count for a string (words × 1.3, rounded down).
+    pub fn count_tokens(text: &str) -> usize {
+        let words = text.split_whitespace().count();
+        (words as f64 * 1.3) as usize
+    }
+
+    /// Estimate token count for a single message.
+    pub fn count_message_tokens(msg: &ChatMessage) -> usize {
+        Self::count_tokens(&msg.content)
+    }
+
+    /// Estimate total token count across a slice of messages.
+    pub fn count_conversation_tokens(msgs: &[ChatMessage]) -> usize {
+        msgs.iter().map(|m| Self::count_message_tokens(m)).sum()
+    }
+
+    /// Returns `true` if the messages fit within `max_tokens`.
+    pub fn fits_in_context(msgs: &[ChatMessage], max_tokens: usize) -> bool {
+        Self::count_conversation_tokens(msgs) <= max_tokens
+    }
+
+    /// Return the longest prefix of `msgs` whose total tokens ≤ `max_tokens`.
+    pub fn truncate_to_fit(msgs: &[ChatMessage], max_tokens: usize) -> Vec<ChatMessage> {
+        let mut total: usize = 0;
+        let mut result = Vec::new();
+        for msg in msgs {
+            let t = Self::count_message_tokens(msg);
+            if total + t > max_tokens {
+                break;
+            }
+            total += t;
+            result.push(msg.clone());
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -944,5 +1126,122 @@ mod tests {
         conv.add_message(MessageRole::System, "init", 0);
         assert_eq!(conv.messages().len(), 1);
         assert_eq!(conv.messages()[0].role, MessageRole::System);
+    }
+
+    // ── ChatHistory tests ──
+
+    #[test]
+    fn history_add_and_get() {
+        let mut h = ChatHistory::new();
+        h.add_message(MessageRole::User, "hello", 1);
+        h.add_message(MessageRole::Assistant, "hi", 2);
+        assert_eq!(h.message_count(), 2);
+        assert_eq!(h.get_messages().len(), 2);
+    }
+
+    #[test]
+    fn history_clear() {
+        let mut h = ChatHistory::new();
+        h.add_message(MessageRole::User, "msg", 1);
+        h.clear();
+        assert_eq!(h.message_count(), 0);
+    }
+
+    #[test]
+    fn history_get_by_role() {
+        let mut h = ChatHistory::new();
+        h.add_message(MessageRole::User, "a", 1);
+        h.add_message(MessageRole::Assistant, "b", 2);
+        h.add_message(MessageRole::User, "c", 3);
+        assert_eq!(h.get_messages_by_role(&MessageRole::User).len(), 2);
+        assert_eq!(h.get_messages_by_role(&MessageRole::Assistant).len(), 1);
+    }
+
+    #[test]
+    fn history_last_n_and_since() {
+        let mut h = ChatHistory::new();
+        for i in 0..5 {
+            h.add_message(MessageRole::User, format!("m{i}"), i * 10);
+        }
+        assert_eq!(h.last_n_messages(3).len(), 3);
+        assert_eq!(h.last_n_messages(100).len(), 5);
+        assert_eq!(h.messages_since(20).len(), 3);
+    }
+
+    #[test]
+    fn history_to_conversation() {
+        let mut h = ChatHistory::new();
+        h.add_message(MessageRole::System, "sys", 0);
+        h.add_message(MessageRole::User, "hi", 1);
+        let conv = h.to_conversation();
+        assert_eq!(conv.message_count(), 2);
+    }
+
+    // ── ChatPromptTemplate tests ──
+
+    #[test]
+    fn template_render_basic() {
+        let tpl = ChatPromptTemplate::new("Hello {name}, welcome to {place}!", MessageRole::System);
+        let mut vars = HashMap::new();
+        vars.insert("name".into(), "Alice".into());
+        vars.insert("place".into(), "Wonderland".into());
+        let msg = tpl.render(&vars);
+        assert_eq!(msg.content, "Hello Alice, welcome to Wonderland!");
+        assert_eq!(msg.role, MessageRole::System);
+    }
+
+    #[test]
+    fn template_with_role() {
+        let tpl = ChatPromptTemplate::new("test", MessageRole::User).with_role(MessageRole::Assistant);
+        let msg = tpl.render(&HashMap::new());
+        assert_eq!(msg.role, MessageRole::Assistant);
+    }
+
+    #[test]
+    fn prompt_chain_render() {
+        let chain = ChatPromptChain::new()
+            .push(ChatPromptTemplate::new("You are {role}", MessageRole::System))
+            .push(ChatPromptTemplate::new("Hello {role}", MessageRole::User));
+        let mut vars = HashMap::new();
+        vars.insert("role".into(), "an assistant".into());
+        let msgs = chain.render(&vars);
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(msgs[0].content, "You are an assistant");
+        assert_eq!(msgs[1].role, MessageRole::User);
+    }
+
+    // ── ChatTokenCounter tests ──
+
+    #[test]
+    fn token_count_basic() {
+        // 4 words × 1.3 = 5.2 → 5
+        assert_eq!(ChatTokenCounter::count_tokens("one two three four"), 5);
+        assert_eq!(ChatTokenCounter::count_tokens(""), 0);
+    }
+
+    #[test]
+    fn token_count_message_and_conversation() {
+        let m1 = ChatMessage { role: MessageRole::User, content: "one two".into(), timestamp: 0 };
+        let m2 = ChatMessage { role: MessageRole::Assistant, content: "three four five".into(), timestamp: 1 };
+        assert_eq!(ChatTokenCounter::count_message_tokens(&m1), 2); // 2 × 1.3 = 2.6 → 2
+        let total = ChatTokenCounter::count_conversation_tokens(&[m1.clone(), m2.clone()]);
+        assert_eq!(total, 2 + 3); // 2 + (3×1.3=3.9→3)
+    }
+
+    #[test]
+    fn token_fits_and_truncate() {
+        let msgs: Vec<ChatMessage> = (0..5)
+            .map(|i| ChatMessage {
+                role: MessageRole::User,
+                content: format!("word{i} extra"),
+                timestamp: i,
+            })
+            .collect();
+        // each message: 2 words × 1.3 = 2.6 → 2 tokens
+        assert!(ChatTokenCounter::fits_in_context(&msgs, 100));
+        assert!(!ChatTokenCounter::fits_in_context(&msgs, 3));
+        let truncated = ChatTokenCounter::truncate_to_fit(&msgs, 5);
+        assert!(truncated.len() < msgs.len());
+        assert!(ChatTokenCounter::fits_in_context(&truncated, 5));
     }
 }

@@ -560,6 +560,160 @@ impl DragMetrics {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DragPayload – typed drag content
+// ---------------------------------------------------------------------------
+
+/// Typed payload for drag operations.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DragPayload {
+    File { uri: String, mime_type: String },
+    Tab { tab_id: String, group_id: usize },
+    TreeNode { node_id: String, parent_id: Option<String> },
+    Text { content: String },
+}
+
+impl DragPayload {
+    pub fn payload_type(&self) -> &str {
+        match self {
+            Self::File { .. } => "file",
+            Self::Tab { .. } => "tab",
+            Self::TreeNode { .. } => "tree_node",
+            Self::Text { .. } => "text",
+        }
+    }
+
+    pub fn is_file(&self) -> bool {
+        matches!(self, Self::File { .. })
+    }
+
+    pub fn is_tab(&self) -> bool {
+        matches!(self, Self::Tab { .. })
+    }
+
+    pub fn is_tree_node(&self) -> bool {
+        matches!(self, Self::TreeNode { .. })
+    }
+
+    pub fn is_text(&self) -> bool {
+        matches!(self, Self::Text { .. })
+    }
+}
+
+impl fmt::Display for DragPayload {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::File { uri, mime_type } => write!(f, "File({uri}, {mime_type})"),
+            Self::Tab { tab_id, group_id } => write!(f, "Tab({tab_id}, group {group_id})"),
+            Self::TreeNode { node_id, parent_id } => {
+                if let Some(pid) = parent_id {
+                    write!(f, "TreeNode({node_id}, parent {pid})")
+                } else {
+                    write!(f, "TreeNode({node_id}, root)")
+                }
+            }
+            Self::Text { content } => write!(f, "Text({content})"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DropPosition / DropZoneTarget
+// ---------------------------------------------------------------------------
+
+/// Where inside a drop zone the item should land.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DropPosition {
+    Before,
+    After,
+    Into,
+}
+
+/// A resolved drop target combining a zone id and a position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DropZoneTarget {
+    pub zone_id: String,
+    pub position: DropPosition,
+}
+
+impl DropZoneTarget {
+    pub fn new(zone_id: impl Into<String>, position: DropPosition) -> Self {
+        Self {
+            zone_id: zone_id.into(),
+            position,
+        }
+    }
+
+    pub fn is_before(&self) -> bool {
+        self.position == DropPosition::Before
+    }
+
+    pub fn is_after(&self) -> bool {
+        self.position == DropPosition::After
+    }
+
+    pub fn is_into(&self) -> bool {
+        self.position == DropPosition::Into
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Drag geometry helpers
+// ---------------------------------------------------------------------------
+
+/// Euclidean distance between two points.
+pub fn drag_distance(x1: f64, y1: f64, x2: f64, y2: f64) -> f64 {
+    ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt()
+}
+
+/// Returns `true` when the drag distance exceeds the given threshold (default 5.0).
+pub fn exceeds_drag_threshold(x1: f64, y1: f64, x2: f64, y2: f64, threshold: f64) -> bool {
+    drag_distance(x1, y1, x2, y2) > threshold
+}
+
+/// Tracks a drag gesture from press to release.
+#[derive(Debug, Clone)]
+pub struct DragGesture {
+    pub start_x: f64,
+    pub start_y: f64,
+    pub current_x: f64,
+    pub current_y: f64,
+    pub is_active: bool,
+    pub payload: Option<DragPayload>,
+}
+
+impl DragGesture {
+    pub fn new(x: f64, y: f64) -> Self {
+        Self {
+            start_x: x,
+            start_y: y,
+            current_x: x,
+            current_y: y,
+            is_active: true,
+            payload: None,
+        }
+    }
+
+    pub fn update(&mut self, x: f64, y: f64) {
+        self.current_x = x;
+        self.current_y = y;
+    }
+
+    pub fn distance(&self) -> f64 {
+        drag_distance(self.start_x, self.start_y, self.current_x, self.current_y)
+    }
+
+    pub fn has_exceeded_threshold(&self, threshold: f64) -> bool {
+        self.distance() > threshold
+    }
+
+    /// Mark the gesture complete and return the payload, if any.
+    pub fn complete(&mut self) -> Option<DragPayload> {
+        self.is_active = false;
+        self.payload.take()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -951,5 +1105,107 @@ mod tests {
         assert_eq!(m.most_common_mime_type.as_deref(), Some("text/plain"));
         // total items: 2 + 1 + 1 = 4, avg = 4/3
         assert!((m.avg_items_per_drop - 4.0 / 3.0).abs() < f64::EPSILON);
+    }
+
+    // --- DragPayload tests ---
+
+    #[test]
+    fn drag_payload_type_names() {
+        let file = DragPayload::File { uri: "file:///a.txt".into(), mime_type: "text/plain".into() };
+        let tab = DragPayload::Tab { tab_id: "t1".into(), group_id: 0 };
+        let tree = DragPayload::TreeNode { node_id: "n1".into(), parent_id: None };
+        let text = DragPayload::Text { content: "hello".into() };
+        assert_eq!(file.payload_type(), "file");
+        assert_eq!(tab.payload_type(), "tab");
+        assert_eq!(tree.payload_type(), "tree_node");
+        assert_eq!(text.payload_type(), "text");
+    }
+
+    #[test]
+    fn drag_payload_is_variant() {
+        let p = DragPayload::File { uri: "u".into(), mime_type: "m".into() };
+        assert!(p.is_file());
+        assert!(!p.is_tab());
+        assert!(!p.is_tree_node());
+        assert!(!p.is_text());
+    }
+
+    #[test]
+    fn drag_payload_display() {
+        let p = DragPayload::Tab { tab_id: "t1".into(), group_id: 2 };
+        assert_eq!(format!("{p}"), "Tab(t1, group 2)");
+
+        let p2 = DragPayload::TreeNode { node_id: "n".into(), parent_id: Some("p".into()) };
+        assert!(format!("{p2}").contains("parent p"));
+
+        let p3 = DragPayload::TreeNode { node_id: "n".into(), parent_id: None };
+        assert!(format!("{p3}").contains("root"));
+    }
+
+    // --- DropPosition / DropZoneTarget tests ---
+
+    #[test]
+    fn drop_zone_target_positions() {
+        let t = DropZoneTarget::new("zone1", DropPosition::Before);
+        assert!(t.is_before());
+        assert!(!t.is_after());
+        assert!(!t.is_into());
+    }
+
+    #[test]
+    fn drop_zone_target_into() {
+        let t = DropZoneTarget::new("z", DropPosition::Into);
+        assert!(t.is_into());
+        assert_eq!(t.zone_id, "z");
+    }
+
+    // --- drag_distance / exceeds_drag_threshold tests ---
+
+    #[test]
+    fn drag_distance_zero() {
+        assert!((drag_distance(1.0, 2.0, 1.0, 2.0)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn drag_distance_3_4_5() {
+        let d = drag_distance(0.0, 0.0, 3.0, 4.0);
+        assert!((d - 5.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn exceeds_threshold_true() {
+        assert!(exceeds_drag_threshold(0.0, 0.0, 10.0, 0.0, 5.0));
+    }
+
+    #[test]
+    fn exceeds_threshold_false() {
+        assert!(!exceeds_drag_threshold(0.0, 0.0, 3.0, 0.0, 5.0));
+    }
+
+    // --- DragGesture tests ---
+
+    #[test]
+    fn drag_gesture_lifecycle() {
+        let mut g = DragGesture::new(10.0, 20.0);
+        assert!(g.is_active);
+        assert!((g.distance()).abs() < f64::EPSILON);
+
+        g.update(13.0, 24.0);
+        assert!((g.distance() - 5.0).abs() < f64::EPSILON);
+        assert!(g.has_exceeded_threshold(4.9));
+        assert!(!g.has_exceeded_threshold(5.0));
+
+        g.payload = Some(DragPayload::Text { content: "hi".into() });
+        let p = g.complete();
+        assert!(!g.is_active);
+        assert!(p.is_some());
+        assert!(p.unwrap().is_text());
+    }
+
+    #[test]
+    fn drag_gesture_complete_without_payload() {
+        let mut g = DragGesture::new(0.0, 0.0);
+        assert!(g.complete().is_none());
+        assert!(!g.is_active);
     }
 }

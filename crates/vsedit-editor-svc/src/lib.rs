@@ -538,6 +538,165 @@ impl EditorService {
 }
 
 // ---------------------------------------------------------------------------
+// EditorGroupLayout
+// ---------------------------------------------------------------------------
+
+/// Describes how editor groups are laid out in the workspace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorGroupLayout {
+    /// A single editor pane, no splits.
+    Single,
+    /// Groups are arranged side-by-side horizontally.
+    Horizontal,
+    /// Groups are arranged top-to-bottom vertically.
+    Vertical,
+}
+
+impl EditorGroupLayout {
+    /// Human-readable description of the layout.
+    pub fn describe(&self) -> &'static str {
+        match self {
+            Self::Single => "single pane",
+            Self::Horizontal => "horizontal split",
+            Self::Vertical => "vertical split",
+        }
+    }
+
+    /// The minimum number of visible splits for this layout.
+    pub fn split_count(&self) -> usize {
+        match self {
+            Self::Single => 1,
+            Self::Horizontal | Self::Vertical => 2,
+        }
+    }
+
+    /// Whether this layout involves a split.
+    pub fn is_split(&self) -> bool {
+        !matches!(self, Self::Single)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorTabReorder
+// ---------------------------------------------------------------------------
+
+/// Records a drag-to-reorder operation on tabs within a group.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EditorTabReorder {
+    pub from_index: usize,
+    pub to_index: usize,
+    pub group_id: u32,
+}
+
+impl EditorTabReorder {
+    /// Create a new reorder operation. Returns `None` if `from == to`.
+    pub fn new(from_index: usize, to_index: usize, group_id: u32) -> Option<Self> {
+        if from_index == to_index {
+            return None;
+        }
+        Some(Self {
+            from_index,
+            to_index,
+            group_id,
+        })
+    }
+
+    /// Validate that both indices are within `tab_count`.
+    pub fn is_valid(&self, tab_count: usize) -> bool {
+        self.from_index < tab_count && self.to_index < tab_count
+    }
+
+    /// Apply the reorder to a mutable slice of editor inputs.
+    /// Returns `true` if the reorder was applied, `false` if indices are
+    /// out of range.
+    pub fn apply(&self, editors: &mut Vec<EditorInput>) -> bool {
+        if !self.is_valid(editors.len()) {
+            return false;
+        }
+        let item = editors.remove(self.from_index);
+        editors.insert(self.to_index, item);
+        true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Focus cycling
+// ---------------------------------------------------------------------------
+
+/// Given the active group index and total group count, return the next group
+/// index (cycling back to 0 after the last group).
+pub fn editor_group_focus_cycle(active: usize, group_count: usize) -> usize {
+    if group_count == 0 {
+        return 0;
+    }
+    (active + 1) % group_count
+}
+
+/// Like [`editor_group_focus_cycle`] but cycles in reverse.
+pub fn editor_group_focus_cycle_reverse(active: usize, group_count: usize) -> usize {
+    if group_count == 0 {
+        return 0;
+    }
+    if active == 0 {
+        group_count - 1
+    } else {
+        active - 1
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorService – split & group helpers
+// ---------------------------------------------------------------------------
+
+impl EditorService {
+    /// Split the active group by cloning its tab list into a new group.
+    ///
+    /// Returns the index of the newly created group, or `None` if the active
+    /// group is empty (nothing to clone).
+    pub fn split_group(&mut self) -> Option<usize> {
+        let src = &self.groups[self.active_group];
+        if src.count() == 0 {
+            return None;
+        }
+        let cloned_editors: Vec<EditorInput> = src.editors.clone();
+        let active_idx = src.active_index;
+
+        let new_id = self.next_group_id;
+        self.next_group_id += 1;
+        let mut new_group = EditorGroup::new(new_id);
+        new_group.editors = cloned_editors;
+        new_group.active_index = active_idx;
+        self.groups.push(new_group);
+        Some(self.groups.len() - 1)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorGroup – close helpers
+// ---------------------------------------------------------------------------
+
+impl EditorGroup {
+    /// Close all non-dirty editors in this group. Returns the number of
+    /// editors that were closed.
+    pub fn close_all_in_group(&mut self) -> usize {
+        let before = self.editors.len();
+        self.editors.retain(|e| e.is_dirty);
+        let after = self.editors.len();
+
+        // Fix up active index.
+        if self.editors.is_empty() {
+            self.active_index = None;
+        } else if let Some(active) = self.active_index {
+            if active >= self.editors.len() {
+                self.active_index = Some(self.editors.len() - 1);
+            }
+        }
+
+        before - after
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -960,5 +1119,109 @@ mod tests {
         let stats = svc.group_stats();
         assert_eq!(stats.empty_groups, 2);
         assert_eq!(stats.total_tabs, 0);
+    }
+
+    // -- EditorGroupLayout --------------------------------------------------
+
+    #[test]
+    fn layout_describe_and_split_count() {
+        assert_eq!(EditorGroupLayout::Single.describe(), "single pane");
+        assert_eq!(EditorGroupLayout::Horizontal.describe(), "horizontal split");
+        assert_eq!(EditorGroupLayout::Vertical.describe(), "vertical split");
+
+        assert_eq!(EditorGroupLayout::Single.split_count(), 1);
+        assert_eq!(EditorGroupLayout::Horizontal.split_count(), 2);
+        assert_eq!(EditorGroupLayout::Vertical.split_count(), 2);
+
+        assert!(!EditorGroupLayout::Single.is_split());
+        assert!(EditorGroupLayout::Horizontal.is_split());
+        assert!(EditorGroupLayout::Vertical.is_split());
+    }
+
+    // -- EditorTabReorder ---------------------------------------------------
+
+    #[test]
+    fn tab_reorder_same_index_returns_none() {
+        assert!(EditorTabReorder::new(2, 2, 0).is_none());
+    }
+
+    #[test]
+    fn tab_reorder_apply() {
+        let mut editors = vec![
+            make_input("/a.rs"),
+            make_input("/b.rs"),
+            make_input("/c.rs"),
+        ];
+        let reorder = EditorTabReorder::new(0, 2, 0).unwrap();
+        assert!(reorder.is_valid(3));
+        assert!(reorder.apply(&mut editors));
+        assert_eq!(editors[0].uri, VsUri::file("/b.rs"));
+        assert_eq!(editors[1].uri, VsUri::file("/c.rs"));
+        assert_eq!(editors[2].uri, VsUri::file("/a.rs"));
+    }
+
+    #[test]
+    fn tab_reorder_invalid_indices() {
+        let reorder = EditorTabReorder::new(0, 5, 0).unwrap();
+        assert!(!reorder.is_valid(3));
+        let mut editors = vec![make_input("/a.rs")];
+        assert!(!reorder.apply(&mut editors));
+    }
+
+    // -- Focus cycling ------------------------------------------------------
+
+    #[test]
+    fn focus_cycle_wraps() {
+        assert_eq!(editor_group_focus_cycle(0, 3), 1);
+        assert_eq!(editor_group_focus_cycle(2, 3), 0);
+        assert_eq!(editor_group_focus_cycle(0, 1), 0);
+        assert_eq!(editor_group_focus_cycle(0, 0), 0);
+    }
+
+    #[test]
+    fn focus_cycle_reverse_wraps() {
+        assert_eq!(editor_group_focus_cycle_reverse(1, 3), 0);
+        assert_eq!(editor_group_focus_cycle_reverse(0, 3), 2);
+        assert_eq!(editor_group_focus_cycle_reverse(0, 1), 0);
+        assert_eq!(editor_group_focus_cycle_reverse(0, 0), 0);
+    }
+
+    // -- split_group --------------------------------------------------------
+
+    #[test]
+    fn split_group_clones_tabs() {
+        let mut svc = EditorService::new();
+        svc.open_editor(make_input("/a.rs"), None);
+        svc.open_editor(make_input("/b.rs"), None);
+
+        let new_idx = svc.split_group().unwrap();
+        assert_eq!(svc.get_groups().len(), 2);
+        let new_group = &svc.get_groups()[new_idx];
+        assert_eq!(new_group.count(), 2);
+        assert_eq!(new_group.get_editors()[0].uri, VsUri::file("/a.rs"));
+        assert_eq!(new_group.get_editors()[1].uri, VsUri::file("/b.rs"));
+    }
+
+    #[test]
+    fn split_group_empty_returns_none() {
+        let mut svc = EditorService::new();
+        assert!(svc.split_group().is_none());
+    }
+
+    // -- close_all_in_group -------------------------------------------------
+
+    #[test]
+    fn close_all_in_group_keeps_dirty() {
+        let mut group = EditorGroup::new(0);
+        group.open(make_input("/a.rs"));
+        let mut dirty = make_input("/b.rs");
+        dirty.is_dirty = true;
+        group.open(dirty);
+        group.open(make_input("/c.rs"));
+
+        let closed = group.close_all_in_group();
+        assert_eq!(closed, 2);
+        assert_eq!(group.count(), 1);
+        assert_eq!(group.active_editor().unwrap().uri, VsUri::file("/b.rs"));
     }
 }

@@ -683,6 +683,170 @@ impl KeyCode {
     }
 }
 
+// ---------------------------------------------------------------------------
+// KeyChordParseError
+// ---------------------------------------------------------------------------
+
+/// Errors that can occur when parsing a key chord string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KeyChordParseError {
+    /// The input string was empty or whitespace-only.
+    EmptyInput,
+    /// A key name was not recognised.
+    UnknownKey(String),
+    /// The chord string had an invalid format.
+    InvalidFormat(String),
+}
+
+impl std::fmt::Display for KeyChordParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyInput => f.write_str("empty input"),
+            Self::UnknownKey(k) => write!(f, "unknown key: {k}"),
+            Self::InvalidFormat(msg) => write!(f, "invalid format: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for KeyChordParseError {}
+
+// ---------------------------------------------------------------------------
+// KeyCombo
+// ---------------------------------------------------------------------------
+
+/// A sequence of one or more key chords (e.g. `Ctrl+K Ctrl+C`).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct KeyCombo {
+    pub chords: Vec<KeyCodeChord>,
+}
+
+impl KeyCombo {
+    pub fn new(chords: Vec<KeyCodeChord>) -> Self {
+        Self { chords }
+    }
+
+    pub fn single(chord: KeyCodeChord) -> Self {
+        Self {
+            chords: vec![chord],
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.chords.len()
+    }
+
+    pub fn is_single(&self) -> bool {
+        self.chords.len() == 1
+    }
+
+    pub fn first(&self) -> Option<&KeyCodeChord> {
+        self.chords.first()
+    }
+}
+
+impl std::fmt::Display for KeyCombo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, chord) in self.chords.iter().enumerate() {
+            if i > 0 {
+                f.write_str(" ")?;
+            }
+            write!(f, "{chord}")?;
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeyChordParser
+// ---------------------------------------------------------------------------
+
+/// Parses VS Code-style key chord strings such as `"ctrl+shift+p"` or
+/// `"ctrl+k ctrl+c"`.
+pub struct KeyChordParser;
+
+impl KeyChordParser {
+    /// Parse a single key chord like `"ctrl+shift+p"`.
+    pub fn parse(input: &str) -> Result<KeyCodeChord, KeyChordParseError> {
+        let input = input.trim();
+        if input.is_empty() {
+            return Err(KeyChordParseError::EmptyInput);
+        }
+
+        let tokens: Vec<&str> = input.split('+').collect();
+        if tokens.is_empty() || tokens.iter().any(|t| t.is_empty()) {
+            return Err(KeyChordParseError::InvalidFormat(format!(
+                "bad chord: {input}"
+            )));
+        }
+
+        let mut ctrl = false;
+        let mut shift = false;
+        let mut alt = false;
+        let mut meta = false;
+
+        // All tokens except the last are modifiers; the last is the key.
+        let (modifier_tokens, key_token) = tokens.split_at(tokens.len() - 1);
+        let key_str = key_token[0];
+
+        for &tok in modifier_tokens {
+            match tok.to_ascii_lowercase().as_str() {
+                "ctrl" | "cmd" => ctrl = true,
+                "shift" => shift = true,
+                "alt" => alt = true,
+                "meta" => meta = true,
+                _ => {
+                    return Err(KeyChordParseError::InvalidFormat(format!(
+                        "unknown modifier: {tok}"
+                    )));
+                }
+            }
+        }
+
+        let key_code = string_to_key_code(key_str);
+        if key_code == KeyCode::Unknown && !key_str.eq_ignore_ascii_case("unknown") {
+            return Err(KeyChordParseError::UnknownKey(key_str.to_string()));
+        }
+
+        Ok(KeyCodeChord::new(ctrl, shift, alt, meta, key_code))
+    }
+
+    /// Parse a multi-part chord sequence like `"ctrl+k ctrl+c"`.
+    pub fn parse_sequence(input: &str) -> Result<KeyCombo, KeyChordParseError> {
+        let input = input.trim();
+        if input.is_empty() {
+            return Err(KeyChordParseError::EmptyInput);
+        }
+
+        let parts: Vec<&str> = input.split_whitespace().collect();
+        let mut chords = Vec::with_capacity(parts.len());
+        for part in parts {
+            chords.push(Self::parse(part)?);
+        }
+        Ok(KeyCombo::new(chords))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Convenience wrappers
+// ---------------------------------------------------------------------------
+
+/// Return the canonical string name for a [`KeyCode`]. Delegates to
+/// [`key_code_to_string`].
+pub fn keycode_to_name(code: KeyCode) -> &'static str {
+    key_code_to_string(code)
+}
+
+/// Look up a [`KeyCode`] by name. Returns `None` if the name is unrecognised.
+/// Delegates to [`string_to_key_code`].
+pub fn name_to_keycode(name: &str) -> Option<KeyCode> {
+    let kc = string_to_key_code(name);
+    if kc == KeyCode::Unknown && !name.eq_ignore_ascii_case("unknown") {
+        None
+    } else {
+        Some(kc)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -957,5 +1121,107 @@ mod tests {
         a.merge(&b);
         assert_eq!(a.total(), 2);
         assert_eq!(a.min_time_ns(), Some(50));
+    }
+
+    // -----------------------------------------------------------------------
+    // KeyChordParser / KeyCombo / convenience wrappers
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_simple_chord() {
+        let chord = KeyChordParser::parse("ctrl+shift+p").unwrap();
+        assert!(chord.ctrl);
+        assert!(chord.shift);
+        assert!(!chord.alt);
+        assert!(!chord.meta);
+        assert_eq!(chord.key_code, KeyCode::KeyP);
+    }
+
+    #[test]
+    fn parse_single_key_no_modifiers() {
+        let chord = KeyChordParser::parse("Escape").unwrap();
+        assert!(!chord.ctrl);
+        assert!(!chord.shift);
+        assert_eq!(chord.key_code, KeyCode::Escape);
+    }
+
+    #[test]
+    fn parse_alt_f4() {
+        let chord = KeyChordParser::parse("alt+F4").unwrap();
+        assert!(chord.alt);
+        assert_eq!(chord.key_code, KeyCode::F4);
+    }
+
+    #[test]
+    fn parse_case_insensitive_modifiers() {
+        let chord = KeyChordParser::parse("CTRL+SHIFT+A").unwrap();
+        assert!(chord.ctrl);
+        assert!(chord.shift);
+        assert_eq!(chord.key_code, KeyCode::KeyA);
+    }
+
+    #[test]
+    fn parse_cmd_as_ctrl() {
+        let chord = KeyChordParser::parse("cmd+c").unwrap();
+        assert!(chord.ctrl);
+        assert_eq!(chord.key_code, KeyCode::KeyC);
+    }
+
+    #[test]
+    fn parse_meta_modifier() {
+        let chord = KeyChordParser::parse("meta+s").unwrap();
+        assert!(chord.meta);
+        assert_eq!(chord.key_code, KeyCode::KeyS);
+    }
+
+    #[test]
+    fn parse_empty_input_error() {
+        assert_eq!(KeyChordParser::parse(""), Err(KeyChordParseError::EmptyInput));
+        assert_eq!(KeyChordParser::parse("   "), Err(KeyChordParseError::EmptyInput));
+    }
+
+    #[test]
+    fn parse_unknown_key_error() {
+        let err = KeyChordParser::parse("ctrl+nonsensekey").unwrap_err();
+        assert!(matches!(err, KeyChordParseError::UnknownKey(_)));
+    }
+
+    #[test]
+    fn parse_sequence_two_part() {
+        let combo = KeyChordParser::parse_sequence("ctrl+k ctrl+c").unwrap();
+        assert_eq!(combo.len(), 2);
+        assert!(!combo.is_single());
+        assert_eq!(combo.chords[0].key_code, KeyCode::KeyK);
+        assert_eq!(combo.chords[1].key_code, KeyCode::KeyC);
+        assert!(combo.chords[0].ctrl);
+        assert!(combo.chords[1].ctrl);
+    }
+
+    #[test]
+    fn parse_sequence_single_part() {
+        let combo = KeyChordParser::parse_sequence("shift+tab").unwrap();
+        assert!(combo.is_single());
+        assert_eq!(combo.first().unwrap().key_code, KeyCode::Tab);
+    }
+
+    #[test]
+    fn key_combo_display() {
+        let combo = KeyCombo::new(vec![
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyK),
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyC),
+        ]);
+        assert_eq!(combo.to_string(), "Ctrl+K Ctrl+C");
+    }
+
+    #[test]
+    fn keycode_to_name_and_back() {
+        let name = keycode_to_name(KeyCode::Enter);
+        assert_eq!(name, "Enter");
+        assert_eq!(name_to_keycode("Enter"), Some(KeyCode::Enter));
+    }
+
+    #[test]
+    fn name_to_keycode_unknown_returns_none() {
+        assert_eq!(name_to_keycode("totallyinvalid"), None);
     }
 }

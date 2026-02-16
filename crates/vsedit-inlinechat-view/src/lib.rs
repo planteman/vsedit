@@ -114,6 +114,7 @@ impl InlineChatHistory {
     }
 }
 
+#[derive(Debug)]
 pub struct InlineChatWidget {
     state: InlineChatState,
     request: Option<InlineChatRequest>,
@@ -523,6 +524,213 @@ impl InlineChatDiff {
     /// Total number of changed characters (added + removed).
     pub fn total_changes(&self) -> usize {
         self.added_chars + self.removed_chars
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Inline chat session
+// ---------------------------------------------------------------------------
+
+/// A session wrapping widget + history with prompt/response tracking.
+#[derive(Debug)]
+pub struct InlineChatSession {
+    pub session_id: String,
+    pub widget: InlineChatWidget,
+    pub history: InlineChatHistory,
+    pub created_prompts: Vec<String>,
+}
+
+impl InlineChatSession {
+    pub fn new(session_id: impl Into<String>) -> Self {
+        Self {
+            session_id: session_id.into(),
+            widget: InlineChatWidget::new(),
+            history: InlineChatHistory::new(),
+            created_prompts: Vec::new(),
+        }
+    }
+
+    /// Start a request and record the prompt.
+    pub fn submit_prompt(&mut self, request: InlineChatRequest) {
+        self.created_prompts.push(request.prompt.clone());
+        self.widget.start_request(request);
+    }
+
+    /// Set the response and push the completed interaction to history.
+    pub fn complete(&mut self, response: InlineChatResponse) {
+        self.widget.set_response(response.clone());
+        if let Some(req) = self.widget.get_request().cloned() {
+            self.history.push(req, response);
+        }
+    }
+
+    /// Accept the current response, resetting the widget to idle.
+    pub fn accept(&mut self) {
+        self.widget.accept();
+    }
+
+    /// Reject the current response, resetting the widget to idle.
+    pub fn reject(&mut self) {
+        self.widget.reject();
+    }
+
+    /// Re-submit the last prompt as a new request.
+    pub fn retry(&mut self) {
+        if let Some(prompt) = self.created_prompts.last().cloned() {
+            if let Some(req) = self.widget.get_request().cloned() {
+                let new_req = InlineChatRequest {
+                    prompt,
+                    selection_start_line: req.selection_start_line,
+                    selection_end_line: req.selection_end_line,
+                    uri: req.uri,
+                };
+                self.widget.start_request(new_req);
+            }
+        }
+    }
+
+    pub fn prompt_count(&self) -> usize {
+        self.created_prompts.len()
+    }
+
+    pub fn is_idle(&self) -> bool {
+        *self.widget.get_state() == InlineChatState::Idle
+    }
+
+    pub fn current_prompt(&self) -> Option<&str> {
+        self.widget.get_request().map(|r| r.prompt.as_str())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Inline diff preview
+// ---------------------------------------------------------------------------
+
+/// A single hunk of differences between original and proposed text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffHunk {
+    pub start_line: usize,
+    pub removed: Vec<String>,
+    pub added: Vec<String>,
+}
+
+/// Shows proposed changes inline with hunk-based diffing.
+#[derive(Debug, Clone)]
+pub struct InlineDiffPreview {
+    pub original_lines: Vec<String>,
+    pub proposed_lines: Vec<String>,
+    pub diff_hunks: Vec<DiffHunk>,
+}
+
+impl InlineDiffPreview {
+    /// Compute a simple line-by-line diff between original and proposed text.
+    pub fn compute(original: &str, proposed: &str) -> Self {
+        let original_lines: Vec<String> = original.lines().map(String::from).collect();
+        let proposed_lines: Vec<String> = proposed.lines().map(String::from).collect();
+        let mut hunks = Vec::new();
+
+        let max_len = original_lines.len().max(proposed_lines.len());
+        let mut i = 0;
+        while i < max_len {
+            let orig = original_lines.get(i).map(String::as_str);
+            let prop = proposed_lines.get(i).map(String::as_str);
+
+            if orig != prop {
+                let start = i;
+                let mut removed = Vec::new();
+                let mut added = Vec::new();
+
+                // Collect consecutive differing lines.
+                while i < max_len {
+                    let o = original_lines.get(i).map(String::as_str);
+                    let p = proposed_lines.get(i).map(String::as_str);
+                    if o == p {
+                        break;
+                    }
+                    if let Some(line) = o {
+                        removed.push(line.to_string());
+                    }
+                    if let Some(line) = p {
+                        added.push(line.to_string());
+                    }
+                    i += 1;
+                }
+
+                hunks.push(DiffHunk { start_line: start, removed, added });
+            } else {
+                i += 1;
+            }
+        }
+
+        Self { original_lines, proposed_lines, diff_hunks: hunks }
+    }
+
+    pub fn hunk_count(&self) -> usize {
+        self.diff_hunks.len()
+    }
+
+    pub fn total_additions(&self) -> usize {
+        self.diff_hunks.iter().map(|h| h.added.len()).sum()
+    }
+
+    pub fn total_removals(&self) -> usize {
+        self.diff_hunks.iter().map(|h| h.removed.len()).sum()
+    }
+
+    pub fn has_changes(&self) -> bool {
+        !self.diff_hunks.is_empty()
+    }
+
+    pub fn summary(&self) -> String {
+        format!(
+            "{} hunk(s), +{} -{} lines",
+            self.hunk_count(),
+            self.total_additions(),
+            self.total_removals(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Inline chat action
+// ---------------------------------------------------------------------------
+
+/// Actions a user can take on an inline chat response.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InlineChatAction {
+    Accept,
+    Reject,
+    Retry,
+    Edit(String),
+    AcceptPartial { hunk_index: usize },
+}
+
+impl InlineChatAction {
+    /// Whether this action is terminal (Accept or Reject).
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Self::Accept | Self::Reject)
+    }
+
+    pub fn description(&self) -> &str {
+        match self {
+            Self::Accept => "Accept the proposed changes",
+            Self::Reject => "Reject the proposed changes",
+            Self::Retry => "Retry the request",
+            Self::Edit(_) => "Edit the prompt and resubmit",
+            Self::AcceptPartial { .. } => "Accept a specific hunk",
+        }
+    }
+}
+
+impl fmt::Display for InlineChatAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Accept => write!(f, "Accept"),
+            Self::Reject => write!(f, "Reject"),
+            Self::Retry => write!(f, "Retry"),
+            Self::Edit(prompt) => write!(f, "Edit({prompt})"),
+            Self::AcceptPartial { hunk_index } => write!(f, "AcceptPartial(hunk {hunk_index})"),
+        }
     }
 }
 
@@ -968,5 +1176,136 @@ mod tests {
         let diff = InlineChatDiff::compute("", "");
         assert!(diff.is_identical());
         assert_eq!(diff.total_changes(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // InlineChatSession tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn session_new_is_idle() {
+        let session = InlineChatSession::new("s1");
+        assert_eq!(session.session_id, "s1");
+        assert!(session.is_idle());
+        assert_eq!(session.prompt_count(), 0);
+        assert!(session.current_prompt().is_none());
+    }
+
+    #[test]
+    fn session_submit_and_complete() {
+        let mut session = InlineChatSession::new("s2");
+        session.submit_prompt(sample_request());
+        assert!(!session.is_idle());
+        assert_eq!(session.current_prompt(), Some("refactor this"));
+        assert_eq!(session.prompt_count(), 1);
+
+        session.complete(sample_response());
+        assert_eq!(session.history.len(), 1);
+        assert_eq!(
+            session.history.last().unwrap().response.text,
+            "refactored"
+        );
+    }
+
+    #[test]
+    fn session_accept_and_reject() {
+        let mut session = InlineChatSession::new("s3");
+        session.submit_prompt(sample_request());
+        session.complete(sample_response());
+        session.accept();
+        assert!(session.is_idle());
+
+        session.submit_prompt(sample_request());
+        session.complete(sample_response());
+        session.reject();
+        assert!(session.is_idle());
+    }
+
+    #[test]
+    fn session_retry_resubmits_last_prompt() {
+        let mut session = InlineChatSession::new("s4");
+        session.submit_prompt(sample_request());
+        session.retry();
+        // Widget should still be active (re-submitted).
+        assert!(!session.is_idle());
+        assert_eq!(session.current_prompt(), Some("refactor this"));
+    }
+
+    // -----------------------------------------------------------------------
+    // InlineDiffPreview tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn diff_preview_identical() {
+        let preview = InlineDiffPreview::compute("aaa\nbbb\nccc", "aaa\nbbb\nccc");
+        assert!(!preview.has_changes());
+        assert_eq!(preview.hunk_count(), 0);
+        assert_eq!(preview.total_additions(), 0);
+        assert_eq!(preview.total_removals(), 0);
+    }
+
+    #[test]
+    fn diff_preview_single_line_change() {
+        let preview = InlineDiffPreview::compute("aaa\nbbb\nccc", "aaa\nBBB\nccc");
+        assert!(preview.has_changes());
+        assert_eq!(preview.hunk_count(), 1);
+        assert_eq!(preview.total_additions(), 1);
+        assert_eq!(preview.total_removals(), 1);
+        assert_eq!(preview.diff_hunks[0].start_line, 1);
+        assert_eq!(preview.diff_hunks[0].removed, vec!["bbb"]);
+        assert_eq!(preview.diff_hunks[0].added, vec!["BBB"]);
+    }
+
+    #[test]
+    fn diff_preview_summary() {
+        let preview = InlineDiffPreview::compute("a\nb\nc", "a\nX\nY\nc");
+        let s = preview.summary();
+        assert!(s.contains("hunk(s)"));
+        assert!(s.contains('+'));
+        assert!(s.contains('-'));
+    }
+
+    #[test]
+    fn diff_preview_addition_only() {
+        let preview = InlineDiffPreview::compute("a\nb", "a\nb\nc");
+        assert!(preview.has_changes());
+        assert!(preview.total_additions() >= 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // InlineChatAction tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn action_is_terminal() {
+        assert!(InlineChatAction::Accept.is_terminal());
+        assert!(InlineChatAction::Reject.is_terminal());
+        assert!(!InlineChatAction::Retry.is_terminal());
+        assert!(!InlineChatAction::Edit("fix".into()).is_terminal());
+        assert!(!InlineChatAction::AcceptPartial { hunk_index: 0 }.is_terminal());
+    }
+
+    #[test]
+    fn action_display() {
+        assert_eq!(format!("{}", InlineChatAction::Accept), "Accept");
+        assert_eq!(format!("{}", InlineChatAction::Reject), "Reject");
+        assert_eq!(format!("{}", InlineChatAction::Retry), "Retry");
+        assert_eq!(
+            format!("{}", InlineChatAction::Edit("new prompt".into())),
+            "Edit(new prompt)"
+        );
+        assert_eq!(
+            format!("{}", InlineChatAction::AcceptPartial { hunk_index: 2 }),
+            "AcceptPartial(hunk 2)"
+        );
+    }
+
+    #[test]
+    fn action_description() {
+        assert!(!InlineChatAction::Accept.description().is_empty());
+        assert!(!InlineChatAction::Retry.description().is_empty());
+        assert!(!InlineChatAction::AcceptPartial { hunk_index: 0 }
+            .description()
+            .is_empty());
     }
 }

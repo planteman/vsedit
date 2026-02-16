@@ -583,6 +583,271 @@ pub fn file_uri_to_path(uri: &str) -> Result<String, LspError> {
     Ok(uri["file://".len()..].to_string())
 }
 
+// ---------------------------------------------------------------------------
+// LSP server registry
+// ---------------------------------------------------------------------------
+
+/// Metadata for a single language server.
+#[derive(Debug, Clone)]
+pub struct LspServerInfo {
+    pub language_id: String,
+    pub server_name: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub capabilities: ServerCapabilityFlags,
+    pub is_running: bool,
+}
+
+impl LspServerInfo {
+    pub fn new(
+        language_id: impl Into<String>,
+        server_name: impl Into<String>,
+        command: impl Into<String>,
+        args: Vec<String>,
+    ) -> Self {
+        Self {
+            language_id: language_id.into(),
+            server_name: server_name.into(),
+            command: command.into(),
+            args,
+            capabilities: ServerCapabilityFlags::default(),
+            is_running: false,
+        }
+    }
+
+    /// Mark this server as running.
+    pub fn mark_running(&mut self) {
+        self.is_running = true;
+    }
+
+    /// Mark this server as stopped.
+    pub fn mark_stopped(&mut self) {
+        self.is_running = false;
+    }
+
+    /// Check whether this server supports a named feature.
+    pub fn supports_feature(&self, feature: &str) -> bool {
+        self.capabilities.supports(feature)
+    }
+}
+
+/// Registry that tracks multiple language servers.
+#[derive(Debug, Clone, Default)]
+pub struct LspServerRegistry {
+    servers: Vec<LspServerInfo>,
+}
+
+impl LspServerRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a language server. Replaces any existing entry for the same
+    /// `language_id`.
+    pub fn register(&mut self, info: LspServerInfo) {
+        self.unregister(&info.language_id);
+        self.servers.push(info);
+    }
+
+    /// Remove the server registered for `language_id`. Returns `true` if an
+    /// entry was removed.
+    pub fn unregister(&mut self, language_id: &str) -> bool {
+        let before = self.servers.len();
+        self.servers.retain(|s| s.language_id != language_id);
+        self.servers.len() < before
+    }
+
+    /// Look up a server by language id.
+    pub fn get(&self, language_id: &str) -> Option<&LspServerInfo> {
+        self.servers.iter().find(|s| s.language_id == language_id)
+    }
+
+    /// Look up a server mutably by language id.
+    pub fn get_mut(&mut self, language_id: &str) -> Option<&mut LspServerInfo> {
+        self.servers.iter_mut().find(|s| s.language_id == language_id)
+    }
+
+    /// Return references to all currently running servers.
+    pub fn running_servers(&self) -> Vec<&LspServerInfo> {
+        self.servers.iter().filter(|s| s.is_running).collect()
+    }
+
+    /// Total number of registered servers.
+    pub fn server_count(&self) -> usize {
+        self.servers.len()
+    }
+
+    /// Return the language ids of all registered servers.
+    pub fn languages(&self) -> Vec<&str> {
+        self.servers.iter().map(|s| s.language_id.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Negotiated LSP capabilities
+// ---------------------------------------------------------------------------
+
+/// Describes the text document synchronisation kind negotiated with the server.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum TextDocSyncKind {
+    #[default]
+    None,
+    Full,
+    Incremental,
+}
+
+impl fmt::Display for TextDocSyncKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TextDocSyncKind::None => f.write_str("none"),
+            TextDocSyncKind::Full => f.write_str("full"),
+            TextDocSyncKind::Incremental => f.write_str("incremental"),
+        }
+    }
+}
+
+/// Negotiated capabilities extracted from an LSP `InitializeResult`.
+#[derive(Debug, Clone, Default)]
+pub struct LspCapabilities {
+    pub text_document_sync: TextDocSyncKind,
+    pub flags: ServerCapabilityFlags,
+    pub server_name: Option<String>,
+    pub server_version: Option<String>,
+}
+
+impl LspCapabilities {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Build from an `InitializeResult` returned by the server.
+    pub fn from_initialize_result(result: &lsp_types::InitializeResult) -> Self {
+        let flags = ServerCapabilityFlags::from_server_capabilities(&result.capabilities);
+
+        let text_document_sync = result
+            .capabilities
+            .text_document_sync
+            .as_ref()
+            .map(|sync| match sync {
+                lsp_types::TextDocumentSyncCapability::Kind(k) => match *k {
+                    lsp_types::TextDocumentSyncKind::NONE => TextDocSyncKind::None,
+                    lsp_types::TextDocumentSyncKind::FULL => TextDocSyncKind::Full,
+                    lsp_types::TextDocumentSyncKind::INCREMENTAL => TextDocSyncKind::Incremental,
+                    _ => TextDocSyncKind::None,
+                },
+                lsp_types::TextDocumentSyncCapability::Options(opts) => {
+                    opts.change.map_or(TextDocSyncKind::None, |k| match k {
+                        lsp_types::TextDocumentSyncKind::NONE => TextDocSyncKind::None,
+                        lsp_types::TextDocumentSyncKind::FULL => TextDocSyncKind::Full,
+                        lsp_types::TextDocumentSyncKind::INCREMENTAL => {
+                            TextDocSyncKind::Incremental
+                        }
+                        _ => TextDocSyncKind::None,
+                    })
+                }
+            })
+            .unwrap_or(TextDocSyncKind::None);
+
+        let (server_name, server_version) = result
+            .server_info
+            .as_ref()
+            .map(|info| (Some(info.name.clone()), info.version.clone()))
+            .unwrap_or((None, None));
+
+        Self {
+            text_document_sync,
+            flags,
+            server_name,
+            server_version,
+        }
+    }
+
+    /// Return a human-readable summary of the negotiated capabilities.
+    pub fn summary(&self) -> String {
+        let name = self
+            .server_name
+            .as_deref()
+            .unwrap_or("unknown server");
+        let ver = self
+            .server_version
+            .as_deref()
+            .unwrap_or("?");
+        let features = self.flags.supported_features();
+        let feat_str = if features.is_empty() {
+            "none".to_string()
+        } else {
+            features.join(", ")
+        };
+        format!("{name} v{ver} | sync={} | features: {feat_str}", self.text_document_sync)
+    }
+}
+
+impl fmt::Display for LspCapabilities {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.summary())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Initialize params builder
+// ---------------------------------------------------------------------------
+
+/// Build an `lsp_types::InitializeParams` from workspace settings.
+///
+/// The `workspace_root` must be an absolute path. It is converted to a
+/// `file://` URI via [`path_to_file_uri`].
+pub fn lsp_initialize_params(
+    workspace_root: &str,
+    client_name: &str,
+    client_version: &str,
+) -> Result<lsp_types::InitializeParams, LspError> {
+    let root_uri = path_to_file_uri(workspace_root)?;
+
+    #[allow(deprecated)] // root_path / root_uri are deprecated but widely used
+    Ok(lsp_types::InitializeParams {
+        process_id: Some(std::process::id()),
+        root_path: Some(workspace_root.to_string()),
+        root_uri: Some(
+            root_uri
+                .parse::<lsp_types::Uri>()
+                .map_err(|e| LspError::InvalidUri(e.to_string()))?,
+        ),
+        initialization_options: None,
+        capabilities: lsp_types::ClientCapabilities {
+            text_document: Some(lsp_types::TextDocumentClientCapabilities {
+                synchronization: Some(lsp_types::TextDocumentSyncClientCapabilities {
+                    dynamic_registration: Some(false),
+                    will_save: Some(false),
+                    will_save_wait_until: Some(false),
+                    did_save: Some(true),
+                }),
+                completion: Some(lsp_types::CompletionClientCapabilities {
+                    dynamic_registration: Some(false),
+                    completion_item: Some(lsp_types::CompletionItemCapability {
+                        snippet_support: Some(false),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                hover: Some(lsp_types::HoverClientCapabilities {
+                    dynamic_registration: Some(false),
+                    content_format: Some(vec![lsp_types::MarkupKind::PlainText]),
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+        trace: Some(lsp_types::TraceValue::Off),
+        workspace_folders: None,
+        client_info: Some(lsp_types::ClientInfo {
+            name: client_name.to_string(),
+            version: Some(client_version.to_string()),
+        }),
+        locale: None,
+        work_done_progress_params: Default::default(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -969,5 +1234,173 @@ mod tests {
     #[test]
     fn path_to_file_uri_relative_fails() {
         assert!(path_to_file_uri("relative/path.rs").is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // LspServerInfo / LspServerRegistry tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn server_info_new_and_running() {
+        let mut info = LspServerInfo::new("rust", "rust-analyzer", "rust-analyzer", vec![]);
+        assert!(!info.is_running);
+        info.mark_running();
+        assert!(info.is_running);
+        info.mark_stopped();
+        assert!(!info.is_running);
+    }
+
+    #[test]
+    fn server_info_supports_feature() {
+        let mut info = LspServerInfo::new("rust", "rust-analyzer", "rust-analyzer", vec![]);
+        info.capabilities.completion = true;
+        assert!(info.supports_feature("completion"));
+        assert!(!info.supports_feature("rename"));
+        assert!(!info.supports_feature("unknown_feature"));
+    }
+
+    #[test]
+    fn registry_register_and_get() {
+        let mut reg = LspServerRegistry::new();
+        assert_eq!(reg.server_count(), 0);
+
+        reg.register(LspServerInfo::new("rust", "ra", "rust-analyzer", vec![]));
+        reg.register(LspServerInfo::new(
+            "python",
+            "pyright",
+            "pyright-langserver",
+            vec!["--stdio".into()],
+        ));
+
+        assert_eq!(reg.server_count(), 2);
+        assert!(reg.get("rust").is_some());
+        assert!(reg.get("python").is_some());
+        assert!(reg.get("go").is_none());
+    }
+
+    #[test]
+    fn registry_unregister() {
+        let mut reg = LspServerRegistry::new();
+        reg.register(LspServerInfo::new("rust", "ra", "rust-analyzer", vec![]));
+        assert!(reg.unregister("rust"));
+        assert!(!reg.unregister("rust")); // already removed
+        assert_eq!(reg.server_count(), 0);
+    }
+
+    #[test]
+    fn registry_running_servers() {
+        let mut reg = LspServerRegistry::new();
+        reg.register(LspServerInfo::new("rust", "ra", "rust-analyzer", vec![]));
+        reg.register(LspServerInfo::new("python", "pyright", "pyright", vec![]));
+
+        assert!(reg.running_servers().is_empty());
+
+        reg.get_mut("rust").unwrap().mark_running();
+        let running = reg.running_servers();
+        assert_eq!(running.len(), 1);
+        assert_eq!(running[0].language_id, "rust");
+    }
+
+    #[test]
+    fn registry_languages() {
+        let mut reg = LspServerRegistry::new();
+        reg.register(LspServerInfo::new("rust", "ra", "rust-analyzer", vec![]));
+        reg.register(LspServerInfo::new("python", "pyright", "pyright", vec![]));
+        let langs = reg.languages();
+        assert!(langs.contains(&"rust"));
+        assert!(langs.contains(&"python"));
+    }
+
+    #[test]
+    fn registry_replaces_duplicate_language() {
+        let mut reg = LspServerRegistry::new();
+        reg.register(LspServerInfo::new("rust", "old-server", "old", vec![]));
+        reg.register(LspServerInfo::new("rust", "new-server", "new", vec![]));
+        assert_eq!(reg.server_count(), 1);
+        assert_eq!(reg.get("rust").unwrap().server_name, "new-server");
+    }
+
+    // -----------------------------------------------------------------------
+    // LspCapabilities / TextDocSyncKind tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn text_doc_sync_kind_display() {
+        assert_eq!(format!("{}", TextDocSyncKind::None), "none");
+        assert_eq!(format!("{}", TextDocSyncKind::Full), "full");
+        assert_eq!(format!("{}", TextDocSyncKind::Incremental), "incremental");
+    }
+
+    #[test]
+    fn lsp_capabilities_default_summary() {
+        let caps = LspCapabilities::new();
+        let s = caps.summary();
+        assert!(s.contains("unknown server"));
+        assert!(s.contains("v?"));
+        assert!(s.contains("sync=none"));
+        assert!(s.contains("features: none"));
+    }
+
+    #[test]
+    fn lsp_capabilities_from_initialize_result() {
+        let result = lsp_types::InitializeResult {
+            capabilities: lsp_types::ServerCapabilities {
+                text_document_sync: Some(lsp_types::TextDocumentSyncCapability::Kind(
+                    lsp_types::TextDocumentSyncKind::INCREMENTAL,
+                )),
+                completion_provider: Some(lsp_types::CompletionOptions::default()),
+                hover_provider: Some(lsp_types::HoverProviderCapability::Simple(true)),
+                ..Default::default()
+            },
+            server_info: Some(lsp_types::ServerInfo {
+                name: "test-server".into(),
+                version: Some("1.2.3".into()),
+            }),
+        };
+
+        let caps = LspCapabilities::from_initialize_result(&result);
+        assert_eq!(caps.text_document_sync, TextDocSyncKind::Incremental);
+        assert!(caps.flags.completion);
+        assert!(caps.flags.hover);
+        assert!(!caps.flags.rename);
+        assert_eq!(caps.server_name.as_deref(), Some("test-server"));
+        assert_eq!(caps.server_version.as_deref(), Some("1.2.3"));
+
+        let summary = caps.summary();
+        assert!(summary.contains("test-server"));
+        assert!(summary.contains("1.2.3"));
+        assert!(summary.contains("incremental"));
+    }
+
+    #[test]
+    fn lsp_capabilities_display_delegates_to_summary() {
+        let caps = LspCapabilities::new();
+        assert_eq!(format!("{caps}"), caps.summary());
+    }
+
+    // -----------------------------------------------------------------------
+    // lsp_initialize_params tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    #[allow(deprecated)]
+    fn initialize_params_valid() {
+        let params =
+            lsp_initialize_params("/home/user/project", "vsedit", "0.1.0").unwrap();
+        assert_eq!(
+            params.root_uri.as_ref().unwrap().as_str(),
+            "file:///home/user/project"
+        );
+        assert_eq!(params.client_info.as_ref().unwrap().name, "vsedit");
+        assert_eq!(
+            params.client_info.as_ref().unwrap().version.as_deref(),
+            Some("0.1.0")
+        );
+        assert!(params.process_id.is_some());
+    }
+
+    #[test]
+    fn initialize_params_relative_path_fails() {
+        assert!(lsp_initialize_params("relative/path", "c", "0").is_err());
     }
 }

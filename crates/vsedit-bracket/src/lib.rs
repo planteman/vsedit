@@ -523,6 +523,214 @@ impl BracketStats {
     }
 }
 
+/// A single bracket with its assigned color and position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColorizedBracket {
+    pub char: char,
+    pub col: usize,
+    pub color: String,
+    pub depth: u32,
+}
+
+/// Assigns bracket pair colors by nesting depth.
+#[derive(Debug, Clone)]
+pub struct BracketColorizer {
+    colors: Vec<String>,
+}
+
+impl BracketColorizer {
+    /// Create a colorizer with the given color strings.
+    pub fn new(colors: Vec<String>) -> Self {
+        Self { colors }
+    }
+
+    /// Colorize brackets in a single line, cycling colors by nesting depth.
+    pub fn colorize_line(&self, line: &str, pairs: &[BracketPair]) -> Vec<ColorizedBracket> {
+        let mut results = Vec::new();
+        if self.colors.is_empty() {
+            return results;
+        }
+        let mut depth: u32 = 0;
+        for (ci, ch) in line.char_indices() {
+            let is_open = pairs.iter().any(|p| p.open == ch);
+            let is_close = pairs.iter().any(|p| p.close == ch);
+            if is_open {
+                let color_idx = (depth as usize) % self.colors.len();
+                results.push(ColorizedBracket {
+                    char: ch,
+                    col: ci,
+                    color: self.colors[color_idx].clone(),
+                    depth,
+                });
+                depth += 1;
+            } else if is_close {
+                if depth > 0 {
+                    depth -= 1;
+                }
+                let color_idx = (depth as usize) % self.colors.len();
+                results.push(ColorizedBracket {
+                    char: ch,
+                    col: ci,
+                    color: self.colors[color_idx].clone(),
+                    depth,
+                });
+            }
+        }
+        results
+    }
+}
+
+impl Default for BracketColorizer {
+    fn default() -> Self {
+        Self {
+            colors: vec![
+                "#FFD700".to_string(),
+                "#DA70D6".to_string(),
+                "#87CEEB".to_string(),
+                "#98FB98".to_string(),
+                "#FF6347".to_string(),
+                "#DDA0DD".to_string(),
+            ],
+        }
+    }
+}
+
+/// Find the bracket pair that contains or starts at the given position.
+pub fn bracket_pair_at_position(
+    lines: &[&str],
+    line: u32,
+    col: u32,
+    pairs: &[BracketPair],
+) -> Option<BracketMatch> {
+    let target_line = lines.get((line - 1) as usize)?;
+    let ch = target_line.chars().nth((col - 1) as usize)?;
+
+    // If the position is on a bracket, find its match.
+    let is_bracket = pairs.iter().any(|p| p.open == ch || p.close == ch);
+    if is_bracket {
+        if let Some(pair) = pairs.iter().find(|p| p.open == ch) {
+            if let Some((cl, cc)) = find_closing(lines, line, col, pair) {
+                let all = find_all_brackets(lines, pairs);
+                let depth = all
+                    .iter()
+                    .find(|m| m.open_line == line && m.open_col == col)
+                    .map(|m| m.depth)
+                    .unwrap_or(0);
+                return Some(BracketMatch {
+                    open_line: line,
+                    open_col: col,
+                    close_line: cl,
+                    close_col: cc,
+                    depth,
+                });
+            }
+        }
+        if let Some(pair) = pairs.iter().find(|p| p.close == ch) {
+            if let Some((ol, oc)) = find_opening(lines, line, col, pair) {
+                let all = find_all_brackets(lines, pairs);
+                let depth = all
+                    .iter()
+                    .find(|m| m.close_line == line && m.close_col == col)
+                    .map(|m| m.depth)
+                    .unwrap_or(0);
+                return Some(BracketMatch {
+                    open_line: ol,
+                    open_col: oc,
+                    close_line: line,
+                    close_col: col,
+                    depth,
+                });
+            }
+        }
+        return None;
+    }
+
+    // Not on a bracket — find the enclosing pair.
+    find_enclosing_brackets(lines, line, col, pairs).ok()
+}
+
+/// The kind of bracket error detected.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BracketErrorKind {
+    /// An opening bracket with no matching close.
+    UnmatchedOpen,
+    /// A closing bracket with no matching open.
+    UnmatchedClose,
+    /// A closing bracket that does not match the expected opening bracket.
+    Mismatch { expected: char, found: char },
+}
+
+/// Information about a single bracket error.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BracketErrorInfo {
+    pub line: u32,
+    pub col: u32,
+    pub bracket: char,
+    pub error_kind: BracketErrorKind,
+}
+
+/// Detect mismatched and unmatched brackets in a document.
+pub fn bracket_errors(lines: &[&str], pairs: &[BracketPair]) -> Vec<BracketErrorInfo> {
+    let mut errors = Vec::new();
+    // Single stack to detect cross-type mismatches.
+    let mut stack: Vec<(u32, u32, char)> = Vec::new();
+
+    for (li, line) in lines.iter().enumerate() {
+        let line1 = (li + 1) as u32;
+        for (ci, ch) in line.char_indices() {
+            let col1 = (ci + 1) as u32;
+
+            if pairs.iter().any(|p| p.open == ch) {
+                stack.push((line1, col1, ch));
+            } else if let Some(pair) = pairs.iter().find(|p| p.close == ch) {
+                match stack.last() {
+                    Some(&(_, _, open_ch)) if open_ch == pair.open => {
+                        stack.pop();
+                    }
+                    Some(&(_, _, open_ch)) if pairs.iter().any(|p| p.open == open_ch) => {
+                        // Mismatch: expected the close of whatever is on top.
+                        let expected_close = pairs
+                            .iter()
+                            .find(|p| p.open == open_ch)
+                            .map(|p| p.close)
+                            .unwrap_or('?');
+                        errors.push(BracketErrorInfo {
+                            line: line1,
+                            col: col1,
+                            bracket: ch,
+                            error_kind: BracketErrorKind::Mismatch {
+                                expected: expected_close,
+                                found: ch,
+                            },
+                        });
+                        stack.pop();
+                    }
+                    _ => {
+                        errors.push(BracketErrorInfo {
+                            line: line1,
+                            col: col1,
+                            bracket: ch,
+                            error_kind: BracketErrorKind::UnmatchedClose,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Remaining items on the stack are unmatched opens.
+    for (line, col, ch) in stack {
+        errors.push(BracketErrorInfo {
+            line,
+            col,
+            bracket: ch,
+            error_kind: BracketErrorKind::UnmatchedOpen,
+        });
+    }
+
+    errors
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -955,5 +1163,139 @@ mod tests {
         let pairs = default_bracket_pairs();
         let stats = BracketStats::compute(&lines, &pairs);
         assert_eq!(stats.most_common_pair, Some(('(', ')')));
+    }
+
+    // -- BracketColorizer tests ---------------------------------------------
+
+    #[test]
+    fn colorizer_default_has_six_colors() {
+        let c = BracketColorizer::default();
+        assert_eq!(c.colors.len(), 6);
+    }
+
+    #[test]
+    fn colorizer_colorize_line_simple() {
+        let c = BracketColorizer::new(vec!["red".into(), "blue".into()]);
+        let pairs = default_bracket_pairs();
+        let result = c.colorize_line("(a)", &pairs);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].char, '(');
+        assert_eq!(result[0].col, 0);
+        assert_eq!(result[0].color, "red");
+        assert_eq!(result[0].depth, 0);
+        assert_eq!(result[1].char, ')');
+        assert_eq!(result[1].color, "red");
+    }
+
+    #[test]
+    fn colorizer_nested_depth_cycling() {
+        let c = BracketColorizer::new(vec!["A".into(), "B".into()]);
+        let pairs = default_bracket_pairs();
+        let result = c.colorize_line("(([]))", &pairs);
+        // ( depth=0->A, ( depth=1->B, [ depth=2->A, ] depth=2->A, ) depth=1->B, ) depth=0->A
+        assert_eq!(result.len(), 6);
+        assert_eq!(result[0].color, "A"); // (
+        assert_eq!(result[1].color, "B"); // (
+        assert_eq!(result[2].color, "A"); // [
+        assert_eq!(result[3].color, "A"); // ]
+        assert_eq!(result[4].color, "B"); // )
+        assert_eq!(result[5].color, "A"); // )
+    }
+
+    #[test]
+    fn colorizer_empty_colors() {
+        let c = BracketColorizer::new(vec![]);
+        let pairs = default_bracket_pairs();
+        let result = c.colorize_line("(a)", &pairs);
+        assert!(result.is_empty());
+    }
+
+    // -- bracket_pair_at_position tests -------------------------------------
+
+    #[test]
+    fn pair_at_position_on_open_bracket() {
+        let lines = vec!["(hello)"];
+        let pairs = default_bracket_pairs();
+        let m = bracket_pair_at_position(&lines, 1, 1, &pairs).unwrap();
+        assert_eq!(m.open_line, 1);
+        assert_eq!(m.open_col, 1);
+        assert_eq!(m.close_line, 1);
+        assert_eq!(m.close_col, 7);
+    }
+
+    #[test]
+    fn pair_at_position_on_close_bracket() {
+        let lines = vec!["(hello)"];
+        let pairs = default_bracket_pairs();
+        let m = bracket_pair_at_position(&lines, 1, 7, &pairs).unwrap();
+        assert_eq!(m.open_col, 1);
+        assert_eq!(m.close_col, 7);
+    }
+
+    #[test]
+    fn pair_at_position_inside_brackets() {
+        let lines = vec!["(hello)"];
+        let pairs = default_bracket_pairs();
+        let m = bracket_pair_at_position(&lines, 1, 3, &pairs).unwrap();
+        assert_eq!(m.open_col, 1);
+        assert_eq!(m.close_col, 7);
+    }
+
+    #[test]
+    fn pair_at_position_no_brackets() {
+        let lines = vec!["hello"];
+        let pairs = default_bracket_pairs();
+        assert!(bracket_pair_at_position(&lines, 1, 3, &pairs).is_none());
+    }
+
+    // -- bracket_errors tests -----------------------------------------------
+
+    #[test]
+    fn bracket_errors_valid_document() {
+        let lines = vec!["fn f() { [x] }"];
+        let pairs = default_bracket_pairs();
+        assert!(bracket_errors(&lines, &pairs).is_empty());
+    }
+
+    #[test]
+    fn bracket_errors_unmatched_open() {
+        let lines = vec!["(a + b"];
+        let pairs = default_bracket_pairs();
+        let errs = bracket_errors(&lines, &pairs);
+        assert_eq!(errs.len(), 1);
+        assert_eq!(errs[0].bracket, '(');
+        assert_eq!(errs[0].error_kind, BracketErrorKind::UnmatchedOpen);
+    }
+
+    #[test]
+    fn bracket_errors_unmatched_close() {
+        let lines = vec!["a + b)"];
+        let pairs = default_bracket_pairs();
+        let errs = bracket_errors(&lines, &pairs);
+        assert_eq!(errs.len(), 1);
+        assert_eq!(errs[0].bracket, ')');
+        assert_eq!(errs[0].error_kind, BracketErrorKind::UnmatchedClose);
+    }
+
+    #[test]
+    fn bracket_errors_mismatch() {
+        let lines = vec!["(a + b]"];
+        let pairs = default_bracket_pairs();
+        let errs = bracket_errors(&lines, &pairs);
+        assert_eq!(errs.len(), 1);
+        assert_eq!(
+            errs[0].error_kind,
+            BracketErrorKind::Mismatch { expected: ')', found: ']' }
+        );
+    }
+
+    #[test]
+    fn bracket_errors_multiple() {
+        let lines = vec![")("];
+        let pairs = default_bracket_pairs();
+        let errs = bracket_errors(&lines, &pairs);
+        assert_eq!(errs.len(), 2);
+        assert_eq!(errs[0].error_kind, BracketErrorKind::UnmatchedClose);
+        assert_eq!(errs[1].error_kind, BracketErrorKind::UnmatchedOpen);
     }
 }

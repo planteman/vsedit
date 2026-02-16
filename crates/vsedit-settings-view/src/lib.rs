@@ -653,6 +653,172 @@ impl Default for SettingsBreadcrumb {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SettingsTreeNode – hierarchical settings display
+// ---------------------------------------------------------------------------
+
+/// A tree node for hierarchical settings navigation.
+#[derive(Debug, Clone)]
+pub struct SettingsTreeNode {
+    pub key: String,
+    pub label: String,
+    pub children: Vec<SettingsTreeNode>,
+    pub entry_index: Option<usize>,
+    pub expanded: bool,
+}
+
+impl SettingsTreeNode {
+    /// Create a new tree node with the given key and label.
+    pub fn new(key: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            key: key.into(),
+            label: label.into(),
+            children: Vec::new(),
+            entry_index: None,
+            expanded: false,
+        }
+    }
+
+    /// Append a child node and return a mutable reference to it.
+    pub fn add_child(&mut self, child: SettingsTreeNode) -> &mut SettingsTreeNode {
+        self.children.push(child);
+        self.children.last_mut().unwrap()
+    }
+
+    /// A leaf node has no children.
+    pub fn is_leaf(&self) -> bool {
+        self.children.is_empty()
+    }
+
+    /// Number of direct children.
+    pub fn child_count(&self) -> usize {
+        self.children.len()
+    }
+
+    /// Toggle the expanded state.
+    pub fn toggle_expand(&mut self) {
+        self.expanded = !self.expanded;
+    }
+
+    /// Recursively search for a node by key, returning a reference if found.
+    pub fn find_by_key(&self, key: &str) -> Option<&SettingsTreeNode> {
+        if self.key == key {
+            return Some(self);
+        }
+        for child in &self.children {
+            if let Some(found) = child.find_by_key(key) {
+                return Some(found);
+            }
+        }
+        None
+    }
+}
+
+/// Build a tree from a slice of `SettingEntry` values using dotted IDs.
+///
+/// For example, `editor.fontSize` produces root → editor → fontSize.
+pub fn build_tree(entries: &[SettingEntry]) -> SettingsTreeNode {
+    let mut root = SettingsTreeNode::new("root", "Settings");
+    root.expanded = true;
+
+    for (idx, entry) in entries.iter().enumerate() {
+        let parts: Vec<&str> = entry.id.split('.').collect();
+        let mut current = &mut root;
+
+        for (depth, part) in parts.iter().enumerate() {
+            let is_last = depth == parts.len() - 1;
+            let pos = current.children.iter().position(|c| c.key == *part);
+
+            if let Some(pos) = pos {
+                current = &mut current.children[pos];
+            } else {
+                let label = if is_last {
+                    entry.title.clone()
+                } else {
+                    (*part).to_string()
+                };
+                let mut node = SettingsTreeNode::new(*part, label);
+                if is_last {
+                    node.entry_index = Some(idx);
+                }
+                current.add_child(node);
+                let last = current.children.len() - 1;
+                current = &mut current.children[last];
+            }
+        }
+    }
+
+    root
+}
+
+// ---------------------------------------------------------------------------
+// SettingsSearchIndex – fast keyword search
+// ---------------------------------------------------------------------------
+
+/// Pre-built search index for fast case-insensitive keyword matching.
+#[derive(Debug, Clone)]
+pub struct SettingsSearchIndex {
+    terms: Vec<(usize, Vec<String>)>,
+}
+
+impl SettingsSearchIndex {
+    /// Build a search index from a slice of setting entries.
+    pub fn build(entries: &[SettingEntry]) -> Self {
+        let terms = entries
+            .iter()
+            .enumerate()
+            .map(|(i, e)| {
+                let mut tokens: Vec<String> = Vec::new();
+                tokens.push(e.id.to_lowercase());
+                tokens.push(e.title.to_lowercase());
+                tokens.push(e.description.to_lowercase());
+                tokens.push(e.category.to_lowercase());
+                (i, tokens)
+            })
+            .collect();
+        Self { terms }
+    }
+
+    /// Return indices of entries whose searchable terms contain all query words
+    /// (case-insensitive, AND semantics).
+    pub fn search(&self, query: &str) -> Vec<usize> {
+        let words: Vec<String> = query
+            .split_whitespace()
+            .map(|w| w.to_lowercase())
+            .collect();
+        if words.is_empty() {
+            return (0..self.terms.len()).collect();
+        }
+
+        self.terms
+            .iter()
+            .filter(|(_, tokens)| {
+                words.iter().all(|w| tokens.iter().any(|t| t.contains(w.as_str())))
+            })
+            .map(|(i, _)| *i)
+            .collect()
+    }
+
+    /// Number of entries in the index.
+    pub fn entry_count(&self) -> usize {
+        self.terms.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingsModifiedFilter
+// ---------------------------------------------------------------------------
+
+/// Return indices of entries whose current value differs from the default.
+pub fn filter_modified(entries: &[SettingEntry]) -> Vec<usize> {
+    entries
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| e.modified || e.current_value != e.default_value)
+        .map(|(i, _)| i)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -962,5 +1128,129 @@ mod tests {
     fn breadcrumb_default() {
         let bc = SettingsBreadcrumb::default();
         assert!(bc.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // SettingsTreeNode tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn tree_node_basic() {
+        let mut node = SettingsTreeNode::new("root", "Root");
+        assert!(node.is_leaf());
+        assert_eq!(node.child_count(), 0);
+        node.add_child(SettingsTreeNode::new("a", "A"));
+        assert!(!node.is_leaf());
+        assert_eq!(node.child_count(), 1);
+    }
+
+    #[test]
+    fn tree_node_toggle_expand() {
+        let mut node = SettingsTreeNode::new("n", "N");
+        assert!(!node.expanded);
+        node.toggle_expand();
+        assert!(node.expanded);
+        node.toggle_expand();
+        assert!(!node.expanded);
+    }
+
+    #[test]
+    fn tree_node_find_by_key() {
+        let mut root = SettingsTreeNode::new("root", "Root");
+        let mut child = SettingsTreeNode::new("editor", "Editor");
+        child.add_child(SettingsTreeNode::new("fontSize", "Font Size"));
+        root.add_child(child);
+
+        assert!(root.find_by_key("fontSize").is_some());
+        assert!(root.find_by_key("editor").is_some());
+        assert!(root.find_by_key("missing").is_none());
+    }
+
+    #[test]
+    fn build_tree_from_entries() {
+        let entries = sample_entries();
+        let tree = build_tree(&entries);
+
+        assert_eq!(tree.key, "root");
+        assert!(tree.expanded);
+        // Should have two top-level groups: "editor" and "terminal"
+        assert_eq!(tree.child_count(), 2);
+
+        let editor = tree.find_by_key("editor").unwrap();
+        // editor has fontSize, wordWrap, minimap
+        assert_eq!(editor.child_count(), 3);
+        assert!(!editor.is_leaf());
+
+        let font_size = tree.find_by_key("fontSize").unwrap();
+        assert!(font_size.is_leaf());
+        assert_eq!(font_size.entry_index, Some(0));
+
+        // minimap is an intermediate node with child "enabled"
+        let minimap = tree.find_by_key("minimap").unwrap();
+        assert!(!minimap.is_leaf());
+        let enabled = tree.find_by_key("enabled").unwrap();
+        assert!(enabled.is_leaf());
+        assert_eq!(enabled.entry_index, Some(2));
+    }
+
+    // -----------------------------------------------------------------------
+    // SettingsSearchIndex tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn search_index_basic() {
+        let entries = sample_entries();
+        let index = SettingsSearchIndex::build(&entries);
+        assert_eq!(index.entry_count(), 4);
+
+        // "font" matches fontSize (0) and terminal fontFamily (3)
+        let results = index.search("font");
+        assert!(results.contains(&0));
+        assert!(results.contains(&3));
+
+        // empty query returns all
+        assert_eq!(index.search("").len(), 4);
+    }
+
+    #[test]
+    fn search_index_case_insensitive() {
+        let entries = sample_entries();
+        let index = SettingsSearchIndex::build(&entries);
+
+        let r1 = index.search("MINIMAP");
+        let r2 = index.search("minimap");
+        assert_eq!(r1, r2);
+        assert!(r1.contains(&2));
+    }
+
+    #[test]
+    fn search_index_multi_word() {
+        let entries = sample_entries();
+        let index = SettingsSearchIndex::build(&entries);
+
+        // "font terminal" should match only entry 3 (terminal.fontFamily)
+        let results = index.search("font terminal");
+        assert_eq!(results, vec![3]);
+    }
+
+    // -----------------------------------------------------------------------
+    // filter_modified tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn filter_modified_returns_changed() {
+        let mut entries = sample_entries();
+        // nothing modified yet
+        assert!(filter_modified(&entries).is_empty());
+
+        // modify one entry via the flag
+        entries[1].modified = true;
+        let modified = filter_modified(&entries);
+        assert_eq!(modified, vec![1]);
+
+        // modify another by changing its value
+        entries[3].current_value = "Courier".to_string();
+        let modified = filter_modified(&entries);
+        assert_eq!(modified, vec![1, 3]);
     }
 }

@@ -659,6 +659,143 @@ impl RenderTracker {
 }
 
 // ---------------------------------------------------------------------------
+// Extended TerminalCapabilities methods
+// ---------------------------------------------------------------------------
+
+impl TerminalCapabilities {
+    /// Placeholder: sixel graphics are not yet detected.
+    pub fn supports_sixel(&self) -> bool {
+        false
+    }
+
+    /// Placeholder: Kitty graphics protocol is not yet detected.
+    pub fn supports_kitty_graphics(&self) -> bool {
+        false
+    }
+
+    /// Returns a human-readable summary of detected capabilities.
+    pub fn capability_summary(&self) -> String {
+        format!(
+            "truecolor: {}, 256color: {}, mouse: {}, bracketed_paste: {}, sixel: {}, kitty_graphics: {}",
+            if self.supports_true_color { "yes" } else { "no" },
+            if self.supports_256_color { "yes" } else { "no" },
+            if self.supports_mouse { "yes" } else { "no" },
+            if self.supports_bracketed_paste { "yes" } else { "no" },
+            if self.supports_sixel() { "yes" } else { "no" },
+            if self.supports_kitty_graphics() { "yes" } else { "no" },
+        )
+    }
+
+    /// Detect capabilities from environment variables.
+    pub fn from_env() -> Self {
+        let colorterm = std::env::var("COLORTERM").unwrap_or_default();
+        let term = std::env::var("TERM").unwrap_or_default();
+        let supports_true_color =
+            colorterm.eq_ignore_ascii_case("truecolor") || colorterm.eq_ignore_ascii_case("24bit");
+        let supports_256 = supports_true_color || term.contains("256color");
+        Self {
+            supports_color: !term.is_empty() || !colorterm.is_empty(),
+            supports_256_color: supports_256,
+            supports_true_color,
+            supports_mouse: true,
+            supports_bracketed_paste: true,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Terminal size helper
+// ---------------------------------------------------------------------------
+
+/// Returns the current terminal size as `(columns, rows)`.
+///
+/// Falls back to `(80, 24)` if the size cannot be determined.
+pub fn terminal_size() -> (u16, u16) {
+    crossterm::terminal::size().unwrap_or((80, 24))
+}
+
+// ---------------------------------------------------------------------------
+// RenderRegion — partial screen update with dirty tracking
+// ---------------------------------------------------------------------------
+
+/// A rectangular screen region with dirty tracking for partial updates.
+#[derive(Debug, Clone)]
+pub struct RenderRegion {
+    pub x: u16,
+    pub y: u16,
+    pub width: u16,
+    pub height: u16,
+    pub dirty: bool,
+    pub content: Vec<String>,
+}
+
+impl RenderRegion {
+    /// Create a new render region. Content is initialized to empty strings.
+    pub fn new(x: u16, y: u16, width: u16, height: u16) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+            dirty: true,
+            content: vec![String::new(); height as usize],
+        }
+    }
+
+    /// Mark the region as needing a redraw.
+    pub fn mark_dirty(&mut self) {
+        self.dirty = true;
+    }
+
+    /// Mark the region as up-to-date.
+    pub fn mark_clean(&mut self) {
+        self.dirty = false;
+    }
+
+    /// Returns whether the region needs a redraw.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Set the content for a given row (0-based) and mark dirty.
+    pub fn set_line(&mut self, row: usize, text: String) {
+        if row < self.content.len() {
+            self.content[row] = text;
+            self.dirty = true;
+        }
+    }
+
+    /// Get the content for a given row.
+    pub fn get_line(&self, row: usize) -> Option<&str> {
+        self.content.get(row).map(|s| s.as_str())
+    }
+
+    /// Clear all content and mark dirty.
+    pub fn clear(&mut self) {
+        for line in &mut self.content {
+            line.clear();
+        }
+        self.dirty = true;
+    }
+
+    /// Check if this region overlaps with another.
+    pub fn overlaps(&self, other: &RenderRegion) -> bool {
+        self.x < other.x + other.width
+            && self.x + self.width > other.x
+            && self.y < other.y + other.height
+            && self.y + self.height > other.y
+    }
+
+    /// Check if a point falls within this region.
+    pub fn contains_point(&self, px: u16, py: u16) -> bool {
+        px >= self.x
+            && px < self.x + self.width
+            && py >= self.y
+            && py < self.y + self.height
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -956,5 +1093,114 @@ mod tests {
         assert_eq!(tracker.frame_count(), 0);
         assert_eq!(tracker.average_render_time_us(), 0);
         assert!(tracker.last_frame().is_none());
+    }
+
+    // -- TerminalCapabilities extended methods --
+
+    #[test]
+    fn capabilities_sixel_placeholder() {
+        let caps = TerminalCapabilities::default();
+        assert!(!caps.supports_sixel());
+    }
+
+    #[test]
+    fn capabilities_kitty_graphics_placeholder() {
+        let caps = TerminalCapabilities::default();
+        assert!(!caps.supports_kitty_graphics());
+    }
+
+    #[test]
+    fn capabilities_summary_contains_fields() {
+        let caps = TerminalCapabilities::default();
+        let summary = caps.capability_summary();
+        assert!(summary.contains("truecolor:"));
+        assert!(summary.contains("mouse:"));
+        assert!(summary.contains("bracketed_paste:"));
+        assert!(summary.contains("sixel:"));
+        assert!(summary.contains("kitty_graphics:"));
+    }
+
+    #[test]
+    fn capabilities_from_env() {
+        // from_env should return a valid struct regardless of env state
+        let caps = TerminalCapabilities::from_env();
+        // mouse and bracketed_paste are always true
+        assert!(caps.supports_mouse);
+        assert!(caps.supports_bracketed_paste);
+    }
+
+    // -- terminal_size --
+
+    #[test]
+    fn terminal_size_returns_nonzero() {
+        let (cols, rows) = terminal_size();
+        assert!(cols > 0);
+        assert!(rows > 0);
+    }
+
+    // -- RenderRegion --
+
+    #[test]
+    fn render_region_new_defaults() {
+        let r = RenderRegion::new(5, 10, 40, 3);
+        assert_eq!(r.x, 5);
+        assert_eq!(r.y, 10);
+        assert_eq!(r.width, 40);
+        assert_eq!(r.height, 3);
+        assert!(r.is_dirty());
+        assert_eq!(r.content.len(), 3);
+    }
+
+    #[test]
+    fn render_region_set_and_get_line() {
+        let mut r = RenderRegion::new(0, 0, 80, 4);
+        r.mark_clean();
+        assert!(!r.is_dirty());
+        r.set_line(2, "hello".into());
+        assert!(r.is_dirty());
+        assert_eq!(r.get_line(2), Some("hello"));
+        assert_eq!(r.get_line(0), Some(""));
+        assert_eq!(r.get_line(99), None);
+    }
+
+    #[test]
+    fn render_region_clear() {
+        let mut r = RenderRegion::new(0, 0, 10, 2);
+        r.set_line(0, "data".into());
+        r.mark_clean();
+        r.clear();
+        assert!(r.is_dirty());
+        assert_eq!(r.get_line(0), Some(""));
+    }
+
+    #[test]
+    fn render_region_dirty_tracking() {
+        let mut r = RenderRegion::new(0, 0, 10, 2);
+        assert!(r.is_dirty()); // new region is dirty
+        r.mark_clean();
+        assert!(!r.is_dirty());
+        r.mark_dirty();
+        assert!(r.is_dirty());
+    }
+
+    #[test]
+    fn render_region_overlaps() {
+        let a = RenderRegion::new(0, 0, 10, 10);
+        let b = RenderRegion::new(5, 5, 10, 10);
+        let c = RenderRegion::new(20, 20, 5, 5);
+        assert!(a.overlaps(&b));
+        assert!(b.overlaps(&a));
+        assert!(!a.overlaps(&c));
+        assert!(!c.overlaps(&a));
+    }
+
+    #[test]
+    fn render_region_contains_point() {
+        let r = RenderRegion::new(10, 20, 5, 3);
+        assert!(r.contains_point(10, 20));
+        assert!(r.contains_point(14, 22));
+        assert!(!r.contains_point(15, 20)); // x == x+width is out
+        assert!(!r.contains_point(10, 23)); // y == y+height is out
+        assert!(!r.contains_point(9, 20));
     }
 }

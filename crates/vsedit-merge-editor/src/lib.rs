@@ -557,6 +557,208 @@ impl fmt::Display for ConflictStats {
     }
 }
 
+/// A region where the base, ours, and theirs versions conflict.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConflictRegion {
+    /// Start index in the base (inclusive).
+    pub base_start: usize,
+    /// End index in the base (exclusive).
+    pub base_end: usize,
+    /// Lines from the "ours" side for this region.
+    pub ours_lines: Vec<String>,
+    /// Lines from the "theirs" side for this region.
+    pub theirs_lines: Vec<String>,
+}
+
+/// 3-way merge inputs.
+#[derive(Debug, Clone)]
+pub struct ThreeWayMerge {
+    pub base: Vec<String>,
+    pub ours: Vec<String>,
+    pub theirs: Vec<String>,
+}
+
+impl ThreeWayMerge {
+    pub fn new(base: Vec<String>, ours: Vec<String>, theirs: Vec<String>) -> Self {
+        Self { base, ours, theirs }
+    }
+
+    /// Returns `true` when ours and theirs disagree and at least one differs from base.
+    pub fn has_conflicts(&self) -> bool {
+        if self.ours == self.theirs {
+            return false;
+        }
+        let max_len = self.base.len().max(self.ours.len()).max(self.theirs.len());
+        for i in 0..max_len {
+            let b = self.base.get(i);
+            let o = self.ours.get(i);
+            let t = self.theirs.get(i);
+            if o != t && (o != b || t != b) {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn base_line_count(&self) -> usize {
+        self.base.len()
+    }
+
+    pub fn ours_line_count(&self) -> usize {
+        self.ours.len()
+    }
+
+    pub fn theirs_line_count(&self) -> usize {
+        self.theirs.len()
+    }
+}
+
+/// Finds non-overlapping conflict regions by comparing line-by-line.
+///
+/// When both ours and theirs differ from base at a given position, the line
+/// belongs to a conflict region. Adjacent conflict lines are merged into a
+/// single [`ConflictRegion`].
+pub fn conflict_regions(
+    base: &[String],
+    ours: &[String],
+    theirs: &[String],
+) -> Vec<ConflictRegion> {
+    let max_len = base.len().max(ours.len()).max(theirs.len());
+    let mut regions: Vec<ConflictRegion> = Vec::new();
+
+    let mut i = 0;
+    while i < max_len {
+        let b = base.get(i);
+        let o = ours.get(i);
+        let t = theirs.get(i);
+
+        let ours_differs = o != b;
+        let theirs_differs = t != b;
+
+        if ours_differs && theirs_differs && o != t {
+            // Start of a conflict region.
+            let start = i;
+            let mut o_lines = Vec::new();
+            let mut t_lines = Vec::new();
+            while i < max_len {
+                let b2 = base.get(i);
+                let o2 = ours.get(i);
+                let t2 = theirs.get(i);
+                let od = o2 != b2;
+                let td = t2 != b2;
+                if od && td && o2 != t2 {
+                    if let Some(o2) = o2 {
+                        o_lines.push(o2.clone());
+                    }
+                    if let Some(t2) = t2 {
+                        t_lines.push(t2.clone());
+                    }
+                    i += 1;
+                } else {
+                    break;
+                }
+            }
+            regions.push(ConflictRegion {
+                base_start: start,
+                base_end: i,
+                ours_lines: o_lines,
+                theirs_lines: t_lines,
+            });
+        } else {
+            i += 1;
+        }
+    }
+
+    regions
+}
+
+/// Result of an automatic three-way merge attempt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AutoResolveResult {
+    pub merged_lines: Vec<String>,
+    pub had_conflicts: bool,
+    pub conflict_count: usize,
+}
+
+/// Attempts to automatically merge three versions line-by-line.
+///
+/// * If ours == theirs, uses ours.
+/// * If only ours differs from base, uses ours.
+/// * If only theirs differs from base, uses theirs.
+/// * If both differ from base and from each other, inserts conflict markers.
+pub fn auto_resolve(
+    base: &[String],
+    ours: &[String],
+    theirs: &[String],
+) -> AutoResolveResult {
+    let max_len = base.len().max(ours.len()).max(theirs.len());
+    let mut merged = Vec::new();
+    let mut conflict_count: usize = 0;
+
+    let mut i = 0;
+    while i < max_len {
+        let b = base.get(i).map(|s| s.as_str());
+        let o = ours.get(i).map(|s| s.as_str());
+        let t = theirs.get(i).map(|s| s.as_str());
+
+        if o == t {
+            // Both sides agree — use whichever is present (prefer ours).
+            if let Some(line) = o {
+                merged.push(line.to_string());
+            }
+        } else {
+            let ours_differs = o != b;
+            let theirs_differs = t != b;
+
+            if ours_differs && theirs_differs {
+                // True conflict — collect consecutive conflicting lines.
+                conflict_count += 1;
+                let mut o_lines: Vec<&str> = Vec::new();
+                let mut t_lines: Vec<&str> = Vec::new();
+                while i < max_len {
+                    let b2 = base.get(i).map(|s| s.as_str());
+                    let o2 = ours.get(i).map(|s| s.as_str());
+                    let t2 = theirs.get(i).map(|s| s.as_str());
+                    if o2 != t2 && o2 != b2 && t2 != b2 {
+                        if let Some(l) = o2 {
+                            o_lines.push(l);
+                        }
+                        if let Some(l) = t2 {
+                            t_lines.push(l);
+                        }
+                        i += 1;
+                    } else {
+                        break;
+                    }
+                }
+                merged.push("<<<<<<< ours".to_string());
+                for l in &o_lines {
+                    merged.push(l.to_string());
+                }
+                merged.push("=======".to_string());
+                for l in &t_lines {
+                    merged.push(l.to_string());
+                }
+                merged.push(">>>>>>> theirs".to_string());
+                continue; // i already advanced
+            } else if ours_differs {
+                if let Some(line) = o {
+                    merged.push(line.to_string());
+                }
+            } else if let Some(line) = t {
+                merged.push(line.to_string());
+            }
+        }
+        i += 1;
+    }
+
+    AutoResolveResult {
+        merged_lines: merged,
+        had_conflicts: conflict_count > 0,
+        conflict_count,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -956,5 +1158,135 @@ d
         let s = format!("{stats}");
         assert!(s.contains("total=5"));
         assert!(s.contains("resolved=3"));
+    }
+
+    // ---- ThreeWayMerge tests ----
+
+    #[test]
+    fn three_way_merge_no_conflicts_when_sides_agree() {
+        let m = ThreeWayMerge::new(
+            vec!["a".into()],
+            vec!["b".into()],
+            vec!["b".into()],
+        );
+        assert!(!m.has_conflicts());
+    }
+
+    #[test]
+    fn three_way_merge_has_conflicts_both_differ() {
+        let m = ThreeWayMerge::new(
+            vec!["a".into()],
+            vec!["b".into()],
+            vec!["c".into()],
+        );
+        assert!(m.has_conflicts());
+    }
+
+    #[test]
+    fn three_way_merge_line_counts() {
+        let m = ThreeWayMerge::new(
+            vec!["1".into(), "2".into()],
+            vec!["a".into()],
+            vec!["x".into(), "y".into(), "z".into()],
+        );
+        assert_eq!(m.base_line_count(), 2);
+        assert_eq!(m.ours_line_count(), 1);
+        assert_eq!(m.theirs_line_count(), 3);
+    }
+
+    // ---- conflict_regions tests ----
+
+    #[test]
+    fn conflict_regions_no_conflicts() {
+        let base = vec!["a".into(), "b".into()];
+        let ours = vec!["a".into(), "b".into()];
+        let theirs = vec!["a".into(), "b".into()];
+        let regions = conflict_regions(&base, &ours, &theirs);
+        assert!(regions.is_empty());
+    }
+
+    #[test]
+    fn conflict_regions_single_conflict() {
+        let base = vec!["a".into(), "b".into(), "c".into()];
+        let ours = vec!["a".into(), "X".into(), "c".into()];
+        let theirs = vec!["a".into(), "Y".into(), "c".into()];
+        let regions = conflict_regions(&base, &ours, &theirs);
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0].base_start, 1);
+        assert_eq!(regions[0].base_end, 2);
+        assert_eq!(regions[0].ours_lines, vec!["X".to_string()]);
+        assert_eq!(regions[0].theirs_lines, vec!["Y".to_string()]);
+    }
+
+    #[test]
+    fn conflict_regions_only_one_side_differs() {
+        let base = vec!["a".into(), "b".into()];
+        let ours = vec!["a".into(), "X".into()];
+        let theirs = vec!["a".into(), "b".into()];
+        let regions = conflict_regions(&base, &ours, &theirs);
+        assert!(regions.is_empty());
+    }
+
+    // ---- auto_resolve tests ----
+
+    #[test]
+    fn auto_resolve_identical() {
+        let base = vec!["a".into(), "b".into()];
+        let result = auto_resolve(&base, &base, &base);
+        assert_eq!(result.merged_lines, vec!["a".to_string(), "b".to_string()]);
+        assert!(!result.had_conflicts);
+        assert_eq!(result.conflict_count, 0);
+    }
+
+    #[test]
+    fn auto_resolve_only_ours_differs() {
+        let base = vec!["a".into(), "b".into()];
+        let ours = vec!["a".into(), "X".into()];
+        let result = auto_resolve(&base, &ours, &base);
+        assert_eq!(result.merged_lines, vec!["a".to_string(), "X".to_string()]);
+        assert!(!result.had_conflicts);
+    }
+
+    #[test]
+    fn auto_resolve_only_theirs_differs() {
+        let base = vec!["a".into(), "b".into()];
+        let theirs = vec!["a".into(), "Y".into()];
+        let result = auto_resolve(&base, &base, &theirs);
+        assert_eq!(result.merged_lines, vec!["a".to_string(), "Y".to_string()]);
+        assert!(!result.had_conflicts);
+    }
+
+    #[test]
+    fn auto_resolve_both_agree_on_change() {
+        let base = vec!["a".into()];
+        let changed = vec!["Z".into()];
+        let result = auto_resolve(&base, &changed, &changed);
+        assert_eq!(result.merged_lines, vec!["Z".to_string()]);
+        assert!(!result.had_conflicts);
+    }
+
+    #[test]
+    fn auto_resolve_true_conflict_produces_markers() {
+        let base = vec!["a".into(), "b".into(), "c".into()];
+        let ours = vec!["a".into(), "X".into(), "c".into()];
+        let theirs = vec!["a".into(), "Y".into(), "c".into()];
+        let result = auto_resolve(&base, &ours, &theirs);
+        assert!(result.had_conflicts);
+        assert_eq!(result.conflict_count, 1);
+        assert!(result.merged_lines.contains(&"<<<<<<< ours".to_string()));
+        assert!(result.merged_lines.contains(&"=======".to_string()));
+        assert!(result.merged_lines.contains(&">>>>>>> theirs".to_string()));
+        assert!(result.merged_lines.contains(&"X".to_string()));
+        assert!(result.merged_lines.contains(&"Y".to_string()));
+    }
+
+    #[test]
+    fn auto_resolve_multiple_conflicts() {
+        let base = vec!["a".into(), "b".into(), "c".into(), "d".into(), "e".into()];
+        let ours = vec!["X".into(), "b".into(), "c".into(), "W".into(), "e".into()];
+        let theirs = vec!["Y".into(), "b".into(), "c".into(), "V".into(), "e".into()];
+        let result = auto_resolve(&base, &ours, &theirs);
+        assert!(result.had_conflicts);
+        assert_eq!(result.conflict_count, 2);
     }
 }

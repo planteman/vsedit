@@ -1,5 +1,6 @@
 //! Comments view (code review comments).
 
+use std::collections::HashMap;
 use std::fmt;
 #[derive(Debug, Clone)]
 pub struct CommentReaction {
@@ -39,6 +40,29 @@ impl CommentThread {
     }
 
     pub fn last_comment(&self) -> Option<&Comment> {
+        self.comments.last()
+    }
+
+    pub fn add_reply(&mut self, author: &str, body: &str, timestamp: u64) {
+        let id = self.comments.len() as u64 + 1;
+        self.comments.push(Comment {
+            id,
+            author: author.to_string(),
+            body: body.to_string(),
+            timestamp,
+            reactions: Vec::new(),
+        });
+    }
+
+    pub fn resolve(&mut self) {
+        self.resolved = true;
+    }
+
+    pub fn unresolve(&mut self) {
+        self.resolved = false;
+    }
+
+    pub fn latest_comment(&self) -> Option<&Comment> {
         self.comments.last()
     }
 }
@@ -388,6 +412,195 @@ impl fmt::Display for CommentStatistics {
             "threads={}, comments={}, resolved={}",
             self.total_threads, self.total_comments, self.resolved_threads
         )
+    }
+}
+
+pub fn comment_range_overlap<'a>(
+    threads: &[&'a CommentThread],
+    start_line: u32,
+    end_line: u32,
+) -> Vec<&'a CommentThread> {
+    threads
+        .iter()
+        .filter(|t| t.line >= start_line && t.line <= end_line)
+        .copied()
+        .collect()
+}
+
+pub struct CommentController {
+    threads: HashMap<String, Vec<CommentThread>>,
+}
+
+impl CommentController {
+    pub fn new() -> Self {
+        Self {
+            threads: HashMap::new(),
+        }
+    }
+
+    pub fn add_thread(&mut self, uri: &str, thread: CommentThread) {
+        self.threads
+            .entry(uri.to_string())
+            .or_default()
+            .push(thread);
+    }
+
+    pub fn get_threads(&self, uri: &str) -> Vec<&CommentThread> {
+        self.threads
+            .get(uri)
+            .map(|v| v.iter().collect())
+            .unwrap_or_default()
+    }
+
+    pub fn remove_thread(&mut self, uri: &str, thread_id: &str) -> bool {
+        if let Some(v) = self.threads.get_mut(uri) {
+            let before = v.len();
+            v.retain(|t| t.id != thread_id);
+            v.len() < before
+        } else {
+            false
+        }
+    }
+
+    pub fn thread_count(&self, uri: &str) -> usize {
+        self.threads.get(uri).map(|v| v.len()).unwrap_or(0)
+    }
+
+    pub fn all_uris(&self) -> Vec<&str> {
+        self.threads.keys().map(|s| s.as_str()).collect()
+    }
+
+    pub fn resolve_all(&mut self, uri: &str) {
+        if let Some(v) = self.threads.get_mut(uri) {
+            for t in v.iter_mut() {
+                t.resolved = true;
+            }
+        }
+    }
+
+    pub fn unresolved_count(&self, uri: &str) -> usize {
+        self.threads
+            .get(uri)
+            .map(|v| v.iter().filter(|t| !t.resolved).count())
+            .unwrap_or(0)
+    }
+}
+
+/// Formats comment threads into different text representations.
+pub struct CommentFormatter;
+
+impl CommentFormatter {
+    /// Format a thread as markdown with heading, author, body, and reactions.
+    pub fn format_as_markdown(thread: &CommentThread) -> String {
+        let mut out = String::new();
+        let status = if thread.resolved { "✅ Resolved" } else { "❌ Unresolved" };
+        out.push_str(&format!("## Thread {} ({})\n\n", thread.id, status));
+        out.push_str(&format!("**File:** `{}` line {}\n\n", thread.uri, thread.line));
+        for comment in &thread.comments {
+            out.push_str(&format!("### {} (id: {})\n\n", comment.author, comment.id));
+            out.push_str(&comment.body);
+            out.push('\n');
+            if !comment.reactions.is_empty() {
+                let reactions: Vec<String> = comment
+                    .reactions
+                    .iter()
+                    .map(|r| format!("{} ×{}", r.label, r.count))
+                    .collect();
+                out.push_str(&format!("\n> Reactions: {}\n", reactions.join(", ")));
+            }
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Format a thread as plain text.
+    pub fn format_as_plain(thread: &CommentThread) -> String {
+        let mut out = String::new();
+        let status = if thread.resolved { "Resolved" } else { "Unresolved" };
+        out.push_str(&format!(
+            "Thread {} [{}] - {}:{}\n",
+            thread.id, status, thread.uri, thread.line
+        ));
+        for comment in &thread.comments {
+            out.push_str(&format!("  {}: {}\n", comment.author, comment.body));
+            if !comment.reactions.is_empty() {
+                let reactions: Vec<String> = comment
+                    .reactions
+                    .iter()
+                    .map(|r| format!("{} ({})", r.label, r.count))
+                    .collect();
+                out.push_str(&format!("    Reactions: {}\n", reactions.join(", ")));
+            }
+        }
+        out
+    }
+
+    /// Produce a summary string for a slice of threads.
+    pub fn format_summary(threads: &[CommentThread]) -> String {
+        let total = threads.len();
+        let resolved = threads.iter().filter(|t| t.resolved).count();
+        let total_comments: usize = threads.iter().map(|t| t.comments.len()).sum();
+        format!(
+            "{} threads, {} resolved, {} total comments",
+            total, resolved, total_comments
+        )
+    }
+}
+
+/// Builder-style search over comment threads.
+#[derive(Debug, Clone, Default)]
+pub struct CommentSearch {
+    author: Option<String>,
+    body_contains: Option<String>,
+    resolved: Option<bool>,
+}
+
+impl CommentSearch {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_author(mut self, author: &str) -> Self {
+        self.author = Some(author.to_string());
+        self
+    }
+
+    pub fn with_body_contains(mut self, text: &str) -> Self {
+        self.body_contains = Some(text.to_ascii_lowercase());
+        self
+    }
+
+    pub fn with_resolved(mut self, resolved: bool) -> Self {
+        self.resolved = Some(resolved);
+        self
+    }
+
+    pub fn search<'a>(&self, threads: &'a [CommentThread]) -> Vec<&'a CommentThread> {
+        threads
+            .iter()
+            .filter(|thread| {
+                if let Some(resolved) = self.resolved {
+                    if thread.resolved != resolved {
+                        return false;
+                    }
+                }
+                if let Some(ref author) = self.author {
+                    if !thread.comments.iter().any(|c| c.author == *author) {
+                        return false;
+                    }
+                }
+                if let Some(ref text) = self.body_contains {
+                    if !thread
+                        .comments
+                        .iter()
+                        .any(|c| c.body.to_ascii_lowercase().contains(text.as_str()))
+                    {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect()
     }
 }
 
@@ -955,5 +1168,202 @@ mod tests {
         let t3 = make_thread("t2", "file.rs", 1);
         assert_eq!(t1, t2);
         assert_ne!(t1, t3);
+    }
+
+    #[test]
+    fn thread_add_reply() {
+        let mut t = make_thread("t1", "file.rs", 1);
+        t.add_reply("alice", "hello", 100);
+        t.add_reply("bob", "world", 200);
+        assert_eq!(t.comment_count(), 2);
+        assert_eq!(t.comments[0].author, "alice");
+        assert_eq!(t.comments[1].author, "bob");
+    }
+
+    #[test]
+    fn thread_resolve_unresolve() {
+        let mut t = make_thread("t1", "file.rs", 1);
+        assert!(!t.resolved);
+        t.resolve();
+        assert!(t.resolved);
+        t.unresolve();
+        assert!(!t.resolved);
+    }
+
+    #[test]
+    fn thread_latest_comment() {
+        let mut t = make_thread("t1", "file.rs", 1);
+        assert!(t.latest_comment().is_none());
+        t.add_reply("alice", "first", 10);
+        t.add_reply("bob", "second", 20);
+        assert_eq!(t.latest_comment().unwrap().body, "second");
+    }
+
+    #[test]
+    fn thread_authors_unique() {
+        let mut t = make_thread("t1", "file.rs", 1);
+        t.add_reply("alice", "a", 1);
+        t.add_reply("bob", "b", 2);
+        t.add_reply("alice", "c", 3);
+        let authors = t.authors();
+        assert_eq!(authors, vec!["alice", "bob"]);
+    }
+
+    #[test]
+    fn test_comment_range_overlap() {
+        let t1 = make_thread("t1", "f.rs", 5);
+        let t2 = make_thread("t2", "f.rs", 10);
+        let t3 = make_thread("t3", "f.rs", 15);
+        let threads: Vec<&CommentThread> = vec![&t1, &t2, &t3];
+        let result = comment_range_overlap(&threads, 5, 10);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].id, "t1");
+        assert_eq!(result[1].id, "t2");
+    }
+
+    #[test]
+    fn test_comment_range_overlap_empty() {
+        let t1 = make_thread("t1", "f.rs", 1);
+        let threads: Vec<&CommentThread> = vec![&t1];
+        let result = comment_range_overlap(&threads, 10, 20);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn controller_add_and_get() {
+        let mut ctrl = CommentController::new();
+        ctrl.add_thread("a.rs", make_thread("t1", "a.rs", 1));
+        ctrl.add_thread("a.rs", make_thread("t2", "a.rs", 5));
+        ctrl.add_thread("b.rs", make_thread("t3", "b.rs", 1));
+        assert_eq!(ctrl.get_threads("a.rs").len(), 2);
+        assert_eq!(ctrl.get_threads("b.rs").len(), 1);
+        assert!(ctrl.get_threads("c.rs").is_empty());
+    }
+
+    #[test]
+    fn controller_remove_thread() {
+        let mut ctrl = CommentController::new();
+        ctrl.add_thread("a.rs", make_thread("t1", "a.rs", 1));
+        ctrl.add_thread("a.rs", make_thread("t2", "a.rs", 2));
+        assert!(ctrl.remove_thread("a.rs", "t1"));
+        assert_eq!(ctrl.thread_count("a.rs"), 1);
+        assert!(!ctrl.remove_thread("a.rs", "t99"));
+        assert!(!ctrl.remove_thread("missing.rs", "t1"));
+    }
+
+    #[test]
+    fn controller_all_uris() {
+        let mut ctrl = CommentController::new();
+        ctrl.add_thread("a.rs", make_thread("t1", "a.rs", 1));
+        ctrl.add_thread("b.rs", make_thread("t2", "b.rs", 1));
+        let mut uris = ctrl.all_uris();
+        uris.sort();
+        assert_eq!(uris, vec!["a.rs", "b.rs"]);
+    }
+
+    #[test]
+    fn controller_resolve_all_and_unresolved_count() {
+        let mut ctrl = CommentController::new();
+        ctrl.add_thread("a.rs", make_thread("t1", "a.rs", 1));
+        ctrl.add_thread("a.rs", make_thread("t2", "a.rs", 2));
+        assert_eq!(ctrl.unresolved_count("a.rs"), 2);
+        ctrl.resolve_all("a.rs");
+        assert_eq!(ctrl.unresolved_count("a.rs"), 0);
+        assert_eq!(ctrl.unresolved_count("missing.rs"), 0);
+    }
+
+    #[test]
+    fn formatter_markdown_basic() {
+        let mut thread = make_thread("t1", "main.rs", 42);
+        thread.comments.push(make_comment(1, "alice", "LGTM", 100));
+        let md = CommentFormatter::format_as_markdown(&thread);
+        assert!(md.contains("## Thread t1"));
+        assert!(md.contains("alice"));
+        assert!(md.contains("LGTM"));
+        assert!(md.contains("main.rs"));
+        assert!(md.contains("Unresolved"));
+    }
+
+    #[test]
+    fn formatter_markdown_resolved_with_reactions() {
+        let mut thread = make_thread("t2", "lib.rs", 10);
+        thread.resolved = true;
+        thread.comments.push(make_comment_with_reactions(
+            1,
+            "bob",
+            vec![CommentReaction { label: "👍".into(), count: 3, has_reacted: false }],
+        ));
+        let md = CommentFormatter::format_as_markdown(&thread);
+        assert!(md.contains("Resolved"));
+        assert!(md.contains("👍 ×3"));
+    }
+
+    #[test]
+    fn formatter_plain_text() {
+        let mut thread = make_thread("t1", "main.rs", 5);
+        thread.comments.push(make_comment(1, "carol", "Fix this", 200));
+        let plain = CommentFormatter::format_as_plain(&thread);
+        assert!(plain.contains("Thread t1 [Unresolved]"));
+        assert!(plain.contains("carol: Fix this"));
+    }
+
+    #[test]
+    fn formatter_summary() {
+        let mut t1 = make_thread("t1", "a.rs", 1);
+        t1.comments.push(make_comment(1, "a", "c1", 1));
+        t1.comments.push(make_comment(2, "b", "c2", 2));
+        t1.resolved = true;
+
+        let mut t2 = make_thread("t2", "b.rs", 2);
+        t2.comments.push(make_comment(3, "c", "c3", 3));
+
+        let mut t3 = make_thread("t3", "c.rs", 3);
+        t3.resolved = true;
+
+        let summary = CommentFormatter::format_summary(&[t1, t2, t3]);
+        assert_eq!(summary, "3 threads, 2 resolved, 3 total comments");
+    }
+
+    #[test]
+    fn search_by_author() {
+        let mut t1 = make_thread("t1", "a.rs", 1);
+        t1.comments.push(make_comment(1, "alice", "hi", 1));
+        let mut t2 = make_thread("t2", "b.rs", 2);
+        t2.comments.push(make_comment(2, "bob", "bye", 2));
+
+        let threads = [t1, t2];
+        let results = CommentSearch::new().with_author("alice").search(&threads);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "t1");
+    }
+
+    #[test]
+    fn search_by_body_and_resolved() {
+        let mut t1 = make_thread("t1", "a.rs", 1);
+        t1.comments.push(make_comment(1, "alice", "TODO fix this", 1));
+        t1.resolved = true;
+
+        let mut t2 = make_thread("t2", "b.rs", 2);
+        t2.comments.push(make_comment(2, "bob", "todo later", 2));
+
+        let threads = [t1, t2];
+        let results = CommentSearch::new()
+            .with_body_contains("todo")
+            .with_resolved(false)
+            .search(&threads);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "t2");
+    }
+
+    #[test]
+    fn search_no_filters_returns_all() {
+        let mut t1 = make_thread("t1", "a.rs", 1);
+        t1.comments.push(make_comment(1, "x", "a", 1));
+        let mut t2 = make_thread("t2", "b.rs", 2);
+        t2.comments.push(make_comment(2, "y", "b", 2));
+
+        let threads = [t1, t2];
+        let results = CommentSearch::new().search(&threads);
+        assert_eq!(results.len(), 2);
     }
 }
