@@ -10,6 +10,7 @@ vsedit-files = { path = "../vsedit-files" }
 vsedit-tree = { path = "../vsedit-tree" }
 vsedit-wb-views = { path = "../vsedit-wb-views" }
 ratatui.workspace = true
+crossterm.workspace = true
 
 [dev-dependencies]
 tempfile = "3"
