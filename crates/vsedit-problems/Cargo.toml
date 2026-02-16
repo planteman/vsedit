@@ -1,0 +1,9 @@
+[package]
+name = "vsedit-problems"
+description = "Problems panel view"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+ratatui = { workspace = true }

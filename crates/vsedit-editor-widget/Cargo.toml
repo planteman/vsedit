@@ -9,4 +9,11 @@ license.workspace = true
 vsedit-editor-controller = { path = "../vsedit-editor-controller" }
 vsedit-editor-render = { path = "../vsedit-editor-render" }
 vsedit-editor-viewparts = { path = "../vsedit-editor-viewparts" }
+vsedit-text-model = { path = "../vsedit-text-model" }
+vsedit-cursor = { path = "../vsedit-cursor" }
+vsedit-viewmodel = { path = "../vsedit-viewmodel" }
+vsedit-editor-types = { path = "../vsedit-editor-types" }
+vsedit-editor-config = { path = "../vsedit-editor-config" }
+vsedit-text-render = { path = "../vsedit-text-render" }
+ratatui = { workspace = true }
 

@@ -7,4 +7,6 @@ license.workspace = true
 
 [dependencies]
 vsedit-ext-api = { path = "../vsedit-ext-api" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 

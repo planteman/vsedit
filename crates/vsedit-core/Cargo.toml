@@ -8,15 +8,21 @@ license.workspace = true
 [dependencies]
 vsedit-configuration = { path = "../vsedit-configuration" }
 vsedit-di = { path = "../vsedit-di" }
+vsedit-editor-controller = { path = "../vsedit-editor-controller" }
+vsedit-editor-widget = { path = "../vsedit-editor-widget" }
 vsedit-environment = { path = "../vsedit-environment" }
 vsedit-ext-host = { path = "../vsedit-ext-host" }
+vsedit-input = { path = "../vsedit-input" }
 vsedit-lifecycle-svc = { path = "../vsedit-lifecycle-svc" }
 vsedit-log = { path = "../vsedit-log" }
 vsedit-product = { path = "../vsedit-product" }
 vsedit-tui = { path = "../vsedit-tui" }
 vsedit-workbench = { path = "../vsedit-workbench" }
 clap = { version = "4", features = ["derive"] }
-tokio = { version = "1", features = ["full"] }
+crossterm = { workspace = true }
+futures = { workspace = true }
+ratatui = { workspace = true }
+tokio = { workspace = true }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 

@@ -6,6 +6,5 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-vsedit-ext-debug = { path = "../vsedit-ext-debug" }
-vsedit-wb-views = { path = "../vsedit-wb-views" }
+ratatui = { workspace = true }
 

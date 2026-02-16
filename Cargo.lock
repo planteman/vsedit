@@ -104,26 +104,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
-name = "bindgen"
-version = "0.71.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f58bf3d7db68cfbac37cfc485a8d711e87e064c3d0fe0435b92f7a407f9d6b3"
-dependencies = [
- "bitflags 2.11.0",
- "cexpr",
- "clang-sys",
- "itertools",
- "log",
- "prettyplease",
- "proc-macro2",
- "quote",
- "regex",
- "rustc-hash",
- "shlex",
- "syn",
-]
-
-[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -192,30 +172,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "cexpr"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fac387a98bb7c37292057cffc56d62ecb629900026402633ae9160df93a8766"
-dependencies = [
- "nom",
-]
-
-[[package]]
 name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
-
-[[package]]
-name = "clang-sys"
-version = "1.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b023947811758c97c59bf9d1c188fd619ad4718dcaa767947df1cadb14f39f4"
-dependencies = [
- "glob",
- "libc",
- "libloading",
-]
 
 [[package]]
 name = "clap"
@@ -311,31 +271,6 @@ checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "crossbeam-deque"
-version = "0.8.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dd111b7b7f7d55b72c0a6ae361660ee5853c9af73f70c3c2ef6858b950e2e51"
-dependencies = [
- "crossbeam-epoch",
- "crossbeam-utils",
-]
-
-[[package]]
-name = "crossbeam-epoch"
-version = "0.9.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
-dependencies = [
- "crossbeam-utils",
-]
-
-[[package]]
-name = "crossbeam-utils"
-version = "0.8.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crossterm"
@@ -468,15 +403,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75030f3c4f45dafd7586dd6780965a8c7e8e285a5ecb86713e63a79c5b2766f3"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "encoding_rs_io"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cc3c5651fb62ab8aa3103998dade57efdd028544bd300516baa31840c252a83"
-dependencies = [
- "encoding_rs",
 ]
 
 [[package]]
@@ -719,12 +645,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "glob"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
-
-[[package]]
 name = "globset"
 version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -735,30 +655,6 @@ dependencies = [
  "log",
  "regex-automata",
  "regex-syntax",
-]
-
-[[package]]
-name = "grep-matcher"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36d7b71093325ab22d780b40d7df3066ae4aebb518ba719d38c697a8228a8023"
-dependencies = [
- "memchr",
-]
-
-[[package]]
-name = "grep-searcher"
-version = "0.1.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac63295322dc48ebb20a25348147905d816318888e64f531bfc2a2bc0577dc34"
-dependencies = [
- "bstr",
- "encoding_rs",
- "encoding_rs_io",
- "grep-matcher",
- "log",
- "memchr",
- "memmap2",
 ]
 
 [[package]]
@@ -1054,22 +950,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ignore"
-version = "0.4.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3d782a365a015e0f5c04902246139249abf769125006fbe7649e2ee88169b4a"
-dependencies = [
- "crossbeam-deque",
- "globset",
- "log",
- "memchr",
- "regex-automata",
- "same-file",
- "walkdir",
- "winapi-util",
-]
-
-[[package]]
 name = "indexmap"
 version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1189,16 +1069,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "keyring"
-version = "3.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eebcc3aff044e5944a8fbaf69eb277d11986064cba30c468730e8b9909fb551c"
-dependencies = [
- "log",
- "zeroize",
-]
-
-[[package]]
 name = "kqueue"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1235,16 +1105,6 @@ name = "libc"
 version = "0.2.182"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
-
-[[package]]
-name = "libloading"
-version = "0.8.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
-dependencies = [
- "cfg-if",
- "windows-link",
-]
 
 [[package]]
 name = "libredox"
@@ -1326,15 +1186,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
-name = "memmap2"
-version = "0.9.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "744133e4a0e0a658e1374cf3bf8e415c4052a15a111acd372764c55b4177d490"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "memoffset"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1348,12 +1199,6 @@ name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
-
-[[package]]
-name = "minimal-lexical"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "mio"
@@ -1396,16 +1241,6 @@ dependencies = [
  "libc",
  "memoffset",
  "pin-utils",
-]
-
-[[package]]
-name = "nom"
-version = "7.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
-dependencies = [
- "memchr",
- "minimal-lexical",
 ]
 
 [[package]]
@@ -1456,29 +1291,6 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
-
-[[package]]
-name = "onig"
-version = "6.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "336b9c63443aceef14bea841b899035ae3abe89b7c486aaf4c5bd8aafedac3f0"
-dependencies = [
- "bitflags 2.11.0",
- "libc",
- "once_cell",
- "onig_sys",
-]
-
-[[package]]
-name = "onig_sys"
-version = "69.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7f86c6eef3d6df15f23bcfb6af487cbd2fed4e5581d58d5bf1f5f8b7f6727dc"
-dependencies = [
- "bindgen",
- "cc",
- "pkg-config",
-]
 
 [[package]]
 name = "openssl"
@@ -1755,7 +1567,6 @@ dependencies = [
  "bytes",
  "encoding_rs",
  "futures-core",
- "futures-util",
  "h2",
  "http",
  "http-body",
@@ -1777,14 +1588,12 @@ dependencies = [
  "sync_wrapper",
  "tokio",
  "tokio-native-tls",
- "tokio-util",
  "tower",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-streams",
  "web-sys",
 ]
 
@@ -1825,12 +1634,6 @@ dependencies = [
  "libsqlite3-sys",
  "smallvec",
 ]
-
-[[package]]
-name = "rustc-hash"
-version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
 
 [[package]]
 name = "rustix"
@@ -2173,12 +1976,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d08889ec5408683408db66ad89e0e1f93dff55c73a4ccc71c427d5b277ee47e6"
 
 [[package]]
-name = "streaming-iterator"
-version = "0.1.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b2231b7c3057d5e4ad0156fb3dc807d900806020c5ffa3ee6ff2c8c76fb8520"
-
-[[package]]
 name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2513,25 +2310,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tree-sitter"
-version = "0.24.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5387dffa7ffc7d2dae12b50c6f7aab8ff79d6210147c6613561fc3d474c6f75"
-dependencies = [
- "cc",
- "regex",
- "regex-syntax",
- "streaming-iterator",
- "tree-sitter-language",
-]
-
-[[package]]
-name = "tree-sitter-language"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "009994f150cc0cd50ff54917d5bc8bffe8cad10ca10d81c34da2ec421ae61782"
-
-[[package]]
 name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2689,6 +2467,7 @@ version = "0.1.0"
 name = "vsedit-breadcrumb"
 version = "0.1.0"
 dependencies = [
+ "ratatui",
  "vsedit-widgets",
 ]
 
@@ -2713,10 +2492,6 @@ dependencies = [
 [[package]]
 name = "vsedit-chat-view"
 version = "0.1.0"
-dependencies = [
- "vsedit-ext-chat",
- "vsedit-wb-chat",
-]
 
 [[package]]
 name = "vsedit-checksum"
@@ -2791,13 +2566,19 @@ name = "vsedit-core"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "crossterm",
+ "futures",
+ "ratatui",
  "tokio",
  "tracing",
  "tracing-subscriber",
  "vsedit-configuration",
  "vsedit-di",
+ "vsedit-editor-controller",
+ "vsedit-editor-widget",
  "vsedit-environment",
  "vsedit-ext-host",
+ "vsedit-input",
  "vsedit-lifecycle-svc",
  "vsedit-log",
  "vsedit-product",
@@ -2817,8 +2598,7 @@ dependencies = [
 name = "vsedit-debug-view"
 version = "0.1.0"
 dependencies = [
- "vsedit-ext-debug",
- "vsedit-wb-views",
+ "ratatui",
 ]
 
 [[package]]
@@ -2862,10 +2642,6 @@ dependencies = [
 [[package]]
 name = "vsedit-download"
 version = "0.1.0"
-dependencies = [
- "reqwest",
- "tokio",
-]
 
 [[package]]
 name = "vsedit-editor-commands"
@@ -2887,8 +2663,10 @@ dependencies = [
 name = "vsedit-editor-controller"
 version = "0.1.0"
 dependencies = [
- "vsedit-editor-commands",
- "vsedit-input",
+ "vsedit-cursor",
+ "vsedit-editor-types",
+ "vsedit-text-model",
+ "vsedit-viewmodel",
 ]
 
 [[package]]
@@ -2937,9 +2715,16 @@ dependencies = [
 name = "vsedit-editor-widget"
 version = "0.1.0"
 dependencies = [
+ "ratatui",
+ "vsedit-cursor",
+ "vsedit-editor-config",
  "vsedit-editor-controller",
  "vsedit-editor-render",
+ "vsedit-editor-types",
  "vsedit-editor-viewparts",
+ "vsedit-text-model",
+ "vsedit-text-render",
+ "vsedit-viewmodel",
 ]
 
 [[package]]
@@ -2949,9 +2734,6 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-encryption"
 version = "0.1.0"
-dependencies = [
- "keyring",
-]
 
 [[package]]
 name = "vsedit-environment"
@@ -2978,6 +2760,8 @@ version = "0.1.0"
 name = "vsedit-explorer"
 version = "0.1.0"
 dependencies = [
+ "ratatui",
+ "tempfile",
  "vsedit-files",
  "vsedit-tree",
  "vsedit-wb-views",
@@ -3001,11 +2785,17 @@ dependencies = [
 [[package]]
 name = "vsedit-ext-auth"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "vsedit-ext-chat"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
@@ -3013,28 +2803,42 @@ dependencies = [
 name = "vsedit-ext-commands"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
 [[package]]
 name = "vsedit-ext-comments"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "vsedit-ext-debug"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
 [[package]]
 name = "vsedit-ext-decorations"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "vsedit-ext-diagnostics"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
@@ -3042,6 +2846,8 @@ dependencies = [
 name = "vsedit-ext-documents"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
@@ -3049,6 +2855,8 @@ dependencies = [
 name = "vsedit-ext-editors"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
@@ -3056,6 +2864,8 @@ dependencies = [
 name = "vsedit-ext-fs"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
@@ -3074,17 +2884,25 @@ dependencies = [
 name = "vsedit-ext-languages"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
 [[package]]
 name = "vsedit-ext-lm"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "vsedit-ext-mgmt"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "tokio",
  "vsedit-extensions-plat",
  "vsedit-files",
@@ -3094,6 +2912,8 @@ dependencies = [
 name = "vsedit-ext-notebook"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
@@ -3101,16 +2921,26 @@ dependencies = [
 name = "vsedit-ext-output"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
 [[package]]
 name = "vsedit-ext-progress"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "vsedit-ext-quickopen"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "vsedit-ext-rpc"
@@ -3127,17 +2957,25 @@ dependencies = [
 name = "vsedit-ext-scm"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
 [[package]]
 name = "vsedit-ext-statusbar"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "vsedit-ext-tasks"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
@@ -3145,6 +2983,8 @@ dependencies = [
 name = "vsedit-ext-terminal"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
@@ -3152,17 +2992,25 @@ dependencies = [
 name = "vsedit-ext-testing"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
 [[package]]
 name = "vsedit-ext-timeline"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "vsedit-ext-treeview"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
@@ -3170,6 +3018,8 @@ dependencies = [
 name = "vsedit-ext-view"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-mgmt",
  "vsedit-wb-views",
 ]
@@ -3178,6 +3028,8 @@ dependencies = [
 name = "vsedit-ext-webview"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
@@ -3185,6 +3037,8 @@ dependencies = [
 name = "vsedit-ext-window"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
@@ -3192,6 +3046,8 @@ dependencies = [
 name = "vsedit-ext-workspace"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-ext-api",
 ]
 
@@ -3290,9 +3146,6 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-inlinechat-view"
 version = "0.1.0"
-dependencies = [
- "vsedit-ext-chat",
-]
 
 [[package]]
 name = "vsedit-input"
@@ -3311,13 +3164,6 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-ipc"
 version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "tokio",
- "vsedit-buffer",
- "vsedit-di",
-]
 
 [[package]]
 name = "vsedit-json"
@@ -3480,9 +3326,6 @@ dependencies = [
 [[package]]
 name = "vsedit-multicursor"
 version = "0.1.0"
-dependencies = [
- "vsedit-cursor",
-]
 
 [[package]]
 name = "vsedit-multidiff"
@@ -3533,8 +3376,12 @@ dependencies = [
 [[package]]
 name = "vsedit-outline-view"
 version = "0.1.0"
+
+[[package]]
+name = "vsedit-output"
+version = "0.1.0"
 dependencies = [
- "vsedit-wb-views",
+ "ratatui",
 ]
 
 [[package]]
@@ -3563,6 +3410,13 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-policy"
 version = "0.1.0"
+
+[[package]]
+name = "vsedit-problems"
+version = "0.1.0"
+dependencies = [
+ "ratatui",
+]
 
 [[package]]
 name = "vsedit-product"
@@ -3638,6 +3492,7 @@ version = "0.1.0"
 name = "vsedit-scm-view"
 version = "0.1.0"
 dependencies = [
+ "ratatui",
  "vsedit-ext-scm",
  "vsedit-wb-views",
 ]
@@ -3645,16 +3500,17 @@ dependencies = [
 [[package]]
 name = "vsedit-scrollbar"
 version = "0.1.0"
-dependencies = [
- "vsedit-widgets",
-]
 
 [[package]]
 name = "vsedit-search-view"
 version = "0.1.0"
 dependencies = [
+ "globset",
+ "ratatui",
+ "regex",
  "vsedit-wb-search",
  "vsedit-wb-views",
+ "walkdir",
 ]
 
 [[package]]
@@ -3664,8 +3520,12 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-settings-ui"
 version = "0.1.0"
+
+[[package]]
+name = "vsedit-settings-view"
+version = "0.1.0"
 dependencies = [
- "vsedit-configuration",
+ "ratatui",
 ]
 
 [[package]]
@@ -3771,6 +3631,7 @@ dependencies = [
 name = "vsedit-terminal-view"
 version = "0.1.0"
 dependencies = [
+ "ratatui",
  "vsedit-wb-terminal",
 ]
 
@@ -4025,11 +3886,6 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-wb-search"
 version = "0.1.0"
-dependencies = [
- "grep-searcher",
- "ignore",
- "vsedit-files",
-]
 
 [[package]]
 name = "vsedit-wb-statusbar"
@@ -4046,27 +3902,14 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-wb-terminal"
 version = "0.1.0"
-dependencies = [
- "vsedit-terminal-plat",
- "vsedit-tui",
-]
 
 [[package]]
 name = "vsedit-wb-textmate"
 version = "0.1.0"
-dependencies = [
- "onig",
- "serde",
- "serde_json",
- "vsedit-tokens",
-]
 
 [[package]]
 name = "vsedit-wb-themes"
 version = "0.1.0"
-dependencies = [
- "vsedit-theme",
-]
 
 [[package]]
 name = "vsedit-wb-title"
@@ -4075,9 +3918,6 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-wb-treesitter"
 version = "0.1.0"
-dependencies = [
- "tree-sitter",
-]
 
 [[package]]
 name = "vsedit-wb-tunnel"
@@ -4121,11 +3961,17 @@ version = "0.1.0"
 name = "vsedit-workbench"
 version = "0.1.0"
 dependencies = [
- "vsedit-di",
- "vsedit-layout",
- "vsedit-lifecycle-svc",
- "vsedit-tui",
+ "ratatui",
+ "vsedit-commands",
+ "vsedit-contextkey",
+ "vsedit-input",
+ "vsedit-keybinding-svc",
+ "vsedit-keybindings",
+ "vsedit-keycodes",
+ "vsedit-notification",
  "vsedit-wb-layout",
+ "vsedit-wb-statusbar",
+ "vsedit-wb-views",
 ]
 
 [[package]]
@@ -4264,19 +4110,6 @@ dependencies = [
  "indexmap",
  "wasm-encoder",
  "wasmparser",
-]
-
-[[package]]
-name = "wasm-streams"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15053d8d85c7eccdbefef60f06769760a563c7f0a9d6902a13d35c7800b0ad65"
-dependencies = [
- "futures-util",
- "js-sys",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]
