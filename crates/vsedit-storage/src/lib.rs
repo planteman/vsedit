@@ -2,16 +2,32 @@
 //!
 //! Equivalent to VS Code's `vs/platform/storage/common/storage.ts`.
 //! Uses SQLite for persistent storage, with scopes for global/workspace data.
+//!
+//! Sub-modules provide higher-level APIs:
+//! - [`memento`] — typed key-value store for extension state
+//! - [`window_state`] — JSON-based window layout persistence
+//! - [`backup`] — crash-recovery backups for dirty files
+//! - [`secret`] — secret storage with OS keychain integration
+//! - [`recent`] — recently opened files and workspaces
 
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
 
 use rusqlite::{params, Connection};
 
+pub mod backup;
+pub mod memento;
+pub mod recent;
+pub mod secret;
+pub mod window_state;
+
 /// Storage scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StorageScope {
     /// Global storage (shared across all workspaces).
+    Global,
+    /// Profile-specific storage.
     Profile,
     /// Workspace-specific storage.
     Workspace,
@@ -88,6 +104,11 @@ impl Storage {
     /// Get a value or return a default.
     pub fn get_or(&self, key: &str, default: &str) -> String {
         self.get(key).unwrap_or_else(|| default.to_string())
+    }
+
+    /// Get all key-value pairs as a HashMap.
+    pub fn get_all(&self) -> HashMap<String, String> {
+        self.entries().into_iter().collect()
     }
 
     /// Get a boolean value.
@@ -186,14 +207,14 @@ impl StorageService {
 
     pub fn get(&self, key: &str, scope: StorageScope) -> Option<String> {
         match scope {
-            StorageScope::Profile => self.global.get(key),
+            StorageScope::Global | StorageScope::Profile => self.global.get(key),
             StorageScope::Workspace => self.workspace.as_ref().and_then(|w| w.get(key)),
         }
     }
 
     pub fn set(&self, key: &str, value: &str, scope: StorageScope) -> StorageResult<()> {
         match scope {
-            StorageScope::Profile => self.global.set(key, value),
+            StorageScope::Global | StorageScope::Profile => self.global.set(key, value),
             StorageScope::Workspace => {
                 if let Some(w) = &self.workspace {
                     w.set(key, value)
@@ -206,7 +227,7 @@ impl StorageService {
 
     pub fn remove(&self, key: &str, scope: StorageScope) -> StorageResult<()> {
         match scope {
-            StorageScope::Profile => self.global.remove(key),
+            StorageScope::Global | StorageScope::Profile => self.global.remove(key),
             StorageScope::Workspace => {
                 if let Some(w) = &self.workspace {
                     w.remove(key)
@@ -215,6 +236,28 @@ impl StorageService {
                 }
             }
         }
+    }
+
+    /// Get all key-value pairs for a scope.
+    pub fn get_all(&self, scope: StorageScope) -> HashMap<String, String> {
+        match scope {
+            StorageScope::Global | StorageScope::Profile => self.global.get_all(),
+            StorageScope::Workspace => self
+                .workspace
+                .as_ref()
+                .map(|w| w.get_all())
+                .unwrap_or_default(),
+        }
+    }
+
+    /// Get a reference to the global storage.
+    pub fn global(&self) -> &Storage {
+        &self.global
+    }
+
+    /// Get a reference to the workspace storage, if any.
+    pub fn workspace(&self) -> Option<&Storage> {
+        self.workspace.as_ref()
     }
 }
 
@@ -324,6 +367,11 @@ impl StorageService {
     pub fn set_i64(&self, key: &str, value: i64, scope: StorageScope) -> StorageResult<()> {
         self.set(key, &value.to_string(), scope)
     }
+
+    /// Delete a key from a scope.
+    pub fn delete(&self, key: &str, scope: StorageScope) -> StorageResult<()> {
+        self.remove(key, scope)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -333,6 +381,7 @@ impl StorageService {
 impl std::fmt::Display for StorageScope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            StorageScope::Global => write!(f, "Global"),
             StorageScope::Profile => write!(f, "Profile"),
             StorageScope::Workspace => write!(f, "Workspace"),
         }
@@ -535,6 +584,7 @@ mod tests {
 
     #[test]
     fn scope_display() {
+        assert_eq!(format!("{}", StorageScope::Global), "Global");
         assert_eq!(format!("{}", StorageScope::Profile), "Profile");
         assert_eq!(format!("{}", StorageScope::Workspace), "Workspace");
     }
@@ -552,5 +602,59 @@ mod tests {
         assert!(svc.get("key", StorageScope::Workspace).is_none());
         assert!(svc.set("key", "val", StorageScope::Workspace).is_ok());
         assert!(svc.remove("key", StorageScope::Workspace).is_ok());
+    }
+
+    #[test]
+    fn get_all_returns_hashmap() {
+        let store = Storage::in_memory().unwrap();
+        store.set("a", "1").unwrap();
+        store.set("b", "2").unwrap();
+        let all = store.get_all();
+        assert_eq!(all.len(), 2);
+        assert_eq!(all.get("a"), Some(&"1".to_string()));
+        assert_eq!(all.get("b"), Some(&"2".to_string()));
+    }
+
+    #[test]
+    fn storage_service_global_scope() {
+        let global = Storage::in_memory().unwrap();
+        let svc = StorageService::new(global);
+        svc.set("key", "val", StorageScope::Global).unwrap();
+        assert_eq!(svc.get("key", StorageScope::Global), Some("val".to_string()));
+        // Global and Profile share the same backing store
+        assert_eq!(svc.get("key", StorageScope::Profile), Some("val".to_string()));
+    }
+
+    #[test]
+    fn storage_service_get_all() {
+        let global = Storage::in_memory().unwrap();
+        let workspace = Storage::in_memory().unwrap();
+        let svc = StorageService::new(global).with_workspace(workspace);
+        svc.set("a", "1", StorageScope::Global).unwrap();
+        svc.set("b", "2", StorageScope::Workspace).unwrap();
+        let global_all = svc.get_all(StorageScope::Global);
+        assert_eq!(global_all.len(), 1);
+        assert_eq!(global_all.get("a"), Some(&"1".to_string()));
+        let ws_all = svc.get_all(StorageScope::Workspace);
+        assert_eq!(ws_all.len(), 1);
+        assert_eq!(ws_all.get("b"), Some(&"2".to_string()));
+    }
+
+    #[test]
+    fn storage_service_delete() {
+        let global = Storage::in_memory().unwrap();
+        let svc = StorageService::new(global);
+        svc.set("key", "val", StorageScope::Global).unwrap();
+        svc.delete("key", StorageScope::Global).unwrap();
+        assert!(!svc.has("key", StorageScope::Global));
+    }
+
+    #[test]
+    fn storage_service_accessors() {
+        let global = Storage::in_memory().unwrap();
+        let workspace = Storage::in_memory().unwrap();
+        let svc = StorageService::new(global).with_workspace(workspace);
+        assert!(svc.global().is_empty());
+        assert!(svc.workspace().unwrap().is_empty());
     }
 }
