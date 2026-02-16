@@ -797,6 +797,8 @@ pub struct Workbench {
     pub scm_groups: Vec<ScmGroup>,
     /// SCM branch name cache.
     pub scm_branch: Option<String>,
+    /// Simplified SCM changes list: (status_char, filepath).
+    pub scm_changes: Vec<(char, String)>,
     /// Debug view for the sidebar.
     pub debug_view: DebugView,
     /// Which sub-view is active in the bottom panel.
@@ -1133,6 +1135,7 @@ impl Workbench {
             scm_view: ScmView::new(),
             scm_groups: Vec::new(),
             scm_branch: None,
+            scm_changes: Vec::new(),
             debug_view: DebugView::new(),
             active_panel: ActivePanelView::Terminal,
             terminal_view: TerminalView::new(),
@@ -2361,6 +2364,35 @@ impl Workbench {
         let (e, w, i) = self.get_problem_count();
         self.statusbar
             .update_item("statusbar.problems", &format!("✖ {} ⚠ {} ℹ {}", e, w, i));
+    }
+
+    /// Update SCM status from a simplified (status_char, filepath) list.
+    ///
+    /// Populates `scm_branch`, `scm_changes`, and rebuilds `scm_groups` so the
+    /// sidebar renders the current working-copy state.
+    pub fn set_scm_status(&mut self, branch: Option<String>, changes: Vec<(char, String)>) {
+        self.scm_branch = branch;
+        self.scm_changes = changes.clone();
+
+        let mut group = ScmGroup::new("changes", "Changes");
+        for (status_char, path) in &changes {
+            let status = match status_char {
+                'M' => vsedit_scm_view::ScmFileStatus::Modified,
+                'A' => vsedit_scm_view::ScmFileStatus::Added,
+                'D' => vsedit_scm_view::ScmFileStatus::Deleted,
+                'R' => vsedit_scm_view::ScmFileStatus::Renamed,
+                '!' => vsedit_scm_view::ScmFileStatus::Conflicted,
+                'I' => vsedit_scm_view::ScmFileStatus::Ignored,
+                _   => vsedit_scm_view::ScmFileStatus::Untracked,
+            };
+            group.add_change(vsedit_scm_view::ScmFileChange::new(path, status));
+        }
+        self.scm_groups = if group.changes.is_empty() {
+            Vec::new()
+        } else {
+            vec![group]
+        };
+        self.update_activity_bar_badges();
     }
 
     /// Update activity bar badge counts from current state.

@@ -63,6 +63,8 @@ pub enum EditorAction {
     AddCursorBelow,
     AddSelectionToNextFindMatch,
     SelectAllOccurrences,
+    CursorUndo,
+    RemoveSecondaryCursors,
 
     // -- navigation --
     PageUp(u32),
@@ -189,6 +191,12 @@ impl EditorController {
             }
             EditorAction::AddSelectionToNextFindMatch => self.add_selection_to_next_find_match(),
             EditorAction::SelectAllOccurrences => self.select_all_occurrences(),
+            EditorAction::CursorUndo => {
+                self.cursors.cursor_undo();
+            }
+            EditorAction::RemoveSecondaryCursors => {
+                self.cursors.remove_secondary_cursors();
+            }
 
             // -- navigation -----------------------------------------------------
             EditorAction::PageUp(lines) => self.page_up(lines),

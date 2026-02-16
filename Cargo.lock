@@ -3004,6 +3004,7 @@ dependencies = [
  "vsedit-contextkey",
  "vsedit-cursor",
  "vsedit-debug",
+ "vsedit-debug-view",
  "vsedit-di",
  "vsedit-editor-controller",
  "vsedit-editor-types",

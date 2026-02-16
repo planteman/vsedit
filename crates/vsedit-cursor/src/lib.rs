@@ -175,6 +175,25 @@ impl CursorController {
             self.cursors[index] = state;
         }
     }
+
+    /// Remove all secondary cursors, keeping only the primary cursor.
+    pub fn remove_secondary_cursors(&mut self) {
+        self.cursors.truncate(1);
+        self.column_select_data.truncate(1);
+    }
+
+    /// Return `true` when more than one cursor exists.
+    pub fn has_multiple_cursors(&self) -> bool {
+        self.cursors.len() > 1
+    }
+
+    /// Undo the last cursor addition (soft undo).
+    pub fn cursor_undo(&mut self) {
+        if self.cursors.len() > 1 {
+            self.cursors.pop();
+            self.column_select_data.pop();
+        }
+    }
 }
 
 impl Default for CursorController {

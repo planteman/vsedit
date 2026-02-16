@@ -58,6 +58,7 @@ use vsedit_workbench::{ActivePanelView, ActiveSidebarPanel, FocusedPart, Workben
 use vsedit_workspace::Workspace;
 use vsedit_lsp::{DiagnosticCollection, Severity as LspSeverity};
 use vsedit_debug::BreakpointStore;
+use vsedit_debug_view::DebugState;
 use vsedit_terminal::PtySession;
 use vsedit_files::watcher::FileWatcher;
 
@@ -1126,7 +1127,19 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
                 sync_state(app);
                 return false;
             }
+            KeyCode::Up if has_alt => {
+                // Ctrl+Alt+Up → Add cursor above
+                app.controller.execute_action(EditorAction::AddCursorAbove);
+                sync_state(app);
+                return false;
+            }
             KeyCode::Down if has_shift => {
+                app.controller.execute_action(EditorAction::AddCursorBelow);
+                sync_state(app);
+                return false;
+            }
+            KeyCode::Down if has_alt => {
+                // Ctrl+Alt+Down → Add cursor below
                 app.controller.execute_action(EditorAction::AddCursorBelow);
                 sync_state(app);
                 return false;
@@ -1341,6 +1354,7 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
         if has_shift && app.debug_active {
             // Stop debugging
             app.debug_active = false;
+            app.workbench.debug_view.state = DebugState::Inactive;
             app.workbench.statusbar.update_item("statusbar.debug", "");
             app.context_keys
                 .set_context("inDebugMode", ContextKeyValue::Bool(false));
@@ -1352,13 +1366,31 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
 
     // ── F10 → Step over (debug) ────────────────────────────────────────
     if key_event.code == KeyCode::F(10) && app.debug_active {
-        tracing::info!("Step over");
+        tracing::info!("Debug: step over");
+        send_ext_event(&mut *app, "debug/stepOver", serde_json::json!({}));
         return false;
     }
 
-    // ── F11 → Step into (debug) ────────────────────────────────────────
+    // ── F11 / Shift+F11 → Step into / Step out (debug) ─────────────────
     if key_event.code == KeyCode::F(11) && app.debug_active {
-        tracing::info!("Step into");
+        if has_shift {
+            tracing::info!("Debug: step out");
+            send_ext_event(&mut *app, "debug/stepOut", serde_json::json!({}));
+        } else {
+            tracing::info!("Debug: step into");
+            send_ext_event(&mut *app, "debug/stepInto", serde_json::json!({}));
+        }
+        return false;
+    }
+
+    // ── Escape with multiple cursors → collapse to single cursor ───────
+    if key_event.code == KeyCode::Esc
+        && !has_ctrl
+        && !has_alt
+        && app.controller.cursors.has_multiple_cursors()
+    {
+        app.controller.execute_action(EditorAction::RemoveSecondaryCursors);
+        sync_state(app);
         return false;
     }
 
@@ -1499,6 +1531,7 @@ fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
                                             tracing::info!("Starting debug session: type={}, program={}", debug_type, program);
                                             app.workbench.statusbar.update_item("statusbar.debug", "⚡ Debugging");
                                             app.debug_active = true;
+                                            app.workbench.debug_view.state = DebugState::Running;
                                             // Fire onDebug activation event.
                                             tracing::info!("Firing onDebug activation event");
                                             let exts: Vec<String> = app
@@ -1864,6 +1897,23 @@ fn toggle_breakpoint(app: &mut AppState) {
     app.breakpoint_store.toggle_breakpoint(&path_str, line);
     let bp_count: usize = app.breakpoints.values().map(|v| v.len()).sum();
     tracing::debug!("Breakpoint toggled: {}:{} (total: {})", path_str, line, bp_count);
+
+    // Sync into the debug sidebar view.
+    sync_debug_view_breakpoints(app);
+}
+
+/// Rebuild the debug sidebar breakpoint list from `app.breakpoints`.
+fn sync_debug_view_breakpoints(app: &mut AppState) {
+    let mut id_counter: u64 = 0;
+    let mut bps = Vec::new();
+    for (path, lines) in &app.breakpoints {
+        let path_str = path.display().to_string();
+        for &line in lines {
+            id_counter += 1;
+            bps.push(vsedit_debug_view::Breakpoint::new(id_counter, &path_str, line));
+        }
+    }
+    app.workbench.debug_view.breakpoints = bps;
 }
 
 // ---------------------------------------------------------------------------
