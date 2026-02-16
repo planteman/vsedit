@@ -589,6 +589,199 @@ impl Default for WidgetsValidator {
     }
 }
 
+/// A circular chain of focusable widget IDs with explicit group tracking.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FocusChain {
+    groups: Vec<FocusGroup>,
+}
+
+/// A named group within a focus chain.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FocusGroup {
+    pub name: String,
+    pub widget_ids: Vec<String>,
+}
+
+impl FocusGroup {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into(), widget_ids: Vec::new() }
+    }
+
+    pub fn add(&mut self, id: impl Into<String>) {
+        let id = id.into();
+        if !self.widget_ids.contains(&id) {
+            self.widget_ids.push(id);
+        }
+    }
+
+    pub fn len(&self) -> usize { self.widget_ids.len() }
+    pub fn is_empty(&self) -> bool { self.widget_ids.is_empty() }
+}
+
+impl FocusChain {
+    pub fn new() -> Self { Self { groups: Vec::new() } }
+
+    pub fn add_group(&mut self, group: FocusGroup) {
+        self.groups.push(group);
+    }
+
+    /// Returns all widget IDs in focus order (group by group).
+    pub fn all_ids(&self) -> Vec<&str> {
+        self.groups.iter()
+            .flat_map(|g| g.widget_ids.iter().map(|s| s.as_str()))
+            .collect()
+    }
+
+    /// Find the next focusable ID after `current` in the chain, wrapping around.
+    pub fn next_after(&self, current: &str) -> Option<&str> {
+        let ids = self.all_ids();
+        if ids.is_empty() { return None; }
+        let pos = ids.iter().position(|id| *id == current)?;
+        let next = (pos + 1) % ids.len();
+        Some(ids[next])
+    }
+
+    /// Find the previous focusable ID before `current` in the chain.
+    pub fn prev_before(&self, current: &str) -> Option<&str> {
+        let ids = self.all_ids();
+        if ids.is_empty() { return None; }
+        let pos = ids.iter().position(|id| *id == current)?;
+        let prev = if pos == 0 { ids.len() - 1 } else { pos - 1 };
+        Some(ids[prev])
+    }
+
+    /// Total number of focusable widgets across all groups.
+    pub fn total_count(&self) -> usize {
+        self.groups.iter().map(|g| g.widget_ids.len()).sum()
+    }
+
+    /// Find which group a widget belongs to.
+    pub fn group_of(&self, id: &str) -> Option<&str> {
+        self.groups.iter()
+            .find(|g| g.widget_ids.iter().any(|w| w == id))
+            .map(|g| g.name.as_str())
+    }
+}
+
+impl Default for FocusChain {
+    fn default() -> Self { Self::new() }
+}
+
+/// Measurement constraints for a widget's layout.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WidgetMeasure {
+    pub preferred_width: u16,
+    pub preferred_height: u16,
+    pub min_width: u16,
+    pub min_height: u16,
+    pub max_width: u16,
+    pub max_height: u16,
+}
+
+impl WidgetMeasure {
+    pub fn new(preferred_width: u16, preferred_height: u16) -> Self {
+        Self {
+            preferred_width,
+            preferred_height,
+            min_width: 0,
+            min_height: 0,
+            max_width: u16::MAX,
+            max_height: u16::MAX,
+        }
+    }
+
+    pub fn with_min(mut self, width: u16, height: u16) -> Self {
+        self.min_width = width;
+        self.min_height = height;
+        self
+    }
+
+    pub fn with_max(mut self, width: u16, height: u16) -> Self {
+        self.max_width = width;
+        self.max_height = height;
+        self
+    }
+
+    /// Constrain an area to respect this measure's min/max bounds.
+    pub fn constrain(&self, area: Rect) -> Rect {
+        let w = area.width.max(self.min_width).min(self.max_width);
+        let h = area.height.max(self.min_height).min(self.max_height);
+        Rect::new(area.x, area.y, w, h)
+    }
+
+    /// Check if an area satisfies the minimum size requirements.
+    pub fn satisfies_min(&self, area: Rect) -> bool {
+        area.width >= self.min_width && area.height >= self.min_height
+    }
+
+    /// Compute the preferred area starting at (0,0).
+    pub fn preferred_rect(&self) -> Rect {
+        Rect::new(0, 0, self.preferred_width, self.preferred_height)
+    }
+}
+
+impl fmt::Display for WidgetMeasure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "WidgetMeasure({}x{}, min={}x{}, max={}x{})",
+            self.preferred_width, self.preferred_height,
+            self.min_width, self.min_height,
+            self.max_width, self.max_height)
+    }
+}
+
+/// Visibility state for a widget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Visibility {
+    Visible,
+    Hidden,
+    Collapsed,
+}
+
+impl Visibility {
+    pub fn is_visible(&self) -> bool { *self == Visibility::Visible }
+    pub fn takes_space(&self) -> bool { *self != Visibility::Collapsed }
+}
+
+impl fmt::Display for Visibility {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Visibility::Visible => write!(f, "Visible"),
+            Visibility::Hidden => write!(f, "Hidden"),
+            Visibility::Collapsed => write!(f, "Collapsed"),
+        }
+    }
+}
+
+/// Toggle visibility of a widget, recalculating layout areas.
+/// Returns the new visibility state and the adjusted area (zero-sized if collapsed).
+pub fn widget_visibility_toggle(current: Visibility, area: Rect) -> (Visibility, Rect) {
+    match current {
+        Visibility::Visible => (Visibility::Hidden, area),
+        Visibility::Hidden => (Visibility::Collapsed, Rect::new(area.x, area.y, 0, 0)),
+        Visibility::Collapsed => (Visibility::Visible, area),
+    }
+}
+
+/// Compute layout for a list of widgets with visibility, distributing available width equally among visible widgets.
+pub fn layout_visible_widgets(
+    widgets: &[(String, Visibility, WidgetMeasure)],
+    available: Rect,
+) -> Vec<(String, Rect)> {
+    let visible: Vec<&(String, Visibility, WidgetMeasure)> = widgets.iter()
+        .filter(|(_, vis, _)| vis.takes_space())
+        .collect();
+    if visible.is_empty() { return Vec::new(); }
+    let per_width = available.width / visible.len() as u16;
+    let mut x = available.x;
+    visible.iter().map(|(name, _, measure)| {
+        let w = per_width.max(measure.min_width).min(measure.max_width);
+        let h = available.height.max(measure.min_height).min(measure.max_height);
+        let rect = Rect::new(x, available.y, w, h);
+        x += w;
+        (name.clone(), rect)
+    }).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -996,5 +1189,116 @@ mod tests {
     fn widgets_is_ascii_printable() {
         assert!(WidgetsValidator::is_ascii_printable("Hello World 123"));
         assert!(!WidgetsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn focus_chain_navigation() {
+        let mut chain = FocusChain::new();
+        let mut g = FocusGroup::new("main");
+        g.add("editor");
+        g.add("sidebar");
+        g.add("panel");
+        chain.add_group(g);
+        assert_eq!(chain.next_after("editor"), Some("sidebar"));
+        assert_eq!(chain.next_after("panel"), Some("editor")); // wraps
+        assert_eq!(chain.prev_before("editor"), Some("panel")); // wraps back
+    }
+
+    #[test]
+    fn focus_chain_group_of() {
+        let mut chain = FocusChain::new();
+        let mut g1 = FocusGroup::new("editors");
+        g1.add("e1");
+        let mut g2 = FocusGroup::new("panels");
+        g2.add("p1");
+        chain.add_group(g1);
+        chain.add_group(g2);
+        assert_eq!(chain.group_of("e1"), Some("editors"));
+        assert_eq!(chain.group_of("p1"), Some("panels"));
+        assert_eq!(chain.group_of("unknown"), None);
+    }
+
+    #[test]
+    fn focus_chain_total_count() {
+        let mut chain = FocusChain::new();
+        let mut g = FocusGroup::new("g");
+        g.add("a");
+        g.add("b");
+        chain.add_group(g);
+        assert_eq!(chain.total_count(), 2);
+    }
+
+    #[test]
+    fn widget_measure_constrain() {
+        let m = WidgetMeasure::new(50, 20).with_min(10, 5).with_max(100, 40);
+        let small = Rect::new(0, 0, 5, 3);
+        let constrained = m.constrain(small);
+        assert_eq!(constrained.width, 10);
+        assert_eq!(constrained.height, 5);
+    }
+
+    #[test]
+    fn widget_measure_satisfies_min() {
+        let m = WidgetMeasure::new(50, 20).with_min(10, 5);
+        assert!(m.satisfies_min(Rect::new(0, 0, 20, 10)));
+        assert!(!m.satisfies_min(Rect::new(0, 0, 5, 10)));
+    }
+
+    #[test]
+    fn widget_measure_preferred_rect() {
+        let m = WidgetMeasure::new(80, 24);
+        let r = m.preferred_rect();
+        assert_eq!(r.width, 80);
+        assert_eq!(r.height, 24);
+    }
+
+    #[test]
+    fn visibility_toggle_cycle() {
+        let area = Rect::new(0, 0, 100, 50);
+        let (v1, a1) = widget_visibility_toggle(Visibility::Visible, area);
+        assert_eq!(v1, Visibility::Hidden);
+        assert_eq!(a1, area);
+        let (v2, a2) = widget_visibility_toggle(v1, a1);
+        assert_eq!(v2, Visibility::Collapsed);
+        assert_eq!(a2.width, 0);
+        let (v3, _) = widget_visibility_toggle(v2, area);
+        assert_eq!(v3, Visibility::Visible);
+    }
+
+    #[test]
+    fn visibility_properties() {
+        assert!(Visibility::Visible.is_visible());
+        assert!(!Visibility::Hidden.is_visible());
+        assert!(Visibility::Hidden.takes_space());
+        assert!(!Visibility::Collapsed.takes_space());
+    }
+
+    #[test]
+    fn layout_visible_widgets_basic() {
+        let widgets = vec![
+            ("a".into(), Visibility::Visible, WidgetMeasure::new(50, 20)),
+            ("b".into(), Visibility::Collapsed, WidgetMeasure::new(50, 20)),
+            ("c".into(), Visibility::Visible, WidgetMeasure::new(50, 20)),
+        ];
+        let result = layout_visible_widgets(&widgets, Rect::new(0, 0, 100, 30));
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].0, "a");
+        assert_eq!(result[1].0, "c");
+    }
+
+    #[test]
+    fn widget_measure_display() {
+        let m = WidgetMeasure::new(80, 24).with_min(10, 5);
+        let s = format!("{}", m);
+        assert!(s.contains("80x24"));
+        assert!(s.contains("min=10x5"));
+    }
+
+    #[test]
+    fn focus_group_no_duplicates() {
+        let mut g = FocusGroup::new("test");
+        g.add("x");
+        g.add("x");
+        assert_eq!(g.len(), 1);
     }
 }

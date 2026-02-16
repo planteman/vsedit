@@ -562,6 +562,204 @@ impl<'a> CommandPalette<'a> {
     }
 }
 
+/// An item displayed in the command palette with a display label.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandPaletteItem {
+    pub command_id: String,
+    pub category: Option<String>,
+    pub title: String,
+    pub keybinding: Option<String>,
+}
+
+impl CommandPaletteItem {
+    pub fn new(command_id: impl Into<String>, title: impl Into<String>) -> Self {
+        Self {
+            command_id: command_id.into(),
+            category: None,
+            title: title.into(),
+            keybinding: None,
+        }
+    }
+
+    pub fn with_category(mut self, category: impl Into<String>) -> Self {
+        self.category = Some(category.into());
+        self
+    }
+
+    pub fn with_keybinding(mut self, keybinding: impl Into<String>) -> Self {
+        self.keybinding = Some(keybinding.into());
+        self
+    }
+
+    /// Generate the display label: "Category: Title" or just "Title".
+    pub fn display_label(&self) -> String {
+        match &self.category {
+            Some(cat) => format!("{}: {}", cat, self.title),
+            None => self.title.clone(),
+        }
+    }
+
+    /// Build from a CommandDescriptor.
+    pub fn from_descriptor(desc: &CommandDescriptor) -> Self {
+        Self {
+            command_id: desc.id.clone(),
+            category: desc.category.clone(),
+            title: desc.title.clone(),
+            keybinding: desc.keybinding.clone(),
+        }
+    }
+}
+
+impl fmt::Display for CommandPaletteItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = self.display_label();
+        match &self.keybinding {
+            Some(kb) => write!(f, "{label}  ({kb})"),
+            None => write!(f, "{label}"),
+        }
+    }
+}
+
+/// A search result with a relevance score (higher = better match).
+#[derive(Debug, Clone)]
+pub struct PaletteSearchResult {
+    pub item: CommandPaletteItem,
+    pub score: i32,
+}
+
+/// Compute a fuzzy match score. Returns 0 for no match, higher for better matches.
+fn fuzzy_score(query: &str, text: &str) -> i32 {
+    if query.is_empty() {
+        return 1;
+    }
+    let query_lower = query.to_lowercase();
+    let text_lower = text.to_lowercase();
+
+    // Exact substring match gets highest score
+    if text_lower.contains(&query_lower) {
+        let bonus = if text_lower.starts_with(&query_lower) {
+            50
+        } else {
+            0
+        };
+        return 100 + bonus - text.len() as i32;
+    }
+
+    // Character-by-character fuzzy match
+    let mut qi = 0;
+    let query_chars: Vec<char> = query_lower.chars().collect();
+    let mut score = 0i32;
+    let mut prev_matched = false;
+
+    for c in text_lower.chars() {
+        if qi < query_chars.len() && c == query_chars[qi] {
+            score += if prev_matched { 3 } else { 1 };
+            qi += 1;
+            prev_matched = true;
+        } else {
+            prev_matched = false;
+        }
+    }
+
+    if qi == query_chars.len() {
+        score
+    } else {
+        0
+    }
+}
+
+/// Search palette items with fuzzy matching, returning results sorted by score descending.
+pub fn command_palette_search(
+    items: &[CommandPaletteItem],
+    query: &str,
+) -> Vec<PaletteSearchResult> {
+    let mut results: Vec<PaletteSearchResult> = items
+        .iter()
+        .filter_map(|item| {
+            let label = item.display_label();
+            let label_score = fuzzy_score(query, &label);
+            let id_score = fuzzy_score(query, &item.command_id);
+            let score = label_score.max(id_score);
+            if score > 0 {
+                Some(PaletteSearchResult {
+                    item: item.clone(),
+                    score,
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+    results.sort_by(|a, b| b.score.cmp(&a.score));
+    results
+}
+
+/// Tracks recently used commands in the command palette.
+#[derive(Debug, Clone)]
+pub struct CommandPaletteHistory {
+    entries: Vec<String>,
+    max_size: usize,
+}
+
+impl CommandPaletteHistory {
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_size,
+        }
+    }
+
+    /// Record a command as recently used. Moves it to the front if already present.
+    pub fn record(&mut self, command_id: impl Into<String>) {
+        let id = command_id.into();
+        self.entries.retain(|e| e != &id);
+        self.entries.insert(0, id);
+        if self.entries.len() > self.max_size {
+            self.entries.truncate(self.max_size);
+        }
+    }
+
+    /// Get the most recently used command ids, most recent first.
+    pub fn recent(&self) -> &[String] {
+        &self.entries
+    }
+
+    /// Get the number of entries in the history.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Check if a command is in the history.
+    pub fn contains(&self, command_id: &str) -> bool {
+        self.entries.iter().any(|e| e == command_id)
+    }
+
+    /// Boost search results by sorting recently used commands higher.
+    pub fn boost_results(&self, results: &mut [PaletteSearchResult]) {
+        for result in results.iter_mut() {
+            if let Some(pos) = self.entries.iter().position(|e| e == &result.item.command_id) {
+                result.score += (self.max_size - pos) as i32 * 10;
+            }
+        }
+        results.sort_by(|a, b| b.score.cmp(&a.score));
+    }
+}
+
+impl Default for CommandPaletteHistory {
+    fn default() -> Self {
+        Self::new(50)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -996,5 +1194,124 @@ mod tests {
         let all = palette.all_enabled();
         assert_eq!(all[0].title, "Apple");
         assert_eq!(all[1].title, "Zebra");
+    }
+
+    // ── CommandPaletteItem / search / history tests ──
+
+    #[test]
+    fn palette_item_display_label_with_category() {
+        let item = CommandPaletteItem::new("editor.action.format", "Format Document")
+            .with_category("Editor");
+        assert_eq!(item.display_label(), "Editor: Format Document");
+    }
+
+    #[test]
+    fn palette_item_display_label_without_category() {
+        let item = CommandPaletteItem::new("workbench.action.quit", "Quit");
+        assert_eq!(item.display_label(), "Quit");
+    }
+
+    #[test]
+    fn palette_item_display_with_keybinding() {
+        let item = CommandPaletteItem::new("editor.action.format", "Format")
+            .with_keybinding("Shift+Alt+F");
+        let s = format!("{}", item);
+        assert!(s.contains("Format"));
+        assert!(s.contains("Shift+Alt+F"));
+    }
+
+    #[test]
+    fn palette_item_from_descriptor() {
+        let desc = CommandDescriptor::builder("cmd.test", "Test Command")
+            .category("Testing")
+            .keybinding("Ctrl+T")
+            .build();
+        let item = CommandPaletteItem::from_descriptor(&desc);
+        assert_eq!(item.command_id, "cmd.test");
+        assert_eq!(item.category.as_deref(), Some("Testing"));
+        assert_eq!(item.keybinding.as_deref(), Some("Ctrl+T"));
+    }
+
+    #[test]
+    fn palette_search_exact_substring() {
+        let items = vec![
+            CommandPaletteItem::new("a", "Format Document"),
+            CommandPaletteItem::new("b", "Open File"),
+            CommandPaletteItem::new("c", "Format Selection"),
+        ];
+        let results = command_palette_search(&items, "Format");
+        assert_eq!(results.len(), 2);
+        assert!(results[0].item.title.contains("Format"));
+    }
+
+    #[test]
+    fn palette_search_fuzzy() {
+        let items = vec![
+            CommandPaletteItem::new("a", "Format Document"),
+            CommandPaletteItem::new("b", "Open File"),
+        ];
+        let results = command_palette_search(&items, "fmtdoc");
+        // Should fuzzy-match "Format Document"
+        assert!(results.iter().any(|r| r.item.command_id == "a"));
+    }
+
+    #[test]
+    fn palette_search_empty_query_returns_all() {
+        let items = vec![
+            CommandPaletteItem::new("a", "A"),
+            CommandPaletteItem::new("b", "B"),
+        ];
+        let results = command_palette_search(&items, "");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn palette_history_record_and_recent() {
+        let mut history = CommandPaletteHistory::new(3);
+        history.record("cmd.a");
+        history.record("cmd.b");
+        history.record("cmd.c");
+        assert_eq!(history.recent(), &["cmd.c", "cmd.b", "cmd.a"]);
+    }
+
+    #[test]
+    fn palette_history_moves_to_front() {
+        let mut history = CommandPaletteHistory::new(5);
+        history.record("cmd.a");
+        history.record("cmd.b");
+        history.record("cmd.a"); // should move to front
+        assert_eq!(history.recent()[0], "cmd.a");
+        assert_eq!(history.len(), 2);
+    }
+
+    #[test]
+    fn palette_history_max_size() {
+        let mut history = CommandPaletteHistory::new(2);
+        history.record("cmd.a");
+        history.record("cmd.b");
+        history.record("cmd.c");
+        assert_eq!(history.len(), 2);
+        assert!(!history.contains("cmd.a"));
+    }
+
+    #[test]
+    fn palette_history_boost_results() {
+        let mut history = CommandPaletteHistory::new(10);
+        history.record("b");
+        let items = vec![
+            CommandPaletteItem::new("a", "Alpha"),
+            CommandPaletteItem::new("b", "Beta"),
+        ];
+        let mut results = command_palette_search(&items, "");
+        history.boost_results(&mut results);
+        assert_eq!(results[0].item.command_id, "b");
+    }
+
+    #[test]
+    fn palette_history_clear() {
+        let mut history = CommandPaletteHistory::new(10);
+        history.record("x");
+        history.clear();
+        assert!(history.is_empty());
     }
 }

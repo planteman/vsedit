@@ -580,6 +580,169 @@ impl Default for ExtApiValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Version compatibility checking
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ApiVersionCheck {
+    pub current_version: String,
+}
+
+impl ApiVersionCheck {
+    pub fn new(current: impl Into<String>) -> Self {
+        Self { current_version: current.into() }
+    }
+
+    /// Parse a semver string "major.minor.patch" into (major, minor, patch).
+    fn parse_semver(s: &str) -> Option<(u32, u32, u32)> {
+        let parts: Vec<&str> = s.split('.').collect();
+        if parts.len() != 3 { return None; }
+        Some((parts[0].parse().ok()?, parts[1].parse().ok()?, parts[2].parse().ok()?))
+    }
+
+    /// Check if `required` version is satisfied by the current version.
+    /// Returns true if current >= required.
+    pub fn is_compatible(&self, required: &str) -> bool {
+        let Some(current) = Self::parse_semver(&self.current_version) else { return false };
+        let required = required.trim_start_matches('^').trim_start_matches('~').trim_start_matches(">=");
+        let Some(req) = Self::parse_semver(required) else { return false };
+        current >= req
+    }
+
+    /// Check if two versions share the same major version.
+    pub fn same_major(&self, other: &str) -> bool {
+        let Some(current) = Self::parse_semver(&self.current_version) else { return false };
+        let Some(other) = Self::parse_semver(other) else { return false };
+        current.0 == other.0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Deprecation tracking
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ApiDeprecationWarning {
+    pub api_name: String,
+    pub deprecated_since: String,
+    pub replacement: Option<String>,
+    pub message: String,
+}
+
+impl ApiDeprecationWarning {
+    pub fn new(api_name: impl Into<String>, since: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            api_name: api_name.into(),
+            deprecated_since: since.into(),
+            replacement: None,
+            message: message.into(),
+        }
+    }
+
+    pub fn with_replacement(mut self, replacement: impl Into<String>) -> Self {
+        self.replacement = Some(replacement.into());
+        self
+    }
+
+    /// Format a human-readable deprecation message.
+    pub fn format_warning(&self) -> String {
+        match &self.replacement {
+            Some(r) => format!("'{}' is deprecated since {}. Use '{}' instead. {}", self.api_name, self.deprecated_since, r, self.message),
+            None => format!("'{}' is deprecated since {}. {}", self.api_name, self.deprecated_since, self.message),
+        }
+    }
+}
+
+impl fmt::Display for ApiDeprecationWarning {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.format_warning())
+    }
+}
+
+/// Registry of deprecation warnings.
+#[derive(Debug, Clone, Default)]
+pub struct DeprecationRegistry {
+    warnings: Vec<ApiDeprecationWarning>,
+}
+
+impl DeprecationRegistry {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn register(&mut self, warning: ApiDeprecationWarning) {
+        if !self.warnings.iter().any(|w| w.api_name == warning.api_name) {
+            self.warnings.push(warning);
+        }
+    }
+
+    pub fn is_deprecated(&self, api_name: &str) -> bool {
+        self.warnings.iter().any(|w| w.api_name == api_name)
+    }
+
+    pub fn get_warning(&self, api_name: &str) -> Option<&ApiDeprecationWarning> {
+        self.warnings.iter().find(|w| w.api_name == api_name)
+    }
+
+    pub fn all_warnings(&self) -> &[ApiDeprecationWarning] {
+        &self.warnings
+    }
+
+    pub fn count(&self) -> usize {
+        self.warnings.len()
+    }
+
+    /// Get warnings introduced since a specific version.
+    pub fn warnings_since(&self, version: &str) -> Vec<&ApiDeprecationWarning> {
+        let check = ApiVersionCheck::new(version);
+        self.warnings.iter().filter(|w| {
+            // Warning is "since" a version; include it if `version >= deprecated_since`
+            check.is_compatible(&w.deprecated_since)
+        }).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Capability querying helpers
+// ---------------------------------------------------------------------------
+
+/// Check whether a specific capability is supported.
+pub fn api_capability_check(caps: &ApiCapabilities, feature: &str) -> bool {
+    match feature {
+        "proposedApi" => caps.supports_proposed_api,
+        "webview" => caps.supports_webview,
+        "terminal" => caps.supports_terminal,
+        "debug" => caps.supports_debug,
+        "notebook" => caps.supports_notebook,
+        "chat" => caps.supports_chat,
+        "languageModels" => caps.supports_language_models,
+        "testing" => caps.supports_testing,
+        "authentication" => caps.supports_authentication,
+        "customEditors" => caps.supports_custom_editors,
+        _ => false,
+    }
+}
+
+/// List all supported capability names for the given capabilities struct.
+pub fn api_supported_features(caps: &ApiCapabilities) -> Vec<&'static str> {
+    let mut features = Vec::new();
+    let checks = [
+        ("proposedApi", caps.supports_proposed_api),
+        ("webview", caps.supports_webview),
+        ("terminal", caps.supports_terminal),
+        ("debug", caps.supports_debug),
+        ("notebook", caps.supports_notebook),
+        ("chat", caps.supports_chat),
+        ("languageModels", caps.supports_language_models),
+        ("testing", caps.supports_testing),
+        ("authentication", caps.supports_authentication),
+        ("customEditors", caps.supports_custom_editors),
+    ];
+    for (name, supported) in checks {
+        if supported { features.push(name); }
+    }
+    features
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -687,171 +850,106 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn version_check_compatible() {
+        let check = ApiVersionCheck::new("1.110.0");
+        assert!(check.is_compatible("1.70.0"));
+        assert!(check.is_compatible("1.110.0"));
+        assert!(!check.is_compatible("1.111.0"));
+        assert!(!check.is_compatible("2.0.0"));
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn version_check_caret_prefix() {
+        let check = ApiVersionCheck::new("1.110.0");
+        assert!(check.is_compatible("^1.70.0"));
+        assert!(check.is_compatible(">=1.100.0"));
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn version_check_same_major() {
+        let check = ApiVersionCheck::new("1.110.0");
+        assert!(check.same_major("1.0.0"));
+        assert!(!check.same_major("2.0.0"));
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn version_check_invalid_semver() {
+        let check = ApiVersionCheck::new("1.110.0");
+        assert!(!check.is_compatible("not-a-version"));
+        assert!(!check.is_compatible("1.2"));
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn deprecation_warning_format_with_replacement() {
+        let w = ApiDeprecationWarning::new("window.showInputBox", "1.100.0", "Consider alternatives.")
+            .with_replacement("window.createInputBox");
+        let msg = w.format_warning();
+        assert!(msg.contains("window.showInputBox"));
+        assert!(msg.contains("1.100.0"));
+        assert!(msg.contains("window.createInputBox"));
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn deprecation_warning_format_without_replacement() {
+        let w = ApiDeprecationWarning::new("env.openExternal", "1.90.0", "Will be removed.");
+        let msg = w.format_warning();
+        assert!(msg.contains("env.openExternal"));
+        assert!(!msg.contains("Use '"));
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn deprecation_registry_tracks_warnings() {
+        let mut reg = DeprecationRegistry::new();
+        reg.register(ApiDeprecationWarning::new("api.old", "1.50.0", "gone"));
+        reg.register(ApiDeprecationWarning::new("api.old", "1.50.0", "duplicate"));
+        assert_eq!(reg.count(), 1);
+        assert!(reg.is_deprecated("api.old"));
+        assert!(!reg.is_deprecated("api.new"));
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn deprecation_registry_get_warning() {
+        let mut reg = DeprecationRegistry::new();
+        reg.register(ApiDeprecationWarning::new("api.foo", "1.80.0", "removed"));
+        let w = reg.get_warning("api.foo").unwrap();
+        assert_eq!(w.deprecated_since, "1.80.0");
+        assert!(reg.get_warning("api.bar").is_none());
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn capability_check_known_features() {
+        let caps = ApiCapabilities::default();
+        assert!(api_capability_check(&caps, "terminal"));
+        assert!(api_capability_check(&caps, "debug"));
+        assert!(!api_capability_check(&caps, "webview"));
+        assert!(!api_capability_check(&caps, "unknown_feature"));
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn supported_features_list() {
+        let caps = ApiCapabilities::default();
+        let features = api_supported_features(&caps);
+        assert!(features.contains(&"terminal"));
+        assert!(features.contains(&"debug"));
+        assert!(features.contains(&"testing"));
+        assert!(!features.contains(&"webview"));
     }
 
     #[test]
-    fn behavior_check_10() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn deprecation_warning_display() {
+        let w = ApiDeprecationWarning::new("old.api", "1.0.0", "removed")
+            .with_replacement("new.api");
+        let s = format!("{}", w);
+        assert!(s.contains("old.api"));
+        assert!(s.contains("new.api"));
     }
 
     #[test]
-    fn behavior_check_11() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_27() {
-        let _svc = ApiRegistry::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn version_check_parse_semver_valid() {
+        let check = ApiVersionCheck::new("0.0.1");
+        assert!(check.is_compatible("0.0.0"));
+        assert!(check.is_compatible("0.0.1"));
+        assert!(!check.is_compatible("0.0.2"));
     }
 
     #[test]

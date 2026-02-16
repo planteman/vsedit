@@ -3,6 +3,7 @@
 //! Equivalent to VS Code's `vs/platform/environment/common/environment.ts`.
 //! Provides well-known paths and CLI arguments for vsedit.
 
+use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
@@ -645,6 +646,161 @@ impl Default for EnvironmentValidator {
     }
 }
 
+/// Resolves environment variable references in strings.
+/// Replaces `${env:VAR_NAME}` with the value of the environment variable.
+pub fn resolve_env_variables(input: &str, env_getter: &dyn Fn(&str) -> Option<String>) -> String {
+    let mut result = String::new();
+    let mut chars = input.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '$' && chars.peek() == Some(&'{') {
+            chars.next(); // consume '{'
+            let mut var_ref = String::new();
+            while let Some(&c) = chars.peek() {
+                if c == '}' {
+                    chars.next();
+                    break;
+                }
+                var_ref.push(c);
+                chars.next();
+            }
+            if let Some(var_name) = var_ref.strip_prefix("env:") {
+                if let Some(val) = env_getter(var_name) {
+                    result.push_str(&val);
+                } else {
+                    result.push_str(&format!("${{env:{}}}", var_name));
+                }
+            } else {
+                result.push_str(&format!("${{{}}}", var_ref));
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+    result
+}
+
+/// Resolve environment variables using the actual process environment.
+pub fn resolve_env_variables_from_process(input: &str) -> String {
+    resolve_env_variables(input, &|name| std::env::var(name).ok())
+}
+
+/// Captured snapshot of the shell environment.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ShellEnvironment {
+    variables: HashMap<String, String>,
+}
+
+impl ShellEnvironment {
+    /// Create an empty shell environment.
+    pub fn new() -> Self {
+        Self {
+            variables: HashMap::new(),
+        }
+    }
+
+    /// Capture the current process environment.
+    pub fn capture() -> Self {
+        let variables: HashMap<String, String> = std::env::vars().collect();
+        Self { variables }
+    }
+
+    /// Create from a set of key-value pairs.
+    pub fn from_pairs(pairs: Vec<(&str, &str)>) -> Self {
+        let variables = pairs
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        Self { variables }
+    }
+
+    /// Get a variable value.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.variables.get(key).map(|s| s.as_str())
+    }
+
+    /// Set a variable.
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.variables.insert(key.into(), value.into());
+    }
+
+    /// Remove a variable.
+    pub fn remove(&mut self, key: &str) -> bool {
+        self.variables.remove(key).is_some()
+    }
+
+    /// Number of variables.
+    pub fn len(&self) -> usize {
+        self.variables.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.variables.is_empty()
+    }
+
+    /// Get all variable names.
+    pub fn keys(&self) -> Vec<&str> {
+        self.variables.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Merge another environment into this one (other takes precedence).
+    pub fn merge(&mut self, other: &ShellEnvironment) {
+        for (k, v) in &other.variables {
+            self.variables.insert(k.clone(), v.clone());
+        }
+    }
+
+    /// Create a getter function compatible with resolve_env_variables.
+    pub fn as_getter(&self) -> impl Fn(&str) -> Option<String> + '_ {
+        move |name: &str| self.variables.get(name).cloned()
+    }
+}
+
+impl Default for ShellEnvironment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ShellEnvironment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ShellEnvironment({} vars)", self.variables.len())
+    }
+}
+
+/// Parse a PATH-style environment variable into a list of paths.
+/// Uses `:` as separator on Unix, `;` on Windows.
+pub fn env_path_list(value: &str) -> Vec<PathBuf> {
+    let separator = if cfg!(windows) { ';' } else { ':' };
+    value
+        .split(separator)
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
+        .collect()
+}
+
+/// Join a list of paths into a PATH-style string.
+pub fn env_path_join(paths: &[PathBuf]) -> String {
+    let separator = if cfg!(windows) { ";" } else { ":" };
+    paths
+        .iter()
+        .map(|p| p.display().to_string())
+        .collect::<Vec<_>>()
+        .join(separator)
+}
+
+/// Prepend a path to a PATH-style value, deduplicating.
+pub fn env_path_prepend(path: &Path, existing: &str) -> String {
+    let mut paths = env_path_list(existing);
+    paths.retain(|p| p != path);
+    paths.insert(0, path.to_path_buf());
+    env_path_join(&paths)
+}
+
+/// Check if a path is in a PATH-style variable.
+pub fn env_path_contains(value: &str, path: &Path) -> bool {
+    env_path_list(value).iter().any(|p| p == path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -998,5 +1154,132 @@ mod tests {
     fn environment_is_ascii_printable() {
         assert!(EnvironmentValidator::is_ascii_printable("Hello World 123"));
         assert!(!EnvironmentValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn resolve_env_single_variable() {
+        let result = resolve_env_variables("Hello ${env:USER}!", &|name| {
+            if name == "USER" {
+                Some("alice".into())
+            } else {
+                None
+            }
+        });
+        assert_eq!(result, "Hello alice!");
+    }
+
+    #[test]
+    fn resolve_env_missing_variable() {
+        let result = resolve_env_variables("${env:MISSING}", &|_| None);
+        assert_eq!(result, "${env:MISSING}");
+    }
+
+    #[test]
+    fn resolve_env_multiple_variables() {
+        let result = resolve_env_variables("${env:HOME}/.config/${env:APP}", &|name| match name {
+            "HOME" => Some("/home/user".into()),
+            "APP" => Some("vsedit".into()),
+            _ => None,
+        });
+        assert_eq!(result, "/home/user/.config/vsedit");
+    }
+
+    #[test]
+    fn resolve_env_no_variables() {
+        let result = resolve_env_variables("no vars here", &|_| None);
+        assert_eq!(result, "no vars here");
+    }
+
+    #[test]
+    fn resolve_env_non_env_braces() {
+        let result = resolve_env_variables("${workspaceFolder}/src", &|_| None);
+        assert_eq!(result, "${workspaceFolder}/src");
+    }
+
+    #[test]
+    fn shell_environment_basic() {
+        let mut env = ShellEnvironment::new();
+        assert!(env.is_empty());
+        env.set("FOO", "bar");
+        assert_eq!(env.get("FOO"), Some("bar"));
+        assert_eq!(env.len(), 1);
+        env.remove("FOO");
+        assert!(env.is_empty());
+    }
+
+    #[test]
+    fn shell_environment_merge() {
+        let mut base = ShellEnvironment::from_pairs(vec![("A", "1"), ("B", "2")]);
+        let overlay = ShellEnvironment::from_pairs(vec![("B", "override"), ("C", "3")]);
+        base.merge(&overlay);
+        assert_eq!(base.get("A"), Some("1"));
+        assert_eq!(base.get("B"), Some("override"));
+        assert_eq!(base.get("C"), Some("3"));
+    }
+
+    #[test]
+    fn shell_environment_as_getter() {
+        let env = ShellEnvironment::from_pairs(vec![("HOME", "/home/test")]);
+        let result = resolve_env_variables("${env:HOME}/docs", &env.as_getter());
+        assert_eq!(result, "/home/test/docs");
+    }
+
+    #[test]
+    fn env_path_list_parsing() {
+        let paths = env_path_list("/usr/bin:/usr/local/bin:/home/user/bin");
+        assert_eq!(paths.len(), 3);
+        assert_eq!(paths[0], PathBuf::from("/usr/bin"));
+        assert_eq!(paths[2], PathBuf::from("/home/user/bin"));
+    }
+
+    #[test]
+    fn env_path_join_roundtrip() {
+        let paths = vec![
+            PathBuf::from("/a"),
+            PathBuf::from("/b"),
+            PathBuf::from("/c"),
+        ];
+        let joined = env_path_join(&paths);
+        let parsed = env_path_list(&joined);
+        assert_eq!(parsed, paths);
+    }
+
+    #[test]
+    fn env_path_prepend_deduplicates() {
+        let result =
+            env_path_prepend(Path::new("/usr/local/bin"), "/usr/bin:/usr/local/bin:/bin");
+        let paths = env_path_list(&result);
+        assert_eq!(paths[0], PathBuf::from("/usr/local/bin"));
+        assert_eq!(
+            paths
+                .iter()
+                .filter(|p| p.as_path() == Path::new("/usr/local/bin"))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn env_path_contains_check() {
+        assert!(env_path_contains(
+            "/usr/bin:/usr/local/bin",
+            Path::new("/usr/bin")
+        ));
+        assert!(!env_path_contains(
+            "/usr/bin:/usr/local/bin",
+            Path::new("/home/user/bin")
+        ));
+    }
+
+    #[test]
+    fn env_path_list_empty() {
+        let paths = env_path_list("");
+        assert!(paths.is_empty());
+    }
+
+    #[test]
+    fn shell_environment_capture() {
+        let env = ShellEnvironment::capture();
+        assert!(!env.is_empty());
     }
 }

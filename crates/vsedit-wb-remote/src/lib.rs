@@ -568,6 +568,194 @@ impl ConnectionPool {
     }
 }
 
+/// Parsed remote authority with scheme and host components.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RemoteAuthority {
+    pub scheme: String,
+    pub host: String,
+    pub port: Option<u16>,
+    pub user: Option<String>,
+}
+
+impl RemoteAuthority {
+    /// Parse an authority string like "ssh+remote+myhost" or "wsl+Ubuntu".
+    /// Format: scheme+host or scheme+host+port or user@scheme+host
+    pub fn parse(authority: &str) -> Result<Self, RemoteError> {
+        if authority.is_empty() {
+            return Err(RemoteError::InvalidAuthority("empty authority".into()));
+        }
+        let (user, rest) = if let Some(at_pos) = authority.find('@') {
+            (Some(authority[..at_pos].to_string()), &authority[at_pos+1..])
+        } else {
+            (None, authority)
+        };
+
+        let parts: Vec<&str> = rest.splitn(2, '+').collect();
+        if parts.len() < 2 {
+            return Err(RemoteError::InvalidAuthority(
+                format!("authority must contain '+' separator: {authority}")
+            ));
+        }
+
+        let scheme = parts[0].to_string();
+        let host_part = parts[1].to_string();
+
+        // Check for port in host (host:port format)
+        let (host, port) = if let Some(colon_pos) = host_part.rfind(':') {
+            if let Ok(p) = host_part[colon_pos+1..].parse::<u16>() {
+                (host_part[..colon_pos].to_string(), Some(p))
+            } else {
+                (host_part, None)
+            }
+        } else {
+            (host_part, None)
+        };
+
+        Ok(Self { scheme, host, port, user })
+    }
+
+    /// Check if this is an SSH remote.
+    pub fn is_ssh(&self) -> bool {
+        self.scheme == "ssh" || self.scheme == "ssh-remote"
+    }
+
+    /// Check if this is a WSL remote.
+    pub fn is_wsl(&self) -> bool {
+        self.scheme == "wsl"
+    }
+
+    /// Check if this is a dev container remote.
+    pub fn is_dev_container(&self) -> bool {
+        self.scheme == "dev-container" || self.scheme == "attached-container"
+    }
+
+    /// Reconstruct the authority string.
+    pub fn to_authority_string(&self) -> String {
+        let mut s = String::new();
+        if let Some(ref user) = self.user {
+            s.push_str(user);
+            s.push('@');
+        }
+        s.push_str(&self.scheme);
+        s.push('+');
+        s.push_str(&self.host);
+        if let Some(port) = self.port {
+            s.push(':');
+            s.push_str(&port.to_string());
+        }
+        s
+    }
+}
+
+impl fmt::Display for RemoteAuthority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_authority_string())
+    }
+}
+
+/// Generate a human-readable label for a remote connection.
+pub fn remote_label(authority: &RemoteAuthority) -> String {
+    match authority.scheme.as_str() {
+        "ssh" | "ssh-remote" => {
+            let user_prefix = authority.user.as_ref()
+                .map(|u| format!("{u}@"))
+                .unwrap_or_default();
+            let port_suffix = authority.port
+                .map(|p| format!(":{p}"))
+                .unwrap_or_default();
+            format!("SSH: {user_prefix}{host}{port_suffix}", host = authority.host)
+        }
+        "wsl" => format!("WSL: {}", authority.host),
+        "dev-container" | "attached-container" => format!("Dev Container: {}", authority.host),
+        "tunnel" => format!("Tunnel: {}", authority.host),
+        other => format!("{}: {}", other, authority.host),
+    }
+}
+
+/// Generate a short label suitable for the status bar.
+pub fn remote_label_short(authority: &RemoteAuthority) -> String {
+    match authority.scheme.as_str() {
+        "ssh" | "ssh-remote" => authority.host.clone(),
+        "wsl" => format!("WSL: {}", authority.host),
+        "dev-container" | "attached-container" => "Container".to_string(),
+        "tunnel" => "Tunnel".to_string(),
+        _ => authority.host.clone(),
+    }
+}
+
+/// Represents the remote indicator shown in the status bar.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RemoteIndicator {
+    pub label: String,
+    pub tooltip: String,
+    pub icon: RemoteIcon,
+    pub is_connected: bool,
+}
+
+/// Icon to display for the remote indicator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RemoteIcon {
+    Cloud,
+    Terminal,
+    Container,
+    Globe,
+    Disconnected,
+}
+
+impl fmt::Display for RemoteIcon {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RemoteIcon::Cloud => write!(f, "☁"),
+            RemoteIcon::Terminal => write!(f, ">_"),
+            RemoteIcon::Container => write!(f, "⬡"),
+            RemoteIcon::Globe => write!(f, "🌐"),
+            RemoteIcon::Disconnected => write!(f, "⊘"),
+        }
+    }
+}
+
+impl RemoteIndicator {
+    /// Create a remote indicator from a parsed authority and connection state.
+    pub fn from_authority(authority: &RemoteAuthority, connected: bool) -> Self {
+        let label = if connected {
+            remote_label_short(authority)
+        } else {
+            "Disconnected".to_string()
+        };
+
+        let tooltip = if connected {
+            remote_label(authority)
+        } else {
+            format!("Disconnected from {}", remote_label(authority))
+        };
+
+        let icon = if !connected {
+            RemoteIcon::Disconnected
+        } else if authority.is_ssh() {
+            RemoteIcon::Terminal
+        } else if authority.is_wsl() {
+            RemoteIcon::Cloud
+        } else if authority.is_dev_container() {
+            RemoteIcon::Container
+        } else {
+            RemoteIcon::Globe
+        };
+
+        Self { label, tooltip, icon, is_connected: connected }
+    }
+
+    /// Render the indicator as a status bar string: "icon label"
+    pub fn render(&self) -> String {
+        format!("{} {}", self.icon, self.label)
+    }
+}
+
+impl fmt::Display for RemoteIndicator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.render())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -998,5 +1186,109 @@ mod tests {
         pool.disconnect("host1");
         assert_eq!(pool.active_count(), 0);
         assert!(pool.connect("nonexistent").is_err());
+    }
+
+    #[test]
+    fn remote_authority_parse_ssh() {
+        let auth = RemoteAuthority::parse("ssh+myserver").unwrap();
+        assert_eq!(auth.scheme, "ssh");
+        assert_eq!(auth.host, "myserver");
+        assert!(auth.is_ssh());
+        assert!(!auth.is_wsl());
+    }
+
+    #[test]
+    fn remote_authority_parse_wsl() {
+        let auth = RemoteAuthority::parse("wsl+Ubuntu-22.04").unwrap();
+        assert_eq!(auth.scheme, "wsl");
+        assert_eq!(auth.host, "Ubuntu-22.04");
+        assert!(auth.is_wsl());
+    }
+
+    #[test]
+    fn remote_authority_parse_with_user() {
+        let auth = RemoteAuthority::parse("root@ssh+server").unwrap();
+        assert_eq!(auth.user, Some("root".into()));
+        assert_eq!(auth.scheme, "ssh");
+        assert_eq!(auth.host, "server");
+    }
+
+    #[test]
+    fn remote_authority_parse_with_port() {
+        let auth = RemoteAuthority::parse("ssh+myhost:2222").unwrap();
+        assert_eq!(auth.host, "myhost");
+        assert_eq!(auth.port, Some(2222));
+    }
+
+    #[test]
+    fn remote_authority_parse_invalid() {
+        assert!(RemoteAuthority::parse("").is_err());
+        assert!(RemoteAuthority::parse("no-plus-sign").is_err());
+    }
+
+    #[test]
+    fn remote_authority_to_string_roundtrip() {
+        let auth = RemoteAuthority::parse("ssh+myserver").unwrap();
+        assert_eq!(auth.to_authority_string(), "ssh+myserver");
+    }
+
+    #[test]
+    fn remote_label_ssh() {
+        let auth = RemoteAuthority::parse("ssh+prod-server").unwrap();
+        let label = remote_label(&auth);
+        assert!(label.contains("SSH"));
+        assert!(label.contains("prod-server"));
+    }
+
+    #[test]
+    fn remote_label_wsl() {
+        let auth = RemoteAuthority::parse("wsl+Ubuntu").unwrap();
+        assert_eq!(remote_label(&auth), "WSL: Ubuntu");
+    }
+
+    #[test]
+    fn remote_label_short_ssh() {
+        let auth = RemoteAuthority::parse("ssh+myserver").unwrap();
+        assert_eq!(remote_label_short(&auth), "myserver");
+    }
+
+    #[test]
+    fn remote_indicator_connected_ssh() {
+        let auth = RemoteAuthority::parse("ssh+prod").unwrap();
+        let ind = RemoteIndicator::from_authority(&auth, true);
+        assert!(ind.is_connected);
+        assert_eq!(ind.icon, RemoteIcon::Terminal);
+        assert_eq!(ind.label, "prod");
+    }
+
+    #[test]
+    fn remote_indicator_disconnected() {
+        let auth = RemoteAuthority::parse("ssh+prod").unwrap();
+        let ind = RemoteIndicator::from_authority(&auth, false);
+        assert!(!ind.is_connected);
+        assert_eq!(ind.icon, RemoteIcon::Disconnected);
+        assert_eq!(ind.label, "Disconnected");
+    }
+
+    #[test]
+    fn remote_indicator_render() {
+        let auth = RemoteAuthority::parse("wsl+Ubuntu").unwrap();
+        let ind = RemoteIndicator::from_authority(&auth, true);
+        let rendered = ind.render();
+        assert!(rendered.contains("WSL"));
+    }
+
+    #[test]
+    fn remote_icon_display() {
+        assert!(!format!("{}", RemoteIcon::Cloud).is_empty());
+        assert!(!format!("{}", RemoteIcon::Disconnected).is_empty());
+    }
+
+    #[test]
+    fn remote_authority_dev_container() {
+        let auth = RemoteAuthority::parse("dev-container+abc123").unwrap();
+        assert!(auth.is_dev_container());
+        let label = remote_label(&auth);
+        assert!(label.contains("Dev Container"));
     }
 }

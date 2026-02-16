@@ -567,6 +567,210 @@ impl Default for StateValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Per-workspace state
+// ---------------------------------------------------------------------------
+
+/// Per-workspace state storage identified by a workspace ID.
+#[derive(Debug, Clone)]
+pub struct WorkspaceState {
+    pub workspace_id: String,
+    store: HashMap<String, String>,
+}
+
+impl WorkspaceState {
+    pub fn new(workspace_id: impl Into<String>) -> Self {
+        Self { workspace_id: workspace_id.into(), store: HashMap::new() }
+    }
+
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.store.insert(key.into(), value.into());
+    }
+
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.store.get(key).map(|s| s.as_str())
+    }
+
+    pub fn remove(&mut self, key: &str) -> bool {
+        self.store.remove(key).is_some()
+    }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.store.keys().map(|s| s.as_str()).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.store.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.store.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.store.clear();
+    }
+
+    /// Export all entries as a list of (key, value) pairs for serialization.
+    pub fn export(&self) -> Vec<(&str, &str)> {
+        self.store.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect()
+    }
+
+    /// Import entries from a list of (key, value) pairs.
+    pub fn import(&mut self, entries: &[(&str, &str)]) {
+        for (k, v) in entries {
+            self.store.insert(k.to_string(), v.to_string());
+        }
+    }
+}
+
+impl fmt::Display for WorkspaceState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "WorkspaceState(id={}, keys={})", self.workspace_id, self.store.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Global state
+// ---------------------------------------------------------------------------
+
+/// Global state that persists across all workspaces.
+#[derive(Debug, Clone)]
+pub struct GlobalState {
+    store: HashMap<String, String>,
+    pub version: u32,
+}
+
+impl GlobalState {
+    pub fn new() -> Self {
+        Self { store: HashMap::new(), version: 1 }
+    }
+
+    pub fn with_version(version: u32) -> Self {
+        Self { store: HashMap::new(), version }
+    }
+
+    pub fn version(&self) -> u32 {
+        self.version
+    }
+
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.store.insert(key.into(), value.into());
+    }
+
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.store.get(key).map(|s| s.as_str())
+    }
+
+    pub fn remove(&mut self, key: &str) -> bool {
+        self.store.remove(key).is_some()
+    }
+
+    pub fn len(&self) -> usize {
+        self.store.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.store.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.store.clear();
+    }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.store.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Export all entries for serialization.
+    pub fn export(&self) -> Vec<(&str, &str)> {
+        self.store.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect()
+    }
+}
+
+impl Default for GlobalState {
+    fn default() -> Self { Self::new() }
+}
+
+impl fmt::Display for GlobalState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "GlobalState(v{}, keys={})", self.version, self.store.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// State migration
+// ---------------------------------------------------------------------------
+
+/// A migration step that transforms state from one version to the next.
+#[derive(Debug, Clone)]
+pub struct StateMigration {
+    pub from_version: u32,
+    pub to_version: u32,
+    pub description: String,
+}
+
+impl StateMigration {
+    pub fn new(from: u32, to: u32, description: impl Into<String>) -> Self {
+        Self { from_version: from, to_version: to, description: description.into() }
+    }
+}
+
+impl fmt::Display for StateMigration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Migration v{} -> v{}: {}", self.from_version, self.to_version, self.description)
+    }
+}
+
+/// Result of applying a migration chain.
+#[derive(Debug, Clone)]
+pub struct MigrationResult {
+    pub applied: Vec<StateMigration>,
+    pub final_version: u32,
+    pub keys_renamed: usize,
+    pub keys_removed: usize,
+}
+
+/// Apply a series of key renames and removals as part of a state migration.
+pub fn state_migration(
+    state: &mut GlobalState,
+    renames: &[(&str, &str)],
+    removals: &[&str],
+    target_version: u32,
+) -> MigrationResult {
+    let from_version = state.version();
+    let mut keys_renamed = 0;
+    let mut keys_removed = 0;
+
+    for (old_key, new_key) in renames {
+        if let Some(val) = state.get(old_key).map(|s| s.to_string()) {
+            state.remove(old_key);
+            state.set(*new_key, val);
+            keys_renamed += 1;
+        }
+    }
+
+    for key in removals {
+        if state.remove(key) {
+            keys_removed += 1;
+        }
+    }
+
+    state.version = target_version;
+
+    MigrationResult {
+        applied: vec![StateMigration::new(from_version, target_version, "state migration")],
+        final_version: target_version,
+        keys_renamed,
+        keys_removed,
+    }
+}
+
+/// Check if migration is needed between two versions.
+pub fn migration_needed(current_version: u32, target_version: u32) -> bool {
+    current_version < target_version
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -998,5 +1202,126 @@ mod tests {
     fn state_is_ascii_printable() {
         assert!(StateValidator::is_ascii_printable("Hello World 123"));
         assert!(!StateValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // WorkspaceState / GlobalState / Migration tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn workspace_state_basic() {
+        let mut ws = WorkspaceState::new("ws-123");
+        ws.set("theme", "dark");
+        assert_eq!(ws.get("theme"), Some("dark"));
+        assert_eq!(ws.workspace_id, "ws-123");
+        assert_eq!(ws.len(), 1);
+    }
+
+    #[test]
+    fn workspace_state_remove_and_clear() {
+        let mut ws = WorkspaceState::new("ws");
+        ws.set("a", "1");
+        ws.set("b", "2");
+        assert!(ws.remove("a"));
+        assert!(!ws.remove("a"));
+        assert_eq!(ws.len(), 1);
+        ws.clear();
+        assert!(ws.is_empty());
+    }
+
+    #[test]
+    fn workspace_state_export_import() {
+        let mut ws = WorkspaceState::new("ws");
+        ws.set("key1", "val1");
+        ws.set("key2", "val2");
+        let exported = ws.export();
+        let mut ws2 = WorkspaceState::new("ws2");
+        ws2.import(&exported);
+        assert_eq!(ws2.get("key1"), Some("val1"));
+        assert_eq!(ws2.get("key2"), Some("val2"));
+    }
+
+    #[test]
+    fn global_state_basic() {
+        let mut gs = GlobalState::new();
+        assert_eq!(gs.version(), 1);
+        gs.set("lastOpened", "/home/user/project");
+        assert_eq!(gs.get("lastOpened"), Some("/home/user/project"));
+        assert_eq!(gs.len(), 1);
+    }
+
+    #[test]
+    fn global_state_with_version() {
+        let gs = GlobalState::with_version(5);
+        assert_eq!(gs.version(), 5);
+    }
+
+    #[test]
+    fn global_state_display() {
+        let mut gs = GlobalState::new();
+        gs.set("a", "1");
+        let s = format!("{}", gs);
+        assert!(s.contains("v1"));
+        assert!(s.contains("keys=1"));
+    }
+
+    #[test]
+    fn state_migration_rename_keys() {
+        let mut gs = GlobalState::new();
+        gs.set("old.setting", "value");
+        gs.set("keep.me", "intact");
+        let result = state_migration(&mut gs, &[("old.setting", "new.setting")], &[], 2);
+        assert_eq!(gs.get("new.setting"), Some("value"));
+        assert!(gs.get("old.setting").is_none());
+        assert_eq!(gs.get("keep.me"), Some("intact"));
+        assert_eq!(result.keys_renamed, 1);
+        assert_eq!(result.final_version, 2);
+        assert_eq!(gs.version(), 2);
+    }
+
+    #[test]
+    fn state_migration_remove_keys() {
+        let mut gs = GlobalState::new();
+        gs.set("obsolete", "gone");
+        gs.set("keep", "stays");
+        let result = state_migration(&mut gs, &[], &["obsolete", "nonexistent"], 2);
+        assert!(gs.get("obsolete").is_none());
+        assert_eq!(gs.get("keep"), Some("stays"));
+        assert_eq!(result.keys_removed, 1);
+    }
+
+    #[test]
+    fn state_migration_combined() {
+        let mut gs = GlobalState::new();
+        gs.set("old_name", "data");
+        gs.set("remove_me", "bye");
+        let result = state_migration(&mut gs, &[("old_name", "new_name")], &["remove_me"], 3);
+        assert_eq!(gs.get("new_name"), Some("data"));
+        assert!(gs.get("remove_me").is_none());
+        assert_eq!(result.keys_renamed, 1);
+        assert_eq!(result.keys_removed, 1);
+    }
+
+    #[test]
+    fn migration_needed_check() {
+        assert!(migration_needed(1, 2));
+        assert!(!migration_needed(2, 2));
+        assert!(!migration_needed(3, 2));
+    }
+
+    #[test]
+    fn workspace_state_display() {
+        let ws = WorkspaceState::new("test-ws");
+        let s = format!("{}", ws);
+        assert!(s.contains("test-ws"));
+    }
+
+    #[test]
+    fn state_migration_display() {
+        let m = StateMigration::new(1, 2, "rename theme keys");
+        let s = format!("{}", m);
+        assert!(s.contains("v1"));
+        assert!(s.contains("v2"));
+        assert!(s.contains("rename theme keys"));
     }
 }

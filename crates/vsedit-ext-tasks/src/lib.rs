@@ -2,6 +2,7 @@
 //!
 //! RPC bridge between the extension host and the main thread for task providers.
 
+use std::collections::HashMap;
 use std::fmt;
 use serde::{Deserialize, Serialize};
 
@@ -620,6 +621,299 @@ impl Default for ExtTasksValidator {
     }
 }
 
+// ── Task Execution Records ──
+
+/// Record of a completed task execution with timing and exit status.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TaskExecutionRecord {
+    pub task_name: String,
+    pub task_type: String,
+    pub start_time_ms: u64,
+    pub duration_ms: u64,
+    pub exit_code: Option<i32>,
+    pub success: bool,
+}
+
+impl TaskExecutionRecord {
+    pub fn new(task_name: impl Into<String>, task_type: impl Into<String>) -> Self {
+        Self {
+            task_name: task_name.into(),
+            task_type: task_type.into(),
+            start_time_ms: 0,
+            duration_ms: 0,
+            exit_code: None,
+            success: false,
+        }
+    }
+
+    pub fn with_timing(mut self, start_ms: u64, duration_ms: u64) -> Self {
+        self.start_time_ms = start_ms;
+        self.duration_ms = duration_ms;
+        self
+    }
+
+    pub fn with_result(mut self, exit_code: i32) -> Self {
+        self.exit_code = Some(exit_code);
+        self.success = exit_code == 0;
+        self
+    }
+
+    pub fn mark_success(mut self) -> Self {
+        self.success = true;
+        self.exit_code = Some(0);
+        self
+    }
+
+    pub fn mark_failure(mut self, exit_code: i32) -> Self {
+        self.success = false;
+        self.exit_code = Some(exit_code);
+        self
+    }
+}
+
+impl fmt::Display for TaskExecutionRecord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.success { "OK" } else { "FAIL" };
+        write!(
+            f,
+            "[{}] {} ({}) {}ms",
+            status, self.task_name, self.task_type, self.duration_ms
+        )
+    }
+}
+
+/// History of task execution records.
+#[derive(Debug, Clone, Default)]
+pub struct TaskExecutionHistory {
+    records: Vec<TaskExecutionRecord>,
+    max_records: usize,
+}
+
+impl TaskExecutionHistory {
+    pub fn new(max_records: usize) -> Self {
+        Self {
+            records: Vec::new(),
+            max_records,
+        }
+    }
+
+    pub fn add(&mut self, record: TaskExecutionRecord) {
+        self.records.push(record);
+        if self.records.len() > self.max_records {
+            self.records.remove(0);
+        }
+    }
+
+    pub fn records(&self) -> &[TaskExecutionRecord] {
+        &self.records
+    }
+
+    pub fn successful_count(&self) -> usize {
+        self.records.iter().filter(|r| r.success).count()
+    }
+
+    pub fn failed_count(&self) -> usize {
+        self.records.iter().filter(|r| !r.success).count()
+    }
+
+    pub fn last_record(&self) -> Option<&TaskExecutionRecord> {
+        self.records.last()
+    }
+
+    pub fn by_task_name(&self, name: &str) -> Vec<&TaskExecutionRecord> {
+        self.records.iter().filter(|r| r.task_name == name).collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.records.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+}
+
+// ── Problem Matcher ──
+
+/// A problem pattern that matches compiler-style error output.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProblemPattern {
+    pub regexp: String,
+    pub file_group: usize,
+    pub line_group: usize,
+    pub message_group: usize,
+    pub severity_group: Option<usize>,
+}
+
+/// A matched problem from task output.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchedProblem {
+    pub file: String,
+    pub line: u32,
+    pub message: String,
+    pub severity: ProblemSeverity,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProblemSeverity {
+    Error,
+    Warning,
+    Info,
+}
+
+impl fmt::Display for ProblemSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ProblemSeverity::Error => write!(f, "error"),
+            ProblemSeverity::Warning => write!(f, "warning"),
+            ProblemSeverity::Info => write!(f, "info"),
+        }
+    }
+}
+
+impl fmt::Display for MatchedProblem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}:{}: {}: {}",
+            self.file, self.line, self.severity, self.message
+        )
+    }
+}
+
+/// Parse task output lines against a problem pattern, returning matched problems.
+pub fn task_problem_matcher(output: &str, pattern: &ProblemPattern) -> Vec<MatchedProblem> {
+    let re = match regex::Regex::new(&pattern.regexp) {
+        Ok(r) => r,
+        Err(_) => return Vec::new(),
+    };
+
+    output
+        .lines()
+        .filter_map(|line| {
+            let caps = re.captures(line)?;
+            let file = caps.get(pattern.file_group)?.as_str().to_string();
+            let line_num: u32 = caps.get(pattern.line_group)?.as_str().parse().ok()?;
+            let message = caps.get(pattern.message_group)?.as_str().to_string();
+            let severity = if let Some(sg) = pattern.severity_group {
+                match caps
+                    .get(sg)
+                    .map(|m| m.as_str().to_lowercase())
+                    .as_deref()
+                {
+                    Some("warning") | Some("warn") => ProblemSeverity::Warning,
+                    Some("info") | Some("note") => ProblemSeverity::Info,
+                    _ => ProblemSeverity::Error,
+                }
+            } else {
+                ProblemSeverity::Error
+            };
+            Some(MatchedProblem {
+                file,
+                line: line_num,
+                message,
+                severity,
+            })
+        })
+        .collect()
+}
+
+/// Built-in GCC/rustc-style problem pattern.
+pub fn gcc_problem_pattern() -> ProblemPattern {
+    ProblemPattern {
+        regexp: r"^(.+):(\d+):\d+: (error|warning|note): (.+)$".to_string(),
+        file_group: 1,
+        line_group: 2,
+        message_group: 4,
+        severity_group: Some(3),
+    }
+}
+
+// ── Task Dependency Chain ──
+
+/// Manages task dependencies (preLaunchTask chains).
+#[derive(Debug, Clone, Default)]
+pub struct TaskDependencyChain {
+    /// task_name -> list of tasks it depends on (preLaunchTasks)
+    dependencies: HashMap<String, Vec<String>>,
+}
+
+impl TaskDependencyChain {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a dependency: `task` depends on `depends_on` (preLaunchTask).
+    pub fn add_dependency(&mut self, task: impl Into<String>, depends_on: impl Into<String>) {
+        self.dependencies
+            .entry(task.into())
+            .or_default()
+            .push(depends_on.into());
+    }
+
+    /// Get direct dependencies of a task.
+    pub fn dependencies_of(&self, task: &str) -> Vec<&str> {
+        self.dependencies
+            .get(task)
+            .map(|deps| deps.iter().map(|s| s.as_str()).collect())
+            .unwrap_or_default()
+    }
+
+    /// Compute the full execution order for a task (topological sort, dependencies first).
+    /// Returns None if a cycle is detected.
+    pub fn execution_order(&self, task: &str) -> Option<Vec<String>> {
+        let mut order = Vec::new();
+        let mut visited = std::collections::HashSet::new();
+        let mut in_stack = std::collections::HashSet::new();
+        if self.topo_visit(task, &mut order, &mut visited, &mut in_stack) {
+            Some(order)
+        } else {
+            None
+        }
+    }
+
+    fn topo_visit(
+        &self,
+        task: &str,
+        order: &mut Vec<String>,
+        visited: &mut std::collections::HashSet<String>,
+        in_stack: &mut std::collections::HashSet<String>,
+    ) -> bool {
+        if in_stack.contains(task) {
+            return false;
+        } // cycle
+        if visited.contains(task) {
+            return true;
+        }
+        in_stack.insert(task.to_string());
+        if let Some(deps) = self.dependencies.get(task) {
+            for dep in deps {
+                if !self.topo_visit(dep, order, visited, in_stack) {
+                    return false;
+                }
+            }
+        }
+        in_stack.remove(task);
+        visited.insert(task.to_string());
+        order.push(task.to_string());
+        true
+    }
+
+    /// Check if a task has any dependencies.
+    pub fn has_dependencies(&self, task: &str) -> bool {
+        self.dependencies.get(task).is_some_and(|d| !d.is_empty())
+    }
+
+    /// Get all tasks that have dependencies registered.
+    pub fn all_tasks(&self) -> Vec<&str> {
+        self.dependencies.keys().map(|s| s.as_str()).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -998,5 +1292,127 @@ mod tests {
     fn ext_tasks_is_ascii_printable() {
         assert!(ExtTasksValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtTasksValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn execution_record_basic() {
+        let r = TaskExecutionRecord::new("build", "shell")
+            .with_timing(1000, 500)
+            .mark_success();
+        assert!(r.success);
+        assert_eq!(r.exit_code, Some(0));
+        assert_eq!(r.duration_ms, 500);
+    }
+
+    #[test]
+    fn execution_record_failure() {
+        let r = TaskExecutionRecord::new("test", "shell").mark_failure(1);
+        assert!(!r.success);
+        assert_eq!(r.exit_code, Some(1));
+    }
+
+    #[test]
+    fn execution_record_display() {
+        let r = TaskExecutionRecord::new("build", "shell")
+            .with_timing(0, 1234)
+            .mark_success();
+        let s = format!("{}", r);
+        assert!(s.contains("OK"));
+        assert!(s.contains("1234ms"));
+    }
+
+    #[test]
+    fn execution_history_basic() {
+        let mut h = TaskExecutionHistory::new(10);
+        h.add(TaskExecutionRecord::new("a", "shell").mark_success());
+        h.add(TaskExecutionRecord::new("b", "shell").mark_failure(1));
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.successful_count(), 1);
+        assert_eq!(h.failed_count(), 1);
+    }
+
+    #[test]
+    fn execution_history_max_records() {
+        let mut h = TaskExecutionHistory::new(2);
+        h.add(TaskExecutionRecord::new("a", "s").mark_success());
+        h.add(TaskExecutionRecord::new("b", "s").mark_success());
+        h.add(TaskExecutionRecord::new("c", "s").mark_success());
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.records()[0].task_name, "b");
+    }
+
+    #[test]
+    fn execution_history_by_name() {
+        let mut h = TaskExecutionHistory::new(10);
+        h.add(TaskExecutionRecord::new("build", "shell").mark_success());
+        h.add(TaskExecutionRecord::new("test", "shell").mark_success());
+        h.add(TaskExecutionRecord::new("build", "shell").mark_failure(1));
+        assert_eq!(h.by_task_name("build").len(), 2);
+    }
+
+    #[test]
+    fn problem_matcher_gcc_style() {
+        let output =
+            "src/main.rs:10:5: error: expected `;`\nsrc/lib.rs:20:1: warning: unused variable";
+        let pattern = gcc_problem_pattern();
+        let problems = task_problem_matcher(output, &pattern);
+        assert_eq!(problems.len(), 2);
+        assert_eq!(problems[0].file, "src/main.rs");
+        assert_eq!(problems[0].line, 10);
+        assert_eq!(problems[0].severity, ProblemSeverity::Error);
+        assert_eq!(problems[1].severity, ProblemSeverity::Warning);
+    }
+
+    #[test]
+    fn problem_matcher_no_match() {
+        let output = "Everything is fine\nNo errors here";
+        let pattern = gcc_problem_pattern();
+        let problems = task_problem_matcher(output, &pattern);
+        assert!(problems.is_empty());
+    }
+
+    #[test]
+    fn dependency_chain_execution_order() {
+        let mut chain = TaskDependencyChain::new();
+        chain.add_dependency("test", "build");
+        chain.add_dependency("build", "compile");
+        let order = chain.execution_order("test").unwrap();
+        assert_eq!(order, vec!["compile", "build", "test"]);
+    }
+
+    #[test]
+    fn dependency_chain_cycle_detection() {
+        let mut chain = TaskDependencyChain::new();
+        chain.add_dependency("a", "b");
+        chain.add_dependency("b", "a");
+        assert!(chain.execution_order("a").is_none());
+    }
+
+    #[test]
+    fn dependency_chain_no_deps() {
+        let chain = TaskDependencyChain::new();
+        let order = chain.execution_order("standalone").unwrap();
+        assert_eq!(order, vec!["standalone"]);
+    }
+
+    #[test]
+    fn dependency_chain_has_dependencies() {
+        let mut chain = TaskDependencyChain::new();
+        chain.add_dependency("test", "build");
+        assert!(chain.has_dependencies("test"));
+        assert!(!chain.has_dependencies("build"));
+    }
+
+    #[test]
+    fn matched_problem_display() {
+        let p = MatchedProblem {
+            file: "main.rs".into(),
+            line: 5,
+            message: "oops".into(),
+            severity: ProblemSeverity::Error,
+        };
+        let s = format!("{}", p);
+        assert!(s.contains("main.rs:5"));
+        assert!(s.contains("error"));
     }
 }

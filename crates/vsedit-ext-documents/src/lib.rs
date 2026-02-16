@@ -611,6 +611,208 @@ impl Default for ExtDocumentsValidator {
     }
 }
 
+/// A content provider for virtual documents with a URI scheme.
+#[derive(Debug, Clone)]
+pub struct DocumentContentProvider {
+    pub scheme: String,
+    contents: HashMap<String, String>,
+}
+
+impl DocumentContentProvider {
+    pub fn new(scheme: impl Into<String>) -> Self {
+        Self { scheme: scheme.into(), contents: HashMap::new() }
+    }
+
+    /// Register content for a virtual URI.
+    pub fn provide_content(&mut self, uri: &str, content: impl Into<String>) {
+        self.contents.insert(uri.to_string(), content.into());
+    }
+
+    /// Retrieve content for a virtual URI.
+    pub fn get_content(&self, uri: &str) -> Option<&str> {
+        self.contents.get(uri).map(|s| s.as_str())
+    }
+
+    /// Remove a virtual document.
+    pub fn remove(&mut self, uri: &str) -> bool {
+        self.contents.remove(uri).is_some()
+    }
+
+    /// Check if a URI belongs to this provider's scheme.
+    pub fn handles_uri(&self, uri: &str) -> bool {
+        uri.starts_with(&format!("{}://", self.scheme))
+    }
+
+    /// Number of virtual documents registered.
+    pub fn count(&self) -> usize {
+        self.contents.len()
+    }
+
+    /// List all registered URIs.
+    pub fn uris(&self) -> Vec<&str> {
+        self.contents.keys().map(|s| s.as_str()).collect()
+    }
+}
+
+impl fmt::Display for DocumentContentProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DocumentContentProvider(scheme={}, count={})", self.scheme, self.contents.len())
+    }
+}
+
+/// A single diff hunk between two document versions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DiffHunk {
+    pub old_start: usize,
+    pub old_count: usize,
+    pub new_start: usize,
+    pub new_count: usize,
+    pub content: String,
+}
+
+impl fmt::Display for DiffHunk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "@@ -{},{} +{},{} @@", self.old_start, self.old_count, self.new_start, self.new_count)
+    }
+}
+
+/// Result of a document diff operation.
+#[derive(Debug, Clone)]
+pub struct DocumentDiffResult {
+    pub hunks: Vec<DiffHunk>,
+    pub has_changes: bool,
+    pub additions: usize,
+    pub deletions: usize,
+}
+
+impl DocumentDiffResult {
+    pub fn no_changes() -> Self {
+        Self { hunks: Vec::new(), has_changes: false, additions: 0, deletions: 0 }
+    }
+}
+
+/// Compare two document contents line-by-line, returning diff hunks.
+pub fn document_diff(old: &str, new: &str) -> DocumentDiffResult {
+    let old_lines: Vec<&str> = old.lines().collect();
+    let new_lines: Vec<&str> = new.lines().collect();
+
+    if old_lines == new_lines {
+        return DocumentDiffResult::no_changes();
+    }
+
+    let mut hunks = Vec::new();
+    let mut additions = 0usize;
+    let mut deletions = 0usize;
+    let max_len = old_lines.len().max(new_lines.len());
+    let mut i = 0;
+    while i < max_len {
+        let old_line = old_lines.get(i).copied();
+        let new_line = new_lines.get(i).copied();
+        if old_line != new_line {
+            let hunk_start = i;
+            let mut hunk_content = String::new();
+            let mut old_count = 0;
+            let mut new_count = 0;
+            while i < max_len && old_lines.get(i).copied() != new_lines.get(i).copied() {
+                if let Some(ol) = old_lines.get(i) {
+                    hunk_content.push_str(&format!("-{}\n", ol));
+                    old_count += 1;
+                    deletions += 1;
+                }
+                if let Some(nl) = new_lines.get(i) {
+                    hunk_content.push_str(&format!("+{}\n", nl));
+                    new_count += 1;
+                    additions += 1;
+                }
+                i += 1;
+            }
+            hunks.push(DiffHunk {
+                old_start: hunk_start + 1,
+                old_count,
+                new_start: hunk_start + 1,
+                new_count,
+                content: hunk_content,
+            });
+        } else {
+            i += 1;
+        }
+    }
+
+    DocumentDiffResult { hunks, has_changes: true, additions, deletions }
+}
+
+/// Accumulates multiple text edits before applying them as a batch.
+#[derive(Debug, Clone, Default)]
+pub struct DocumentChangeAccumulator {
+    uri: String,
+    edits: Vec<TextEdit>,
+}
+
+impl DocumentChangeAccumulator {
+    pub fn new(uri: impl Into<String>) -> Self {
+        Self { uri: uri.into(), edits: Vec::new() }
+    }
+
+    /// Add an edit to the batch.
+    pub fn add_edit(&mut self, edit: TextEdit) {
+        self.edits.push(edit);
+    }
+
+    /// Add an insertion at a specific position.
+    pub fn insert(&mut self, line: u32, col: u32, text: impl Into<String>) {
+        self.edits.push(TextEdit::new(line, col, line, col, text));
+    }
+
+    /// Add a deletion of a range.
+    pub fn delete(&mut self, start_line: u32, start_col: u32, end_line: u32, end_col: u32) {
+        self.edits.push(TextEdit::new(start_line, start_col, end_line, end_col, ""));
+    }
+
+    /// Number of accumulated edits.
+    pub fn edit_count(&self) -> usize {
+        self.edits.len()
+    }
+
+    /// Build a DocumentMessage::Change from the accumulated edits.
+    pub fn to_change_message(&self, version: u32) -> DocumentMessage {
+        DocumentMessage::Change {
+            uri: self.uri.clone(),
+            version,
+            changes: self.edits.clone(),
+            sync_kind: DocumentSyncKind::Incremental,
+        }
+    }
+
+    /// Clear all accumulated edits.
+    pub fn clear(&mut self) {
+        self.edits.clear();
+    }
+
+    /// Get the target URI.
+    pub fn uri(&self) -> &str {
+        &self.uri
+    }
+
+    /// Check if there are any accumulated edits.
+    pub fn is_empty(&self) -> bool {
+        self.edits.is_empty()
+    }
+
+    /// Validate all accumulated edits.
+    pub fn validate_all(&self) -> Result<(), DocumentError> {
+        for edit in &self.edits {
+            edit.validate()?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for DocumentChangeAccumulator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DocumentChangeAccumulator(uri={}, edits={})", self.uri, self.edits.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -997,5 +1199,107 @@ mod tests {
     fn ext_documents_is_ascii_printable() {
         assert!(ExtDocumentsValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtDocumentsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn content_provider_handles_scheme() {
+        let mut p = DocumentContentProvider::new("git");
+        p.provide_content("git://HEAD/main.rs", "fn main() {}");
+        assert!(p.handles_uri("git://HEAD/main.rs"));
+        assert!(!p.handles_uri("file:///tmp/foo.rs"));
+        assert_eq!(p.get_content("git://HEAD/main.rs"), Some("fn main() {}"));
+    }
+
+    #[test]
+    fn content_provider_remove() {
+        let mut p = DocumentContentProvider::new("test");
+        p.provide_content("test://doc1", "hello");
+        assert!(p.remove("test://doc1"));
+        assert!(!p.remove("test://doc1"));
+        assert_eq!(p.count(), 0);
+    }
+
+    #[test]
+    fn content_provider_uris() {
+        let mut p = DocumentContentProvider::new("mem");
+        p.provide_content("mem://a", "a");
+        p.provide_content("mem://b", "b");
+        assert_eq!(p.count(), 2);
+    }
+
+    #[test]
+    fn document_diff_identical() {
+        let result = document_diff("hello\nworld", "hello\nworld");
+        assert!(!result.has_changes);
+        assert!(result.hunks.is_empty());
+    }
+
+    #[test]
+    fn document_diff_single_line_change() {
+        let result = document_diff("hello\nworld", "hello\nearth");
+        assert!(result.has_changes);
+        assert_eq!(result.additions, 1);
+        assert_eq!(result.deletions, 1);
+        assert_eq!(result.hunks.len(), 1);
+    }
+
+    #[test]
+    fn document_diff_added_lines() {
+        let result = document_diff("line1", "line1\nline2\nline3");
+        assert!(result.has_changes);
+        assert!(result.additions > 0);
+    }
+
+    #[test]
+    fn diff_hunk_display() {
+        let h = DiffHunk { old_start: 1, old_count: 2, new_start: 1, new_count: 3, content: String::new() };
+        let s = format!("{}", h);
+        assert!(s.contains("@@ -1,2 +1,3 @@"));
+    }
+
+    #[test]
+    fn change_accumulator_basic() {
+        let mut acc = DocumentChangeAccumulator::new("file:///test.rs");
+        assert!(acc.is_empty());
+        acc.insert(0, 0, "hello");
+        acc.delete(1, 0, 1, 5);
+        assert_eq!(acc.edit_count(), 2);
+        assert_eq!(acc.uri(), "file:///test.rs");
+    }
+
+    #[test]
+    fn change_accumulator_to_message() {
+        let mut acc = DocumentChangeAccumulator::new("file:///foo.rs");
+        acc.insert(0, 0, "test");
+        let msg = acc.to_change_message(5);
+        match msg {
+            DocumentMessage::Change { version, uri, .. } => {
+                assert_eq!(version, 5);
+                assert_eq!(uri, "file:///foo.rs");
+            }
+            _ => panic!("expected Change message"),
+        }
+    }
+
+    #[test]
+    fn change_accumulator_validate_all() {
+        let mut acc = DocumentChangeAccumulator::new("file:///x.rs");
+        acc.insert(0, 0, "ok");
+        assert!(acc.validate_all().is_ok());
+    }
+
+    #[test]
+    fn change_accumulator_clear() {
+        let mut acc = DocumentChangeAccumulator::new("file:///x.rs");
+        acc.insert(0, 0, "text");
+        acc.clear();
+        assert!(acc.is_empty());
+    }
+
+    #[test]
+    fn content_provider_display() {
+        let p = DocumentContentProvider::new("vscode");
+        let s = format!("{}", p);
+        assert!(s.contains("vscode"));
     }
 }

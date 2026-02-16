@@ -526,6 +526,115 @@ impl Default for MenuValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Menu item groups
+// ---------------------------------------------------------------------------
+
+/// A named group of menu items with a sort order, delimited by separators.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MenuItemGroup {
+    pub group_id: String,
+    pub order: i32,
+    pub items: Vec<MenuItem>,
+}
+
+impl MenuItemGroup {
+    pub fn new(group_id: impl Into<String>, order: i32) -> Self {
+        Self { group_id: group_id.into(), order, items: Vec::new() }
+    }
+
+    pub fn add_item(&mut self, item: MenuItem) {
+        self.items.push(item);
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Convert groups into a flat list of MenuItems with separators between groups.
+    pub fn flatten_groups(groups: &[MenuItemGroup]) -> Vec<MenuItem> {
+        let mut result = Vec::new();
+        let mut sorted: Vec<&MenuItemGroup> = groups.iter().collect();
+        sorted.sort_by_key(|g| g.order);
+        for group in &sorted {
+            if group.items.is_empty() {
+                continue;
+            }
+            if !result.is_empty() {
+                result.push(MenuItem::separator());
+            }
+            for item in &group.items {
+                result.push(item.clone());
+            }
+        }
+        result
+    }
+}
+
+impl fmt::Display for MenuItemGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "MenuItemGroup({}, order={}, items={})", self.group_id, self.order, self.items.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Menu item sorting
+// ---------------------------------------------------------------------------
+
+/// Sort menu contributions by group_id alphabetically, then by order within each group.
+pub fn menu_item_sort(contributions: &mut [MenuContribution]) {
+    contributions.sort_by(|a, b| {
+        a.group_id.cmp(&b.group_id).then(a.order.cmp(&b.order))
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Menu action resolution
+// ---------------------------------------------------------------------------
+
+/// A resolved menu action mapping a menu item to its command id.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedMenuAction {
+    pub menu_item_id: String,
+    pub command_id: String,
+    pub label: String,
+    pub keybinding: Option<String>,
+    pub enabled: bool,
+}
+
+impl fmt::Display for ResolvedMenuAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.keybinding {
+            Some(kb) => write!(f, "{} ({}) [{}]", self.label, self.command_id, kb),
+            None => write!(f, "{} ({})", self.label, self.command_id),
+        }
+    }
+}
+
+/// Look up the command for a menu item. Returns a ResolvedMenuAction by matching
+/// menu_item_id to a command registry (represented as a HashMap<String, String>
+/// mapping menu item ids to command ids).
+pub fn menu_action_resolve(
+    bar: &MenuBar,
+    command_map: &HashMap<String, String>,
+) -> Vec<ResolvedMenuAction> {
+    let actions = bar.get_all_actions();
+    actions.iter().filter_map(|item| {
+        let command_id = command_map.get(&item.id)?;
+        Some(ResolvedMenuAction {
+            menu_item_id: item.id.clone(),
+            command_id: command_id.clone(),
+            label: item.label.clone(),
+            keybinding: item.keybinding.clone(),
+            enabled: item.enabled,
+        })
+    }).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -669,189 +778,130 @@ mod tests {
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn menu_item_group_new() {
+        let g = MenuItemGroup::new("navigation", 1);
+        assert_eq!(g.group_id, "navigation");
+        assert_eq!(g.order, 1);
+        assert!(g.is_empty());
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn menu_item_group_add_items() {
+        let mut g = MenuItemGroup::new("nav", 0);
+        g.add_item(MenuItem::action("go_back", "Go Back"));
+        g.add_item(MenuItem::action("go_forward", "Go Forward"));
+        assert_eq!(g.item_count(), 2);
+        assert!(!g.is_empty());
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn flatten_groups_with_separators() {
+        let mut g1 = MenuItemGroup::new("nav", 1);
+        g1.add_item(MenuItem::action("a", "A"));
+        let mut g2 = MenuItemGroup::new("edit", 2);
+        g2.add_item(MenuItem::action("b", "B"));
+        g2.add_item(MenuItem::action("c", "C"));
+        let flat = MenuItemGroup::flatten_groups(&[g2, g1]); // order matters
+        assert_eq!(flat.len(), 4); // A, separator, B, C
+        assert_eq!(flat[0].id, "a");
+        assert_eq!(flat[1].kind, MenuItemKind::Separator);
+        assert_eq!(flat[2].id, "b");
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn flatten_single_group_no_separator() {
+        let mut g = MenuItemGroup::new("only", 0);
+        g.add_item(MenuItem::action("x", "X"));
+        let flat = MenuItemGroup::flatten_groups(&[g]);
+        assert_eq!(flat.len(), 1);
+        assert_eq!(flat[0].id, "x");
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn flatten_empty_groups_skipped() {
+        let g_empty = MenuItemGroup::new("empty", 0);
+        let mut g_full = MenuItemGroup::new("full", 1);
+        g_full.add_item(MenuItem::action("a", "A"));
+        let flat = MenuItemGroup::flatten_groups(&[g_empty, g_full]);
+        assert_eq!(flat.len(), 1);
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn menu_item_sort_by_group_then_order() {
+        let mut contribs = vec![
+            MenuContribution { group_id: "b".into(), order: 2, item: MenuItem::action("b2", "B2") },
+            MenuContribution { group_id: "a".into(), order: 1, item: MenuItem::action("a1", "A1") },
+            MenuContribution { group_id: "b".into(), order: 1, item: MenuItem::action("b1", "B1") },
+            MenuContribution { group_id: "a".into(), order: 2, item: MenuItem::action("a2", "A2") },
+        ];
+        menu_item_sort(&mut contribs);
+        assert_eq!(contribs[0].item.id, "a1");
+        assert_eq!(contribs[1].item.id, "a2");
+        assert_eq!(contribs[2].item.id, "b1");
+        assert_eq!(contribs[3].item.id, "b2");
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn menu_action_resolve_basic() {
+        let mut bar = MenuBar::new();
+        let mut file = MenuItem::submenu("file", "File");
+        file.children.push(MenuItem::action("open", "Open"));
+        file.children.push(MenuItem::action("save", "Save"));
+        bar.add_menu(file);
+
+        let mut cmd_map = HashMap::new();
+        cmd_map.insert("open".to_string(), "workbench.action.files.openFile".to_string());
+        cmd_map.insert("save".to_string(), "workbench.action.files.save".to_string());
+
+        let resolved = menu_action_resolve(&bar, &cmd_map);
+        assert_eq!(resolved.len(), 2);
+        assert!(resolved.iter().any(|r| r.command_id == "workbench.action.files.openFile"));
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn menu_action_resolve_missing_command() {
+        let mut bar = MenuBar::new();
+        bar.add_menu(MenuItem::action("unknown", "Unknown"));
+        let cmd_map = HashMap::new();
+        let resolved = menu_action_resolve(&bar, &cmd_map);
+        assert!(resolved.is_empty());
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn resolved_menu_action_display_with_keybinding() {
+        let action = ResolvedMenuAction {
+            menu_item_id: "open".into(),
+            command_id: "workbench.action.files.openFile".into(),
+            label: "Open File".into(),
+            keybinding: Some("Ctrl+O".into()),
+            enabled: true,
+        };
+        let s = format!("{}", action);
+        assert!(s.contains("Open File"));
+        assert!(s.contains("Ctrl+O"));
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn resolved_menu_action_display_without_keybinding() {
+        let action = ResolvedMenuAction {
+            menu_item_id: "x".into(),
+            command_id: "cmd.x".into(),
+            label: "Do X".into(),
+            keybinding: None,
+            enabled: true,
+        };
+        let s = format!("{}", action);
+        assert!(s.contains("Do X"));
+        assert!(!s.contains("["));
     }
 
     #[test]
-    fn behavior_check_10() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_27() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_28() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_29() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_30() {
-        let _svc = MenuBar::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn menu_item_group_display() {
+        let mut g = MenuItemGroup::new("nav", 1);
+        g.add_item(MenuItem::action("a", "A"));
+        let s = format!("{}", g);
+        assert!(s.contains("nav"));
+        assert!(s.contains("items=1"));
     }
 
     #[test]

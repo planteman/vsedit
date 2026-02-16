@@ -466,6 +466,122 @@ impl std::fmt::Debug for ContextKeyService {
 }
 
 // ---------------------------------------------------------------------------
+// ContextKeyExpression — higher-level wrapper
+// ---------------------------------------------------------------------------
+
+/// A parsed and ready-to-evaluate context key expression with its source string.
+#[derive(Debug, Clone)]
+pub struct ContextKeyExpression {
+    source: String,
+    parsed: ContextKeyExpr,
+}
+
+impl ContextKeyExpression {
+    /// Parse a when-clause expression string like "editorTextFocus && !suggestWidgetVisible".
+    pub fn parse(expr: &str) -> Result<Self, ParseError> {
+        let parsed = ContextKeyExpr::parse(expr)?;
+        Ok(Self { source: expr.to_string(), parsed })
+    }
+
+    /// Evaluate the expression against a context.
+    pub fn evaluate(&self, ctx: &dyn IContext) -> bool {
+        self.parsed.evaluate(ctx)
+    }
+
+    /// Get the original source string.
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Get the parsed expression tree.
+    pub fn expr(&self) -> &ContextKeyExpr {
+        &self.parsed
+    }
+
+    /// Returns the set of context key names referenced by this expression.
+    pub fn referenced_keys(&self) -> Vec<String> {
+        let mut keys = Vec::new();
+        Self::collect_keys(&self.parsed, &mut keys);
+        keys.sort();
+        keys.dedup();
+        keys
+    }
+
+    fn collect_keys(expr: &ContextKeyExpr, keys: &mut Vec<String>) {
+        match expr {
+            ContextKeyExpr::Defined(k) | ContextKeyExpr::Equals(k, _) | ContextKeyExpr::NotEquals(k, _)
+            | ContextKeyExpr::Regex(k, _) | ContextKeyExpr::Greater(k, _) | ContextKeyExpr::GreaterEquals(k, _)
+            | ContextKeyExpr::Less(k, _) | ContextKeyExpr::LessEquals(k, _) => {
+                keys.push(k.clone());
+            }
+            ContextKeyExpr::In(k, s) | ContextKeyExpr::NotIn(k, s) => {
+                keys.push(k.clone());
+                keys.push(s.clone());
+            }
+            ContextKeyExpr::Not(inner) => Self::collect_keys(inner, keys),
+            ContextKeyExpr::And(exprs) | ContextKeyExpr::Or(exprs) => {
+                for e in exprs { Self::collect_keys(e, keys); }
+            }
+            ContextKeyExpr::True | ContextKeyExpr::False => {}
+        }
+    }
+}
+
+impl fmt::Display for ContextKeyExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.source)
+    }
+}
+
+impl PartialEq for ContextKeyExpression {
+    fn eq(&self, other: &Self) -> bool {
+        self.source == other.source
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Free functions
+// ---------------------------------------------------------------------------
+
+/// Evaluate a when-clause string against a context. Returns false on parse errors.
+pub fn evaluate_expression(expr: &str, ctx: &dyn IContext) -> bool {
+    ContextKeyExpr::parse(expr).map(|e| e.evaluate(ctx)).unwrap_or(false)
+}
+
+/// Serialize a context key value to a JSON-compatible string.
+pub fn context_key_serialize(value: &ContextKeyValue) -> String {
+    match value {
+        ContextKeyValue::Bool(b) => b.to_string(),
+        ContextKeyValue::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"")),
+        ContextKeyValue::Number(n) => n.to_string(),
+        ContextKeyValue::Null => "null".to_string(),
+    }
+}
+
+/// Deserialize a context key value from a string representation.
+pub fn context_key_deserialize(s: &str) -> ContextKeyValue {
+    let s = s.trim();
+    if s == "null" {
+        return ContextKeyValue::Null;
+    }
+    if s == "true" {
+        return ContextKeyValue::Bool(true);
+    }
+    if s == "false" {
+        return ContextKeyValue::Bool(false);
+    }
+    if let Ok(n) = s.parse::<f64>() {
+        return ContextKeyValue::Number(n);
+    }
+    // Strip surrounding quotes if present
+    if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
+        let inner = &s[1..s.len()-1];
+        return ContextKeyValue::String(inner.replace("\\\"", "\"").replace("\\\\", "\\"));
+    }
+    ContextKeyValue::String(s.to_string())
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -995,5 +1111,112 @@ mod tests {
         assert!(grandchild.get_value("c").is_some());
         assert!(grandchild.get_value("b").is_some());
         assert!(grandchild.get_value("a").is_some());
+    }
+
+    // -- TestContext helper --------------------------------------------------
+
+    struct TestContext {
+        values: HashMap<String, ContextKeyValue>,
+    }
+
+    impl TestContext {
+        fn new() -> Self {
+            Self { values: HashMap::new() }
+        }
+        fn set(&mut self, key: &str, value: ContextKeyValue) {
+            self.values.insert(key.to_string(), value);
+        }
+    }
+
+    impl IContext for TestContext {
+        fn get_value(&self, key: &str) -> Option<&ContextKeyValue> {
+            self.values.get(key)
+        }
+    }
+
+    // -- ContextKeyExpression ------------------------------------------------
+
+    #[test]
+    fn context_key_expression_parse_and_evaluate() {
+        let expr = ContextKeyExpression::parse("editorFocus && !readOnly").unwrap();
+        let mut ctx = TestContext::new();
+        ctx.set("editorFocus", ContextKeyValue::Bool(true));
+        ctx.set("readOnly", ContextKeyValue::Bool(false));
+        assert!(expr.evaluate(&ctx));
+    }
+
+    #[test]
+    fn context_key_expression_referenced_keys() {
+        let expr = ContextKeyExpression::parse("editorFocus && lang == rust").unwrap();
+        let keys = expr.referenced_keys();
+        assert!(keys.contains(&"editorFocus".to_string()));
+        assert!(keys.contains(&"lang".to_string()));
+    }
+
+    #[test]
+    fn context_key_expression_source() {
+        let expr = ContextKeyExpression::parse("editorFocus").unwrap();
+        assert_eq!(expr.source(), "editorFocus");
+    }
+
+    #[test]
+    fn context_key_expression_display() {
+        let expr = ContextKeyExpression::parse("a && b").unwrap();
+        assert_eq!(format!("{}", expr), "a && b");
+    }
+
+    #[test]
+    fn evaluate_expression_helper() {
+        let mut ctx = TestContext::new();
+        ctx.set("visible", ContextKeyValue::Bool(true));
+        assert!(evaluate_expression("visible", &ctx));
+        assert!(!evaluate_expression("invisible", &ctx));
+    }
+
+    #[test]
+    fn serialize_deserialize_bool() {
+        let val = ContextKeyValue::Bool(true);
+        let s = context_key_serialize(&val);
+        assert_eq!(s, "true");
+        assert_eq!(context_key_deserialize(&s), val);
+    }
+
+    #[test]
+    fn serialize_deserialize_number() {
+        let val = ContextKeyValue::Number(42.5);
+        let s = context_key_serialize(&val);
+        assert_eq!(s, "42.5");
+        assert_eq!(context_key_deserialize(&s), val);
+    }
+
+    #[test]
+    fn serialize_deserialize_string() {
+        let val = ContextKeyValue::String("hello world".into());
+        let s = context_key_serialize(&val);
+        assert_eq!(s, "\"hello world\"");
+        assert_eq!(context_key_deserialize(&s), val);
+    }
+
+    #[test]
+    fn serialize_deserialize_null() {
+        let val = ContextKeyValue::Null;
+        let s = context_key_serialize(&val);
+        assert_eq!(s, "null");
+        assert_eq!(context_key_deserialize(&s), val);
+    }
+
+    #[test]
+    fn context_key_expression_equality() {
+        let e1 = ContextKeyExpression::parse("a && b").unwrap();
+        let e2 = ContextKeyExpression::parse("a && b").unwrap();
+        let e3 = ContextKeyExpression::parse("a || b").unwrap();
+        assert_eq!(e1, e2);
+        assert_ne!(e1, e3);
+    }
+
+    #[test]
+    fn evaluate_expression_parse_error_returns_false() {
+        let ctx = TestContext::new();
+        assert!(!evaluate_expression("&&", &ctx));
     }
 }
