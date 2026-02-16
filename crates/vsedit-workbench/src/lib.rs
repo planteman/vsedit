@@ -615,6 +615,7 @@ pub enum FocusedPart {
     Panel,
     QuickInput,
     CommandPalette,
+    FindBar,
 }
 
 // ---------------------------------------------------------------------------
@@ -668,20 +669,54 @@ impl QuickOpenState {
         }
     }
 
-    /// Filter the given workspace files using fuzzy matching against the query.
+    /// Filter the given workspace files using case-insensitive matching.
+    ///
+    /// Results are ranked: exact filename matches first, then prefix matches,
+    /// then other substring matches, with fuzzy matches last.
     pub fn filter(&mut self, workspace_files: &[PathBuf]) {
         if self.query.is_empty() {
             self.filtered_results = workspace_files.to_vec();
         } else {
-            let mut scored: Vec<(PathBuf, i32)> = workspace_files
+            let query_lower = self.query.to_lowercase();
+
+            // Classify each file into a ranking tier.
+            // Tier 0 = exact filename match, 1 = prefix, 2 = substring, 3 = fuzzy only
+            let mut scored: Vec<(PathBuf, u8, i32)> = workspace_files
                 .iter()
                 .filter_map(|p| {
-                    let name = p.to_string_lossy();
-                    fuzzy_match(&self.query, &name).map(|m| (p.clone(), m.score))
+                    let full = p.to_string_lossy();
+                    let full_lower = full.to_lowercase();
+                    let fname = p.file_name()
+                        .map(|n| n.to_string_lossy().to_lowercase())
+                        .unwrap_or_default();
+
+                    // Determine best tier for this entry.
+                    let tier = if fname == query_lower {
+                        0 // exact filename match
+                    } else if fname.starts_with(&query_lower) {
+                        1 // filename prefix
+                    } else if full_lower.contains(&query_lower) {
+                        2 // substring anywhere in path
+                    } else {
+                        3 // fuzzy only
+                    };
+
+                    // For tier 3 we still require fuzzy to match.
+                    if tier <= 2 {
+                        let score = fuzzy_match(&self.query, &full)
+                            .map(|m| m.score)
+                            .unwrap_or(0);
+                        Some((p.clone(), tier, score))
+                    } else {
+                        fuzzy_match(&self.query, &full)
+                            .map(|m| (p.clone(), tier, m.score))
+                    }
                 })
                 .collect();
-            scored.sort_by(|a, b| b.1.cmp(&a.1));
-            self.filtered_results = scored.into_iter().map(|(p, _)| p).collect();
+
+            // Sort by tier ascending, then by fuzzy score descending.
+            scored.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| b.2.cmp(&a.2)));
+            self.filtered_results = scored.into_iter().map(|(p, _, _)| p).collect();
         }
         self.selected_index = 0;
     }
@@ -825,12 +860,24 @@ pub struct Workbench {
     pub show_quick_open: bool,
     /// Known workspace file paths for Quick Open filtering.
     pub workspace_files: Vec<PathBuf>,
+    /// Whether the find bar overlay is visible.
+    pub show_find_bar: bool,
+    /// Current text typed into the find bar input.
+    pub find_query: String,
+    /// Match positions as (line, col) pairs (0-based).
+    pub find_matches: Vec<(usize, usize)>,
+    /// Index of the currently highlighted match.
+    pub find_current_match: usize,
     /// Whether the Go To Line input overlay is visible.
     pub show_goto_line: bool,
     /// Current text typed into the Go To Line input.
     pub goto_line_input: String,
     /// Installed extension names for the sidebar.
     pub installed_extensions: Vec<InstalledExtensionInfo>,
+    /// Filter query for the extensions sidebar search input.
+    pub extensions_filter: String,
+    /// Currently selected extension index in the filtered list.
+    pub extensions_selected: usize,
 }
 
 /// Summary info for an installed extension shown in the sidebar.
@@ -1063,6 +1110,17 @@ impl Workbench {
             weight: KeybindingWeight::WorkbenchContrib,
             source: KeybindingSource::Default,
         });
+        // Find in editor: Ctrl+F
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, false, false, false, KeyCode::KeyF,
+            )),
+            command: "actions.find".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+            source: KeybindingSource::Default,
+        });
 
         let mut views = ViewsRegistry::new();
         register_default_containers(&mut views);
@@ -1100,6 +1158,7 @@ impl Workbench {
             commands.register("workbench.action.focusThirdEditorGroup", Box::new(|_| Ok(None))),
             commands.register("workbench.action.decreaseSidebarWidth", Box::new(|_| Ok(None))),
             commands.register("workbench.action.increaseSidebarWidth", Box::new(|_| Ok(None))),
+            commands.register("actions.find", Box::new(|_| Ok(None))),
         ];
 
         let mut context = WorkbenchContext::new();
@@ -1149,9 +1208,15 @@ impl Workbench {
             quick_open: QuickOpenState::new(),
             show_quick_open: false,
             workspace_files: Vec::new(),
+            show_find_bar: false,
+            find_query: String::new(),
+            find_matches: Vec::new(),
+            find_current_match: 0,
             show_goto_line: false,
             goto_line_input: String::new(),
             installed_extensions: Vec::new(),
+            extensions_filter: String::new(),
+            extensions_selected: 0,
         }
     }
 
@@ -1299,33 +1364,86 @@ impl Workbench {
                             self.debug_view.render(content_area, frame.buffer_mut());
                         }
                         ActiveSidebarPanel::Extensions => {
-                            if self.installed_extensions.is_empty() {
-                                let stub = Paragraph::new(Span::styled(
-                                    " No extensions installed",
+                            let filtered: Vec<&InstalledExtensionInfo> = self
+                                .installed_extensions
+                                .iter()
+                                .filter(|ext| {
+                                    self.extensions_filter.is_empty()
+                                        || ext
+                                            .name
+                                            .to_lowercase()
+                                            .contains(&self.extensions_filter.to_lowercase())
+                                })
+                                .collect();
+
+                            let mut lines: Vec<Line> = Vec::new();
+
+                            // Search input
+                            lines.push(Line::from(vec![
+                                Span::styled(
+                                    " 🔍 ",
                                     Style::default().fg(Color::DarkGray),
-                                ));
-                                frame.render_widget(stub, content_area);
+                                ),
+                                if self.extensions_filter.is_empty() {
+                                    Span::styled(
+                                        "Search Extensions...",
+                                        Style::default().fg(Color::DarkGray),
+                                    )
+                                } else {
+                                    Span::raw(&self.extensions_filter)
+                                },
+                            ]));
+
+                            // Section header
+                            lines.push(Line::from(Span::styled(
+                                format!(" INSTALLED ({})", filtered.len()),
+                                Style::default()
+                                    .fg(Color::White)
+                                    .add_modifier(Modifier::BOLD),
+                            )));
+
+                            if filtered.is_empty() {
+                                lines.push(Line::from(Span::styled(
+                                    "   No extensions found",
+                                    Style::default().fg(Color::DarkGray),
+                                )));
                             } else {
-                                let items: Vec<Line> = self
-                                    .installed_extensions
-                                    .iter()
-                                    .map(|ext| {
-                                        let status = if ext.activated { "●" } else { "○" };
-                                        let label = format!(
-                                            " {} {} — {} v{}",
-                                            status, ext.name, ext.publisher, ext.version
-                                        );
-                                        let color = if ext.activated {
-                                            Color::Green
-                                        } else {
-                                            Color::Gray
-                                        };
-                                        Line::from(Span::styled(label, Style::default().fg(color)))
-                                    })
-                                    .collect();
-                                let ext_list = Paragraph::new(items);
-                                frame.render_widget(ext_list, content_area);
+                                for (i, ext) in filtered.iter().enumerate() {
+                                    let status =
+                                        if ext.activated { "●" } else { "○" };
+                                    let is_selected = i == self.extensions_selected;
+                                    let bg = if is_selected {
+                                        Color::DarkGray
+                                    } else {
+                                        Color::Black
+                                    };
+                                    let status_color = if ext.activated {
+                                        Color::Green
+                                    } else {
+                                        Color::Gray
+                                    };
+                                    lines.push(Line::from(vec![
+                                        Span::styled(
+                                            format!(" {} ", status),
+                                            Style::default().fg(status_color).bg(bg),
+                                        ),
+                                        Span::styled(
+                                            &ext.name,
+                                            Style::default()
+                                                .fg(Color::White)
+                                                .bg(bg)
+                                                .add_modifier(Modifier::BOLD),
+                                        ),
+                                        Span::styled(
+                                            format!(" {} v{}", ext.publisher, ext.version),
+                                            Style::default().fg(Color::DarkGray).bg(bg),
+                                        ),
+                                    ]));
+                                }
                             }
+
+                            let ext_widget = Paragraph::new(lines);
+                            frame.render_widget(ext_widget, content_area);
                         }
                     }
                 }
@@ -1515,6 +1633,11 @@ impl Workbench {
         if self.show_goto_line {
             self.render_goto_line(frame, area);
         }
+
+        // Find bar overlay
+        if self.show_find_bar {
+            self.render_find_bar(frame, area);
+        }
     }
 
     /// Render the command palette overlay.
@@ -1693,6 +1816,12 @@ impl Workbench {
             return self.handle_quick_open_key(key);
         }
 
+        // When find bar is focused, handle keys directly.
+        if self.focused == FocusedPart::FindBar {
+            self.handle_find_bar_key(key);
+            return WorkbenchAction::None;
+        }
+
         // When panel is focused, Left/Right switch panel tabs.
         if self.focused == FocusedPart::Panel && !key.ctrl && !key.alt && !key.meta {
             match key.key_code {
@@ -1851,6 +1980,9 @@ impl Workbench {
                 let w = self.layout.get_sidebar_width();
                 self.layout.set_sidebar_width((w + 2).min(80));
             }
+            "actions.find" => {
+                self.toggle_find_bar();
+            }
             _ => {
                 let _ = self.commands.execute(command_id, vec![]);
             }
@@ -2005,6 +2137,41 @@ impl Workbench {
         self.focused = self.saved_focus;
     }
 
+    /// Append a character to the Quick Open query and re-filter.
+    pub fn quick_open_input(&mut self, ch: char) {
+        self.quick_open.query.push(ch);
+        self.quick_open_filter();
+    }
+
+    /// Remove the last character from the Quick Open query and re-filter.
+    pub fn quick_open_backspace(&mut self) {
+        self.quick_open.query.pop();
+        self.quick_open_filter();
+    }
+
+    /// Move the Quick Open selection up.
+    pub fn quick_open_up(&mut self) {
+        self.quick_open.select_previous();
+    }
+
+    /// Move the Quick Open selection down.
+    pub fn quick_open_down(&mut self) {
+        self.quick_open.select_next();
+    }
+
+    /// Accept the currently selected Quick Open entry and return its path.
+    pub fn quick_open_accept(&mut self) -> Option<String> {
+        let path = self.quick_open.selected_path().map(|p| p.to_string_lossy().to_string());
+        self.close_quick_open();
+        path
+    }
+
+    /// Re-filter workspace files using the current Quick Open query.
+    pub fn quick_open_filter(&mut self) {
+        let files = self.workspace_files.clone();
+        self.quick_open.filter(&files);
+    }
+
     /// Handle a key press while the Quick Open overlay is focused.
     fn handle_quick_open_key(&mut self, key: KeyInput) -> WorkbenchAction {
         use vsedit_keycodes::KeyCode as KC;
@@ -2127,10 +2294,162 @@ impl Workbench {
         frame.render_widget(Paragraph::new(input_line), inner);
     }
 
+    // -----------------------------------------------------------------------
+    // Find bar
+    // -----------------------------------------------------------------------
+
+    /// Toggle the find bar overlay on or off.
+    pub fn toggle_find_bar(&mut self) {
+        if self.show_find_bar {
+            self.find_bar_close();
+        } else {
+            self.saved_focus = self.focused;
+            self.focused = FocusedPart::FindBar;
+            self.show_find_bar = true;
+            self.find_query.clear();
+            self.find_matches.clear();
+            self.find_current_match = 0;
+        }
+    }
+
+    /// Append a character to the find query and re-run the search.
+    pub fn find_bar_input(&mut self, ch: char) {
+        self.find_query.push(ch);
+        self.update_find_matches();
+    }
+
+    /// Remove the last character from the find query and re-run the search.
+    pub fn find_bar_backspace(&mut self) {
+        self.find_query.pop();
+        self.update_find_matches();
+    }
+
+    /// Move to the next match.
+    pub fn find_bar_next(&mut self) {
+        if !self.find_matches.is_empty() {
+            self.find_current_match = (self.find_current_match + 1) % self.find_matches.len();
+        }
+    }
+
+    /// Move to the previous match.
+    pub fn find_bar_prev(&mut self) {
+        if !self.find_matches.is_empty() {
+            if self.find_current_match == 0 {
+                self.find_current_match = self.find_matches.len() - 1;
+            } else {
+                self.find_current_match -= 1;
+            }
+        }
+    }
+
+    /// Close the find bar and restore focus.
+    pub fn find_bar_close(&mut self) {
+        self.show_find_bar = false;
+        self.find_query.clear();
+        self.find_matches.clear();
+        self.find_current_match = 0;
+        self.focused = self.saved_focus;
+    }
+
+    /// Scan the current editor content for occurrences of the find query.
+    fn update_find_matches(&mut self) {
+        self.find_matches.clear();
+        self.find_current_match = 0;
+        if self.find_query.is_empty() {
+            return;
+        }
+        if let Some(ref lines) = self.editor_content {
+            let query = &self.find_query;
+            for (line_idx, line) in lines.iter().enumerate() {
+                let mut start = 0;
+                while let Some(pos) = line[start..].find(query) {
+                    self.find_matches.push((line_idx, start + pos));
+                    start += pos + query.len();
+                }
+            }
+        }
+    }
+
+    /// Handle a key press while the find bar is focused.
+    fn handle_find_bar_key(&mut self, key: KeyInput) {
+        use vsedit_keycodes::KeyCode as KC;
+
+        match key.key_code {
+            KC::Escape => {
+                self.find_bar_close();
+            }
+            KC::Enter => {
+                if key.shift {
+                    self.find_bar_prev();
+                } else {
+                    self.find_bar_next();
+                }
+            }
+            KC::Backspace => {
+                self.find_bar_backspace();
+            }
+            other => {
+                if !key.ctrl && !key.alt && !key.meta {
+                    if let Some(ch) = key_code_to_char(other, key.shift) {
+                        self.find_bar_input(ch);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Render the find bar overlay at the top-right of the editor area.
+    fn render_find_bar(&self, frame: &mut Frame, area: Rect) {
+        let width = 40u16.min(area.width);
+        let height = 3u16;
+        let x = area.x + area.width.saturating_sub(width);
+        let y = area.y;
+        let bar_area = Rect::new(x, y, width, height);
+
+        frame.render_widget(Clear, bar_area);
+
+        let match_info = if self.find_query.is_empty() {
+            String::new()
+        } else if self.find_matches.is_empty() {
+            "No results".to_string()
+        } else {
+            format!("{} of {}", self.find_current_match + 1, self.find_matches.len())
+        };
+
+        let block = Block::default()
+            .title(" Find ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow))
+            .style(Style::default().bg(Color::DarkGray));
+        let inner = block.inner(bar_area);
+        frame.render_widget(block, bar_area);
+
+        if inner.height == 0 || inner.width == 0 {
+            return;
+        }
+
+        let mut spans = vec![
+            Span::raw(&self.find_query),
+        ];
+        if !match_info.is_empty() {
+            let pad = inner.width as usize
+                - self.find_query.len().min(inner.width as usize)
+                - match_info.len().min(inner.width as usize);
+            spans.push(Span::raw(" ".repeat(pad)));
+            spans.push(Span::styled(match_info, Style::default().fg(Color::DarkGray)));
+        }
+        frame.render_widget(Paragraph::new(Line::from(spans)), inner);
+    }
+
     /// Render the Quick Open overlay.
     fn render_quick_open(&self, frame: &mut Frame, area: Rect) {
+        // Cap the list at 15 visible items plus 1 row for the input line.
+        const MAX_VISIBLE: usize = 15;
+
         let width = (area.width * 3 / 5).max(20).min(area.width);
-        let height = (area.height * 2 / 5).max(5).min(area.height);
+        // Height = border(2) + input(1) + up to MAX_VISIBLE rows
+        let needed = (self.quick_open.filtered_results.len().min(MAX_VISIBLE) + 3) as u16;
+        let height = needed.max(5).min(area.height);
         let x = area.x + (area.width.saturating_sub(width)) / 2;
         let y = area.y + 1;
         let popup_area = Rect::new(x, y, width, height);
@@ -2156,19 +2475,48 @@ impl Workbench {
         let input_area = Rect::new(inner.x, inner.y, inner.width, 1);
         frame.render_widget(Paragraph::new(input_line), input_area);
 
-        // Results list
+        // Results list (cap at MAX_VISIBLE)
         let list_start_y = inner.y + 1;
-        let list_height = inner.height.saturating_sub(1) as usize;
+        let list_height = (inner.height.saturating_sub(1) as usize).min(MAX_VISIBLE);
 
-        for (i, path) in self.quick_open.filtered_results.iter().take(list_height).enumerate() {
+        // Compute scroll offset so the selected item is always visible.
+        let total = self.quick_open.filtered_results.len();
+        let sel = self.quick_open.selected_index;
+        let scroll_offset = if sel >= list_height {
+            sel - list_height + 1
+        } else {
+            0
+        };
+
+        let workspace_root = self.workspace_folder.as_deref().unwrap_or("");
+
+        let visible = self.quick_open.filtered_results.iter()
+            .skip(scroll_offset)
+            .take(list_height)
+            .enumerate();
+
+        for (i, path) in visible {
+            let abs_index = scroll_offset + i;
             let filename = path.file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_default();
-            let dir = path.parent()
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_default();
+            // Show path relative to workspace root.
+            let dir = if !workspace_root.is_empty() {
+                path.parent()
+                    .map(|p| {
+                        let s = p.to_string_lossy();
+                        s.strip_prefix(workspace_root)
+                            .map(|r| r.trim_start_matches('/').to_string())
+                            .unwrap_or_else(|| s.to_string())
+                    })
+                    .unwrap_or_default()
+            } else {
+                path.parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default()
+            };
 
-            let style = if i == self.quick_open.selected_index {
+            let style = if abs_index == sel {
                 Style::default().bg(Color::Blue).fg(Color::White).add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::White)
@@ -2180,6 +2528,12 @@ impl Workbench {
                     format!("  {}", dir),
                     Style::default().fg(Color::DarkGray),
                 ));
+            }
+
+            // Show item count at the right edge of the first visible row.
+            if i == 0 && total > list_height {
+                let count_label = format!(" ({}/{})", sel + 1, total);
+                spans.push(Span::styled(count_label, Style::default().fg(Color::DarkGray)));
             }
 
             let row_area = Rect::new(inner.x, list_start_y + i as u16, inner.width, 1);
@@ -2290,7 +2644,41 @@ impl Workbench {
                 }
             }
             ActiveSidebarPanel::Extensions => {
-                // Stub — no interactive elements yet
+                let filtered_count = self
+                    .installed_extensions
+                    .iter()
+                    .filter(|ext| {
+                        self.extensions_filter.is_empty()
+                            || ext
+                                .name
+                                .to_lowercase()
+                                .contains(&self.extensions_filter.to_lowercase())
+                    })
+                    .count();
+                match key.key_code {
+                    KC::UpArrow => {
+                        self.extensions_selected =
+                            self.extensions_selected.saturating_sub(1);
+                    }
+                    KC::DownArrow => {
+                        if filtered_count > 0 {
+                            self.extensions_selected =
+                                (self.extensions_selected + 1).min(filtered_count - 1);
+                        }
+                    }
+                    KC::Backspace => {
+                        self.extensions_filter.pop();
+                        self.extensions_selected = 0;
+                    }
+                    other => {
+                        if !key.ctrl && !key.alt && !key.meta {
+                            if let Some(ch) = key_code_to_char(other, key.shift) {
+                                self.extensions_filter.push(ch);
+                                self.extensions_selected = 0;
+                            }
+                        }
+                    }
+                }
             }
         }
     }
