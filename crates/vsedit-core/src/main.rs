@@ -132,6 +132,7 @@ fn handle_event(
         CtEvent::Key(key_event) => {
             let has_ctrl = key_event.modifiers.contains(KeyModifiers::CONTROL);
             let has_shift = key_event.modifiers.contains(KeyModifiers::SHIFT);
+            let has_alt = key_event.modifiers.contains(KeyModifiers::ALT);
 
             // When command palette is open, route all keys through workbench.
             if workbench.focused == FocusedPart::CommandPalette {
@@ -215,6 +216,105 @@ fn handle_event(
             // Ctrl+key combos: route through workbench or handle directly.
             if has_ctrl {
                 match key_event.code {
+                    // -- Ctrl+Shift combos --
+                    KeyCode::Char('k') | KeyCode::Char('K') if has_shift => {
+                        controller.execute_action(EditorAction::DeleteLine);
+                        workbench.is_modified = true;
+                        if let Some(tab) = workbench.tab_service.get_active_tab() {
+                            let id = tab.id;
+                            workbench.tab_service.set_modified(id, true);
+                        }
+                        sync_state(workbench, controller);
+                        return false;
+                    }
+                    KeyCode::Char('l') | KeyCode::Char('L') if has_shift => {
+                        controller.execute_action(EditorAction::SelectAllOccurrences);
+                        sync_state(workbench, controller);
+                        return false;
+                    }
+                    KeyCode::Up if has_shift => {
+                        controller.execute_action(EditorAction::AddCursorAbove);
+                        sync_state(workbench, controller);
+                        return false;
+                    }
+                    KeyCode::Down if has_shift => {
+                        controller.execute_action(EditorAction::AddCursorBelow);
+                        sync_state(workbench, controller);
+                        return false;
+                    }
+                    KeyCode::Enter if has_shift => {
+                        controller.execute_action(EditorAction::InsertLineAbove);
+                        workbench.is_modified = true;
+                        if let Some(tab) = workbench.tab_service.get_active_tab() {
+                            let id = tab.id;
+                            workbench.tab_service.set_modified(id, true);
+                        }
+                        sync_state(workbench, controller);
+                        return false;
+                    }
+                    KeyCode::Char('\\') if has_shift => {
+                        controller.execute_action(EditorAction::JumpToMatchingBracket);
+                        sync_state(workbench, controller);
+                        return false;
+                    }
+                    // -- Ctrl-only combos --
+                    KeyCode::Char('d') => {
+                        controller.execute_action(EditorAction::AddSelectionToNextFindMatch);
+                        sync_state(workbench, controller);
+                        return false;
+                    }
+                    KeyCode::Char('l') => {
+                        controller.execute_action(EditorAction::SelectLine);
+                        sync_state(workbench, controller);
+                        return false;
+                    }
+                    KeyCode::Char('/') => {
+                        controller.execute_action(EditorAction::ToggleLineComment);
+                        workbench.is_modified = true;
+                        if let Some(tab) = workbench.tab_service.get_active_tab() {
+                            let id = tab.id;
+                            workbench.tab_service.set_modified(id, true);
+                        }
+                        sync_state(workbench, controller);
+                        return false;
+                    }
+                    KeyCode::Char(']') => {
+                        controller.execute_action(EditorAction::IndentLine);
+                        workbench.is_modified = true;
+                        if let Some(tab) = workbench.tab_service.get_active_tab() {
+                            let id = tab.id;
+                            workbench.tab_service.set_modified(id, true);
+                        }
+                        sync_state(workbench, controller);
+                        return false;
+                    }
+                    KeyCode::Char('[') => {
+                        controller.execute_action(EditorAction::OutdentLine);
+                        workbench.is_modified = true;
+                        if let Some(tab) = workbench.tab_service.get_active_tab() {
+                            let id = tab.id;
+                            workbench.tab_service.set_modified(id, true);
+                        }
+                        sync_state(workbench, controller);
+                        return false;
+                    }
+                    KeyCode::Enter => {
+                        controller.execute_action(EditorAction::InsertLineBelow);
+                        workbench.is_modified = true;
+                        if let Some(tab) = workbench.tab_service.get_active_tab() {
+                            let id = tab.id;
+                            workbench.tab_service.set_modified(id, true);
+                        }
+                        sync_state(workbench, controller);
+                        return false;
+                    }
+                    KeyCode::Char('g') => {
+                        // Go to line — for now, go to line 1 as a stub.
+                        // A full implementation would show an input box.
+                        controller.execute_action(EditorAction::GoToLine(1));
+                        sync_state(workbench, controller);
+                        return false;
+                    }
                     KeyCode::Char('f') => {
                         editor_widget.open_find();
                         return false;
@@ -315,7 +415,7 @@ fn handle_event(
 
             // Non-ctrl key events → editor actions.
             let editor_action = match key_event.code {
-                KeyCode::Char(c) => Some(EditorAction::InsertText(c.to_string())),
+                KeyCode::Char(c) if !has_alt => Some(EditorAction::InsertText(c.to_string())),
                 KeyCode::Backspace => Some(EditorAction::DeleteLeft),
                 KeyCode::Delete => Some(EditorAction::DeleteRight),
                 KeyCode::Enter => Some(EditorAction::NewLine),
@@ -335,14 +435,18 @@ fn handle_event(
                     }
                 }
                 KeyCode::Up => {
-                    if has_shift {
+                    if has_alt {
+                        Some(EditorAction::MoveLineUp)
+                    } else if has_shift {
                         Some(EditorAction::SelectUp)
                     } else {
                         Some(EditorAction::MoveCursorUp)
                     }
                 }
                 KeyCode::Down => {
-                    if has_shift {
+                    if has_alt {
+                        Some(EditorAction::MoveLineDown)
+                    } else if has_shift {
                         Some(EditorAction::SelectDown)
                     } else {
                         Some(EditorAction::MoveCursorDown)
@@ -350,6 +454,8 @@ fn handle_event(
                 }
                 KeyCode::Home => Some(EditorAction::MoveCursorLineStart),
                 KeyCode::End => Some(EditorAction::MoveCursorLineEnd),
+                KeyCode::PageUp => Some(EditorAction::PageUp(20)),
+                KeyCode::PageDown => Some(EditorAction::PageDown(20)),
                 _ => None,
             };
 
@@ -386,4 +492,12 @@ fn sync_state(
     }
     let pos = controller.cursors.get_primary().position();
     workbench.set_cursor_info(pos.line, pos.column);
+    // Show multi-cursor count in statusbar.
+    let cursor_count = controller.cursors.get_all().len();
+    if cursor_count > 1 {
+        workbench.statusbar.update_item(
+            "statusbar.lineColumn",
+            &format!("Ln {}, Col {} ({} cursors)", pos.line, pos.column, cursor_count),
+        );
+    }
 }

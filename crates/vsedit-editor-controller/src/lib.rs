@@ -50,6 +50,26 @@ pub enum EditorAction {
     IndentLine,
     OutdentLine,
 
+    // -- line operations --
+    MoveLineUp,
+    MoveLineDown,
+    ToggleLineComment,
+    SelectLine,
+    InsertLineBelow,
+    InsertLineAbove,
+
+    // -- multi-cursor --
+    AddCursorAbove,
+    AddCursorBelow,
+    AddSelectionToNextFindMatch,
+    SelectAllOccurrences,
+
+    // -- navigation --
+    PageUp(u32),
+    PageDown(u32),
+    JumpToMatchingBracket,
+    GoToLine(u32),
+
     // -- history --
     Undo,
     Redo,
@@ -108,6 +128,30 @@ impl EditorController {
             // -- indentation ----------------------------------------------------
             EditorAction::IndentLine => self.indent_line(),
             EditorAction::OutdentLine => self.outdent_line(),
+
+            // -- line operations ------------------------------------------------
+            EditorAction::MoveLineUp => self.move_line_up(),
+            EditorAction::MoveLineDown => self.move_line_down(),
+            EditorAction::ToggleLineComment => self.toggle_line_comment(),
+            EditorAction::SelectLine => self.select_line(),
+            EditorAction::InsertLineBelow => self.insert_line_below(),
+            EditorAction::InsertLineAbove => self.insert_line_above(),
+
+            // -- multi-cursor ---------------------------------------------------
+            EditorAction::AddCursorAbove => {
+                self.cursors.add_cursor_above(&self.model);
+            }
+            EditorAction::AddCursorBelow => {
+                self.cursors.add_cursor_below(&self.model);
+            }
+            EditorAction::AddSelectionToNextFindMatch => self.add_selection_to_next_find_match(),
+            EditorAction::SelectAllOccurrences => self.select_all_occurrences(),
+
+            // -- navigation -----------------------------------------------------
+            EditorAction::PageUp(lines) => self.page_up(lines),
+            EditorAction::PageDown(lines) => self.page_down(lines),
+            EditorAction::JumpToMatchingBracket => self.jump_to_matching_bracket(),
+            EditorAction::GoToLine(line) => self.go_to_line(line),
 
             // -- history --------------------------------------------------------
             EditorAction::Undo => { self.model.undo(); }
@@ -442,6 +486,353 @@ impl EditorController {
             }
         }
     }
+
+    // -- line operations ----------------------------------------------------
+
+    /// Swap the current line with the line above.
+    fn move_line_up(&mut self) {
+        let line = self.cursors.get_primary().position().line;
+        if line <= 1 {
+            return;
+        }
+        let cur_content = self.model.get_line_content(line).to_string();
+        let above_content = self.model.get_line_content(line - 1).to_string();
+        let cur_max = self.model.get_line_max_column(line);
+        let above_max = self.model.get_line_max_column(line - 1);
+        // Replace the above line with current, and current with above.
+        self.model.apply_edit(
+            Range::new(line - 1, 1, line, cur_max),
+            &format!("{}\n{}", cur_content, above_content),
+        );
+        // Move cursor up.
+        let pos = self.cursors.get_primary().position();
+        let _ = (cur_max, above_max);
+        self.cursors.set_state(
+            0,
+            CursorState::from_position(Position::new(line - 1, pos.column)),
+        );
+    }
+
+    /// Swap the current line with the line below.
+    fn move_line_down(&mut self) {
+        let line = self.cursors.get_primary().position().line;
+        let line_count = self.model.get_line_count();
+        if line >= line_count {
+            return;
+        }
+        let cur_content = self.model.get_line_content(line).to_string();
+        let below_content = self.model.get_line_content(line + 1).to_string();
+        let below_max = self.model.get_line_max_column(line + 1);
+        // Replace current and below lines.
+        self.model.apply_edit(
+            Range::new(line, 1, line + 1, below_max),
+            &format!("{}\n{}", below_content, cur_content),
+        );
+        // Move cursor down.
+        let pos = self.cursors.get_primary().position();
+        self.cursors.set_state(
+            0,
+            CursorState::from_position(Position::new(line + 1, pos.column)),
+        );
+    }
+
+    /// Toggle "// " line comment on each cursor's line.
+    fn toggle_line_comment(&mut self) {
+        let mut lines: Vec<u32> = self
+            .cursors
+            .get_all()
+            .iter()
+            .map(|c| c.position().line)
+            .collect();
+        lines.sort_unstable();
+        lines.dedup();
+
+        // Determine if we should comment or uncomment: if all lines start
+        // with "// ", uncomment; otherwise comment.
+        let all_commented = lines.iter().all(|&l| {
+            let content = self.model.get_line_content(l);
+            let trimmed = content.trim_start();
+            trimmed.starts_with("// ")
+        });
+
+        if all_commented {
+            // Uncomment: remove first occurrence of "// " (preserving leading whitespace).
+            for &line in lines.iter().rev() {
+                let content = self.model.get_line_content(line).to_string();
+                let ws_len = content.len() - content.trim_start().len();
+                let start_col = (ws_len as u32) + 1;
+                self.model.delete(Range::new(line, start_col, line, start_col + 3));
+            }
+        } else {
+            // Comment: prepend "// " after leading whitespace.
+            for &line in lines.iter().rev() {
+                let content = self.model.get_line_content(line).to_string();
+                let ws_len = content.len() - content.trim_start().len();
+                let insert_col = (ws_len as u32) + 1;
+                self.model.insert(Position::new(line, insert_col), "// ");
+            }
+        }
+    }
+
+    /// Select the entire current line (including newline).
+    fn select_line(&mut self) {
+        let line = self.cursors.get_primary().position().line;
+        let max_col = self.model.get_line_max_column(line);
+        let start = Position::new(line, 1);
+        let end = if line < self.model.get_line_count() {
+            Position::new(line + 1, 1)
+        } else {
+            Position::new(line, max_col)
+        };
+        self.cursors.set_state(
+            0,
+            CursorState {
+                selection: Selection::from_positions(start, end),
+            },
+        );
+    }
+
+    /// Insert a blank line below the current line and move cursor there.
+    fn insert_line_below(&mut self) {
+        let line = self.cursors.get_primary().position().line;
+        let max_col = self.model.get_line_max_column(line);
+        self.model.insert(Position::new(line, max_col), "\n");
+        self.cursors.set_state(
+            0,
+            CursorState::from_position(Position::new(line + 1, 1)),
+        );
+    }
+
+    /// Insert a blank line above the current line and move cursor there.
+    fn insert_line_above(&mut self) {
+        let line = self.cursors.get_primary().position().line;
+        self.model.insert(Position::new(line, 1), "\n");
+        self.cursors.set_state(
+            0,
+            CursorState::from_position(Position::new(line, 1)),
+        );
+    }
+
+    // -- multi-cursor: find-match ------------------------------------------
+
+    /// Get the word under the primary cursor.
+    fn word_under_cursor(&self) -> Option<(String, Range)> {
+        let pos = self.cursors.get_primary().position();
+        let sel = self.cursors.get_primary().selection.as_range();
+        if !sel.is_empty() {
+            // Already have a selection — return the selected text.
+            let text = self.model.get_value_in_range(sel);
+            return Some((text, sel));
+        }
+        let content = self.model.get_line_content(pos.line);
+        let bytes = content.as_bytes();
+        let col_idx = (pos.column as usize).saturating_sub(1);
+        if col_idx >= bytes.len() {
+            return None;
+        }
+        // Find word boundaries around cursor.
+        let mut start = col_idx;
+        let mut end = col_idx;
+        while start > 0 && is_word_char(bytes[start - 1]) {
+            start -= 1;
+        }
+        while end < bytes.len() && is_word_char(bytes[end]) {
+            end += 1;
+        }
+        if start == end {
+            return None;
+        }
+        let word = content[start..end].to_string();
+        let range = Range::new(
+            pos.line,
+            (start as u32) + 1,
+            pos.line,
+            (end as u32) + 1,
+        );
+        Some((word, range))
+    }
+
+    /// Add selection to next find match (Ctrl+D behavior).
+    fn add_selection_to_next_find_match(&mut self) {
+        let sel = self.cursors.get_primary().selection.as_range();
+        if sel.is_empty() {
+            // First press: select the word under cursor.
+            if let Some((_word, range)) = self.word_under_cursor() {
+                self.cursors.set_state(
+                    0,
+                    CursorState {
+                        selection: Selection::from_positions(range.start, range.end),
+                    },
+                );
+            }
+            return;
+        }
+        // Subsequent presses: find next occurrence and add cursor there.
+        let selected_text = self.model.get_value_in_range(sel);
+        let matches = self.model.find_matches(&selected_text, false, true);
+        // Find the first match that starts after the last cursor's selection end.
+        let all_cursors = self.cursors.get_all();
+        let mut max_end = Position::new(1, 1);
+        for c in all_cursors {
+            let r = c.selection.as_range();
+            if r.end > max_end {
+                max_end = r.end;
+            }
+        }
+        // Find next match after max_end, wrapping around.
+        let next = matches
+            .iter()
+            .find(|m| m.start >= max_end)
+            .or_else(|| matches.first());
+        if let Some(m) = next {
+            // Don't add if a cursor already covers this range.
+            let already_exists = all_cursors.iter().any(|c| c.selection.as_range() == *m);
+            if !already_exists {
+                self.cursors.add_cursor(m.start);
+                let idx = self.cursors.get_all().len() - 1;
+                self.cursors.set_state(
+                    idx,
+                    CursorState {
+                        selection: Selection::from_positions(m.start, m.end),
+                    },
+                );
+            }
+        }
+    }
+
+    /// Select all occurrences of the word under cursor (Ctrl+Shift+L).
+    fn select_all_occurrences(&mut self) {
+        let (word, _range) = match self.word_under_cursor() {
+            Some(w) => w,
+            None => return,
+        };
+        let matches = self.model.find_matches(&word, false, true);
+        if matches.is_empty() {
+            return;
+        }
+        // Set primary cursor to first match.
+        self.cursors.set_state(
+            0,
+            CursorState {
+                selection: Selection::from_positions(matches[0].start, matches[0].end),
+            },
+        );
+        // Add cursors for remaining matches.
+        for m in &matches[1..] {
+            self.cursors.add_cursor(m.start);
+            let idx = self.cursors.get_all().len() - 1;
+            self.cursors.set_state(
+                idx,
+                CursorState {
+                    selection: Selection::from_positions(m.start, m.end),
+                },
+            );
+        }
+    }
+
+    // -- navigation ---------------------------------------------------------
+
+    /// Scroll up by `lines` lines.
+    fn page_up(&mut self, lines: u32) {
+        self.move_cursors_vertical_n(false, true, lines);
+    }
+
+    /// Scroll down by `lines` lines.
+    fn page_down(&mut self, lines: u32) {
+        self.move_cursors_vertical_n(false, false, lines);
+    }
+
+    /// Apply vertical movement of `n` lines.
+    fn move_cursors_vertical_n(&mut self, select: bool, up: bool, n: u32) {
+        let count = self.cursors.get_all().len();
+        for i in 0..count {
+            let cur = self.cursors.get_all()[i].clone();
+            let mem = self.cursors.get_column_memory(i);
+            let (new_state, new_mem) = if up {
+                vsedit_cursor::move_up(&self.model, &cur, select, n, mem)
+            } else {
+                vsedit_cursor::move_down(&self.model, &cur, select, n, mem)
+            };
+            self.cursors.set_state(i, new_state);
+            self.cursors.set_column_memory(i, Some(new_mem));
+        }
+        self.cursors.merge_overlapping();
+    }
+
+    /// Jump to matching bracket at cursor position.
+    fn jump_to_matching_bracket(&mut self) {
+        let pos = self.cursors.get_primary().position();
+        let content = self.model.get_line_content(pos.line);
+        let col_idx = (pos.column as usize).saturating_sub(1);
+        let bytes = content.as_bytes();
+        if col_idx >= bytes.len() {
+            return;
+        }
+        let ch = bytes[col_idx];
+        let (target, forward) = match ch {
+            b'(' => (b')', true),
+            b')' => (b'(', false),
+            b'[' => (b']', true),
+            b']' => (b'[', false),
+            b'{' => (b'}', true),
+            b'}' => (b'{', false),
+            _ => return,
+        };
+        let full_text = self.model.get_value();
+        let offset = self.model.position_to_offset(pos);
+        let text_bytes = full_text.as_bytes();
+        let mut depth = 1i32;
+        if forward {
+            let mut i = offset + 1;
+            while i < text_bytes.len() {
+                if text_bytes[i] == ch {
+                    depth += 1;
+                } else if text_bytes[i] == target {
+                    depth -= 1;
+                    if depth == 0 {
+                        let new_pos = self.model.offset_to_position(i);
+                        self.cursors.set_state(0, CursorState::from_position(new_pos));
+                        return;
+                    }
+                }
+                i += 1;
+            }
+        } else {
+            if offset == 0 {
+                return;
+            }
+            let mut i = offset - 1;
+            loop {
+                if text_bytes[i] == ch {
+                    depth += 1;
+                } else if text_bytes[i] == target {
+                    depth -= 1;
+                    if depth == 0 {
+                        let new_pos = self.model.offset_to_position(i);
+                        self.cursors.set_state(0, CursorState::from_position(new_pos));
+                        return;
+                    }
+                }
+                if i == 0 {
+                    break;
+                }
+                i -= 1;
+            }
+        }
+    }
+
+    /// Go to a specific line number.
+    fn go_to_line(&mut self, line: u32) {
+        let target = line.max(1).min(self.model.get_line_count());
+        self.cursors.set_state(
+            0,
+            CursorState::from_position(Position::new(target, 1)),
+        );
+    }
+}
+
+fn is_word_char(b: u8) -> bool {
+    matches!(b, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_')
 }
 
 impl Default for EditorController {
