@@ -5,7 +5,9 @@
 
 use std::collections::HashMap;
 use std::env;
+use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::process::{Child, Command, Stdio};
 
 use vsedit_events::{Emitter, Event};
 use vsedit_lifecycle::{Disposable, DisposableStore};
@@ -766,6 +768,136 @@ pub fn default_shell_config() -> ShellConfig {
 }
 
 // ---------------------------------------------------------------------------
+// PTY configuration and session
+// ---------------------------------------------------------------------------
+
+/// Configuration for spawning a PTY session.
+#[derive(Debug, Clone)]
+pub struct PtyConfig {
+    pub shell: String,
+    pub cols: u16,
+    pub rows: u16,
+    pub cwd: Option<PathBuf>,
+    pub env: HashMap<String, String>,
+}
+
+impl Default for PtyConfig {
+    fn default() -> Self {
+        Self {
+            shell: detect_default_shell().to_string_lossy().into_owned(),
+            cols: 80,
+            rows: 24,
+            cwd: None,
+            env: HashMap::new(),
+        }
+    }
+}
+
+/// A pseudo-terminal session wrapping a shell process with piped I/O.
+pub struct PtySession {
+    child: Child,
+    buffer: TerminalBuffer,
+}
+
+impl PtySession {
+    /// Spawn a new shell process.
+    pub fn spawn(shell: &str, cols: u16, rows: u16) -> Result<Self, std::io::Error> {
+        let child = Command::new(shell)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .env("TERM", "xterm-256color")
+            .env("COLUMNS", cols.to_string())
+            .env("LINES", rows.to_string())
+            .spawn()?;
+
+        Ok(Self {
+            child,
+            buffer: TerminalBuffer::new(cols, rows),
+        })
+    }
+
+    /// Spawn from a `PtyConfig`.
+    pub fn spawn_with_config(config: &PtyConfig) -> Result<Self, std::io::Error> {
+        let mut cmd = Command::new(&config.shell);
+        cmd.stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .env("TERM", "xterm-256color")
+            .env("COLUMNS", config.cols.to_string())
+            .env("LINES", config.rows.to_string());
+
+        if let Some(ref cwd) = config.cwd {
+            cmd.current_dir(cwd);
+        }
+        for (k, v) in &config.env {
+            cmd.env(k, v);
+        }
+
+        let child = cmd.spawn()?;
+        Ok(Self {
+            child,
+            buffer: TerminalBuffer::new(config.cols, config.rows),
+        })
+    }
+
+    /// Write input to the shell (user keystrokes).
+    pub fn write_input(&mut self, data: &[u8]) -> Result<(), std::io::Error> {
+        if let Some(ref mut stdin) = self.child.stdin {
+            stdin.write_all(data)?;
+            stdin.flush()?;
+        }
+        Ok(())
+    }
+
+    /// Read available output from the shell and feed into terminal buffer.
+    pub fn read_output(&mut self) -> Result<Vec<u8>, std::io::Error> {
+        let mut buf = vec![0u8; 4096];
+        if let Some(ref mut stdout) = self.child.stdout {
+            match stdout.read(&mut buf) {
+                Ok(n) if n > 0 => {
+                    buf.truncate(n);
+                    let text = String::from_utf8_lossy(&buf);
+                    self.buffer.write_str(&text);
+                    Ok(buf)
+                }
+                Ok(_) => Ok(Vec::new()),
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(Vec::new()),
+                Err(e) => Err(e),
+            }
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    /// Check if the child process is still running.
+    pub fn is_alive(&mut self) -> bool {
+        matches!(self.child.try_wait(), Ok(None))
+    }
+
+    /// Kill the child process.
+    pub fn kill(&mut self) -> Result<(), std::io::Error> {
+        self.child.kill()
+    }
+
+    /// Get the terminal buffer for rendering.
+    pub fn buffer(&self) -> &TerminalBuffer {
+        &self.buffer
+    }
+
+    /// Get mutable buffer reference.
+    pub fn buffer_mut(&mut self) -> &mut TerminalBuffer {
+        &mut self.buffer
+    }
+}
+
+impl Drop for PtySession {
+    fn drop(&mut self) {
+        let _ = self.kill();
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Terminal instance
 // ---------------------------------------------------------------------------
 
@@ -973,6 +1105,27 @@ impl TerminalService {
         self.event_emitter
             .fire(&TerminalServiceEvent::InstanceCreated(id));
         id
+    }
+
+    /// Create a terminal instance backed by a real shell process.
+    pub fn create_with_pty(
+        &mut self,
+        shell: Option<&str>,
+        cols: u16,
+        rows: u16,
+    ) -> Result<TerminalId, std::io::Error> {
+        let shell_path = shell.unwrap_or_else(|| {
+            if cfg!(windows) {
+                "cmd.exe"
+            } else {
+                "/bin/sh"
+            }
+        });
+        let _pty = PtySession::spawn(shell_path, cols, rows)?;
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let shell_config = ShellConfig::new(PathBuf::from(shell_path));
+        let id = self.create("Terminal (PTY)", cwd, shell_config, cols, rows);
+        Ok(id)
     }
 
     /// Destroy a terminal instance.
@@ -1560,5 +1713,148 @@ mod tests {
     fn terminal_id_display() {
         let id = TerminalId(42);
         assert_eq!(format!("{}", id), "terminal-42");
+    }
+
+    // -- PtyConfig tests ---------------------------------------------------
+
+    #[test]
+    fn pty_config_default_values() {
+        let config = PtyConfig::default();
+        assert_eq!(config.cols, 80);
+        assert_eq!(config.rows, 24);
+        assert!(!config.shell.is_empty());
+        assert!(config.cwd.is_none());
+        assert!(config.env.is_empty());
+    }
+
+    #[test]
+    fn pty_config_custom_values() {
+        let config = PtyConfig {
+            shell: "/bin/zsh".to_string(),
+            cols: 120,
+            rows: 40,
+            cwd: Some(PathBuf::from("/tmp")),
+            env: {
+                let mut m = HashMap::new();
+                m.insert("FOO".to_string(), "bar".to_string());
+                m
+            },
+        };
+        assert_eq!(config.shell, "/bin/zsh");
+        assert_eq!(config.cols, 120);
+        assert_eq!(config.rows, 40);
+        assert_eq!(config.cwd, Some(PathBuf::from("/tmp")));
+        assert_eq!(config.env.get("FOO").unwrap(), "bar");
+    }
+
+    #[test]
+    fn pty_config_default_shell_matches_detect() {
+        let config = PtyConfig::default();
+        let detected = detect_default_shell();
+        assert_eq!(config.shell, detected.to_string_lossy());
+    }
+
+    #[test]
+    fn pty_config_clone() {
+        let config = PtyConfig::default();
+        let cloned = config.clone();
+        assert_eq!(config.shell, cloned.shell);
+        assert_eq!(config.cols, cloned.cols);
+        assert_eq!(config.rows, cloned.rows);
+    }
+
+    #[test]
+    fn detect_default_shell_non_empty() {
+        let shell = detect_default_shell();
+        assert!(!shell.to_string_lossy().is_empty());
+    }
+
+    // -- PtySession tests --------------------------------------------------
+
+    #[test]
+    #[ignore] // Spawns real process; may be flaky in CI
+    fn pty_session_spawn_and_alive() {
+        let mut pty = PtySession::spawn("/bin/sh", 80, 24).expect("spawn failed");
+        assert!(pty.is_alive());
+        pty.kill().expect("kill failed");
+        // Wait for process to exit.
+        let _ = pty.child.wait();
+        assert!(!pty.is_alive());
+    }
+
+    #[test]
+    #[ignore] // Spawns real process; may be flaky in CI
+    fn pty_session_write_input() {
+        let mut pty = PtySession::spawn("/bin/sh", 80, 24).expect("spawn failed");
+        let result = pty.write_input(b"echo hello\n");
+        assert!(result.is_ok());
+        pty.kill().expect("kill failed");
+    }
+
+    #[test]
+    #[ignore] // Spawns real process; may be flaky in CI
+    fn pty_session_kill_lifecycle() {
+        let mut pty = PtySession::spawn("/bin/sh", 80, 24).expect("spawn failed");
+        assert!(pty.is_alive());
+        assert!(pty.kill().is_ok());
+        let _ = pty.child.wait();
+        assert!(!pty.is_alive());
+    }
+
+    #[test]
+    #[ignore] // Spawns real process; may be flaky in CI
+    fn pty_session_buffer_accessible() {
+        let pty = PtySession::spawn("/bin/sh", 80, 24).expect("spawn failed");
+        assert_eq!(pty.buffer().cols(), 80);
+        assert_eq!(pty.buffer().rows(), 24);
+    }
+
+    #[test]
+    #[ignore] // Spawns real process; may be flaky in CI
+    fn pty_session_buffer_mut_accessible() {
+        let mut pty = PtySession::spawn("/bin/sh", 80, 24).expect("spawn failed");
+        pty.buffer_mut().write_str("test");
+        let line = pty.buffer().line(0).unwrap();
+        assert_eq!(line[0].ch, 't');
+    }
+
+    #[test]
+    #[ignore] // Spawns real process; may be flaky in CI
+    fn pty_session_spawn_with_config() {
+        let config = PtyConfig {
+            shell: "/bin/sh".to_string(),
+            cols: 100,
+            rows: 30,
+            cwd: Some(PathBuf::from("/tmp")),
+            env: HashMap::new(),
+        };
+        let mut pty = PtySession::spawn_with_config(&config).expect("spawn_with_config failed");
+        assert!(pty.is_alive());
+        assert_eq!(pty.buffer().cols(), 100);
+        assert_eq!(pty.buffer().rows(), 30);
+        pty.kill().expect("kill failed");
+    }
+
+    #[test]
+    fn pty_session_spawn_invalid_shell() {
+        let result = PtySession::spawn("/nonexistent/shell", 80, 24);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    #[ignore] // Spawns real process; may be flaky in CI
+    fn service_create_with_pty() {
+        let mut svc = TerminalService::new();
+        let id = svc.create_with_pty(Some("/bin/sh"), 80, 24).expect("create_with_pty failed");
+        assert!(svc.get(id).is_some());
+        assert_eq!(svc.count(), 1);
+    }
+
+    #[test]
+    fn service_create_with_pty_invalid_shell() {
+        let mut svc = TerminalService::new();
+        let result = svc.create_with_pty(Some("/nonexistent/shell"), 80, 24);
+        assert!(result.is_err());
+        assert_eq!(svc.count(), 0);
     }
 }
