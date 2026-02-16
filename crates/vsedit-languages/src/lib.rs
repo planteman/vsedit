@@ -1,369 +1,35 @@
-//! Language registration and detection.
+//! Language registration, detection, and editing configuration.
 //!
 //! Manages language definitions and provides lookup by file extension,
-//! filename, MIME type, and first-line content (e.g. shebangs).
+//! filename, MIME type, and first-line content (e.g. shebangs). Also provides
+//! per-language editing behaviour: commenting, auto-closing pairs, brackets,
+//! folding markers, indentation rules, and word patterns.
 //!
 //! # Key types
 //!
-//! - [`LanguageConfiguration`] — describes a single language.
-//! - [`LanguageRegistry`] — stores languages and provides fast lookups.
-//! - [`register_default_languages`] — registers ~20 common languages.
+//! - [`LanguageDefinition`] — describes a single language for registration.
+//! - [`LanguageConfiguration`] — per-language editing behaviour.
+//! - [`LanguageService`] — stores languages and provides fast lookups.
+//! - [`register_default_languages`] — registers 30+ common languages.
 
-use std::collections::HashMap;
+mod config;
+mod defaults;
+mod definition;
+mod editing;
+mod registry;
 
-use regex::Regex;
+pub use config::*;
+pub use defaults::register_default_languages;
+pub use definition::*;
+pub use editing::*;
+pub use registry::*;
+
+// Re-export the old name as an alias for backward compatibility.
+pub type LanguageConfiguration = LanguageDefinition;
+pub type LanguageRegistry = LanguageService;
 
 /// A language identifier string (e.g. `"rust"`, `"typescript"`).
 pub type LanguageId = String;
-
-// ---------------------------------------------------------------------------
-// LanguageConfiguration
-// ---------------------------------------------------------------------------
-
-/// Configuration for a registered language.
-#[derive(Debug, Clone)]
-pub struct LanguageConfiguration {
-    /// Unique identifier (e.g. `"rust"`).
-    pub id: String,
-    /// Human-readable name (e.g. `"Rust"`).
-    pub name: String,
-    /// File extensions including the dot (e.g. `[".rs"]`).
-    pub extensions: Vec<String>,
-    /// Exact filenames (e.g. `["Makefile"]`).
-    pub filenames: Vec<String>,
-    /// Alternative names (e.g. `["Rust", "rust"]`).
-    pub aliases: Vec<String>,
-    /// Associated MIME types (e.g. `["text/x-rust"]`).
-    pub mime_types: Vec<String>,
-    /// Regex for first-line detection (e.g. `"^#!.*python"`).
-    pub first_line: Option<String>,
-}
-
-// ---------------------------------------------------------------------------
-// LanguageRegistry
-// ---------------------------------------------------------------------------
-
-/// Manages registered languages with indexes for fast lookup.
-pub struct LanguageRegistry {
-    languages: Vec<LanguageConfiguration>,
-    ext_index: HashMap<String, usize>,
-    filename_index: HashMap<String, usize>,
-}
-
-impl LanguageRegistry {
-    /// Create an empty registry.
-    pub fn new() -> Self {
-        Self {
-            languages: Vec::new(),
-            ext_index: HashMap::new(),
-            filename_index: HashMap::new(),
-        }
-    }
-
-    /// Register a language configuration.
-    ///
-    /// Indexes are updated for all extensions and filenames declared in the
-    /// configuration. Later registrations overwrite earlier ones for the same
-    /// extension or filename.
-    pub fn register(&mut self, config: LanguageConfiguration) {
-        let idx = self.languages.len();
-
-        for ext in &config.extensions {
-            self.ext_index.insert(ext.to_lowercase(), idx);
-        }
-        for name in &config.filenames {
-            self.filename_index.insert(name.clone(), idx);
-        }
-
-        self.languages.push(config);
-    }
-
-    /// Look up a language by file extension (e.g. `".rs"`).
-    pub fn get_language_id_by_extension(&self, ext: &str) -> Option<&str> {
-        self.ext_index
-            .get(&ext.to_lowercase())
-            .map(|&idx| self.languages[idx].id.as_str())
-    }
-
-    /// Look up a language by exact filename (e.g. `"Makefile"`).
-    pub fn get_language_id_by_filename(&self, name: &str) -> Option<&str> {
-        self.filename_index
-            .get(name)
-            .map(|&idx| self.languages[idx].id.as_str())
-    }
-
-    /// Look up a language by MIME type (e.g. `"text/x-rust"`).
-    pub fn get_language_id_by_mime(&self, mime: &str) -> Option<&str> {
-        self.languages
-            .iter()
-            .find(|lang| lang.mime_types.iter().any(|m| m == mime))
-            .map(|lang| lang.id.as_str())
-    }
-
-    /// Look up a language by matching `first_line` regex against the given line.
-    pub fn get_language_id_by_first_line(&self, first_line: &str) -> Option<&str> {
-        for lang in &self.languages {
-            if let Some(pattern) = &lang.first_line {
-                if let Ok(re) = Regex::new(pattern) {
-                    if re.is_match(first_line) {
-                        return Some(&lang.id);
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    /// Get a language configuration by its id.
-    pub fn get_language(&self, id: &str) -> Option<&LanguageConfiguration> {
-        self.languages.iter().find(|lang| lang.id == id)
-    }
-
-    /// Return the ids of all registered languages.
-    pub fn get_registered_language_ids(&self) -> Vec<&str> {
-        self.languages.iter().map(|lang| lang.id.as_str()).collect()
-    }
-
-    /// Guess the language for a file, trying filename, extension, and
-    /// optionally the first line of content.
-    pub fn guess_language_id(&self, filename: &str, first_line: Option<&str>) -> Option<&str> {
-        // 1. Exact filename match
-        let basename = filename.rsplit('/').next().unwrap_or(filename);
-        if let Some(id) = self.get_language_id_by_filename(basename) {
-            return Some(id);
-        }
-
-        // 2. Extension match
-        if let Some(dot_pos) = basename.rfind('.') {
-            let ext = &basename[dot_pos..];
-            if let Some(id) = self.get_language_id_by_extension(ext) {
-                return Some(id);
-            }
-        }
-
-        // 3. First-line match
-        if let Some(line) = first_line {
-            if let Some(id) = self.get_language_id_by_first_line(line) {
-                return Some(id);
-            }
-        }
-
-        None
-    }
-}
-
-impl Default for LanguageRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Default language registrations
-// ---------------------------------------------------------------------------
-
-/// Register ~20 common languages with the given registry.
-pub fn register_default_languages(registry: &mut LanguageRegistry) {
-    registry.register(LanguageConfiguration {
-        id: "rust".into(),
-        name: "Rust".into(),
-        extensions: vec![".rs".into()],
-        filenames: vec![],
-        aliases: vec!["Rust".into(), "rust".into()],
-        mime_types: vec!["text/x-rust".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "typescript".into(),
-        name: "TypeScript".into(),
-        extensions: vec![".ts".into(), ".mts".into(), ".cts".into()],
-        filenames: vec![],
-        aliases: vec!["TypeScript".into(), "ts".into()],
-        mime_types: vec!["text/typescript".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "javascript".into(),
-        name: "JavaScript".into(),
-        extensions: vec![".js".into(), ".mjs".into(), ".cjs".into()],
-        filenames: vec![],
-        aliases: vec!["JavaScript".into(), "js".into()],
-        mime_types: vec!["text/javascript".into()],
-        first_line: Some(r"^#!.*\bnode\b".into()),
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "python".into(),
-        name: "Python".into(),
-        extensions: vec![".py".into(), ".pyi".into()],
-        filenames: vec![],
-        aliases: vec!["Python".into(), "py".into()],
-        mime_types: vec!["text/x-python".into()],
-        first_line: Some(r"^#!.*\bpython[23]?\b".into()),
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "go".into(),
-        name: "Go".into(),
-        extensions: vec![".go".into()],
-        filenames: vec![],
-        aliases: vec!["Go".into(), "golang".into()],
-        mime_types: vec!["text/x-go".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "java".into(),
-        name: "Java".into(),
-        extensions: vec![".java".into()],
-        filenames: vec![],
-        aliases: vec!["Java".into()],
-        mime_types: vec!["text/x-java".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "c".into(),
-        name: "C".into(),
-        extensions: vec![".c".into(), ".h".into()],
-        filenames: vec![],
-        aliases: vec!["C".into()],
-        mime_types: vec!["text/x-c".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "cpp".into(),
-        name: "C++".into(),
-        extensions: vec![".cpp".into(), ".cc".into(), ".cxx".into(), ".hpp".into(), ".hxx".into()],
-        filenames: vec![],
-        aliases: vec!["C++".into(), "cpp".into()],
-        mime_types: vec!["text/x-c++src".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "csharp".into(),
-        name: "C#".into(),
-        extensions: vec![".cs".into()],
-        filenames: vec![],
-        aliases: vec!["C#".into(), "csharp".into()],
-        mime_types: vec!["text/x-csharp".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "html".into(),
-        name: "HTML".into(),
-        extensions: vec![".html".into(), ".htm".into()],
-        filenames: vec![],
-        aliases: vec!["HTML".into()],
-        mime_types: vec!["text/html".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "css".into(),
-        name: "CSS".into(),
-        extensions: vec![".css".into()],
-        filenames: vec![],
-        aliases: vec!["CSS".into()],
-        mime_types: vec!["text/css".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "json".into(),
-        name: "JSON".into(),
-        extensions: vec![".json".into()],
-        filenames: vec![],
-        aliases: vec!["JSON".into()],
-        mime_types: vec!["application/json".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "jsonc".into(),
-        name: "JSON with Comments".into(),
-        extensions: vec![".jsonc".into()],
-        filenames: vec![],
-        aliases: vec!["JSONC".into(), "jsonc".into()],
-        mime_types: vec!["application/json".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "yaml".into(),
-        name: "YAML".into(),
-        extensions: vec![".yml".into(), ".yaml".into()],
-        filenames: vec![],
-        aliases: vec!["YAML".into(), "yml".into()],
-        mime_types: vec!["text/yaml".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "toml".into(),
-        name: "TOML".into(),
-        extensions: vec![".toml".into()],
-        filenames: vec!["Cargo.toml".into()],
-        aliases: vec!["TOML".into()],
-        mime_types: vec!["text/x-toml".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "markdown".into(),
-        name: "Markdown".into(),
-        extensions: vec![".md".into(), ".markdown".into()],
-        filenames: vec![],
-        aliases: vec!["Markdown".into(), "md".into()],
-        mime_types: vec!["text/markdown".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "shellscript".into(),
-        name: "Shell Script".into(),
-        extensions: vec![".sh".into(), ".bash".into(), ".zsh".into()],
-        filenames: vec![".bashrc".into(), ".zshrc".into(), ".profile".into()],
-        aliases: vec!["Shell".into(), "bash".into(), "sh".into()],
-        mime_types: vec!["text/x-shellscript".into()],
-        first_line: Some(r"^#!.*\b(bash|sh|zsh)\b".into()),
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "xml".into(),
-        name: "XML".into(),
-        extensions: vec![".xml".into(), ".xsl".into(), ".xsd".into()],
-        filenames: vec![],
-        aliases: vec!["XML".into()],
-        mime_types: vec!["text/xml".into(), "application/xml".into()],
-        first_line: Some(r"^<\?xml\b".into()),
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "sql".into(),
-        name: "SQL".into(),
-        extensions: vec![".sql".into()],
-        filenames: vec![],
-        aliases: vec!["SQL".into()],
-        mime_types: vec!["text/x-sql".into()],
-        first_line: None,
-    });
-
-    registry.register(LanguageConfiguration {
-        id: "dockerfile".into(),
-        name: "Dockerfile".into(),
-        extensions: vec![".dockerfile".into()],
-        filenames: vec!["Dockerfile".into(), "Containerfile".into()],
-        aliases: vec!["Dockerfile".into(), "docker".into()],
-        mime_types: vec!["text/x-dockerfile".into()],
-        first_line: None,
-    });
-}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -373,8 +39,8 @@ pub fn register_default_languages(registry: &mut LanguageRegistry) {
 mod tests {
     use super::*;
 
-    fn make_registry() -> LanguageRegistry {
-        let mut reg = LanguageRegistry::new();
+    fn make_registry() -> LanguageService {
+        let mut reg = LanguageService::new();
         register_default_languages(&mut reg);
         reg
     }
@@ -548,15 +214,15 @@ mod tests {
         assert!(ids.contains(&"rust"));
         assert!(ids.contains(&"python"));
         assert!(ids.contains(&"dockerfile"));
-        assert_eq!(ids.len(), 20);
+        assert!(ids.len() >= 30);
     }
 
     // -- Custom registration ------------------------------------------------
 
     #[test]
     fn custom_language_registration() {
-        let mut reg = LanguageRegistry::new();
-        reg.register(LanguageConfiguration {
+        let mut reg = LanguageService::new();
+        reg.register(LanguageDefinition {
             id: "brainfuck".into(),
             name: "Brainfuck".into(),
             extensions: vec![".bf".into()],
@@ -573,7 +239,267 @@ mod tests {
 
     #[test]
     fn default_creates_empty_registry() {
-        let reg = LanguageRegistry::default();
+        let reg = LanguageService::default();
         assert!(reg.get_registered_language_ids().is_empty());
+    }
+
+    // -- New language registrations -----------------------------------------
+
+    #[test]
+    fn ruby_registered() {
+        let reg = make_registry();
+        assert_eq!(reg.guess_language_id("app.rb", None), Some("ruby"));
+    }
+
+    #[test]
+    fn php_registered() {
+        let reg = make_registry();
+        assert_eq!(reg.guess_language_id("index.php", None), Some("php"));
+    }
+
+    #[test]
+    fn makefile_registered() {
+        let reg = make_registry();
+        assert_eq!(reg.guess_language_id("Makefile", None), Some("makefile"));
+    }
+
+    #[test]
+    fn perl_shebang() {
+        let reg = make_registry();
+        assert_eq!(
+            reg.get_language_id_by_first_line("#!/usr/bin/perl"),
+            Some("perl"),
+        );
+    }
+
+    #[test]
+    fn ruby_shebang() {
+        let reg = make_registry();
+        assert_eq!(
+            reg.get_language_id_by_first_line("#!/usr/bin/env ruby"),
+            Some("ruby"),
+        );
+    }
+
+    // -- LanguageEditConfig -------------------------------------------------
+
+    #[test]
+    fn default_edit_config_has_common_brackets() {
+        let cfg = LanguageEditConfig::default();
+        assert!(cfg.brackets.iter().any(|b| b.open == "(" && b.close == ")"));
+        assert!(cfg.brackets.iter().any(|b| b.open == "{" && b.close == "}"));
+    }
+
+    #[test]
+    fn edit_config_for_rust() {
+        let svc = make_registry();
+        let cfg = svc.get_edit_config("rust").unwrap();
+        assert_eq!(cfg.comments.line_comment.as_deref(), Some("//"));
+        let (open, close) = cfg.comments.block_comment.as_ref().unwrap();
+        assert_eq!(open, "/*");
+        assert_eq!(close, "*/");
+    }
+
+    #[test]
+    fn edit_config_for_python() {
+        let svc = make_registry();
+        let cfg = svc.get_edit_config("python").unwrap();
+        assert_eq!(cfg.comments.line_comment.as_deref(), Some("#"));
+        assert!(cfg.comments.block_comment.is_none());
+    }
+
+    #[test]
+    fn edit_config_for_html() {
+        let svc = make_registry();
+        let cfg = svc.get_edit_config("html").unwrap();
+        assert!(cfg.comments.line_comment.is_none());
+        let (open, close) = cfg.comments.block_comment.as_ref().unwrap();
+        assert_eq!(open, "<!--");
+        assert_eq!(close, "-->");
+    }
+
+    #[test]
+    fn edit_config_unknown_language() {
+        let svc = make_registry();
+        assert!(svc.get_edit_config("brainfuck").is_none());
+    }
+
+    // -- Comment toggling ---------------------------------------------------
+
+    #[test]
+    fn toggle_line_comment_adds() {
+        let result = toggle_line_comment("//", "hello world", false);
+        assert_eq!(result, "// hello world");
+    }
+
+    #[test]
+    fn toggle_line_comment_removes() {
+        let result = toggle_line_comment("//", "// hello world", true);
+        assert_eq!(result, "hello world");
+    }
+
+    #[test]
+    fn toggle_line_comment_removes_no_space() {
+        let result = toggle_line_comment("//", "//hello world", true);
+        assert_eq!(result, "hello world");
+    }
+
+    #[test]
+    fn toggle_block_comment_adds() {
+        let result = toggle_block_comment("/*", "*/", "hello world", false);
+        assert_eq!(result, "/* hello world */");
+    }
+
+    #[test]
+    fn toggle_block_comment_removes() {
+        let result = toggle_block_comment("/*", "*/", "/* hello world */", true);
+        assert_eq!(result, "hello world");
+    }
+
+    // -- Auto-closing -------------------------------------------------------
+
+    #[test]
+    fn should_auto_close_bracket() {
+        let cfg = LanguageEditConfig::default();
+        assert!(should_auto_close(&cfg, "(", "normal"));
+    }
+
+    #[test]
+    fn should_auto_close_respects_not_in() {
+        let mut cfg = LanguageEditConfig::default();
+        cfg.auto_closing_pairs = vec![AutoClosingPair {
+            open: "'".into(),
+            close: "'".into(),
+            not_in: vec!["string".into(), "comment".into()],
+        }];
+        assert!(!should_auto_close(&cfg, "'", "string"));
+        assert!(!should_auto_close(&cfg, "'", "comment"));
+        assert!(should_auto_close(&cfg, "'", "normal"));
+    }
+
+    #[test]
+    fn get_matching_bracket_found() {
+        let cfg = LanguageEditConfig::default();
+        assert_eq!(get_matching_bracket(&cfg, "("), Some(")".to_string()));
+        assert_eq!(get_matching_bracket(&cfg, "{"), Some("}".to_string()));
+        assert_eq!(get_matching_bracket(&cfg, "["), Some("]".to_string()));
+    }
+
+    #[test]
+    fn get_matching_bracket_not_found() {
+        let cfg = LanguageEditConfig::default();
+        assert_eq!(get_matching_bracket(&cfg, "x"), None);
+    }
+
+    // -- Word pattern -------------------------------------------------------
+
+    #[test]
+    fn default_word_pattern_matches() {
+        let svc = make_registry();
+        let re = get_word_pattern(&svc, "rust");
+        assert!(re.is_match("hello"));
+        assert!(re.is_match("_foo"));
+        assert!(!re.is_match("123"));
+    }
+
+    #[test]
+    fn javascript_word_pattern_includes_dollar() {
+        let svc = make_registry();
+        let re = get_word_pattern(&svc, "javascript");
+        assert!(re.is_match("$element"));
+    }
+
+    #[test]
+    fn css_word_pattern_includes_dash() {
+        let svc = make_registry();
+        let re = get_word_pattern(&svc, "css");
+        assert!(re.is_match("font-size"));
+    }
+
+    // -- parse_language_configuration (JSON) --------------------------------
+
+    #[test]
+    fn parse_language_configuration_json() {
+        let json = r#"{
+            "comments": {
+                "lineComment": "//",
+                "blockComment": ["/*", "*/"]
+            },
+            "brackets": [
+                ["(", ")"],
+                ["{", "}"]
+            ],
+            "autoClosingPairs": [
+                { "open": "{", "close": "}" },
+                { "open": "'", "close": "'", "notIn": ["string"] }
+            ],
+            "folding": {
+                "markers": {
+                    "start": "^\\s*#region\\b",
+                    "end": "^\\s*#endregion\\b"
+                }
+            }
+        }"#;
+        let cfg = parse_language_configuration(json).unwrap();
+        assert_eq!(cfg.comments.line_comment.as_deref(), Some("//"));
+        let (open, close) = cfg.comments.block_comment.as_ref().unwrap();
+        assert_eq!(open, "/*");
+        assert_eq!(close, "*/");
+        assert_eq!(cfg.brackets.len(), 2);
+        assert_eq!(cfg.auto_closing_pairs.len(), 2);
+        assert_eq!(cfg.auto_closing_pairs[1].not_in, vec!["string".to_string()]);
+        assert!(cfg.folding_markers.is_some());
+        let fm = cfg.folding_markers.as_ref().unwrap();
+        assert!(fm.start.is_match("  #region foo"));
+    }
+
+    #[test]
+    fn parse_language_configuration_minimal() {
+        let json = r#"{}"#;
+        let cfg = parse_language_configuration(json).unwrap();
+        assert!(cfg.comments.line_comment.is_none());
+        assert!(cfg.brackets.is_empty());
+    }
+
+    // -- Folding markers ----------------------------------------------------
+
+    #[test]
+    fn edit_config_folding_markers_rust() {
+        let svc = make_registry();
+        let cfg = svc.get_edit_config("rust").unwrap();
+        let fm = cfg.folding_markers.as_ref().unwrap();
+        assert!(fm.start.is_match("  // #region test"));
+        assert!(fm.end.is_match("  // #endregion"));
+    }
+
+    // -- Indentation rules --------------------------------------------------
+
+    #[test]
+    fn indentation_rules_present_for_rust() {
+        let svc = make_registry();
+        let cfg = svc.get_edit_config("rust").unwrap();
+        let rules = cfg.indentation_rules.as_ref().unwrap();
+        assert!(rules.increase_indent_pattern.is_match("{"));
+    }
+
+    // -- Surrounding pairs --------------------------------------------------
+
+    #[test]
+    fn surrounding_pairs_present() {
+        let cfg = LanguageEditConfig::default();
+        assert!(cfg.surrounding_pairs.iter().any(|b| b.open == "(" && b.close == ")"));
+        assert!(cfg.surrounding_pairs.iter().any(|b| b.open == "\"" && b.close == "\""));
+    }
+
+    // -- OnEnterRule --------------------------------------------------------
+
+    #[test]
+    fn on_enter_rules_for_c_like() {
+        let svc = make_registry();
+        let cfg = svc.get_edit_config("javascript").unwrap();
+        assert!(!cfg.on_enter_rules.is_empty());
+        // The first rule should match opening a block comment
+        let rule = &cfg.on_enter_rules[0];
+        assert!(rule.before_text.is_match("/** some doc"));
     }
 }

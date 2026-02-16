@@ -2930,6 +2930,7 @@ dependencies = [
 name = "vsedit-diff"
 version = "0.1.0"
 dependencies = [
+ "ratatui",
  "similar",
  "vsedit-text-model",
 ]
@@ -3536,6 +3537,8 @@ name = "vsedit-languages"
 version = "0.1.0"
 dependencies = [
  "regex",
+ "serde",
+ "serde_json",
  "vsedit-glob",
 ]
 
