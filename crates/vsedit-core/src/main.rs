@@ -1028,6 +1028,13 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
         return handle_workbench_action(&action, app);
     }
 
+    // ── Find bar → route through workbench ──────────────────────────
+    if app.workbench.focused == FocusedPart::FindBar {
+        let input = from_crossterm_key(key_event);
+        let action = app.workbench.handle_input(InputEvent::Key(input));
+        return handle_workbench_action(&action, app);
+    }
+
     // ── Terminal panel focused → route keystrokes to PTY ─────────────
     if app.workbench.focused == FocusedPart::Panel
         && app.workbench.active_panel == ActivePanelView::Terminal
@@ -1235,14 +1242,11 @@ fn handle_key_event(key_event: crossterm::event::KeyEvent, app: &mut AppState) -
                 return false;
             }
             KeyCode::Char('f') => {
-                app.editor_widget.open_find();
+                dispatch_command("actions.find", app);
                 return false;
             }
             KeyCode::Char('h') => {
-                app.editor_widget.open_find();
-                if !app.editor_widget.show_replace {
-                    app.editor_widget.toggle_replace();
-                }
+                dispatch_command("actions.find", app);
                 return false;
             }
             KeyCode::Char('s') => {
