@@ -2,7 +2,10 @@
 //!
 //! RPC bridge between the extension host and the main thread for the test API.
 
+use std::collections::HashMap;
 use std::fmt;
+use std::path::Path;
+
 use serde::{Deserialize, Serialize};
 
 /// Proxy identifier for this extension API namespace.
@@ -419,6 +422,605 @@ impl Default for TestBridge {
 /// Initialize the testing extension API bridge.
 pub fn register() {
     // Registration will connect RPC handlers when extension host starts
+}
+
+// ── VS Code Testing API ──
+
+/// A tag that can be associated with test items and run profiles.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct TestTag {
+    pub id: String,
+}
+
+impl TestTag {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self { id: id.into() }
+    }
+}
+
+/// The execution state of a test.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TestState {
+    Queued,
+    Running,
+    Passed,
+    Failed,
+    Skipped,
+    Errored,
+}
+
+impl TestState {
+    /// Returns a single-char icon for the state.
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Self::Queued => "○",
+            Self::Running => "◉",
+            Self::Passed => "✓",
+            Self::Failed => "✗",
+            Self::Skipped => "⊘",
+            Self::Errored => "✗",
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Queued => "Queued",
+            Self::Running => "Running",
+            Self::Passed => "Passed",
+            Self::Failed => "Failed",
+            Self::Skipped => "Skipped",
+            Self::Errored => "Errored",
+        }
+    }
+}
+
+/// A VS Code-compatible test item with full metadata.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct VscTestItem {
+    pub id: String,
+    pub uri: Option<String>,
+    pub label: String,
+    pub description: Option<String>,
+    pub range: Option<(u32, u32, u32, u32)>,
+    pub children: Vec<VscTestItem>,
+    pub tags: Vec<TestTag>,
+    pub can_resolve_children: bool,
+    pub busy: bool,
+    pub error: Option<String>,
+}
+
+impl VscTestItem {
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            uri: None,
+            label: label.into(),
+            description: None,
+            range: None,
+            children: Vec::new(),
+            tags: Vec::new(),
+            can_resolve_children: false,
+            busy: false,
+            error: None,
+        }
+    }
+
+    /// Add a child item.
+    pub fn add_child(&mut self, child: VscTestItem) {
+        self.children.push(child);
+    }
+
+    /// Add a tag.
+    pub fn add_tag(&mut self, tag: TestTag) {
+        if !self.tags.contains(&tag) {
+            self.tags.push(tag);
+        }
+    }
+
+    /// Check if this item has a given tag.
+    pub fn has_tag(&self, tag_id: &str) -> bool {
+        self.tags.iter().any(|t| t.id == tag_id)
+    }
+}
+
+/// A managed collection of test items, supporting add/delete/get/replace/forEach.
+#[derive(Debug, Clone, Default)]
+pub struct TestItemCollection {
+    items: Vec<VscTestItem>,
+}
+
+impl TestItemCollection {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    pub fn add(&mut self, item: VscTestItem) {
+        // Replace if same id exists
+        self.items.retain(|i| i.id != item.id);
+        self.items.push(item);
+    }
+
+    pub fn delete(&mut self, id: &str) -> bool {
+        let before = self.items.len();
+        self.items.retain(|i| i.id != id);
+        self.items.len() < before
+    }
+
+    pub fn get(&self, id: &str) -> Option<&VscTestItem> {
+        self.items.iter().find(|i| i.id == id)
+    }
+
+    pub fn replace(&mut self, items: Vec<VscTestItem>) {
+        self.items = items;
+    }
+
+    pub fn for_each(&self, mut callback: impl FnMut(&VscTestItem)) {
+        for item in &self.items {
+            callback(item);
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &VscTestItem> {
+        self.items.iter()
+    }
+}
+
+/// The kind of test run profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TestRunProfileKind {
+    Run,
+    Debug,
+    Coverage,
+}
+
+/// A configuration profile for running tests.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TestRunProfile {
+    pub label: String,
+    pub kind: TestRunProfileKind,
+    pub is_default: bool,
+    pub tag: Option<TestTag>,
+    pub supports_continuous_run: bool,
+}
+
+impl TestRunProfile {
+    pub fn new(label: impl Into<String>, kind: TestRunProfileKind) -> Self {
+        Self {
+            label: label.into(),
+            kind,
+            is_default: false,
+            tag: None,
+            supports_continuous_run: false,
+        }
+    }
+}
+
+/// A request to execute tests.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TestRunRequest {
+    pub include: Option<Vec<String>>,
+    pub exclude: Option<Vec<String>>,
+    pub profile: Option<TestRunProfile>,
+}
+
+impl TestRunRequest {
+    pub fn new() -> Self {
+        Self {
+            include: None,
+            exclude: None,
+            profile: None,
+        }
+    }
+
+    pub fn with_include(mut self, ids: Vec<String>) -> Self {
+        self.include = Some(ids);
+        self
+    }
+
+    pub fn with_exclude(mut self, ids: Vec<String>) -> Self {
+        self.exclude = Some(ids);
+        self
+    }
+
+    pub fn with_profile(mut self, profile: TestRunProfile) -> Self {
+        self.profile = Some(profile);
+        self
+    }
+}
+
+impl Default for TestRunRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A message produced during test execution.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TestOutputMessage {
+    pub message: String,
+    pub expected_output: Option<String>,
+    pub actual_output: Option<String>,
+    pub location: Option<TestLocation>,
+}
+
+/// A source location.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TestLocation {
+    pub uri: String,
+    pub line: u32,
+    pub column: Option<u32>,
+}
+
+/// The result of a single test item in a run.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TestRunResult {
+    pub item_id: String,
+    pub state: TestState,
+    pub duration_ms: Option<f64>,
+    pub messages: Vec<TestOutputMessage>,
+}
+
+/// A VS Code-style test run.
+#[derive(Debug, Clone)]
+pub struct VscTestRun {
+    pub name: Option<String>,
+    pub is_cancelled: bool,
+    pub results: Vec<TestRunResult>,
+}
+
+impl VscTestRun {
+    pub fn new(name: Option<String>) -> Self {
+        Self {
+            name,
+            is_cancelled: false,
+            results: Vec::new(),
+        }
+    }
+
+    pub fn cancel(&mut self) {
+        self.is_cancelled = true;
+    }
+
+    pub fn record(&mut self, result: TestRunResult) {
+        self.results.push(result);
+    }
+}
+
+// ── Test Controller ──
+
+/// A test controller that manages test items and run profiles.
+#[derive(Debug)]
+pub struct TestController {
+    pub id: String,
+    pub label: String,
+    pub profiles: Vec<TestRunProfile>,
+    pub items: TestItemCollection,
+    runs: Vec<VscTestRun>,
+    next_run_id: u64,
+}
+
+impl TestController {
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            profiles: Vec::new(),
+            items: TestItemCollection::new(),
+            runs: Vec::new(),
+            next_run_id: 1,
+        }
+    }
+
+    /// Register a run profile.
+    pub fn create_run_profile(
+        &mut self,
+        label: impl Into<String>,
+        kind: TestRunProfileKind,
+    ) -> &TestRunProfile {
+        let profile = TestRunProfile::new(label, kind);
+        self.profiles.push(profile);
+        self.profiles.last().unwrap()
+    }
+
+    /// Start a new test run.
+    pub fn create_test_run(&mut self, request: &TestRunRequest) -> usize {
+        let run = VscTestRun::new(request.profile.as_ref().map(|p| p.label.clone()));
+        self.runs.push(run);
+        let idx = self.runs.len() - 1;
+        self.next_run_id += 1;
+        idx
+    }
+
+    /// Get a test run by index.
+    pub fn get_run(&self, idx: usize) -> Option<&VscTestRun> {
+        self.runs.get(idx)
+    }
+
+    /// Get a mutable test run by index.
+    pub fn get_run_mut(&mut self, idx: usize) -> Option<&mut VscTestRun> {
+        self.runs.get_mut(idx)
+    }
+
+    /// Resolve children of a test item (sets busy flag, calls resolver).
+    pub fn resolve_children(&mut self, item_id: &str) {
+        if let Some(item) = self.items.items.iter_mut().find(|i| i.id == item_id) {
+            item.busy = true;
+            // In a real implementation, this would invoke the registered handler
+            item.busy = false;
+            item.can_resolve_children = false;
+        }
+    }
+
+    pub fn run_count(&self) -> usize {
+        self.runs.len()
+    }
+}
+
+// ── Test Discovery ──
+
+/// Supported test frameworks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestFramework {
+    CargoTest,
+    Jest,
+    Pytest,
+    GoTest,
+    Unknown,
+}
+
+impl TestFramework {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::CargoTest => "cargo test",
+            Self::Jest => "jest",
+            Self::Pytest => "pytest",
+            Self::GoTest => "go test",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+/// Detect the test framework for a workspace path.
+pub fn detect_test_framework(workspace: &Path) -> TestFramework {
+    if workspace.join("Cargo.toml").exists() {
+        TestFramework::CargoTest
+    } else if workspace.join("package.json").exists() {
+        if workspace.join("jest.config.js").exists()
+            || workspace.join("jest.config.ts").exists()
+        {
+            TestFramework::Jest
+        } else {
+            TestFramework::Unknown
+        }
+    } else if workspace.join("pytest.ini").exists()
+        || workspace.join("setup.py").exists()
+        || workspace.join("pyproject.toml").exists()
+    {
+        TestFramework::Pytest
+    } else if workspace.join("go.mod").exists() {
+        TestFramework::GoTest
+    } else {
+        TestFramework::Unknown
+    }
+}
+
+/// Parse `cargo test --list` output into test items.
+pub struct CargoTestDiscoverer;
+
+impl CargoTestDiscoverer {
+    /// Parse the output of `cargo test -- --list` into `VscTestItem` entries.
+    pub fn parse_test_list(output: &str) -> Vec<VscTestItem> {
+        let mut items: Vec<VscTestItem> = Vec::new();
+        // Group tests by module path
+        let mut modules: HashMap<String, Vec<VscTestItem>> = HashMap::new();
+
+        for line in output.lines() {
+            let line = line.trim();
+            if line.is_empty() || !line.ends_with(": test") {
+                continue;
+            }
+            let name = line.trim_end_matches(": test").trim();
+            if name.is_empty() {
+                continue;
+            }
+
+            // Split into module path and test name
+            if let Some(pos) = name.rfind("::") {
+                let module = &name[..pos];
+                let test_name = &name[pos + 2..];
+                let item = VscTestItem::new(name, test_name);
+                modules.entry(module.to_string()).or_default().push(item);
+            } else {
+                items.push(VscTestItem::new(name, name));
+            }
+        }
+
+        // Build module hierarchy
+        for (module_path, tests) in modules {
+            let mut module_item = VscTestItem::new(&module_path, &module_path);
+            for test in tests {
+                module_item.add_child(test);
+            }
+            items.push(module_item);
+        }
+
+        items
+    }
+}
+
+/// Discover tests for a given framework (stub — real impl would run commands).
+pub fn discover_tests(framework: TestFramework, _path: &Path) -> Vec<VscTestItem> {
+    match framework {
+        TestFramework::CargoTest => {
+            // In production, would run `cargo test -- --list` and parse
+            Vec::new()
+        }
+        TestFramework::Jest => Vec::new(),
+        TestFramework::Pytest => Vec::new(),
+        TestFramework::GoTest => Vec::new(),
+        TestFramework::Unknown => Vec::new(),
+    }
+}
+
+// ── Test Result Aggregation ──
+
+/// Summary statistics for a set of test results.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TestResultSummary {
+    pub total: usize,
+    pub passed: usize,
+    pub failed: usize,
+    pub skipped: usize,
+    pub errored: usize,
+    pub duration_ms: f64,
+}
+
+impl TestResultSummary {
+    pub fn is_success(&self) -> bool {
+        self.failed == 0 && self.errored == 0
+    }
+}
+
+/// Compute a summary from a slice of test results.
+pub fn compute_summary(results: &[TestRunResult]) -> TestResultSummary {
+    let mut summary = TestResultSummary {
+        total: results.len(),
+        passed: 0,
+        failed: 0,
+        skipped: 0,
+        errored: 0,
+        duration_ms: 0.0,
+    };
+    for r in results {
+        match r.state {
+            TestState::Passed => summary.passed += 1,
+            TestState::Failed => summary.failed += 1,
+            TestState::Skipped => summary.skipped += 1,
+            TestState::Errored => summary.errored += 1,
+            TestState::Queued | TestState::Running => {}
+        }
+        if let Some(d) = r.duration_ms {
+            summary.duration_ms += d;
+        }
+    }
+    summary
+}
+
+/// Keeps the last N test runs for comparison.
+#[derive(Debug, Clone)]
+pub struct TestRunHistory {
+    capacity: usize,
+    summaries: Vec<TestResultSummary>,
+}
+
+impl TestRunHistory {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity: capacity.max(1),
+            summaries: Vec::new(),
+        }
+    }
+
+    pub fn push(&mut self, summary: TestResultSummary) {
+        if self.summaries.len() >= self.capacity {
+            self.summaries.remove(0);
+        }
+        self.summaries.push(summary);
+    }
+
+    pub fn latest(&self) -> Option<&TestResultSummary> {
+        self.summaries.last()
+    }
+
+    pub fn all(&self) -> &[TestResultSummary] {
+        &self.summaries
+    }
+
+    pub fn len(&self) -> usize {
+        self.summaries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.summaries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.summaries.clear();
+    }
+}
+
+// ── Coverage Support ──
+
+/// Coverage information for a single file.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FileCoverage {
+    pub uri: String,
+    pub statement_coverage: CoverageStats,
+    pub branch_coverage: Option<CoverageStats>,
+    pub function_coverage: Option<CoverageStats>,
+}
+
+/// Coverage statistics as covered/total.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CoverageStats {
+    pub covered: usize,
+    pub total: usize,
+}
+
+impl CoverageStats {
+    pub fn new(covered: usize, total: usize) -> Self {
+        Self { covered, total }
+    }
+
+    pub fn percentage(&self) -> f64 {
+        if self.total == 0 {
+            0.0
+        } else {
+            self.covered as f64 / self.total as f64 * 100.0
+        }
+    }
+}
+
+/// Detailed per-line coverage info.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DetailedCoverage {
+    pub line_number: u32,
+    pub executed_count: u32,
+    pub is_covered: bool,
+}
+
+/// Trait for coverage providers.
+pub trait CoverageProvider {
+    fn provide_file_coverage(&self) -> Vec<FileCoverage>;
+}
+
+// ── Test View Rendering Helpers ──
+
+/// Format a test item tree for terminal display.
+pub fn render_test_tree(items: &[VscTestItem], indent: usize) -> String {
+    let mut out = String::new();
+    let prefix = "  ".repeat(indent);
+    for item in items {
+        out.push_str(&format!("{}{}\n", prefix, item.label));
+        if !item.children.is_empty() {
+            out.push_str(&render_test_tree(&item.children, indent + 1));
+        }
+    }
+    out
+}
+
+/// Format a test result with state icon for display.
+pub fn render_result_line(result: &TestRunResult) -> String {
+    let icon = result.state.icon();
+    let duration = result
+        .duration_ms
+        .map(|d| format!(" ({:.0}ms)", d))
+        .unwrap_or_default();
+    format!("{icon} {}{duration}", result.item_id)
 }
 
 /// Accumulated statistics for ext-testing operations.
@@ -1036,5 +1638,373 @@ mod tests {
     fn ext_testing_is_ascii_printable() {
         assert!(ExtTestingValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtTestingValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ── VS Code Testing API Tests ──
+
+    #[test]
+    fn test_tag_new() {
+        let tag = TestTag::new("slow");
+        assert_eq!(tag.id, "slow");
+    }
+
+    #[test]
+    fn test_tag_equality() {
+        assert_eq!(TestTag::new("a"), TestTag::new("a"));
+        assert_ne!(TestTag::new("a"), TestTag::new("b"));
+    }
+
+    #[test]
+    fn test_state_icons() {
+        assert_eq!(TestState::Passed.icon(), "✓");
+        assert_eq!(TestState::Failed.icon(), "✗");
+        assert_eq!(TestState::Skipped.icon(), "⊘");
+        assert_eq!(TestState::Queued.icon(), "○");
+        assert_eq!(TestState::Running.icon(), "◉");
+        assert_eq!(TestState::Errored.icon(), "✗");
+    }
+
+    #[test]
+    fn test_state_labels() {
+        assert_eq!(TestState::Passed.label(), "Passed");
+        assert_eq!(TestState::Failed.label(), "Failed");
+        assert_eq!(TestState::Running.label(), "Running");
+    }
+
+    #[test]
+    fn vsc_test_item_new() {
+        let item = VscTestItem::new("t1", "my test");
+        assert_eq!(item.id, "t1");
+        assert_eq!(item.label, "my test");
+        assert!(!item.busy);
+        assert!(!item.can_resolve_children);
+        assert!(item.children.is_empty());
+        assert!(item.tags.is_empty());
+    }
+
+    #[test]
+    fn vsc_test_item_add_child() {
+        let mut parent = VscTestItem::new("p", "parent");
+        parent.add_child(VscTestItem::new("c1", "child1"));
+        parent.add_child(VscTestItem::new("c2", "child2"));
+        assert_eq!(parent.children.len(), 2);
+    }
+
+    #[test]
+    fn vsc_test_item_tags() {
+        let mut item = VscTestItem::new("t1", "test");
+        item.add_tag(TestTag::new("slow"));
+        item.add_tag(TestTag::new("slow")); // duplicate ignored
+        assert_eq!(item.tags.len(), 1);
+        assert!(item.has_tag("slow"));
+        assert!(!item.has_tag("fast"));
+    }
+
+    #[test]
+    fn test_item_collection_add_get_delete() {
+        let mut coll = TestItemCollection::new();
+        coll.add(VscTestItem::new("a", "A"));
+        coll.add(VscTestItem::new("b", "B"));
+        assert_eq!(coll.size(), 2);
+        assert!(coll.get("a").is_some());
+        assert!(coll.get("c").is_none());
+        assert!(coll.delete("a"));
+        assert_eq!(coll.size(), 1);
+        assert!(!coll.delete("nonexistent"));
+    }
+
+    #[test]
+    fn test_item_collection_replace() {
+        let mut coll = TestItemCollection::new();
+        coll.add(VscTestItem::new("old", "Old"));
+        coll.replace(vec![VscTestItem::new("new1", "New1"), VscTestItem::new("new2", "New2")]);
+        assert_eq!(coll.size(), 2);
+        assert!(coll.get("old").is_none());
+        assert!(coll.get("new1").is_some());
+    }
+
+    #[test]
+    fn test_item_collection_for_each() {
+        let mut coll = TestItemCollection::new();
+        coll.add(VscTestItem::new("a", "A"));
+        coll.add(VscTestItem::new("b", "B"));
+        let mut ids = Vec::new();
+        coll.for_each(|item| ids.push(item.id.clone()));
+        assert_eq!(ids.len(), 2);
+    }
+
+    #[test]
+    fn test_item_collection_add_replaces_same_id() {
+        let mut coll = TestItemCollection::new();
+        coll.add(VscTestItem::new("a", "First"));
+        coll.add(VscTestItem::new("a", "Second"));
+        assert_eq!(coll.size(), 1);
+        assert_eq!(coll.get("a").unwrap().label, "Second");
+    }
+
+    #[test]
+    fn test_run_profile_new() {
+        let profile = TestRunProfile::new("Run Tests", TestRunProfileKind::Run);
+        assert_eq!(profile.label, "Run Tests");
+        assert_eq!(profile.kind, TestRunProfileKind::Run);
+        assert!(!profile.is_default);
+        assert!(!profile.supports_continuous_run);
+    }
+
+    #[test]
+    fn test_run_profile_kind_variants() {
+        assert_ne!(TestRunProfileKind::Run, TestRunProfileKind::Debug);
+        assert_ne!(TestRunProfileKind::Debug, TestRunProfileKind::Coverage);
+        assert_eq!(TestRunProfileKind::Run, TestRunProfileKind::Run);
+    }
+
+    #[test]
+    fn test_run_request_builder() {
+        let req = TestRunRequest::new()
+            .with_include(vec!["t1".into(), "t2".into()])
+            .with_exclude(vec!["t3".into()])
+            .with_profile(TestRunProfile::new("Run", TestRunProfileKind::Run));
+        assert_eq!(req.include.as_ref().unwrap().len(), 2);
+        assert_eq!(req.exclude.as_ref().unwrap().len(), 1);
+        assert!(req.profile.is_some());
+    }
+
+    #[test]
+    fn test_run_request_default() {
+        let req = TestRunRequest::default();
+        assert!(req.include.is_none());
+        assert!(req.exclude.is_none());
+        assert!(req.profile.is_none());
+    }
+
+    #[test]
+    fn test_output_message() {
+        let msg = TestOutputMessage {
+            message: "assertion failed".into(),
+            expected_output: Some("42".into()),
+            actual_output: Some("43".into()),
+            location: Some(TestLocation {
+                uri: "file:///test.rs".into(),
+                line: 10,
+                column: Some(5),
+            }),
+        };
+        assert_eq!(msg.expected_output.as_deref(), Some("42"));
+        assert_eq!(msg.location.as_ref().unwrap().line, 10);
+    }
+
+    #[test]
+    fn test_run_result() {
+        let result = TestRunResult {
+            item_id: "t1".into(),
+            state: TestState::Passed,
+            duration_ms: Some(12.5),
+            messages: vec![],
+        };
+        assert_eq!(result.state, TestState::Passed);
+        assert_eq!(result.duration_ms, Some(12.5));
+    }
+
+    #[test]
+    fn vsc_test_run_lifecycle() {
+        let mut run = VscTestRun::new(Some("Suite".into()));
+        assert!(!run.is_cancelled);
+        run.record(TestRunResult {
+            item_id: "t1".into(),
+            state: TestState::Passed,
+            duration_ms: Some(5.0),
+            messages: vec![],
+        });
+        assert_eq!(run.results.len(), 1);
+        run.cancel();
+        assert!(run.is_cancelled);
+    }
+
+    #[test]
+    fn test_controller_lifecycle() {
+        let mut ctrl = TestController::new("rust", "Rust Tests");
+        assert_eq!(ctrl.id, "rust");
+        ctrl.create_run_profile("Run", TestRunProfileKind::Run);
+        ctrl.create_run_profile("Debug", TestRunProfileKind::Debug);
+        assert_eq!(ctrl.profiles.len(), 2);
+
+        ctrl.items.add(VscTestItem::new("t1", "test_one"));
+        assert_eq!(ctrl.items.size(), 1);
+
+        let req = TestRunRequest::new();
+        let run_idx = ctrl.create_test_run(&req);
+        assert_eq!(ctrl.run_count(), 1);
+        assert!(ctrl.get_run(run_idx).is_some());
+    }
+
+    #[test]
+    fn test_controller_resolve_children() {
+        let mut ctrl = TestController::new("rust", "Rust Tests");
+        let mut item = VscTestItem::new("t1", "test");
+        item.can_resolve_children = true;
+        ctrl.items.add(item);
+        ctrl.resolve_children("t1");
+        assert!(!ctrl.items.get("t1").unwrap().can_resolve_children);
+    }
+
+    #[test]
+    fn test_framework_detection() {
+        // Unknown for nonexistent path
+        let fw = detect_test_framework(std::path::Path::new("/nonexistent/path"));
+        assert_eq!(fw, TestFramework::Unknown);
+    }
+
+    #[test]
+    fn test_framework_labels() {
+        assert_eq!(TestFramework::CargoTest.label(), "cargo test");
+        assert_eq!(TestFramework::Jest.label(), "jest");
+        assert_eq!(TestFramework::Pytest.label(), "pytest");
+        assert_eq!(TestFramework::GoTest.label(), "go test");
+        assert_eq!(TestFramework::Unknown.label(), "unknown");
+    }
+
+    #[test]
+    fn cargo_test_discoverer_parse() {
+        let output = "\
+tests::test_add: test
+tests::test_sub: test
+other_test: test
+ignored_line
+";
+        let items = CargoTestDiscoverer::parse_test_list(output);
+        // "tests" module has 2 children, plus "other_test" at root
+        assert_eq!(items.len(), 2); // module "tests" + "other_test"
+        let other = items.iter().find(|i| i.id == "other_test");
+        assert!(other.is_some());
+        let module = items.iter().find(|i| i.id == "tests");
+        assert!(module.is_some());
+        assert_eq!(module.unwrap().children.len(), 2);
+    }
+
+    #[test]
+    fn cargo_test_discoverer_empty_output() {
+        let items = CargoTestDiscoverer::parse_test_list("");
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn compute_summary_basic() {
+        let results = vec![
+            TestRunResult { item_id: "t1".into(), state: TestState::Passed, duration_ms: Some(10.0), messages: vec![] },
+            TestRunResult { item_id: "t2".into(), state: TestState::Failed, duration_ms: Some(20.0), messages: vec![] },
+            TestRunResult { item_id: "t3".into(), state: TestState::Skipped, duration_ms: None, messages: vec![] },
+            TestRunResult { item_id: "t4".into(), state: TestState::Errored, duration_ms: Some(5.0), messages: vec![] },
+        ];
+        let s = compute_summary(&results);
+        assert_eq!(s.total, 4);
+        assert_eq!(s.passed, 1);
+        assert_eq!(s.failed, 1);
+        assert_eq!(s.skipped, 1);
+        assert_eq!(s.errored, 1);
+        assert!((s.duration_ms - 35.0).abs() < f64::EPSILON);
+        assert!(!s.is_success());
+    }
+
+    #[test]
+    fn compute_summary_all_pass() {
+        let results = vec![
+            TestRunResult { item_id: "t1".into(), state: TestState::Passed, duration_ms: Some(1.0), messages: vec![] },
+        ];
+        let s = compute_summary(&results);
+        assert!(s.is_success());
+    }
+
+    #[test]
+    fn test_run_history() {
+        let mut history = TestRunHistory::new(3);
+        assert!(history.is_empty());
+        history.push(TestResultSummary { total: 1, passed: 1, failed: 0, skipped: 0, errored: 0, duration_ms: 1.0 });
+        history.push(TestResultSummary { total: 2, passed: 1, failed: 1, skipped: 0, errored: 0, duration_ms: 2.0 });
+        history.push(TestResultSummary { total: 3, passed: 3, failed: 0, skipped: 0, errored: 0, duration_ms: 3.0 });
+        assert_eq!(history.len(), 3);
+        // Adding a 4th should drop the oldest
+        history.push(TestResultSummary { total: 4, passed: 4, failed: 0, skipped: 0, errored: 0, duration_ms: 4.0 });
+        assert_eq!(history.len(), 3);
+        assert_eq!(history.all()[0].total, 2);
+        assert_eq!(history.latest().unwrap().total, 4);
+    }
+
+    #[test]
+    fn test_run_history_clear() {
+        let mut history = TestRunHistory::new(5);
+        history.push(TestResultSummary { total: 1, passed: 1, failed: 0, skipped: 0, errored: 0, duration_ms: 0.0 });
+        history.clear();
+        assert!(history.is_empty());
+    }
+
+    #[test]
+    fn coverage_stats_percentage() {
+        let stats = CoverageStats::new(75, 100);
+        assert!((stats.percentage() - 75.0).abs() < f64::EPSILON);
+        let zero = CoverageStats::new(0, 0);
+        assert!((zero.percentage() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn file_coverage_creation() {
+        let fc = FileCoverage {
+            uri: "file:///src/main.rs".into(),
+            statement_coverage: CoverageStats::new(80, 100),
+            branch_coverage: Some(CoverageStats::new(40, 50)),
+            function_coverage: None,
+        };
+        assert!((fc.statement_coverage.percentage() - 80.0).abs() < f64::EPSILON);
+        assert!((fc.branch_coverage.as_ref().unwrap().percentage() - 80.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn detailed_coverage_fields() {
+        let dc = DetailedCoverage { line_number: 42, executed_count: 3, is_covered: true };
+        assert_eq!(dc.line_number, 42);
+        assert!(dc.is_covered);
+    }
+
+    #[test]
+    fn render_test_tree_output() {
+        let mut parent = VscTestItem::new("p", "Parent");
+        parent.add_child(VscTestItem::new("c1", "Child 1"));
+        parent.add_child(VscTestItem::new("c2", "Child 2"));
+        let output = render_test_tree(&[parent], 0);
+        assert!(output.contains("Parent"));
+        assert!(output.contains("  Child 1"));
+        assert!(output.contains("  Child 2"));
+    }
+
+    #[test]
+    fn render_result_line_output() {
+        let result = TestRunResult {
+            item_id: "my_test".into(),
+            state: TestState::Passed,
+            duration_ms: Some(42.0),
+            messages: vec![],
+        };
+        let line = render_result_line(&result);
+        assert!(line.contains("✓"));
+        assert!(line.contains("my_test"));
+        assert!(line.contains("42ms"));
+    }
+
+    #[test]
+    fn render_result_line_no_duration() {
+        let result = TestRunResult {
+            item_id: "t1".into(),
+            state: TestState::Failed,
+            duration_ms: None,
+            messages: vec![],
+        };
+        let line = render_result_line(&result);
+        assert!(line.contains("✗"));
+        assert!(!line.contains("ms"));
+    }
+
+    #[test]
+    fn discover_tests_returns_empty_for_unknown() {
+        let items = discover_tests(TestFramework::Unknown, std::path::Path::new("/tmp"));
+        assert!(items.is_empty());
     }
 }

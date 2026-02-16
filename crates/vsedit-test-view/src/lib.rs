@@ -536,6 +536,74 @@ impl Default for TestViewValidator {
     }
 }
 
+// Re-export VS Code Testing API types from ext-testing
+pub use vsedit_ext_testing::{
+    CoverageStats, DetailedCoverage, FileCoverage, TestItemCollection, TestOutputMessage,
+    TestRunHistory, TestRunProfileKind, TestRunRequest, TestRunResult, TestResultSummary, TestTag,
+    VscTestItem, VscTestRun, TestController, TestRunProfile, TestFramework,
+    compute_summary, detect_test_framework, render_test_tree, render_result_line,
+    CargoTestDiscoverer,
+};
+
+/// Render a test tree with state icons.
+pub fn render_test_items_with_state(items: &[TestItem], indent: usize) -> String {
+    let mut out = String::new();
+    let prefix = "  ".repeat(indent);
+    for item in items {
+        let icon = state_icon(item.state);
+        let duration = item
+            .duration_ms
+            .map(|d| format!(" ({:.0}ms)", d))
+            .unwrap_or_default();
+        out.push_str(&format!("{prefix}{icon} {}{duration}\n", item.label));
+        if !item.children.is_empty() {
+            out.push_str(&render_test_items_with_state(&item.children, indent + 1));
+        }
+    }
+    out
+}
+
+/// Returns a single-character icon for the given state.
+pub fn state_icon(state: TestState) -> &'static str {
+    match state {
+        TestState::Queued => "○",
+        TestState::Running => "◉",
+        TestState::Passed => "✓",
+        TestState::Failed => "✗",
+        TestState::Skipped => "⊘",
+        TestState::Errored => "✗",
+    }
+}
+
+/// Format a test run as a summary output panel.
+pub fn render_output_panel(run: &TestRun) -> String {
+    let stats = run.get_stats();
+    let mut out = String::new();
+    out.push_str(&format!("Test Run: {}\n", run.name));
+    out.push_str(&format!(
+        "Total: {}  Passed: {}  Failed: {}  Skipped: {}  Errored: {}\n",
+        stats.total, stats.passed, stats.failed, stats.skipped, stats.errored
+    ));
+    if let Some(d) = run.duration_ms() {
+        out.push_str(&format!("Duration: {}ms\n", d));
+    }
+    out.push('\n');
+    for item in run.flatten_items() {
+        let icon = state_icon(item.state);
+        let duration = item
+            .duration_ms
+            .map(|d| format!(" ({:.0}ms)", d))
+            .unwrap_or_default();
+        let msg = item
+            .message
+            .as_deref()
+            .map(|m| format!("  → {m}"))
+            .unwrap_or_default();
+        out.push_str(&format!("{icon} {}{duration}{msg}\n", item.label));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
