@@ -595,6 +595,283 @@ impl AccessibilityNode {
     }
 }
 
+// ---------------------------------------------------------------------------
+// AnnouncementQueue — FIFO queue for screen reader announcements
+// ---------------------------------------------------------------------------
+
+use std::collections::VecDeque;
+
+/// A FIFO queue for delivering announcements to screen readers in order.
+///
+/// Unlike the Vec-based queue in [`AccessibilityService`], this provides
+/// bounded capacity with overflow policy and peek/dequeue semantics.
+#[derive(Debug, Clone)]
+pub struct AnnouncementQueue {
+    queue: VecDeque<Announcement>,
+    capacity: usize,
+}
+
+impl AnnouncementQueue {
+    /// Create a queue with the given maximum capacity.
+    /// Capacity is clamped to at least 1.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            queue: VecDeque::new(),
+            capacity: capacity.max(1),
+        }
+    }
+
+    /// Enqueue an announcement. If the queue is full, the oldest announcement
+    /// is dropped to make room.
+    pub fn enqueue(&mut self, announcement: Announcement) {
+        if self.queue.len() >= self.capacity {
+            self.queue.pop_front();
+        }
+        self.queue.push_back(announcement);
+    }
+
+    /// Dequeue the oldest announcement.
+    pub fn dequeue(&mut self) -> Option<Announcement> {
+        self.queue.pop_front()
+    }
+
+    /// Peek at the oldest announcement without removing it.
+    pub fn peek(&self) -> Option<&Announcement> {
+        self.queue.front()
+    }
+
+    /// Drain all announcements in FIFO order.
+    pub fn drain_all(&mut self) -> Vec<Announcement> {
+        self.queue.drain(..).collect()
+    }
+
+    /// Return the number of queued announcements.
+    pub fn len(&self) -> usize {
+        self.queue.len()
+    }
+
+    /// Return `true` if the queue is empty.
+    pub fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    /// Return `true` if the queue is at capacity.
+    pub fn is_full(&self) -> bool {
+        self.queue.len() >= self.capacity
+    }
+
+    /// Return the maximum capacity.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Clear all queued announcements.
+    pub fn clear(&mut self) {
+        self.queue.clear();
+    }
+
+    /// Enqueue a polite announcement with the given message.
+    pub fn enqueue_polite(&mut self, message: impl Into<String>) {
+        self.enqueue(Announcement::polite(message));
+    }
+
+    /// Enqueue an assertive announcement with the given message.
+    pub fn enqueue_assertive(&mut self, message: impl Into<String>) {
+        self.enqueue(Announcement::assertive(message));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// announce_change — construct accessible change descriptions
+// ---------------------------------------------------------------------------
+
+/// Construct an accessible description of a change event.
+///
+/// Combines the `role` of the widget, a human-readable `label`, and an
+/// `action` verb (e.g. "expanded", "selected") into a string suitable for
+/// screen reader announcement.
+pub fn announce_change(role: AriaRole, label: &str, action: &str) -> Announcement {
+    let message = format!("{} \"{}\": {}", role, label, action);
+    Announcement::polite(message)
+}
+
+/// Construct an assertive change announcement for critical events.
+pub fn announce_change_assertive(role: AriaRole, label: &str, action: &str) -> Announcement {
+    let message = format!("{} \"{}\": {}", role, label, action);
+    Announcement::assertive(message)
+}
+
+// ---------------------------------------------------------------------------
+// AriaRole helpers
+// ---------------------------------------------------------------------------
+
+impl AriaRole {
+    /// Returns all defined ARIA roles.
+    pub fn all() -> &'static [AriaRole] {
+        &[
+            AriaRole::Button,
+            AriaRole::Checkbox,
+            AriaRole::Dialog,
+            AriaRole::Grid,
+            AriaRole::List,
+            AriaRole::ListItem,
+            AriaRole::Menu,
+            AriaRole::MenuItem,
+            AriaRole::Tab,
+            AriaRole::TabPanel,
+            AriaRole::Tree,
+            AriaRole::TreeItem,
+            AriaRole::TextBox,
+            AriaRole::Status,
+            AriaRole::Alert,
+        ]
+    }
+
+    /// Returns `true` if this role is an interactive widget role.
+    pub fn is_interactive(&self) -> bool {
+        matches!(
+            self,
+            AriaRole::Button
+                | AriaRole::Checkbox
+                | AriaRole::Menu
+                | AriaRole::MenuItem
+                | AriaRole::Tab
+                | AriaRole::TextBox
+                | AriaRole::TreeItem
+        )
+    }
+
+    /// Returns `true` if this role is a container role.
+    pub fn is_container(&self) -> bool {
+        matches!(
+            self,
+            AriaRole::Dialog
+                | AriaRole::Grid
+                | AriaRole::List
+                | AriaRole::Menu
+                | AriaRole::TabPanel
+                | AriaRole::Tree
+        )
+    }
+
+    /// Parse an ARIA role from its string representation.
+    pub fn from_str(s: &str) -> Option<AriaRole> {
+        match s {
+            "button" => Some(AriaRole::Button),
+            "checkbox" => Some(AriaRole::Checkbox),
+            "dialog" => Some(AriaRole::Dialog),
+            "grid" => Some(AriaRole::Grid),
+            "list" => Some(AriaRole::List),
+            "listitem" => Some(AriaRole::ListItem),
+            "menu" => Some(AriaRole::Menu),
+            "menuitem" => Some(AriaRole::MenuItem),
+            "tab" => Some(AriaRole::Tab),
+            "tabpanel" => Some(AriaRole::TabPanel),
+            "tree" => Some(AriaRole::Tree),
+            "treeitem" => Some(AriaRole::TreeItem),
+            "textbox" => Some(AriaRole::TextBox),
+            "status" => Some(AriaRole::Status),
+            "alert" => Some(AriaRole::Alert),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AccessibilityNode — tree traversal helpers
+// ---------------------------------------------------------------------------
+
+impl AccessibilityNode {
+    /// Collect all leaf nodes (nodes with no children).
+    pub fn leaves(&self) -> Vec<&AccessibilityNode> {
+        let mut result = Vec::new();
+        self.collect_leaves(&mut result);
+        result
+    }
+
+    fn collect_leaves<'a>(&'a self, out: &mut Vec<&'a AccessibilityNode>) {
+        if self.children.is_empty() {
+            out.push(self);
+        } else {
+            for child in &self.children {
+                child.collect_leaves(out);
+            }
+        }
+    }
+
+    /// Find the first node in the tree with the given role (depth-first).
+    pub fn find_by_role(&self, role: AriaRole) -> Option<&AccessibilityNode> {
+        if self.role == role {
+            return Some(self);
+        }
+        for child in &self.children {
+            if let Some(found) = child.find_by_role(role) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
+    /// Collect all node labels in depth-first order.
+    pub fn all_labels(&self) -> Vec<&str> {
+        let mut labels = Vec::new();
+        self.collect_labels(&mut labels);
+        labels
+    }
+
+    fn collect_labels<'a>(&'a self, out: &mut Vec<&'a str>) {
+        out.push(&self.label);
+        for child in &self.children {
+            child.collect_labels(out);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FocusTracker — wrap-around navigation
+// ---------------------------------------------------------------------------
+
+impl FocusTracker {
+    /// Move focus to the next element, wrapping around to the first.
+    pub fn focus_next_wrap(&mut self) -> Option<&str> {
+        let len = self.focus_chain.len();
+        if len == 0 {
+            return None;
+        }
+        let idx = match self.current_index {
+            Some(i) => (i + 1) % len,
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        Some(&self.focus_chain[idx])
+    }
+
+    /// Move focus to the previous element, wrapping around to the last.
+    pub fn focus_previous_wrap(&mut self) -> Option<&str> {
+        let len = self.focus_chain.len();
+        if len == 0 {
+            return None;
+        }
+        let idx = match self.current_index {
+            Some(0) => len - 1,
+            Some(i) => i - 1,
+            None => len - 1,
+        };
+        self.current_index = Some(idx);
+        Some(&self.focus_chain[idx])
+    }
+
+    /// Set focus to the element with the given id. Returns true if found.
+    pub fn focus_by_id(&mut self, id: &str) -> bool {
+        if let Some(pos) = self.focus_chain.iter().position(|s| s == id) {
+            self.current_index = Some(pos);
+            true
+        } else {
+            false
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -941,5 +1218,175 @@ mod tests {
         let leaf = AccessibilityNode::new("leaf", AriaRole::Button);
         assert_eq!(leaf.depth(), 1);
         assert_eq!(leaf.node_count(), 1);
+    }
+
+    // ---- AnnouncementQueue tests ----
+
+    #[test]
+    fn test_announcement_queue_fifo_order() {
+        let mut q = AnnouncementQueue::new(10);
+        q.enqueue_polite("first");
+        q.enqueue_polite("second");
+        q.enqueue_assertive("third");
+        assert_eq!(q.len(), 3);
+        assert_eq!(q.peek().unwrap().message, "first");
+        assert_eq!(q.dequeue().unwrap().message, "first");
+        assert_eq!(q.dequeue().unwrap().message, "second");
+        assert_eq!(q.dequeue().unwrap().message, "third");
+        assert!(q.is_empty());
+    }
+
+    #[test]
+    fn test_announcement_queue_overflow() {
+        let mut q = AnnouncementQueue::new(2);
+        q.enqueue_polite("a");
+        q.enqueue_polite("b");
+        assert!(q.is_full());
+        q.enqueue_polite("c"); // drops "a"
+        assert_eq!(q.len(), 2);
+        assert_eq!(q.dequeue().unwrap().message, "b");
+        assert_eq!(q.dequeue().unwrap().message, "c");
+    }
+
+    #[test]
+    fn test_announcement_queue_drain() {
+        let mut q = AnnouncementQueue::new(5);
+        q.enqueue_polite("x");
+        q.enqueue_assertive("y");
+        let all = q.drain_all();
+        assert_eq!(all.len(), 2);
+        assert!(q.is_empty());
+    }
+
+    #[test]
+    fn test_announcement_queue_capacity() {
+        let q = AnnouncementQueue::new(0); // clamped to 1
+        assert_eq!(q.capacity(), 1);
+    }
+
+    // ---- announce_change tests ----
+
+    #[test]
+    fn test_announce_change_polite() {
+        let ann = announce_change(AriaRole::TreeItem, "src/main.rs", "expanded");
+        assert_eq!(ann.priority, AnnouncementPriority::Polite);
+        assert!(ann.message.contains("treeitem"));
+        assert!(ann.message.contains("src/main.rs"));
+        assert!(ann.message.contains("expanded"));
+    }
+
+    #[test]
+    fn test_announce_change_assertive() {
+        let ann = announce_change_assertive(AriaRole::Alert, "Error", "file not found");
+        assert_eq!(ann.priority, AnnouncementPriority::Assertive);
+        assert!(ann.message.contains("alert"));
+    }
+
+    // ---- AriaRole helpers ----
+
+    #[test]
+    fn test_aria_role_all_variants() {
+        let all = AriaRole::all();
+        assert_eq!(all.len(), 15);
+        assert!(all.contains(&AriaRole::Button));
+        assert!(all.contains(&AriaRole::Alert));
+    }
+
+    #[test]
+    fn test_aria_role_interactive() {
+        assert!(AriaRole::Button.is_interactive());
+        assert!(AriaRole::Checkbox.is_interactive());
+        assert!(AriaRole::TextBox.is_interactive());
+        assert!(!AriaRole::Dialog.is_interactive());
+        assert!(!AriaRole::List.is_interactive());
+        assert!(!AriaRole::Status.is_interactive());
+    }
+
+    #[test]
+    fn test_aria_role_container() {
+        assert!(AriaRole::Dialog.is_container());
+        assert!(AriaRole::Tree.is_container());
+        assert!(AriaRole::List.is_container());
+        assert!(!AriaRole::Button.is_container());
+        assert!(!AriaRole::TextBox.is_container());
+    }
+
+    #[test]
+    fn test_aria_role_from_str() {
+        assert_eq!(AriaRole::from_str("button"), Some(AriaRole::Button));
+        assert_eq!(AriaRole::from_str("dialog"), Some(AriaRole::Dialog));
+        assert_eq!(AriaRole::from_str("unknown"), None);
+    }
+
+    // ---- AccessibilityNode tree helpers ----
+
+    #[test]
+    fn test_node_leaves() {
+        let mut root = AccessibilityNode::new("root", AriaRole::Tree);
+        let mut branch = AccessibilityNode::new("branch", AriaRole::TreeItem);
+        branch.add_child(AccessibilityNode::new("leaf1", AriaRole::TreeItem));
+        branch.add_child(AccessibilityNode::new("leaf2", AriaRole::TreeItem));
+        root.add_child(branch);
+        root.add_child(AccessibilityNode::new("leaf3", AriaRole::TreeItem));
+        let leaves = root.leaves();
+        assert_eq!(leaves.len(), 3);
+        assert_eq!(leaves[0].label, "leaf1");
+        assert_eq!(leaves[2].label, "leaf3");
+    }
+
+    #[test]
+    fn test_node_find_by_role() {
+        let mut root = AccessibilityNode::new("root", AriaRole::Tree);
+        let mut child = AccessibilityNode::new("child", AriaRole::List);
+        child.add_child(AccessibilityNode::new("btn", AriaRole::Button));
+        root.add_child(child);
+        assert_eq!(root.find_by_role(AriaRole::Button).unwrap().label, "btn");
+        assert!(root.find_by_role(AriaRole::Alert).is_none());
+    }
+
+    #[test]
+    fn test_node_all_labels() {
+        let mut root = AccessibilityNode::new("root", AriaRole::Tree);
+        root.add_child(AccessibilityNode::new("a", AriaRole::TreeItem));
+        root.add_child(AccessibilityNode::new("b", AriaRole::TreeItem));
+        let labels = root.all_labels();
+        assert_eq!(labels, vec!["root", "a", "b"]);
+    }
+
+    // ---- FocusTracker wrap-around ----
+
+    #[test]
+    fn test_focus_tracker_wrap_around_next() {
+        let mut ft = FocusTracker::new();
+        ft.push("a".to_string());
+        ft.push("b".to_string());
+        ft.push("c".to_string());
+        assert_eq!(ft.focus_next_wrap(), Some("b"));
+        assert_eq!(ft.focus_next_wrap(), Some("c"));
+        assert_eq!(ft.focus_next_wrap(), Some("a")); // wraps
+        assert_eq!(ft.focus_next_wrap(), Some("b"));
+    }
+
+    #[test]
+    fn test_focus_tracker_wrap_around_prev() {
+        let mut ft = FocusTracker::new();
+        ft.push("a".to_string());
+        ft.push("b".to_string());
+        ft.push("c".to_string());
+        assert_eq!(ft.focus_previous_wrap(), Some("c")); // wraps from 0
+        assert_eq!(ft.focus_previous_wrap(), Some("b"));
+        assert_eq!(ft.focus_previous_wrap(), Some("a"));
+        assert_eq!(ft.focus_previous_wrap(), Some("c")); // wraps again
+    }
+
+    #[test]
+    fn test_focus_tracker_focus_by_id() {
+        let mut ft = FocusTracker::new();
+        ft.push("alpha".to_string());
+        ft.push("beta".to_string());
+        ft.push("gamma".to_string());
+        assert!(ft.focus_by_id("beta"));
+        assert_eq!(ft.current_focus(), Some("beta"));
+        assert!(!ft.focus_by_id("delta"));
     }
 }

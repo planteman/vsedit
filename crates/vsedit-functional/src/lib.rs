@@ -542,6 +542,117 @@ where
     Err(last_err.unwrap())
 }
 
+/// Builder for composing an arbitrary number of `T -> T` functions left-to-right.
+pub struct PipeBuilder<T: 'static> {
+    fns: Vec<Box<dyn Fn(T) -> T>>,
+}
+
+impl<T: 'static> PipeBuilder<T> {
+    /// Create a new empty pipe builder.
+    pub fn new() -> Self {
+        Self { fns: Vec::new() }
+    }
+
+    /// Append a function to the pipeline.
+    pub fn then(mut self, f: impl Fn(T) -> T + 'static) -> Self {
+        self.fns.push(Box::new(f));
+        self
+    }
+
+    /// Consume the builder and return a single composed function.
+    ///
+    /// An empty pipeline acts as the identity function.
+    pub fn build(self) -> Box<dyn Fn(T) -> T> {
+        Box::new(move |mut val| {
+            for f in &self.fns {
+                val = f(val);
+            }
+            val
+        })
+    }
+
+    /// Return the number of functions in the pipeline.
+    pub fn len(&self) -> usize {
+        self.fns.len()
+    }
+
+    /// Return `true` if the pipeline contains no functions.
+    pub fn is_empty(&self) -> bool {
+        self.fns.is_empty()
+    }
+}
+
+impl<T: 'static> Default for PipeBuilder<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Create a new [`PipeBuilder`] for composing `T -> T` functions.
+pub fn pipe<T: 'static>() -> PipeBuilder<T> {
+    PipeBuilder::new()
+}
+
+/// Wrap a function with debounce logic using an invocation counter.
+///
+/// The returned closure only calls `f` every `threshold`-th invocation,
+/// returning `Some(result)`. All other calls return `None`.
+pub fn debounce_fn<T, R>(
+    f: impl Fn(T) -> R + 'static,
+    threshold: usize,
+) -> impl FnMut(T) -> Option<R> {
+    let mut calls: usize = 0;
+    move |arg| {
+        calls += 1;
+        if calls >= threshold {
+            calls = 0;
+            Some(f(arg))
+        } else {
+            None
+        }
+    }
+}
+
+/// Generate a sequence by repeatedly applying a function to a state.
+///
+/// Starting with `seed`, calls `f(&state)`. When it returns
+/// `Some((value, next_state))`, pushes `value` and continues. Stops on `None`.
+pub fn unfold<T: Clone, S>(seed: S, f: impl Fn(&S) -> Option<(T, S)>) -> Vec<T> {
+    let mut state = seed;
+    let mut result = Vec::new();
+    while let Some((value, next)) = f(&state) {
+        result.push(value);
+        state = next;
+    }
+    result
+}
+
+/// Map each item with `f` and flatten the resulting `Vec`s into one.
+pub fn flatmap<T, R>(items: impl IntoIterator<Item = T>, f: impl Fn(T) -> Vec<R>) -> Vec<R> {
+    let mut result = Vec::new();
+    for item in items {
+        result.extend(f(item));
+    }
+    result
+}
+
+/// Like `take_while` but includes the first element that does not match the
+/// predicate.
+pub fn take_while_inclusive<T>(
+    items: impl IntoIterator<Item = T>,
+    pred: impl Fn(&T) -> bool,
+) -> Vec<T> {
+    let mut result = Vec::new();
+    for item in items {
+        let matches = pred(&item);
+        result.push(item);
+        if !matches {
+            break;
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -932,5 +1043,77 @@ mod tests {
         let result: Result<i32, &str> = retry_with_callback(3, || { count += 1; Err("fail") }, |_| {});
         assert_eq!(result, Err("fail"));
         assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn pipe_builder_multiple_functions() {
+        let add_one = |x: i32| x + 1;
+        let double = |x: i32| x * 2;
+        let negate = |x: i32| -x;
+        let f = pipe().then(add_one).then(double).then(negate).build();
+        // (5 + 1) * 2 = 12, then -12
+        assert_eq!(f(5), -12);
+    }
+
+    #[test]
+    fn pipe_builder_empty_is_identity() {
+        let f = pipe::<i32>().build();
+        assert_eq!(f(42), 42);
+    }
+
+    #[test]
+    fn pipe_builder_len_and_empty() {
+        let b = pipe::<i32>();
+        assert!(b.is_empty());
+        assert_eq!(b.len(), 0);
+        let b = b.then(|x| x + 1);
+        assert!(!b.is_empty());
+        assert_eq!(b.len(), 1);
+    }
+
+    #[test]
+    fn debounce_fn_triggers_at_threshold() {
+        let mut d = debounce_fn(|x: i32| x * 10, 3);
+        d(1); // call 1
+        d(2); // call 2
+        let result = d(3); // call 3 → triggers
+        assert_eq!(result, Some(30));
+    }
+
+    #[test]
+    fn debounce_fn_returns_none_before_threshold() {
+        let mut d = debounce_fn(|x: i32| x * 10, 3);
+        assert_eq!(d(1), None);
+        assert_eq!(d(2), None);
+    }
+
+    #[test]
+    fn unfold_generates_fibonacci() {
+        let fibs = unfold((0_u64, 1_u64), |&(a, b)| {
+            if a > 20 {
+                None
+            } else {
+                Some((a, (b, a + b)))
+            }
+        });
+        assert_eq!(fibs, vec![0, 1, 1, 2, 3, 5, 8, 13]);
+    }
+
+    #[test]
+    fn unfold_stops_on_none() {
+        let result = unfold(0, |_: &i32| None::<(i32, i32)>);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn flatmap_flattens_results() {
+        let result = flatmap(vec![1, 2, 3], |x| vec![x, x * 10]);
+        assert_eq!(result, vec![1, 10, 2, 20, 3, 30]);
+    }
+
+    #[test]
+    fn take_while_inclusive_includes_boundary() {
+        let result = take_while_inclusive(vec![1, 2, 3, 4, 5], |&x| x < 3);
+        assert_eq!(result, vec![1, 2, 3]);
     }
 }

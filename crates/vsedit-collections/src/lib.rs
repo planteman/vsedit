@@ -450,6 +450,212 @@ where
 }
 
 // ---------------------------------------------------------------------------
+// LRUCache<K, V>
+// ---------------------------------------------------------------------------
+
+/// A least-recently-used cache with configurable capacity.
+///
+/// When the cache exceeds capacity, the least-recently accessed entry is evicted.
+/// Both `get` and `set` count as access.
+#[derive(Debug)]
+pub struct LruCache<K, V> {
+    /// Entries in order from least-recently used (front) to most-recently used (back).
+    entries: Vec<(K, V)>,
+    capacity: usize,
+}
+
+impl<K: Eq + Hash, V> LruCache<K, V> {
+    /// Create a new LRU cache with the given capacity (clamped to at least 1).
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            capacity: capacity.max(1),
+        }
+    }
+
+    /// Get a reference to the value for `key`, marking it as recently used.
+    pub fn get(&mut self, key: &K) -> Option<&V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            let entry = self.entries.remove(pos);
+            self.entries.push(entry);
+            self.entries.last().map(|(_, v)| v)
+        } else {
+            None
+        }
+    }
+
+    /// Peek at a value without updating its position.
+    pub fn peek(&self, key: &K) -> Option<&V> {
+        self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    }
+
+    /// Insert or update a key-value pair. Returns the evicted entry if the
+    /// cache was at capacity and a new key was inserted.
+    pub fn set(&mut self, key: K, value: V) -> Option<(K, V)> {
+        // Remove existing entry for this key.
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == &key) {
+            self.entries.remove(pos);
+        }
+
+        // Evict if at capacity.
+        let evicted = if self.entries.len() >= self.capacity {
+            Some(self.entries.remove(0))
+        } else {
+            None
+        };
+
+        self.entries.push((key, value));
+        evicted
+    }
+
+    /// Remove a key from the cache, returning its value if present.
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        if let Some(pos) = self.entries.iter().position(|(k, _)| k == key) {
+            Some(self.entries.remove(pos).1)
+        } else {
+            None
+        }
+    }
+
+    /// Returns the number of entries in the cache.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` if the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Returns `true` if the cache contains `key`.
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+
+    /// Returns the cache capacity.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Return keys in order from least-recently used to most-recently used.
+    pub fn keys(&self) -> impl Iterator<Item = &K> {
+        self.entries.iter().map(|(k, _)| k)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PriorityQueue<T> — min-heap
+// ---------------------------------------------------------------------------
+
+/// A min-priority queue backed by a binary heap.
+///
+/// The smallest element (according to `Ord`) is dequeued first.
+#[derive(Debug, Clone)]
+pub struct PriorityQueue<T> {
+    heap: Vec<T>,
+}
+
+impl<T: Ord> PriorityQueue<T> {
+    /// Create an empty priority queue.
+    pub fn new() -> Self {
+        Self { heap: Vec::new() }
+    }
+
+    /// Push an item onto the queue.
+    pub fn push(&mut self, item: T) {
+        self.heap.push(item);
+        self.sift_up(self.heap.len() - 1);
+    }
+
+    /// Remove and return the smallest item, or `None` if empty.
+    pub fn pop(&mut self) -> Option<T> {
+        if self.heap.is_empty() {
+            return None;
+        }
+        let last = self.heap.len() - 1;
+        self.heap.swap(0, last);
+        let item = self.heap.pop();
+        if !self.heap.is_empty() {
+            self.sift_down(0);
+        }
+        item
+    }
+
+    /// Peek at the smallest item without removing it.
+    pub fn peek(&self) -> Option<&T> {
+        self.heap.first()
+    }
+
+    /// Returns the number of items in the queue.
+    pub fn len(&self) -> usize {
+        self.heap.len()
+    }
+
+    /// Returns `true` if the queue is empty.
+    pub fn is_empty(&self) -> bool {
+        self.heap.is_empty()
+    }
+
+    /// Clear all items from the queue.
+    pub fn clear(&mut self) {
+        self.heap.clear();
+    }
+
+    /// Drain all items in sorted (ascending) order.
+    pub fn drain_sorted(&mut self) -> Vec<T> {
+        let mut result = Vec::with_capacity(self.heap.len());
+        while let Some(item) = self.pop() {
+            result.push(item);
+        }
+        result
+    }
+
+    fn sift_up(&mut self, mut idx: usize) {
+        while idx > 0 {
+            let parent = (idx - 1) / 2;
+            if self.heap[idx] < self.heap[parent] {
+                self.heap.swap(idx, parent);
+                idx = parent;
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn sift_down(&mut self, mut idx: usize) {
+        let len = self.heap.len();
+        loop {
+            let left = 2 * idx + 1;
+            let right = 2 * idx + 2;
+            let mut smallest = idx;
+            if left < len && self.heap[left] < self.heap[smallest] {
+                smallest = left;
+            }
+            if right < len && self.heap[right] < self.heap[smallest] {
+                smallest = right;
+            }
+            if smallest != idx {
+                self.heap.swap(idx, smallest);
+                idx = smallest;
+            } else {
+                break;
+            }
+        }
+    }
+}
+
+impl<T: Ord> Default for PriorityQueue<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Utility functions
 // ---------------------------------------------------------------------------
 
@@ -945,5 +1151,165 @@ mod tests {
         let items = vec![1, 3, 5];
         let result = coalesce(items, |_, _| None);
         assert_eq!(result, vec![1, 3, 5]);
+    }
+
+    // -- LruCache -----------------------------------------------------------
+
+    #[test]
+    fn lru_cache_basic_get_set() {
+        let mut cache = LruCache::new(3);
+        cache.set("a", 1);
+        cache.set("b", 2);
+        cache.set("c", 3);
+        assert_eq!(cache.len(), 3);
+        assert_eq!(cache.get(&"a"), Some(&1));
+        assert_eq!(cache.get(&"b"), Some(&2));
+        assert!(cache.contains_key(&"c"));
+    }
+
+    #[test]
+    fn lru_cache_eviction() {
+        let mut cache = LruCache::new(2);
+        cache.set("a", 1);
+        cache.set("b", 2);
+        let evicted = cache.set("c", 3); // evicts "a"
+        assert_eq!(evicted, Some(("a", 1)));
+        assert!(!cache.contains_key(&"a"));
+        assert!(cache.contains_key(&"b"));
+        assert!(cache.contains_key(&"c"));
+    }
+
+    #[test]
+    fn lru_cache_access_updates_order() {
+        let mut cache = LruCache::new(2);
+        cache.set("a", 1);
+        cache.set("b", 2);
+        cache.get(&"a"); // "a" is now most recent
+        let evicted = cache.set("c", 3); // evicts "b" (least recent)
+        assert_eq!(evicted, Some(("b", 2)));
+        assert!(cache.contains_key(&"a"));
+    }
+
+    #[test]
+    fn lru_cache_update_existing() {
+        let mut cache = LruCache::new(2);
+        cache.set("a", 1);
+        cache.set("b", 2);
+        cache.set("a", 10); // update, no eviction
+        assert_eq!(cache.get(&"a"), Some(&10));
+        assert_eq!(cache.len(), 2);
+    }
+
+    #[test]
+    fn lru_cache_remove() {
+        let mut cache = LruCache::new(3);
+        cache.set("a", 1);
+        cache.set("b", 2);
+        assert_eq!(cache.remove(&"a"), Some(1));
+        assert_eq!(cache.len(), 1);
+        assert!(cache.remove(&"z").is_none());
+    }
+
+    #[test]
+    fn lru_cache_peek_no_reorder() {
+        let mut cache = LruCache::new(2);
+        cache.set("a", 1);
+        cache.set("b", 2);
+        assert_eq!(cache.peek(&"a"), Some(&1));
+        // Peek shouldn't change order, so "a" should still be LRU
+        let evicted = cache.set("c", 3);
+        assert_eq!(evicted, Some(("a", 1)));
+    }
+
+    #[test]
+    fn lru_cache_clear() {
+        let mut cache = LruCache::new(3);
+        cache.set("a", 1);
+        cache.set("b", 2);
+        cache.clear();
+        assert!(cache.is_empty());
+        assert_eq!(cache.capacity(), 3);
+    }
+
+    #[test]
+    fn lru_cache_keys_order() {
+        let mut cache = LruCache::new(3);
+        cache.set("a", 1);
+        cache.set("b", 2);
+        cache.set("c", 3);
+        cache.get(&"a"); // move "a" to most recent
+        let keys: Vec<_> = cache.keys().collect();
+        assert_eq!(keys, vec![&"b", &"c", &"a"]); // LRU → MRU
+    }
+
+    // -- PriorityQueue ------------------------------------------------------
+
+    #[test]
+    fn priority_queue_min_heap() {
+        let mut pq = PriorityQueue::new();
+        pq.push(5);
+        pq.push(1);
+        pq.push(3);
+        pq.push(2);
+        pq.push(4);
+        assert_eq!(pq.len(), 5);
+        assert_eq!(pq.peek(), Some(&1));
+        assert_eq!(pq.pop(), Some(1));
+        assert_eq!(pq.pop(), Some(2));
+        assert_eq!(pq.pop(), Some(3));
+        assert_eq!(pq.pop(), Some(4));
+        assert_eq!(pq.pop(), Some(5));
+        assert!(pq.is_empty());
+    }
+
+    #[test]
+    fn priority_queue_drain_sorted() {
+        let mut pq = PriorityQueue::new();
+        pq.push(10);
+        pq.push(3);
+        pq.push(7);
+        pq.push(1);
+        let sorted = pq.drain_sorted();
+        assert_eq!(sorted, vec![1, 3, 7, 10]);
+        assert!(pq.is_empty());
+    }
+
+    #[test]
+    fn priority_queue_single_element() {
+        let mut pq = PriorityQueue::new();
+        pq.push(42);
+        assert_eq!(pq.peek(), Some(&42));
+        assert_eq!(pq.pop(), Some(42));
+        assert!(pq.pop().is_none());
+    }
+
+    #[test]
+    fn priority_queue_duplicates() {
+        let mut pq = PriorityQueue::new();
+        pq.push(3);
+        pq.push(1);
+        pq.push(3);
+        pq.push(1);
+        assert_eq!(pq.drain_sorted(), vec![1, 1, 3, 3]);
+    }
+
+    #[test]
+    fn priority_queue_clear() {
+        let mut pq = PriorityQueue::new();
+        pq.push(1);
+        pq.push(2);
+        pq.clear();
+        assert!(pq.is_empty());
+    }
+
+    #[test]
+    fn priority_queue_with_strings() {
+        let mut pq: PriorityQueue<String> = PriorityQueue::new();
+        pq.push("banana".into());
+        pq.push("apple".into());
+        pq.push("cherry".into());
+        assert_eq!(pq.pop().as_deref(), Some("apple"));
+        assert_eq!(pq.pop().as_deref(), Some("banana"));
+        assert_eq!(pq.pop().as_deref(), Some("cherry"));
     }
 }

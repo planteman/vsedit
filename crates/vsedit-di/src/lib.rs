@@ -533,6 +533,152 @@ impl fmt::Display for ContainerDiagnostics {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ServiceScope — hierarchical DI scope
+// ---------------------------------------------------------------------------
+
+/// A hierarchical DI scope where a child inherits parent services but can
+/// override them with its own registrations.
+pub struct ServiceScope {
+    own: ServiceCollection,
+    parent: Option<Arc<RwLock<ServiceCollection>>>,
+}
+
+impl ServiceScope {
+    /// Create a root scope with no parent.
+    pub fn new() -> Self {
+        Self {
+            own: ServiceCollection::new(),
+            parent: None,
+        }
+    }
+
+    /// Create a child scope that references the parent accessor's collection.
+    pub fn child(parent: &ServiceAccessor) -> Self {
+        Self {
+            own: ServiceCollection::new(),
+            parent: Some(Arc::clone(&parent.inner)),
+        }
+    }
+
+    /// Register a service in this scope's own collection.
+    pub fn register<T: Service>(&mut self, service: T) {
+        self.own.register(service);
+    }
+
+    /// Get a reference to a service registered in this scope's own collection.
+    ///
+    /// Does **not** look into the parent because we cannot return a reference
+    /// through a `RwLock` guard. Use [`has`](Self::has) to check both scopes.
+    pub fn get<T: Service>(&self) -> Option<&T> {
+        self.own.get::<T>()
+    }
+
+    /// Returns `true` if a service of type `T` exists in this scope or the
+    /// parent scope.
+    pub fn has<T: Service>(&self) -> bool {
+        if self.own.has::<T>() {
+            return true;
+        }
+        if let Some(ref parent) = self.parent {
+            if let Ok(guard) = parent.read() {
+                return guard.has::<T>();
+            }
+        }
+        false
+    }
+
+    /// Returns `true` if a service of type `T` exists only in this scope's own
+    /// collection.
+    pub fn has_own<T: Service>(&self) -> bool {
+        self.own.has::<T>()
+    }
+
+    /// Returns the number of services registered in this scope's own
+    /// collection (excluding parent).
+    pub fn own_count(&self) -> usize {
+        self.own.len()
+    }
+}
+
+impl Default for ServiceScope {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ServiceRegistry — tagged multi-implementation registry
+// ---------------------------------------------------------------------------
+
+/// A registry that allows multiple service implementations to be registered
+/// under string tags and retrieved as a group.
+pub struct ServiceRegistry {
+    tagged: HashMap<String, Vec<Box<dyn Any + Send + Sync>>>,
+}
+
+impl ServiceRegistry {
+    /// Create an empty registry.
+    pub fn new() -> Self {
+        Self {
+            tagged: HashMap::new(),
+        }
+    }
+
+    /// Register a service under the given tag.
+    pub fn register_tagged<T: Service>(&mut self, tag: &str, service: T) {
+        self.tagged
+            .entry(tag.to_string())
+            .or_default()
+            .push(Box::new(service));
+    }
+
+    /// Return references to all services of type `T` registered under the
+    /// given tag.
+    pub fn get_tagged<T: Service>(&self, tag: &str) -> Vec<&T> {
+        self.tagged
+            .get(tag)
+            .map(|entries| {
+                entries
+                    .iter()
+                    .filter_map(|b| b.downcast_ref::<T>())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Number of services stored under the given tag.
+    pub fn tag_count(&self, tag: &str) -> usize {
+        self.tagged.get(tag).map_or(0, |v| v.len())
+    }
+
+    /// All registered tags.
+    pub fn tags(&self) -> Vec<&str> {
+        self.tagged.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Returns `true` if the given tag has been registered.
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tagged.contains_key(tag)
+    }
+
+    /// Remove all services registered under the given tag.
+    pub fn clear_tag(&mut self, tag: &str) {
+        self.tagged.remove(tag);
+    }
+
+    /// Total number of services across all tags.
+    pub fn total_services(&self) -> usize {
+        self.tagged.values().map(|v| v.len()).sum()
+    }
+}
+
+impl Default for ServiceRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -938,5 +1084,122 @@ mod tests {
         let diag_after = ContainerDiagnostics::from_collection(&sc);
         assert_eq!(diag_after.factory_count, 0);
         assert_eq!(diag_after.instance_count, 1);
+    }
+
+    // -- ServiceScope tests -------------------------------------------------
+
+    #[test]
+    fn scope_root_register_and_get() {
+        let mut scope = ServiceScope::new();
+        scope.register(LogService { prefix: "root".into() });
+        let log = scope.get::<LogService>().unwrap();
+        assert_eq!(log.prefix, "root");
+        assert_eq!(scope.own_count(), 1);
+    }
+
+    #[test]
+    fn scope_child_has_from_parent() {
+        let mut parent_col = ServiceCollection::new();
+        parent_col.register(ConfigService { value: 42 });
+        let accessor = ServiceAccessor::new(parent_col);
+
+        let child = ServiceScope::child(&accessor);
+        assert!(child.has::<ConfigService>());
+        // get returns None because we can't return ref through RwLock
+        assert!(child.get::<ConfigService>().is_none());
+    }
+
+    #[test]
+    fn scope_child_override_parent() {
+        let mut parent_col = ServiceCollection::new();
+        parent_col.register(LogService { prefix: "parent".into() });
+        let accessor = ServiceAccessor::new(parent_col);
+
+        let mut child = ServiceScope::child(&accessor);
+        child.register(LogService { prefix: "child".into() });
+
+        let log = child.get::<LogService>().unwrap();
+        assert_eq!(log.prefix, "child");
+        assert!(child.has_own::<LogService>());
+    }
+
+    #[test]
+    fn scope_has_own_vs_has() {
+        let mut parent_col = ServiceCollection::new();
+        parent_col.register(ConfigService { value: 10 });
+        let accessor = ServiceAccessor::new(parent_col);
+
+        let mut child = ServiceScope::child(&accessor);
+        child.register(LogService { prefix: "mine".into() });
+
+        assert!(child.has_own::<LogService>());
+        assert!(!child.has_own::<ConfigService>());
+        assert!(child.has::<LogService>());
+        assert!(child.has::<ConfigService>());
+    }
+
+    // -- ServiceRegistry tests ----------------------------------------------
+
+    #[test]
+    fn registry_register_and_get_tagged() {
+        let mut reg = ServiceRegistry::new();
+        reg.register_tagged("loggers", LogService { prefix: "a".into() });
+
+        let loggers = reg.get_tagged::<LogService>("loggers");
+        assert_eq!(loggers.len(), 1);
+        assert_eq!(loggers[0].prefix, "a");
+    }
+
+    #[test]
+    fn registry_multiple_implementations() {
+        let mut reg = ServiceRegistry::new();
+        reg.register_tagged("loggers", LogService { prefix: "a".into() });
+        reg.register_tagged("loggers", LogService { prefix: "b".into() });
+        reg.register_tagged("loggers", LogService { prefix: "c".into() });
+
+        let loggers = reg.get_tagged::<LogService>("loggers");
+        assert_eq!(loggers.len(), 3);
+        assert_eq!(loggers[1].prefix, "b");
+    }
+
+    #[test]
+    fn registry_tag_count_and_tags() {
+        let mut reg = ServiceRegistry::new();
+        reg.register_tagged("loggers", LogService { prefix: "x".into() });
+        reg.register_tagged("loggers", LogService { prefix: "y".into() });
+        reg.register_tagged("configs", ConfigService { value: 1 });
+
+        assert_eq!(reg.tag_count("loggers"), 2);
+        assert_eq!(reg.tag_count("configs"), 1);
+        assert_eq!(reg.tag_count("missing"), 0);
+
+        let tags = reg.tags();
+        assert_eq!(tags.len(), 2);
+        assert!(tags.contains(&"loggers"));
+        assert!(tags.contains(&"configs"));
+    }
+
+    #[test]
+    fn registry_clear_tag() {
+        let mut reg = ServiceRegistry::new();
+        reg.register_tagged("loggers", LogService { prefix: "a".into() });
+        reg.register_tagged("loggers", LogService { prefix: "b".into() });
+        assert!(reg.has_tag("loggers"));
+
+        reg.clear_tag("loggers");
+        assert!(!reg.has_tag("loggers"));
+        assert_eq!(reg.tag_count("loggers"), 0);
+    }
+
+    #[test]
+    fn registry_total_services() {
+        let mut reg = ServiceRegistry::new();
+        reg.register_tagged("loggers", LogService { prefix: "a".into() });
+        reg.register_tagged("loggers", LogService { prefix: "b".into() });
+        reg.register_tagged("configs", ConfigService { value: 1 });
+
+        assert_eq!(reg.total_services(), 3);
+        reg.clear_tag("loggers");
+        assert_eq!(reg.total_services(), 1);
     }
 }

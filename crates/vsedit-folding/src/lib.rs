@@ -489,6 +489,203 @@ pub struct FoldingStatistics {
     pub total_span: u32,
 }
 
+// ---------------------------------------------------------------------------
+// Comment-based folding provider
+// ---------------------------------------------------------------------------
+
+/// A folding provider that detects consecutive comment-line blocks.
+pub struct CommentFoldingProvider {
+    pub comment_prefix: String,
+}
+
+impl CommentFoldingProvider {
+    pub fn new(comment_prefix: &str) -> Self {
+        Self {
+            comment_prefix: comment_prefix.to_string(),
+        }
+    }
+}
+
+impl FoldingProvider for CommentFoldingProvider {
+    fn compute_folding_ranges(&self, text: &str) -> Vec<FoldingRange> {
+        let mut ranges = Vec::new();
+        let mut block_start: Option<u32> = None;
+
+        for (i, line) in text.lines().enumerate() {
+            let line_num = (i + 1) as u32;
+            let trimmed = line.trim_start();
+            if trimmed.starts_with(&self.comment_prefix) {
+                if block_start.is_none() {
+                    block_start = Some(line_num);
+                }
+            } else {
+                if let Some(start) = block_start.take() {
+                    let end = line_num - 1;
+                    if end > start {
+                        ranges.push(FoldingRange {
+                            start_line: start,
+                            end_line: end,
+                            kind: FoldingRangeKind::Comment,
+                            is_collapsed: false,
+                        });
+                    }
+                }
+            }
+        }
+        // Close trailing comment block
+        if let Some(start) = block_start {
+            let end = text.lines().count() as u32;
+            if end > start {
+                ranges.push(FoldingRange {
+                    start_line: start,
+                    end_line: end,
+                    kind: FoldingRangeKind::Comment,
+                    is_collapsed: false,
+                });
+            }
+        }
+        ranges
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Folding range set with set operations
+// ---------------------------------------------------------------------------
+
+/// A collection of folding ranges with set operations.
+#[derive(Debug, Clone)]
+pub struct FoldingRangeSet {
+    ranges: Vec<FoldingRange>,
+}
+
+impl FoldingRangeSet {
+    pub fn new() -> Self {
+        Self { ranges: Vec::new() }
+    }
+
+    pub fn add(&mut self, range: FoldingRange) {
+        self.ranges.push(range);
+    }
+
+    /// Merge all ranges from `other`, deduplicating by start_line + end_line.
+    pub fn merge(&mut self, other: &FoldingRangeSet) {
+        for r in &other.ranges {
+            let duplicate = self
+                .ranges
+                .iter()
+                .any(|existing| existing.start_line == r.start_line && existing.end_line == r.end_line);
+            if !duplicate {
+                self.ranges.push(r.clone());
+            }
+        }
+    }
+
+    pub fn get_ranges(&self) -> &[FoldingRange] {
+        &self.ranges
+    }
+
+    /// Return all ranges that contain `line`.
+    pub fn ranges_containing_line(&self, line: u32) -> Vec<&FoldingRange> {
+        self.ranges
+            .iter()
+            .filter(|r| line >= r.start_line && line <= r.end_line)
+            .collect()
+    }
+
+    /// Return ranges at a specific nesting depth (0 = top-level).
+    pub fn ranges_at_depth(&self, depth: u32) -> Vec<&FoldingRange> {
+        self.ranges
+            .iter()
+            .filter(|r| r.nesting_depth_in(&self.ranges) == depth)
+            .collect()
+    }
+
+    /// Collapse all ranges at a given nesting depth.
+    pub fn collapse_all_at_depth(&mut self, depth: u32) {
+        let snapshot: Vec<FoldingRange> = self.ranges.clone();
+        for range in &mut self.ranges {
+            if range.nesting_depth_in(&snapshot) == depth {
+                range.is_collapsed = true;
+            }
+        }
+    }
+
+    /// Sum of lines hidden by collapsed ranges (end - start for each).
+    pub fn total_hidden_lines(&self) -> u32 {
+        self.ranges
+            .iter()
+            .filter(|r| r.is_collapsed)
+            .map(|r| r.end_line - r.start_line)
+            .sum()
+    }
+
+    pub fn len(&self) -> usize {
+        self.ranges.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.ranges.is_empty()
+    }
+}
+
+impl Default for FoldingRangeSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Region fold / unfold
+// ---------------------------------------------------------------------------
+
+/// Fold the range starting at `start_line`. When `recursive` is true, also
+/// fold all nested ranges within the target.
+pub fn fold_region(model: &mut FoldingModel, start_line: u32, recursive: bool) {
+    let nested_starts: Vec<u32> = if recursive {
+        if let Some(parent) = model.get_range_at(start_line).cloned() {
+            model
+                .find_nested(&parent)
+                .iter()
+                .map(|r| r.start_line)
+                .collect()
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
+
+    for range in model.ranges.iter_mut() {
+        if range.start_line == start_line || (recursive && nested_starts.contains(&range.start_line)) {
+            range.is_collapsed = true;
+        }
+    }
+}
+
+/// Unfold the range starting at `start_line`. When `recursive` is true, also
+/// unfold all nested ranges within the target.
+pub fn unfold_region(model: &mut FoldingModel, start_line: u32, recursive: bool) {
+    let nested_starts: Vec<u32> = if recursive {
+        if let Some(parent) = model.get_range_at(start_line).cloned() {
+            model
+                .find_nested(&parent)
+                .iter()
+                .map(|r| r.start_line)
+                .collect()
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
+
+    for range in model.ranges.iter_mut() {
+        if range.start_line == start_line || (recursive && nested_starts.contains(&range.start_line)) {
+            range.is_collapsed = false;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -931,5 +1128,140 @@ mod tests {
         let text = "use std::io;\nuse std::fmt;\n\nfn main() {\n    println!(\"hello\");\n}\n";
         let ranges = provider.compute_folding_ranges(text);
         assert!(ranges.len() >= 2); // imports + bracket fold
+    }
+
+    #[test]
+    fn comment_provider_detects_comment_blocks() {
+        let provider = CommentFoldingProvider::new("//");
+        let text = "// first\n// second\n// third\nfn main() {}\n";
+        let ranges = provider.compute_folding_ranges(text);
+        assert_eq!(ranges.len(), 1);
+        assert_eq!(ranges[0].start_line, 1);
+        assert_eq!(ranges[0].end_line, 3);
+        assert_eq!(ranges[0].kind, FoldingRangeKind::Comment);
+    }
+
+    #[test]
+    fn comment_provider_skips_non_comment_lines() {
+        let provider = CommentFoldingProvider::new("//");
+        let text = "let x = 1;\nlet y = 2;\nlet z = 3;\n";
+        let ranges = provider.compute_folding_ranges(text);
+        assert!(ranges.is_empty());
+    }
+
+    #[test]
+    fn folding_range_set_add_and_get() {
+        let mut set = FoldingRangeSet::new();
+        assert!(set.is_empty());
+        set.add(FoldingRange {
+            start_line: 1, end_line: 10,
+            kind: FoldingRangeKind::Region, is_collapsed: false,
+        });
+        assert_eq!(set.len(), 1);
+        assert_eq!(set.get_ranges()[0].start_line, 1);
+    }
+
+    #[test]
+    fn folding_range_set_merge_deduplicates() {
+        let mut a = FoldingRangeSet::new();
+        a.add(FoldingRange {
+            start_line: 1, end_line: 10,
+            kind: FoldingRangeKind::Region, is_collapsed: false,
+        });
+        a.add(FoldingRange {
+            start_line: 20, end_line: 30,
+            kind: FoldingRangeKind::Region, is_collapsed: false,
+        });
+
+        let mut b = FoldingRangeSet::new();
+        b.add(FoldingRange {
+            start_line: 1, end_line: 10,
+            kind: FoldingRangeKind::Region, is_collapsed: false,
+        });
+        b.add(FoldingRange {
+            start_line: 40, end_line: 50,
+            kind: FoldingRangeKind::Region, is_collapsed: false,
+        });
+
+        a.merge(&b);
+        assert_eq!(a.len(), 3); // duplicate (1,10) not added twice
+    }
+
+    #[test]
+    fn folding_range_set_ranges_containing_line() {
+        let mut set = FoldingRangeSet::new();
+        set.add(FoldingRange {
+            start_line: 1, end_line: 20,
+            kind: FoldingRangeKind::Region, is_collapsed: false,
+        });
+        set.add(FoldingRange {
+            start_line: 5, end_line: 10,
+            kind: FoldingRangeKind::Region, is_collapsed: false,
+        });
+        set.add(FoldingRange {
+            start_line: 30, end_line: 40,
+            kind: FoldingRangeKind::Region, is_collapsed: false,
+        });
+        let containing = set.ranges_containing_line(7);
+        assert_eq!(containing.len(), 2);
+        let containing_outside = set.ranges_containing_line(25);
+        assert!(containing_outside.is_empty());
+    }
+
+    #[test]
+    fn folding_range_set_total_hidden_lines() {
+        let mut set = FoldingRangeSet::new();
+        set.add(FoldingRange {
+            start_line: 1, end_line: 11,
+            kind: FoldingRangeKind::Region, is_collapsed: true,
+        });
+        set.add(FoldingRange {
+            start_line: 20, end_line: 25,
+            kind: FoldingRangeKind::Region, is_collapsed: true,
+        });
+        set.add(FoldingRange {
+            start_line: 30, end_line: 40,
+            kind: FoldingRangeKind::Region, is_collapsed: false,
+        });
+        assert_eq!(set.total_hidden_lines(), 15); // 10 + 5
+    }
+
+    #[test]
+    fn fold_region_non_recursive() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 5, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        fold_region(&mut model, 1, false);
+        assert!(model.get_range_at(1).unwrap().is_collapsed);
+        assert!(!model.get_range_at(5).unwrap().is_collapsed);
+    }
+
+    #[test]
+    fn fold_region_recursive() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 5, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        fold_region(&mut model, 1, true);
+        assert!(model.get_range_at(1).unwrap().is_collapsed);
+        assert!(model.get_range_at(5).unwrap().is_collapsed);
+    }
+
+    #[test]
+    fn unfold_region_recursive() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: true },
+            FoldingRange { start_line: 5, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: true },
+            FoldingRange { start_line: 25, end_line: 30, kind: FoldingRangeKind::Region, is_collapsed: true },
+        ]);
+        unfold_region(&mut model, 1, true);
+        assert!(!model.get_range_at(1).unwrap().is_collapsed);
+        assert!(!model.get_range_at(5).unwrap().is_collapsed);
+        // Range outside the target should remain collapsed
+        assert!(model.get_range_at(25).unwrap().is_collapsed);
     }
 }

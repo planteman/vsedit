@@ -2788,3 +2788,310 @@ mod configuration_extended {
         assert_eq!(inspect.effective_value, Some(json!("on")));
     }
 }
+
+// ─── Syntax Highlighting ────────────────────────────────────────────────
+
+#[cfg(test)]
+mod syntax_highlighting {
+    use vsedit_syntax::SyntaxHighlighter;
+
+    #[test]
+    fn test_integration_syntax_highlight_rust() {
+        let highlighter = SyntaxHighlighter::new();
+        let syntax = highlighter.syntax_for_file("main.rs").unwrap();
+        let spans = highlighter.highlight_line("fn main() {}", syntax);
+        assert!(!spans.is_empty(), "Rust code should produce tokens");
+    }
+
+    #[test]
+    fn test_integration_syntax_highlight_python() {
+        let highlighter = SyntaxHighlighter::new();
+        let syntax = highlighter.syntax_for_file("script.py").unwrap();
+        let spans = highlighter.highlight_line("def hello():", syntax);
+        assert!(!spans.is_empty(), "Python code should produce tokens");
+    }
+
+    #[test]
+    fn test_integration_syntax_highlight_javascript() {
+        let highlighter = SyntaxHighlighter::new();
+        let syntax = highlighter.syntax_for_file("app.js").unwrap();
+        let spans = highlighter.highlight_line("const x = 42;", syntax);
+        assert!(!spans.is_empty(), "JavaScript code should produce tokens");
+    }
+
+    #[test]
+    fn test_integration_syntax_cache_returns_cached_result() {
+        use vsedit_syntax::HighlightCache;
+        let highlighter = SyntaxHighlighter::new();
+        let syntax = highlighter.syntax_for_file("main.rs").unwrap();
+        let spans = highlighter.highlight_line("let x = 1;", syntax);
+
+        let mut cache = HighlightCache::new();
+        cache.set(0, spans.clone());
+        let cached = cache.get(0).unwrap();
+        assert_eq!(spans, *cached, "Cached result should match original highlight");
+    }
+
+    #[test]
+    fn test_integration_syntax_unknown_extension_fallback() {
+        let highlighter = SyntaxHighlighter::new();
+        let result = highlighter.syntax_for_file("data.xyzabc999");
+        assert!(result.is_none(), "Unknown extension should return None");
+    }
+}
+
+// ─── URI ────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod uri {
+    use vsedit_uri::{VsUri, UriChanges};
+
+    #[test]
+    fn test_integration_uri_parse_https() {
+        let uri = VsUri::parse("https://example.com/path?q=1#frag");
+        assert_eq!(uri.scheme, "https");
+        assert_eq!(uri.authority, "example.com");
+        assert_eq!(uri.path, "/path");
+        assert_eq!(uri.query, "q=1");
+        assert_eq!(uri.fragment, "frag");
+    }
+
+    #[test]
+    fn test_integration_uri_to_string_roundtrip() {
+        let uri = VsUri::from_components("https", "host.io", "/a/b", "", "");
+        let s = uri.to_uri_string();
+        assert!(s.starts_with("https://"), "Serialized URI should start with scheme");
+        assert!(s.contains("host.io"), "Serialized URI should contain authority");
+    }
+
+    #[test]
+    fn test_integration_uri_scheme_authority_path() {
+        let uri = VsUri::from_components("file", "", "/home/user/file.rs", "", "");
+        assert_eq!(uri.scheme, "file");
+        assert_eq!(uri.authority, "");
+        assert_eq!(uri.path, "/home/user/file.rs");
+    }
+
+    #[test]
+    fn test_integration_uri_file_creation() {
+        let uri = VsUri::file("/home/user/project/main.rs");
+        assert!(uri.is_file());
+        assert_eq!(uri.scheme, "file");
+        assert_eq!(uri.path, "/home/user/project/main.rs");
+    }
+
+    #[test]
+    fn test_integration_uri_with_changes_path() {
+        let base = VsUri::file("/home/user/old.rs");
+        let changed = VsUri::with(&base, UriChanges {
+            path: Some("/home/user/new.rs".into()),
+            ..Default::default()
+        });
+        assert_eq!(changed.path, "/home/user/new.rs");
+        assert_eq!(changed.scheme, "file", "Scheme should be preserved");
+    }
+}
+
+// ─── Text Model Editing ────────────────────────────────────────────────
+
+#[cfg(test)]
+mod text_model_editing {
+    use vsedit_text_model::TextModel;
+    use vsedit_editor_types::{ITextModel, Position, Range};
+
+    #[test]
+    fn test_integration_model_multiline_insert() {
+        let mut model = TextModel::new("aaa\nbbb\nccc");
+        model.insert(Position { line: 2, column: 4 }, "\ninserted");
+        assert_eq!(model.get_line_count(), 4);
+        assert_eq!(model.get_line_content(3), "inserted");
+    }
+
+    #[test]
+    fn test_integration_model_delete_across_lines() {
+        let mut model = TextModel::new("first\nsecond\nthird");
+        model.delete(Range::new(1, 1, 2, 7));
+        let text = model.get_value();
+        assert!(!text.contains("first"));
+        assert!(!text.contains("second"));
+        assert!(text.contains("third"));
+    }
+
+    #[test]
+    fn test_integration_model_get_line_content_specific() {
+        let model = TextModel::new("alpha\nbeta\ngamma\ndelta");
+        assert_eq!(model.get_line_content(1), "alpha");
+        assert_eq!(model.get_line_content(2), "beta");
+        assert_eq!(model.get_line_content(3), "gamma");
+        assert_eq!(model.get_line_content(4), "delta");
+    }
+
+    #[test]
+    fn test_integration_model_replace_text() {
+        let mut model = TextModel::new("hello world");
+        model.apply_edit(Range::new(1, 7, 1, 12), "rust");
+        assert_eq!(model.get_value(), "hello rust");
+    }
+
+    #[test]
+    fn test_integration_model_complex_edits_verify_content() {
+        let mut model = TextModel::new("line1\nline2\nline3");
+        model.insert(Position { line: 1, column: 6 }, " modified");
+        model.delete(Range::new(2, 1, 2, 6));
+        model.apply_edit(Range::new(3, 1, 3, 6), "LINE3");
+        assert_eq!(model.get_line_content(1), "line1 modified");
+        assert_eq!(model.get_line_content(2), "");
+        assert_eq!(model.get_line_content(3), "LINE3");
+    }
+}
+
+// ─── Event System Extended ──────────────────────────────────────────────
+
+#[cfg(test)]
+mod events_extended {
+    use vsedit_events::Emitter;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicI32, Ordering};
+
+    #[test]
+    fn test_integration_emitter_subscribe_and_emit() {
+        let emitter = Emitter::new();
+        let value = Arc::new(AtomicI32::new(0));
+        let value_clone = value.clone();
+
+        let event = emitter.event();
+        let _sub = event.on(move |v: &i32| {
+            value_clone.store(*v, Ordering::SeqCst);
+        });
+
+        emitter.fire(&99);
+        assert_eq!(value.load(Ordering::SeqCst), 99);
+    }
+
+    #[test]
+    fn test_integration_emitter_multiple_subscribers() {
+        let emitter = Emitter::new();
+        let counter = Arc::new(AtomicI32::new(0));
+        let c1 = counter.clone();
+        let c2 = counter.clone();
+
+        let event = emitter.event();
+        let _s1 = event.on(move |_: &i32| { c1.fetch_add(1, Ordering::SeqCst); });
+        let _s2 = event.on(move |_: &i32| { c2.fetch_add(10, Ordering::SeqCst); });
+
+        emitter.fire(&0);
+        assert_eq!(counter.load(Ordering::SeqCst), 11);
+    }
+
+    #[test]
+    fn test_integration_emitter_unsubscribe_via_dispose() {
+        let emitter = Emitter::new();
+        let counter = Arc::new(AtomicI32::new(0));
+        let c = counter.clone();
+
+        let event = emitter.event();
+        let sub = event.on(move |_: &i32| { c.fetch_add(1, Ordering::SeqCst); });
+
+        emitter.fire(&1);
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+
+        sub.dispose();
+        emitter.fire(&2);
+        assert_eq!(counter.load(Ordering::SeqCst), 1, "Should not receive after dispose");
+    }
+
+    #[test]
+    fn test_integration_emitter_unsubscribe_via_drop() {
+        let emitter = Emitter::new();
+        let counter = Arc::new(AtomicI32::new(0));
+        let c = counter.clone();
+
+        let event = emitter.event();
+        {
+            let _sub = event.on(move |_: &String| { c.fetch_add(1, Ordering::SeqCst); });
+            emitter.fire(&"a".to_string());
+            assert_eq!(counter.load(Ordering::SeqCst), 1);
+        }
+        // _sub dropped here
+        emitter.fire(&"b".to_string());
+        assert_eq!(counter.load(Ordering::SeqCst), 1, "Should not receive after drop");
+    }
+
+    #[test]
+    fn test_integration_emitter_event_data_passing() {
+        let emitter = Emitter::new();
+        let received = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let r = received.clone();
+
+        let event = emitter.event();
+        let _sub = event.on(move |v: &String| {
+            r.lock().unwrap().push(v.clone());
+        });
+
+        emitter.fire(&"first".to_string());
+        emitter.fire(&"second".to_string());
+        emitter.fire(&"third".to_string());
+
+        let data = received.lock().unwrap();
+        assert_eq!(*data, vec!["first", "second", "third"]);
+    }
+}
+
+// ─── DI Container Extended ─────────────────────────────────────────────
+
+#[cfg(test)]
+mod di_extended {
+    use vsedit_di::{ServiceCollection, Service};
+
+    struct AlphaService { val: i32 }
+    impl Service for AlphaService {
+        fn service_name() -> &'static str { "AlphaService" }
+    }
+
+    struct BetaService { name: String }
+    impl Service for BetaService {
+        fn service_name() -> &'static str { "BetaService" }
+    }
+
+    #[test]
+    fn test_integration_di_register_and_get() {
+        let mut col = ServiceCollection::new();
+        col.register(AlphaService { val: 42 });
+        let svc = col.get::<AlphaService>();
+        assert!(svc.is_some());
+        assert_eq!(svc.unwrap().val, 42);
+    }
+
+    #[test]
+    fn test_integration_di_multiple_services() {
+        let mut col = ServiceCollection::new();
+        col.register(AlphaService { val: 1 });
+        col.register(BetaService { name: "beta".into() });
+        assert_eq!(col.get::<AlphaService>().unwrap().val, 1);
+        assert_eq!(col.get::<BetaService>().unwrap().name, "beta");
+    }
+
+    #[test]
+    fn test_integration_di_service_override() {
+        let mut col = ServiceCollection::new();
+        col.register(AlphaService { val: 10 });
+        assert_eq!(col.get::<AlphaService>().unwrap().val, 10);
+        col.register(AlphaService { val: 20 });
+        assert_eq!(col.get::<AlphaService>().unwrap().val, 20);
+    }
+
+    #[test]
+    fn test_integration_di_missing_service_returns_none() {
+        let col = ServiceCollection::new();
+        let result = col.get::<BetaService>();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_integration_di_has_check() {
+        let mut col = ServiceCollection::new();
+        assert!(!col.has::<AlphaService>());
+        col.register(AlphaService { val: 0 });
+        assert!(col.has::<AlphaService>());
+    }
+}

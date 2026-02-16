@@ -514,6 +514,315 @@ fn parse_uri_manual(value: &str) -> VsUri {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// URI resolution — resolve relative URIs against a base
+// ---------------------------------------------------------------------------
+
+impl VsUri {
+    /// Resolve a relative path reference against this URI as the base.
+    ///
+    /// ```
+    /// # use vsedit_uri::VsUri;
+    /// let base = VsUri::parse("https://example.com/a/b/c");
+    /// let resolved = base.resolve("../d");
+    /// assert_eq!(resolved.path, "/a/d");
+    /// ```
+    pub fn resolve(&self, relative: &str) -> Self {
+        if relative.is_empty() {
+            return self.clone();
+        }
+
+        // If relative is a full URI, just parse it.
+        if relative.contains("://") || relative.starts_with("data:") || relative.starts_with("mailto:") {
+            return VsUri::parse(relative);
+        }
+
+        // Split off fragment from relative
+        let (rel_path_query, fragment) = match relative.find('#') {
+            Some(idx) => (&relative[..idx], &relative[idx + 1..]),
+            None => (relative, ""),
+        };
+
+        // Split off query from relative
+        let (rel_path, query) = match rel_path_query.find('?') {
+            Some(idx) => (&rel_path_query[..idx], &rel_path_query[idx + 1..]),
+            None => (rel_path_query, ""),
+        };
+
+        let new_path = if rel_path.starts_with('/') {
+            // Absolute path — use directly
+            normalize_path(rel_path)
+        } else {
+            // Relative path — merge with base
+            let base_dir = match self.path.rfind('/') {
+                Some(idx) => &self.path[..idx + 1],
+                None => "/",
+            };
+            let merged = format!("{}{}", base_dir, rel_path);
+            normalize_path(&merged)
+        };
+
+        VsUri {
+            scheme: self.scheme.clone(),
+            authority: self.authority.clone(),
+            path: new_path,
+            query: if query.is_empty() && rel_path.is_empty() {
+                self.query.clone()
+            } else {
+                query.to_string()
+            },
+            fragment: fragment.to_string(),
+        }
+    }
+}
+
+/// Normalize a path by resolving `.` and `..` segments.
+fn normalize_path(path: &str) -> String {
+    let mut segments: Vec<&str> = Vec::new();
+    for seg in path.split('/') {
+        match seg {
+            "." => {}
+            ".." => {
+                // Don't pop past root
+                if segments.len() > 1 {
+                    segments.pop();
+                }
+            }
+            _ => segments.push(seg),
+        }
+    }
+    let result = segments.join("/");
+    if result.is_empty() {
+        "/".to_string()
+    } else {
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// URI query parameter parsing & building
+// ---------------------------------------------------------------------------
+
+/// Parsed query parameters from a URI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QueryParams {
+    params: Vec<(String, String)>,
+}
+
+impl QueryParams {
+    /// Parse query parameters from a query string (without the leading `?`).
+    pub fn parse(query: &str) -> Self {
+        let mut params = Vec::new();
+        if query.is_empty() {
+            return Self { params };
+        }
+        for pair in query.split('&') {
+            if pair.is_empty() {
+                continue;
+            }
+            let (key, value) = match pair.find('=') {
+                Some(idx) => (
+                    percent_decode(&pair[..idx]),
+                    percent_decode(&pair[idx + 1..]),
+                ),
+                None => (percent_decode(pair), String::new()),
+            };
+            params.push((key, value));
+        }
+        Self { params }
+    }
+
+    /// Parse query parameters directly from a [`VsUri`].
+    pub fn from_uri(uri: &VsUri) -> Self {
+        Self::parse(&uri.query)
+    }
+
+    /// Get the first value for a given key.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.params
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// Get all values for a given key.
+    pub fn get_all(&self, key: &str) -> Vec<&str> {
+        self.params
+            .iter()
+            .filter(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
+            .collect()
+    }
+
+    /// Returns true if the given key is present.
+    pub fn has(&self, key: &str) -> bool {
+        self.params.iter().any(|(k, _)| k == key)
+    }
+
+    /// Return the number of parameters.
+    pub fn len(&self) -> usize {
+        self.params.len()
+    }
+
+    /// Return true if there are no parameters.
+    pub fn is_empty(&self) -> bool {
+        self.params.is_empty()
+    }
+
+    /// Build the query string (without the leading `?`).
+    pub fn to_query_string(&self) -> String {
+        self.params
+            .iter()
+            .map(|(k, v)| {
+                if v.is_empty() {
+                    encode_query(k)
+                } else {
+                    format!("{}={}", encode_query(k), encode_query(v))
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("&")
+    }
+
+    /// Add a key-value pair.
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.params.push((key.into(), value.into()));
+    }
+
+    /// Remove all entries with the given key. Returns the number removed.
+    pub fn remove(&mut self, key: &str) -> usize {
+        let before = self.params.len();
+        self.params.retain(|(k, _)| k != key);
+        before - self.params.len()
+    }
+
+    /// Return all keys (may contain duplicates).
+    pub fn keys(&self) -> Vec<&str> {
+        self.params.iter().map(|(k, _)| k.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Data URI encoding/decoding
+// ---------------------------------------------------------------------------
+
+/// A decoded data URI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataUri {
+    pub mime_type: String,
+    pub data: Vec<u8>,
+    pub is_base64: bool,
+}
+
+impl DataUri {
+    /// Decode a data URI string into its components.
+    ///
+    /// Supports both plain text (`data:text/plain,Hello`) and base64
+    /// (`data:text/plain;base64,SGVsbG8=`) forms.
+    pub fn decode(uri_str: &str) -> Option<Self> {
+        let rest = uri_str.strip_prefix("data:")?;
+
+        let (header, data_part) = match rest.find(',') {
+            Some(idx) => (&rest[..idx], &rest[idx + 1..]),
+            None => return None,
+        };
+
+        let is_base64 = header.ends_with(";base64");
+        let mime_type = if is_base64 {
+            header.strip_suffix(";base64").unwrap_or(header)
+        } else {
+            header
+        };
+
+        let data = if is_base64 {
+            base64_decode(data_part)?
+        } else {
+            percent_decode(data_part).into_bytes()
+        };
+
+        Some(DataUri {
+            mime_type: mime_type.to_string(),
+            data,
+            is_base64,
+        })
+    }
+
+    /// Encode this data URI back to a string.
+    pub fn encode(&self) -> String {
+        if self.is_base64 {
+            format!("data:{};base64,{}", self.mime_type, base64_encode(&self.data))
+        } else {
+            format!(
+                "data:{},{}",
+                self.mime_type,
+                encode_path(&String::from_utf8_lossy(&self.data))
+            )
+        }
+    }
+}
+
+/// Simple base64 decoder (RFC 4648).
+fn base64_decode(input: &str) -> Option<Vec<u8>> {
+    let table = |c: u8| -> Option<u8> {
+        match c {
+            b'A'..=b'Z' => Some(c - b'A'),
+            b'a'..=b'z' => Some(c - b'a' + 26),
+            b'0'..=b'9' => Some(c - b'0' + 52),
+            b'+' => Some(62),
+            b'/' => Some(63),
+            b'=' | b'\n' | b'\r' | b' ' => None,
+            _ => None,
+        }
+    };
+
+    let filtered: Vec<u8> = input
+        .bytes()
+        .filter(|&b| b != b'=' && b != b'\n' && b != b'\r' && b != b' ')
+        .collect();
+
+    let mut out = Vec::with_capacity(filtered.len() * 3 / 4);
+    let mut buf: u32 = 0;
+    let mut bits: u32 = 0;
+
+    for &byte in &filtered {
+        let val = table(byte)?;
+        buf = (buf << 6) | val as u32;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((buf >> bits) as u8);
+            buf &= (1 << bits) - 1;
+        }
+    }
+    Some(out)
+}
+
+/// Simple base64 encoder (RFC 4648).
+fn base64_encode(data: &[u8]) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
+        let b2 = chunk.get(2).copied().unwrap_or(0) as u32;
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        result.push(CHARS[((triple >> 18) & 0x3F) as usize] as char);
+        result.push(CHARS[((triple >> 12) & 0x3F) as usize] as char);
+        if chunk.len() > 1 {
+            result.push(CHARS[((triple >> 6) & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(CHARS[(triple & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -776,7 +1085,6 @@ mod tests {
     fn encode_special_chars() {
         let uri = VsUri::from_components("https", "example.com", "/path/café", "", "");
         let s = uri.to_string();
-        // Non-ASCII bytes should be percent-encoded.
         assert!(s.contains("caf%C3%A9"));
     }
 
@@ -803,7 +1111,6 @@ mod tests {
     #[test]
     fn uri_path_to_fs_path_windows_unc() {
         let result = uri_path_to_fs_path("/server/share/file.txt", true);
-        // UNC paths don't have drive letters, leading `/` is stripped.
         assert_eq!(result, "server\\share\\file.txt");
     }
 
@@ -813,7 +1120,6 @@ mod tests {
     fn serde_serialize() {
         let uri = VsUri::file("/home/user/file.rs");
         let json = serde_json::to_string(&uri).unwrap();
-        // Should be a JSON string containing the URI.
         assert!(json.starts_with('"'));
         assert!(json.contains("file:///home/user/file.rs"));
     }
@@ -921,7 +1227,6 @@ mod tests {
     fn file_path_with_hash() {
         let uri = VsUri::file("/tmp/file#1.txt");
         assert_eq!(uri.path, "/tmp/file#1.txt");
-        // The `#` in the path must be encoded in the URI string.
         let s = uri.to_string();
         assert!(!s.contains("#1.txt"));
         assert!(s.contains("%231.txt"));
@@ -944,5 +1249,175 @@ mod tests {
         assert_eq!(lowercase_drive_letter("/C:/foo"), "/c:/foo");
         assert_eq!(lowercase_drive_letter("/c:/foo"), "/c:/foo");
         assert_eq!(lowercase_drive_letter("/home/user"), "/home/user");
+    }
+
+    // ---- URI resolution tests ----
+
+    #[test]
+    fn resolve_relative_sibling() {
+        let base = VsUri::parse("https://example.com/a/b/c");
+        let resolved = base.resolve("d");
+        assert_eq!(resolved.path, "/a/b/d");
+        assert_eq!(resolved.scheme, "https");
+        assert_eq!(resolved.authority, "example.com");
+    }
+
+    #[test]
+    fn resolve_relative_dotdot() {
+        let base = VsUri::parse("https://example.com/a/b/c");
+        let resolved = base.resolve("../d");
+        assert_eq!(resolved.path, "/a/d");
+    }
+
+    #[test]
+    fn resolve_absolute_path() {
+        let base = VsUri::parse("https://example.com/a/b/c");
+        let resolved = base.resolve("/x/y");
+        assert_eq!(resolved.path, "/x/y");
+        assert_eq!(resolved.authority, "example.com");
+    }
+
+    #[test]
+    fn resolve_empty_returns_self() {
+        let base = VsUri::parse("https://example.com/a/b/c");
+        let resolved = base.resolve("");
+        assert_eq!(resolved, base);
+    }
+
+    #[test]
+    fn resolve_full_uri() {
+        let base = VsUri::parse("https://example.com/a/b/c");
+        let resolved = base.resolve("https://other.com/x");
+        assert_eq!(resolved.scheme, "https");
+        assert_eq!(resolved.authority, "other.com");
+        assert_eq!(resolved.path, "/x");
+    }
+
+    #[test]
+    fn resolve_with_query_and_fragment() {
+        let base = VsUri::parse("https://example.com/a/b");
+        let resolved = base.resolve("c?key=val#section");
+        assert_eq!(resolved.path, "/a/c");
+        assert_eq!(resolved.query, "key=val");
+        assert_eq!(resolved.fragment, "section");
+    }
+
+    // ---- QueryParams tests ----
+
+    #[test]
+    fn query_params_parse_basic() {
+        let params = QueryParams::parse("foo=bar&baz=qux");
+        assert_eq!(params.len(), 2);
+        assert_eq!(params.get("foo"), Some("bar"));
+        assert_eq!(params.get("baz"), Some("qux"));
+        assert!(params.has("foo"));
+        assert!(!params.has("missing"));
+    }
+
+    #[test]
+    fn query_params_parse_empty() {
+        let params = QueryParams::parse("");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn query_params_no_value() {
+        let params = QueryParams::parse("flag");
+        assert_eq!(params.len(), 1);
+        assert_eq!(params.get("flag"), Some(""));
+    }
+
+    #[test]
+    fn query_params_duplicate_keys() {
+        let params = QueryParams::parse("a=1&a=2&a=3");
+        assert_eq!(params.get("a"), Some("1")); // first
+        assert_eq!(params.get_all("a"), vec!["1", "2", "3"]);
+    }
+
+    #[test]
+    fn query_params_build_roundtrip() {
+        let mut params = QueryParams::parse("");
+        params.set("name", "hello world");
+        params.set("page", "2");
+        let qs = params.to_query_string();
+        assert!(qs.contains("name="));
+        assert!(qs.contains("page=2"));
+    }
+
+    #[test]
+    fn query_params_remove() {
+        let mut params = QueryParams::parse("a=1&b=2&a=3");
+        assert_eq!(params.remove("a"), 2);
+        assert_eq!(params.len(), 1);
+        assert!(!params.has("a"));
+    }
+
+    #[test]
+    fn query_params_from_uri() {
+        let uri = VsUri::parse("https://example.com/path?key=value&other=123");
+        let params = QueryParams::from_uri(&uri);
+        assert_eq!(params.get("key"), Some("value"));
+        assert_eq!(params.get("other"), Some("123"));
+    }
+
+    #[test]
+    fn query_params_keys() {
+        let params = QueryParams::parse("x=1&y=2&z=3");
+        assert_eq!(params.keys(), vec!["x", "y", "z"]);
+    }
+
+    // ---- DataUri tests ----
+
+    #[test]
+    fn data_uri_decode_plain() {
+        let data = DataUri::decode("data:text/plain,Hello%20World").unwrap();
+        assert_eq!(data.mime_type, "text/plain");
+        assert_eq!(data.data, b"Hello World");
+        assert!(!data.is_base64);
+    }
+
+    #[test]
+    fn data_uri_decode_base64() {
+        let data = DataUri::decode("data:text/plain;base64,SGVsbG8=").unwrap();
+        assert_eq!(data.mime_type, "text/plain");
+        assert_eq!(data.data, b"Hello");
+        assert!(data.is_base64);
+    }
+
+    #[test]
+    fn data_uri_decode_invalid() {
+        assert!(DataUri::decode("not-a-data-uri").is_none());
+        assert!(DataUri::decode("data:text/plain").is_none()); // no comma
+    }
+
+    #[test]
+    fn data_uri_encode_roundtrip_base64() {
+        let original = DataUri {
+            mime_type: "application/octet-stream".to_string(),
+            data: vec![0, 1, 2, 3, 255],
+            is_base64: true,
+        };
+        let encoded = original.encode();
+        let decoded = DataUri::decode(&encoded).unwrap();
+        assert_eq!(decoded.data, original.data);
+        assert_eq!(decoded.mime_type, original.mime_type);
+    }
+
+    #[test]
+    fn data_uri_encode_plain() {
+        let original = DataUri {
+            mime_type: "text/plain".to_string(),
+            data: b"Hello".to_vec(),
+            is_base64: false,
+        };
+        let encoded = original.encode();
+        assert!(encoded.starts_with("data:text/plain,"));
+    }
+
+    #[test]
+    fn normalize_path_removes_dots() {
+        assert_eq!(normalize_path("/a/b/../c"), "/a/c");
+        assert_eq!(normalize_path("/a/./b"), "/a/b");
+        assert_eq!(normalize_path("/a/b/../../c"), "/c");
     }
 }

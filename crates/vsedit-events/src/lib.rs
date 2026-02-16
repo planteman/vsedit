@@ -583,6 +583,110 @@ pub fn counter_listener<T: Clone + Send + Sync + 'static>(
     (handle, count)
 }
 
+// ---------------------------------------------------------------------------
+// Timestamp helper
+// ---------------------------------------------------------------------------
+
+/// Returns the current system time as milliseconds since the Unix epoch.
+fn current_time_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time before Unix epoch")
+        .as_millis() as u64
+}
+
+// ---------------------------------------------------------------------------
+// DebouncedEmitter
+// ---------------------------------------------------------------------------
+
+/// A wrapper around [`Emitter`] that only fires after a configurable quiet
+/// period has elapsed since the last call to [`fire`](DebouncedEmitter::fire).
+pub struct DebouncedEmitter<T> {
+    inner: Emitter<T>,
+    quiet_period_ms: u64,
+    last_fire_time: Arc<Mutex<u64>>,
+}
+
+impl<T: Clone + Send + Sync + 'static> DebouncedEmitter<T> {
+    /// Create a new debounced emitter with the given quiet period in
+    /// milliseconds.
+    pub fn new(quiet_period_ms: u64) -> Self {
+        Self {
+            inner: Emitter::new(),
+            quiet_period_ms,
+            last_fire_time: Arc::new(Mutex::new(0)),
+        }
+    }
+
+    /// Fire the value only if enough time has passed since the last fire.
+    pub fn fire(&self, value: &T) {
+        let now = current_time_ms();
+        let mut last = self.last_fire_time.lock().unwrap();
+        if now.saturating_sub(*last) >= self.quiet_period_ms {
+            self.inner.fire(value);
+            *last = now;
+        }
+    }
+
+    /// Returns the subscribable event for this emitter.
+    pub fn event(&self) -> Event<T> {
+        self.inner.event()
+    }
+
+    /// Unconditionally fires the value and resets the timer.
+    pub fn force_fire(&self, value: &T) {
+        let now = current_time_ms();
+        let mut last = self.last_fire_time.lock().unwrap();
+        *last = now;
+        self.inner.fire(value);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThrottledEmitter
+// ---------------------------------------------------------------------------
+
+/// A wrapper around [`Emitter`] that limits emissions to at most one per
+/// configured interval.
+pub struct ThrottledEmitter<T> {
+    inner: Emitter<T>,
+    interval_ms: u64,
+    last_emit_time: Arc<Mutex<u64>>,
+}
+
+impl<T: Clone + Send + Sync + 'static> ThrottledEmitter<T> {
+    /// Create a new throttled emitter with the given interval in milliseconds.
+    pub fn new(interval_ms: u64) -> Self {
+        Self {
+            inner: Emitter::new(),
+            interval_ms,
+            last_emit_time: Arc::new(Mutex::new(0)),
+        }
+    }
+
+    /// Fire the value only if the interval has elapsed since the last emit.
+    pub fn fire(&self, value: &T) {
+        let now = current_time_ms();
+        let mut last = self.last_emit_time.lock().unwrap();
+        if now.saturating_sub(*last) >= self.interval_ms {
+            self.inner.fire(value);
+            *last = now;
+        }
+    }
+
+    /// Returns the subscribable event for this emitter.
+    pub fn event(&self) -> Event<T> {
+        self.inner.event()
+    }
+
+    /// Resets the throttle timer, allowing the next fire to proceed
+    /// immediately.
+    pub fn reset(&self) {
+        let mut last = self.last_emit_time.lock().unwrap();
+        *last = 0;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -924,5 +1028,124 @@ mod tests {
         drop(handle);
         emitter.fire(&99);
         assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // DebouncedEmitter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn debounced_fires_after_quiet_period() {
+        let emitter = DebouncedEmitter::<i32>::new(0);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = emitter.event().on(move |v: &i32| {
+            r.lock().unwrap().push(*v);
+        });
+        emitter.fire(&1);
+        assert_eq!(*received.lock().unwrap(), vec![1]);
+    }
+
+    #[test]
+    fn debounced_suppresses_rapid_fires() {
+        let emitter = DebouncedEmitter::<i32>::new(500);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = emitter.event().on(move |v: &i32| {
+            r.lock().unwrap().push(*v);
+        });
+        // First fire should succeed (last_fire_time starts at 0).
+        emitter.fire(&1);
+        // Rapid subsequent fires should be suppressed.
+        emitter.fire(&2);
+        emitter.fire(&3);
+        assert_eq!(*received.lock().unwrap(), vec![1]);
+    }
+
+    #[test]
+    fn debounced_force_fire_always_fires() {
+        let emitter = DebouncedEmitter::<i32>::new(500);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = emitter.event().on(move |v: &i32| {
+            r.lock().unwrap().push(*v);
+        });
+        emitter.fire(&1);
+        emitter.force_fire(&2);
+        emitter.force_fire(&3);
+        assert_eq!(*received.lock().unwrap(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn debounced_event_returns_correct_event() {
+        let emitter = DebouncedEmitter::<i32>::new(0);
+        let event = emitter.event();
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = event.on(move |v: &i32| {
+            r.lock().unwrap().push(*v);
+        });
+        emitter.fire(&42);
+        assert_eq!(*received.lock().unwrap(), vec![42]);
+    }
+
+    // -----------------------------------------------------------------------
+    // ThrottledEmitter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn throttled_fires_first_event_immediately() {
+        let emitter = ThrottledEmitter::<i32>::new(500);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = emitter.event().on(move |v: &i32| {
+            r.lock().unwrap().push(*v);
+        });
+        // First fire always succeeds (last_emit_time starts at 0).
+        emitter.fire(&1);
+        assert_eq!(*received.lock().unwrap(), vec![1]);
+    }
+
+    #[test]
+    fn throttled_suppresses_rapid_fires() {
+        let emitter = ThrottledEmitter::<i32>::new(500);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = emitter.event().on(move |v: &i32| {
+            r.lock().unwrap().push(*v);
+        });
+        emitter.fire(&1);
+        emitter.fire(&2);
+        emitter.fire(&3);
+        assert_eq!(*received.lock().unwrap(), vec![1]);
+    }
+
+    #[test]
+    fn throttled_fires_after_interval_passes() {
+        let emitter = ThrottledEmitter::<i32>::new(50);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = emitter.event().on(move |v: &i32| {
+            r.lock().unwrap().push(*v);
+        });
+        emitter.fire(&1);
+        std::thread::sleep(Duration::from_millis(80));
+        emitter.fire(&2);
+        assert_eq!(*received.lock().unwrap(), vec![1, 2]);
+    }
+
+    #[test]
+    fn throttled_reset_allows_immediate_fire() {
+        let emitter = ThrottledEmitter::<i32>::new(500);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _h = emitter.event().on(move |v: &i32| {
+            r.lock().unwrap().push(*v);
+        });
+        emitter.fire(&1);
+        emitter.fire(&2); // suppressed
+        emitter.reset();
+        emitter.fire(&3); // should succeed after reset
+        assert_eq!(*received.lock().unwrap(), vec![1, 3]);
     }
 }

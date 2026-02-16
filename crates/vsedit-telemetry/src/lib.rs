@@ -558,6 +558,120 @@ impl TelemetryService {
     }
 }
 
+// --- TelemetryAggregator ---
+
+/// Collects events and produces summaries.
+pub struct TelemetryAggregator {
+    pub events: Vec<TelemetryEvent>,
+}
+
+impl TelemetryAggregator {
+    pub fn new() -> Self {
+        Self { events: Vec::new() }
+    }
+
+    pub fn add_event(&mut self, event: TelemetryEvent) {
+        self.events.push(event);
+    }
+
+    pub fn add_events(&mut self, events: Vec<TelemetryEvent>) {
+        self.events.extend(events);
+    }
+
+    pub fn event_count(&self) -> usize {
+        self.events.len()
+    }
+
+    pub fn counts_by_type(&self) -> HashMap<String, usize> {
+        let mut map = HashMap::new();
+        for event in &self.events {
+            *map.entry(event.event_type.to_string()).or_insert(0) += 1;
+        }
+        map
+    }
+
+    pub fn counts_by_name(&self) -> HashMap<String, usize> {
+        let mut map = HashMap::new();
+        for event in &self.events {
+            *map.entry(event.name.clone()).or_insert(0) += 1;
+        }
+        map
+    }
+
+    pub fn average_duration(&self, measurement_key: &str) -> Option<f64> {
+        let mut sum = 0.0;
+        let mut count = 0usize;
+        for event in &self.events {
+            for (key, value) in &event.measurements {
+                if key == measurement_key {
+                    sum += value;
+                    count += 1;
+                }
+            }
+        }
+        if count == 0 {
+            None
+        } else {
+            Some(sum / count as f64)
+        }
+    }
+
+    pub fn summarize(&self) -> TelemetrySummary {
+        TelemetrySummary::from_events(&self.events)
+    }
+
+    pub fn clear(&mut self) {
+        self.events.clear();
+    }
+
+    pub fn drain(&mut self) -> Vec<TelemetryEvent> {
+        std::mem::take(&mut self.events)
+    }
+}
+
+// --- TelemetryFilter ---
+
+/// Suppresses events by criteria.
+pub struct TelemetryFilter {
+    pub suppressed_types: Vec<TelemetryEventType>,
+    pub suppressed_names: Vec<String>,
+    pub min_level: Option<TelemetryLevel>,
+}
+
+impl TelemetryFilter {
+    pub fn new() -> Self {
+        Self {
+            suppressed_types: Vec::new(),
+            suppressed_names: Vec::new(),
+            min_level: None,
+        }
+    }
+
+    pub fn suppress_type(mut self, event_type: TelemetryEventType) -> Self {
+        self.suppressed_types.push(event_type);
+        self
+    }
+
+    pub fn suppress_name(mut self, name: impl Into<String>) -> Self {
+        self.suppressed_names.push(name.into());
+        self
+    }
+
+    pub fn should_allow(&self, event: &TelemetryEvent) -> bool {
+        if self.suppressed_types.contains(&event.event_type) {
+            return false;
+        }
+        if self.suppressed_names.contains(&event.name) {
+            return false;
+        }
+        true
+    }
+
+    pub fn filter_events<'a>(&self, events: &'a [TelemetryEvent]) -> Vec<&'a TelemetryEvent> {
+        events.iter().filter(|e| self.should_allow(e)).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -926,5 +1040,123 @@ mod tests {
         let mut svc = TelemetryService::new(TelemetryLevel::Usage);
         svc.log_event("click", vec![], vec![]);
         assert!(svc.get_error_summary().is_empty());
+    }
+
+    // --- TelemetryAggregator tests ---
+
+    fn make_event(name: &str, event_type: TelemetryEventType, measurements: Vec<(String, f64)>) -> TelemetryEvent {
+        TelemetryEvent {
+            name: name.to_string(),
+            event_type,
+            properties: vec![],
+            measurements,
+            timestamp: 1000,
+        }
+    }
+
+    #[test]
+    fn aggregator_add_and_count() {
+        let mut agg = TelemetryAggregator::new();
+        assert_eq!(agg.event_count(), 0);
+        agg.add_event(make_event("a", TelemetryEventType::Event, vec![]));
+        assert_eq!(agg.event_count(), 1);
+        agg.add_events(vec![
+            make_event("b", TelemetryEventType::Error, vec![]),
+            make_event("c", TelemetryEventType::Metric, vec![]),
+        ]);
+        assert_eq!(agg.event_count(), 3);
+    }
+
+    #[test]
+    fn aggregator_counts_by_type() {
+        let mut agg = TelemetryAggregator::new();
+        agg.add_event(make_event("a", TelemetryEventType::Event, vec![]));
+        agg.add_event(make_event("b", TelemetryEventType::Event, vec![]));
+        agg.add_event(make_event("c", TelemetryEventType::Error, vec![]));
+        let counts = agg.counts_by_type();
+        assert_eq!(counts.get("Event"), Some(&2));
+        assert_eq!(counts.get("Error"), Some(&1));
+    }
+
+    #[test]
+    fn aggregator_counts_by_name() {
+        let mut agg = TelemetryAggregator::new();
+        agg.add_event(make_event("click", TelemetryEventType::Event, vec![]));
+        agg.add_event(make_event("click", TelemetryEventType::Event, vec![]));
+        agg.add_event(make_event("scroll", TelemetryEventType::Event, vec![]));
+        let counts = agg.counts_by_name();
+        assert_eq!(counts.get("click"), Some(&2));
+        assert_eq!(counts.get("scroll"), Some(&1));
+    }
+
+    #[test]
+    fn aggregator_average_duration() {
+        let mut agg = TelemetryAggregator::new();
+        agg.add_event(make_event("a", TelemetryEventType::Metric, vec![("duration".to_string(), 10.0)]));
+        agg.add_event(make_event("b", TelemetryEventType::Metric, vec![("duration".to_string(), 30.0)]));
+        agg.add_event(make_event("c", TelemetryEventType::Event, vec![]));
+        assert_eq!(agg.average_duration("duration"), Some(20.0));
+        assert_eq!(agg.average_duration("missing"), None);
+    }
+
+    #[test]
+    fn aggregator_summarize() {
+        let mut agg = TelemetryAggregator::new();
+        agg.add_event(make_event("a", TelemetryEventType::Metric, vec![("latency".to_string(), 5.0)]));
+        agg.add_event(make_event("b", TelemetryEventType::Event, vec![]));
+        let summary = agg.summarize();
+        assert_eq!(summary.total_events, 2);
+        assert_eq!(summary.counts_by_type.get("Metric"), Some(&1));
+        assert_eq!(summary.counts_by_type.get("Event"), Some(&1));
+        assert_eq!(summary.measurement_avg("latency"), Some(5.0));
+    }
+
+    #[test]
+    fn aggregator_drain() {
+        let mut agg = TelemetryAggregator::new();
+        agg.add_event(make_event("a", TelemetryEventType::Event, vec![]));
+        agg.add_event(make_event("b", TelemetryEventType::Event, vec![]));
+        let drained = agg.drain();
+        assert_eq!(drained.len(), 2);
+        assert_eq!(agg.event_count(), 0);
+    }
+
+    // --- TelemetryFilter tests ---
+
+    #[test]
+    fn filter_suppress_type() {
+        let filter = TelemetryFilter::new()
+            .suppress_type(TelemetryEventType::Error);
+        let allowed = make_event("a", TelemetryEventType::Event, vec![]);
+        let blocked = make_event("b", TelemetryEventType::Error, vec![]);
+        assert!(filter.should_allow(&allowed));
+        assert!(!filter.should_allow(&blocked));
+    }
+
+    #[test]
+    fn filter_suppress_name() {
+        let filter = TelemetryFilter::new()
+            .suppress_name("debug_ping");
+        let allowed = make_event("click", TelemetryEventType::Event, vec![]);
+        let blocked = make_event("debug_ping", TelemetryEventType::Event, vec![]);
+        assert!(filter.should_allow(&allowed));
+        assert!(!filter.should_allow(&blocked));
+    }
+
+    #[test]
+    fn filter_events_combined() {
+        let filter = TelemetryFilter::new()
+            .suppress_type(TelemetryEventType::Exception)
+            .suppress_name("noisy");
+        let events = vec![
+            make_event("ok", TelemetryEventType::Event, vec![]),
+            make_event("crash", TelemetryEventType::Exception, vec![]),
+            make_event("noisy", TelemetryEventType::Event, vec![]),
+            make_event("metric", TelemetryEventType::Metric, vec![]),
+        ];
+        let filtered = filter.filter_events(&events);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].name, "ok");
+        assert_eq!(filtered[1].name, "metric");
     }
 }

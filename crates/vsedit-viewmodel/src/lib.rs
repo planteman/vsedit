@@ -500,6 +500,151 @@ impl ViewModelSearch {
     }
 }
 
+// ---------------------------------------------------------------------------
+// VisibleRange — tracks the range of visible lines
+// ---------------------------------------------------------------------------
+
+/// Tracks the first and last visible line in the editor viewport.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VisibleRange {
+    /// 1-based first visible view line.
+    pub first_line: u32,
+    /// 1-based last visible view line (inclusive).
+    pub last_line: u32,
+}
+
+impl VisibleRange {
+    pub fn new(first_line: u32, last_line: u32) -> Self {
+        Self { first_line, last_line }
+    }
+
+    /// Number of visible lines.
+    pub fn line_count(&self) -> u32 {
+        if self.last_line >= self.first_line {
+            self.last_line - self.first_line + 1
+        } else {
+            0
+        }
+    }
+
+    /// Check if a view line (1-based) is within this visible range.
+    pub fn contains(&self, view_line: u32) -> bool {
+        view_line >= self.first_line && view_line <= self.last_line
+    }
+
+    /// Compute the overlap between two visible ranges.
+    pub fn overlap(&self, other: &VisibleRange) -> Option<VisibleRange> {
+        let first = self.first_line.max(other.first_line);
+        let last = self.last_line.min(other.last_line);
+        if first <= last {
+            Some(VisibleRange::new(first, last))
+        } else {
+            None
+        }
+    }
+
+    /// Returns true if the range is empty (last < first).
+    pub fn is_empty(&self) -> bool {
+        self.last_line < self.first_line
+    }
+}
+
+impl fmt::Display for VisibleRange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "VisibleRange({}-{})", self.first_line, self.last_line)
+    }
+}
+
+impl ViewModel {
+    /// Compute the [`VisibleRange`] for a given viewport.
+    pub fn visible_range(&self, viewport: &Viewport) -> VisibleRange {
+        let total = self.get_view_line_count();
+        let first = viewport.first_view_line.min(total).max(1);
+        let last = (viewport.first_view_line + viewport.visible_line_count - 1).min(total);
+        VisibleRange::new(first, last)
+    }
+
+    /// Map a visible range of view lines to the corresponding model line range.
+    pub fn visible_range_to_model(&self, range: &VisibleRange) -> (u32, u32) {
+        if range.is_empty() || self.view_lines.is_empty() {
+            return (0, 0);
+        }
+        let first_model = self.get_view_line(range.first_line).model_line;
+        let last_model = self.get_view_line(range.last_line).model_line;
+        (first_model, last_model)
+    }
+
+    /// Compute the scroll offset needed to reveal a target view line within a viewport.
+    ///
+    /// Returns the new first visible view line such that `target_view_line` is within
+    /// the viewport. If the line is already visible, returns `None`.
+    pub fn scroll_to_reveal(&self, target_view_line: u32, viewport: &Viewport) -> Option<u32> {
+        let total = self.get_view_line_count();
+        if target_view_line < 1 || target_view_line > total {
+            return None;
+        }
+
+        let first = viewport.first_view_line;
+        let last = viewport.first_view_line + viewport.visible_line_count.saturating_sub(1);
+
+        if target_view_line >= first && target_view_line <= last {
+            // Already visible
+            return None;
+        }
+
+        if target_view_line < first {
+            // Scroll up: target becomes the first line
+            Some(target_view_line)
+        } else {
+            // Scroll down: target becomes the last line
+            Some(target_view_line.saturating_sub(viewport.visible_line_count.saturating_sub(1)))
+        }
+    }
+
+    /// Compute the scroll offset to center a target view line in the viewport.
+    pub fn scroll_to_center(&self, target_view_line: u32, viewport_height: u32) -> u32 {
+        let total = self.get_view_line_count();
+        if target_view_line < 1 || target_view_line > total || viewport_height == 0 {
+            return 1;
+        }
+        let half = viewport_height / 2;
+        let first = target_view_line.saturating_sub(half).max(1);
+        let max_first = total.saturating_sub(viewport_height).max(0) + 1;
+        first.min(max_first)
+    }
+
+    /// Map a model line and column to view coordinates, accounting for word wrap.
+    /// Returns `(view_line, view_column)` both 1-based.
+    pub fn map_model_to_view_coords(&self, model_line: u32, model_col: u32) -> (u32, u32) {
+        let pos = self.model_position_to_view_position(Position::new(model_line, model_col));
+        (pos.line, pos.column)
+    }
+
+    /// Map view coordinates to model coordinates, accounting for word wrap.
+    /// Returns `(model_line, model_column)` both 1-based.
+    pub fn map_view_to_model_coords(&self, view_line: u32, view_col: u32) -> (u32, u32) {
+        let pos = self.view_position_to_model_position(Position::new(view_line, view_col));
+        (pos.line, pos.column)
+    }
+
+    /// Count the total number of wrapped continuation lines in the view model.
+    pub fn wrapped_line_count(&self) -> u32 {
+        self.view_lines.iter().filter(|vl| vl.is_wrapped).count() as u32
+    }
+
+    /// Get the range of view lines for a model line range.
+    /// Returns (first_view_line, last_view_line) both 1-based.
+    pub fn view_line_range_for_model_range(
+        &self,
+        first_model: u32,
+        last_model: u32,
+    ) -> Option<(u32, u32)> {
+        let first_vl = self.first_view_line_for_model(first_model)?;
+        let last_vl = self.last_view_line_for_model(last_model)?;
+        Some((first_vl, last_vl))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -945,5 +1090,138 @@ mod tests {
         assert_eq!(matches.len(), 2);
         assert_eq!(matches[0].start_col, 0);
         assert_eq!(matches[1].start_col, 2);
+    }
+
+    // ---- VisibleRange tests ----
+
+    #[test]
+    fn visible_range_basic() {
+        let vr = VisibleRange::new(3, 7);
+        assert_eq!(vr.line_count(), 5);
+        assert!(vr.contains(3));
+        assert!(vr.contains(7));
+        assert!(!vr.contains(2));
+        assert!(!vr.contains(8));
+        assert!(!vr.is_empty());
+    }
+
+    #[test]
+    fn visible_range_overlap() {
+        let a = VisibleRange::new(1, 5);
+        let b = VisibleRange::new(3, 8);
+        let overlap = a.overlap(&b).unwrap();
+        assert_eq!(overlap.first_line, 3);
+        assert_eq!(overlap.last_line, 5);
+
+        let c = VisibleRange::new(6, 10);
+        assert!(a.overlap(&c).is_none());
+    }
+
+    #[test]
+    fn visible_range_empty() {
+        let vr = VisibleRange::new(5, 3);
+        assert!(vr.is_empty());
+        assert_eq!(vr.line_count(), 0);
+    }
+
+    #[test]
+    fn visible_range_display() {
+        let vr = VisibleRange::new(1, 10);
+        assert_eq!(format!("{vr}"), "VisibleRange(1-10)");
+    }
+
+    #[test]
+    fn vm_visible_range_computation() {
+        let model = make_model("a\nb\nc\nd\ne");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let vp = Viewport::new(2, 3);
+        let vr = vm.visible_range(&vp);
+        assert_eq!(vr.first_line, 2);
+        assert_eq!(vr.last_line, 4);
+        assert_eq!(vr.line_count(), 3);
+    }
+
+    #[test]
+    fn vm_visible_range_to_model() {
+        let model = make_model("hello world\nfoo\nbar");
+        let vm = ViewModel::new(model, 6, WordWrap::On);
+        // "hello world" wraps to view lines 1,2; "foo" = 3; "bar" = 4
+        let vr = VisibleRange::new(1, 3);
+        let (first_m, last_m) = vm.visible_range_to_model(&vr);
+        assert_eq!(first_m, 1);
+        assert_eq!(last_m, 2);
+    }
+
+    // ---- scroll_to_reveal tests ----
+
+    #[test]
+    fn scroll_to_reveal_already_visible() {
+        let model = make_model("a\nb\nc\nd\ne");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let vp = Viewport::new(2, 3); // lines 2-4 visible
+        assert!(vm.scroll_to_reveal(3, &vp).is_none());
+    }
+
+    #[test]
+    fn scroll_to_reveal_scroll_up() {
+        let model = make_model("a\nb\nc\nd\ne");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let vp = Viewport::new(3, 2); // lines 3-4 visible
+        let new_first = vm.scroll_to_reveal(1, &vp).unwrap();
+        assert_eq!(new_first, 1);
+    }
+
+    #[test]
+    fn scroll_to_reveal_scroll_down() {
+        let model = make_model("a\nb\nc\nd\ne");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let vp = Viewport::new(1, 2); // lines 1-2 visible
+        let new_first = vm.scroll_to_reveal(5, &vp).unwrap();
+        assert_eq!(new_first, 4); // lines 4-5 visible
+    }
+
+    #[test]
+    fn scroll_to_center() {
+        let model = make_model("a\nb\nc\nd\ne\nf\ng\nh\ni\nj");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let first = vm.scroll_to_center(5, 4);
+        assert_eq!(first, 3); // center line 5 in viewport of 4 lines
+    }
+
+    // ---- coordinate mapping tests ----
+
+    #[test]
+    fn map_model_to_view_with_wrap() {
+        let model = make_model("hello world");
+        let vm = ViewModel::new(model, 6, WordWrap::On);
+        let (vl, vc) = vm.map_model_to_view_coords(1, 7);
+        assert_eq!(vl, 2);
+        assert_eq!(vc, 1);
+    }
+
+    #[test]
+    fn map_view_to_model_with_wrap() {
+        let model = make_model("hello world");
+        let vm = ViewModel::new(model, 6, WordWrap::On);
+        let (ml, mc) = vm.map_view_to_model_coords(2, 1);
+        assert_eq!(ml, 1);
+        assert_eq!(mc, 7);
+    }
+
+    #[test]
+    fn wrapped_line_count_check() {
+        let model = make_model("hello world\nfoo");
+        let vm = ViewModel::new(model, 6, WordWrap::On);
+        assert_eq!(vm.wrapped_line_count(), 1);
+    }
+
+    #[test]
+    fn view_line_range_for_model_range() {
+        let model = make_model("hello world\nfoo\nbar");
+        let vm = ViewModel::new(model, 6, WordWrap::On);
+        let (first, last) = vm.view_line_range_for_model_range(1, 2).unwrap();
+        assert_eq!(first, 1);
+        assert_eq!(last, 3); // "hello " + "world" + "foo"
+        assert!(vm.view_line_range_for_model_range(99, 100).is_none());
     }
 }

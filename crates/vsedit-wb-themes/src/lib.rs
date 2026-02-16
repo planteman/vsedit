@@ -392,6 +392,149 @@ impl ColorTheme {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ThemeColorMap — resolving semantic token colors
+// ---------------------------------------------------------------------------
+
+/// Maps semantic token types to resolved colors from a theme.
+///
+/// Provides fast lookup of foreground colors for tokens like "keyword",
+/// "string", "comment", etc.
+#[derive(Debug, Clone)]
+pub struct ThemeColorMap {
+    token_map: HashMap<String, String>,
+}
+
+impl ThemeColorMap {
+    /// Build a color map from a theme's token colors.
+    ///
+    /// For each token color entry, every scope gets mapped to the foreground color.
+    pub fn from_theme(theme: &ColorTheme) -> Self {
+        let mut map = HashMap::new();
+        for tc in &theme.token_colors {
+            if let Some(ref fg) = tc.foreground {
+                for scope in &tc.scope {
+                    map.insert(scope.clone(), fg.clone());
+                }
+            }
+        }
+        Self { token_map: map }
+    }
+
+    /// Look up the foreground color for a token scope.
+    pub fn get_color(&self, scope: &str) -> Option<&str> {
+        self.token_map.get(scope).map(|s| s.as_str())
+    }
+
+    /// Look up a color, trying each scope in order until one matches.
+    pub fn resolve_scopes(&self, scopes: &[&str]) -> Option<&str> {
+        for scope in scopes {
+            if let Some(color) = self.get_color(scope) {
+                return Some(color);
+            }
+        }
+        None
+    }
+
+    /// Returns the number of scope-to-color mappings.
+    pub fn len(&self) -> usize {
+        self.token_map.len()
+    }
+
+    /// Returns `true` if there are no mappings.
+    pub fn is_empty(&self) -> bool {
+        self.token_map.is_empty()
+    }
+
+    /// Returns all mapped scope names.
+    pub fn scopes(&self) -> Vec<&str> {
+        let mut s: Vec<&str> = self.token_map.keys().map(|k| k.as_str()).collect();
+        s.sort();
+        s
+    }
+}
+
+// ---------------------------------------------------------------------------
+// theme_contrast_ratio — WCAG contrast ratio calculation
+// ---------------------------------------------------------------------------
+
+/// Compute the relative luminance of a color (sRGB) per WCAG 2.0.
+///
+/// The input is a `ColorValue`. Returns a value between 0.0 (black) and 1.0 (white).
+pub fn relative_luminance(color: &ColorValue) -> f64 {
+    fn linearize(channel: u8) -> f64 {
+        let c = channel as f64 / 255.0;
+        if c <= 0.03928 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    }
+    let r = linearize(color.red());
+    let g = linearize(color.green());
+    let b = linearize(color.blue());
+    0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/// Compute the WCAG 2.0 contrast ratio between two colors.
+///
+/// Returns a value between 1.0 (no contrast) and 21.0 (maximum contrast).
+pub fn theme_contrast_ratio(fg: &ColorValue, bg: &ColorValue) -> f64 {
+    let l1 = relative_luminance(fg);
+    let l2 = relative_luminance(bg);
+    let lighter = l1.max(l2);
+    let darker = l1.min(l2);
+    (lighter + 0.05) / (darker + 0.05)
+}
+
+/// Check if the contrast ratio meets WCAG AA requirements for normal text (≥ 4.5).
+pub fn meets_wcag_aa(fg: &ColorValue, bg: &ColorValue) -> bool {
+    theme_contrast_ratio(fg, bg) >= 4.5
+}
+
+/// Check if the contrast ratio meets WCAG AAA requirements for normal text (≥ 7.0).
+pub fn meets_wcag_aaa(fg: &ColorValue, bg: &ColorValue) -> bool {
+    theme_contrast_ratio(fg, bg) >= 7.0
+}
+
+// ---------------------------------------------------------------------------
+// color_blend — alpha compositing
+// ---------------------------------------------------------------------------
+
+/// Blend a foreground color over a background color using alpha compositing.
+///
+/// `alpha` is a value from 0.0 (fully transparent) to 1.0 (fully opaque).
+/// Returns the blended color as a `ColorValue`.
+pub fn color_blend(fg: &ColorValue, bg: &ColorValue, alpha: f64) -> ColorValue {
+    let alpha = alpha.clamp(0.0, 1.0);
+    let blend = |f: u8, b: u8| -> u8 {
+        let result = (f as f64) * alpha + (b as f64) * (1.0 - alpha);
+        result.round().clamp(0.0, 255.0) as u8
+    };
+    let r = blend(fg.red(), bg.red());
+    let g = blend(fg.green(), bg.green());
+    let b = blend(fg.blue(), bg.blue());
+    let hex = format!("#{:02x}{:02x}{:02x}", r, g, b);
+    ColorValue::new(hex).unwrap()
+}
+
+/// Blend two colors at 50% (simple average).
+pub fn color_mix(a: &ColorValue, b: &ColorValue) -> ColorValue {
+    color_blend(a, b, 0.5)
+}
+
+/// Lighten a color by blending with white.
+pub fn color_lighten(color: &ColorValue, amount: f64) -> ColorValue {
+    let white = ColorValue::new("#ffffff").unwrap();
+    color_blend(&white, color, amount)
+}
+
+/// Darken a color by blending with black.
+pub fn color_darken(color: &ColorValue, amount: f64) -> ColorValue {
+    let black = ColorValue::new("#000000").unwrap();
+    color_blend(&black, color, amount)
+}
+
 /// Convert a `vsedit_theme::ColorTheme` into the local `ColorTheme`.
 fn convert_core_theme(core: vsedit_theme::ColorTheme) -> ColorTheme {
     let colors: HashMap<String, String> = core.colors.iter()
@@ -945,5 +1088,135 @@ mod tests {
         b.colors.insert("editor.background".into(), "#000000".into());
         let cmp = ThemeComparison::compare(&a, &b);
         assert!(cmp.changed_colors.contains(&"editor.background".to_string()));
+    }
+
+    // ---- ThemeColorMap tests ----
+
+    #[test]
+    fn theme_color_map_from_theme() {
+        let theme = dark_theme();
+        let map = ThemeColorMap::from_theme(&theme);
+        assert!(!map.is_empty());
+        assert_eq!(map.get_color("keyword"), Some("#569cd6"));
+        assert!(map.get_color("nonexistent").is_none());
+    }
+
+    #[test]
+    fn theme_color_map_resolve_scopes() {
+        let theme = dark_theme();
+        let map = ThemeColorMap::from_theme(&theme);
+        // Try scopes in order, "variable" doesn't exist but "keyword" does
+        assert_eq!(
+            map.resolve_scopes(&["variable", "keyword"]),
+            Some("#569cd6")
+        );
+        assert!(map.resolve_scopes(&["nonexistent"]).is_none());
+    }
+
+    #[test]
+    fn theme_color_map_scopes_list() {
+        let theme = dark_theme();
+        let map = ThemeColorMap::from_theme(&theme);
+        let scopes = map.scopes();
+        assert!(scopes.contains(&"keyword"));
+        assert_eq!(map.len(), 1);
+    }
+
+    // ---- theme_contrast_ratio tests ----
+
+    #[test]
+    fn contrast_ratio_black_white() {
+        let black = ColorValue::new("#000000").unwrap();
+        let white = ColorValue::new("#ffffff").unwrap();
+        let ratio = theme_contrast_ratio(&black, &white);
+        assert!((ratio - 21.0).abs() < 0.1); // should be ~21:1
+    }
+
+    #[test]
+    fn contrast_ratio_same_color() {
+        let color = ColorValue::new("#808080").unwrap();
+        let ratio = theme_contrast_ratio(&color, &color);
+        assert!((ratio - 1.0).abs() < 0.01); // should be ~1:1
+    }
+
+    #[test]
+    fn meets_wcag_aa_check() {
+        let black = ColorValue::new("#000000").unwrap();
+        let white = ColorValue::new("#ffffff").unwrap();
+        assert!(meets_wcag_aa(&black, &white));
+        assert!(meets_wcag_aaa(&black, &white));
+
+        // Similar grays won't pass
+        let gray1 = ColorValue::new("#808080").unwrap();
+        let gray2 = ColorValue::new("#909090").unwrap();
+        assert!(!meets_wcag_aa(&gray1, &gray2));
+    }
+
+    #[test]
+    fn relative_luminance_extremes() {
+        let black = ColorValue::new("#000000").unwrap();
+        let white = ColorValue::new("#ffffff").unwrap();
+        assert!(relative_luminance(&black) < 0.01);
+        assert!((relative_luminance(&white) - 1.0).abs() < 0.01);
+    }
+
+    // ---- color_blend tests ----
+
+    #[test]
+    fn blend_fully_opaque() {
+        let fg = ColorValue::new("#ff0000").unwrap();
+        let bg = ColorValue::new("#0000ff").unwrap();
+        let result = color_blend(&fg, &bg, 1.0);
+        assert_eq!(result.red(), 255);
+        assert_eq!(result.green(), 0);
+        assert_eq!(result.blue(), 0);
+    }
+
+    #[test]
+    fn blend_fully_transparent() {
+        let fg = ColorValue::new("#ff0000").unwrap();
+        let bg = ColorValue::new("#0000ff").unwrap();
+        let result = color_blend(&fg, &bg, 0.0);
+        assert_eq!(result.red(), 0);
+        assert_eq!(result.green(), 0);
+        assert_eq!(result.blue(), 255);
+    }
+
+    #[test]
+    fn blend_half_alpha() {
+        let fg = ColorValue::new("#ff0000").unwrap();
+        let bg = ColorValue::new("#0000ff").unwrap();
+        let result = color_blend(&fg, &bg, 0.5);
+        // Should be roughly (128, 0, 128)
+        assert!((result.red() as i32 - 128).abs() <= 1);
+        assert_eq!(result.green(), 0);
+        assert!((result.blue() as i32 - 128).abs() <= 1);
+    }
+
+    #[test]
+    fn color_mix_symmetric() {
+        let a = ColorValue::new("#ff0000").unwrap();
+        let b = ColorValue::new("#0000ff").unwrap();
+        let mixed = color_mix(&a, &b);
+        assert!((mixed.red() as i32 - 128).abs() <= 1);
+        assert!((mixed.blue() as i32 - 128).abs() <= 1);
+    }
+
+    #[test]
+    fn color_lighten_moves_toward_white() {
+        let dark = ColorValue::new("#333333").unwrap();
+        let lighter = color_lighten(&dark, 0.5);
+        assert!(lighter.red() > dark.red());
+        assert!(lighter.green() > dark.green());
+        assert!(lighter.blue() > dark.blue());
+    }
+
+    #[test]
+    fn color_darken_moves_toward_black() {
+        let light = ColorValue::new("#cccccc").unwrap();
+        let darker = color_darken(&light, 0.5);
+        assert!(darker.red() < light.red());
+        assert!(darker.green() < light.green());
+        assert!(darker.blue() < light.blue());
     }
 }

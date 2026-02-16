@@ -588,6 +588,168 @@ impl CommentFormatter {
     }
 }
 
+// ── per-line block comment toggle ─────────────────────────────────────
+
+/// Toggle block comments on a multi-line selection, operating per-line.
+///
+/// If **all** non-empty lines are wrapped in `open…close`, the markers are
+/// removed from each line. Otherwise, each non-empty line is wrapped with
+/// `open…close`. Empty lines are left untouched.
+pub fn block_comment_toggle(lines: &[&str], open: &str, close: &str) -> Vec<String> {
+    let all_wrapped = lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .all(|l| {
+            let trimmed = l.trim();
+            trimmed.starts_with(open) && trimmed.ends_with(close)
+        });
+
+    lines
+        .iter()
+        .map(|line| {
+            if line.trim().is_empty() {
+                return line.to_string();
+            }
+            if all_wrapped {
+                let indent_len = line.len() - line.trim_start().len();
+                let (indent, rest) = line.split_at(indent_len);
+                let trimmed = rest.trim_end();
+                let inner = &trimmed[open.len()..trimmed.len() - close.len()];
+                let inner = inner.strip_prefix(' ').unwrap_or(inner);
+                let inner = inner.strip_suffix(' ').unwrap_or(inner);
+                format!("{indent}{inner}")
+            } else {
+                let indent_len = line.len() - line.trim_start().len();
+                let (indent, rest) = line.split_at(indent_len);
+                format!("{indent}{open} {rest} {close}")
+            }
+        })
+        .collect()
+}
+
+// ── comment style report ──────────────────────────────────────────────
+
+/// Full report of comment styles found in source text.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CommentStyleReport {
+    /// Line-comment prefixes with their occurrence counts, sorted by count
+    /// descending.
+    pub line_styles: Vec<(String, usize)>,
+    /// Block-comment pairs with their occurrence counts, sorted by count
+    /// descending.
+    pub block_styles: Vec<(String, String, usize)>,
+    /// The dominant comment style, if any.
+    pub dominant_style: Option<DetectedCommentStyle>,
+    /// Total number of lines that contain a recognised comment marker.
+    pub total_comment_lines: usize,
+    /// Total number of lines in the input.
+    pub total_lines: usize,
+}
+
+/// Analyze source code to identify all comment patterns and their
+/// frequencies.
+pub fn detect_comment_style(content: &str) -> CommentStyleReport {
+    let total_lines = content.lines().count();
+
+    let mut line_styles: Vec<(String, usize)> = Vec::new();
+    for &pfx in CommentStyleDetector::LINE_PREFIXES {
+        let count = content
+            .lines()
+            .filter(|l| l.trim_start().starts_with(pfx))
+            .count();
+        if count > 0 {
+            line_styles.push((pfx.to_string(), count));
+        }
+    }
+    line_styles.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let mut block_styles: Vec<(String, String, usize)> = Vec::new();
+    for &(open, close) in CommentStyleDetector::BLOCK_PAIRS {
+        let opens = content.matches(open).count();
+        let closes = content.matches(close).count();
+        let count = opens.min(closes);
+        if count > 0 {
+            block_styles.push((open.to_string(), close.to_string(), count));
+        }
+    }
+    block_styles.sort_by(|a, b| b.2.cmp(&a.2));
+
+    let total_comment_lines = content
+        .lines()
+        .filter(|l| {
+            let t = l.trim_start();
+            CommentStyleDetector::LINE_PREFIXES.iter().any(|p| t.starts_with(p))
+                || CommentStyleDetector::BLOCK_PAIRS
+                    .iter()
+                    .any(|(o, c)| t.contains(o) || t.contains(c))
+        })
+        .count();
+
+    let dominant_style = CommentStyleDetector::detect(content);
+
+    CommentStyleReport {
+        line_styles,
+        block_styles,
+        dominant_style,
+        total_comment_lines,
+        total_lines,
+    }
+}
+
+// ── multi-line block comment helper ───────────────────────────────────
+
+/// Helper for wrapping and unwrapping text in block-comment markers.
+#[derive(Debug, Clone)]
+pub struct MultiLineBlockComment {
+    open: String,
+    close: String,
+}
+
+impl MultiLineBlockComment {
+    /// Create a new helper with the given open/close markers.
+    pub fn new(open: &str, close: &str) -> Self {
+        Self {
+            open: open.to_string(),
+            close: close.to_string(),
+        }
+    }
+
+    /// Wrap `text` in the block-comment markers with surrounding spaces.
+    pub fn wrap(&self, text: &str) -> String {
+        format!("{} {} {}", self.open, text, self.close)
+    }
+
+    /// Remove block-comment markers if present, returning `None` if the
+    /// text is not wrapped.
+    pub fn unwrap(&self, text: &str) -> Option<String> {
+        let trimmed = text.trim();
+        if self.is_wrapped(text) {
+            let inner = &trimmed[self.open.len()..trimmed.len() - self.close.len()];
+            let inner = inner.strip_prefix(' ').unwrap_or(inner);
+            let inner = inner.strip_suffix(' ').unwrap_or(inner);
+            Some(inner.to_string())
+        } else {
+            None
+        }
+    }
+
+    /// Return `true` if `text` is wrapped in the block-comment markers.
+    pub fn is_wrapped(&self, text: &str) -> bool {
+        let trimmed = text.trim();
+        trimmed.starts_with(&self.open) && trimmed.ends_with(&self.close)
+    }
+
+    /// Toggle block-comment markers: wrap if not wrapped, unwrap if
+    /// already wrapped.
+    pub fn toggle(&self, text: &str) -> String {
+        if let Some(inner) = self.unwrap(text) {
+            inner
+        } else {
+            self.wrap(text)
+        }
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -930,5 +1092,91 @@ mod tests {
         let lines = vec!["//"];
         let result = CommentFormatter::normalize_spacing(&lines, "//");
         assert_eq!(result[0], "//");
+    }
+
+    // ── block_comment_toggle tests ────────────────────────────────────
+
+    #[test]
+    fn block_comment_toggle_adds_per_line() {
+        let lines = vec!["fn main() {", "    println!(\"hi\");", "}"];
+        let result = block_comment_toggle(&lines, "/*", "*/");
+        assert_eq!(
+            result,
+            vec!["/* fn main() { */", "    /* println!(\"hi\"); */", "/* } */"]
+        );
+    }
+
+    #[test]
+    fn block_comment_toggle_removes_per_line() {
+        let lines = vec!["/* fn main() { */", "    /* println!(\"hi\"); */", "/* } */"];
+        let result = block_comment_toggle(&lines, "/*", "*/");
+        assert_eq!(result, vec!["fn main() {", "    println!(\"hi\");", "}"]);
+    }
+
+    #[test]
+    fn block_comment_toggle_preserves_empty_lines() {
+        let lines = vec!["hello", "", "world"];
+        let result = block_comment_toggle(&lines, "/*", "*/");
+        assert_eq!(result, vec!["/* hello */", "", "/* world */"]);
+    }
+
+    // ── detect_comment_style tests ────────────────────────────────────
+
+    #[test]
+    fn detect_comment_style_identifies_line_comments() {
+        let content = "// first\n// second\nlet x = 1;\n";
+        let report = detect_comment_style(content);
+        assert_eq!(
+            report.dominant_style,
+            Some(DetectedCommentStyle::Line("//".to_string()))
+        );
+    }
+
+    #[test]
+    fn detect_comment_style_identifies_block_comments() {
+        let content = "/* block one */\ncode\n/* block two */\n";
+        let report = detect_comment_style(content);
+        assert_eq!(
+            report.dominant_style,
+            Some(DetectedCommentStyle::Block {
+                open: "/*".to_string(),
+                close: "*/".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn detect_comment_style_reports_counts() {
+        let content = "// a\n// b\n// c\nlet x = 1;\nlet y = 2;\n";
+        let report = detect_comment_style(content);
+        assert_eq!(report.total_lines, 5);
+        assert_eq!(report.total_comment_lines, 3);
+        assert_eq!(report.line_styles[0], ("//".to_string(), 3));
+    }
+
+    // ── MultiLineBlockComment tests ───────────────────────────────────
+
+    #[test]
+    fn multi_line_block_comment_wrap_and_unwrap() {
+        let bc = MultiLineBlockComment::new("/*", "*/");
+        let wrapped = bc.wrap("hello");
+        assert_eq!(wrapped, "/* hello */");
+        let unwrapped = bc.unwrap(&wrapped);
+        assert_eq!(unwrapped, Some("hello".to_string()));
+        assert_eq!(bc.unwrap("no markers"), None);
+    }
+
+    #[test]
+    fn multi_line_block_comment_is_wrapped() {
+        let bc = MultiLineBlockComment::new("<!--", "-->");
+        assert!(bc.is_wrapped("<!-- stuff -->"));
+        assert!(!bc.is_wrapped("not wrapped"));
+    }
+
+    #[test]
+    fn multi_line_block_comment_toggle() {
+        let bc = MultiLineBlockComment::new("/*", "*/");
+        assert_eq!(bc.toggle("hello"), "/* hello */");
+        assert_eq!(bc.toggle("/* hello */"), "hello");
     }
 }

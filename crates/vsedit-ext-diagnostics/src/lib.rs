@@ -558,6 +558,146 @@ pub struct QuickFixSuggestion {
     pub diagnostic_index: usize,
 }
 
+// ---------------------------------------------------------------------------
+// DiagnosticSeverityCounter — tallies errors/warnings/info/hints
+// ---------------------------------------------------------------------------
+
+/// Incremental counter for diagnostic severities.
+///
+/// Unlike [`SeverityAggregation`] which is built from a slice, this counter
+/// can be incrementally updated as diagnostics are added or removed.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DiagnosticSeverityCounter {
+    pub errors: usize,
+    pub warnings: usize,
+    pub infos: usize,
+    pub hints: usize,
+}
+
+impl DiagnosticSeverityCounter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Increment the count for the given severity.
+    pub fn increment(&mut self, severity: DiagnosticSeverity) {
+        match severity {
+            DiagnosticSeverity::Error => self.errors += 1,
+            DiagnosticSeverity::Warning => self.warnings += 1,
+            DiagnosticSeverity::Information => self.infos += 1,
+            DiagnosticSeverity::Hint => self.hints += 1,
+        }
+    }
+
+    /// Decrement the count for the given severity (saturating).
+    pub fn decrement(&mut self, severity: DiagnosticSeverity) {
+        match severity {
+            DiagnosticSeverity::Error => self.errors = self.errors.saturating_sub(1),
+            DiagnosticSeverity::Warning => self.warnings = self.warnings.saturating_sub(1),
+            DiagnosticSeverity::Information => self.infos = self.infos.saturating_sub(1),
+            DiagnosticSeverity::Hint => self.hints = self.hints.saturating_sub(1),
+        }
+    }
+
+    /// Get the count for a specific severity.
+    pub fn get(&self, severity: DiagnosticSeverity) -> usize {
+        match severity {
+            DiagnosticSeverity::Error => self.errors,
+            DiagnosticSeverity::Warning => self.warnings,
+            DiagnosticSeverity::Information => self.infos,
+            DiagnosticSeverity::Hint => self.hints,
+        }
+    }
+
+    /// Total count across all severities.
+    pub fn total(&self) -> usize {
+        self.errors + self.warnings + self.infos + self.hints
+    }
+
+    /// Reset all counts to zero.
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    /// Returns the most severe level that has a non-zero count.
+    pub fn worst_severity(&self) -> Option<DiagnosticSeverity> {
+        if self.errors > 0 {
+            Some(DiagnosticSeverity::Error)
+        } else if self.warnings > 0 {
+            Some(DiagnosticSeverity::Warning)
+        } else if self.infos > 0 {
+            Some(DiagnosticSeverity::Information)
+        } else if self.hints > 0 {
+            Some(DiagnosticSeverity::Hint)
+        } else {
+            None
+        }
+    }
+}
+
+impl fmt::Display for DiagnosticSeverityCounter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "errors={}, warnings={}, info={}, hints={}",
+            self.errors, self.warnings, self.infos, self.hints
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// filter_diagnostics — filter by severity and/or source
+// ---------------------------------------------------------------------------
+
+/// Filter diagnostics by severity, source, or both.
+///
+/// If `severity` is `Some`, only diagnostics matching that severity are included.
+/// If `source` is `Some`, only diagnostics whose source matches (case-insensitive) are included.
+pub fn filter_diagnostics(
+    diags: &[Diagnostic],
+    severity: Option<DiagnosticSeverity>,
+    source: Option<&str>,
+) -> Vec<Diagnostic> {
+    diags
+        .iter()
+        .filter(|d| {
+            if let Some(sev) = severity {
+                if d.severity != sev {
+                    return false;
+                }
+            }
+            if let Some(src) = source {
+                match &d.source {
+                    Some(ds) => {
+                        if !ds.eq_ignore_ascii_case(src) {
+                            return false;
+                        }
+                    }
+                    None => return false,
+                }
+            }
+            true
+        })
+        .cloned()
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// diagnostic_sort — sort by severity then line
+// ---------------------------------------------------------------------------
+
+/// Sort diagnostics by severity (most severe first), then by start line,
+/// then by start column.
+pub fn diagnostic_sort(diags: &mut [Diagnostic]) {
+    diags.sort_by(|a, b| {
+        a.severity
+            .weight()
+            .cmp(&b.severity.weight())
+            .then(a.start_line.cmp(&b.start_line))
+            .then(a.start_col.cmp(&b.start_col))
+    });
+}
+
 /// Tracks quick fix suggestions for diagnostics.
 #[derive(Debug, Default)]
 pub struct QuickFixTracker {
@@ -942,5 +1082,143 @@ mod tests {
         assert_eq!(tracker.suggestions_for(99).len(), 0);
         tracker.clear();
         assert_eq!(tracker.total_suggestions(), 0);
+    }
+
+    // ---- DiagnosticSeverityCounter tests ----
+
+    #[test]
+    fn counter_increment_and_get() {
+        let mut counter = DiagnosticSeverityCounter::new();
+        counter.increment(DiagnosticSeverity::Error);
+        counter.increment(DiagnosticSeverity::Error);
+        counter.increment(DiagnosticSeverity::Warning);
+        assert_eq!(counter.get(DiagnosticSeverity::Error), 2);
+        assert_eq!(counter.get(DiagnosticSeverity::Warning), 1);
+        assert_eq!(counter.get(DiagnosticSeverity::Information), 0);
+        assert_eq!(counter.total(), 3);
+    }
+
+    #[test]
+    fn counter_decrement_saturates() {
+        let mut counter = DiagnosticSeverityCounter::new();
+        counter.decrement(DiagnosticSeverity::Error);
+        assert_eq!(counter.errors, 0); // no underflow
+        counter.increment(DiagnosticSeverity::Hint);
+        counter.increment(DiagnosticSeverity::Hint);
+        counter.decrement(DiagnosticSeverity::Hint);
+        assert_eq!(counter.hints, 1);
+    }
+
+    #[test]
+    fn counter_worst_severity() {
+        let mut counter = DiagnosticSeverityCounter::new();
+        assert!(counter.worst_severity().is_none());
+        counter.increment(DiagnosticSeverity::Hint);
+        assert_eq!(counter.worst_severity(), Some(DiagnosticSeverity::Hint));
+        counter.increment(DiagnosticSeverity::Warning);
+        assert_eq!(counter.worst_severity(), Some(DiagnosticSeverity::Warning));
+        counter.increment(DiagnosticSeverity::Error);
+        assert_eq!(counter.worst_severity(), Some(DiagnosticSeverity::Error));
+    }
+
+    #[test]
+    fn counter_reset() {
+        let mut counter = DiagnosticSeverityCounter::new();
+        counter.increment(DiagnosticSeverity::Error);
+        counter.increment(DiagnosticSeverity::Warning);
+        counter.reset();
+        assert_eq!(counter.total(), 0);
+    }
+
+    #[test]
+    fn counter_display() {
+        let mut counter = DiagnosticSeverityCounter::new();
+        counter.increment(DiagnosticSeverity::Error);
+        counter.increment(DiagnosticSeverity::Warning);
+        let s = format!("{counter}");
+        assert!(s.contains("errors=1"));
+        assert!(s.contains("warnings=1"));
+    }
+
+    // ---- filter_diagnostics tests ----
+
+    #[test]
+    fn filter_by_severity_only() {
+        let diags = vec![
+            make_diag("e1", DiagnosticSeverity::Error),
+            make_diag("w1", DiagnosticSeverity::Warning),
+            make_diag("e2", DiagnosticSeverity::Error),
+        ];
+        let filtered = filter_diagnostics(&diags, Some(DiagnosticSeverity::Error), None);
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|d| d.severity == DiagnosticSeverity::Error));
+    }
+
+    #[test]
+    fn filter_by_source_only() {
+        let mut d1 = make_diag("e1", DiagnosticSeverity::Error);
+        d1.source = Some("rustc".into());
+        let mut d2 = make_diag("e2", DiagnosticSeverity::Error);
+        d2.source = Some("clippy".into());
+        let mut d3 = make_diag("w1", DiagnosticSeverity::Warning);
+        d3.source = Some("RUSTC".into()); // case-insensitive
+        let diags = vec![d1, d2, d3];
+        let filtered = filter_diagnostics(&diags, None, Some("rustc"));
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn filter_by_severity_and_source() {
+        let mut d1 = make_diag("e1", DiagnosticSeverity::Error);
+        d1.source = Some("rustc".into());
+        let mut d2 = make_diag("w1", DiagnosticSeverity::Warning);
+        d2.source = Some("rustc".into());
+        let diags = vec![d1, d2];
+        let filtered = filter_diagnostics(&diags, Some(DiagnosticSeverity::Error), Some("rustc"));
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].message, "e1");
+    }
+
+    #[test]
+    fn filter_no_source_match() {
+        let d1 = make_diag("e1", DiagnosticSeverity::Error); // source is None
+        let filtered = filter_diagnostics(&[d1], None, Some("rustc"));
+        assert!(filtered.is_empty());
+    }
+
+    // ---- diagnostic_sort tests ----
+
+    #[test]
+    fn sort_by_severity_then_line() {
+        let mut diags = vec![
+            DiagnosticBuilder::new("hint", DiagnosticSeverity::Hint)
+                .span(1, 0, 1, 5).build().unwrap(),
+            DiagnosticBuilder::new("error-line5", DiagnosticSeverity::Error)
+                .span(5, 0, 5, 5).build().unwrap(),
+            DiagnosticBuilder::new("warning", DiagnosticSeverity::Warning)
+                .span(3, 0, 3, 5).build().unwrap(),
+            DiagnosticBuilder::new("error-line2", DiagnosticSeverity::Error)
+                .span(2, 0, 2, 5).build().unwrap(),
+        ];
+        diagnostic_sort(&mut diags);
+        assert_eq!(diags[0].severity, DiagnosticSeverity::Error);
+        assert_eq!(diags[0].start_line, 2);
+        assert_eq!(diags[1].severity, DiagnosticSeverity::Error);
+        assert_eq!(diags[1].start_line, 5);
+        assert_eq!(diags[2].severity, DiagnosticSeverity::Warning);
+        assert_eq!(diags[3].severity, DiagnosticSeverity::Hint);
+    }
+
+    #[test]
+    fn sort_by_column_within_same_line_severity() {
+        let mut diags = vec![
+            DiagnosticBuilder::new("b", DiagnosticSeverity::Error)
+                .span(1, 10, 1, 15).build().unwrap(),
+            DiagnosticBuilder::new("a", DiagnosticSeverity::Error)
+                .span(1, 2, 1, 8).build().unwrap(),
+        ];
+        diagnostic_sort(&mut diags);
+        assert_eq!(diags[0].start_col, 2);
+        assert_eq!(diags[1].start_col, 10);
     }
 }

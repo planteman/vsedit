@@ -536,6 +536,11 @@ impl OutputChannelFilter {
         Self { severity: None, pattern: Some(pattern.to_string()) }
     }
 
+    /// Create a filter matching both severity and pattern.
+    pub fn by_severity_and_pattern(severity: OutputSeverity, pattern: &str) -> Self {
+        Self { severity: Some(severity), pattern: Some(pattern.to_string()) }
+    }
+
     /// Returns `true` if the given line matches this filter.
     pub fn matches(&self, line: &str) -> bool {
         if let Some(ref sev) = self.severity {
@@ -554,6 +559,218 @@ impl OutputChannelFilter {
             }
         }
         true
+    }
+    /// Apply this filter to all lines in a channel, returning matching line indices.
+    pub fn apply(&self, channel: &OutputChannel) -> Vec<usize> {
+        channel
+            .content
+            .iter()
+            .enumerate()
+            .filter(|(_, line)| self.matches(line))
+            .map(|(i, _)| i)
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputChannelGroup — categorized output channels
+// ---------------------------------------------------------------------------
+
+/// Groups output channels by category for organized display.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OutputChannelGroup {
+    pub category: String,
+    pub channel_indices: Vec<usize>,
+}
+
+impl OutputChannelGroup {
+    pub fn new(category: impl Into<String>) -> Self {
+        Self {
+            category: category.into(),
+            channel_indices: Vec::new(),
+        }
+    }
+
+    /// Add a channel index to this group.
+    pub fn add_channel(&mut self, index: usize) {
+        if !self.channel_indices.contains(&index) {
+            self.channel_indices.push(index);
+        }
+    }
+
+    /// Remove a channel index from this group. Returns true if found.
+    pub fn remove_channel(&mut self, index: usize) -> bool {
+        if let Some(pos) = self.channel_indices.iter().position(|&i| i == index) {
+            self.channel_indices.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Returns the number of channels in this group.
+    pub fn channel_count(&self) -> usize {
+        self.channel_indices.len()
+    }
+
+    /// Returns true if the group contains no channels.
+    pub fn is_empty(&self) -> bool {
+        self.channel_indices.is_empty()
+    }
+}
+
+impl fmt::Display for OutputChannelGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "OutputChannelGroup({}, {} channels)",
+            self.category,
+            self.channel_indices.len()
+        )
+    }
+}
+
+/// Manages multiple channel groups for an [`OutputPanel`].
+#[derive(Debug, Clone, Default)]
+pub struct OutputGroupManager {
+    groups: Vec<OutputChannelGroup>,
+}
+
+impl OutputGroupManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a new group and return its index.
+    pub fn create_group(&mut self, category: impl Into<String>) -> usize {
+        let idx = self.groups.len();
+        self.groups.push(OutputChannelGroup::new(category));
+        idx
+    }
+
+    /// Add a channel to a group. Returns false if the group index is invalid.
+    pub fn add_to_group(&mut self, group_index: usize, channel_index: usize) -> bool {
+        if let Some(g) = self.groups.get_mut(group_index) {
+            g.add_channel(channel_index);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get a group by index.
+    pub fn get_group(&self, index: usize) -> Option<&OutputChannelGroup> {
+        self.groups.get(index)
+    }
+
+    /// Find a group by category name.
+    pub fn find_group(&self, category: &str) -> Option<usize> {
+        self.groups.iter().position(|g| g.category == category)
+    }
+
+    /// Return all group names.
+    pub fn group_names(&self) -> Vec<&str> {
+        self.groups.iter().map(|g| g.category.as_str()).collect()
+    }
+
+    /// Return the number of groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// output_search — find text across all channel output
+// ---------------------------------------------------------------------------
+
+/// A search match within an output channel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputSearchMatch {
+    pub channel_index: usize,
+    pub line_index: usize,
+    pub start_col: usize,
+    pub end_col: usize,
+}
+
+/// Search for a pattern across all channels in the panel.
+///
+/// Returns matches with channel index, line index, and column range.
+/// The search is case-insensitive.
+pub fn output_search(panel: &OutputPanel, query: &str) -> Vec<OutputSearchMatch> {
+    let mut results = Vec::new();
+    if query.is_empty() {
+        return results;
+    }
+    let lower_query = query.to_lowercase();
+    for (ch_idx, channel) in panel.channels.iter().enumerate() {
+        for (line_idx, line) in channel.content.iter().enumerate() {
+            let lower_line = line.to_lowercase();
+            let mut start = 0;
+            while let Some(pos) = lower_line[start..].find(&lower_query) {
+                let abs_start = start + pos;
+                results.push(OutputSearchMatch {
+                    channel_index: ch_idx,
+                    line_index: line_idx,
+                    start_col: abs_start,
+                    end_col: abs_start + query.len(),
+                });
+                start = abs_start + 1;
+            }
+        }
+    }
+    results
+}
+
+// ---------------------------------------------------------------------------
+// OutputChannelAppendMode — append/replace/prepend behavior
+// ---------------------------------------------------------------------------
+
+/// How content should be added to an output channel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputChannelAppendMode {
+    /// Add content to the end (default).
+    Append,
+    /// Replace all existing content.
+    Replace,
+    /// Add content to the beginning.
+    Prepend,
+}
+
+impl fmt::Display for OutputChannelAppendMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Append => write!(f, "Append"),
+            Self::Replace => write!(f, "Replace"),
+            Self::Prepend => write!(f, "Prepend"),
+        }
+    }
+}
+
+impl OutputPanel {
+    /// Append a line using the specified mode.
+    pub fn append_with_mode(
+        &mut self,
+        channel_index: usize,
+        line: impl Into<String>,
+        mode: OutputChannelAppendMode,
+    ) -> bool {
+        if let Some(ch) = self.channels.get_mut(channel_index) {
+            let line = line.into();
+            match mode {
+                OutputChannelAppendMode::Append => ch.content.push(line),
+                OutputChannelAppendMode::Replace => {
+                    ch.content.clear();
+                    ch.content.push(line);
+                }
+                OutputChannelAppendMode::Prepend => ch.content.insert(0, line),
+            }
+            if self.auto_scroll && channel_index == self.active_channel_index {
+                self.scroll_to_bottom();
+            }
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -944,5 +1161,141 @@ mod tests {
     fn filter_severity_case_insensitive() {
         let f = OutputChannelFilter::by_severity(OutputSeverity::Warning);
         assert!(f.matches("[WARNING] disk space low"));
+    }
+
+    // ---- OutputChannelGroup tests ----
+
+    #[test]
+    fn channel_group_add_remove() {
+        let mut group = OutputChannelGroup::new("Build");
+        group.add_channel(0);
+        group.add_channel(1);
+        group.add_channel(0); // duplicate, ignored
+        assert_eq!(group.channel_count(), 2);
+        assert!(!group.is_empty());
+        assert!(group.remove_channel(0));
+        assert_eq!(group.channel_count(), 1);
+        assert!(!group.remove_channel(99));
+        assert_eq!(group.to_string(), "OutputChannelGroup(Build, 1 channels)");
+    }
+
+    #[test]
+    fn group_manager_create_and_find() {
+        let mut mgr = OutputGroupManager::new();
+        let g0 = mgr.create_group("Build");
+        let g1 = mgr.create_group("Debug");
+        mgr.add_to_group(g0, 0);
+        mgr.add_to_group(g0, 1);
+        mgr.add_to_group(g1, 2);
+        assert_eq!(mgr.group_count(), 2);
+        assert_eq!(mgr.find_group("Build"), Some(0));
+        assert_eq!(mgr.find_group("Debug"), Some(1));
+        assert_eq!(mgr.find_group("Missing"), None);
+        assert_eq!(mgr.group_names(), vec!["Build", "Debug"]);
+        let grp = mgr.get_group(g0).unwrap();
+        assert_eq!(grp.channel_count(), 2);
+    }
+
+    #[test]
+    fn group_manager_invalid_group() {
+        let mut mgr = OutputGroupManager::new();
+        assert!(!mgr.add_to_group(99, 0));
+    }
+
+    // ---- output_search tests ----
+
+    #[test]
+    fn output_search_across_channels() {
+        let mut p = OutputPanel::new();
+        p.create_channel("Build");
+        p.create_channel("Debug");
+        p.append_line(0, "[error] compile failed");
+        p.append_line(0, "all good");
+        p.append_line(1, "ERROR: runtime crash");
+
+        let results = output_search(&p, "error");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].channel_index, 0);
+        assert_eq!(results[0].line_index, 0);
+        assert_eq!(results[1].channel_index, 1);
+    }
+
+    #[test]
+    fn output_search_multiple_in_line() {
+        let mut p = OutputPanel::new();
+        p.create_channel("Log");
+        p.append_line(0, "error error error");
+        let results = output_search(&p, "error");
+        assert_eq!(results.len(), 3);
+    }
+
+    #[test]
+    fn output_search_empty_query() {
+        let p = OutputPanel::new();
+        assert!(output_search(&p, "").is_empty());
+    }
+
+    // ---- OutputChannelAppendMode tests ----
+
+    #[test]
+    fn append_mode_append() {
+        let mut p = OutputPanel::new();
+        p.create_channel("Log");
+        p.append_with_mode(0, "line1", OutputChannelAppendMode::Append);
+        p.append_with_mode(0, "line2", OutputChannelAppendMode::Append);
+        assert_eq!(p.channels[0].content, vec!["line1", "line2"]);
+    }
+
+    #[test]
+    fn append_mode_replace() {
+        let mut p = OutputPanel::new();
+        p.create_channel("Log");
+        p.append_line(0, "old1");
+        p.append_line(0, "old2");
+        p.append_with_mode(0, "new", OutputChannelAppendMode::Replace);
+        assert_eq!(p.channels[0].content, vec!["new"]);
+    }
+
+    #[test]
+    fn append_mode_prepend() {
+        let mut p = OutputPanel::new();
+        p.create_channel("Log");
+        p.append_line(0, "second");
+        p.append_with_mode(0, "first", OutputChannelAppendMode::Prepend);
+        assert_eq!(p.channels[0].content, vec!["first", "second"]);
+    }
+
+    #[test]
+    fn append_mode_invalid_channel() {
+        let mut p = OutputPanel::new();
+        assert!(!p.append_with_mode(99, "x", OutputChannelAppendMode::Append));
+    }
+
+    #[test]
+    fn append_mode_display() {
+        assert_eq!(format!("{}", OutputChannelAppendMode::Append), "Append");
+        assert_eq!(format!("{}", OutputChannelAppendMode::Replace), "Replace");
+        assert_eq!(format!("{}", OutputChannelAppendMode::Prepend), "Prepend");
+    }
+
+    // ---- OutputChannelFilter::apply ----
+
+    #[test]
+    fn filter_apply_to_channel() {
+        let mut ch = OutputChannel::new("Log");
+        ch.content.push("[error] bad thing".into());
+        ch.content.push("[info] all good".into());
+        ch.content.push("[error] another bad thing".into());
+        let f = OutputChannelFilter::by_severity(OutputSeverity::Error);
+        let indices = f.apply(&ch);
+        assert_eq!(indices, vec![0, 2]);
+    }
+
+    #[test]
+    fn filter_severity_and_pattern() {
+        let f = OutputChannelFilter::by_severity_and_pattern(OutputSeverity::Error, "timeout");
+        assert!(f.matches("[error] connection timeout"));
+        assert!(!f.matches("[error] disk full"));
+        assert!(!f.matches("[info] timeout ignored"));
     }
 }

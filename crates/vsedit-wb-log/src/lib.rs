@@ -462,6 +462,86 @@ pub fn grep_entries_all_fields<'a>(entries: &'a [LogEntry], pattern: &str) -> Ve
         .collect()
 }
 
+/// Filter criteria for selecting log entries by level.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LogFilterLevel {
+    /// Match all entries regardless of level.
+    All,
+    /// Match entries at exactly this level.
+    AtLevel(LogLevel),
+    /// Match entries strictly above this level.
+    AboveLevel(LogLevel),
+    /// Match entries strictly below this level.
+    BelowLevel(LogLevel),
+    /// Match entries within an inclusive range.
+    Range { min: LogLevel, max: LogLevel },
+}
+
+impl fmt::Display for LogFilterLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LogFilterLevel::All => write!(f, "All"),
+            LogFilterLevel::AtLevel(l) => write!(f, "AtLevel({l})"),
+            LogFilterLevel::AboveLevel(l) => write!(f, "AboveLevel({l})"),
+            LogFilterLevel::BelowLevel(l) => write!(f, "BelowLevel({l})"),
+            LogFilterLevel::Range { min, max } => write!(f, "Range({min}..{max})"),
+        }
+    }
+}
+
+/// Filter `entries` according to a [`LogFilterLevel`] criterion.
+pub fn apply_filter<'a>(entries: &'a [LogEntry], filter: &LogFilterLevel) -> Vec<&'a LogEntry> {
+    entries
+        .iter()
+        .filter(|e| match filter {
+            LogFilterLevel::All => true,
+            LogFilterLevel::AtLevel(l) => e.level == *l,
+            LogFilterLevel::AboveLevel(l) => e.level > *l,
+            LogFilterLevel::BelowLevel(l) => e.level < *l,
+            LogFilterLevel::Range { min, max } => e.level >= *min && e.level <= *max,
+        })
+        .collect()
+}
+
+/// Which fields [`log_search`] should inspect.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LogSearchFields {
+    /// Search only the message field.
+    Message,
+    /// Search only the source field.
+    Source,
+    /// Search both message and source fields.
+    All,
+}
+
+/// Search `entries` for `query` in the specified `fields`.
+pub fn log_search<'a>(
+    entries: &'a [LogEntry],
+    query: &str,
+    case_sensitive: bool,
+    fields: LogSearchFields,
+) -> Vec<&'a LogEntry> {
+    let matches = |haystack: &str| -> bool {
+        if case_sensitive {
+            haystack.contains(query)
+        } else {
+            haystack.to_lowercase().contains(&query.to_lowercase())
+        }
+    };
+
+    entries
+        .iter()
+        .filter(|e| match &fields {
+            LogSearchFields::Message => matches(&e.message),
+            LogSearchFields::Source => e.source.as_ref().map_or(false, |s| matches(s)),
+            LogSearchFields::All => {
+                matches(&e.message)
+                    || e.source.as_ref().map_or(false, |s| matches(s))
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -917,5 +997,84 @@ mod tests {
         let entries = sample_entries();
         let results = grep_entries_all_fields(&entries, "NETWORK");
         assert_eq!(results.len(), 2); // both entries with source "network"
+    }
+
+    #[test]
+    fn test_apply_filter_all() {
+        let entries = sample_entries();
+        let results = apply_filter(&entries, &LogFilterLevel::All);
+        assert_eq!(results.len(), entries.len());
+    }
+
+    #[test]
+    fn test_apply_filter_at_level() {
+        let entries = sample_entries();
+        let results = apply_filter(&entries, &LogFilterLevel::AtLevel(LogLevel::Info));
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().all(|e| e.level == LogLevel::Info));
+    }
+
+    #[test]
+    fn test_apply_filter_above_level() {
+        let entries = sample_entries();
+        // Above Warning => Error, Critical
+        let results = apply_filter(&entries, &LogFilterLevel::AboveLevel(LogLevel::Warning));
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().all(|e| e.level > LogLevel::Warning));
+    }
+
+    #[test]
+    fn test_apply_filter_below_level() {
+        let entries = sample_entries();
+        // Below Warning => Trace, Debug, Info
+        let results = apply_filter(&entries, &LogFilterLevel::BelowLevel(LogLevel::Warning));
+        assert_eq!(results.len(), 3); // Info("started"), Info("connected"), Debug("tick")
+        assert!(results.iter().all(|e| e.level < LogLevel::Warning));
+    }
+
+    #[test]
+    fn test_apply_filter_range() {
+        let entries = sample_entries();
+        // Info..=Error inclusive
+        let results = apply_filter(
+            &entries,
+            &LogFilterLevel::Range { min: LogLevel::Info, max: LogLevel::Error },
+        );
+        assert_eq!(results.len(), 4); // 2×Info + Warning + Error
+        assert!(results.iter().all(|e| e.level >= LogLevel::Info && e.level <= LogLevel::Error));
+    }
+
+    #[test]
+    fn test_log_search_case_insensitive_message() {
+        let entries = sample_entries();
+        let results = log_search(&entries, "STARTED", false, LogSearchFields::Message);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].message, "started");
+    }
+
+    #[test]
+    fn test_log_search_case_sensitive_message() {
+        let entries = sample_entries();
+        // "STARTED" should NOT match "started" when case-sensitive
+        let results = log_search(&entries, "STARTED", true, LogSearchFields::Message);
+        assert!(results.is_empty());
+
+        let results = log_search(&entries, "started", true, LogSearchFields::Message);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_log_search_source_field() {
+        let entries = sample_entries();
+        let results = log_search(&entries, "network", false, LogSearchFields::Source);
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_log_search_all_fields() {
+        let entries = sample_entries();
+        // "app" appears as source on "started" and "out of memory"
+        let results = log_search(&entries, "app", false, LogSearchFields::All);
+        assert_eq!(results.len(), 2);
     }
 }

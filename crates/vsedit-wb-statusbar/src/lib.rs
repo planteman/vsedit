@@ -13,6 +13,7 @@ use vsedit_events::{Emitter, Event};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatusBarAlignment {
     Left,
+    Center,
     Right,
 }
 
@@ -333,6 +334,7 @@ impl fmt::Display for StatusBarAlignment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             StatusBarAlignment::Left => write!(f, "Left"),
+            StatusBarAlignment::Center => write!(f, "Center"),
             StatusBarAlignment::Right => write!(f, "Right"),
         }
     }
@@ -517,6 +519,130 @@ impl StatusBarService {
     pub fn hidden_count(&self) -> usize {
         self.items.iter().filter(|i| !i.visible).count()
     }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarSection
+// ---------------------------------------------------------------------------
+
+/// Logical grouping of status bar items within a named section.
+#[derive(Debug, Clone)]
+pub struct StatusBarSection {
+    pub name: String,
+    pub alignment: StatusBarAlignment,
+    pub items: Vec<StatusBarItem>,
+}
+
+impl StatusBarSection {
+    pub fn new(name: impl Into<String>, alignment: StatusBarAlignment) -> Self {
+        Self {
+            name: name.into(),
+            alignment,
+            items: Vec::new(),
+        }
+    }
+
+    pub fn add_item(&mut self, item: StatusBarItem) {
+        self.items.push(item);
+    }
+
+    pub fn remove_item(&mut self, id: &str) {
+        self.items.retain(|i| i.id != id);
+    }
+
+    /// Returns items sorted by priority descending.
+    pub fn get_items_sorted(&self) -> Vec<&StatusBarItem> {
+        let mut sorted: Vec<&StatusBarItem> = self.items.iter().collect();
+        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn get_item(&self, id: &str) -> Option<&StatusBarItem> {
+        self.items.iter().find(|i| i.id == id)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarLayout
+// ---------------------------------------------------------------------------
+
+/// Manages left, center, and right status bar sections.
+#[derive(Debug, Clone)]
+pub struct StatusBarLayout {
+    pub left: StatusBarSection,
+    pub center: StatusBarSection,
+    pub right: StatusBarSection,
+}
+
+impl StatusBarLayout {
+    pub fn new() -> Self {
+        Self {
+            left: StatusBarSection::new("left", StatusBarAlignment::Left),
+            center: StatusBarSection::new("center", StatusBarAlignment::Center),
+            right: StatusBarSection::new("right", StatusBarAlignment::Right),
+        }
+    }
+
+    pub fn add_to_left(&mut self, item: StatusBarItem) {
+        self.left.add_item(item);
+    }
+
+    pub fn add_to_center(&mut self, item: StatusBarItem) {
+        self.center.add_item(item);
+    }
+
+    pub fn add_to_right(&mut self, item: StatusBarItem) {
+        self.right.add_item(item);
+    }
+
+    pub fn get_left(&self) -> Vec<&StatusBarItem> {
+        self.left.get_items_sorted()
+    }
+
+    pub fn get_center(&self) -> Vec<&StatusBarItem> {
+        self.center.get_items_sorted()
+    }
+
+    pub fn get_right(&self) -> Vec<&StatusBarItem> {
+        self.right.get_items_sorted()
+    }
+
+    pub fn total_items(&self) -> usize {
+        self.left.len() + self.center.len() + self.right.len()
+    }
+
+    /// Removes the item with the given id from whichever section contains it.
+    pub fn remove_item(&mut self, id: &str) {
+        self.left.remove_item(id);
+        self.center.remove_item(id);
+        self.right.remove_item(id);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Animation helpers
+// ---------------------------------------------------------------------------
+
+pub const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+pub const DOTS_FRAMES: &[&str] = &[".", "..", "..."];
+
+/// Returns the appropriate frame for the given elapsed time.
+///
+/// If `frames` is empty the function returns `""`.
+pub fn animation_frame<'a>(elapsed_ms: u64, frames: &[&'a str]) -> &'a str {
+    if frames.is_empty() {
+        return "";
+    }
+    let idx = (elapsed_ms / 80) as usize % frames.len();
+    frames[idx]
 }
 
 // ---------------------------------------------------------------------------
@@ -927,5 +1053,124 @@ mod tests {
         svc.add_item(a);
         svc.add_item(b);
         assert_eq!(svc.hidden_count(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // StatusBarSection tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn section_add_and_get_items_sorted() {
+        let mut sec = StatusBarSection::new("left", StatusBarAlignment::Left);
+        sec.add_item(make_item("low", StatusBarAlignment::Left, 10));
+        sec.add_item(make_item("high", StatusBarAlignment::Left, 50));
+        sec.add_item(make_item("mid", StatusBarAlignment::Left, 30));
+
+        let sorted = sec.get_items_sorted();
+        assert_eq!(sorted[0].id, "high");
+        assert_eq!(sorted[1].id, "mid");
+        assert_eq!(sorted[2].id, "low");
+    }
+
+    #[test]
+    fn section_remove_item() {
+        let mut sec = StatusBarSection::new("left", StatusBarAlignment::Left);
+        sec.add_item(make_item("a", StatusBarAlignment::Left, 1));
+        sec.add_item(make_item("b", StatusBarAlignment::Left, 2));
+        sec.remove_item("a");
+        assert_eq!(sec.len(), 1);
+        assert!(sec.get_item("a").is_none());
+        assert!(sec.get_item("b").is_some());
+    }
+
+    #[test]
+    fn section_is_empty_and_len() {
+        let mut sec = StatusBarSection::new("test", StatusBarAlignment::Left);
+        assert!(sec.is_empty());
+        assert_eq!(sec.len(), 0);
+        sec.add_item(make_item("x", StatusBarAlignment::Left, 1));
+        assert!(!sec.is_empty());
+        assert_eq!(sec.len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // StatusBarLayout tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn layout_add_to_sections_and_get_sorted() {
+        let mut layout = StatusBarLayout::new();
+        layout.add_to_left(make_item("l1", StatusBarAlignment::Left, 10));
+        layout.add_to_left(make_item("l2", StatusBarAlignment::Left, 20));
+        layout.add_to_center(make_item("c1", StatusBarAlignment::Center, 5));
+        layout.add_to_right(make_item("r1", StatusBarAlignment::Right, 1));
+
+        let left = layout.get_left();
+        assert_eq!(left.len(), 2);
+        assert_eq!(left[0].id, "l2");
+        assert_eq!(left[1].id, "l1");
+
+        let center = layout.get_center();
+        assert_eq!(center.len(), 1);
+        assert_eq!(center[0].id, "c1");
+
+        let right = layout.get_right();
+        assert_eq!(right.len(), 1);
+        assert_eq!(right[0].id, "r1");
+    }
+
+    #[test]
+    fn layout_total_items() {
+        let mut layout = StatusBarLayout::new();
+        assert_eq!(layout.total_items(), 0);
+        layout.add_to_left(make_item("l", StatusBarAlignment::Left, 1));
+        layout.add_to_center(make_item("c", StatusBarAlignment::Center, 1));
+        layout.add_to_right(make_item("r", StatusBarAlignment::Right, 1));
+        assert_eq!(layout.total_items(), 3);
+    }
+
+    #[test]
+    fn layout_remove_from_any_section() {
+        let mut layout = StatusBarLayout::new();
+        layout.add_to_left(make_item("a", StatusBarAlignment::Left, 1));
+        layout.add_to_center(make_item("b", StatusBarAlignment::Center, 1));
+        layout.add_to_right(make_item("c", StatusBarAlignment::Right, 1));
+
+        layout.remove_item("b");
+        assert_eq!(layout.total_items(), 2);
+        assert!(layout.center.is_empty());
+
+        layout.remove_item("c");
+        assert_eq!(layout.total_items(), 1);
+        assert!(layout.right.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // animation_frame tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn animation_frame_cycles_through_frames() {
+        let frames = &["a", "b", "c"];
+        assert_eq!(animation_frame(0, frames), "a");
+        assert_eq!(animation_frame(80, frames), "b");
+        assert_eq!(animation_frame(160, frames), "c");
+        // wraps around
+        assert_eq!(animation_frame(240, frames), "a");
+    }
+
+    #[test]
+    fn animation_frame_empty_returns_default() {
+        let frames: &[&str] = &[];
+        assert_eq!(animation_frame(0, frames), "");
+        assert_eq!(animation_frame(1000, frames), "");
+    }
+
+    #[test]
+    fn animation_frame_with_spinner_frames() {
+        assert_eq!(animation_frame(0, SPINNER_FRAMES), "⠋");
+        assert_eq!(animation_frame(80, SPINNER_FRAMES), "⠙");
+        // full cycle (10 frames × 80ms = 800ms)
+        assert_eq!(animation_frame(800, SPINNER_FRAMES), "⠋");
     }
 }
