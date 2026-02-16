@@ -1,14 +1,25 @@
 //! Settings sync across devices.
 
+pub mod extensions;
+pub mod keybindings;
+pub mod merge;
+pub mod profile;
+pub mod service;
+pub mod snippets;
+pub mod state;
+
 use std::fmt;
 
-#[derive(Debug, Clone, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SyncResource {
     Settings,
     Keybindings,
     Snippets,
     Extensions,
-    UIState,
+    GlobalState,
+    Profiles,
 }
 
 impl fmt::Display for SyncResource {
@@ -18,7 +29,8 @@ impl fmt::Display for SyncResource {
             SyncResource::Keybindings => write!(f, "Keybindings"),
             SyncResource::Snippets => write!(f, "Snippets"),
             SyncResource::Extensions => write!(f, "Extensions"),
-            SyncResource::UIState => write!(f, "UI State"),
+            SyncResource::GlobalState => write!(f, "Global State"),
+            SyncResource::Profiles => write!(f, "Profiles"),
         }
     }
 }
@@ -50,6 +62,7 @@ pub enum SyncError {
     AlreadyExists(String),
     SyncInProgress,
     NotEnabled,
+    ConflictDetected,
 }
 
 impl fmt::Display for SyncError {
@@ -59,6 +72,7 @@ impl fmt::Display for SyncError {
             SyncError::AlreadyExists(name) => write!(f, "resource already exists: {name}"),
             SyncError::SyncInProgress => write!(f, "sync already in progress"),
             SyncError::NotEnabled => write!(f, "sync is not enabled"),
+            SyncError::ConflictDetected => write!(f, "conflict detected during sync"),
         }
     }
 }
@@ -534,7 +548,7 @@ mod tests {
     #[test]
     fn resource_and_status_display() {
         assert_eq!(SyncResource::Settings.to_string(), "Settings");
-        assert_eq!(SyncResource::UIState.to_string(), "UI State");
+        assert_eq!(SyncResource::GlobalState.to_string(), "Global State");
         assert_eq!(SyncStatus::Idle.to_string(), "Idle");
         assert_eq!(SyncStatus::UpToDate.to_string(), "Up to Date");
         assert_eq!(
@@ -589,8 +603,8 @@ mod tests {
         let mut svc = SyncService::new();
         svc.enable();
         assert_eq!(
-            svc.try_sync(&SyncResource::UIState),
-            Err(SyncError::ResourceNotFound("UI State".into()))
+            svc.try_sync(&SyncResource::GlobalState),
+            Err(SyncError::ResourceNotFound("Global State".into()))
         );
     }
 
@@ -637,13 +651,13 @@ mod tests {
     #[test]
     fn entry_is_in_sync() {
         let mut svc = SyncService::new();
-        svc.add_resource(SyncResource::UIState);
+        svc.add_resource(SyncResource::GlobalState);
         let entry = &svc.get_all_entries()[0];
         assert!(!entry.is_in_sync()); // remote is None
-        svc.update_version(&SyncResource::UIState, Some(5), Some(5))
+        svc.update_version(&SyncResource::GlobalState, Some(5), Some(5))
             .unwrap();
         assert!(svc.get_all_entries()[0].is_in_sync());
-        svc.update_version(&SyncResource::UIState, Some(6), None)
+        svc.update_version(&SyncResource::GlobalState, Some(6), None)
             .unwrap();
         assert!(!svc.get_all_entries()[0].is_in_sync());
     }
@@ -691,7 +705,8 @@ mod tests {
         assert!(!SyncResource::Keybindings.to_string().is_empty());
         assert!(!SyncResource::Snippets.to_string().is_empty());
         assert!(!SyncResource::Extensions.to_string().is_empty());
-        assert!(!SyncResource::UIState.to_string().is_empty());
+        assert!(!SyncResource::GlobalState.to_string().is_empty());
+        assert!(!SyncResource::Profiles.to_string().is_empty());
     }
 
     #[test]

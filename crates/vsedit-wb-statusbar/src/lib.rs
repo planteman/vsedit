@@ -500,6 +500,13 @@ impl ItemAnimationState {
     }
 }
 
+impl StatusBarService {
+    /// Returns the number of items that are currently hidden.
+    pub fn hidden_count(&self) -> usize {
+        self.items.iter().filter(|i| !i.visible).count()
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -895,5 +902,17 @@ mod tests {
         let anim = ItemAnimationState::new("fast", 0);
         assert!((anim.progress() - 1.0).abs() < f64::EPSILON);
         assert!(anim.is_complete());
+    }
+
+    #[test]
+    fn hidden_count_filters_visible() {
+        let mut svc = StatusBarService::new();
+        let mut a = make_item("a", StatusBarAlignment::Left, 1);
+        a.visible = true;
+        let mut b = make_item("b", StatusBarAlignment::Right, 2);
+        b.visible = false;
+        svc.add_item(a);
+        svc.add_item(b);
+        assert_eq!(svc.hidden_count(), 1);
     }
 }

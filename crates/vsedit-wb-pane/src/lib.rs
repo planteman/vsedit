@@ -474,6 +474,220 @@ impl fmt::Display for PaneGroup {
     }
 }
 
+/// A snapshot of all panes at a particular point in time.
+#[derive(Debug, Clone)]
+pub struct PaneSnapshot {
+    pub panes: Vec<Pane>,
+    pub label: String,
+}
+
+impl PaneSnapshot {
+    /// Capture the current state of all panes in a service.
+    pub fn capture(service: &PaneService, label: impl Into<String>) -> Self {
+        Self {
+            panes: service.panes.clone(),
+            label: label.into(),
+        }
+    }
+
+    /// Restore the snapshot into a service, replacing all existing panes.
+    pub fn restore(self, service: &mut PaneService) {
+        service.panes = self.panes;
+    }
+
+    /// Number of panes in the snapshot.
+    pub fn len(&self) -> usize {
+        self.panes.len()
+    }
+
+    /// Whether the snapshot is empty.
+    pub fn is_empty(&self) -> bool {
+        self.panes.is_empty()
+    }
+
+    /// Return pane ids in the snapshot.
+    pub fn pane_ids(&self) -> Vec<&str> {
+        self.panes.iter().map(|p| p.id.as_str()).collect()
+    }
+}
+
+impl fmt::Display for PaneSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Snapshot(\"{}\", {} panes)", self.label, self.panes.len())
+    }
+}
+
+/// An iterator over panes with optional filtering.
+pub struct PaneIterator<'a> {
+    panes: &'a [Pane],
+    index: usize,
+    location_filter: Option<PaneLocation>,
+    visible_only: bool,
+}
+
+impl<'a> PaneIterator<'a> {
+    /// Create an iterator over all panes in a service.
+    pub fn new(service: &'a PaneService) -> Self {
+        Self {
+            panes: &service.panes,
+            index: 0,
+            location_filter: None,
+            visible_only: false,
+        }
+    }
+
+    /// Filter to only panes at the given location.
+    pub fn at_location(mut self, location: PaneLocation) -> Self {
+        self.location_filter = Some(location);
+        self
+    }
+
+    /// Filter to only visible panes.
+    pub fn visible(mut self) -> Self {
+        self.visible_only = true;
+        self
+    }
+}
+
+impl<'a> Iterator for PaneIterator<'a> {
+    type Item = &'a Pane;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.index < self.panes.len() {
+            let pane = &self.panes[self.index];
+            self.index += 1;
+            if let Some(loc) = self.location_filter {
+                if pane.location != loc {
+                    continue;
+                }
+            }
+            if self.visible_only && !pane.visible {
+                continue;
+            }
+            return Some(pane);
+        }
+        None
+    }
+}
+
+/// Deserialize a layout string produced by [`serialize_layout`] back into panes.
+///
+/// Each segment has the format `id:Location:visible`. Unknown locations default
+/// to `Sidebar`.
+pub fn deserialize_layout(input: &str) -> Vec<Pane> {
+    if input.is_empty() {
+        return Vec::new();
+    }
+    input
+        .split(';')
+        .filter_map(|segment| {
+            let parts: Vec<&str> = segment.split(':').collect();
+            if parts.len() < 3 {
+                return None;
+            }
+            let id = parts[0].to_string();
+            let location = match parts[1] {
+                "Editor" => PaneLocation::Editor,
+                "Panel" => PaneLocation::Panel,
+                "Sidebar" => PaneLocation::Sidebar,
+                "AuxiliaryBar" => PaneLocation::AuxiliaryBar,
+                _ => PaneLocation::Sidebar,
+            };
+            let visible = parts[2] == "true";
+            Some(Pane {
+                id: id.clone(),
+                title: id,
+                location,
+                size: PaneSize {
+                    width: None,
+                    height: None,
+                    min_width: 100,
+                    min_height: 100,
+                },
+                visible,
+                maximized: false,
+            })
+        })
+        .collect()
+}
+
+/// Tracks a drag-and-drop reordering operation on panes.
+#[derive(Debug, Clone)]
+pub struct PaneDragDrop {
+    /// The id of the pane being dragged.
+    pub dragged_id: String,
+    /// The original index in the pane list.
+    pub origin_index: usize,
+    /// The current hover/target index.
+    pub target_index: Option<usize>,
+    /// Whether the drop has been committed.
+    pub committed: bool,
+}
+
+impl PaneDragDrop {
+    /// Begin a drag operation for the pane at `origin_index`.
+    pub fn begin(dragged_id: impl Into<String>, origin_index: usize) -> Self {
+        Self {
+            dragged_id: dragged_id.into(),
+            origin_index,
+            target_index: None,
+            committed: false,
+        }
+    }
+
+    /// Update the hover target.
+    pub fn hover(&mut self, target_index: usize) {
+        self.target_index = Some(target_index);
+    }
+
+    /// Cancel the drag operation.
+    pub fn cancel(&mut self) {
+        self.target_index = None;
+        self.committed = false;
+    }
+
+    /// Commit the drag, applying the reorder to the given pane list.
+    /// Returns `true` if the reorder was applied.
+    pub fn commit(&mut self, panes: &mut Vec<Pane>) -> bool {
+        let target = match self.target_index {
+            Some(t) => t,
+            None => return false,
+        };
+        if self.origin_index >= panes.len() || target >= panes.len() {
+            return false;
+        }
+        if self.origin_index == target {
+            self.committed = true;
+            return true;
+        }
+        let pane = panes.remove(self.origin_index);
+        let insert_at = if target > self.origin_index {
+            target - 1
+        } else {
+            target
+        };
+        let insert_at = insert_at.min(panes.len());
+        panes.insert(insert_at, pane);
+        self.committed = true;
+        true
+    }
+
+    /// Whether this drag moved the pane from its original position.
+    pub fn did_move(&self) -> bool {
+        self.committed && self.target_index.map_or(false, |t| t != self.origin_index)
+    }
+}
+
+impl fmt::Display for PaneDragDrop {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "DragDrop({}, from={}, to={:?}, committed={})",
+            self.dragged_id, self.origin_index, self.target_index, self.committed,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -796,5 +1010,101 @@ mod tests {
         let resolved = group.resolve(&svc);
         assert_eq!(resolved.len(), 2);
         assert_eq!(format!("{group}"), "PaneGroup(\"My Group\", 2 panes)");
+    }
+
+    #[test]
+    fn snapshot_capture_and_restore() {
+        let mut svc = PaneService::new();
+        svc.add_pane(pane("s1", PaneLocation::Editor));
+        svc.add_pane(pane("s2", PaneLocation::Panel));
+        let snap = PaneSnapshot::capture(&svc, "before-change");
+        assert_eq!(snap.len(), 2);
+        assert_eq!(snap.label, "before-change");
+        assert_eq!(snap.pane_ids(), vec!["s1", "s2"]);
+
+        svc.add_pane(pane("s3", PaneLocation::Sidebar));
+        assert_eq!(svc.pane_count(), 3);
+
+        snap.restore(&mut svc);
+        assert_eq!(svc.pane_count(), 2);
+        assert!(svc.get_pane("s3").is_none());
+        assert_eq!(format!("{}", PaneSnapshot::capture(&svc, "x")), "Snapshot(\"x\", 2 panes)");
+    }
+
+    #[test]
+    fn pane_iterator_filters() {
+        let mut svc = PaneService::new();
+        svc.add_pane(pane("i1", PaneLocation::Editor));
+        svc.add_pane(pane("i2", PaneLocation::Panel));
+        let mut hidden = pane("i3", PaneLocation::Editor);
+        hidden.visible = false;
+        svc.add_pane(hidden);
+        svc.add_pane(pane("i4", PaneLocation::Editor));
+
+        let all: Vec<_> = PaneIterator::new(&svc).collect();
+        assert_eq!(all.len(), 4);
+
+        let editors: Vec<_> = PaneIterator::new(&svc).at_location(PaneLocation::Editor).collect();
+        assert_eq!(editors.len(), 3);
+
+        let visible_editors: Vec<_> = PaneIterator::new(&svc)
+            .at_location(PaneLocation::Editor)
+            .visible()
+            .collect();
+        assert_eq!(visible_editors.len(), 2);
+    }
+
+    #[test]
+    fn deserialize_layout_roundtrip() {
+        let panes = vec![
+            pane("d1", PaneLocation::Editor),
+            pane("d2", PaneLocation::Panel),
+        ];
+        let serialized = serialize_layout(&panes);
+        let deserialized = deserialize_layout(&serialized);
+        assert_eq!(deserialized.len(), 2);
+        assert_eq!(deserialized[0].id, "d1");
+        assert_eq!(deserialized[0].location, PaneLocation::Editor);
+        assert!(deserialized[0].visible);
+        assert_eq!(deserialized[1].id, "d2");
+        assert_eq!(deserialized[1].location, PaneLocation::Panel);
+    }
+
+    #[test]
+    fn deserialize_layout_empty() {
+        let deserialized = deserialize_layout("");
+        assert!(deserialized.is_empty());
+    }
+
+    #[test]
+    fn drag_drop_reorder() {
+        let mut panes = vec![
+            pane("dd1", PaneLocation::Editor),
+            pane("dd2", PaneLocation::Editor),
+            pane("dd3", PaneLocation::Editor),
+        ];
+        let mut drag = PaneDragDrop::begin("dd1", 0);
+        assert!(!drag.did_move());
+
+        drag.hover(2);
+        assert!(drag.commit(&mut panes));
+        assert!(drag.did_move());
+        assert_eq!(panes[0].id, "dd2");
+        assert_eq!(panes[1].id, "dd1");
+        assert_eq!(panes[2].id, "dd3");
+    }
+
+    #[test]
+    fn drag_drop_cancel() {
+        let mut panes = vec![
+            pane("c1", PaneLocation::Editor),
+            pane("c2", PaneLocation::Editor),
+        ];
+        let mut drag = PaneDragDrop::begin("c1", 0);
+        drag.hover(1);
+        drag.cancel();
+        assert!(!drag.commit(&mut panes));
+        assert!(!drag.did_move());
+        assert_eq!(panes[0].id, "c1");
     }
 }

@@ -429,6 +429,60 @@ impl MarkerFilterPipeline {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Marker group summary
+// ---------------------------------------------------------------------------
+
+/// Counts of markers broken down by severity for a group of markers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkerGroupSummary {
+    pub error_count: usize,
+    pub warning_count: usize,
+    pub info_count: usize,
+    pub hint_count: usize,
+}
+
+impl MarkerGroupSummary {
+    /// Total number of markers across all severities.
+    pub fn total(&self) -> usize {
+        self.error_count + self.warning_count + self.info_count + self.hint_count
+    }
+
+    /// Returns the most severe level present, or `None` if empty.
+    pub fn worst_severity(&self) -> Option<MarkerSeverity> {
+        if self.error_count > 0 {
+            Some(MarkerSeverity::Error)
+        } else if self.warning_count > 0 {
+            Some(MarkerSeverity::Warning)
+        } else if self.info_count > 0 {
+            Some(MarkerSeverity::Info)
+        } else if self.hint_count > 0 {
+            Some(MarkerSeverity::Hint)
+        } else {
+            None
+        }
+    }
+}
+
+/// Summarize a slice of markers by counting each severity level.
+pub fn summarize_group(markers: &[Marker]) -> MarkerGroupSummary {
+    let mut summary = MarkerGroupSummary {
+        error_count: 0,
+        warning_count: 0,
+        info_count: 0,
+        hint_count: 0,
+    };
+    for m in markers {
+        match m.severity {
+            MarkerSeverity::Error => summary.error_count += 1,
+            MarkerSeverity::Warning => summary.warning_count += 1,
+            MarkerSeverity::Info => summary.info_count += 1,
+            MarkerSeverity::Hint => summary.hint_count += 1,
+        }
+    }
+    summary
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -861,5 +915,61 @@ mod tests {
             assert_eq!(s.count, 0);
             assert_eq!(s.affected_files, 0);
         }
+    }
+
+    // -- MarkerGroupSummary tests -----------------------------------------
+
+    #[test]
+    fn summarize_group_mixed_severities() {
+        let markers = vec![
+            make_marker("a.rs", MarkerSeverity::Error, "e1"),
+            make_marker("a.rs", MarkerSeverity::Warning, "w1"),
+            make_marker("a.rs", MarkerSeverity::Warning, "w2"),
+            make_marker("a.rs", MarkerSeverity::Info, "i1"),
+        ];
+        let s = summarize_group(&markers);
+        assert_eq!(s.error_count, 1);
+        assert_eq!(s.warning_count, 2);
+        assert_eq!(s.info_count, 1);
+        assert_eq!(s.hint_count, 0);
+        assert_eq!(s.total(), 4);
+    }
+
+    #[test]
+    fn summarize_group_empty() {
+        let s = summarize_group(&[]);
+        assert_eq!(s.total(), 0);
+        assert_eq!(s.worst_severity(), None);
+    }
+
+    #[test]
+    fn summarize_group_worst_severity_error() {
+        let markers = vec![
+            make_marker("a.rs", MarkerSeverity::Warning, "w"),
+            make_marker("a.rs", MarkerSeverity::Error, "e"),
+        ];
+        let s = summarize_group(&markers);
+        assert_eq!(s.worst_severity(), Some(MarkerSeverity::Error));
+    }
+
+    #[test]
+    fn summarize_group_worst_severity_warning_only() {
+        let markers = vec![
+            make_marker("a.rs", MarkerSeverity::Warning, "w"),
+            make_marker("a.rs", MarkerSeverity::Hint, "h"),
+        ];
+        let s = summarize_group(&markers);
+        assert_eq!(s.worst_severity(), Some(MarkerSeverity::Warning));
+    }
+
+    #[test]
+    fn summarize_group_only_hints() {
+        let markers = vec![
+            make_marker("a.rs", MarkerSeverity::Hint, "h1"),
+            make_marker("a.rs", MarkerSeverity::Hint, "h2"),
+        ];
+        let s = summarize_group(&markers);
+        assert_eq!(s.hint_count, 2);
+        assert_eq!(s.worst_severity(), Some(MarkerSeverity::Hint));
     }
 }

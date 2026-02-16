@@ -538,6 +538,56 @@ impl CommentStyleDetector {
     }
 }
 
+// ── comment formatter ─────────────────────────────────────────────────
+
+/// Normalizes comment formatting by ensuring consistent spacing after
+/// the comment prefix.
+pub struct CommentFormatter;
+
+impl CommentFormatter {
+    /// Normalize each line so that `prefix` is followed by exactly one
+    /// space. Lines that are not commented or are blank are left as-is.
+    pub fn normalize_spacing(lines: &[&str], prefix: &str) -> Vec<String> {
+        lines
+            .iter()
+            .map(|line| {
+                let trimmed = line.trim_start();
+                if trimmed.is_empty() || !trimmed.starts_with(prefix) {
+                    return line.to_string();
+                }
+                let indent_len = line.len() - trimmed.len();
+                let indent = &line[..indent_len];
+                let after_prefix = &trimmed[prefix.len()..];
+                let content = after_prefix.trim_start();
+                if content.is_empty() {
+                    format!("{indent}{prefix}")
+                } else {
+                    format!("{indent}{prefix} {content}")
+                }
+            })
+            .collect()
+    }
+
+    /// Return `true` if every commented line already has exactly one space
+    /// after the prefix.
+    pub fn is_normalized(lines: &[&str], prefix: &str) -> bool {
+        for line in lines {
+            let trimmed = line.trim_start();
+            if !trimmed.starts_with(prefix) || trimmed.is_empty() {
+                continue;
+            }
+            let after = &trimmed[prefix.len()..];
+            if after.is_empty() {
+                continue;
+            }
+            if !after.starts_with(' ') || after.starts_with("  ") {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 // ── tests ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -842,5 +892,43 @@ mod tests {
         let content = "# comment\ncode\n# another\n# more\n";
         let style = CommentStyleDetector::detect(content);
         assert_eq!(style, Some(DetectedCommentStyle::Line("#".to_string())));
+    }
+
+    // ── CommentFormatter tests ───────────────────────────────────────
+
+    #[test]
+    fn formatter_normalize_spacing() {
+        let lines = vec!["//hello", "//  world", "  //foo", "plain", ""];
+        let result = CommentFormatter::normalize_spacing(&lines, "//");
+        assert_eq!(result[0], "// hello");
+        assert_eq!(result[1], "// world");
+        assert_eq!(result[2], "  // foo");
+        assert_eq!(result[3], "plain");
+        assert_eq!(result[4], "");
+    }
+
+    #[test]
+    fn formatter_already_normalized() {
+        let lines = vec!["// hello", "// world"];
+        assert!(CommentFormatter::is_normalized(&lines, "//"));
+    }
+
+    #[test]
+    fn formatter_not_normalized() {
+        let lines = vec!["//hello", "// ok"];
+        assert!(!CommentFormatter::is_normalized(&lines, "//"));
+    }
+
+    #[test]
+    fn formatter_double_space_not_normalized() {
+        let lines = vec!["//  double"];
+        assert!(!CommentFormatter::is_normalized(&lines, "//"));
+    }
+
+    #[test]
+    fn formatter_empty_comment_stays() {
+        let lines = vec!["//"];
+        let result = CommentFormatter::normalize_spacing(&lines, "//");
+        assert_eq!(result[0], "//");
     }
 }

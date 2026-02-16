@@ -570,6 +570,19 @@ impl fmt::Display for ListenerPriority {
     }
 }
 
+/// Creates a listener that counts how many times it is invoked.
+/// Returns an `Arc<AtomicU64>` that tracks the count.
+pub fn counter_listener<T: Clone + Send + Sync + 'static>(
+    event: &Event<T>,
+) -> (DisposableHandle, Arc<AtomicU64>) {
+    let count = Arc::new(AtomicU64::new(0));
+    let count_clone = Arc::clone(&count);
+    let handle = event.on(move |_| {
+        count_clone.fetch_add(1, Ordering::SeqCst);
+    });
+    (handle, count)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -889,5 +902,27 @@ mod tests {
         buf.push("b");
         assert_eq!(buf.values(), &["b"]);
         assert_eq!(buf.len(), 1);
+    }
+
+    #[test]
+    fn counter_listener_counts_fires() {
+        let emitter = Emitter::new();
+        let (handle, count) = counter_listener(&emitter.event());
+        emitter.fire(&1);
+        emitter.fire(&2);
+        emitter.fire(&3);
+        assert_eq!(count.load(Ordering::SeqCst), 3);
+        drop(handle);
+    }
+
+    #[test]
+    fn counter_listener_stops_after_dispose() {
+        let emitter = Emitter::new();
+        let (handle, count) = counter_listener(&emitter.event());
+        emitter.fire(&42);
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        drop(handle);
+        emitter.fire(&99);
+        assert_eq!(count.load(Ordering::SeqCst), 1);
     }
 }

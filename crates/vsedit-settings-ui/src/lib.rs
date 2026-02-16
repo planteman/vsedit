@@ -530,6 +530,43 @@ pub fn diff_settings(a: &SettingsRegistry, b: &SettingsRegistry) -> SettingsDiff
     diff
 }
 
+/// Exports settings from a registry to a simple key=value text representation,
+/// with an optional key prefix filter.
+pub struct SettingsFilteredExporter<'a> {
+    registry: &'a SettingsRegistry,
+    prefix: Option<&'a str>,
+}
+
+impl<'a> SettingsFilteredExporter<'a> {
+    pub fn new(registry: &'a SettingsRegistry) -> Self {
+        Self { registry, prefix: None }
+    }
+
+    /// Only export settings whose key starts with `prefix`.
+    pub fn with_prefix(mut self, prefix: &'a str) -> Self {
+        self.prefix = Some(prefix);
+        self
+    }
+
+    /// Serializes matching settings to a JSON-like string of `"key": "value"` pairs.
+    pub fn to_json_string(&self) -> String {
+        let items: Vec<_> = self.registry.all().iter()
+            .filter(|item| self.prefix.map_or(true, |p| item.key.starts_with(p)))
+            .collect();
+        let mut out = String::from("{\n");
+        for (i, item) in items.iter().enumerate() {
+            let val = item.current_value.as_deref().unwrap_or(&item.default_value);
+            out.push_str(&format!("  \"{}\": \"{}\"", item.key, val));
+            if i + 1 < items.len() {
+                out.push(',');
+            }
+            out.push('\n');
+        }
+        out.push('}');
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -884,5 +921,59 @@ mod tests {
         assert_eq!(d.only_in_b, vec!["only.b"]);
         assert_eq!(d.changed.len(), 1);
         assert_eq!(d.changed[0], ("shared.key".into(), "aaa".into(), "bbb".into()));
+    }
+
+    #[test]
+    fn filtered_exporter_empty_registry() {
+        let reg = SettingsRegistry::new();
+        let exp = SettingsFilteredExporter::new(&reg);
+        assert_eq!(exp.to_json_string(), "{\n}");
+    }
+
+    #[test]
+    fn filtered_exporter_uses_current_value() {
+        let mut reg = SettingsRegistry::new();
+        reg.add(SettingItem {
+            key: "a.b".into(),
+            label: "AB".into(),
+            description: String::new(),
+            setting_type: SettingType::String,
+            default_value: "default".into(),
+            current_value: Some("custom".into()),
+            enum_values: vec![],
+            scope: SettingScope::User,
+        });
+        let json = SettingsFilteredExporter::new(&reg).to_json_string();
+        assert!(json.contains("\"a.b\": \"custom\""));
+    }
+
+    #[test]
+    fn filtered_exporter_with_prefix() {
+        let mut reg = SettingsRegistry::new();
+        reg.add(SettingItem {
+            key: "editor.fontSize".into(),
+            label: "Font Size".into(),
+            description: String::new(),
+            setting_type: SettingType::Number,
+            default_value: "14".into(),
+            current_value: None,
+            enum_values: vec![],
+            scope: SettingScope::User,
+        });
+        reg.add(SettingItem {
+            key: "terminal.shell".into(),
+            label: "Shell".into(),
+            description: String::new(),
+            setting_type: SettingType::String,
+            default_value: "/bin/bash".into(),
+            current_value: None,
+            enum_values: vec![],
+            scope: SettingScope::User,
+        });
+        let json = SettingsFilteredExporter::new(&reg)
+            .with_prefix("editor.")
+            .to_json_string();
+        assert!(json.contains("editor.fontSize"));
+        assert!(!json.contains("terminal.shell"));
     }
 }

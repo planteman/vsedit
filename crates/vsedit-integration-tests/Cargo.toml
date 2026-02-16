@@ -1,0 +1,26 @@
+[package]
+name = "vsedit-integration-tests"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+vsedit-text-model = { path = "../vsedit-text-model" }
+vsedit-editor-types = { path = "../vsedit-editor-types" }
+vsedit-cursor = { path = "../vsedit-cursor" }
+vsedit-editor-controller = { path = "../vsedit-editor-controller" }
+vsedit-json = { path = "../vsedit-json" }
+vsedit-commands = { path = "../vsedit-commands" }
+vsedit-events = { path = "../vsedit-events" }
+vsedit-di = { path = "../vsedit-di" }
+vsedit-languages = { path = "../vsedit-languages" }
+vsedit-diff = { path = "../vsedit-diff" }
+vsedit-explorer = { path = "../vsedit-explorer" }
+vsedit-ext-host = { path = "../vsedit-ext-host" }
+vsedit-snippet = { path = "../vsedit-snippet" }
+vsedit-suggest = { path = "../vsedit-suggest" }
+vsedit-wb-search = { path = "../vsedit-wb-search" }
+vsedit-workspace = { path = "../vsedit-workspace" }
+vsedit-uri = { path = "../vsedit-uri" }
+vsedit-configuration = { path = "../vsedit-configuration" }
+serde_json.workspace = true
+tempfile.workspace = true

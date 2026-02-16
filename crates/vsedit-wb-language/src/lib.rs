@@ -424,6 +424,42 @@ impl LanguageFeatureMatrix {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Language association
+// ---------------------------------------------------------------------------
+
+/// Maps a file extension to a language ID for quick lookup.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LanguageAssociation {
+    /// File extension including the dot, e.g. ".rs".
+    pub extension: String,
+    /// Language ID this extension maps to, e.g. "rust".
+    pub language_id: String,
+}
+
+impl LanguageAssociation {
+    pub fn new(extension: impl Into<String>, language_id: impl Into<String>) -> Self {
+        Self {
+            extension: extension.into(),
+            language_id: language_id.into(),
+        }
+    }
+}
+
+/// Resolve a file extension to a language ID using a list of associations.
+///
+/// Returns the language ID of the first matching association, or `None`.
+pub fn resolve_language_by_extension(
+    associations: &[LanguageAssociation],
+    filename: &str,
+) -> Option<String> {
+    let lower = filename.to_lowercase();
+    associations
+        .iter()
+        .find(|a| lower.ends_with(&a.extension.to_lowercase()))
+        .map(|a| a.language_id.clone())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -861,5 +897,56 @@ mod tests {
             has_auto_closing_pairs: true,
         };
         assert_eq!(fm.enabled_count(), 3);
+    }
+
+    // -- LanguageAssociation tests ----------------------------------------
+
+    #[test]
+    fn resolve_language_by_extension_basic() {
+        let assocs = vec![
+            LanguageAssociation::new(".rs", "rust"),
+            LanguageAssociation::new(".py", "python"),
+        ];
+        assert_eq!(
+            resolve_language_by_extension(&assocs, "main.rs"),
+            Some("rust".into())
+        );
+    }
+
+    #[test]
+    fn resolve_language_by_extension_case_insensitive() {
+        let assocs = vec![LanguageAssociation::new(".RS", "rust")];
+        assert_eq!(
+            resolve_language_by_extension(&assocs, "main.rs"),
+            Some("rust".into())
+        );
+    }
+
+    #[test]
+    fn resolve_language_by_extension_no_match() {
+        let assocs = vec![LanguageAssociation::new(".rs", "rust")];
+        assert_eq!(
+            resolve_language_by_extension(&assocs, "main.py"),
+            None
+        );
+    }
+
+    #[test]
+    fn resolve_language_by_extension_first_wins() {
+        let assocs = vec![
+            LanguageAssociation::new(".ts", "typescript"),
+            LanguageAssociation::new(".ts", "typescriptreact"),
+        ];
+        assert_eq!(
+            resolve_language_by_extension(&assocs, "app.ts"),
+            Some("typescript".into())
+        );
+    }
+
+    #[test]
+    fn language_association_new() {
+        let a = LanguageAssociation::new(".go", "go");
+        assert_eq!(a.extension, ".go");
+        assert_eq!(a.language_id, "go");
     }
 }

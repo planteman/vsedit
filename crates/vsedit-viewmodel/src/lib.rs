@@ -461,6 +461,45 @@ impl ViewModel {
     }
 }
 
+/// A search match within the view model.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewModelSearchMatch {
+    /// 1-based view line number.
+    pub view_line: u32,
+    /// 0-based start column in the view line content.
+    pub start_col: u32,
+    /// 0-based end column (exclusive) in the view line content.
+    pub end_col: u32,
+}
+
+/// Searches for a pattern across view lines in the view model.
+pub struct ViewModelSearch;
+
+impl ViewModelSearch {
+    /// Find all occurrences of `pattern` in the view model's view lines.
+    pub fn find(vm: &ViewModel, pattern: &str) -> Vec<ViewModelSearchMatch> {
+        let mut results = Vec::new();
+        if pattern.is_empty() {
+            return results;
+        }
+        let count = vm.get_view_line_count();
+        for i in 1..=count {
+            let content = vm.get_view_line_content(i);
+            let mut start = 0;
+            while let Some(pos) = content[start..].find(pattern) {
+                let abs_start = start + pos;
+                results.push(ViewModelSearchMatch {
+                    view_line: i,
+                    start_col: abs_start as u32,
+                    end_col: (abs_start + pattern.len()) as u32,
+                });
+                start = abs_start + 1;
+            }
+        }
+        results
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -878,5 +917,33 @@ mod tests {
         assert_eq!(vm.pixel_offset_of_view_line(2, &tracker), 25);
         let vl = vm.view_line_at_pixel(30, &tracker);
         assert_eq!(vl, 2); // 25..45 is line 2
+    }
+
+    #[test]
+    fn search_finds_pattern() {
+        let model = make_model("hello world\nhello rust");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let matches = ViewModelSearch::find(&vm, "hello");
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].view_line, 1);
+        assert_eq!(matches[1].view_line, 2);
+    }
+
+    #[test]
+    fn search_no_match() {
+        let model = make_model("foo bar");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let matches = ViewModelSearch::find(&vm, "baz");
+        assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn search_multiple_in_line() {
+        let model = make_model("abab");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let matches = ViewModelSearch::find(&vm, "ab");
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].start_col, 0);
+        assert_eq!(matches[1].start_col, 2);
     }
 }

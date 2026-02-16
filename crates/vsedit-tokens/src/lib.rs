@@ -605,6 +605,16 @@ impl TokenizationCache {
     }
 }
 
+/// Returns a human-readable name for a `StandardTokenType` variant.
+pub fn token_type_name(tt: StandardTokenType) -> &'static str {
+    match tt {
+        StandardTokenType::Other => "Other",
+        StandardTokenType::Comment => "Comment",
+        StandardTokenType::String => "String",
+        StandardTokenType::RegExp => "RegExp",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -890,5 +900,20 @@ mod tests {
     fn merge_token_ranges_empty() {
         let merged = merge_token_ranges(&[]);
         assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn token_type_name_all_variants() {
+        assert_eq!(token_type_name(StandardTokenType::Other), "Other");
+        assert_eq!(token_type_name(StandardTokenType::Comment), "Comment");
+        assert_eq!(token_type_name(StandardTokenType::String), "String");
+        assert_eq!(token_type_name(StandardTokenType::RegExp), "RegExp");
+    }
+
+    #[test]
+    fn token_type_name_is_not_empty() {
+        for tt in [StandardTokenType::Other, StandardTokenType::Comment, StandardTokenType::String, StandardTokenType::RegExp] {
+            assert!(!token_type_name(tt).is_empty());
+        }
     }
 }

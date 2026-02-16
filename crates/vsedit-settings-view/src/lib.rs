@@ -609,6 +609,50 @@ pub fn validate_settings_view_state(view: &SettingsView) -> Vec<String> {
     errors
 }
 
+/// Represents a navigation breadcrumb path in the settings UI (e.g. "User > Editor > Font").
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SettingsBreadcrumb {
+    segments: Vec<String>,
+}
+
+impl SettingsBreadcrumb {
+    /// Create an empty breadcrumb.
+    pub fn new() -> Self {
+        Self { segments: Vec::new() }
+    }
+
+    /// Push a new segment onto the breadcrumb trail.
+    pub fn push(&mut self, segment: &str) {
+        self.segments.push(segment.to_string());
+    }
+
+    /// Pop the last segment, returning it if present.
+    pub fn pop(&mut self) -> Option<String> {
+        self.segments.pop()
+    }
+
+    /// Return the display string with segments joined by " > ".
+    pub fn display(&self) -> String {
+        self.segments.join(" > ")
+    }
+
+    /// Return the current depth (number of segments).
+    pub fn depth(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// Return true if the breadcrumb is empty.
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+}
+
+impl Default for SettingsBreadcrumb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -871,5 +915,52 @@ mod tests {
         let errors = validate_settings_view_state(&v);
         assert_eq!(errors.len(), 1);
         assert!(errors[0].contains("NonExistent"));
+    }
+
+    #[test]
+    fn breadcrumb_empty() {
+        let bc = SettingsBreadcrumb::new();
+        assert!(bc.is_empty());
+        assert_eq!(bc.depth(), 0);
+        assert_eq!(bc.display(), "");
+    }
+
+    #[test]
+    fn breadcrumb_push_display() {
+        let mut bc = SettingsBreadcrumb::new();
+        bc.push("User");
+        bc.push("Editor");
+        bc.push("Font");
+        assert_eq!(bc.display(), "User > Editor > Font");
+        assert_eq!(bc.depth(), 3);
+    }
+
+    #[test]
+    fn breadcrumb_pop() {
+        let mut bc = SettingsBreadcrumb::new();
+        bc.push("A");
+        bc.push("B");
+        assert_eq!(bc.pop(), Some("B".to_string()));
+        assert_eq!(bc.display(), "A");
+    }
+
+    #[test]
+    fn breadcrumb_pop_empty() {
+        let mut bc = SettingsBreadcrumb::new();
+        assert_eq!(bc.pop(), None);
+    }
+
+    #[test]
+    fn breadcrumb_single_segment() {
+        let mut bc = SettingsBreadcrumb::new();
+        bc.push("Root");
+        assert_eq!(bc.display(), "Root");
+        assert!(!bc.is_empty());
+    }
+
+    #[test]
+    fn breadcrumb_default() {
+        let bc = SettingsBreadcrumb::default();
+        assert!(bc.is_empty());
     }
 }

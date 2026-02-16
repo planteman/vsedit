@@ -435,6 +435,175 @@ impl MinimapRenderer {
     }
 }
 
+/// Represents a selected region in the minimap.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MinimapSelection {
+    pub start_line: u32,
+    pub end_line: u32,
+    pub start_col: u32,
+    pub end_col: u32,
+}
+
+impl MinimapSelection {
+    pub fn new(start_line: u32, end_line: u32, start_col: u32, end_col: u32) -> Self {
+        Self {
+            start_line: start_line.min(end_line),
+            end_line: start_line.max(end_line),
+            start_col,
+            end_col,
+        }
+    }
+
+    /// Number of lines spanned by the selection.
+    pub fn line_span(&self) -> u32 {
+        self.end_line - self.start_line + 1
+    }
+
+    /// Whether a given line is within this selection.
+    pub fn contains_line(&self, line: u32) -> bool {
+        line >= self.start_line && line <= self.end_line
+    }
+
+    /// Whether two selections overlap.
+    pub fn overlaps(&self, other: &MinimapSelection) -> bool {
+        self.start_line <= other.end_line && other.start_line <= self.end_line
+    }
+
+    /// Merge two overlapping selections into one.
+    pub fn merge(&self, other: &MinimapSelection) -> Option<MinimapSelection> {
+        if !self.overlaps(other) {
+            return None;
+        }
+        Some(MinimapSelection {
+            start_line: self.start_line.min(other.start_line),
+            end_line: self.end_line.max(other.end_line),
+            start_col: self.start_col.min(other.start_col),
+            end_col: self.end_col.max(other.end_col),
+        })
+    }
+}
+
+impl fmt::Display for MinimapSelection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Selection(L{}:{}-L{}:{})",
+            self.start_line, self.start_col, self.end_line, self.end_col,
+        )
+    }
+}
+
+/// Tracks search result highlights in the minimap.
+#[derive(Debug, Clone)]
+pub struct MinimapSearch {
+    /// Line numbers that contain search matches.
+    matches: Vec<u32>,
+    pub query: String,
+    pub case_sensitive: bool,
+}
+
+impl MinimapSearch {
+    pub fn new(query: impl Into<String>, case_sensitive: bool) -> Self {
+        Self {
+            matches: Vec::new(),
+            query: query.into(),
+            case_sensitive,
+        }
+    }
+
+    /// Execute the search against a set of minimap lines.
+    pub fn search(&mut self, lines: &[MinimapLine]) {
+        self.matches.clear();
+        // Simplified: treat each token's color_id as text-proxy content; in a real
+        // implementation this would search actual text. Here we highlight lines
+        // that have tokens spanning enough columns.
+        let query_len = self.query.len() as u32;
+        if query_len == 0 {
+            return;
+        }
+        for line in lines {
+            for token in &line.tokens {
+                if token.length >= query_len {
+                    self.matches.push(line.line_number);
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Return the matched line numbers.
+    pub fn matched_lines(&self) -> &[u32] {
+        &self.matches
+    }
+
+    /// Number of matches found.
+    pub fn match_count(&self) -> usize {
+        self.matches.len()
+    }
+
+    /// Whether a specific line has a match.
+    pub fn has_match(&self, line: u32) -> bool {
+        self.matches.contains(&line)
+    }
+
+    /// Clear all matches.
+    pub fn clear(&mut self) {
+        self.matches.clear();
+    }
+}
+
+/// A color scheme for the minimap.
+#[derive(Debug, Clone)]
+pub struct MinimapColorScheme {
+    pub name: String,
+    colors: Vec<(u8, [u8; 3])>,
+    pub default_color: [u8; 3],
+}
+
+impl MinimapColorScheme {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            colors: Vec::new(),
+            default_color: [200, 200, 200],
+        }
+    }
+
+    /// Register a color for a given color_id.
+    pub fn set_color(&mut self, color_id: u8, rgb: [u8; 3]) {
+        if let Some(entry) = self.colors.iter_mut().find(|(id, _)| *id == color_id) {
+            entry.1 = rgb;
+        } else {
+            self.colors.push((color_id, rgb));
+        }
+    }
+
+    /// Look up the RGB color for a given color_id.
+    pub fn get_color(&self, color_id: u8) -> [u8; 3] {
+        self.colors
+            .iter()
+            .find(|(id, _)| *id == color_id)
+            .map(|(_, rgb)| *rgb)
+            .unwrap_or(self.default_color)
+    }
+
+    /// Number of registered colors.
+    pub fn color_count(&self) -> usize {
+        self.colors.len()
+    }
+
+    /// Resolve a token to its RGB color.
+    pub fn resolve_token(&self, token: &MinimapToken) -> [u8; 3] {
+        self.get_color(token.color_id)
+    }
+}
+
+impl fmt::Display for MinimapColorScheme {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ColorScheme(\"{}\", {} colors)", self.name, self.colors.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -812,5 +981,81 @@ mod tests {
         let layout = MinimapLayout::new(0.0, 50, 0, 10);
         assert_eq!(layout.y_to_line(100.0), 0);
         assert!((layout.total_height() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn selection_contains_and_span() {
+        let sel = MinimapSelection::new(5, 10, 0, 80);
+        assert_eq!(sel.line_span(), 6);
+        assert!(sel.contains_line(5));
+        assert!(sel.contains_line(10));
+        assert!(!sel.contains_line(4));
+        assert!(!sel.contains_line(11));
+    }
+
+    #[test]
+    fn selection_overlap_and_merge() {
+        let a = MinimapSelection::new(1, 5, 0, 10);
+        let b = MinimapSelection::new(4, 8, 2, 15);
+        assert!(a.overlaps(&b));
+        let merged = a.merge(&b).unwrap();
+        assert_eq!(merged.start_line, 1);
+        assert_eq!(merged.end_line, 8);
+        assert_eq!(merged.start_col, 0);
+        assert_eq!(merged.end_col, 15);
+    }
+
+    #[test]
+    fn selection_no_overlap() {
+        let a = MinimapSelection::new(1, 3, 0, 10);
+        let b = MinimapSelection::new(5, 8, 0, 10);
+        assert!(!a.overlaps(&b));
+        assert!(a.merge(&b).is_none());
+    }
+
+    #[test]
+    fn minimap_search_matches() {
+        let lines = vec![
+            MinimapLine {
+                line_number: 0,
+                tokens: vec![MinimapToken { start_col: 0, length: 10, color_id: 1 }],
+            },
+            MinimapLine {
+                line_number: 1,
+                tokens: vec![MinimapToken { start_col: 0, length: 2, color_id: 1 }],
+            },
+            MinimapLine {
+                line_number: 2,
+                tokens: vec![MinimapToken { start_col: 0, length: 5, color_id: 2 }],
+            },
+        ];
+        let mut search = MinimapSearch::new("hello", false);
+        search.search(&lines);
+        assert_eq!(search.match_count(), 2);
+        assert!(search.has_match(0));
+        assert!(!search.has_match(1));
+        assert!(search.has_match(2));
+    }
+
+    #[test]
+    fn color_scheme_lookup() {
+        let mut scheme = MinimapColorScheme::new("dark");
+        scheme.set_color(1, [255, 0, 0]);
+        scheme.set_color(2, [0, 255, 0]);
+        assert_eq!(scheme.get_color(1), [255, 0, 0]);
+        assert_eq!(scheme.get_color(2), [0, 255, 0]);
+        assert_eq!(scheme.get_color(99), [200, 200, 200]);
+        assert_eq!(scheme.color_count(), 2);
+        let token = MinimapToken { start_col: 0, length: 5, color_id: 1 };
+        assert_eq!(scheme.resolve_token(&token), [255, 0, 0]);
+    }
+
+    #[test]
+    fn color_scheme_update() {
+        let mut scheme = MinimapColorScheme::new("test");
+        scheme.set_color(1, [100, 100, 100]);
+        scheme.set_color(1, [200, 200, 200]);
+        assert_eq!(scheme.color_count(), 1);
+        assert_eq!(scheme.get_color(1), [200, 200, 200]);
     }
 }

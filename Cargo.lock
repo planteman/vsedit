@@ -3618,6 +3618,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "vsedit-integration-tests"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "tempfile",
+ "vsedit-commands",
+ "vsedit-configuration",
+ "vsedit-cursor",
+ "vsedit-di",
+ "vsedit-diff",
+ "vsedit-editor-controller",
+ "vsedit-editor-types",
+ "vsedit-events",
+ "vsedit-explorer",
+ "vsedit-ext-host",
+ "vsedit-json",
+ "vsedit-languages",
+ "vsedit-snippet",
+ "vsedit-suggest",
+ "vsedit-text-model",
+ "vsedit-uri",
+ "vsedit-wb-search",
+ "vsedit-workspace",
+]
+
+[[package]]
 name = "vsedit-interactive"
 version = "0.1.0"
 
@@ -4246,6 +4272,10 @@ version = "0.1.0"
 [[package]]
 name = "vsedit-userdatasync"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "vsedit-viewlayout"

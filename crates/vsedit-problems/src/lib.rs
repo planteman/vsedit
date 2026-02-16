@@ -515,6 +515,101 @@ impl ProblemsPanel {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Quick-fix suggestions
+// ---------------------------------------------------------------------------
+
+/// A suggested fix for a diagnostic problem.
+#[derive(Debug, Clone)]
+pub struct ProblemQuickFix {
+    /// Human-readable title describing what the fix does.
+    pub title: String,
+    /// Path of the file the fix applies to.
+    pub file_path: String,
+    /// Replacement text to insert at the fix location.
+    pub replacement_text: String,
+    /// Line number where the replacement starts (1-based).
+    pub line: u32,
+    /// Column number where the replacement starts (1-based).
+    pub column: u32,
+}
+
+impl ProblemQuickFix {
+    pub fn new(
+        title: impl Into<String>,
+        file_path: impl Into<String>,
+        replacement_text: impl Into<String>,
+        line: u32,
+        column: u32,
+    ) -> Self {
+        Self {
+            title: title.into(),
+            file_path: file_path.into(),
+            replacement_text: replacement_text.into(),
+            line,
+            column,
+        }
+    }
+
+    /// Returns `true` if this fix only removes code (replacement is empty).
+    pub fn is_deletion(&self) -> bool {
+        self.replacement_text.is_empty()
+    }
+}
+
+impl ProblemsPanel {
+    /// Suggest quick fixes for the currently selected problem.
+    ///
+    /// Returns a list of applicable fixes based on the problem's code and
+    /// severity. This is a heuristic lookup — real IDE integrations would
+    /// query a language server.
+    pub fn suggest_fixes(&self) -> Vec<ProblemQuickFix> {
+        let filtered = self.filtered_problems();
+        let problem = match filtered.get(self.selected_index) {
+            Some(p) => p,
+            None => return Vec::new(),
+        };
+
+        let mut fixes = Vec::new();
+
+        if let Some(ref code) = problem.code {
+            if code.starts_with('E') {
+                fixes.push(ProblemQuickFix::new(
+                    format!("Apply suggested fix for {}", code),
+                    &problem.file_path,
+                    "/* fix applied */",
+                    problem.line,
+                    problem.column,
+                ));
+            }
+        }
+
+        match problem.severity {
+            ProblemSeverity::Warning => {
+                fixes.push(ProblemQuickFix::new(
+                    "Suppress this warning",
+                    &problem.file_path,
+                    "#[allow(warnings)]",
+                    problem.line.saturating_sub(1).max(1),
+                    1,
+                ));
+            }
+            ProblemSeverity::Hint => {
+                fixes.push(ProblemQuickFix::new(
+                    problem.message.clone(),
+                    &problem.file_path,
+                    "",
+                    problem.line,
+                    problem.column,
+                ));
+            }
+            _ => {}
+        }
+
+        fixes
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -854,5 +949,67 @@ mod tests {
         p.scroll_offset = 5;
         p.ensure_visible(0);
         assert_eq!(p.scroll_offset, 5); // unchanged
+    }
+
+    // -- Quick fix tests ---------------------------------------------------
+
+    #[test]
+    fn quick_fix_new_and_is_deletion() {
+        let fix = ProblemQuickFix::new("Remove unused import", "src/main.rs", "", 5, 1);
+        assert!(fix.is_deletion());
+        let fix2 = ProblemQuickFix::new("Replace", "src/main.rs", "new_code()", 5, 1);
+        assert!(!fix2.is_deletion());
+    }
+
+    #[test]
+    fn suggest_fixes_for_error_with_code() {
+        let mut p = ProblemsPanel::new();
+        p.problems = vec![
+            Problem::new(ProblemSeverity::Error, "unused variable", "rustc", "src/main.rs", 10, 5)
+                .with_code("E0001"),
+        ];
+        let fixes = p.suggest_fixes();
+        assert_eq!(fixes.len(), 1);
+        assert!(fixes[0].title.contains("E0001"));
+    }
+
+    #[test]
+    fn suggest_fixes_for_warning() {
+        let mut p = ProblemsPanel::new();
+        p.problems = vec![
+            Problem::new(ProblemSeverity::Warning, "deprecated fn", "clippy", "src/lib.rs", 20, 1),
+        ];
+        let fixes = p.suggest_fixes();
+        assert!(fixes.iter().any(|f| f.replacement_text.contains("allow")));
+    }
+
+    #[test]
+    fn suggest_fixes_for_hint_is_deletion() {
+        let mut p = ProblemsPanel::new();
+        p.problems = vec![
+            Problem::new(ProblemSeverity::Hint, "add type annotation", "rustc", "src/util.rs", 5, 1),
+        ];
+        let fixes = p.suggest_fixes();
+        assert!(!fixes.is_empty());
+        assert!(fixes[0].is_deletion());
+    }
+
+    #[test]
+    fn suggest_fixes_empty_when_no_selection() {
+        let p = ProblemsPanel::new();
+        let fixes = p.suggest_fixes();
+        assert!(fixes.is_empty());
+    }
+
+    #[test]
+    fn suggest_fixes_respects_filter() {
+        let mut p = ProblemsPanel::new();
+        p.problems = vec![
+            Problem::new(ProblemSeverity::Error, "unused variable", "rustc", "src/main.rs", 10, 5)
+                .with_code("E0001"),
+        ];
+        p.filter.show_errors = false;
+        let fixes = p.suggest_fixes();
+        assert!(fixes.is_empty());
     }
 }

@@ -505,6 +505,78 @@ pub fn detect_conflicts(bindings: &[Keybinding]) -> Vec<KeybindingConflict> {
 }
 
 // ---------------------------------------------------------------------------
+// Command aliases
+// ---------------------------------------------------------------------------
+
+/// Maps an alias name to a canonical command ID.
+#[derive(Debug, Clone)]
+pub struct CommandAlias {
+    /// The alias name (e.g. "quit").
+    pub alias: String,
+    /// The real command id the alias points to (e.g. "workbench.action.quit").
+    pub command_id: String,
+}
+
+impl CommandAlias {
+    pub fn new(alias: impl Into<String>, command_id: impl Into<String>) -> Self {
+        Self {
+            alias: alias.into(),
+            command_id: command_id.into(),
+        }
+    }
+}
+
+impl CommandRegistry {
+    /// Register an alias that maps to an existing command id.
+    ///
+    /// The alias is stored as a separate mapping. When executed, the
+    /// registry resolves the alias and delegates to the real command.
+    pub fn register_alias(&self, alias: impl Into<String>, command_id: impl Into<String>) {
+        let alias = alias.into();
+        let command_id = command_id.into();
+        let map = self.commands.read().unwrap();
+        if !map.contains_key(&command_id) {
+            return;
+        }
+        drop(map);
+        // Store the alias as a command whose handler delegates to the real id.
+        // We wrap the real command_id in a descriptor whose description
+        // encodes the alias relationship.
+        let target = command_id.clone();
+        let weak = Arc::downgrade(&self.commands);
+        let handler: CommandHandler = Box::new(move |args: CommandArgs| {
+            let strong = weak.upgrade().ok_or("registry dropped")?;
+            let map = strong.read().map_err(|e| e.to_string())?;
+            let desc = map
+                .get(&target)
+                .ok_or_else(|| format!("Alias target '{}' not found", target))?;
+            (desc.handler)(args)
+        });
+        let descriptor = CommandDescriptor {
+            id: alias.clone(),
+            handler,
+            description: Some(format!("Alias for {}", command_id)),
+        };
+        let mut map = self.commands.write().unwrap();
+        map.insert(alias, descriptor);
+    }
+
+    /// Resolve an alias to the underlying command id.
+    ///
+    /// Returns `Some(command_id)` if the given `id` was registered via
+    /// `register_alias`, or `None` if the id is not an alias.
+    pub fn resolve_alias(&self, id: &str) -> Option<String> {
+        let map = self.commands.read().unwrap();
+        map.get(id).and_then(|d| {
+            d.description
+                .as_ref()
+                .filter(|desc| desc.starts_with("Alias for "))
+                .map(|desc| desc.trim_start_matches("Alias for ").to_string())
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -859,5 +931,47 @@ mod tests {
             Keybinding { key: "ctrl+c".into(), command_id: "copy".into() },
         ];
         assert!(detect_conflicts(&bindings).is_empty());
+    }
+
+    // -- Alias tests -------------------------------------------------------
+
+    #[test]
+    fn register_and_resolve_alias() {
+        let registry = CommandRegistry::new();
+        let _reg = registry.register("workbench.action.quit", Box::new(|_args| Ok(None)));
+        registry.register_alias("quit", "workbench.action.quit");
+        assert!(registry.has("quit"));
+        let resolved = registry.resolve_alias("quit");
+        assert_eq!(resolved, Some("workbench.action.quit".to_string()));
+    }
+
+    #[test]
+    fn alias_executes_same_handler() {
+        let registry = CommandRegistry::new();
+        let _reg = registry.register("cmd.greet", Box::new(|_args| Ok(Some(Box::new(42_i32)))));
+        registry.register_alias("greet", "cmd.greet");
+        let result = registry.execute("greet", vec![]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn resolve_alias_returns_none_for_non_alias() {
+        let registry = CommandRegistry::new();
+        let _reg = registry.register("cmd.run", Box::new(|_args| Ok(None)));
+        assert_eq!(registry.resolve_alias("cmd.run"), None);
+    }
+
+    #[test]
+    fn alias_to_missing_command_not_registered() {
+        let registry = CommandRegistry::new();
+        registry.register_alias("missing_alias", "nonexistent.cmd");
+        assert!(!registry.has("missing_alias"));
+    }
+
+    #[test]
+    fn command_alias_struct_new() {
+        let a = CommandAlias::new("q", "workbench.action.quit");
+        assert_eq!(a.alias, "q");
+        assert_eq!(a.command_id, "workbench.action.quit");
     }
 }

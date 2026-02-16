@@ -431,6 +431,197 @@ pub fn handle_paste(svc: &ClipboardService, cursor_count: usize) -> Vec<String> 
     }
 }
 
+/// A ring buffer for cycling through clipboard history.
+pub struct ClipboardRing {
+    entries: Vec<ClipboardEntry>,
+    cursor: Option<usize>,
+    max_size: usize,
+}
+
+impl ClipboardRing {
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            cursor: None,
+            max_size,
+        }
+    }
+
+    /// Push a new entry to the ring. Resets the cursor.
+    pub fn push(&mut self, entry: ClipboardEntry) {
+        self.entries.push(entry);
+        if self.entries.len() > self.max_size {
+            self.entries.remove(0);
+        }
+        self.cursor = None;
+    }
+
+    /// Move to the next (more recent) entry and return it.
+    pub fn next(&mut self) -> Option<&ClipboardEntry> {
+        if self.entries.is_empty() {
+            return None;
+        }
+        let idx = match self.cursor {
+            Some(c) => {
+                if c + 1 < self.entries.len() {
+                    c + 1
+                } else {
+                    0
+                }
+            }
+            None => self.entries.len() - 1,
+        };
+        self.cursor = Some(idx);
+        Some(&self.entries[idx])
+    }
+
+    /// Move to the previous (older) entry and return it.
+    pub fn prev(&mut self) -> Option<&ClipboardEntry> {
+        if self.entries.is_empty() {
+            return None;
+        }
+        let idx = match self.cursor {
+            Some(0) => self.entries.len() - 1,
+            Some(c) => c - 1,
+            None => self.entries.len() - 1,
+        };
+        self.cursor = Some(idx);
+        Some(&self.entries[idx])
+    }
+
+    /// Get the currently selected entry without advancing.
+    pub fn current(&self) -> Option<&ClipboardEntry> {
+        self.cursor.and_then(|c| self.entries.get(c))
+    }
+
+    /// Number of entries in the ring.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the ring is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Reset the cursor position.
+    pub fn reset_cursor(&mut self) {
+        self.cursor = None;
+    }
+}
+
+/// Target format for clipboard text formatting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClipboardFormat {
+    Plain,
+    Markdown,
+    HtmlEscaped,
+}
+
+/// Formats clipboard text for different targets.
+pub struct ClipboardFormatter;
+
+impl ClipboardFormatter {
+    /// Format text according to the target format.
+    pub fn format(text: &str, target: ClipboardFormat) -> String {
+        match target {
+            ClipboardFormat::Plain => text.to_string(),
+            ClipboardFormat::Markdown => Self::to_markdown(text),
+            ClipboardFormat::HtmlEscaped => Self::to_html_escaped(text),
+        }
+    }
+
+    fn to_markdown(text: &str) -> String {
+        let mut result = String::with_capacity(text.len() + 10);
+        result.push_str("```\n");
+        result.push_str(text);
+        if !text.ends_with('\n') {
+            result.push('\n');
+        }
+        result.push_str("```");
+        result
+    }
+
+    fn to_html_escaped(text: &str) -> String {
+        let mut result = String::with_capacity(text.len());
+        for c in text.chars() {
+            match c {
+                '&' => result.push_str("&amp;"),
+                '<' => result.push_str("&lt;"),
+                '>' => result.push_str("&gt;"),
+                '"' => result.push_str("&quot;"),
+                '\'' => result.push_str("&#39;"),
+                _ => result.push(c),
+            }
+        }
+        result
+    }
+}
+
+/// Computes a simple diff between two clipboard entries.
+pub fn clipboard_diff(a: &ClipboardEntry, b: &ClipboardEntry) -> ClipboardDiffResult {
+    let a_lines: Vec<&str> = a.text.lines().collect();
+    let b_lines: Vec<&str> = b.text.lines().collect();
+    let mut added = 0usize;
+    let mut removed = 0usize;
+    let mut unchanged = 0usize;
+
+    let max_len = a_lines.len().max(b_lines.len());
+    for i in 0..max_len {
+        match (a_lines.get(i), b_lines.get(i)) {
+            (Some(al), Some(bl)) => {
+                if al == bl {
+                    unchanged += 1;
+                } else {
+                    removed += 1;
+                    added += 1;
+                }
+            }
+            (Some(_), None) => removed += 1,
+            (None, Some(_)) => added += 1,
+            (None, None) => {}
+        }
+    }
+
+    ClipboardDiffResult {
+        lines_added: added,
+        lines_removed: removed,
+        lines_unchanged: unchanged,
+        text_equal: a.text == b.text,
+    }
+}
+
+/// Result of comparing two clipboard entries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClipboardDiffResult {
+    pub lines_added: usize,
+    pub lines_removed: usize,
+    pub lines_unchanged: usize,
+    pub text_equal: bool,
+}
+
+impl ClipboardDiffResult {
+    /// Whether there are any changes between the two entries.
+    pub fn has_changes(&self) -> bool {
+        !self.text_equal
+    }
+
+    /// Total lines involved in the comparison.
+    pub fn total_lines(&self) -> usize {
+        self.lines_added + self.lines_removed + self.lines_unchanged
+    }
+}
+
+impl fmt::Display for ClipboardDiffResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Diff(+{}, -{}, ={})",
+            self.lines_added, self.lines_removed, self.lines_unchanged,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -815,5 +1006,78 @@ mod tests {
         let svc = ClipboardService::new(10);
         let result = handle_paste(&svc, 2);
         assert_eq!(result, vec!["", ""]);
+    }
+
+    #[test]
+    fn clipboard_ring_cycle() {
+        let mut ring = ClipboardRing::new(3);
+        ring.push(ClipboardEntry { text: "a".into(), timestamp: 1, source_mode: SourceMode::Normal });
+        ring.push(ClipboardEntry { text: "b".into(), timestamp: 2, source_mode: SourceMode::Normal });
+        ring.push(ClipboardEntry { text: "c".into(), timestamp: 3, source_mode: SourceMode::Normal });
+
+        let e = ring.next().unwrap();
+        assert_eq!(e.text, "c");
+        let e = ring.next().unwrap();
+        assert_eq!(e.text, "a");
+        let e = ring.next().unwrap();
+        assert_eq!(e.text, "b");
+    }
+
+    #[test]
+    fn clipboard_ring_prev() {
+        let mut ring = ClipboardRing::new(3);
+        ring.push(ClipboardEntry { text: "x".into(), timestamp: 1, source_mode: SourceMode::Normal });
+        ring.push(ClipboardEntry { text: "y".into(), timestamp: 2, source_mode: SourceMode::Normal });
+        let e = ring.prev().unwrap();
+        assert_eq!(e.text, "y");
+        let e = ring.prev().unwrap();
+        assert_eq!(e.text, "x");
+        let e = ring.prev().unwrap();
+        assert_eq!(e.text, "y");
+    }
+
+    #[test]
+    fn clipboard_ring_max_size() {
+        let mut ring = ClipboardRing::new(2);
+        ring.push(ClipboardEntry { text: "a".into(), timestamp: 1, source_mode: SourceMode::Normal });
+        ring.push(ClipboardEntry { text: "b".into(), timestamp: 2, source_mode: SourceMode::Normal });
+        ring.push(ClipboardEntry { text: "c".into(), timestamp: 3, source_mode: SourceMode::Normal });
+        assert_eq!(ring.len(), 2);
+    }
+
+    #[test]
+    fn formatter_html_escape() {
+        let text = "<div class=\"test\">hello & 'world'</div>";
+        let escaped = ClipboardFormatter::format(text, ClipboardFormat::HtmlEscaped);
+        assert_eq!(escaped, "&lt;div class=&quot;test&quot;&gt;hello &amp; &#39;world&#39;&lt;/div&gt;");
+    }
+
+    #[test]
+    fn formatter_markdown() {
+        let text = "fn main() {}";
+        let md = ClipboardFormatter::format(text, ClipboardFormat::Markdown);
+        assert!(md.starts_with("```\n"));
+        assert!(md.ends_with("\n```"));
+        assert!(md.contains("fn main() {}"));
+    }
+
+    #[test]
+    fn diff_entries() {
+        let a = ClipboardEntry { text: "line1\nline2\nline3".into(), timestamp: 1, source_mode: SourceMode::Normal };
+        let b = ClipboardEntry { text: "line1\nchanged\nline3".into(), timestamp: 2, source_mode: SourceMode::Normal };
+        let diff = clipboard_diff(&a, &b);
+        assert!(diff.has_changes());
+        assert_eq!(diff.lines_unchanged, 2);
+        assert_eq!(diff.lines_added, 1);
+        assert_eq!(diff.lines_removed, 1);
+    }
+
+    #[test]
+    fn diff_equal() {
+        let a = ClipboardEntry { text: "same".into(), timestamp: 1, source_mode: SourceMode::Normal };
+        let b = ClipboardEntry { text: "same".into(), timestamp: 2, source_mode: SourceMode::Normal };
+        let diff = clipboard_diff(&a, &b);
+        assert!(!diff.has_changes());
+        assert!(diff.text_equal);
     }
 }

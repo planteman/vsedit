@@ -618,6 +618,55 @@ pub fn is_valid_identifier(s: &str) -> bool {
     chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
+/// Fuzzy string matcher that scores a query against a target string.
+#[derive(Debug, Clone)]
+pub struct StringMatcher {
+    query: String,
+}
+
+impl StringMatcher {
+    /// Create a new matcher for the given query (lowercased internally).
+    pub fn new(query: &str) -> Self {
+        Self { query: query.to_lowercase() }
+    }
+
+    /// Score a target string against the query. Returns 0 for no match.
+    /// Higher scores indicate better matches. Consecutive character matches
+    /// receive a bonus.
+    pub fn score(&self, target: &str) -> u32 {
+        let target_lower = target.to_lowercase();
+        let target_chars: Vec<char> = target_lower.chars().collect();
+        let query_chars: Vec<char> = self.query.chars().collect();
+        if query_chars.is_empty() {
+            return 0;
+        }
+        let mut score: u32 = 0;
+        let mut ti = 0;
+        let mut prev_match = false;
+        for &qc in &query_chars {
+            let mut found = false;
+            while ti < target_chars.len() {
+                if target_chars[ti] == qc {
+                    score += 1;
+                    if prev_match {
+                        score += 2; // consecutive bonus
+                    }
+                    ti += 1;
+                    found = true;
+                    prev_match = true;
+                    break;
+                }
+                ti += 1;
+                prev_match = false;
+            }
+            if !found {
+                return 0;
+            }
+        }
+        score
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -874,5 +923,43 @@ mod tests {
         assert!(!is_valid_identifier(""));
         assert!(!is_valid_identifier("123abc"));
         assert!(!is_valid_identifier("foo bar"));
+    }
+
+    #[test]
+    fn matcher_exact() {
+        let m = StringMatcher::new("abc");
+        assert!(m.score("abc") > 0);
+    }
+
+    #[test]
+    fn matcher_no_match() {
+        let m = StringMatcher::new("xyz");
+        assert_eq!(m.score("abc"), 0);
+    }
+
+    #[test]
+    fn matcher_fuzzy() {
+        let m = StringMatcher::new("fb");
+        assert!(m.score("foobar") > 0);
+    }
+
+    #[test]
+    fn matcher_consecutive_bonus() {
+        let m = StringMatcher::new("ab");
+        let consecutive = m.score("ab");
+        let spread = m.score("a_b");
+        assert!(consecutive > spread);
+    }
+
+    #[test]
+    fn matcher_case_insensitive() {
+        let m = StringMatcher::new("ABC");
+        assert!(m.score("abcdef") > 0);
+    }
+
+    #[test]
+    fn matcher_empty_query() {
+        let m = StringMatcher::new("");
+        assert_eq!(m.score("anything"), 0);
     }
 }

@@ -378,6 +378,102 @@ impl Default for MarkerService {
 }
 
 // ---------------------------------------------------------------------------
+// MarkerFilter builder & MarkerSummary
+// ---------------------------------------------------------------------------
+
+/// Builder-style filter for querying markers by severity, source, or tag.
+pub struct MarkerQueryFilter {
+    pub severities: Option<Vec<MarkerSeverity>>,
+    pub source: Option<String>,
+    pub tags: Option<Vec<MarkerTag>>,
+}
+
+impl MarkerQueryFilter {
+    pub fn new() -> Self {
+        Self {
+            severities: None,
+            source: None,
+            tags: None,
+        }
+    }
+
+    pub fn with_severities(mut self, sevs: Vec<MarkerSeverity>) -> Self {
+        self.severities = Some(sevs);
+        self
+    }
+
+    pub fn with_source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    pub fn with_tags(mut self, tags: Vec<MarkerTag>) -> Self {
+        self.tags = Some(tags);
+        self
+    }
+
+    /// Returns `true` if `marker` passes all filter criteria.
+    pub fn matches(&self, marker: &MarkerData) -> bool {
+        if let Some(ref sevs) = self.severities {
+            if !sevs.contains(&marker.severity) {
+                return false;
+            }
+        }
+        if let Some(ref src) = self.source {
+            if marker.source.as_deref() != Some(src.as_str()) {
+                return false;
+            }
+        }
+        if let Some(ref tags) = self.tags {
+            if !tags.iter().any(|t| marker.tags.contains(t)) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Default for MarkerQueryFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Aggregated summary of markers grouped by severity and source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkerSummary {
+    pub count_by_severity: HashMap<MarkerSeverity, usize>,
+    pub count_by_source: HashMap<String, usize>,
+    pub total: usize,
+}
+
+impl MarkerSummary {
+    /// Build a summary from a slice of markers.
+    pub fn from_markers(markers: &[MarkerData]) -> Self {
+        let mut count_by_severity: HashMap<MarkerSeverity, usize> = HashMap::new();
+        let mut count_by_source: HashMap<String, usize> = HashMap::new();
+        for m in markers {
+            *count_by_severity.entry(m.severity).or_insert(0) += 1;
+            let src = m.source.clone().unwrap_or_else(|| "(unknown)".to_string());
+            *count_by_source.entry(src).or_insert(0) += 1;
+        }
+        Self {
+            count_by_severity,
+            count_by_source,
+            total: markers.len(),
+        }
+    }
+
+    pub fn error_count(&self) -> usize {
+        self.count_by_severity.get(&MarkerSeverity::Error).copied().unwrap_or(0)
+    }
+
+    pub fn warning_count(&self) -> usize {
+        self.count_by_severity.get(&MarkerSeverity::Warning).copied().unwrap_or(0)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -839,5 +935,81 @@ mod tests {
         assert_eq!(stats.warnings, 0);
         assert_eq!(stats.infos, 0);
         assert_eq!(stats.hints, 0);
+    }
+
+    // -- MarkerQueryFilter tests --
+
+    fn make_marker(severity: MarkerSeverity, source: Option<&str>, tags: Vec<MarkerTag>) -> MarkerData {
+        MarkerData {
+            severity,
+            message: "msg".into(),
+            source: source.map(|s| s.to_string()),
+            code: None,
+            start_line: 1,
+            start_column: 1,
+            end_line: 1,
+            end_column: 1,
+            related_information: vec![],
+            tags,
+        }
+    }
+
+    #[test]
+    fn query_filter_severity() {
+        let f = MarkerQueryFilter::new().with_severities(vec![MarkerSeverity::Error]);
+        assert!(f.matches(&make_marker(MarkerSeverity::Error, None, vec![])));
+        assert!(!f.matches(&make_marker(MarkerSeverity::Warning, None, vec![])));
+    }
+
+    #[test]
+    fn query_filter_source() {
+        let f = MarkerQueryFilter::new().with_source("rustc");
+        assert!(f.matches(&make_marker(MarkerSeverity::Error, Some("rustc"), vec![])));
+        assert!(!f.matches(&make_marker(MarkerSeverity::Error, Some("clippy"), vec![])));
+        assert!(!f.matches(&make_marker(MarkerSeverity::Error, None, vec![])));
+    }
+
+    #[test]
+    fn query_filter_tags() {
+        let f = MarkerQueryFilter::new().with_tags(vec![MarkerTag::Deprecated]);
+        assert!(f.matches(&make_marker(MarkerSeverity::Hint, None, vec![MarkerTag::Deprecated])));
+        assert!(!f.matches(&make_marker(MarkerSeverity::Hint, None, vec![MarkerTag::Unnecessary])));
+        assert!(!f.matches(&make_marker(MarkerSeverity::Hint, None, vec![])));
+    }
+
+    #[test]
+    fn query_filter_combined() {
+        let f = MarkerQueryFilter::new()
+            .with_severities(vec![MarkerSeverity::Warning])
+            .with_source("clippy");
+        assert!(f.matches(&make_marker(MarkerSeverity::Warning, Some("clippy"), vec![])));
+        assert!(!f.matches(&make_marker(MarkerSeverity::Error, Some("clippy"), vec![])));
+        assert!(!f.matches(&make_marker(MarkerSeverity::Warning, Some("rustc"), vec![])));
+    }
+
+    #[test]
+    fn query_filter_default_matches_all() {
+        let f = MarkerQueryFilter::default();
+        assert!(f.matches(&make_marker(MarkerSeverity::Error, None, vec![])));
+        assert!(f.matches(&make_marker(MarkerSeverity::Hint, Some("x"), vec![MarkerTag::Unnecessary])));
+    }
+
+    // -- MarkerSummary tests --
+
+    #[test]
+    fn marker_summary_counts() {
+        let markers = vec![
+            make_marker(MarkerSeverity::Error, Some("rustc"), vec![]),
+            make_marker(MarkerSeverity::Error, Some("rustc"), vec![]),
+            make_marker(MarkerSeverity::Warning, Some("clippy"), vec![]),
+            make_marker(MarkerSeverity::Info, None, vec![]),
+        ];
+        let summary = MarkerSummary::from_markers(&markers);
+        assert_eq!(summary.total, 4);
+        assert_eq!(summary.error_count(), 2);
+        assert_eq!(summary.warning_count(), 1);
+        assert_eq!(summary.count_by_source.get("rustc"), Some(&2));
+        assert_eq!(summary.count_by_source.get("clippy"), Some(&1));
+        assert_eq!(summary.count_by_source.get("(unknown)"), Some(&1));
     }
 }

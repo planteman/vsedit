@@ -402,6 +402,154 @@ pub fn group_sessions_by_account<'a>(
     map
 }
 
+/// Validates whether an authentication session has expired.
+#[derive(Debug, Clone)]
+pub struct AuthSessionValidator {
+    /// TTL in seconds.
+    pub ttl_seconds: u64,
+}
+
+impl AuthSessionValidator {
+    pub fn new(ttl_seconds: u64) -> Self {
+        Self { ttl_seconds }
+    }
+
+    /// Check if a session is expired given a creation timestamp and the current time.
+    pub fn is_expired(&self, created_at: u64, now: u64) -> bool {
+        if now < created_at {
+            return false;
+        }
+        now - created_at > self.ttl_seconds
+    }
+
+    /// Filter out expired sessions from a list.
+    pub fn filter_valid<'a>(
+        &self,
+        sessions: &'a [(AuthSession, u64)],
+        now: u64,
+    ) -> Vec<&'a AuthSession> {
+        sessions
+            .iter()
+            .filter(|(_, created_at)| !self.is_expired(*created_at, now))
+            .map(|(session, _)| session)
+            .collect()
+    }
+
+    /// Remaining time in seconds before a session expires. Returns 0 if already expired.
+    pub fn remaining(&self, created_at: u64, now: u64) -> u64 {
+        if self.is_expired(created_at, now) {
+            return 0;
+        }
+        self.ttl_seconds - (now - created_at)
+    }
+}
+
+/// Tracks the state of a token refresh operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RefreshState {
+    Idle,
+    Pending,
+    Succeeded,
+    Failed(String),
+}
+
+/// Manages token refresh state for a session.
+#[derive(Debug, Clone)]
+pub struct AuthTokenRefresher {
+    pub session_id: String,
+    pub state: RefreshState,
+    pub attempt_count: u32,
+    pub max_attempts: u32,
+    pub last_attempt_at: Option<u64>,
+}
+
+impl AuthTokenRefresher {
+    pub fn new(session_id: impl Into<String>, max_attempts: u32) -> Self {
+        Self {
+            session_id: session_id.into(),
+            state: RefreshState::Idle,
+            attempt_count: 0,
+            max_attempts,
+            last_attempt_at: None,
+        }
+    }
+
+    /// Start a refresh attempt. Returns false if max attempts exceeded.
+    pub fn begin_refresh(&mut self, timestamp: u64) -> bool {
+        if self.attempt_count >= self.max_attempts {
+            self.state = RefreshState::Failed("max attempts exceeded".into());
+            return false;
+        }
+        self.state = RefreshState::Pending;
+        self.attempt_count += 1;
+        self.last_attempt_at = Some(timestamp);
+        true
+    }
+
+    /// Mark the refresh as succeeded.
+    pub fn succeed(&mut self) {
+        self.state = RefreshState::Succeeded;
+    }
+
+    /// Mark the refresh as failed.
+    pub fn fail(&mut self, reason: impl Into<String>) {
+        self.state = RefreshState::Failed(reason.into());
+    }
+
+    /// Whether more refresh attempts can be made.
+    pub fn can_retry(&self) -> bool {
+        self.attempt_count < self.max_attempts
+    }
+
+    /// Reset the refresher to initial state.
+    pub fn reset(&mut self) {
+        self.state = RefreshState::Idle;
+        self.attempt_count = 0;
+        self.last_attempt_at = None;
+    }
+}
+
+impl fmt::Display for AuthTokenRefresher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Refresher({}, {:?}, {}/{})",
+            self.session_id, self.state, self.attempt_count, self.max_attempts,
+        )
+    }
+}
+
+/// Checks if a session's scopes include the required permissions.
+pub struct AuthPermissionChecker;
+
+impl AuthPermissionChecker {
+    /// Check if all required scopes are present in the session's scopes.
+    pub fn has_permissions(session: &AuthSession, required: &[&str]) -> bool {
+        required
+            .iter()
+            .all(|req| session.scopes.iter().any(|s| s == req))
+    }
+
+    /// Return which required scopes are missing from the session.
+    pub fn missing_permissions<'a>(
+        session: &AuthSession,
+        required: &[&'a str],
+    ) -> Vec<&'a str> {
+        required
+            .iter()
+            .filter(|req| !session.scopes.iter().any(|s| s == **req))
+            .copied()
+            .collect()
+    }
+
+    /// Check if a session has at least one of the given scopes.
+    pub fn has_any(session: &AuthSession, scopes: &[&str]) -> bool {
+        scopes
+            .iter()
+            .any(|req| session.scopes.iter().any(|s| s == req))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -826,5 +974,95 @@ mod tests {
         assert_eq!(grouped["a1"].len(), 2);
         assert_eq!(grouped["a2"].len(), 1);
         assert_eq!(grouped["a2"][0].id, "s2");
+    }
+
+    #[test]
+    fn session_validator_expired() {
+        let validator = AuthSessionValidator::new(3600);
+        assert!(!validator.is_expired(1000, 2000));
+        assert!(validator.is_expired(1000, 5000));
+        assert_eq!(validator.remaining(1000, 2000), 2600);
+        assert_eq!(validator.remaining(1000, 5000), 0);
+    }
+
+    #[test]
+    fn session_validator_filter() {
+        let validator = AuthSessionValidator::new(100);
+        let sessions = vec![
+            (AuthSession {
+                id: "s1".into(),
+                access_token: "t1".into(),
+                account: AuthAccount { id: "a1".into(), label: "A".into() },
+                scopes: vec![],
+            }, 50),
+            (AuthSession {
+                id: "s2".into(),
+                access_token: "t2".into(),
+                account: AuthAccount { id: "a2".into(), label: "B".into() },
+                scopes: vec![],
+            }, 200),
+        ];
+        let valid = validator.filter_valid(&sessions, 200);
+        assert_eq!(valid.len(), 1);
+        assert_eq!(valid[0].id, "s2");
+    }
+
+    #[test]
+    fn token_refresher_lifecycle() {
+        let mut refresher = AuthTokenRefresher::new("s1", 3);
+        assert!(refresher.can_retry());
+        assert!(refresher.begin_refresh(100));
+        assert_eq!(refresher.state, RefreshState::Pending);
+        refresher.fail("network error");
+        assert!(matches!(refresher.state, RefreshState::Failed(_)));
+        assert!(refresher.begin_refresh(200));
+        refresher.succeed();
+        assert_eq!(refresher.state, RefreshState::Succeeded);
+        assert_eq!(refresher.attempt_count, 2);
+    }
+
+    #[test]
+    fn token_refresher_max_attempts() {
+        let mut refresher = AuthTokenRefresher::new("s1", 1);
+        assert!(refresher.begin_refresh(100));
+        refresher.fail("err");
+        assert!(!refresher.begin_refresh(200));
+        assert!(!refresher.can_retry());
+    }
+
+    #[test]
+    fn permission_checker_has_all() {
+        let session = AuthSession {
+            id: "s1".into(),
+            access_token: "t".into(),
+            account: AuthAccount { id: "a".into(), label: "A".into() },
+            scopes: vec!["repo".into(), "user".into(), "read:org".into()],
+        };
+        assert!(AuthPermissionChecker::has_permissions(&session, &["repo", "user"]));
+        assert!(!AuthPermissionChecker::has_permissions(&session, &["repo", "admin"]));
+    }
+
+    #[test]
+    fn permission_checker_missing() {
+        let session = AuthSession {
+            id: "s1".into(),
+            access_token: "t".into(),
+            account: AuthAccount { id: "a".into(), label: "A".into() },
+            scopes: vec!["repo".into()],
+        };
+        let missing = AuthPermissionChecker::missing_permissions(&session, &["repo", "admin", "user"]);
+        assert_eq!(missing, vec!["admin", "user"]);
+    }
+
+    #[test]
+    fn permission_checker_has_any() {
+        let session = AuthSession {
+            id: "s1".into(),
+            access_token: "t".into(),
+            account: AuthAccount { id: "a".into(), label: "A".into() },
+            scopes: vec!["user".into()],
+        };
+        assert!(AuthPermissionChecker::has_any(&session, &["repo", "user"]));
+        assert!(!AuthPermissionChecker::has_any(&session, &["admin", "write"]));
     }
 }

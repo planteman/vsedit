@@ -506,6 +506,59 @@ impl FeatureActivationTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Remote connection health
+// ---------------------------------------------------------------------------
+
+/// Tracks the health of a remote connection.
+#[derive(Debug, Clone)]
+pub struct RemoteConnectionHealth {
+    /// Round-trip latency in milliseconds of the last successful ping.
+    pub latency_ms: u64,
+    /// Monotonic timestamp (arbitrary epoch) of the last ping attempt.
+    pub last_ping_time: u64,
+    /// Number of consecutive failed pings.
+    pub consecutive_failures: u32,
+    /// Maximum allowed consecutive failures before unhealthy.
+    pub max_failures: u32,
+}
+
+impl RemoteConnectionHealth {
+    pub fn new(max_failures: u32) -> Self {
+        Self {
+            latency_ms: 0,
+            last_ping_time: 0,
+            consecutive_failures: 0,
+            max_failures,
+        }
+    }
+
+    /// Returns `true` if the connection is considered healthy.
+    pub fn is_healthy(&self) -> bool {
+        self.consecutive_failures < self.max_failures
+    }
+
+    /// Record a successful ping with the measured latency.
+    pub fn record_success(&mut self, latency_ms: u64, time: u64) {
+        self.latency_ms = latency_ms;
+        self.last_ping_time = time;
+        self.consecutive_failures = 0;
+    }
+
+    /// Record a failed ping.
+    pub fn record_failure(&mut self, time: u64) {
+        self.last_ping_time = time;
+        self.consecutive_failures += 1;
+    }
+
+    /// Reset the health tracker to its initial state.
+    pub fn reset(&mut self) {
+        self.latency_ms = 0;
+        self.last_ping_time = 0;
+        self.consecutive_failures = 0;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -868,5 +921,53 @@ mod tests {
         tracker.activate(RemoteFeature::Terminal);
         assert_eq!(tracker.active_count(), 1);
         assert_eq!(tracker.activation_history().len(), 1);
+    }
+
+    // -- RemoteConnectionHealth tests ------------------------------------
+
+    #[test]
+    fn health_initially_healthy() {
+        let h = RemoteConnectionHealth::new(3);
+        assert!(h.is_healthy());
+        assert_eq!(h.latency_ms, 0);
+    }
+
+    #[test]
+    fn health_becomes_unhealthy_after_max_failures() {
+        let mut h = RemoteConnectionHealth::new(2);
+        h.record_failure(1);
+        assert!(h.is_healthy());
+        h.record_failure(2);
+        assert!(!h.is_healthy());
+    }
+
+    #[test]
+    fn health_success_resets_failures() {
+        let mut h = RemoteConnectionHealth::new(3);
+        h.record_failure(1);
+        h.record_failure(2);
+        h.record_success(50, 3);
+        assert!(h.is_healthy());
+        assert_eq!(h.latency_ms, 50);
+        assert_eq!(h.consecutive_failures, 0);
+    }
+
+    #[test]
+    fn health_reset() {
+        let mut h = RemoteConnectionHealth::new(3);
+        h.record_failure(1);
+        h.record_success(100, 2);
+        h.reset();
+        assert_eq!(h.latency_ms, 0);
+        assert_eq!(h.consecutive_failures, 0);
+    }
+
+    #[test]
+    fn health_tracks_last_ping_time() {
+        let mut h = RemoteConnectionHealth::new(5);
+        h.record_success(10, 42);
+        assert_eq!(h.last_ping_time, 42);
+        h.record_failure(99);
+        assert_eq!(h.last_ping_time, 99);
     }
 }

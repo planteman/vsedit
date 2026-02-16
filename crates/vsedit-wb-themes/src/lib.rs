@@ -422,6 +422,42 @@ fn convert_core_theme(core: vsedit_theme::ColorTheme) -> ColorTheme {
     }
 }
 
+/// Result of comparing two themes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThemeComparison {
+    /// Color keys present in `b` but not in `a`.
+    pub added_colors: Vec<String>,
+    /// Color keys present in `a` but not in `b`.
+    pub removed_colors: Vec<String>,
+    /// Color keys present in both but with different values.
+    pub changed_colors: Vec<String>,
+}
+
+impl ThemeComparison {
+    /// Compare theme `a` against theme `b` and return the differences.
+    pub fn compare(a: &ColorTheme, b: &ColorTheme) -> Self {
+        let mut added = Vec::new();
+        let mut removed = Vec::new();
+        let mut changed = Vec::new();
+        for key in a.colors.keys() {
+            match b.colors.get(key) {
+                None => removed.push(key.clone()),
+                Some(bv) if bv != a.colors.get(key).unwrap() => changed.push(key.clone()),
+                _ => {}
+            }
+        }
+        for key in b.colors.keys() {
+            if !a.colors.contains_key(key) {
+                added.push(key.clone());
+            }
+        }
+        added.sort();
+        removed.sort();
+        changed.sort();
+        ThemeComparison { added_colors: added, removed_colors: removed, changed_colors: changed }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -880,5 +916,34 @@ mod tests {
         assert_eq!(svc.get_active().unwrap().id, "monokai");
         svc.set_theme("solarized-dark").unwrap();
         assert_eq!(svc.get_active().unwrap().id, "solarized-dark");
+    }
+
+    #[test]
+    fn compare_identical_themes() {
+        let t = dark_theme();
+        let cmp = ThemeComparison::compare(&t, &t);
+        assert!(cmp.added_colors.is_empty());
+        assert!(cmp.removed_colors.is_empty());
+        assert!(cmp.changed_colors.is_empty());
+    }
+
+    #[test]
+    fn compare_added_removed() {
+        let a = dark_theme();
+        let mut colors = HashMap::new();
+        colors.insert("new.color".into(), "#ff0000".into());
+        let b = ColorTheme { id: "b".into(), label: "B".into(), theme_type: ThemeType::Dark, colors, token_colors: vec![] };
+        let cmp = ThemeComparison::compare(&a, &b);
+        assert!(cmp.added_colors.contains(&"new.color".to_string()));
+        assert!(!cmp.removed_colors.is_empty());
+    }
+
+    #[test]
+    fn compare_changed() {
+        let a = dark_theme();
+        let mut b = a.clone();
+        b.colors.insert("editor.background".into(), "#000000".into());
+        let cmp = ThemeComparison::compare(&a, &b);
+        assert!(cmp.changed_colors.contains(&"editor.background".to_string()));
     }
 }

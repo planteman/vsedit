@@ -571,6 +571,225 @@ fn build_indent(width: u32, style: IndentStyle) -> String {
     }
 }
 
+/// Represents an indent guide (vertical line showing indent level).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndentGuide {
+    /// The column position of this guide.
+    pub column: u32,
+    /// The starting line of this guide.
+    pub start_line: usize,
+    /// The ending line of this guide (inclusive).
+    pub end_line: usize,
+    /// The nesting depth (0 = outermost).
+    pub depth: u32,
+}
+
+impl IndentGuide {
+    /// Compute indent guides for a block of text.
+    pub fn compute(text: &str, style: IndentStyle) -> Vec<IndentGuide> {
+        let tab_width = match style {
+            IndentStyle::Tabs => 4u32,
+            IndentStyle::Spaces(n) => n,
+        };
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.is_empty() {
+            return Vec::new();
+        }
+
+        let indent_levels: Vec<u32> = lines
+            .iter()
+            .map(|line| {
+                let trimmed = line.trim_start();
+                if trimmed.is_empty() {
+                    return 0;
+                }
+                let ws_len = line.len() - trimmed.len();
+                let ws = &line[..ws_len];
+                let width: u32 = ws
+                    .chars()
+                    .map(|c| if c == '\t' { tab_width } else { 1 })
+                    .sum();
+                width / tab_width
+            })
+            .collect();
+
+        let mut guides = Vec::new();
+        let max_depth = indent_levels.iter().copied().max().unwrap_or(0);
+
+        for depth in 1..=max_depth {
+            let column = depth * tab_width;
+            let mut start: Option<usize> = None;
+            for (i, &level) in indent_levels.iter().enumerate() {
+                if level >= depth {
+                    if start.is_none() {
+                        start = Some(i);
+                    }
+                } else if let Some(s) = start {
+                    guides.push(IndentGuide {
+                        column,
+                        start_line: s,
+                        end_line: i - 1,
+                        depth,
+                    });
+                    start = None;
+                }
+            }
+            if let Some(s) = start {
+                guides.push(IndentGuide {
+                    column,
+                    start_line: s,
+                    end_line: lines.len() - 1,
+                    depth,
+                });
+            }
+        }
+        guides
+    }
+
+    /// Number of lines this guide spans.
+    pub fn line_span(&self) -> usize {
+        self.end_line - self.start_line + 1
+    }
+}
+
+impl fmt::Display for IndentGuide {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Guide(col={}, lines={}-{}, depth={})",
+            self.column, self.start_line, self.end_line, self.depth,
+        )
+    }
+}
+
+/// Auto-fixes indentation issues found in text.
+pub struct IndentFixer;
+
+impl IndentFixer {
+    /// Fix mixed indentation by converting everything to the target style.
+    pub fn fix_mixed(text: &str, target: IndentStyle) -> String {
+        let tab_width = match target {
+            IndentStyle::Tabs => 4u32,
+            IndentStyle::Spaces(n) => n,
+        };
+        let mut result = String::with_capacity(text.len());
+        for line in text.lines() {
+            let trimmed = line.trim_start();
+            if trimmed.is_empty() {
+                result.push_str(line);
+                result.push('\n');
+                continue;
+            }
+            let ws = &line[..line.len() - trimmed.len()];
+            let width: u32 = ws
+                .chars()
+                .map(|c| if c == '\t' { tab_width } else { 1 })
+                .sum();
+            let new_ws = match target {
+                IndentStyle::Tabs => {
+                    let tabs = width / tab_width;
+                    let spaces = width % tab_width;
+                    format!(
+                        "{}{}",
+                        "\t".repeat(tabs as usize),
+                        " ".repeat(spaces as usize),
+                    )
+                }
+                IndentStyle::Spaces(_) => " ".repeat(width as usize),
+            };
+            result.push_str(&new_ws);
+            result.push_str(trimmed);
+            result.push('\n');
+        }
+        if !text.ends_with('\n') && result.ends_with('\n') {
+            result.pop();
+        }
+        result
+    }
+
+    /// Remove trailing whitespace from all lines.
+    pub fn trim_trailing(text: &str) -> String {
+        text.lines()
+            .map(|line| line.trim_end())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+/// A range of consecutive lines with the same indent level.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndentRange {
+    pub start_line: usize,
+    pub end_line: usize,
+    pub indent_level: u32,
+}
+
+impl IndentRange {
+    /// Compute indent ranges for a block of text.
+    pub fn compute(text: &str, style: IndentStyle) -> Vec<IndentRange> {
+        let tab_width = match style {
+            IndentStyle::Tabs => 4u32,
+            IndentStyle::Spaces(n) => n,
+        };
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.is_empty() {
+            return Vec::new();
+        }
+
+        let mut ranges = Vec::new();
+        let mut current_level = u32::MAX;
+        let mut start = 0usize;
+
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim_start();
+            let level = if trimmed.is_empty() {
+                0
+            } else {
+                let ws = &line[..line.len() - trimmed.len()];
+                let width: u32 = ws
+                    .chars()
+                    .map(|c| if c == '\t' { tab_width } else { 1 })
+                    .sum();
+                width / tab_width
+            };
+            if level != current_level {
+                if current_level != u32::MAX {
+                    ranges.push(IndentRange {
+                        start_line: start,
+                        end_line: i - 1,
+                        indent_level: current_level,
+                    });
+                }
+                current_level = level;
+                start = i;
+            }
+        }
+        if current_level != u32::MAX {
+            ranges.push(IndentRange {
+                start_line: start,
+                end_line: lines.len() - 1,
+                indent_level: current_level,
+            });
+        }
+        ranges
+    }
+
+    /// Number of lines in this range.
+    pub fn line_count(&self) -> usize {
+        self.end_line - self.start_line + 1
+    }
+}
+
+impl fmt::Display for IndentRange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "IndentRange(lines={}-{}, level={})",
+            self.start_line, self.end_line, self.indent_level,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -819,5 +1038,60 @@ mod tests {
         let paste = "    line1\n        line2\n    line3";
         let result = auto_indent_on_paste(paste, "  ", IndentStyle::Spaces(4));
         assert_eq!(result, "  line1\n      line2\n  line3");
+    }
+
+    #[test]
+    fn indent_guides_basic() {
+        let text = "fn main() {\n    let x = 1;\n    if true {\n        inner();\n    }\n}\n";
+        let guides = IndentGuide::compute(text, IndentStyle::Spaces(4));
+        assert!(!guides.is_empty());
+        let depth1: Vec<_> = guides.iter().filter(|g| g.depth == 1).collect();
+        assert!(!depth1.is_empty());
+        assert!(depth1[0].start_line >= 1);
+    }
+
+    #[test]
+    fn indent_guides_empty() {
+        let guides = IndentGuide::compute("", IndentStyle::Spaces(4));
+        assert!(guides.is_empty());
+    }
+
+    #[test]
+    fn indent_fixer_mixed() {
+        let text = "\tline1\n    line2\n\t    line3";
+        let fixed = IndentFixer::fix_mixed(text, IndentStyle::Spaces(4));
+        // All indentation should be spaces
+        for line in fixed.lines() {
+            let ws = &line[..line.len() - line.trim_start().len()];
+            assert!(!ws.contains('\t'), "found tab in: {line:?}");
+        }
+    }
+
+    #[test]
+    fn indent_fixer_trim_trailing() {
+        let text = "hello   \nworld  \nfoo";
+        let trimmed = IndentFixer::trim_trailing(text);
+        assert_eq!(trimmed, "hello\nworld\nfoo");
+    }
+
+    #[test]
+    fn indent_ranges_basic() {
+        let text = "top\n    indented\n    also\n        deep\ntop_again";
+        let ranges = IndentRange::compute(text, IndentStyle::Spaces(4));
+        assert!(ranges.len() >= 3);
+        assert_eq!(ranges[0].indent_level, 0);
+        assert_eq!(ranges[1].indent_level, 1);
+    }
+
+    #[test]
+    fn indent_guide_display() {
+        let guide = IndentGuide {
+            column: 4,
+            start_line: 1,
+            end_line: 5,
+            depth: 1,
+        };
+        assert_eq!(format!("{guide}"), "Guide(col=4, lines=1-5, depth=1)");
+        assert_eq!(guide.line_span(), 5);
     }
 }

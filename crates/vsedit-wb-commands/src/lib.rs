@@ -474,6 +474,94 @@ impl CommandValidator {
     }
 }
 
+// ── Command history ──
+
+/// Records executed commands with monotonic sequence numbers.
+pub struct CommandHistory {
+    entries: Vec<(u64, String, CommandSource)>,
+    next_seq: u64,
+}
+
+impl CommandHistory {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            next_seq: 1,
+        }
+    }
+
+    /// Push a command execution record.
+    pub fn push(&mut self, command_id: impl Into<String>, source: CommandSource) {
+        self.entries.push((self.next_seq, command_id.into(), source));
+        self.next_seq += 1;
+    }
+
+    /// Return the `n` most recent entries (oldest first).
+    pub fn recent(&self, n: usize) -> &[(u64, String, CommandSource)] {
+        let start = self.entries.len().saturating_sub(n);
+        &self.entries[start..]
+    }
+
+    /// Total number of recorded executions.
+    pub fn count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Clear all history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+impl Default for CommandHistory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Command palette ──
+
+/// Searches and filters commands for quick-access display.
+pub struct CommandPalette<'a> {
+    registry: &'a CommandRegistry,
+}
+
+impl<'a> CommandPalette<'a> {
+    pub fn new(registry: &'a CommandRegistry) -> Self {
+        Self { registry }
+    }
+
+    /// Return all enabled commands whose id or title contain `query`
+    /// (case-insensitive), sorted by title.
+    pub fn search(&self, query: &str) -> Vec<&'a CommandDescriptor> {
+        let q = query.to_lowercase();
+        let mut results: Vec<&CommandDescriptor> = self
+            .registry
+            .get_all()
+            .iter()
+            .filter(|c| {
+                c.enabled
+                    && (c.id.to_lowercase().contains(&q)
+                        || c.title.to_lowercase().contains(&q))
+            })
+            .collect();
+        results.sort_by(|a, b| a.title.cmp(&b.title));
+        results
+    }
+
+    /// Return all enabled commands, sorted by title.
+    pub fn all_enabled(&self) -> Vec<&'a CommandDescriptor> {
+        let mut cmds: Vec<&CommandDescriptor> = self
+            .registry
+            .get_all()
+            .iter()
+            .filter(|c| c.enabled)
+            .collect();
+        cmds.sort_by(|a, b| a.title.cmp(&b.title));
+        cmds
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -839,5 +927,74 @@ mod tests {
 
         let ids_bad = vec!["editor.save", "bad", "view.zoom"];
         assert_eq!(CommandValidator::first_invalid(&ids_bad), Some("bad".into()));
+    }
+
+    // ── CommandHistory tests ──
+
+    #[test]
+    fn history_push_and_count() {
+        let mut h = CommandHistory::new();
+        assert_eq!(h.count(), 0);
+        h.push("editor.save", CommandSource::User);
+        h.push("editor.format", CommandSource::Keybinding);
+        assert_eq!(h.count(), 2);
+    }
+
+    #[test]
+    fn history_recent() {
+        let mut h = CommandHistory::new();
+        h.push("a", CommandSource::System);
+        h.push("b", CommandSource::System);
+        h.push("c", CommandSource::System);
+        let recent = h.recent(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].1, "b");
+        assert_eq!(recent[1].1, "c");
+    }
+
+    #[test]
+    fn history_clear() {
+        let mut h = CommandHistory::new();
+        h.push("x", CommandSource::User);
+        h.clear();
+        assert_eq!(h.count(), 0);
+        assert!(h.recent(10).is_empty());
+    }
+
+    // ── CommandPalette tests ──
+
+    #[test]
+    fn palette_search_filters_and_sorts() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("editor.format", "Format Document"));
+        reg.register(make_cmd("editor.save", "Save File"));
+        reg.register(make_cmd("view.zoom", "Zoom In"));
+        let palette = CommandPalette::new(&reg);
+        let results = palette.search("format");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "editor.format");
+    }
+
+    #[test]
+    fn palette_excludes_disabled() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("a", "Alpha"));
+        reg.register(make_cmd("b", "Beta"));
+        reg.set_enabled("a", false);
+        let palette = CommandPalette::new(&reg);
+        let all = palette.all_enabled();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, "b");
+    }
+
+    #[test]
+    fn palette_all_enabled_sorted() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("z", "Zebra"));
+        reg.register(make_cmd("a", "Apple"));
+        let palette = CommandPalette::new(&reg);
+        let all = palette.all_enabled();
+        assert_eq!(all[0].title, "Apple");
+        assert_eq!(all[1].title, "Zebra");
     }
 }

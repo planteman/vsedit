@@ -452,6 +452,79 @@ impl OutputService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Output search
+// ---------------------------------------------------------------------------
+
+/// Represents a single match found in output channel content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputSearchMatch {
+    /// Zero-based line number where the match was found.
+    pub line: usize,
+    /// Byte offset within the line where the match starts.
+    pub start: usize,
+    /// Byte offset within the line where the match ends (exclusive).
+    pub end: usize,
+}
+
+/// Searches within output channel content for occurrences of a pattern.
+#[derive(Debug)]
+pub struct OutputSearch {
+    pattern: String,
+    case_sensitive: bool,
+}
+
+impl OutputSearch {
+    pub fn new(pattern: impl Into<String>) -> Self {
+        Self {
+            pattern: pattern.into(),
+            case_sensitive: true,
+        }
+    }
+
+    pub fn case_insensitive(mut self) -> Self {
+        self.case_sensitive = false;
+        self
+    }
+
+    /// Find all occurrences of the pattern in the given lines.
+    pub fn find_all(&self, lines: &[String]) -> Vec<OutputSearchMatch> {
+        let mut results = Vec::new();
+        for (line_idx, line) in lines.iter().enumerate() {
+            let (haystack, needle);
+            if self.case_sensitive {
+                haystack = line.clone();
+                needle = self.pattern.clone();
+            } else {
+                haystack = line.to_lowercase();
+                needle = self.pattern.to_lowercase();
+            }
+            let mut start = 0;
+            while let Some(pos) = haystack[start..].find(&needle) {
+                let abs = start + pos;
+                results.push(OutputSearchMatch {
+                    line: line_idx,
+                    start: abs,
+                    end: abs + needle.len(),
+                });
+                start = abs + 1;
+            }
+        }
+        results
+    }
+
+    /// Returns line numbers (zero-based) that contain at least one match.
+    pub fn matching_lines(&self, lines: &[String]) -> Vec<usize> {
+        let mut seen = Vec::new();
+        for m in self.find_all(lines) {
+            if seen.last() != Some(&m.line) {
+                seen.push(m.line);
+            }
+        }
+        seen
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -868,5 +941,53 @@ mod tests {
         // First log should have timestamp 1, second should have 2
         assert!(content.contains("[1 INFO]"));
         assert!(content.contains("[2 INFO]"));
+    }
+
+    // -- OutputSearch tests ------------------------------------------------
+
+    #[test]
+    fn search_finds_pattern() {
+        let lines = vec!["hello world".into(), "goodbye world".into()];
+        let search = OutputSearch::new("world");
+        let matches = search.find_all(&lines);
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches[0].line, 0);
+        assert_eq!(matches[1].line, 1);
+    }
+
+    #[test]
+    fn search_case_insensitive() {
+        let lines = vec!["Hello World".into()];
+        let search = OutputSearch::new("hello").case_insensitive();
+        let matches = search.find_all(&lines);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].start, 0);
+    }
+
+    #[test]
+    fn search_no_matches() {
+        let lines = vec!["foo bar".into()];
+        let search = OutputSearch::new("baz");
+        assert!(search.find_all(&lines).is_empty());
+    }
+
+    #[test]
+    fn search_multiple_matches_per_line() {
+        let lines = vec!["aaa".into()];
+        let search = OutputSearch::new("a");
+        let matches = search.find_all(&lines);
+        assert_eq!(matches.len(), 3);
+    }
+
+    #[test]
+    fn search_matching_lines() {
+        let lines = vec![
+            "error: something".into(),
+            "info: ok".into(),
+            "error: another".into(),
+        ];
+        let search = OutputSearch::new("error");
+        let ml = search.matching_lines(&lines);
+        assert_eq!(ml, vec![0, 2]);
     }
 }

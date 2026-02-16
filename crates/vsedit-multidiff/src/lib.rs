@@ -434,6 +434,98 @@ pub fn invert_diff(diff: &FileDiff) -> FileDiff {
     }
 }
 
+// ── Diff navigator ──
+
+/// Navigates between hunks across files in a [`MultiDiffModel`], tracking
+/// the current position (file index and hunk index within that file).
+pub struct DiffNavigator<'a> {
+    model: &'a MultiDiffModel,
+    file_index: usize,
+    hunk_index: usize,
+}
+
+impl<'a> DiffNavigator<'a> {
+    pub fn new(model: &'a MultiDiffModel) -> Self {
+        Self {
+            model,
+            file_index: 0,
+            hunk_index: 0,
+        }
+    }
+
+    /// Move to the next hunk, advancing to the next file if needed.
+    /// Returns `true` if the position changed.
+    pub fn next_hunk(&mut self) -> bool {
+        if self.model.diffs.is_empty() {
+            return false;
+        }
+        let file = &self.model.diffs[self.file_index];
+        if self.hunk_index + 1 < file.hunks.len() {
+            self.hunk_index += 1;
+            return true;
+        }
+        // Try next file with hunks
+        for fi in (self.file_index + 1)..self.model.diffs.len() {
+            if !self.model.diffs[fi].hunks.is_empty() {
+                self.file_index = fi;
+                self.hunk_index = 0;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Move to the previous hunk, going to the prior file if needed.
+    /// Returns `true` if the position changed.
+    pub fn prev_hunk(&mut self) -> bool {
+        if self.model.diffs.is_empty() {
+            return false;
+        }
+        if self.hunk_index > 0 {
+            self.hunk_index -= 1;
+            return true;
+        }
+        for fi in (0..self.file_index).rev() {
+            if !self.model.diffs[fi].hunks.is_empty() {
+                self.file_index = fi;
+                self.hunk_index = self.model.diffs[fi].hunks.len() - 1;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Return the current hunk, if any.
+    pub fn current_hunk(&self) -> Option<&'a DiffHunk> {
+        self.model
+            .diffs
+            .get(self.file_index)
+            .and_then(|f| f.hunks.get(self.hunk_index))
+    }
+
+    /// Jump to the first hunk of the file at `file_index`.
+    /// Returns `true` if the jump succeeded.
+    pub fn jump_to_file(&mut self, file_index: usize) -> bool {
+        if file_index < self.model.diffs.len() {
+            self.file_index = file_index;
+            self.hunk_index = 0;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Current file index.
+    pub fn current_file_index(&self) -> usize {
+        self.file_index
+    }
+
+    /// Current hunk index within the current file.
+    pub fn current_hunk_index(&self) -> usize {
+        self.hunk_index
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -854,5 +946,89 @@ mod tests {
         let s = format!("{}", model);
         assert!(s.contains("a.rs"));
         assert!(s.contains("b.rs"));
+    }
+
+    // ── DiffNavigator tests ──
+
+    fn make_model_with_hunks() -> MultiDiffModel {
+        let mut model = MultiDiffModel::new();
+        model.add_diff(FileDiff {
+            original_uri: Some("a.rs".into()),
+            modified_uri: Some("a.rs".into()),
+            kind: DiffKind::Modified,
+            hunks: vec![make_hunk_with_lines(), make_hunk_with_lines()],
+        });
+        model.add_diff(FileDiff {
+            original_uri: Some("b.rs".into()),
+            modified_uri: Some("b.rs".into()),
+            kind: DiffKind::Modified,
+            hunks: vec![make_hunk_with_lines()],
+        });
+        model
+    }
+
+    #[test]
+    fn navigator_next_within_file() {
+        let model = make_model_with_hunks();
+        let mut nav = DiffNavigator::new(&model);
+        assert_eq!(nav.current_file_index(), 0);
+        assert_eq!(nav.current_hunk_index(), 0);
+        assert!(nav.next_hunk());
+        assert_eq!(nav.current_file_index(), 0);
+        assert_eq!(nav.current_hunk_index(), 1);
+    }
+
+    #[test]
+    fn navigator_next_crosses_file() {
+        let model = make_model_with_hunks();
+        let mut nav = DiffNavigator::new(&model);
+        nav.next_hunk(); // hunk 1 in file 0
+        assert!(nav.next_hunk()); // crosses to file 1, hunk 0
+        assert_eq!(nav.current_file_index(), 1);
+        assert_eq!(nav.current_hunk_index(), 0);
+    }
+
+    #[test]
+    fn navigator_next_at_end_returns_false() {
+        let model = make_model_with_hunks();
+        let mut nav = DiffNavigator::new(&model);
+        nav.next_hunk();
+        nav.next_hunk();
+        assert!(!nav.next_hunk()); // no more hunks
+    }
+
+    #[test]
+    fn navigator_prev_crosses_file() {
+        let model = make_model_with_hunks();
+        let mut nav = DiffNavigator::new(&model);
+        nav.jump_to_file(1);
+        assert!(nav.prev_hunk());
+        assert_eq!(nav.current_file_index(), 0);
+        assert_eq!(nav.current_hunk_index(), 1); // last hunk of file 0
+    }
+
+    #[test]
+    fn navigator_current_hunk() {
+        let model = make_model_with_hunks();
+        let nav = DiffNavigator::new(&model);
+        assert!(nav.current_hunk().is_some());
+    }
+
+    #[test]
+    fn navigator_jump_to_file() {
+        let model = make_model_with_hunks();
+        let mut nav = DiffNavigator::new(&model);
+        assert!(nav.jump_to_file(1));
+        assert_eq!(nav.current_file_index(), 1);
+        assert!(!nav.jump_to_file(99));
+    }
+
+    #[test]
+    fn navigator_empty_model() {
+        let model = MultiDiffModel::new();
+        let mut nav = DiffNavigator::new(&model);
+        assert!(!nav.next_hunk());
+        assert!(!nav.prev_hunk());
+        assert!(nav.current_hunk().is_none());
     }
 }

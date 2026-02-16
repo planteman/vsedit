@@ -518,6 +518,30 @@ pub fn filter_map_collect<T, R>(
     items.into_iter().filter_map(f).collect()
 }
 
+/// Retry a fallible closure up to `max_attempts` times, calling `on_retry`
+/// with the attempt number (1-based) between each failed attempt.
+/// Returns the first `Ok` or the last `Err`.
+pub fn retry_with_callback<T, E, F, C>(max_attempts: usize, mut f: F, mut on_retry: C) -> Result<T, E>
+where
+    F: FnMut() -> Result<T, E>,
+    C: FnMut(usize),
+{
+    assert!(max_attempts > 0, "max_attempts must be at least 1");
+    let mut last_err = None;
+    for attempt in 0..max_attempts {
+        match f() {
+            Ok(v) => return Ok(v),
+            Err(e) => {
+                last_err = Some(e);
+                if attempt + 1 < max_attempts {
+                    on_retry(attempt + 1);
+                }
+            }
+        }
+    }
+    Err(last_err.unwrap())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -881,5 +905,32 @@ mod tests {
             if x % 2 == 0 { Some(x * 10) } else { None }
         });
         assert_eq!(result, vec![20, 40]);
+    }
+
+    #[test]
+    fn retry_cb_succeeds_first() {
+        let result: Result<i32, &str> = retry_with_callback(3, || Ok(42), |_| {});
+        assert_eq!(result, Ok(42));
+    }
+
+    #[test]
+    fn retry_cb_succeeds_after_failures() {
+        let mut attempts = 0;
+        let mut retries = 0;
+        let result: Result<i32, &str> = retry_with_callback(
+            3,
+            || { attempts += 1; if attempts < 3 { Err("fail") } else { Ok(99) } },
+            |_| { retries += 1; },
+        );
+        assert_eq!(result, Ok(99));
+        assert_eq!(retries, 2);
+    }
+
+    #[test]
+    fn retry_cb_all_fail() {
+        let mut count = 0;
+        let result: Result<i32, &str> = retry_with_callback(3, || { count += 1; Err("fail") }, |_| {});
+        assert_eq!(result, Err("fail"));
+        assert_eq!(count, 3);
     }
 }

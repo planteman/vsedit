@@ -407,6 +407,193 @@ impl WorkingCopyService {
     }
 }
 
+/// Sort order for SCM resources.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScmSortOrder {
+    ByStatus,
+    ByUri,
+    ByStatusThenUri,
+}
+
+/// Sorts SCM resources in place.
+pub struct ScmResourceSorter;
+
+impl ScmResourceSorter {
+    fn status_rank(status: ScmStatus) -> u8 {
+        match status {
+            ScmStatus::Conflict => 0,
+            ScmStatus::Modified => 1,
+            ScmStatus::Added => 2,
+            ScmStatus::Deleted => 3,
+            ScmStatus::Renamed => 4,
+            ScmStatus::Untracked => 5,
+            ScmStatus::Ignored => 6,
+        }
+    }
+
+    /// Sort resources by the given order.
+    pub fn sort(resources: &mut [ScmResource], order: ScmSortOrder) {
+        match order {
+            ScmSortOrder::ByStatus => {
+                resources.sort_by_key(|r| Self::status_rank(r.status));
+            }
+            ScmSortOrder::ByUri => {
+                resources.sort_by(|a, b| a.uri.cmp(&b.uri));
+            }
+            ScmSortOrder::ByStatusThenUri => {
+                resources.sort_by(|a, b| {
+                    Self::status_rank(a.status)
+                        .cmp(&Self::status_rank(b.status))
+                        .then_with(|| a.uri.cmp(&b.uri))
+                });
+            }
+        }
+    }
+
+    /// Return a sorted copy without modifying the original.
+    pub fn sorted(resources: &[ScmResource], order: ScmSortOrder) -> Vec<ScmResource> {
+        let mut copy: Vec<ScmResource> = resources.to_vec();
+        Self::sort(&mut copy, order);
+        copy
+    }
+}
+
+/// A set of changes that can be staged or unstaged together.
+#[derive(Debug, Clone)]
+pub struct ScmChangeSet {
+    pub label: String,
+    pub resources: Vec<ScmResource>,
+    pub staged: bool,
+}
+
+impl ScmChangeSet {
+    /// Create a new unstaged change set.
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            resources: Vec::new(),
+            staged: false,
+        }
+    }
+
+    /// Add a resource to the change set.
+    pub fn add(&mut self, resource: ScmResource) {
+        self.resources.push(resource);
+    }
+
+    /// Remove a resource by URI. Returns true if found and removed.
+    pub fn remove(&mut self, uri: &str) -> bool {
+        let before = self.resources.len();
+        self.resources.retain(|r| r.uri != uri);
+        self.resources.len() < before
+    }
+
+    /// Stage all resources in this set.
+    pub fn stage(&mut self) {
+        self.staged = true;
+    }
+
+    /// Unstage all resources in this set.
+    pub fn unstage(&mut self) {
+        self.staged = false;
+    }
+
+    /// Return the number of resources.
+    pub fn len(&self) -> usize {
+        self.resources.len()
+    }
+
+    /// Whether this change set is empty.
+    pub fn is_empty(&self) -> bool {
+        self.resources.is_empty()
+    }
+
+    /// Return URIs of all resources in the set.
+    pub fn uris(&self) -> Vec<&str> {
+        self.resources.iter().map(|r| r.uri.as_str()).collect()
+    }
+
+    /// Count resources by status.
+    pub fn count_by_status(&self) -> Vec<(ScmStatus, usize)> {
+        let mut counts: Vec<(ScmStatus, usize)> = Vec::new();
+        for r in &self.resources {
+            if let Some(entry) = counts.iter_mut().find(|(s, _)| *s == r.status) {
+                entry.1 += 1;
+            } else {
+                counts.push((r.status, 1));
+            }
+        }
+        counts
+    }
+}
+
+/// Generates a preview summary of what would be committed.
+pub struct ScmCommitPreview;
+
+impl ScmCommitPreview {
+    /// Build a human-readable summary of the changes in a group.
+    pub fn preview(group: &ScmGroup) -> String {
+        if group.resources.is_empty() {
+            return format!("{}: (no changes)", group.label);
+        }
+        let mut added = 0usize;
+        let mut modified = 0usize;
+        let mut deleted = 0usize;
+        let mut renamed = 0usize;
+        let mut other = 0usize;
+        for r in &group.resources {
+            match r.status {
+                ScmStatus::Added => added += 1,
+                ScmStatus::Modified => modified += 1,
+                ScmStatus::Deleted => deleted += 1,
+                ScmStatus::Renamed => renamed += 1,
+                _ => other += 1,
+            }
+        }
+        let mut parts = Vec::new();
+        if added > 0 {
+            parts.push(format!("{added} added"));
+        }
+        if modified > 0 {
+            parts.push(format!("{modified} modified"));
+        }
+        if deleted > 0 {
+            parts.push(format!("{deleted} deleted"));
+        }
+        if renamed > 0 {
+            parts.push(format!("{renamed} renamed"));
+        }
+        if other > 0 {
+            parts.push(format!("{other} other"));
+        }
+        format!("{}: {}", group.label, parts.join(", "))
+    }
+
+    /// Build a detailed file listing for the commit preview.
+    pub fn file_listing(group: &ScmGroup) -> Vec<String> {
+        group
+            .resources
+            .iter()
+            .map(|r| {
+                let status_char = match r.status {
+                    ScmStatus::Added => 'A',
+                    ScmStatus::Modified => 'M',
+                    ScmStatus::Deleted => 'D',
+                    ScmStatus::Renamed => 'R',
+                    ScmStatus::Untracked => '?',
+                    ScmStatus::Conflict => 'C',
+                    ScmStatus::Ignored => '!',
+                };
+                if let Some(ref orig) = r.original_uri {
+                    format!("{status_char} {orig} -> {}", r.uri)
+                } else {
+                    format!("{status_char} {}", r.uri)
+                }
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -801,5 +988,90 @@ mod tests {
         let matched = svc.filter_resources("git", &filter);
         assert_eq!(matched.len(), 1);
         assert_eq!(matched[0].uri, "src/a.rs");
+    }
+
+    #[test]
+    fn sort_resources_by_status() {
+        let mut resources = vec![
+            ScmResource { uri: "z.rs".into(), status: ScmStatus::Untracked, original_uri: None },
+            ScmResource { uri: "a.rs".into(), status: ScmStatus::Conflict, original_uri: None },
+            ScmResource { uri: "m.rs".into(), status: ScmStatus::Modified, original_uri: None },
+        ];
+        ScmResourceSorter::sort(&mut resources, ScmSortOrder::ByStatus);
+        assert_eq!(resources[0].status, ScmStatus::Conflict);
+        assert_eq!(resources[1].status, ScmStatus::Modified);
+        assert_eq!(resources[2].status, ScmStatus::Untracked);
+    }
+
+    #[test]
+    fn sort_resources_by_uri() {
+        let mut resources = vec![
+            ScmResource { uri: "z.rs".into(), status: ScmStatus::Added, original_uri: None },
+            ScmResource { uri: "a.rs".into(), status: ScmStatus::Added, original_uri: None },
+        ];
+        ScmResourceSorter::sort(&mut resources, ScmSortOrder::ByUri);
+        assert_eq!(resources[0].uri, "a.rs");
+        assert_eq!(resources[1].uri, "z.rs");
+    }
+
+    #[test]
+    fn changeset_stage_unstage() {
+        let mut cs = ScmChangeSet::new("my changes");
+        cs.add(ScmResource { uri: "a.rs".into(), status: ScmStatus::Modified, original_uri: None });
+        cs.add(ScmResource { uri: "b.rs".into(), status: ScmStatus::Added, original_uri: None });
+        assert_eq!(cs.len(), 2);
+        assert!(!cs.staged);
+        cs.stage();
+        assert!(cs.staged);
+        cs.unstage();
+        assert!(!cs.staged);
+        assert!(cs.remove("a.rs"));
+        assert_eq!(cs.len(), 1);
+        assert!(!cs.remove("nonexistent"));
+    }
+
+    #[test]
+    fn changeset_count_by_status() {
+        let mut cs = ScmChangeSet::new("test");
+        cs.add(ScmResource { uri: "a.rs".into(), status: ScmStatus::Modified, original_uri: None });
+        cs.add(ScmResource { uri: "b.rs".into(), status: ScmStatus::Modified, original_uri: None });
+        cs.add(ScmResource { uri: "c.rs".into(), status: ScmStatus::Added, original_uri: None });
+        let counts = cs.count_by_status();
+        let modified_count = counts.iter().find(|(s, _)| *s == ScmStatus::Modified).unwrap().1;
+        assert_eq!(modified_count, 2);
+        let added_count = counts.iter().find(|(s, _)| *s == ScmStatus::Added).unwrap().1;
+        assert_eq!(added_count, 1);
+    }
+
+    #[test]
+    fn commit_preview_summary() {
+        let group = ScmGroup {
+            id: "staged".into(),
+            label: "Staged Changes".into(),
+            resources: vec![
+                ScmResource { uri: "a.rs".into(), status: ScmStatus::Added, original_uri: None },
+                ScmResource { uri: "b.rs".into(), status: ScmStatus::Modified, original_uri: None },
+                ScmResource { uri: "c.rs".into(), status: ScmStatus::Deleted, original_uri: None },
+            ],
+        };
+        let summary = ScmCommitPreview::preview(&group);
+        assert!(summary.contains("1 added"));
+        assert!(summary.contains("1 modified"));
+        assert!(summary.contains("1 deleted"));
+    }
+
+    #[test]
+    fn commit_preview_file_listing() {
+        let group = ScmGroup {
+            id: "staged".into(),
+            label: "Staged".into(),
+            resources: vec![
+                ScmResource { uri: "new.rs".into(), status: ScmStatus::Added, original_uri: None },
+                ScmResource { uri: "new_name.rs".into(), status: ScmStatus::Renamed, original_uri: Some("old_name.rs".into()) },
+            ],
+        };
+        let listing = ScmCommitPreview::file_listing(&group);
+        assert_eq!(listing[0], "A new.rs");
+        assert_eq!(listing[1], "R old_name.rs -> new_name.rs");
     }
 }

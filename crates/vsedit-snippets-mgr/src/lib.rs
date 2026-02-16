@@ -386,6 +386,213 @@ pub fn load_vscode_snippets(json: &str, source: SnippetSource) -> Result<Vec<Sni
     Ok(snippets)
 }
 
+/// Validates snippet body syntax.
+pub struct SnippetValidator;
+
+impl SnippetValidator {
+    /// Check that all tabstop braces are balanced (e.g. `${1:default}`).
+    /// Returns `Ok(())` if valid, or an error message describing the problem.
+    pub fn validate_body(body: &[String]) -> Result<(), String> {
+        for (line_idx, line) in body.iter().enumerate() {
+            let mut depth = 0i32;
+            let chars: Vec<char> = line.chars().collect();
+            let mut i = 0;
+            while i < chars.len() {
+                if chars[i] == '$' && i + 1 < chars.len() && chars[i + 1] == '{' {
+                    depth += 1;
+                    i += 2;
+                    continue;
+                }
+                if chars[i] == '}' && depth > 0 {
+                    depth -= 1;
+                }
+                i += 1;
+            }
+            if depth != 0 {
+                return Err(format!(
+                    "unbalanced tabstop braces on line {} (depth {})",
+                    line_idx + 1,
+                    depth,
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate that tabstop numbers are non-negative integers and sequential
+    /// starting from 0 or 1 with no gaps.
+    pub fn validate_tabstop_numbers(body: &[String]) -> Result<(), String> {
+        let mut numbers = Vec::new();
+        for line in body {
+            let chars: Vec<char> = line.chars().collect();
+            let mut i = 0;
+            while i < chars.len() {
+                if chars[i] == '$' && i + 1 < chars.len() {
+                    i += 1;
+                    if chars[i] == '{' {
+                        i += 1;
+                        let start = i;
+                        while i < chars.len() && chars[i].is_ascii_digit() {
+                            i += 1;
+                        }
+                        if i > start {
+                            let num_str: String = chars[start..i].iter().collect();
+                            if let Ok(n) = num_str.parse::<u32>() {
+                                numbers.push(n);
+                            }
+                        }
+                    } else if chars[i].is_ascii_digit() {
+                        let start = i;
+                        while i < chars.len() && chars[i].is_ascii_digit() {
+                            i += 1;
+                        }
+                        let num_str: String = chars[start..i].iter().collect();
+                        if let Ok(n) = num_str.parse::<u32>() {
+                            numbers.push(n);
+                        }
+                        continue;
+                    }
+                }
+                i += 1;
+            }
+        }
+        numbers.sort();
+        numbers.dedup();
+        if numbers.is_empty() {
+            return Ok(());
+        }
+        let min = numbers[0];
+        if min > 1 {
+            return Err(format!("tabstops should start at 0 or 1, found {min}"));
+        }
+        for window in numbers.windows(2) {
+            if window[1] - window[0] > 1 {
+                return Err(format!(
+                    "gap in tabstop numbering between {} and {}",
+                    window[0], window[1],
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Run all validations on a snippet.
+    pub fn validate(snippet: &Snippet) -> Result<(), String> {
+        Self::validate_body(&snippet.body)?;
+        Self::validate_tabstop_numbers(&snippet.body)?;
+        Ok(())
+    }
+}
+
+/// Imports snippets from a JSON string.
+pub struct SnippetImporter;
+
+impl SnippetImporter {
+    /// Parse a JSON string into a list of snippets.
+    ///
+    /// Expected format (VS Code snippet file format):
+    /// ```json
+    /// {
+    ///   "Snippet Name": {
+    ///     "prefix": ["trigger"],
+    ///     "body": ["line1", "line2"],
+    ///     "description": "optional",
+    ///     "scope": "optional"
+    ///   }
+    /// }
+    /// ```
+    pub fn from_json(json: &str, source: SnippetSource) -> Result<Vec<Snippet>, String> {
+        let value: serde_json::Value =
+            serde_json::from_str(json).map_err(|e| format!("invalid JSON: {e}"))?;
+        let obj = value.as_object().ok_or("expected top-level object")?;
+        let mut snippets = Vec::new();
+        for (name, entry) in obj {
+            let entry_obj = entry.as_object().ok_or_else(|| {
+                format!("expected object for snippet '{name}'")
+            })?;
+            let prefix = match entry_obj.get("prefix") {
+                Some(serde_json::Value::Array(arr)) => arr
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect(),
+                Some(serde_json::Value::String(s)) => vec![s.clone()],
+                _ => vec![name.clone()],
+            };
+            let body = match entry_obj.get("body") {
+                Some(serde_json::Value::Array(arr)) => arr
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect(),
+                Some(serde_json::Value::String(s)) => vec![s.clone()],
+                _ => Vec::new(),
+            };
+            let description = entry_obj
+                .get("description")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let scope = entry_obj
+                .get("scope")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            snippets.push(Snippet {
+                name: name.clone(),
+                prefix,
+                body,
+                description,
+                scope,
+                source: source.clone(),
+            });
+        }
+        Ok(snippets)
+    }
+}
+
+/// Exports snippets to a JSON string.
+pub struct SnippetExporter;
+
+impl SnippetExporter {
+    /// Convert a list of snippets into a JSON string in VS Code format.
+    pub fn to_json(snippets: &[Snippet]) -> Result<String, String> {
+        let mut map = serde_json::Map::new();
+        for snippet in snippets {
+            let mut entry = serde_json::Map::new();
+            let prefix_values: Vec<serde_json::Value> = snippet
+                .prefix
+                .iter()
+                .map(|p| serde_json::Value::String(p.clone()))
+                .collect();
+            entry.insert(
+                "prefix".to_string(),
+                serde_json::Value::Array(prefix_values),
+            );
+            let body_values: Vec<serde_json::Value> = snippet
+                .body
+                .iter()
+                .map(|b| serde_json::Value::String(b.clone()))
+                .collect();
+            entry.insert(
+                "body".to_string(),
+                serde_json::Value::Array(body_values),
+            );
+            if let Some(ref desc) = snippet.description {
+                entry.insert(
+                    "description".to_string(),
+                    serde_json::Value::String(desc.clone()),
+                );
+            }
+            if let Some(ref scope) = snippet.scope {
+                entry.insert(
+                    "scope".to_string(),
+                    serde_json::Value::String(scope.clone()),
+                );
+            }
+            map.insert(snippet.name.clone(), serde_json::Value::Object(entry));
+        }
+        serde_json::to_string_pretty(&serde_json::Value::Object(map))
+            .map_err(|e| format!("serialization failed: {e}"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -801,5 +1008,70 @@ mod tests {
     fn behavior_check_30() {
         let _svc = SnippetService::new();
         assert!(std::mem::size_of::<usize>() > 0);
+    }
+
+    #[test]
+    fn validator_balanced_braces() {
+        let body = vec!["${1:name}".into(), "let ${2:val} = $1;".into()];
+        assert!(SnippetValidator::validate_body(&body).is_ok());
+    }
+
+    #[test]
+    fn validator_unbalanced_braces() {
+        let body = vec!["${1:name".into()];
+        assert!(SnippetValidator::validate_body(&body).is_err());
+    }
+
+    #[test]
+    fn validator_tabstop_gap() {
+        let body = vec!["$1 $3".into()];
+        assert!(SnippetValidator::validate_tabstop_numbers(&body).is_err());
+    }
+
+    #[test]
+    fn validator_tabstop_sequential() {
+        let body = vec!["$1 ${2:x} $3".into()];
+        assert!(SnippetValidator::validate_tabstop_numbers(&body).is_ok());
+    }
+
+    #[test]
+    fn importer_from_json() {
+        let json = r#"{"Loop": {"prefix": ["for"], "body": ["for ${1:i} in ${2:iter} {", "    $0", "}"]}}"#;
+        let snippets = SnippetImporter::from_json(json, SnippetSource::User).unwrap();
+        assert_eq!(snippets.len(), 1);
+        assert_eq!(snippets[0].name, "Loop");
+        assert_eq!(snippets[0].prefix, vec!["for"]);
+        assert_eq!(snippets[0].body.len(), 3);
+    }
+
+    #[test]
+    fn exporter_roundtrip() {
+        let snippet = Snippet {
+            name: "Test".into(),
+            prefix: vec!["tst".into()],
+            body: vec!["assert!($1);".into()],
+            description: Some("A test".into()),
+            scope: Some("rust".into()),
+            source: SnippetSource::User,
+        };
+        let json = SnippetExporter::to_json(&[snippet]).unwrap();
+        let reimported = SnippetImporter::from_json(&json, SnippetSource::User).unwrap();
+        assert_eq!(reimported.len(), 1);
+        assert_eq!(reimported[0].name, "Test");
+        assert_eq!(reimported[0].prefix, vec!["tst"]);
+        assert_eq!(reimported[0].body, vec!["assert!($1);"]);
+    }
+
+    #[test]
+    fn validate_full_snippet() {
+        let snippet = Snippet {
+            name: "Good".into(),
+            prefix: vec!["g".into()],
+            body: vec!["${1:hello} $2".into()],
+            description: None,
+            scope: None,
+            source: SnippetSource::User,
+        };
+        assert!(SnippetValidator::validate(&snippet).is_ok());
     }
 }

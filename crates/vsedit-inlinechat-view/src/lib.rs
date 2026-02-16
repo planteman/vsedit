@@ -462,6 +462,70 @@ pub fn search_history_entries<'a>(
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Inline chat diff
+// ---------------------------------------------------------------------------
+
+/// Character-level diff statistics between original text and new text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InlineChatDiff {
+    /// Number of characters present in new_text but not in original.
+    pub added_chars: usize,
+    /// Number of characters present in original but not in new_text.
+    pub removed_chars: usize,
+    /// Number of characters unchanged between original and new_text.
+    pub unchanged_chars: usize,
+}
+
+impl InlineChatDiff {
+    /// Compute a simple character-level diff between `original` and `new_text`.
+    ///
+    /// Uses a longest-common-subsequence inspired scan: walks both strings
+    /// left-to-right and counts matching vs differing characters.
+    pub fn compute(original: &str, new_text: &str) -> Self {
+        let orig_chars: Vec<char> = original.chars().collect();
+        let new_chars: Vec<char> = new_text.chars().collect();
+
+        let mut unchanged = 0usize;
+        let mut oi = 0usize;
+        let mut ni = 0usize;
+
+        while oi < orig_chars.len() && ni < new_chars.len() {
+            if orig_chars[oi] == new_chars[ni] {
+                unchanged += 1;
+                oi += 1;
+                ni += 1;
+            } else {
+                // advance whichever pointer has more remaining
+                if (orig_chars.len() - oi) > (new_chars.len() - ni) {
+                    oi += 1;
+                } else {
+                    ni += 1;
+                }
+            }
+        }
+
+        let removed = orig_chars.len() - unchanged;
+        let added = new_chars.len() - unchanged;
+
+        Self {
+            added_chars: added,
+            removed_chars: removed,
+            unchanged_chars: unchanged,
+        }
+    }
+
+    /// Returns `true` if the diff has no changes at all.
+    pub fn is_identical(&self) -> bool {
+        self.added_chars == 0 && self.removed_chars == 0
+    }
+
+    /// Total number of changed characters (added + removed).
+    pub fn total_changes(&self) -> usize {
+        self.added_chars + self.removed_chars
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -859,5 +923,50 @@ mod tests {
         let ss = StreamingState::default();
         assert_eq!(ss.chunks_received, 0);
         assert!(!ss.is_complete);
+    }
+
+    // -- InlineChatDiff tests ---------------------------------------------
+
+    #[test]
+    fn diff_identical_strings() {
+        let diff = InlineChatDiff::compute("hello world", "hello world");
+        assert!(diff.is_identical());
+        assert_eq!(diff.unchanged_chars, 11);
+    }
+
+    #[test]
+    fn diff_completely_different() {
+        let diff = InlineChatDiff::compute("aaa", "bbb");
+        assert_eq!(diff.unchanged_chars, 0);
+        assert_eq!(diff.removed_chars, 3);
+        assert_eq!(diff.added_chars, 3);
+    }
+
+    #[test]
+    fn diff_insertion_only() {
+        let diff = InlineChatDiff::compute("ab", "axb");
+        assert!(diff.added_chars >= 1);
+        assert_eq!(diff.unchanged_chars, 2);
+        assert_eq!(diff.removed_chars, 0);
+    }
+
+    #[test]
+    fn diff_deletion_only() {
+        let diff = InlineChatDiff::compute("abc", "ac");
+        assert!(diff.removed_chars >= 1);
+        assert_eq!(diff.added_chars, 0);
+    }
+
+    #[test]
+    fn diff_total_changes() {
+        let diff = InlineChatDiff::compute("hello", "help");
+        assert!(diff.total_changes() > 0);
+    }
+
+    #[test]
+    fn diff_empty_strings() {
+        let diff = InlineChatDiff::compute("", "");
+        assert!(diff.is_identical());
+        assert_eq!(diff.total_changes(), 0);
     }
 }

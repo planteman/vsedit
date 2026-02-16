@@ -469,6 +469,61 @@ impl Default for MessageFilter {
     }
 }
 
+/// Tracks a sequence of chat messages forming a conversation.
+pub struct ChatConversation {
+    messages: Vec<ChatMessage>,
+    next_id: u64,
+}
+
+impl ChatConversation {
+    pub fn new() -> Self {
+        Self {
+            messages: Vec::new(),
+            next_id: 1,
+        }
+    }
+
+    /// Add a message to the conversation.
+    pub fn add_message(&mut self, role: MessageRole, content: impl Into<String>, timestamp: u64) {
+        self.messages.push(ChatMessage {
+            role,
+            content: content.into(),
+            timestamp,
+        });
+        self.next_id += 1;
+    }
+
+    /// Number of messages in the conversation.
+    pub fn message_count(&self) -> usize {
+        self.messages.len()
+    }
+
+    /// Get the most recent message, if any.
+    pub fn last_message(&self) -> Option<&ChatMessage> {
+        self.messages.last()
+    }
+
+    /// Return all messages whose content contains `query` (case-insensitive).
+    pub fn search(&self, query: &str) -> Vec<&ChatMessage> {
+        let q = query.to_ascii_lowercase();
+        self.messages
+            .iter()
+            .filter(|m| m.content.to_ascii_lowercase().contains(&q))
+            .collect()
+    }
+
+    /// Return all messages as a slice.
+    pub fn messages(&self) -> &[ChatMessage] {
+        &self.messages
+    }
+}
+
+impl Default for ChatConversation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -843,5 +898,51 @@ mod tests {
         assert_eq!(format!("{}", MessageRole::User), "user");
         assert_eq!(format!("{}", MessageRole::Assistant), "assistant");
         assert_eq!(format!("{}", MessageRole::System), "system");
+    }
+
+    // ── ChatConversation tests ──
+
+    #[test]
+    fn conversation_add_and_count() {
+        let mut conv = ChatConversation::new();
+        assert_eq!(conv.message_count(), 0);
+        conv.add_message(MessageRole::User, "Hello", 100);
+        conv.add_message(MessageRole::Assistant, "Hi there", 101);
+        assert_eq!(conv.message_count(), 2);
+    }
+
+    #[test]
+    fn conversation_last_message() {
+        let mut conv = ChatConversation::new();
+        assert!(conv.last_message().is_none());
+        conv.add_message(MessageRole::User, "first", 1);
+        conv.add_message(MessageRole::Assistant, "second", 2);
+        assert_eq!(conv.last_message().unwrap().content, "second");
+    }
+
+    #[test]
+    fn conversation_search() {
+        let mut conv = ChatConversation::new();
+        conv.add_message(MessageRole::User, "Explain borrow checker", 1);
+        conv.add_message(MessageRole::Assistant, "The borrow checker ensures safety", 2);
+        conv.add_message(MessageRole::User, "What about lifetimes?", 3);
+        let results = conv.search("borrow");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn conversation_search_case_insensitive() {
+        let mut conv = ChatConversation::new();
+        conv.add_message(MessageRole::User, "HELLO World", 1);
+        let results = conv.search("hello");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn conversation_messages_slice() {
+        let mut conv = ChatConversation::new();
+        conv.add_message(MessageRole::System, "init", 0);
+        assert_eq!(conv.messages().len(), 1);
+        assert_eq!(conv.messages()[0].role, MessageRole::System);
     }
 }

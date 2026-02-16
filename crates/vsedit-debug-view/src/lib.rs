@@ -600,6 +600,73 @@ impl Default for DebugView {
     }
 }
 
+/// Manages a collection of breakpoints with add, remove, toggle, and
+/// query operations.
+#[derive(Debug, Clone, Default)]
+pub struct BreakpointManager {
+    breakpoints: Vec<Breakpoint>,
+    next_id: u64,
+}
+
+impl BreakpointManager {
+    pub fn new() -> Self {
+        Self {
+            breakpoints: Vec::new(),
+            next_id: 1,
+        }
+    }
+
+    /// Add a breakpoint and return its assigned id.
+    pub fn add(&mut self, file_path: impl Into<String>, line: u32) -> u64 {
+        let id = self.next_id;
+        self.breakpoints.push(Breakpoint::new(id, file_path, line));
+        self.next_id += 1;
+        id
+    }
+
+    /// Remove a breakpoint by id. Returns `true` if it existed.
+    pub fn remove(&mut self, id: u64) -> bool {
+        let before = self.breakpoints.len();
+        self.breakpoints.retain(|bp| bp.id != id);
+        self.breakpoints.len() < before
+    }
+
+    /// Toggle the enabled state of a breakpoint by id.
+    pub fn toggle_enabled(&mut self, id: u64) -> bool {
+        if let Some(bp) = self.breakpoints.iter_mut().find(|bp| bp.id == id) {
+            bp.enabled = !bp.enabled;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Find all breakpoints in a given file.
+    pub fn find_by_file(&self, file_path: &str) -> Vec<&Breakpoint> {
+        self.breakpoints
+            .iter()
+            .filter(|bp| bp.file_path == file_path)
+            .collect()
+    }
+
+    /// Find a breakpoint at a specific file and line.
+    pub fn find_by_file_line(&self, file_path: &str, line: u32) -> Option<&Breakpoint> {
+        self.breakpoints
+            .iter()
+            .find(|bp| bp.file_path == file_path && bp.line == line)
+    }
+
+    /// Count of enabled breakpoints.
+    pub fn count_enabled(&self) -> usize {
+        self.breakpoints.iter().filter(|bp| bp.enabled).count()
+    }
+
+    /// Total breakpoint count.
+    pub fn count(&self) -> usize {
+        self.breakpoints.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -848,5 +915,56 @@ mod tests {
         assert_eq!(view_frame.name, "foo");
         assert_eq!(view_frame.source_path, "/src/foo.rs");
         assert_eq!(view_frame.line, 100);
+    }
+
+    // ── BreakpointManager tests ──
+
+    #[test]
+    fn bp_manager_add_and_count() {
+        let mut mgr = BreakpointManager::new();
+        let id1 = mgr.add("src/main.rs", 10);
+        let id2 = mgr.add("src/main.rs", 20);
+        assert_eq!(mgr.count(), 2);
+        assert_ne!(id1, id2);
+    }
+
+    #[test]
+    fn bp_manager_remove() {
+        let mut mgr = BreakpointManager::new();
+        let id = mgr.add("test.rs", 5);
+        assert!(mgr.remove(id));
+        assert!(!mgr.remove(id));
+        assert_eq!(mgr.count(), 0);
+    }
+
+    #[test]
+    fn bp_manager_toggle_enabled() {
+        let mut mgr = BreakpointManager::new();
+        let id = mgr.add("test.rs", 1);
+        assert_eq!(mgr.count_enabled(), 1);
+        mgr.toggle_enabled(id);
+        assert_eq!(mgr.count_enabled(), 0);
+        mgr.toggle_enabled(id);
+        assert_eq!(mgr.count_enabled(), 1);
+        assert!(!mgr.toggle_enabled(999));
+    }
+
+    #[test]
+    fn bp_manager_find_by_file() {
+        let mut mgr = BreakpointManager::new();
+        mgr.add("a.rs", 1);
+        mgr.add("a.rs", 5);
+        mgr.add("b.rs", 10);
+        assert_eq!(mgr.find_by_file("a.rs").len(), 2);
+        assert_eq!(mgr.find_by_file("b.rs").len(), 1);
+        assert!(mgr.find_by_file("c.rs").is_empty());
+    }
+
+    #[test]
+    fn bp_manager_find_by_file_line() {
+        let mut mgr = BreakpointManager::new();
+        mgr.add("a.rs", 42);
+        assert!(mgr.find_by_file_line("a.rs", 42).is_some());
+        assert!(mgr.find_by_file_line("a.rs", 99).is_none());
     }
 }

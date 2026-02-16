@@ -93,6 +93,7 @@ members = [
     "crates/vsedit-hover",
     "crates/vsedit-hover-contrib",
     "crates/vsedit-image",
+    "crates/vsedit-integration-tests",
     "crates/vsedit-indentation",
     "crates/vsedit-inlayhints",
     "crates/vsedit-inline-complete",

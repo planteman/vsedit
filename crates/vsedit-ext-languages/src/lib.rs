@@ -398,6 +398,104 @@ pub fn format_provider_summary(bridge: &LanguageBridge) -> String {
     out
 }
 
+// ── Selector builder ──
+
+/// Fluent builder for constructing a [`LanguageSelector`].
+pub struct LanguageSelectorBuilder {
+    language: Option<String>,
+    scheme: Option<String>,
+    pattern: Option<String>,
+}
+
+impl LanguageSelectorBuilder {
+    pub fn new() -> Self {
+        Self {
+            language: None,
+            scheme: None,
+            pattern: None,
+        }
+    }
+
+    pub fn language(mut self, language: impl Into<String>) -> Self {
+        self.language = Some(language.into());
+        self
+    }
+
+    pub fn scheme(mut self, scheme: impl Into<String>) -> Self {
+        self.scheme = Some(scheme.into());
+        self
+    }
+
+    pub fn pattern(mut self, pattern: impl Into<String>) -> Self {
+        self.pattern = Some(pattern.into());
+        self
+    }
+
+    pub fn build(self) -> LanguageSelector {
+        LanguageSelector {
+            language: self.language,
+            scheme: self.scheme,
+            pattern: self.pattern,
+        }
+    }
+}
+
+impl Default for LanguageSelectorBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Provider ranking ──
+
+/// A provider with its computed score for a given document.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RankedProvider {
+    pub provider_id: String,
+    pub score: u32,
+}
+
+/// Ranks multiple providers by their selector score for a given document,
+/// returning them in descending score order. Providers with a score of 0
+/// (no match) are excluded.
+pub struct ProviderRanking;
+
+impl ProviderRanking {
+    pub fn rank(
+        providers: &[ProviderRegistration],
+        language: &str,
+        scheme: &str,
+        path: &str,
+    ) -> Vec<RankedProvider> {
+        let mut ranked: Vec<RankedProvider> = providers
+            .iter()
+            .filter_map(|p| {
+                let score = selector_score(&p.selector, language, scheme, path);
+                if score > 0 {
+                    Some(RankedProvider {
+                        provider_id: p.provider_id.clone(),
+                        score,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        ranked.sort_by(|a, b| b.score.cmp(&a.score));
+        ranked
+    }
+
+    /// Returns the single best-matching provider, or `None` if none match.
+    pub fn best(
+        providers: &[ProviderRegistration],
+        language: &str,
+        scheme: &str,
+        path: &str,
+    ) -> Option<RankedProvider> {
+        Self::rank(providers, language, scheme, path).into_iter().next()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -839,5 +937,100 @@ mod tests {
         let go_pos = summary.find("[go]").unwrap();
         let rust_pos = summary.find("[rust]").unwrap();
         assert!(go_pos < rust_pos);
+    }
+
+    // ── LanguageSelectorBuilder tests ──
+
+    #[test]
+    fn selector_builder_all_fields() {
+        let sel = LanguageSelectorBuilder::new()
+            .language("rust")
+            .scheme("file")
+            .pattern("**/*.rs")
+            .build();
+        assert_eq!(sel.language.as_deref(), Some("rust"));
+        assert_eq!(sel.scheme.as_deref(), Some("file"));
+        assert_eq!(sel.pattern.as_deref(), Some("**/*.rs"));
+    }
+
+    #[test]
+    fn selector_builder_partial() {
+        let sel = LanguageSelectorBuilder::new().language("go").build();
+        assert_eq!(sel.language.as_deref(), Some("go"));
+        assert!(sel.scheme.is_none());
+        assert!(sel.pattern.is_none());
+    }
+
+    #[test]
+    fn selector_builder_default_is_wildcard() {
+        let sel = LanguageSelectorBuilder::default().build();
+        assert!(sel.language.is_none());
+        assert!(sel.scheme.is_none());
+        assert!(sel.pattern.is_none());
+        assert!(selector_matches(&sel, "any", "any", "/any/path"));
+    }
+
+    // ── ProviderRanking tests ──
+
+    #[test]
+    fn ranking_orders_by_score_descending() {
+        let providers = vec![
+            ProviderRegistration {
+                provider_id: "wildcard".into(),
+                selector: LanguageSelectorBuilder::new().build(),
+            },
+            ProviderRegistration {
+                provider_id: "lang-only".into(),
+                selector: LanguageSelectorBuilder::new().language("rust").build(),
+            },
+            ProviderRegistration {
+                provider_id: "full".into(),
+                selector: LanguageSelectorBuilder::new()
+                    .language("rust")
+                    .scheme("file")
+                    .pattern("**/*.rs")
+                    .build(),
+            },
+        ];
+        let ranked = ProviderRanking::rank(&providers, "rust", "file", "/src/main.rs");
+        assert_eq!(ranked.len(), 3);
+        assert_eq!(ranked[0].provider_id, "full");
+        assert_eq!(ranked[1].provider_id, "lang-only");
+        assert_eq!(ranked[2].provider_id, "wildcard");
+        assert!(ranked[0].score > ranked[1].score);
+    }
+
+    #[test]
+    fn ranking_excludes_non_matching() {
+        let providers = vec![
+            ProviderRegistration {
+                provider_id: "py".into(),
+                selector: LanguageSelectorBuilder::new().language("python").build(),
+            },
+        ];
+        let ranked = ProviderRanking::rank(&providers, "rust", "file", "/a.rs");
+        assert!(ranked.is_empty());
+    }
+
+    #[test]
+    fn ranking_best_returns_top() {
+        let providers = vec![
+            ProviderRegistration {
+                provider_id: "a".into(),
+                selector: LanguageSelectorBuilder::new().build(),
+            },
+            ProviderRegistration {
+                provider_id: "b".into(),
+                selector: LanguageSelectorBuilder::new().language("rust").build(),
+            },
+        ];
+        let best = ProviderRanking::best(&providers, "rust", "file", "/a.rs").unwrap();
+        assert_eq!(best.provider_id, "b");
+    }
+
+    #[test]
+    fn ranking_best_returns_none_when_empty() {
+        let best = ProviderRanking::best(&[], "rust", "file", "/a.rs");
+        assert!(best.is_none());
     }
 }

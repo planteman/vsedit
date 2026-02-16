@@ -601,6 +601,21 @@ pub fn count_control_chars(text: &str) -> usize {
         .count()
 }
 
+/// Pad a string to `width` display columns using the given `fill` character.
+/// If the string is already at least `width` columns, it is truncated instead.
+pub fn pad_to_width_with_char(text: &str, width: usize, tab_size: u32, fill: char) -> String {
+    let current = display_width(text, tab_size);
+    if current >= width {
+        truncate_to_width(text, width, tab_size)
+    } else {
+        let mut s = text.to_string();
+        for _ in 0..(width - current) {
+            s.push(fill);
+        }
+        s
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -888,5 +903,17 @@ mod tests {
         assert_eq!(count_control_chars("abc"), 0);
         assert_eq!(count_control_chars("a\x01\x02b"), 2);
         assert_eq!(count_control_chars("a\tb\n"), 0); // tab and LF excluded
+    }
+
+    #[test]
+    fn pad_with_char_pads_short() {
+        let s = pad_to_width_with_char("hi", 6, 4, '.');
+        assert_eq!(s, "hi....");
+    }
+
+    #[test]
+    fn pad_with_char_truncates_long() {
+        let s = pad_to_width_with_char("hello world", 5, 4, '.');
+        assert_eq!(s, "hello");
     }
 }

@@ -474,6 +474,55 @@ fn find_opening_smart(
     None
 }
 
+/// Statistics about brackets in a document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BracketStats {
+    /// Total number of matched pairs found.
+    pub total_pairs: usize,
+    /// Maximum nesting depth.
+    pub max_depth: usize,
+    /// The most commonly occurring bracket pair (open, close), if any.
+    pub most_common_pair: Option<(char, char)>,
+}
+
+impl BracketStats {
+    /// Compute bracket statistics for the given document lines using the provided pairs.
+    pub fn compute(lines: &[&str], pairs: &[BracketPair]) -> Self {
+        let mut pair_counts: Vec<usize> = vec![0; pairs.len()];
+        let mut total_pairs: usize = 0;
+        let mut max_depth: usize = 0;
+        let mut depth: usize = 0;
+        for line in lines {
+            for ch in line.chars() {
+                for (pi, pair) in pairs.iter().enumerate() {
+                    if ch == pair.open {
+                        depth += 1;
+                        if depth > max_depth {
+                            max_depth = depth;
+                        }
+                    } else if ch == pair.close && depth > 0 {
+                        pair_counts[pi] += 1;
+                        total_pairs += 1;
+                        depth -= 1;
+                    }
+                }
+            }
+        }
+        let most_common_pair = pair_counts
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, c)| **c)
+            .and_then(|(i, &c)| {
+                if c > 0 {
+                    Some((pairs[i].open, pairs[i].close))
+                } else {
+                    None
+                }
+            });
+        BracketStats { total_pairs, max_depth, most_common_pair }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -880,5 +929,31 @@ mod tests {
         let pairs = default_bracket_pairs();
         let result = find_matching_bracket_smart(&lines, 1, 8, &pairs);
         assert_eq!(result, Some((3, 1)));
+    }
+
+    #[test]
+    fn stats_basic() {
+        let lines = vec!["fn f() { [a] }"];
+        let pairs = default_bracket_pairs();
+        let stats = BracketStats::compute(&lines, &pairs);
+        assert!(stats.total_pairs >= 2);
+        assert_eq!(stats.max_depth, 2);
+    }
+
+    #[test]
+    fn stats_empty() {
+        let lines: Vec<&str> = vec!["no brackets here"];
+        let pairs = default_bracket_pairs();
+        let stats = BracketStats::compute(&lines, &pairs);
+        assert_eq!(stats.total_pairs, 0);
+        assert_eq!(stats.most_common_pair, None);
+    }
+
+    #[test]
+    fn stats_most_common() {
+        let lines = vec!["(())(()){}"];
+        let pairs = default_bracket_pairs();
+        let stats = BracketStats::compute(&lines, &pairs);
+        assert_eq!(stats.most_common_pair, Some(('(', ')')));
     }
 }

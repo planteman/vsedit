@@ -510,6 +510,53 @@ impl OutputPanel {
     }
 }
 
+/// Severity levels for output lines.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputSeverity {
+    Info,
+    Warning,
+    Error,
+}
+
+/// Filters output lines by severity keyword or a custom substring pattern.
+#[derive(Debug, Clone)]
+pub struct OutputChannelFilter {
+    severity: Option<OutputSeverity>,
+    pattern: Option<String>,
+}
+
+impl OutputChannelFilter {
+    /// Create a filter that matches a given severity.
+    pub fn by_severity(severity: OutputSeverity) -> Self {
+        Self { severity: Some(severity), pattern: None }
+    }
+
+    /// Create a filter that matches lines containing `pattern`.
+    pub fn by_pattern(pattern: &str) -> Self {
+        Self { severity: None, pattern: Some(pattern.to_string()) }
+    }
+
+    /// Returns `true` if the given line matches this filter.
+    pub fn matches(&self, line: &str) -> bool {
+        if let Some(ref sev) = self.severity {
+            let keyword = match sev {
+                OutputSeverity::Info => "[info]",
+                OutputSeverity::Warning => "[warning]",
+                OutputSeverity::Error => "[error]",
+            };
+            if !line.to_lowercase().contains(keyword) {
+                return false;
+            }
+        }
+        if let Some(ref pat) = self.pattern {
+            if !line.contains(pat.as_str()) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -877,5 +924,25 @@ mod tests {
         let exported = p.export_all_channels();
         assert!(exported.contains("=== A ==="));
         assert!(exported.contains("data"));
+    }
+
+    #[test]
+    fn filter_by_severity() {
+        let f = OutputChannelFilter::by_severity(OutputSeverity::Error);
+        assert!(f.matches("[error] something failed"));
+        assert!(!f.matches("[info] all good"));
+    }
+
+    #[test]
+    fn filter_by_pattern() {
+        let f = OutputChannelFilter::by_pattern("timeout");
+        assert!(f.matches("connection timeout occurred"));
+        assert!(!f.matches("connection reset"));
+    }
+
+    #[test]
+    fn filter_severity_case_insensitive() {
+        let f = OutputChannelFilter::by_severity(OutputSeverity::Warning);
+        assert!(f.matches("[WARNING] disk space low"));
     }
 }

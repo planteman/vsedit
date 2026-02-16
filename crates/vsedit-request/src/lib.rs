@@ -523,6 +523,16 @@ impl Default for RequestBatch {
     }
 }
 
+impl RequestService {
+    /// Returns the pending request with the largest `created_at` timestamp.
+    pub fn newest_pending(&self) -> Option<&Request> {
+        self.requests
+            .iter()
+            .filter(|r| matches!(r.state, RequestState::Pending))
+            .max_by_key(|r| r.created_at)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -889,5 +899,21 @@ mod tests {
         let cfg = RetryConfig::default();
         assert_eq!(cfg.max_retries, 3);
         assert_eq!(cfg.base_delay_ms, 100);
+    }
+
+    #[test]
+    fn newest_pending_returns_largest_created_at() {
+        let mut svc = RequestService::new();
+        let _a = RequestBuilder::new("GET /a").created_at(50).build(&mut svc);
+        let _b = RequestBuilder::new("GET /b").created_at(10).build(&mut svc);
+        let _c = RequestBuilder::new("GET /c").created_at(30).build(&mut svc);
+        let newest = svc.newest_pending().unwrap();
+        assert_eq!(newest.created_at, 50);
+    }
+
+    #[test]
+    fn newest_pending_none_when_empty() {
+        let svc = RequestService::new();
+        assert!(svc.newest_pending().is_none());
     }
 }
