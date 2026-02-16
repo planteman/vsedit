@@ -65,6 +65,49 @@ pub enum ShutdownReason {
     Kill,
 }
 
+impl ShutdownReason {
+    /// Returns `true` if the reason is user-initiated (`Quit` or `Close`).
+    pub fn is_user_initiated(&self) -> bool {
+        matches!(self, ShutdownReason::Quit | ShutdownReason::Close)
+    }
+
+    /// Returns `true` if the shutdown is destructive and non-recoverable.
+    pub fn is_destructive(&self) -> bool {
+        matches!(self, ShutdownReason::Kill)
+    }
+
+    /// Returns `true` if the shutdown allows the window to reopen (i.e. `Reload`).
+    pub fn is_recoverable(&self) -> bool {
+        matches!(self, ShutdownReason::Reload)
+    }
+
+    /// Returns a human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            ShutdownReason::Quit => "Quit",
+            ShutdownReason::Close => "Close",
+            ShutdownReason::Reload => "Reload",
+            ShutdownReason::Kill => "Kill",
+        }
+    }
+
+    /// Returns all shutdown reason variants.
+    pub fn all() -> &'static [ShutdownReason] {
+        &[
+            ShutdownReason::Quit,
+            ShutdownReason::Close,
+            ShutdownReason::Reload,
+            ShutdownReason::Kill,
+        ]
+    }
+}
+
+impl fmt::Display for ShutdownReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
 /// Veto that can prevent shutdown.
 #[derive(Clone)]
 pub struct WillShutdownEvent {
@@ -88,6 +131,27 @@ impl WillShutdownEvent {
     pub fn is_vetoed(&self) -> bool {
         *self.vetoed.lock().unwrap()
     }
+
+    /// Returns `true` if the shutdown reason is user-initiated.
+    pub fn is_user_initiated(&self) -> bool {
+        self.reason.is_user_initiated()
+    }
+
+    /// Returns `true` if the shutdown can be safely vetoed (non-kill reasons).
+    pub fn is_vetoable(&self) -> bool {
+        !self.reason.is_destructive()
+    }
+
+    /// Conditionally veto: only vetoes if the reason is vetoable.
+    /// Returns `true` if the veto was applied.
+    pub fn try_veto(&self) -> bool {
+        if self.is_vetoable() {
+            self.veto();
+            true
+        } else {
+            false
+        }
+    }
 }
 
 /// Snapshot of a completed shutdown.
@@ -105,6 +169,31 @@ pub struct LifecycleStats {
     pub shutdown_attempts: u64,
     pub vetoed_shutdowns: u64,
     pub current_phase: LifecyclePhase,
+}
+
+impl LifecycleStats {
+    /// Returns the ratio of vetoed shutdowns to total attempts, or 0 if none attempted.
+    pub fn veto_rate(&self) -> f64 {
+        if self.shutdown_attempts == 0 {
+            return 0.0;
+        }
+        self.vetoed_shutdowns as f64 / self.shutdown_attempts as f64
+    }
+
+    /// Returns `true` if the service has progressed past the initial phase.
+    pub fn has_progressed(&self) -> bool {
+        self.phase_transition_count > 0
+    }
+
+    /// Returns `true` if any shutdown was ever attempted.
+    pub fn has_shutdown_history(&self) -> bool {
+        self.shutdown_attempts > 0
+    }
+
+    /// Returns the number of successful (non-vetoed) shutdown attempts.
+    pub fn successful_shutdowns(&self) -> u64 {
+        self.shutdown_attempts.saturating_sub(self.vetoed_shutdowns)
+    }
 }
 
 /// The lifecycle service.
@@ -553,6 +642,25 @@ impl ShutdownBarrier {
     pub fn pending_names(&self) -> Vec<&str> {
         self.pending.iter().map(|s| s.as_str()).collect()
     }
+
+    /// Returns `true` if a task with the given name is currently pending.
+    pub fn contains(&self, name: &str) -> bool {
+        self.pending.contains(name)
+    }
+
+    /// Register multiple tasks at once.
+    pub fn register_all(&mut self, names: &[&str]) {
+        for name in names {
+            self.pending.insert((*name).to_string());
+        }
+    }
+
+    /// Complete all pending tasks, returning how many were cleared.
+    pub fn complete_all(&mut self) -> usize {
+        let count = self.pending.len();
+        self.pending.clear();
+        count
+    }
 }
 
 impl Default for ShutdownBarrier {
@@ -612,6 +720,23 @@ pub struct TimelineEntry {
     pub phase: StartupPhase,
     pub label: String,
     pub duration_ms: u64,
+}
+
+impl TimelineEntry {
+    /// Returns `true` if this entry took longer than the given threshold.
+    pub fn is_slow(&self, threshold_ms: u64) -> bool {
+        self.duration_ms > threshold_ms
+    }
+
+    /// Returns the duration formatted as a human-readable string.
+    pub fn formatted_duration(&self) -> String {
+        format_duration_ms(self.duration_ms)
+    }
+
+    /// Returns a one-line summary of this entry.
+    pub fn one_line_summary(&self) -> String {
+        format!("[{}] {} ({})", self.phase, self.label, self.formatted_duration())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -701,6 +826,28 @@ pub struct HealthStatus {
     pub is_healthy: bool,
     pub uptime_events: usize,
     pub barrier_count: usize,
+}
+
+impl HealthStatus {
+    /// Returns `true` if the service has barriers registered.
+    pub fn has_barriers(&self) -> bool {
+        self.barrier_count > 0
+    }
+
+    /// Returns a one-line diagnostic summary.
+    pub fn summary(&self) -> String {
+        let health = if self.is_healthy { "healthy" } else { "unhealthy" };
+        format!(
+            "phase={}, status={}, events={}, barriers={}",
+            self.phase_name, health, self.uptime_events, self.barrier_count
+        )
+    }
+}
+
+impl fmt::Display for HealthStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
 }
 
 /// Check the health of a lifecycle service.
@@ -825,6 +972,37 @@ impl StartupPhase {
             Self::Ready => 3,
         }
     }
+
+    /// Returns the next startup phase, or `None` if already `Ready`.
+    pub fn next(&self) -> Option<Self> {
+        match self {
+            Self::EarlyInit => Some(Self::ServiceInit),
+            Self::ServiceInit => Some(Self::ExtensionLoad),
+            Self::ExtensionLoad => Some(Self::Ready),
+            Self::Ready => None,
+        }
+    }
+
+    /// Returns the previous startup phase, or `None` if already `EarlyInit`.
+    pub fn previous(&self) -> Option<Self> {
+        match self {
+            Self::EarlyInit => None,
+            Self::ServiceInit => Some(Self::EarlyInit),
+            Self::ExtensionLoad => Some(Self::ServiceInit),
+            Self::Ready => Some(Self::ExtensionLoad),
+        }
+    }
+
+    /// Parse from a string label (case-insensitive).
+    pub fn from_label(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "early init" | "earlyinit" | "early_init" => Some(Self::EarlyInit),
+            "service init" | "serviceinit" | "service_init" => Some(Self::ServiceInit),
+            "extension load" | "extensionload" | "extension_load" => Some(Self::ExtensionLoad),
+            "ready" => Some(Self::Ready),
+            _ => None,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -855,6 +1033,33 @@ impl LifecycleTimeline {
             .map(|e| e.label.as_str())
             .collect::<Vec<_>>()
             .join(", ")
+    }
+
+    /// Returns entries whose duration exceeds the threshold.
+    pub fn slow_entries(&self, threshold_ms: u64) -> Vec<&TimelineEntry> {
+        self.entries.iter().filter(|e| e.is_slow(threshold_ms)).collect()
+    }
+
+    /// Returns the entry with the shortest duration, or `None` if empty.
+    pub fn fastest_entry(&self) -> Option<&TimelineEntry> {
+        self.entries.iter().min_by_key(|e| e.duration_ms)
+    }
+
+    /// Returns a count of entries per phase.
+    pub fn count_by_phase(&self) -> Vec<(StartupPhase, usize)> {
+        StartupPhase::all()
+            .into_iter()
+            .map(|p| (p, self.entries.iter().filter(|e| e.phase == p).count()))
+            .filter(|(_, count)| *count > 0)
+            .collect()
+    }
+
+    /// Returns the average duration across all entries, or `None` if empty.
+    pub fn average_duration_ms(&self) -> Option<u64> {
+        if self.entries.is_empty() {
+            return None;
+        }
+        Some(self.total_duration_ms() / self.entries.len() as u64)
     }
 }
 
@@ -1699,6 +1904,266 @@ mod tests {
         let s = format!("{h}");
         assert!(s.contains("Ready"));
         assert!(s.contains("db"));
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for deepened functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn shutdown_reason_is_user_initiated() {
+        assert!(ShutdownReason::Quit.is_user_initiated());
+        assert!(ShutdownReason::Close.is_user_initiated());
+        assert!(!ShutdownReason::Reload.is_user_initiated());
+        assert!(!ShutdownReason::Kill.is_user_initiated());
+    }
+
+    #[test]
+    fn shutdown_reason_is_destructive() {
+        assert!(ShutdownReason::Kill.is_destructive());
+        assert!(!ShutdownReason::Quit.is_destructive());
+        assert!(!ShutdownReason::Close.is_destructive());
+        assert!(!ShutdownReason::Reload.is_destructive());
+    }
+
+    #[test]
+    fn shutdown_reason_is_recoverable() {
+        assert!(ShutdownReason::Reload.is_recoverable());
+        assert!(!ShutdownReason::Quit.is_recoverable());
+        assert!(!ShutdownReason::Kill.is_recoverable());
+    }
+
+    #[test]
+    fn shutdown_reason_label_and_display() {
+        assert_eq!(ShutdownReason::Quit.label(), "Quit");
+        assert_eq!(ShutdownReason::Close.label(), "Close");
+        assert_eq!(ShutdownReason::Reload.label(), "Reload");
+        assert_eq!(ShutdownReason::Kill.label(), "Kill");
+        assert_eq!(format!("{}", ShutdownReason::Quit), "Quit");
+    }
+
+    #[test]
+    fn shutdown_reason_all() {
+        let all = ShutdownReason::all();
+        assert_eq!(all.len(), 4);
+        assert!(all.contains(&ShutdownReason::Quit));
+        assert!(all.contains(&ShutdownReason::Kill));
+    }
+
+    #[test]
+    fn will_shutdown_event_is_vetoable() {
+        let evt_quit = WillShutdownEvent::new(ShutdownReason::Quit);
+        assert!(evt_quit.is_vetoable());
+        let evt_kill = WillShutdownEvent::new(ShutdownReason::Kill);
+        assert!(!evt_kill.is_vetoable());
+    }
+
+    #[test]
+    fn will_shutdown_event_try_veto() {
+        let evt = WillShutdownEvent::new(ShutdownReason::Close);
+        assert!(evt.try_veto());
+        assert!(evt.is_vetoed());
+
+        let evt_kill = WillShutdownEvent::new(ShutdownReason::Kill);
+        assert!(!evt_kill.try_veto());
+        assert!(!evt_kill.is_vetoed());
+    }
+
+    #[test]
+    fn will_shutdown_event_is_user_initiated() {
+        let evt = WillShutdownEvent::new(ShutdownReason::Quit);
+        assert!(evt.is_user_initiated());
+        let evt2 = WillShutdownEvent::new(ShutdownReason::Reload);
+        assert!(!evt2.is_user_initiated());
+    }
+
+    #[test]
+    fn shutdown_barrier_contains() {
+        let mut barrier = ShutdownBarrier::new();
+        barrier.register("alpha");
+        assert!(barrier.contains("alpha"));
+        assert!(!barrier.contains("beta"));
+    }
+
+    #[test]
+    fn shutdown_barrier_register_all() {
+        let mut barrier = ShutdownBarrier::new();
+        barrier.register_all(&["x", "y", "z"]);
+        assert_eq!(barrier.remaining(), 3);
+        assert!(barrier.contains("x"));
+        assert!(barrier.contains("y"));
+        assert!(barrier.contains("z"));
+    }
+
+    #[test]
+    fn shutdown_barrier_complete_all() {
+        let mut barrier = ShutdownBarrier::new();
+        barrier.register_all(&["a", "b", "c"]);
+        let cleared = barrier.complete_all();
+        assert_eq!(cleared, 3);
+        assert!(barrier.is_clear());
+    }
+
+    #[test]
+    fn timeline_entry_is_slow() {
+        let entry = TimelineEntry {
+            phase: StartupPhase::EarlyInit,
+            label: "test".to_string(),
+            duration_ms: 500,
+        };
+        assert!(entry.is_slow(100));
+        assert!(!entry.is_slow(500));
+        assert!(!entry.is_slow(1000));
+    }
+
+    #[test]
+    fn timeline_entry_formatted_duration() {
+        let entry = TimelineEntry {
+            phase: StartupPhase::EarlyInit,
+            label: "test".to_string(),
+            duration_ms: 2500,
+        };
+        assert_eq!(entry.formatted_duration(), "2.5s");
+    }
+
+    #[test]
+    fn timeline_entry_one_line_summary() {
+        let entry = TimelineEntry {
+            phase: StartupPhase::ServiceInit,
+            label: "connect_db".to_string(),
+            duration_ms: 150,
+        };
+        let s = entry.one_line_summary();
+        assert!(s.contains("Service Init"));
+        assert!(s.contains("connect_db"));
+        assert!(s.contains("150ms"));
+    }
+
+    #[test]
+    fn lifecycle_timeline_slow_entries() {
+        let mut tl = LifecycleTimeline::new();
+        tl.record(StartupPhase::EarlyInit, "fast", 10);
+        tl.record(StartupPhase::ServiceInit, "slow", 500);
+        tl.record(StartupPhase::ExtensionLoad, "medium", 100);
+        let slow = tl.slow_entries(200);
+        assert_eq!(slow.len(), 1);
+        assert_eq!(slow[0].label, "slow");
+    }
+
+    #[test]
+    fn lifecycle_timeline_fastest_entry() {
+        let mut tl = LifecycleTimeline::new();
+        tl.record(StartupPhase::EarlyInit, "a", 50);
+        tl.record(StartupPhase::ServiceInit, "b", 10);
+        tl.record(StartupPhase::ExtensionLoad, "c", 200);
+        let fastest = tl.fastest_entry().unwrap();
+        assert_eq!(fastest.label, "b");
+        assert_eq!(fastest.duration_ms, 10);
+    }
+
+    #[test]
+    fn lifecycle_timeline_count_by_phase() {
+        let mut tl = LifecycleTimeline::new();
+        tl.record(StartupPhase::EarlyInit, "a", 10);
+        tl.record(StartupPhase::EarlyInit, "b", 20);
+        tl.record(StartupPhase::ServiceInit, "c", 30);
+        let counts = tl.count_by_phase();
+        assert_eq!(counts.len(), 2);
+        let early = counts.iter().find(|(p, _)| *p == StartupPhase::EarlyInit).unwrap();
+        assert_eq!(early.1, 2);
+        let svc = counts.iter().find(|(p, _)| *p == StartupPhase::ServiceInit).unwrap();
+        assert_eq!(svc.1, 1);
+    }
+
+    #[test]
+    fn lifecycle_timeline_average_duration() {
+        let mut tl = LifecycleTimeline::new();
+        assert!(tl.average_duration_ms().is_none());
+        tl.record(StartupPhase::EarlyInit, "a", 100);
+        tl.record(StartupPhase::ServiceInit, "b", 300);
+        assert_eq!(tl.average_duration_ms(), Some(200));
+    }
+
+    #[test]
+    fn lifecycle_stats_veto_rate() {
+        let svc = LifecycleService::new();
+        let _sub = svc.on_will_shutdown().on(move |evt: &WillShutdownEvent| {
+            evt.veto();
+        });
+        svc.request_shutdown(ShutdownReason::Quit);
+        svc.request_shutdown(ShutdownReason::Close);
+        let stats = svc.get_stats();
+        assert!((stats.veto_rate() - 1.0).abs() < f64::EPSILON);
+        assert!(stats.has_shutdown_history());
+        assert_eq!(stats.successful_shutdowns(), 0);
+    }
+
+    #[test]
+    fn lifecycle_stats_has_progressed() {
+        let svc = LifecycleService::new();
+        let stats = svc.get_stats();
+        assert!(!stats.has_progressed());
+        svc.set_phase(LifecyclePhase::Ready);
+        let stats = svc.get_stats();
+        assert!(stats.has_progressed());
+    }
+
+    #[test]
+    fn lifecycle_stats_successful_shutdowns() {
+        let svc = LifecycleService::new();
+        let stats = svc.get_stats();
+        assert_eq!(stats.successful_shutdowns(), 0);
+        assert!(!stats.has_shutdown_history());
+        assert!((stats.veto_rate() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn health_status_has_barriers() {
+        let svc = LifecycleService::new();
+        let status = lifecycle_health_check(&svc);
+        assert!(!status.has_barriers());
+
+        svc.register_barrier(ShutdownBarrier::new());
+        let status = lifecycle_health_check(&svc);
+        assert!(status.has_barriers());
+    }
+
+    #[test]
+    fn health_status_summary_and_display() {
+        let svc = LifecycleService::new();
+        svc.set_phase(LifecyclePhase::Ready);
+        let status = lifecycle_health_check(&svc);
+        let summary = status.summary();
+        assert!(summary.contains("phase=Ready"));
+        assert!(summary.contains("healthy"));
+        let display = format!("{status}");
+        assert_eq!(summary, display);
+    }
+
+    #[test]
+    fn startup_phase_next() {
+        assert_eq!(StartupPhase::EarlyInit.next(), Some(StartupPhase::ServiceInit));
+        assert_eq!(StartupPhase::ServiceInit.next(), Some(StartupPhase::ExtensionLoad));
+        assert_eq!(StartupPhase::ExtensionLoad.next(), Some(StartupPhase::Ready));
+        assert_eq!(StartupPhase::Ready.next(), None);
+    }
+
+    #[test]
+    fn startup_phase_previous() {
+        assert_eq!(StartupPhase::EarlyInit.previous(), None);
+        assert_eq!(StartupPhase::ServiceInit.previous(), Some(StartupPhase::EarlyInit));
+        assert_eq!(StartupPhase::ExtensionLoad.previous(), Some(StartupPhase::ServiceInit));
+        assert_eq!(StartupPhase::Ready.previous(), Some(StartupPhase::ExtensionLoad));
+    }
+
+    #[test]
+    fn startup_phase_from_label() {
+        assert_eq!(StartupPhase::from_label("early init"), Some(StartupPhase::EarlyInit));
+        assert_eq!(StartupPhase::from_label("Early_Init"), Some(StartupPhase::EarlyInit));
+        assert_eq!(StartupPhase::from_label("service_init"), Some(StartupPhase::ServiceInit));
+        assert_eq!(StartupPhase::from_label("Extension Load"), Some(StartupPhase::ExtensionLoad));
+        assert_eq!(StartupPhase::from_label("Ready"), Some(StartupPhase::Ready));
+        assert_eq!(StartupPhase::from_label("bogus"), None);
     }
 
 }

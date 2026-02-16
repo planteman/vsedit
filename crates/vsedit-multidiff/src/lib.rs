@@ -671,6 +671,104 @@ impl<'a> DiffNavigator<'a> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Diff change summary per-file
+// ---------------------------------------------------------------------------
+
+/// A one-line summary of changes for a single file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffChangeSummary {
+    pub path: String,
+    pub kind: DiffKind,
+    pub additions: usize,
+    pub deletions: usize,
+    pub hunks: usize,
+}
+
+impl DiffChangeSummary {
+    pub fn from_file_diff(diff: &FileDiff) -> Self {
+        Self {
+            path: diff.display_path().to_string(),
+            kind: diff.kind,
+            additions: diff.total_added(),
+            deletions: diff.total_removed(),
+            hunks: diff.hunk_count(),
+        }
+    }
+
+    /// Net line change (additions - deletions).
+    pub fn net(&self) -> isize {
+        self.additions as isize - self.deletions as isize
+    }
+}
+
+impl fmt::Display for DiffChangeSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} {} (+{} -{} ~{} hunks)",
+            self.kind, self.path, self.additions, self.deletions, self.hunks,
+        )
+    }
+}
+
+/// Generate change summaries for all files in a model.
+pub fn change_summaries(model: &MultiDiffModel) -> Vec<DiffChangeSummary> {
+    model.diffs.iter().map(DiffChangeSummary::from_file_diff).collect()
+}
+
+// ---------------------------------------------------------------------------
+// Unified diff output
+// ---------------------------------------------------------------------------
+
+/// Produce a unified diff string for a single FileDiff.
+pub fn unified_diff(diff: &FileDiff) -> String {
+    let mut out = String::new();
+    let orig = diff.original_uri.as_deref().unwrap_or("/dev/null");
+    let modified = diff.modified_uri.as_deref().unwrap_or("/dev/null");
+    out.push_str(&format!("--- {}\n", orig));
+    out.push_str(&format!("+++ {}\n", modified));
+    for hunk in &diff.hunks {
+        out.push_str(&format!("{}\n", hunk.header()));
+        for line in &hunk.lines {
+            let prefix = match line.kind {
+                DiffLineKind::Context => ' ',
+                DiffLineKind::Added => '+',
+                DiffLineKind::Removed => '-',
+            };
+            out.push_str(&format!("{}{}\n", prefix, line.content));
+        }
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
+// MultiDiffModel — path-based operations
+// ---------------------------------------------------------------------------
+
+impl MultiDiffModel {
+    /// Return all file paths affected by the diff (display paths).
+    pub fn affected_paths(&self) -> Vec<&str> {
+        self.diffs.iter().map(|d| d.display_path()).collect()
+    }
+
+    /// Return the total net line change across all files.
+    pub fn net_change(&self) -> isize {
+        self.total_added_lines() as isize - self.total_removed_lines() as isize
+    }
+
+    /// Return diffs that match a file extension (e.g. "rs", "ts").
+    pub fn diffs_by_extension(&self, ext: &str) -> Vec<&FileDiff> {
+        let suffix = format!(".{}", ext);
+        self.diffs.iter().filter(|d| d.display_path().ends_with(&suffix)).collect()
+    }
+
+    /// Return the largest diff (most total changed lines).
+    pub fn largest_diff(&self) -> Option<&FileDiff> {
+        self.diffs.iter().max_by_key(|d| d.total_added() + d.total_removed())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1325,6 +1423,136 @@ mod tests {
         let stats = compute_per_file_stats(&model);
         assert_eq!(stats.len(), 1);
         assert_eq!(stats[0].modifications, 1);
+    }
+
+    // -- New tests ----------------------------------------------------------
+
+    #[test]
+    fn change_summary_from_file_diff() {
+        let diff = FileDiff {
+            original_uri: Some("old.rs".into()),
+            modified_uri: Some("new.rs".into()),
+            kind: DiffKind::Modified,
+            hunks: vec![DiffHunk {
+                original_start: 1, original_length: 2,
+                modified_start: 1, modified_length: 3,
+                lines: vec![
+                    DiffLine { content: "-old".into(), kind: DiffLineKind::Removed },
+                    DiffLine { content: "+new1".into(), kind: DiffLineKind::Added },
+                    DiffLine { content: "+new2".into(), kind: DiffLineKind::Added },
+                ],
+            }],
+        };
+        let summary = DiffChangeSummary::from_file_diff(&diff);
+        assert_eq!(summary.path, "new.rs");
+        assert_eq!(summary.additions, 2);
+        assert_eq!(summary.deletions, 1);
+        assert_eq!(summary.net(), 1);
+        assert!(format!("{}", summary).contains("Modified"));
+    }
+
+    #[test]
+    fn change_summaries_for_model() {
+        let mut model = MultiDiffModel::new();
+        model.add_diff(make_diff(DiffKind::Added, 1));
+        model.add_diff(make_diff(DiffKind::Removed, 2));
+        let summaries = change_summaries(&model);
+        assert_eq!(summaries.len(), 2);
+        assert_eq!(summaries[0].kind, DiffKind::Added);
+        assert_eq!(summaries[1].kind, DiffKind::Removed);
+    }
+
+    #[test]
+    fn unified_diff_output() {
+        let diff = FileDiff {
+            original_uri: Some("a.rs".into()),
+            modified_uri: Some("b.rs".into()),
+            kind: DiffKind::Modified,
+            hunks: vec![DiffHunk {
+                original_start: 1, original_length: 1,
+                modified_start: 1, modified_length: 1,
+                lines: vec![
+                    DiffLine { content: "hello".into(), kind: DiffLineKind::Removed },
+                    DiffLine { content: "world".into(), kind: DiffLineKind::Added },
+                ],
+            }],
+        };
+        let output = unified_diff(&diff);
+        assert!(output.starts_with("--- a.rs\n+++ b.rs\n"));
+        assert!(output.contains("-hello"));
+        assert!(output.contains("+world"));
+    }
+
+    #[test]
+    fn affected_paths_and_net_change() {
+        let mut model = MultiDiffModel::new();
+        model.add_diff(FileDiff {
+            original_uri: None,
+            modified_uri: Some("src/main.rs".into()),
+            kind: DiffKind::Added,
+            hunks: vec![DiffHunk {
+                original_start: 0, original_length: 0,
+                modified_start: 1, modified_length: 2,
+                lines: vec![
+                    DiffLine { content: "+a".into(), kind: DiffLineKind::Added },
+                    DiffLine { content: "+b".into(), kind: DiffLineKind::Added },
+                ],
+            }],
+        });
+        let paths = model.affected_paths();
+        assert_eq!(paths, vec!["src/main.rs"]);
+        assert_eq!(model.net_change(), 2);
+    }
+
+    #[test]
+    fn diffs_by_extension_filters_correctly() {
+        let mut model = MultiDiffModel::new();
+        model.add_diff(FileDiff {
+            original_uri: Some("a.rs".into()),
+            modified_uri: Some("a.rs".into()),
+            kind: DiffKind::Modified,
+            hunks: vec![],
+        });
+        model.add_diff(FileDiff {
+            original_uri: Some("b.ts".into()),
+            modified_uri: Some("b.ts".into()),
+            kind: DiffKind::Modified,
+            hunks: vec![],
+        });
+        assert_eq!(model.diffs_by_extension("rs").len(), 1);
+        assert_eq!(model.diffs_by_extension("ts").len(), 1);
+        assert_eq!(model.diffs_by_extension("py").len(), 0);
+    }
+
+    #[test]
+    fn largest_diff_returns_most_changed() {
+        let mut model = MultiDiffModel::new();
+        model.add_diff(FileDiff {
+            original_uri: Some("small.rs".into()),
+            modified_uri: Some("small.rs".into()),
+            kind: DiffKind::Modified,
+            hunks: vec![DiffHunk {
+                original_start: 1, original_length: 1,
+                modified_start: 1, modified_length: 1,
+                lines: vec![DiffLine { content: "+x".into(), kind: DiffLineKind::Added }],
+            }],
+        });
+        model.add_diff(FileDiff {
+            original_uri: Some("big.rs".into()),
+            modified_uri: Some("big.rs".into()),
+            kind: DiffKind::Modified,
+            hunks: vec![DiffHunk {
+                original_start: 1, original_length: 5,
+                modified_start: 1, modified_length: 5,
+                lines: vec![
+                    DiffLine { content: "+a".into(), kind: DiffLineKind::Added },
+                    DiffLine { content: "+b".into(), kind: DiffLineKind::Added },
+                    DiffLine { content: "+c".into(), kind: DiffLineKind::Added },
+                ],
+            }],
+        });
+        let largest = model.largest_diff().unwrap();
+        assert_eq!(largest.display_path(), "big.rs");
     }
 }
 

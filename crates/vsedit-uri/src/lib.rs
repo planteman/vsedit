@@ -1075,6 +1075,77 @@ fn base64_encode(data: &[u8]) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// URI analysis and manipulation helpers
+// ---------------------------------------------------------------------------
+
+/// Extract the file extension from a URI's path (without the leading dot).
+/// Returns `None` if no extension is present.
+pub fn uri_extension(uri: &VsUri) -> Option<&str> {
+    let path = &uri.path;
+    if let Some(dot) = path.rfind('.') {
+        let ext = &path[dot + 1..];
+        if ext.is_empty() || ext.contains('/') {
+            None
+        } else {
+            Some(ext)
+        }
+    } else {
+        None
+    }
+}
+
+/// Extract the file name (last path segment) from a URI.
+pub fn uri_filename(uri: &VsUri) -> &str {
+    uri.path.rsplit('/').next().unwrap_or(&uri.path)
+}
+
+/// Return the parent path of a URI (everything up to the last `/`).
+pub fn uri_parent(uri: &VsUri) -> &str {
+    if let Some(pos) = uri.path.rfind('/') {
+        &uri.path[..pos]
+    } else {
+        ""
+    }
+}
+
+/// Split a URI path into individual segments.
+pub fn path_segments(uri: &VsUri) -> Vec<&str> {
+    uri.path.split('/').filter(|s| !s.is_empty()).collect()
+}
+
+/// Check if two URIs share the same origin (scheme + authority).
+pub fn same_origin(a: &VsUri, b: &VsUri) -> bool {
+    a.scheme == b.scheme && a.authority == b.authority
+}
+
+/// Compute a relative path from `base` to `target` if they share the same
+/// origin. Returns `None` if origins differ.
+pub fn relative_path(base: &VsUri, target: &VsUri) -> Option<String> {
+    if !same_origin(base, target) {
+        return None;
+    }
+    let base_parts: Vec<&str> = base.path.split('/').filter(|s| !s.is_empty()).collect();
+    let target_parts: Vec<&str> = target.path.split('/').filter(|s| !s.is_empty()).collect();
+    let common = base_parts
+        .iter()
+        .zip(target_parts.iter())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let ups = base_parts.len().saturating_sub(common + 1); // -1 for the base file
+    let mut result = String::new();
+    for _ in 0..ups {
+        result.push_str("../");
+    }
+    result.push_str(&target_parts[common..].join("/"));
+    Some(result)
+}
+
+/// Decode percent-encoded sequences in a string (public re-export).
+pub fn pct_decode(input: &str) -> String {
+    percent_decode(input)
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1792,5 +1863,71 @@ mod tests {
         assert_eq!(collected.len(), 3);
         assert_eq!(collected[0], ("x", "1"));
         assert_eq!(collected[2], ("z", "3"));
+    }
+
+    // -- uri_extension ---------------------------------------------------------
+
+    #[test]
+    fn uri_extension_rs() {
+        let uri = VsUri::file("/src/main.rs");
+        assert_eq!(uri_extension(&uri), Some("rs"));
+    }
+
+    #[test]
+    fn uri_extension_none() {
+        let uri = VsUri::file("/Makefile");
+        assert_eq!(uri_extension(&uri), None);
+    }
+
+    // -- uri_filename ----------------------------------------------------------
+
+    #[test]
+    fn uri_filename_extracts() {
+        let uri = VsUri::file("/home/user/doc.txt");
+        assert_eq!(uri_filename(&uri), "doc.txt");
+    }
+
+    // -- uri_parent ------------------------------------------------------------
+
+    #[test]
+    fn uri_parent_extracts() {
+        let uri = VsUri::file("/home/user/doc.txt");
+        assert_eq!(uri_parent(&uri), "/home/user");
+    }
+
+    // -- path_segments ---------------------------------------------------------
+
+    #[test]
+    fn path_segments_splits() {
+        let uri = VsUri::file("/a/b/c");
+        assert_eq!(path_segments(&uri), vec!["a", "b", "c"]);
+    }
+
+    // -- same_origin -----------------------------------------------------------
+
+    #[test]
+    fn same_origin_true() {
+        let a = VsUri::from_components("https", "example.com", "/a", "", "");
+        let b = VsUri::from_components("https", "example.com", "/b", "", "");
+        assert!(same_origin(&a, &b));
+    }
+
+    #[test]
+    fn same_origin_false() {
+        let a = VsUri::from_components("https", "example.com", "/a", "", "");
+        let b = VsUri::from_components("http", "example.com", "/b", "", "");
+        assert!(!same_origin(&a, &b));
+    }
+
+    // -- pct_decode -------------------------------------------------------------
+
+    #[test]
+    fn pct_decode_spaces() {
+        assert_eq!(pct_decode("hello%20world"), "hello world");
+    }
+
+    #[test]
+    fn pct_decode_plain() {
+        assert_eq!(pct_decode("abc"), "abc");
     }
 }

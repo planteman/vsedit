@@ -393,6 +393,216 @@ impl Default for NotificationWorkbenchService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Additional NotificationError helpers
+// ---------------------------------------------------------------------------
+
+impl NotificationError {
+    /// Returns `true` if the error is a `NotFound` variant.
+    pub fn is_not_found(&self) -> bool {
+        matches!(self, NotificationError::NotFound(_))
+    }
+
+    /// Returns `true` if the error is an `AlreadyClosed` variant.
+    pub fn is_already_closed(&self) -> bool {
+        matches!(self, NotificationError::AlreadyClosed(_))
+    }
+
+    /// Returns the notification ID associated with this error, if any.
+    pub fn notification_id(&self) -> Option<u64> {
+        match self {
+            NotificationError::NotFound(id) | NotificationError::AlreadyClosed(id) => Some(*id),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional NotificationSource helpers
+// ---------------------------------------------------------------------------
+
+impl NotificationSource {
+    /// Create a new `NotificationSource` from an id and label.
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+        }
+    }
+
+    /// Returns `true` if the source id matches the given pattern (case-insensitive substring).
+    pub fn id_matches(&self, pattern: &str) -> bool {
+        self.id.to_lowercase().contains(&pattern.to_lowercase())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional NotificationAction helpers
+// ---------------------------------------------------------------------------
+
+impl NotificationAction {
+    /// Create a new `NotificationAction` from an id and label.
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+        }
+    }
+
+    /// Returns `true` if the action id matches case-insensitively.
+    pub fn id_eq_ignore_case(&self, other: &str) -> bool {
+        self.id.eq_ignore_ascii_case(other)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional WorkbenchNotification helpers
+// ---------------------------------------------------------------------------
+
+impl WorkbenchNotification {
+    /// Returns `true` if this notification is silent priority.
+    pub fn is_silent(&self) -> bool {
+        self.priority == NotificationPriority::Silent
+    }
+
+    /// Returns `true` if the notification is still open (not closed).
+    pub fn is_open(&self) -> bool {
+        !self.closed
+    }
+
+    /// Returns `true` if the notification has an associated source.
+    pub fn has_source(&self) -> bool {
+        self.source.is_some()
+    }
+
+    /// Returns `true` if the notification has progress tracking enabled.
+    pub fn has_progress(&self) -> bool {
+        self.progress.is_some()
+    }
+
+    /// Returns the number of actions attached to this notification.
+    pub fn action_count(&self) -> usize {
+        self.actions.len()
+    }
+
+    /// Returns all action ids as a collected vector.
+    pub fn action_ids(&self) -> Vec<&str> {
+        self.actions.iter().map(|a| a.id.as_str()).collect()
+    }
+
+    /// Returns `true` if the notification message contains the given substring (case-insensitive).
+    pub fn message_contains(&self, query: &str) -> bool {
+        self.message.to_lowercase().contains(&query.to_lowercase())
+    }
+
+    /// Returns a short label: the first `max_len` characters of the message, truncated with '…'.
+    pub fn short_message(&self, max_len: usize) -> String {
+        WbNotificationValidator::truncate(&self.message, max_len)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional NotificationWorkbenchService helpers
+// ---------------------------------------------------------------------------
+
+impl NotificationWorkbenchService {
+    /// Returns all notifications matching the given filter.
+    pub fn filter(&self, filter: &NotificationFilter) -> Vec<&WorkbenchNotification> {
+        self.notifications.iter().filter(|n| filter.matches(n)).collect()
+    }
+
+    /// Returns a `NotificationSummary` for all notifications in the service.
+    pub fn summary(&self) -> NotificationSummary {
+        NotificationSummary::from_notifications(&self.notifications)
+    }
+
+    /// Updates the priority of a notification. Returns `false` if the id was not found.
+    pub fn update_priority(&mut self, id: u64, priority: NotificationPriority) -> bool {
+        if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) {
+            n.priority = priority;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Returns all notification ids currently tracked.
+    pub fn all_ids(&self) -> Vec<u64> {
+        self.notifications.iter().map(|n| n.id).collect()
+    }
+
+    /// Returns active notifications whose message contains `query` (case-insensitive).
+    pub fn search_active(&self, query: &str) -> Vec<&WorkbenchNotification> {
+        self.notifications
+            .iter()
+            .filter(|n| !n.closed && n.message_contains(query))
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional NotificationStack helpers
+// ---------------------------------------------------------------------------
+
+impl NotificationStack {
+    /// Returns a reference to the notification with the given id, if it exists.
+    pub fn get(&self, id: u64) -> Option<&WorkbenchNotification> {
+        self.notifications.iter().find(|n| n.id == id)
+    }
+
+    /// Returns `true` if the stack has any active (non-closed) notifications.
+    pub fn has_active(&self) -> bool {
+        self.notifications.iter().any(|n| !n.closed)
+    }
+
+    /// Returns the configured maximum visible count.
+    pub fn max_visible(&self) -> usize {
+        self.max_visible
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional NotificationHistory helpers
+// ---------------------------------------------------------------------------
+
+impl NotificationHistory {
+    /// Returns `true` if history contains a notification with the given id.
+    pub fn contains_id(&self, id: u64) -> bool {
+        self.entries.iter().any(|n| n.id == id)
+    }
+
+    /// Returns the oldest entry, if any.
+    pub fn oldest(&self) -> Option<&WorkbenchNotification> {
+        self.entries.first()
+    }
+
+    /// Returns the newest entry, if any.
+    pub fn newest(&self) -> Option<&WorkbenchNotification> {
+        self.entries.last()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional NotificationBatch helpers
+// ---------------------------------------------------------------------------
+
+impl NotificationBatch {
+    /// Returns the highest priority among items in the batch, or `None` if empty.
+    pub fn max_priority(&self) -> Option<NotificationPriority> {
+        self.items.iter().map(|n| n.priority).max()
+    }
+
+    /// Returns `true` if any item in the batch has the given priority.
+    pub fn has_priority(&self, priority: NotificationPriority) -> bool {
+        self.items.iter().any(|n| n.priority == priority)
+    }
+
+    /// Returns all messages in the batch.
+    pub fn messages(&self) -> Vec<&str> {
+        self.items.iter().map(|n| n.message.as_str()).collect()
+    }
+}
+
 /// Accumulated statistics for wb-notification operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WbNotificationStats {
@@ -1696,5 +1906,169 @@ mod tests {
         assert_eq!(recent[1].message, "msg-4");
         history.clear();
         assert!(history.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for added functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_notification_error_predicates_and_id() {
+        let not_found = NotificationError::NotFound(42);
+        assert!(not_found.is_not_found());
+        assert!(!not_found.is_already_closed());
+        assert_eq!(not_found.notification_id(), Some(42));
+
+        let already_closed = NotificationError::AlreadyClosed(7);
+        assert!(!already_closed.is_not_found());
+        assert!(already_closed.is_already_closed());
+        assert_eq!(already_closed.notification_id(), Some(7));
+
+        let empty = NotificationError::EmptyMessage;
+        assert!(!empty.is_not_found());
+        assert_eq!(empty.notification_id(), None);
+
+        let invalid = NotificationError::InvalidProgress("1.5".into());
+        assert_eq!(invalid.notification_id(), None);
+    }
+
+    #[test]
+    fn test_notification_source_new_and_id_matches() {
+        let src = NotificationSource::new("ext.Linter", "My Linter");
+        assert_eq!(src.id, "ext.Linter");
+        assert_eq!(src.label, "My Linter");
+        assert!(src.id_matches("linter"));
+        assert!(src.id_matches("EXT"));
+        assert!(!src.id_matches("compiler"));
+    }
+
+    #[test]
+    fn test_notification_action_new_and_id_eq_ignore_case() {
+        let action = NotificationAction::new("retry-all", "Retry All");
+        assert_eq!(action.id, "retry-all");
+        assert_eq!(action.label, "Retry All");
+        assert!(action.id_eq_ignore_case("RETRY-ALL"));
+        assert!(action.id_eq_ignore_case("Retry-All"));
+        assert!(!action.id_eq_ignore_case("cancel"));
+    }
+
+    #[test]
+    fn test_workbench_notification_extra_helpers() {
+        let mut svc = NotificationWorkbenchService::new();
+        let actions = vec![
+            NotificationAction::new("a1", "Action 1"),
+            NotificationAction::new("a2", "Action 2"),
+        ];
+        let id = svc.notify_with_actions(
+            "Build failed in module-xyz",
+            NotificationPriority::Silent,
+            actions,
+        );
+        let n = svc.get_notification(id).unwrap();
+
+        assert!(n.is_silent());
+        assert!(!n.is_urgent());
+        assert!(n.is_open());
+        assert!(!n.has_source());
+        assert!(!n.has_progress());
+        assert_eq!(n.action_count(), 2);
+        assert_eq!(n.action_ids(), vec!["a1", "a2"]);
+        assert!(n.message_contains("MODULE"));
+        assert!(!n.message_contains("success"));
+        assert_eq!(n.short_message(10), "Build fai…");
+    }
+
+    #[test]
+    fn test_service_filter_summary_and_search() {
+        let mut svc = NotificationWorkbenchService::new();
+        svc.notify("error: disk full", NotificationPriority::Urgent);
+        svc.notify("info: build ok", NotificationPriority::Default);
+        let id3 = svc.notify("warning: low mem", NotificationPriority::Default);
+        svc.close(id3);
+
+        // filter
+        let open = svc.filter(&NotificationFilter::open_only());
+        assert_eq!(open.len(), 2);
+        let urgent = svc.filter(&NotificationFilter::urgent());
+        assert_eq!(urgent.len(), 1);
+
+        // summary
+        let summary = svc.summary();
+        assert_eq!(summary.total, 3);
+        assert_eq!(summary.open, 2);
+        assert_eq!(summary.closed, 1);
+        assert_eq!(summary.urgent, 1);
+
+        // search_active
+        let disk = svc.search_active("DISK");
+        assert_eq!(disk.len(), 1);
+        assert_eq!(disk[0].message, "error: disk full");
+        let none = svc.search_active("nonexistent");
+        assert!(none.is_empty());
+
+        // all_ids
+        let ids = svc.all_ids();
+        assert_eq!(ids.len(), 3);
+    }
+
+    #[test]
+    fn test_service_update_priority() {
+        let mut svc = NotificationWorkbenchService::new();
+        let id = svc.notify("msg", NotificationPriority::Default);
+        assert!(svc.update_priority(id, NotificationPriority::Urgent));
+        assert_eq!(
+            svc.get_notification(id).unwrap().priority,
+            NotificationPriority::Urgent
+        );
+        assert!(!svc.update_priority(999, NotificationPriority::Silent));
+    }
+
+    #[test]
+    fn test_notification_stack_get_and_has_active() {
+        let mut stack = NotificationStack::new(10);
+        assert!(!stack.has_active());
+        assert_eq!(stack.max_visible(), 10);
+
+        stack.push(make_test_notif(1, "hello", NotificationPriority::Default, None));
+        assert!(stack.has_active());
+        assert_eq!(stack.get(1).unwrap().message, "hello");
+        assert!(stack.get(999).is_none());
+
+        stack.close(1);
+        assert!(!stack.has_active());
+    }
+
+    #[test]
+    fn test_notification_history_contains_oldest_newest() {
+        let mut history = NotificationHistory::new(5);
+        assert!(history.oldest().is_none());
+        assert!(history.newest().is_none());
+
+        history.push(make_test_notif(10, "first", NotificationPriority::Default, None));
+        history.push(make_test_notif(20, "second", NotificationPriority::Default, None));
+        history.push(make_test_notif(30, "third", NotificationPriority::Default, None));
+
+        assert!(history.contains_id(10));
+        assert!(history.contains_id(30));
+        assert!(!history.contains_id(99));
+        assert_eq!(history.oldest().unwrap().message, "first");
+        assert_eq!(history.newest().unwrap().message, "third");
+    }
+
+    #[test]
+    fn test_notification_batch_max_priority_and_messages() {
+        let mut batch = NotificationBatch::new("deploy");
+        assert_eq!(batch.max_priority(), None);
+        assert!(batch.messages().is_empty());
+
+        batch.add(make_test_notif(1, "step 1", NotificationPriority::Silent, None));
+        batch.add(make_test_notif(2, "step 2", NotificationPriority::Urgent, None));
+        batch.add(make_test_notif(3, "step 3", NotificationPriority::Default, None));
+
+        assert_eq!(batch.max_priority(), Some(NotificationPriority::Urgent));
+        assert!(batch.has_priority(NotificationPriority::Silent));
+        assert!(!batch.has_priority(NotificationPriority::Default) || batch.has_priority(NotificationPriority::Default));
+        assert_eq!(batch.messages(), vec!["step 1", "step 2", "step 3"]);
+        assert_eq!(batch.label(), "deploy");
     }
 }

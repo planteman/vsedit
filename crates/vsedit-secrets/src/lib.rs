@@ -1038,6 +1038,125 @@ impl SecretAuditLog {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SecretRotator — manage secret rotation
+// ---------------------------------------------------------------------------
+
+/// Tracks secrets that need rotation and generates rotation plans.
+#[derive(Debug, Clone, Default)]
+pub struct SecretRotator {
+    /// Mapping from key to the number of times the secret has been rotated.
+    rotation_counts: HashMap<String, u32>,
+    /// Maximum age in seconds before a secret should be rotated.
+    max_age_seconds: u64,
+}
+
+impl SecretRotator {
+    /// Create a new rotator with a given max age policy.
+    pub fn new(max_age_seconds: u64) -> Self {
+        Self {
+            rotation_counts: HashMap::new(),
+            max_age_seconds,
+        }
+    }
+
+    /// Record that a secret was rotated.
+    pub fn record_rotation(&mut self, key: &str) {
+        *self.rotation_counts.entry(key.to_string()).or_insert(0) += 1;
+    }
+
+    /// Get the number of times a secret has been rotated.
+    pub fn rotation_count(&self, key: &str) -> u32 {
+        self.rotation_counts.get(key).copied().unwrap_or(0)
+    }
+
+    /// Given expiration records and a current time, return keys that need rotation.
+    pub fn needs_rotation<'a>(&self, tracker: &'a ExpirationTracker, now: u64) -> Vec<&'a str> {
+        tracker.expired_keys(now)
+    }
+
+    /// Return keys expiring within the configured max_age_seconds window.
+    pub fn expiring_within_policy<'a>(&self, tracker: &'a ExpirationTracker, now: u64) -> Vec<&'a str> {
+        tracker.expiring_soon(now, self.max_age_seconds)
+    }
+
+    /// Total number of rotations across all keys.
+    pub fn total_rotations(&self) -> u32 {
+        self.rotation_counts.values().sum()
+    }
+
+    /// Get the max age policy in seconds.
+    pub fn max_age(&self) -> u64 {
+        self.max_age_seconds
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SecretAuditLog — additional methods
+// ---------------------------------------------------------------------------
+
+impl SecretAuditLog {
+    /// Return events for a given action type.
+    pub fn events_by_action(&self, action: SecretAccessAction) -> Vec<&SecretAccessEvent> {
+        self.events.iter().filter(|e| e.action == action).collect()
+    }
+
+    /// Return events within a time range [start, end] inclusive.
+    pub fn events_in_range(&self, start: u64, end: u64) -> Vec<&SecretAccessEvent> {
+        self.events
+            .iter()
+            .filter(|e| e.timestamp >= start && e.timestamp <= end)
+            .collect()
+    }
+
+    /// Number of unique callers that have accessed secrets.
+    pub fn unique_callers(&self) -> Vec<&str> {
+        let mut callers: Vec<&str> = self.events.iter().map(|e| e.caller.as_str()).collect();
+        callers.sort();
+        callers.dedup();
+        callers
+    }
+
+    /// Clear all recorded events.
+    pub fn clear(&mut self) {
+        self.events.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InMemorySecretStorage — additional methods
+// ---------------------------------------------------------------------------
+
+impl InMemorySecretStorage {
+    /// Return keys matching a prefix.
+    pub fn keys_with_prefix(&self, prefix: &str) -> Vec<String> {
+        self.secrets
+            .keys()
+            .filter(|k| k.starts_with(prefix))
+            .cloned()
+            .collect()
+    }
+
+    /// Rename a key. Returns error if the source key doesn't exist.
+    pub fn rename_key(&mut self, old_key: &str, new_key: &str) -> Result<(), SecretStorageError> {
+        validate_key(new_key)?;
+        let value = self
+            .secrets
+            .remove(old_key)
+            .ok_or_else(|| SecretStorageError::InvalidKey(format!("key '{}' not found", old_key)))?;
+        self.secrets.insert(new_key.to_string(), value);
+        self.change_log.push(SecretStorageChangeEvent {
+            key: old_key.to_string(),
+            kind: SecretChangeKind::Deleted,
+        });
+        self.change_log.push(SecretStorageChangeEvent {
+            key: new_key.to_string(),
+            kind: SecretChangeKind::Added,
+        });
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1651,5 +1770,94 @@ mod tests {
     fn secret_access_action_display() {
         assert_eq!(format!("{}", SecretAccessAction::Read), "read");
         assert_eq!(format!("{}", SecretAccessAction::Delete), "delete");
+    }
+
+    // -- SecretRotator tests --------------------------------------------------
+
+    #[test]
+    fn rotator_tracks_rotations() {
+        let mut rotator = SecretRotator::new(3600);
+        assert_eq!(rotator.rotation_count("api-key"), 0);
+        rotator.record_rotation("api-key");
+        rotator.record_rotation("api-key");
+        rotator.record_rotation("db-pass");
+        assert_eq!(rotator.rotation_count("api-key"), 2);
+        assert_eq!(rotator.rotation_count("db-pass"), 1);
+        assert_eq!(rotator.total_rotations(), 3);
+    }
+
+    #[test]
+    fn rotator_needs_rotation() {
+        let rotator = SecretRotator::new(3600);
+        let mut tracker = ExpirationTracker::new();
+        tracker.set_expiration("old-key", 100);
+        tracker.set_expiration("fresh-key", 5000);
+        let expired = rotator.needs_rotation(&tracker, 200);
+        assert_eq!(expired, vec!["old-key"]);
+    }
+
+    #[test]
+    fn rotator_expiring_within_policy() {
+        let rotator = SecretRotator::new(1000);
+        let mut tracker = ExpirationTracker::new();
+        tracker.set_expiration("soon", 1500);
+        tracker.set_expiration("later", 5000);
+        let expiring = rotator.expiring_within_policy(&tracker, 1000);
+        assert_eq!(expiring, vec!["soon"]);
+    }
+
+    // -- AuditLog extended tests ----------------------------------------------
+
+    #[test]
+    fn audit_log_events_by_action() {
+        let mut log = SecretAuditLog::new();
+        log.record("k1", SecretAccessAction::Read, 1, "svc");
+        log.record("k2", SecretAccessAction::Write, 2, "svc");
+        log.record("k1", SecretAccessAction::Read, 3, "svc");
+        let reads = log.events_by_action(SecretAccessAction::Read);
+        assert_eq!(reads.len(), 2);
+    }
+
+    #[test]
+    fn audit_log_events_in_range() {
+        let mut log = SecretAuditLog::new();
+        log.record("k1", SecretAccessAction::Read, 10, "svc");
+        log.record("k2", SecretAccessAction::Read, 20, "svc");
+        log.record("k3", SecretAccessAction::Read, 30, "svc");
+        let in_range = log.events_in_range(15, 25);
+        assert_eq!(in_range.len(), 1);
+        assert_eq!(in_range[0].key, "k2");
+    }
+
+    #[test]
+    fn audit_log_unique_callers() {
+        let mut log = SecretAuditLog::new();
+        log.record("k", SecretAccessAction::Read, 1, "alpha");
+        log.record("k", SecretAccessAction::Read, 2, "beta");
+        log.record("k", SecretAccessAction::Read, 3, "alpha");
+        let callers = log.unique_callers();
+        assert_eq!(callers, vec!["alpha", "beta"]);
+    }
+
+    // -- InMemorySecretStorage extended tests ----------------------------------
+
+    #[test]
+    fn storage_keys_with_prefix() {
+        let mut store = InMemorySecretStorage::new();
+        store.store("db.host", "localhost").unwrap();
+        store.store("db.port", "5432").unwrap();
+        store.store("api.key", "secret").unwrap();
+        let mut db_keys = store.keys_with_prefix("db.");
+        db_keys.sort();
+        assert_eq!(db_keys, vec!["db.host", "db.port"]);
+    }
+
+    #[test]
+    fn storage_rename_key() {
+        let mut store = InMemorySecretStorage::new();
+        store.store("old-name", "value123").unwrap();
+        store.rename_key("old-name", "new-name").unwrap();
+        assert!(store.get("old-name").is_none());
+        assert_eq!(store.get("new-name").unwrap(), "value123");
     }
 }

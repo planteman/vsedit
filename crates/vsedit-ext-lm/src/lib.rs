@@ -926,6 +926,97 @@ pub fn largest_model(bridge: &LmBridge) -> Option<&LanguageModelChat> {
     bridge.list_models().iter().max_by_key(|m| m.max_input_tokens)
 }
 
+// ---------------------------------------------------------------------------
+// Prompt utilities
+// ---------------------------------------------------------------------------
+
+/// Estimate the rough token count for a piece of text using a simple
+/// word-based heuristic (≈ 0.75 tokens per whitespace-delimited word).
+pub fn estimate_tokens(text: &str) -> u32 {
+    let words = text.split_whitespace().count();
+    // A commonly used rough heuristic: ~1.33 tokens per word on average.
+    ((words as f64) * 1.33).ceil() as u32
+}
+
+/// Truncate `text` so that its estimated token count stays within `budget`.
+/// Returns the truncated text and whether truncation happened.
+pub fn truncate_to_budget(text: &str, budget: u32) -> (&str, bool) {
+    if estimate_tokens(text) <= budget {
+        return (text, false);
+    }
+    let mut end = 0;
+    let mut words = 0u32;
+    let max_words = (budget as f64 / 1.33).floor() as u32;
+    for (i, ch) in text.char_indices() {
+        if ch.is_whitespace() {
+            words += 1;
+            if words >= max_words {
+                return (&text[..i], true);
+            }
+        }
+        end = i + ch.len_utf8();
+    }
+    (&text[..end], false)
+}
+
+/// A simple sliding-window conversation trimmer that keeps the most recent
+/// messages within a token budget.
+pub fn trim_conversation(history: &ConversationHistory, budget: u32) -> ConversationHistory {
+    let mut total: u32 = 0;
+    let mut start_idx = history.messages.len();
+    for (i, msg) in history.messages.iter().enumerate().rev() {
+        let content = match msg {
+            LanguageModelMessage::System { content } => content,
+            LanguageModelMessage::User { content } => content,
+            LanguageModelMessage::Assistant { content } => content,
+        };
+        let cost = estimate_tokens(content);
+        if total + cost > budget {
+            break;
+        }
+        total += cost;
+        start_idx = i;
+    }
+    ConversationHistory {
+        messages: history.messages[start_idx..].to_vec(),
+    }
+}
+
+/// Build a one-shot prompt from a system instruction and user query.
+pub fn one_shot_messages(system: &str, user: &str) -> Vec<LanguageModelMessage> {
+    vec![
+        LanguageModelMessage::System {
+            content: system.to_string(),
+        },
+        LanguageModelMessage::User {
+            content: user.to_string(),
+        },
+    ]
+}
+
+/// Extract the text content from a `LanguageModelMessage`.
+pub fn message_content(msg: &LanguageModelMessage) -> &str {
+    match msg {
+        LanguageModelMessage::System { content }
+        | LanguageModelMessage::User { content }
+        | LanguageModelMessage::Assistant { content } => content,
+    }
+}
+
+/// Return the role label for a message (useful for serialisation).
+pub fn message_role(msg: &LanguageModelMessage) -> &'static str {
+    match msg {
+        LanguageModelMessage::System { .. } => "system",
+        LanguageModelMessage::User { .. } => "user",
+        LanguageModelMessage::Assistant { .. } => "assistant",
+    }
+}
+
+/// Count the total estimated tokens across all messages.
+pub fn total_message_tokens(messages: &[LanguageModelMessage]) -> u32 {
+    messages.iter().map(|m| estimate_tokens(message_content(m))).sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1790,5 +1881,81 @@ mod tests {
     fn largest_model_empty_bridge() {
         let bridge = LmBridge::new();
         assert!(largest_model(&bridge).is_none());
+    }
+
+    // -- estimate_tokens -------------------------------------------------------
+
+    #[test]
+    fn estimate_tokens_empty() {
+        assert_eq!(estimate_tokens(""), 0);
+    }
+
+    #[test]
+    fn estimate_tokens_short() {
+        // 3 words => ceil(3 * 1.33) = 4
+        assert_eq!(estimate_tokens("hello brave world"), 4);
+    }
+
+    // -- truncate_to_budget ----------------------------------------------------
+
+    #[test]
+    fn truncate_to_budget_no_truncation() {
+        let (result, truncated) = truncate_to_budget("hello world", 100);
+        assert_eq!(result, "hello world");
+        assert!(!truncated);
+    }
+
+    #[test]
+    fn truncate_to_budget_truncates() {
+        let text = "one two three four five six seven eight nine ten";
+        let (result, truncated) = truncate_to_budget(text, 5);
+        assert!(truncated);
+        assert!(result.len() < text.len());
+    }
+
+    // -- trim_conversation -----------------------------------------------------
+
+    #[test]
+    fn trim_conversation_keeps_recent() {
+        let history = ConversationHistory {
+            messages: vec![
+                LanguageModelMessage::User { content: "first".into() },
+                LanguageModelMessage::Assistant { content: "response one that is very long and has many many tokens in it to exceed budget".into() },
+                LanguageModelMessage::User { content: "last".into() },
+            ],
+        };
+        let trimmed = trim_conversation(&history, 5);
+        assert!(!trimmed.messages.is_empty());
+        // The last message should always be preserved
+        assert_eq!(message_content(trimmed.messages.last().unwrap()), "last");
+    }
+
+    // -- one_shot_messages -----------------------------------------------------
+
+    #[test]
+    fn one_shot_messages_structure() {
+        let msgs = one_shot_messages("You are a helper", "Explain Rust");
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(message_role(&msgs[0]), "system");
+        assert_eq!(message_role(&msgs[1]), "user");
+        assert_eq!(message_content(&msgs[0]), "You are a helper");
+    }
+
+    // -- message_content / message_role ----------------------------------------
+
+    #[test]
+    fn message_content_extracts() {
+        let msg = LanguageModelMessage::Assistant { content: "hi".into() };
+        assert_eq!(message_content(&msg), "hi");
+        assert_eq!(message_role(&msg), "assistant");
+    }
+
+    // -- total_message_tokens --------------------------------------------------
+
+    #[test]
+    fn total_message_tokens_sums() {
+        let msgs = one_shot_messages("sys", "user query");
+        let total = total_message_tokens(&msgs);
+        assert!(total > 0);
     }
 }

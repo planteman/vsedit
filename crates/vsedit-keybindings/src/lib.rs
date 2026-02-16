@@ -946,6 +946,119 @@ impl KeySequenceRecorder {
 }
 
 // ---------------------------------------------------------------------------
+// KeybindingSearch – search and filter keybindings
+// ---------------------------------------------------------------------------
+
+/// Criteria for searching/filtering keybindings.
+#[derive(Debug, Clone, Default)]
+pub struct KeybindingSearch {
+    /// Substring to match against the command name (case-insensitive).
+    pub command_contains: Option<String>,
+    /// If set, only match keybindings for this platform.
+    pub platform: Option<Platform>,
+    /// If set, only match keybindings with this many chords.
+    pub chord_count: Option<usize>,
+    /// If set, only match keybindings that use this modifier.
+    pub requires_ctrl: Option<bool>,
+}
+
+impl KeybindingSearch {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn command_contains(mut self, sub: impl Into<String>) -> Self {
+        self.command_contains = Some(sub.into());
+        self
+    }
+
+    pub fn platform(mut self, p: Platform) -> Self {
+        self.platform = Some(p);
+        self
+    }
+
+    pub fn chord_count(mut self, n: usize) -> Self {
+        self.chord_count = Some(n);
+        self
+    }
+
+    pub fn requires_ctrl(mut self, val: bool) -> Self {
+        self.requires_ctrl = Some(val);
+        self
+    }
+
+    /// Test whether a command string and keybinding match all active criteria.
+    pub fn matches(&self, command: &str, binding: &Keybinding) -> bool {
+        if let Some(ref sub) = self.command_contains {
+            if !command.to_lowercase().contains(&sub.to_lowercase()) {
+                return false;
+            }
+        }
+        if let Some(n) = self.chord_count {
+            if binding.chord_count() != n {
+                return false;
+            }
+        }
+        if let Some(needs_ctrl) = self.requires_ctrl {
+            let has_ctrl = binding.parts.iter().any(|c| c.ctrl);
+            if has_ctrl != needs_ctrl {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingStats – statistics about a set of keybindings
+// ---------------------------------------------------------------------------
+
+/// Statistics computed from a collection of keybindings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeybindingStats {
+    pub total: usize,
+    pub single_chord: usize,
+    pub multi_chord: usize,
+    pub with_ctrl: usize,
+    pub with_shift: usize,
+    pub with_alt: usize,
+    pub with_meta: usize,
+}
+
+impl KeybindingStats {
+    /// Compute statistics from a slice of keybindings.
+    pub fn from_bindings(bindings: &[Keybinding]) -> Self {
+        let total = bindings.len();
+        let single_chord = bindings.iter().filter(|b| b.chord_count() == 1).count();
+        let multi_chord = total - single_chord;
+        let with_ctrl = bindings.iter().filter(|b| b.parts.iter().any(|c| c.ctrl)).count();
+        let with_shift = bindings.iter().filter(|b| b.parts.iter().any(|c| c.shift)).count();
+        let with_alt = bindings.iter().filter(|b| b.parts.iter().any(|c| c.alt)).count();
+        let with_meta = bindings.iter().filter(|b| b.parts.iter().any(|c| c.meta)).count();
+        Self { total, single_chord, multi_chord, with_ctrl, with_shift, with_alt, with_meta }
+    }
+}
+
+impl fmt::Display for KeybindingStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Total: {}, Single: {}, Multi: {}, Ctrl: {}, Shift: {}, Alt: {}, Meta: {}",
+            self.total, self.single_chord, self.multi_chord,
+            self.with_ctrl, self.with_shift, self.with_alt, self.with_meta,
+        )
+    }
+}
+
+/// Check whether a keybinding is a prefix of another (i.e. the first chord matches).
+pub fn is_prefix_of(prefix: &Keybinding, full: &Keybinding) -> bool {
+    if prefix.parts.len() >= full.parts.len() {
+        return false;
+    }
+    prefix.parts.iter().zip(full.parts.iter()).all(|(a, b)| a == b)
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1691,5 +1804,75 @@ mod tests {
         assert!(!rec.is_recording());
         assert!(rec.is_empty());
         assert!(rec.to_keybinding().is_none());
+    }
+
+    #[test]
+    fn keybinding_search_by_command() {
+        let search = KeybindingSearch::new().command_contains("save");
+        let kb = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS));
+        assert!(search.matches("editor.action.save", &kb));
+        assert!(!search.matches("editor.action.copy", &kb));
+    }
+
+    #[test]
+    fn keybinding_search_by_chord_count() {
+        let search = KeybindingSearch::new().chord_count(2);
+        let single = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS));
+        let double = Keybinding::two_chords(
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyK),
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyC),
+        );
+        assert!(!search.matches("cmd", &single));
+        assert!(search.matches("cmd", &double));
+    }
+
+    #[test]
+    fn keybinding_search_requires_ctrl() {
+        let search = KeybindingSearch::new().requires_ctrl(true);
+        let with = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyA));
+        let without = Keybinding::new(KeyCodeChord::new(false, false, false, false, KeyCode::KeyA));
+        assert!(search.matches("cmd", &with));
+        assert!(!search.matches("cmd", &without));
+    }
+
+    #[test]
+    fn keybinding_stats_from_bindings() {
+        let bindings = vec![
+            Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+            Keybinding::new(KeyCodeChord::new(false, true, false, false, KeyCode::KeyA)),
+            Keybinding::two_chords(
+                KeyCodeChord::new(true, false, false, false, KeyCode::KeyK),
+                KeyCodeChord::new(true, false, false, false, KeyCode::KeyC),
+            ),
+        ];
+        let stats = KeybindingStats::from_bindings(&bindings);
+        assert_eq!(stats.total, 3);
+        assert_eq!(stats.single_chord, 2);
+        assert_eq!(stats.multi_chord, 1);
+        assert_eq!(stats.with_ctrl, 2);
+        assert_eq!(stats.with_shift, 1);
+    }
+
+    #[test]
+    fn keybinding_stats_display() {
+        let stats = KeybindingStats {
+            total: 5, single_chord: 3, multi_chord: 2,
+            with_ctrl: 4, with_shift: 1, with_alt: 0, with_meta: 0,
+        };
+        let display = stats.to_string();
+        assert!(display.contains("Total: 5"));
+        assert!(display.contains("Single: 3"));
+    }
+
+    #[test]
+    fn is_prefix_of_works() {
+        let prefix = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyK));
+        let full = Keybinding::two_chords(
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyK),
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyC),
+        );
+        assert!(is_prefix_of(&prefix, &full));
+        assert!(!is_prefix_of(&full, &prefix));
+        assert!(!is_prefix_of(&prefix, &prefix));
     }
 }

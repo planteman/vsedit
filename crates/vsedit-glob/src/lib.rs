@@ -1148,6 +1148,132 @@ pub fn is_valid_glob_syntax(pattern: &str) -> bool {
     brace_depth == 0 && bracket_depth == 0
 }
 
+/// Classify a glob pattern into a category describing its complexity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlobComplexity {
+    /// A literal path with no metacharacters.
+    Literal,
+    /// A simple pattern with only `*` or `?`.
+    Simple,
+    /// A pattern using character classes (`[...]`).
+    CharacterClass,
+    /// A pattern using alternation (`{a,b}`).
+    Alternation,
+    /// A recursive glob (`**`).
+    Recursive,
+}
+
+/// Classify the complexity of a glob pattern string.
+pub fn classify_glob(pattern: &str) -> GlobComplexity {
+    if pattern.contains("**") {
+        return GlobComplexity::Recursive;
+    }
+    if pattern.contains('{') {
+        return GlobComplexity::Alternation;
+    }
+    if pattern.contains('[') {
+        return GlobComplexity::CharacterClass;
+    }
+    if pattern.contains('*') || pattern.contains('?') {
+        return GlobComplexity::Simple;
+    }
+    GlobComplexity::Literal
+}
+
+/// Extract the file extension targeted by a glob pattern, if it ends with a
+/// literal extension like `*.rs` or `**/*.toml`.
+pub fn extract_extension_from_glob(pattern: &str) -> Option<&str> {
+    let trimmed = pattern.trim();
+    // Look for the last segment after `/` or the whole string
+    let last_segment = trimmed.rsplit('/').next().unwrap_or(trimmed);
+    // Must start with `*` and have a dot
+    if let Some(rest) = last_segment.strip_prefix("*.") {
+        if !rest.is_empty() && !rest.contains('*') && !rest.contains('?') && !rest.contains('[') {
+            return Some(rest);
+        }
+    }
+    if let Some(rest) = last_segment.strip_prefix("**.") {
+        if !rest.is_empty() && !rest.contains('*') && !rest.contains('?') && !rest.contains('[') {
+            return Some(rest);
+        }
+    }
+    None
+}
+
+/// Return the common prefix of a set of glob pattern strings.
+///
+/// This is the longest leading substring shared by all patterns, useful for
+/// determining a base directory for a search.
+pub fn common_glob_prefix(patterns: &[&str]) -> String {
+    if patterns.is_empty() {
+        return String::new();
+    }
+    let first = patterns[0];
+    let mut prefix_len = first.len();
+    for p in &patterns[1..] {
+        prefix_len = prefix_len.min(p.len());
+        for (i, (a, b)) in first.chars().zip(p.chars()).enumerate() {
+            if a != b || i >= prefix_len {
+                prefix_len = i;
+                break;
+            }
+        }
+    }
+    // Trim back to last `/` to keep directory boundary
+    let prefix = &first[..prefix_len];
+    match prefix.rfind('/') {
+        Some(i) => prefix[..=i].to_string(),
+        None => String::new(),
+    }
+}
+
+impl GlobPatternSet {
+    /// Return a new set containing only patterns that match a given path.
+    pub fn matching_subset(&self, path: &str) -> Result<GlobPatternSet, globset::Error> {
+        let matching: Vec<&str> = self
+            .set
+            .matches(path)
+            .into_iter()
+            .filter_map(|i| self.patterns.get(i).map(|s| s.as_str()))
+            .collect();
+        GlobPatternSet::new(&matching)
+    }
+
+    /// Return the complexity classification of each pattern in the set.
+    pub fn complexities(&self) -> Vec<GlobComplexity> {
+        self.patterns.iter().map(|p| classify_glob(p)).collect()
+    }
+}
+
+impl FileFilter {
+    /// Return the include and exclude pattern counts.
+    pub fn pattern_counts(&self) -> (usize, usize) {
+        (self.includes.pattern_count(), self.excludes.pattern_count())
+    }
+
+    /// Return true if this filter has no include or exclude patterns.
+    pub fn is_passthrough(&self) -> bool {
+        self.includes.is_empty() && self.excludes.is_empty()
+    }
+}
+
+impl FileFilterBuilder {
+    /// Return the number of include patterns added so far.
+    pub fn include_count(&self) -> usize {
+        self.includes.len()
+    }
+
+    /// Return the number of exclude patterns added so far.
+    pub fn exclude_count(&self) -> usize {
+        self.excludes.len()
+    }
+
+    /// Return true if no patterns have been added.
+    pub fn is_empty(&self) -> bool {
+        self.includes.is_empty() && self.excludes.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1775,5 +1901,105 @@ mod tests {
         assert_eq!(diff.pattern_count(), 1);
         assert!(diff.contains_pattern("*.rs"));
         assert!(!diff.contains_pattern("*.toml"));
+    }
+
+    #[test]
+    fn classify_glob_literal() {
+        assert_eq!(classify_glob("src/main.rs"), GlobComplexity::Literal);
+    }
+
+    #[test]
+    fn classify_glob_simple_star() {
+        assert_eq!(classify_glob("*.rs"), GlobComplexity::Simple);
+        assert_eq!(classify_glob("src/?.rs"), GlobComplexity::Simple);
+    }
+
+    #[test]
+    fn classify_glob_character_class() {
+        assert_eq!(classify_glob("[abc].txt"), GlobComplexity::CharacterClass);
+    }
+
+    #[test]
+    fn classify_glob_alternation() {
+        assert_eq!(classify_glob("*.{rs,toml}"), GlobComplexity::Alternation);
+    }
+
+    #[test]
+    fn classify_glob_recursive() {
+        assert_eq!(classify_glob("**/*.rs"), GlobComplexity::Recursive);
+    }
+
+    #[test]
+    fn extract_extension_rs() {
+        assert_eq!(extract_extension_from_glob("*.rs"), Some("rs"));
+        assert_eq!(extract_extension_from_glob("**/*.toml"), Some("toml"));
+    }
+
+    #[test]
+    fn extract_extension_no_match() {
+        assert_eq!(extract_extension_from_glob("src/main.rs"), None);
+        assert_eq!(extract_extension_from_glob("*"), None);
+    }
+
+    #[test]
+    fn common_glob_prefix_shared() {
+        let patterns = &["src/**/*.rs", "src/**/*.toml", "src/lib.rs"];
+        assert_eq!(common_glob_prefix(patterns), "src/");
+    }
+
+    #[test]
+    fn common_glob_prefix_none() {
+        let patterns = &["*.rs", "tests/*.rs"];
+        assert_eq!(common_glob_prefix(patterns), "");
+    }
+
+    #[test]
+    fn common_glob_prefix_empty_input() {
+        let patterns: &[&str] = &[];
+        assert_eq!(common_glob_prefix(patterns), "");
+    }
+
+    #[test]
+    fn pattern_set_matching_subset() {
+        let set = GlobPatternSet::new(&["*.rs", "*.toml", "*.md"]).unwrap();
+        let sub = set.matching_subset("Cargo.toml").unwrap();
+        assert_eq!(sub.pattern_count(), 1);
+        assert!(sub.contains_pattern("*.toml"));
+    }
+
+    #[test]
+    fn pattern_set_complexities() {
+        let set = GlobPatternSet::new(&["*.rs", "**/*.toml", "src/main.rs"]).unwrap();
+        let cx = set.complexities();
+        assert_eq!(cx, vec![GlobComplexity::Simple, GlobComplexity::Recursive, GlobComplexity::Literal]);
+    }
+
+    #[test]
+    fn file_filter_pattern_counts() {
+        let f = FileFilter::new(&["*.rs"], &["*.bak", "*.tmp"]).unwrap();
+        assert_eq!(f.pattern_counts(), (1, 2));
+    }
+
+    #[test]
+    fn file_filter_passthrough() {
+        let f = FileFilter::new(&[], &[]).unwrap();
+        assert!(f.is_passthrough());
+        let f2 = FileFilter::new(&["*.rs"], &[]).unwrap();
+        assert!(!f2.is_passthrough());
+    }
+
+    #[test]
+    fn file_filter_builder_counts() {
+        let b = FileFilterBuilder::new().include("*.rs").exclude("*.bak");
+        assert_eq!(b.include_count(), 1);
+        assert_eq!(b.exclude_count(), 1);
+        assert!(!b.is_empty());
+    }
+
+    #[test]
+    fn file_filter_builder_empty() {
+        let b = FileFilterBuilder::new();
+        assert!(b.is_empty());
+        assert_eq!(b.include_count(), 0);
     }
 }

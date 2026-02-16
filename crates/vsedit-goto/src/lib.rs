@@ -916,6 +916,134 @@ impl GotoHistory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LocationFilter — filter and search goto locations
+// ---------------------------------------------------------------------------
+
+/// Filters and scores goto locations for quick-open / symbol-search UI.
+#[derive(Debug, Clone)]
+pub struct LocationFilter {
+    locations: Vec<Location>,
+}
+
+impl LocationFilter {
+    pub fn new(locations: Vec<Location>) -> Self {
+        Self { locations }
+    }
+
+    /// Filter locations to those in a specific file.
+    pub fn in_file(&self, uri: &str) -> Vec<&Location> {
+        self.locations.iter().filter(|l| l.uri == uri).collect()
+    }
+
+    /// Filter locations within a line range (inclusive).
+    pub fn in_line_range(&self, start: u32, end: u32) -> Vec<&Location> {
+        self.locations.iter().filter(|l| l.line >= start && l.line <= end).collect()
+    }
+
+    /// Return locations sorted by file URI then line number.
+    pub fn sorted(&self) -> Vec<&Location> {
+        let mut sorted: Vec<&Location> = self.locations.iter().collect();
+        sorted.sort_by(|a, b| (&a.uri, a.line, a.column).cmp(&(&b.uri, b.line, b.column)));
+        sorted
+    }
+
+    /// Group locations by file URI.
+    pub fn group_by_file(&self) -> std::collections::HashMap<&str, Vec<&Location>> {
+        let mut groups: std::collections::HashMap<&str, Vec<&Location>> =
+            std::collections::HashMap::new();
+        for loc in &self.locations {
+            groups.entry(loc.uri.as_str()).or_default().push(loc);
+        }
+        groups
+    }
+
+    /// Return the total number of locations.
+    pub fn count(&self) -> usize {
+        self.locations.len()
+    }
+
+    /// Return unique file URIs.
+    pub fn unique_files(&self) -> Vec<&str> {
+        let mut uris: Vec<&str> = self.locations.iter().map(|l| l.uri.as_str()).collect();
+        uris.sort_unstable();
+        uris.dedup();
+        uris
+    }
+
+    /// Return the closest location to a given line/column in a file.
+    pub fn nearest(&self, uri: &str, line: u32, col: u32) -> Option<&Location> {
+        self.locations
+            .iter()
+            .filter(|l| l.uri == uri)
+            .min_by_key(|l| {
+                let dl = (l.line as i64 - line as i64).unsigned_abs();
+                let dc = (l.column as i64 - col as i64).unsigned_abs();
+                dl * 10000 + dc
+            })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GotoResultSet — aggregate results from multiple providers
+// ---------------------------------------------------------------------------
+
+/// Collects results from multiple goto providers and deduplicates them.
+#[derive(Debug, Clone, Default)]
+pub struct GotoResultSet {
+    results: Vec<GotoResult>,
+}
+
+impl GotoResultSet {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a result from a provider.
+    pub fn add(&mut self, result: GotoResult) {
+        self.results.push(result);
+    }
+
+    /// Flatten all results into a single list of locations (converted from LocationLinks).
+    pub fn all_locations(&self) -> Vec<Location> {
+        let mut locs = Vec::new();
+        for r in &self.results {
+            match r {
+                GotoResult::Single(link) => locs.push(link.to_location()),
+                GotoResult::Multiple(v) => {
+                    locs.extend(v.iter().map(|link| link.to_location()));
+                }
+                GotoResult::None => {}
+            }
+        }
+        locs
+    }
+
+    /// Deduplicate locations (same uri, line, column).
+    pub fn unique_locations(&self) -> Vec<Location> {
+        let all = self.all_locations();
+        let mut seen = std::collections::HashSet::new();
+        let mut unique = Vec::new();
+        for loc in all {
+            let key = (loc.uri.clone(), loc.line, loc.column);
+            if seen.insert(key) {
+                unique.push(loc);
+            }
+        }
+        unique
+    }
+
+    /// True if no provider returned any location.
+    pub fn is_empty(&self) -> bool {
+        self.all_locations().is_empty()
+    }
+
+    /// Total number of results added (not locations).
+    pub fn provider_count(&self) -> usize {
+        self.results.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1644,5 +1772,109 @@ mod tests {
 
         let files = hist.unique_files();
         assert_eq!(files.len(), 2);
+    }
+
+    // -- LocationFilter --
+
+    #[test]
+    fn location_filter_in_file() {
+        let locs = vec![
+            Location::new("a.rs", 1, 0),
+            Location::new("b.rs", 2, 0),
+            Location::new("a.rs", 5, 0),
+        ];
+        let filter = LocationFilter::new(locs);
+        assert_eq!(filter.in_file("a.rs").len(), 2);
+        assert_eq!(filter.in_file("c.rs").len(), 0);
+    }
+
+    #[test]
+    fn location_filter_in_line_range() {
+        let locs = vec![
+            Location::new("a.rs", 1, 0),
+            Location::new("a.rs", 5, 0),
+            Location::new("a.rs", 10, 0),
+        ];
+        let filter = LocationFilter::new(locs);
+        let result = filter.in_line_range(3, 8);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].line, 5);
+    }
+
+    #[test]
+    fn location_filter_sorted() {
+        let locs = vec![
+            Location::new("b.rs", 10, 0),
+            Location::new("a.rs", 5, 0),
+            Location::new("a.rs", 1, 0),
+        ];
+        let filter = LocationFilter::new(locs);
+        let sorted = filter.sorted();
+        assert_eq!(sorted[0].uri, "a.rs");
+        assert_eq!(sorted[0].line, 1);
+        assert_eq!(sorted[2].uri, "b.rs");
+    }
+
+    #[test]
+    fn location_filter_group_by_file() {
+        let locs = vec![
+            Location::new("a.rs", 1, 0),
+            Location::new("b.rs", 2, 0),
+            Location::new("a.rs", 3, 0),
+        ];
+        let filter = LocationFilter::new(locs);
+        let groups = filter.group_by_file();
+        assert_eq!(groups.get("a.rs").unwrap().len(), 2);
+        assert_eq!(groups.get("b.rs").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn location_filter_nearest() {
+        let locs = vec![
+            Location::new("a.rs", 1, 0),
+            Location::new("a.rs", 10, 5),
+            Location::new("a.rs", 20, 0),
+        ];
+        let filter = LocationFilter::new(locs);
+        let nearest = filter.nearest("a.rs", 9, 4).unwrap();
+        assert_eq!(nearest.line, 10);
+    }
+
+    // -- GotoResultSet --
+
+    #[test]
+    fn result_set_all_locations() {
+        let mut set = GotoResultSet::new();
+        set.add(GotoResult::Single(LocationLink::new("a.rs", (1,0,1,5), (1,0,1,5))));
+        set.add(GotoResult::Multiple(vec![
+            LocationLink::new("b.rs", (2,0,2,5), (2,0,2,5)),
+            LocationLink::new("c.rs", (3,0,3,5), (3,0,3,5)),
+        ]));
+        set.add(GotoResult::None);
+        assert_eq!(set.all_locations().len(), 3);
+        assert!(!set.is_empty());
+        assert_eq!(set.provider_count(), 3);
+    }
+
+    #[test]
+    fn result_set_unique_locations() {
+        let mut set = GotoResultSet::new();
+        set.add(GotoResult::Single(LocationLink::new("a.rs", (1,0,1,5), (1,0,1,5))));
+        set.add(GotoResult::Single(LocationLink::new("a.rs", (1,0,1,5), (1,0,1,5)))); // duplicate
+        set.add(GotoResult::Single(LocationLink::new("b.rs", (2,0,2,5), (2,0,2,5))));
+        let unique = set.unique_locations();
+        assert_eq!(unique.len(), 2);
+    }
+
+    #[test]
+    fn location_filter_unique_files() {
+        let locs = vec![
+            Location::new("a.rs", 1, 0),
+            Location::new("b.rs", 2, 0),
+            Location::new("a.rs", 3, 0),
+        ];
+        let filter = LocationFilter::new(locs);
+        assert_eq!(filter.unique_files(), vec!["a.rs", "b.rs"]);
+        assert_eq!(filter.count(), 3);
     }
 }

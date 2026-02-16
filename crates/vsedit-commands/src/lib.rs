@@ -1045,6 +1045,122 @@ impl CommandRegistry {
 }
 
 // ---------------------------------------------------------------------------
+// CommandCategory – grouping commands for display
+// ---------------------------------------------------------------------------
+
+/// A logical grouping of commands, used for palette sections and documentation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandCategory {
+    pub id: String,
+    pub label: String,
+    pub order: u32,
+}
+
+impl CommandCategory {
+    pub fn new(id: impl Into<String>, label: impl Into<String>, order: u32) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            order,
+        }
+    }
+}
+
+impl fmt::Display for CommandCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}", self.id, self.label)
+    }
+}
+
+/// Categorised command entry.
+#[derive(Debug, Clone)]
+pub struct CategorisedCommand {
+    pub command_id: String,
+    pub category: String,
+    pub display_label: Option<String>,
+}
+
+impl CategorisedCommand {
+    pub fn new(command_id: impl Into<String>, category: impl Into<String>) -> Self {
+        Self {
+            command_id: command_id.into(),
+            category: category.into(),
+            display_label: None,
+        }
+    }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.display_label = Some(label.into());
+        self
+    }
+
+    pub fn effective_label(&self) -> &str {
+        self.display_label.as_deref().unwrap_or(&self.command_id)
+    }
+}
+
+/// Group a set of categorised commands by category.
+pub fn group_by_category(commands: &[CategorisedCommand]) -> HashMap<String, Vec<&CategorisedCommand>> {
+    let mut map: HashMap<String, Vec<&CategorisedCommand>> = HashMap::new();
+    for cmd in commands {
+        map.entry(cmd.category.clone()).or_default().push(cmd);
+    }
+    map
+}
+
+/// Filter commands whose IDs start with a given prefix.
+pub fn filter_commands_by_prefix<'a>(
+    commands: &'a [CategorisedCommand],
+    prefix: &str,
+) -> Vec<&'a CategorisedCommand> {
+    commands.iter().filter(|c| c.command_id.starts_with(prefix)).collect()
+}
+
+/// Return unique category names from a set of categorised commands.
+pub fn unique_categories(commands: &[CategorisedCommand]) -> Vec<String> {
+    let mut cats: Vec<String> = commands.iter().map(|c| c.category.clone()).collect();
+    cats.sort();
+    cats.dedup();
+    cats
+}
+
+/// Sort categories by their `order` field.
+pub fn sort_categories(categories: &mut [CommandCategory]) {
+    categories.sort_by_key(|c| c.order);
+}
+
+/// Validate a command ID: must be non-empty, contain at least one dot, and
+/// only consist of alphanumeric chars, dots, dashes, and underscores.
+pub fn validate_command_id(id: &str) -> Result<(), String> {
+    if id.is_empty() {
+        return Err("command id must not be empty".into());
+    }
+    if !id.contains('.') {
+        return Err(format!("command id '{id}' must contain at least one dot"));
+    }
+    if !id.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-' || c == '_') {
+        return Err(format!("command id '{id}' contains invalid characters"));
+    }
+    Ok(())
+}
+
+/// Normalise a keybinding string to a canonical form (lowercase, sorted modifiers).
+pub fn normalize_keybinding(kb: &str) -> String {
+    let parts: Vec<&str> = kb.split('+').collect();
+    if parts.len() <= 1 {
+        return kb.to_lowercase();
+    }
+    let key = parts.last().unwrap().to_lowercase();
+    let mut mods: Vec<String> = parts[..parts.len() - 1]
+        .iter()
+        .map(|m| m.to_lowercase())
+        .collect();
+    mods.sort();
+    mods.push(key);
+    mods.join("+")
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1771,5 +1887,95 @@ mod tests {
         let _r = registry.register("real.cmd", Box::new(|_| Ok(None)));
         assert!(registry.resolve_alias_chain("real.cmd").is_none());
         assert_eq!(registry.alias_chain_depth("real.cmd"), 0);
+    }
+
+    #[test]
+    fn command_category_display() {
+        let cat = CommandCategory::new("editor", "Editor Commands", 1);
+        assert_eq!(format!("{cat}"), "[editor] Editor Commands");
+    }
+
+    #[test]
+    fn categorised_command_effective_label() {
+        let cmd = CategorisedCommand::new("editor.action.copy", "editor");
+        assert_eq!(cmd.effective_label(), "editor.action.copy");
+        let cmd2 = cmd.clone().with_label("Copy");
+        assert_eq!(cmd2.effective_label(), "Copy");
+    }
+
+    #[test]
+    fn group_by_category_groups_correctly() {
+        let cmds = vec![
+            CategorisedCommand::new("editor.copy", "editor"),
+            CategorisedCommand::new("editor.paste", "editor"),
+            CategorisedCommand::new("file.save", "file"),
+        ];
+        let groups = group_by_category(&cmds);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups["editor"].len(), 2);
+        assert_eq!(groups["file"].len(), 1);
+    }
+
+    #[test]
+    fn filter_commands_by_prefix_works() {
+        let cmds = vec![
+            CategorisedCommand::new("editor.copy", "editor"),
+            CategorisedCommand::new("editor.paste", "editor"),
+            CategorisedCommand::new("file.save", "file"),
+        ];
+        let filtered = filter_commands_by_prefix(&cmds, "editor.");
+        assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn unique_categories_deduplicates() {
+        let cmds = vec![
+            CategorisedCommand::new("a.b", "x"),
+            CategorisedCommand::new("c.d", "x"),
+            CategorisedCommand::new("e.f", "y"),
+        ];
+        let cats = unique_categories(&cmds);
+        assert_eq!(cats, vec!["x", "y"]);
+    }
+
+    #[test]
+    fn sort_categories_by_order() {
+        let mut cats = vec![
+            CommandCategory::new("b", "B", 3),
+            CommandCategory::new("a", "A", 1),
+            CommandCategory::new("c", "C", 2),
+        ];
+        sort_categories(&mut cats);
+        assert_eq!(cats[0].id, "a");
+        assert_eq!(cats[1].id, "c");
+        assert_eq!(cats[2].id, "b");
+    }
+
+    #[test]
+    fn validate_command_id_accepts_valid() {
+        assert!(validate_command_id("editor.action.copy").is_ok());
+        assert!(validate_command_id("my-ext.do_thing").is_ok());
+    }
+
+    #[test]
+    fn validate_command_id_rejects_empty() {
+        assert!(validate_command_id("").is_err());
+    }
+
+    #[test]
+    fn validate_command_id_rejects_no_dot() {
+        assert!(validate_command_id("nodot").is_err());
+    }
+
+    #[test]
+    fn validate_command_id_rejects_bad_chars() {
+        assert!(validate_command_id("bad id.cmd").is_err());
+    }
+
+    #[test]
+    fn normalize_keybinding_sorts_modifiers() {
+        assert_eq!(normalize_keybinding("Shift+Ctrl+A"), "ctrl+shift+a");
+        assert_eq!(normalize_keybinding("Alt+Shift+Z"), "alt+shift+z");
+        assert_eq!(normalize_keybinding("Escape"), "escape");
     }
 }

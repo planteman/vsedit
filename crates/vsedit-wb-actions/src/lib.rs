@@ -999,6 +999,92 @@ pub fn partition_actions(actions: &[Action]) -> (Vec<&Action>, Vec<&Action>) {
     (enabled, disabled)
 }
 
+
+// ---------------------------------------------------------------------------
+// Action search and grouping utilities
+// ---------------------------------------------------------------------------
+
+use std::collections::HashMap;
+
+/// Group actions by their category name, returning a map from category string to actions.
+pub fn group_by_category_name(actions: &[Action]) -> HashMap<String, Vec<&Action>> {
+    let mut groups: HashMap<String, Vec<&Action>> = HashMap::new();
+    for action in actions {
+        groups.entry(action.category.to_string()).or_default().push(action);
+    }
+    groups
+}
+
+/// Search actions by a case-insensitive query matching label or id. Returns references.
+pub fn find_actions_matching<'a>(actions: &'a [Action], query: &str) -> Vec<&'a Action> {
+    let q = query.to_lowercase();
+    actions
+        .iter()
+        .filter(|a| a.label.to_lowercase().contains(&q) || a.id.to_lowercase().contains(&q))
+        .collect()
+}
+
+/// Return actions sorted by label alphabetically.
+pub fn sort_by_label(actions: &mut [Action]) {
+    actions.sort_by(|a, b| a.label.cmp(&b.label));
+}
+
+/// Return all distinct categories present in the given actions.
+pub fn distinct_categories(actions: &[Action]) -> Vec<ActionCategory> {
+    let mut cats: Vec<ActionCategory> = actions.iter().map(|a| a.category).collect();
+    cats.sort_by_key(|c| format!("{c}"));
+    cats.dedup();
+    cats
+}
+
+/// Count actions with keybindings vs. without.
+pub fn keybinding_stats(actions: &[Action]) -> (usize, usize) {
+    let with = actions.iter().filter(|a| a.keybinding.is_some()).count();
+    (with, actions.len() - with)
+}
+
+/// Produce a multi-line summary string of actions grouped by category.
+pub fn format_action_list(actions: &[Action]) -> String {
+    let mut groups: HashMap<String, Vec<&Action>> = HashMap::new();
+    for action in actions {
+        groups
+            .entry(action.category.to_string())
+            .or_default()
+            .push(action);
+    }
+    let mut keys: Vec<&String> = groups.keys().collect();
+    keys.sort();
+    let mut out = String::new();
+    for key in keys {
+        out.push_str(&format!("[{}]\n", key));
+        for a in &groups[key] {
+            out.push_str(&format!("  {}\n", a));
+        }
+    }
+    out
+}
+
+/// Create a duplicate of an action with a new id and label prefix.
+pub fn clone_action_with_prefix(action: &Action, prefix: &str) -> Action {
+    Action {
+        id: format!("{}.{}", prefix, action.id),
+        label: format!("{}: {}", prefix, action.label),
+        category: action.category,
+        keybinding: action.keybinding.clone(),
+        precondition: action.precondition.clone(),
+        enabled: action.enabled,
+    }
+}
+
+impl ActionRegistry {
+    /// Return a summary of keybinding coverage.
+    pub fn keybinding_coverage(&self) -> String {
+        let (with, without) = keybinding_stats(&self.actions);
+        format!("{} with keybindings, {} without", with, without)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1762,4 +1848,122 @@ mod tests {
         assert_eq!(enabled.len(), 1);
         assert_eq!(disabled.len(), 1);
     }
+
+    #[test]
+    fn group_by_category_name_groups() {
+        let actions = vec![
+            make_action("a", ActionCategory::File),
+            make_action("b", ActionCategory::File),
+            make_action("c", ActionCategory::Edit),
+        ];
+        let groups = group_by_category_name(&actions);
+        assert_eq!(groups["File"].len(), 2);
+        assert_eq!(groups["Edit"].len(), 1);
+    }
+
+    #[test]
+    fn find_actions_matching_by_label() {
+        let actions = vec![
+            make_action("open-file", ActionCategory::File),
+            make_action("save-file", ActionCategory::File),
+            make_action("zoom-in", ActionCategory::View),
+        ];
+        let results = find_actions_matching(&actions, "file");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn find_actions_matching_by_id() {
+        let actions = vec![
+            make_action("open-file", ActionCategory::File),
+            make_action("zoom-in", ActionCategory::View),
+        ];
+        let results = find_actions_matching(&actions, "zoom");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn sort_by_label_sorts() {
+        let mut actions = vec![
+            make_action("z", ActionCategory::File),
+            make_action("a", ActionCategory::File),
+            make_action("m", ActionCategory::File),
+        ];
+        sort_by_label(&mut actions);
+        assert_eq!(actions[0].id, "a");
+        assert_eq!(actions[2].id, "z");
+    }
+
+    #[test]
+    fn distinct_categories_deduplicates() {
+        let actions = vec![
+            make_action("a", ActionCategory::File),
+            make_action("b", ActionCategory::File),
+            make_action("c", ActionCategory::Edit),
+        ];
+        let cats = distinct_categories(&actions);
+        assert_eq!(cats.len(), 2);
+    }
+
+    #[test]
+    fn keybinding_stats_counts() {
+        let actions = vec![
+            Action::builder("a", "A", ActionCategory::File)
+                .keybinding("Ctrl+A")
+                .build(),
+            make_action("b", ActionCategory::File),
+        ];
+        let (with, without) = keybinding_stats(&actions);
+        assert_eq!(with, 1);
+        assert_eq!(without, 1);
+    }
+
+    #[test]
+    fn format_action_list_contains_categories() {
+        let actions = vec![
+            make_action("save", ActionCategory::File),
+            make_action("undo", ActionCategory::Edit),
+        ];
+        let output = format_action_list(&actions);
+        assert!(output.contains("[File]"));
+        assert!(output.contains("[Edit]"));
+    }
+
+    #[test]
+    fn clone_action_with_prefix_works() {
+        let original = make_action("save", ActionCategory::File);
+        let cloned = clone_action_with_prefix(&original, "ext");
+        assert_eq!(cloned.id, "ext.save");
+        assert!(cloned.label.starts_with("ext:"));
+        assert_eq!(cloned.category, ActionCategory::File);
+    }
+
+    #[test]
+    fn registry_disable_category_existing() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("a", ActionCategory::File));
+        reg.register(make_action("b", ActionCategory::File));
+        reg.register(make_action("c", ActionCategory::Edit));
+        let disabled = reg.disable_category(ActionCategory::File);
+        assert_eq!(disabled, 2);
+        assert_eq!(reg.get_enabled_actions().len(), 1);
+        let enabled = reg.enable_all();
+        assert_eq!(enabled, 2);
+        assert_eq!(reg.get_enabled_actions().len(), 3);
+    }
+
+    #[test]
+    fn registry_keybinding_coverage() {
+        let mut reg = ActionRegistry::new();
+        reg.register(
+            Action::builder("a", "A", ActionCategory::File)
+                .keybinding("Ctrl+S")
+                .build(),
+        );
+        reg.register(make_action("b", ActionCategory::File));
+        let coverage = reg.keybinding_coverage();
+        assert!(coverage.contains("1 with"));
+        assert!(coverage.contains("1 without"));
+    }
+
 }

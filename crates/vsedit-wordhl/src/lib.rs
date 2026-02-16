@@ -1048,6 +1048,81 @@ pub fn lines_with_writes(highlights: &[DocumentHighlight]) -> Vec<u32> {
     lines
 }
 
+// ---------------------------------------------------------------------------
+// Highlight filtering and statistics
+// ---------------------------------------------------------------------------
+
+/// Return only highlights of a specific kind.
+pub fn filter_by_kind(
+    highlights: &[DocumentHighlight],
+    kind: DocumentHighlightKind,
+) -> Vec<&DocumentHighlight> {
+    highlights.iter().filter(|h| h.kind == kind).collect()
+}
+
+/// Return highlights that overlap a given column range on a specific line.
+pub fn highlights_at(
+    highlights: &[DocumentHighlight],
+    line: u32,
+    column: u32,
+) -> Vec<&DocumentHighlight> {
+    highlights
+        .iter()
+        .filter(|h| h.is_on_line(line) && h.contains_column(column))
+        .collect()
+}
+
+/// Sort highlights by position (line, then start_column).
+pub fn sort_highlights(highlights: &mut [DocumentHighlight]) {
+    highlights.sort_by(|a, b| {
+        a.line
+            .cmp(&b.line)
+            .then(a.start_column.cmp(&b.start_column))
+    });
+}
+
+/// Remove highlights that fully overlap with a wider highlight on the same line.
+pub fn remove_subsumed_highlights(highlights: &[DocumentHighlight]) -> Vec<DocumentHighlight> {
+    let mut result = Vec::new();
+    for (i, h) in highlights.iter().enumerate() {
+        let subsumed = highlights.iter().enumerate().any(|(j, other)| {
+            i != j
+                && other.line == h.line
+                && other.start_column <= h.start_column
+                && other.end_column >= h.end_column
+                && (other.start_column < h.start_column || other.end_column > h.end_column)
+        });
+        if !subsumed {
+            result.push(h.clone());
+        }
+    }
+    result
+}
+
+/// Return the total number of unique lines that have at least one highlight.
+pub fn highlighted_line_count(highlights: &[DocumentHighlight]) -> usize {
+    let mut lines: Vec<u32> = highlights.iter().map(|h| h.line).collect();
+    lines.sort();
+    lines.dedup();
+    lines.len()
+}
+
+/// Return the highlight with the widest span (longest range).
+pub fn widest_highlight(highlights: &[DocumentHighlight]) -> Option<&DocumentHighlight> {
+    highlights.iter().max_by_key(|h| h.span())
+}
+
+/// Build a summary string like "3 text, 1 read, 2 write".
+pub fn highlight_summary(highlights: &[DocumentHighlight]) -> String {
+    let (text, read, write) = count_by_kind(highlights);
+    format!("{text} text, {read} read, {write} write")
+}
+
+/// Create a highlight that spans an entire line of text.
+pub fn highlight_full_line(line: u32, line_text: &str, kind: DocumentHighlightKind) -> DocumentHighlight {
+    DocumentHighlight::new(line, 1, (line_text.len() + 1) as u32, kind)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1773,5 +1848,106 @@ mod tests {
             DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
         ];
         assert!(lines_with_writes(&hl).is_empty());
+    }
+
+    #[test]
+    fn filter_by_kind_text() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Read),
+            DocumentHighlight::new(3, 1, 5, DocumentHighlightKind::Write),
+        ];
+        let text_only = filter_by_kind(&hl, DocumentHighlightKind::Text);
+        assert_eq!(text_only.len(), 1);
+        assert_eq!(text_only[0].line, 1);
+    }
+
+    #[test]
+    fn count_by_kind_counts() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(3, 1, 5, DocumentHighlightKind::Read),
+            DocumentHighlight::new(4, 1, 5, DocumentHighlightKind::Write),
+        ];
+        assert_eq!(count_by_kind(&hl), (2, 1, 1));
+    }
+
+    #[test]
+    fn highlights_at_finds_match() {
+        let hl = vec![
+            DocumentHighlight::new(1, 5, 10, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 15, 20, DocumentHighlightKind::Read),
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Text),
+        ];
+        let at_1_7 = highlights_at(&hl, 1, 7);
+        assert_eq!(at_1_7.len(), 1);
+        assert_eq!(at_1_7[0].start_column, 5);
+    }
+
+    #[test]
+    fn sort_highlights_orders_by_position() {
+        let mut hl = vec![
+            DocumentHighlight::new(3, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 10, 15, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+        ];
+        sort_highlights(&mut hl);
+        assert_eq!(hl[0].line, 1);
+        assert_eq!(hl[0].start_column, 1);
+        assert_eq!(hl[1].start_column, 10);
+        assert_eq!(hl[2].line, 3);
+    }
+
+    #[test]
+    fn remove_subsumed_highlights_removes_inner() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 20, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 5, 10, DocumentHighlightKind::Read),
+        ];
+        let result = remove_subsumed_highlights(&hl);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].start_column, 1);
+        assert_eq!(result[0].end_column, 20);
+    }
+
+    #[test]
+    fn highlighted_line_count_unique() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(1, 6, 10, DocumentHighlightKind::Text),
+            DocumentHighlight::new(3, 1, 5, DocumentHighlightKind::Text),
+        ];
+        assert_eq!(highlighted_line_count(&hl), 2);
+    }
+
+    #[test]
+    fn widest_highlight_returns_longest() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 20, DocumentHighlightKind::Text),
+            DocumentHighlight::new(3, 1, 10, DocumentHighlightKind::Text),
+        ];
+        let w = widest_highlight(&hl).unwrap();
+        assert_eq!(w.line, 2);
+        assert_eq!(w.span(), 19);
+    }
+
+    #[test]
+    fn highlight_summary_format() {
+        let hl = vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Write),
+        ];
+        assert_eq!(highlight_summary(&hl), "1 text, 0 read, 1 write");
+    }
+
+    #[test]
+    fn highlight_full_line_creates() {
+        let h = highlight_full_line(5, "hello world", DocumentHighlightKind::Read);
+        assert_eq!(h.line, 5);
+        assert_eq!(h.start_column, 1);
+        assert_eq!(h.end_column, 12);
+        assert_eq!(h.kind, DocumentHighlightKind::Read);
     }
 }

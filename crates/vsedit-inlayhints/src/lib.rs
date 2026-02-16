@@ -781,6 +781,7 @@ impl InlayHintFilter {
 
 /// Key identifying a cached hint region.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[allow(dead_code)]
 struct CacheKey {
     uri: String,
     start_line: u32,
@@ -1040,6 +1041,100 @@ pub fn search_hints_by_label<'a>(hints: &'a [InlayHint], query: &str) -> Vec<&'a
         .iter()
         .filter(|h| hint_full_label(h).to_lowercase().contains(&q))
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Hint density & line analysis
+// ---------------------------------------------------------------------------
+
+/// Return a map of line number to count of hints on that line.
+pub fn hints_per_line(hints: &[InlayHint]) -> HashMap<u32, usize> {
+    let mut counts = HashMap::new();
+    for h in hints {
+        *counts.entry(h.position_line).or_insert(0) += 1;
+    }
+    counts
+}
+
+/// Return lines that have more hints than the given threshold.
+pub fn dense_lines(hints: &[InlayHint], threshold: usize) -> Vec<u32> {
+    let counts = hints_per_line(hints);
+    let mut lines: Vec<u32> = counts
+        .into_iter()
+        .filter(|(_, count)| *count > threshold)
+        .map(|(line, _)| line)
+        .collect();
+    lines.sort();
+    lines
+}
+
+/// Return hints that have a tooltip set on any of their label parts.
+pub fn hints_with_label_tooltips<'a>(hints: &'a [InlayHint]) -> Vec<&'a InlayHint> {
+    hints
+        .iter()
+        .filter(|h| h.label.iter().any(|p| p.tooltip.is_some()))
+        .collect()
+}
+
+/// Return the total character length of all hint labels combined.
+pub fn combined_label_length(hints: &[InlayHint]) -> usize {
+    hints
+        .iter()
+        .map(|h| hint_full_label(h).len())
+        .sum()
+}
+
+/// Return hints that have a command attached to any label part.
+pub fn hints_having_commands<'a>(hints: &'a [InlayHint]) -> Vec<&'a InlayHint> {
+    hints
+        .iter()
+        .filter(|h| h.label.iter().any(|p| p.command.is_some()))
+        .collect()
+}
+
+/// Return the average number of label parts per hint (0.0 if empty).
+pub fn avg_label_parts(hints: &[InlayHint]) -> f64 {
+    if hints.is_empty() {
+        return 0.0;
+    }
+    let total: usize = hints.iter().map(|h| h.label.len()).sum();
+    total as f64 / hints.len() as f64
+}
+
+/// Merge two sets of hints, deduplicating by position and full label text.
+pub fn merge_hint_sets(a: &[InlayHint], b: &[InlayHint]) -> Vec<InlayHint> {
+    let mut result: Vec<InlayHint> = a.to_vec();
+    let mut seen: std::collections::HashSet<(u32, u32, String)> = a
+        .iter()
+        .map(|h| (h.position_line, h.position_col, hint_full_label(h)))
+        .collect();
+    for h in b {
+        let key = (h.position_line, h.position_col, hint_full_label(h));
+        if seen.insert(key) {
+            result.push(h.clone());
+        }
+    }
+    result
+}
+
+/// Group hints by their kind into separate vectors.
+pub fn classify_hints(hints: &[InlayHint]) -> (Vec<&InlayHint>, Vec<&InlayHint>, Vec<&InlayHint>) {
+    let mut types = Vec::new();
+    let mut params = Vec::new();
+    let mut others = Vec::new();
+    for h in hints {
+        match h.kind {
+            InlayHintKind::Type => types.push(h),
+            InlayHintKind::Parameter => params.push(h),
+            InlayHintKind::Other => others.push(h),
+        }
+    }
+    (types, params, others)
+}
+
+/// Return hints that have multi-part labels (more than one label part).
+pub fn multi_segment_hints<'a>(hints: &'a [InlayHint]) -> Vec<&'a InlayHint> {
+    hints.iter().filter(|h| h.label.len() > 1).collect()
 }
 
 #[cfg(test)]
@@ -1767,5 +1862,129 @@ mod tests {
     fn search_hints_by_label_no_match() {
         let hints = vec![InlayHint::simple(0, 0, ": i32", InlayHintKind::Type)];
         assert!(search_hints_by_label(&hints, "nope").is_empty());
+    }
+
+    #[test]
+    fn hints_per_line_counts() {
+        let hints = vec![
+            InlayHint::simple(1, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(1, 5, "x:", InlayHintKind::Parameter),
+            InlayHint::simple(3, 0, ": bool", InlayHintKind::Type),
+        ];
+        let counts = hints_per_line(&hints);
+        assert_eq!(counts.get(&1), Some(&2));
+        assert_eq!(counts.get(&3), Some(&1));
+        assert_eq!(counts.get(&2), None);
+    }
+
+    #[test]
+    fn dense_lines_filters_above_threshold() {
+        let hints = vec![
+            InlayHint::simple(1, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(1, 5, "x:", InlayHintKind::Parameter),
+            InlayHint::simple(1, 10, "y:", InlayHintKind::Parameter),
+            InlayHint::simple(3, 0, ": bool", InlayHintKind::Type),
+        ];
+        let dense = dense_lines(&hints, 2);
+        assert_eq!(dense, vec![1]);
+    }
+
+    #[test]
+    fn dense_lines_empty_when_below_threshold() {
+        let hints = vec![
+            InlayHint::simple(1, 0, ": i32", InlayHintKind::Type),
+        ];
+        assert!(dense_lines(&hints, 5).is_empty());
+    }
+
+    #[test]
+    fn hints_with_label_tooltips_filters() {
+        let mut h1 = InlayHint::simple(0, 0, ": i32", InlayHintKind::Type);
+        h1.label[0].tooltip = Some("integer type".into());
+        let h2 = InlayHint::simple(1, 0, "x:", InlayHintKind::Parameter);
+        let hints = vec![h1, h2];
+        let result = hints_with_label_tooltips(&hints);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn combined_label_length_sums() {
+        let hints = vec![
+            InlayHint::simple(0, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(1, 0, "x:", InlayHintKind::Parameter),
+        ];
+        assert_eq!(combined_label_length(&hints), 7);
+    }
+
+    #[test]
+    fn hints_having_commands_filters() {
+        let mut h1 = InlayHint::simple(0, 0, ": i32", InlayHintKind::Type);
+        h1.label[0].command = Some("goto.definition".into());
+        let h2 = InlayHint::simple(1, 0, "x:", InlayHintKind::Parameter);
+        let hints = vec![h1, h2];
+        let result = hints_having_commands(&hints);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn avg_label_parts_computes() {
+        let h1 = InlayHintBuilder::new()
+            .position(0, 0)
+            .add_label_part(": ")
+            .add_label_part("i32")
+            .kind(InlayHintKind::Type)
+            .build()
+            .unwrap();
+        let h2 = InlayHint::simple(1, 0, "x:", InlayHintKind::Parameter);
+        let avg = avg_label_parts(&[h1, h2]);
+        assert!((avg - 1.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn avg_label_parts_empty() {
+        let hints: Vec<InlayHint> = vec![];
+        assert!((avg_label_parts(&hints) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn merge_hint_sets_deduplicates() {
+        let a = vec![
+            InlayHint::simple(0, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(1, 5, "x:", InlayHintKind::Parameter),
+        ];
+        let b = vec![
+            InlayHint::simple(0, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(2, 0, ": bool", InlayHintKind::Type),
+        ];
+        let merged = merge_hint_sets(&a, &b);
+        assert_eq!(merged.len(), 3);
+    }
+
+    #[test]
+    fn classify_hints_groups() {
+        let hints = vec![
+            InlayHint::simple(0, 0, ": i32", InlayHintKind::Type),
+            InlayHint::simple(1, 0, "x:", InlayHintKind::Parameter),
+            InlayHint::simple(2, 0, ": bool", InlayHintKind::Type),
+        ];
+        let (types, params, others) = classify_hints(&hints);
+        assert_eq!(types.len(), 2);
+        assert_eq!(params.len(), 1);
+        assert_eq!(others.len(), 0);
+    }
+
+    #[test]
+    fn multi_segment_hints_filters() {
+        let h1 = InlayHintBuilder::new()
+            .position(0, 0)
+            .add_label_part(": ")
+            .add_label_part("i32")
+            .kind(InlayHintKind::Type)
+            .build()
+            .unwrap();
+        let h2 = InlayHint::simple(1, 0, "x:", InlayHintKind::Parameter);
+        let hints = vec![h1, h2];
+        let result = multi_segment_hints(&hints);
+        assert_eq!(result.len(), 1);
     }
 }

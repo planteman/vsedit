@@ -1037,6 +1037,228 @@ impl StyleSheet {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Color manipulation utilities
+// ---------------------------------------------------------------------------
+
+/// Extract RGB components from a `Color::Rgb`. Returns `None` for non-RGB variants.
+pub fn color_to_rgb(color: Color) -> Option<(u8, u8, u8)> {
+    if let Color::Rgb(r, g, b) = color {
+        Some((r, g, b))
+    } else {
+        None
+    }
+}
+
+/// Convert an RGB `Color` to a hex string like `"#rrggbb"`.
+/// Returns `None` for non-RGB colors.
+pub fn color_to_hex(color: Color) -> Option<String> {
+    color_to_rgb(color).map(|(r, g, b)| format!("#{:02x}{:02x}{:02x}", r, g, b))
+}
+
+/// Lighten an RGB color by a factor in `[0.0, 1.0]`.
+/// A factor of `0.0` returns the original color; `1.0` returns white.
+pub fn lighten(color: Color, factor: f32) -> Option<Color> {
+    let (r, g, b) = color_to_rgb(color)?;
+    let f = factor.clamp(0.0, 1.0);
+    let lr = (r as f32 + (255.0 - r as f32) * f) as u8;
+    let lg = (g as f32 + (255.0 - g as f32) * f) as u8;
+    let lb = (b as f32 + (255.0 - b as f32) * f) as u8;
+    Some(Color::Rgb(lr, lg, lb))
+}
+
+/// Darken an RGB color by a factor in `[0.0, 1.0]`.
+/// A factor of `0.0` returns the original color; `1.0` returns black.
+pub fn darken(color: Color, factor: f32) -> Option<Color> {
+    let (r, g, b) = color_to_rgb(color)?;
+    let f = factor.clamp(0.0, 1.0);
+    let dr = (r as f32 * (1.0 - f)) as u8;
+    let dg = (g as f32 * (1.0 - f)) as u8;
+    let db = (b as f32 * (1.0 - f)) as u8;
+    Some(Color::Rgb(dr, dg, db))
+}
+
+/// Invert an RGB color.
+pub fn invert_color(color: Color) -> Option<Color> {
+    let (r, g, b) = color_to_rgb(color)?;
+    Some(Color::Rgb(255 - r, 255 - g, 255 - b))
+}
+
+/// Compute a grayscale version of an RGB color using luminance weights.
+pub fn grayscale(color: Color) -> Option<Color> {
+    let (r, g, b) = color_to_rgb(color)?;
+    let gray = (0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32) as u8;
+    Some(Color::Rgb(gray, gray, gray))
+}
+
+// ---------------------------------------------------------------------------
+// ThemeScope — semantic scope classification
+// ---------------------------------------------------------------------------
+
+/// Semantic scope for theme color tokens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ThemeScope {
+    Editor,
+    Sidebar,
+    StatusBar,
+    Panel,
+    Tab,
+    Dialog,
+    Notification,
+    Menu,
+}
+
+impl ThemeScope {
+    /// Return the prefix string used in color token IDs for this scope.
+    pub fn prefix(&self) -> &'static str {
+        match self {
+            ThemeScope::Editor => "editor",
+            ThemeScope::Sidebar => "sidebar",
+            ThemeScope::StatusBar => "statusBar",
+            ThemeScope::Panel => "panel",
+            ThemeScope::Tab => "tab",
+            ThemeScope::Dialog => "dialog",
+            ThemeScope::Notification => "notification",
+            ThemeScope::Menu => "menu",
+        }
+    }
+
+    /// Build a `ThemeColor` with this scope's prefix.
+    pub fn color(&self, suffix: &str) -> ThemeColor {
+        ThemeColor::new(format!("{}.{}", self.prefix(), suffix))
+    }
+}
+
+impl ThemeColor {
+    /// Return the scope of this color token based on its prefix, if recognized.
+    pub fn scope(&self) -> Option<ThemeScope> {
+        let id = &self.0;
+        if id.starts_with("editor.") {
+            Some(ThemeScope::Editor)
+        } else if id.starts_with("sidebar.") {
+            Some(ThemeScope::Sidebar)
+        } else if id.starts_with("statusBar.") {
+            Some(ThemeScope::StatusBar)
+        } else if id.starts_with("panel.") {
+            Some(ThemeScope::Panel)
+        } else if id.starts_with("tab.") {
+            Some(ThemeScope::Tab)
+        } else if id.starts_with("dialog.") {
+            Some(ThemeScope::Dialog)
+        } else if id.starts_with("notification.") {
+            Some(ThemeScope::Notification)
+        } else if id.starts_with("menu.") {
+            Some(ThemeScope::Menu)
+        } else {
+            None
+        }
+    }
+
+    /// Return the suffix after the scope prefix (e.g. `"background"` from `"editor.background"`).
+    pub fn suffix(&self) -> Option<&str> {
+        self.0.split_once('.').map(|(_, s)| s)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StyleOverrideStack — layered style overrides
+// ---------------------------------------------------------------------------
+
+/// A stack of named style layers. Later (higher) layers override earlier ones.
+#[derive(Debug, Clone)]
+pub struct StyleOverrideStack {
+    layers: Vec<(String, Style)>,
+}
+
+impl StyleOverrideStack {
+    pub fn new() -> Self {
+        Self { layers: Vec::new() }
+    }
+
+    /// Push a named style layer onto the stack.
+    pub fn push(&mut self, name: impl Into<String>, style: Style) {
+        self.layers.push((name.into(), style));
+    }
+
+    /// Remove the topmost layer matching `name`. Returns `true` if found.
+    pub fn remove(&mut self, name: &str) -> bool {
+        if let Some(pos) = self.layers.iter().rposition(|l| l.0 == name) {
+            self.layers.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Flatten all layers into a single `Style` by patching each layer on top.
+    pub fn flatten(&self) -> Style {
+        let mut result = Style::default();
+        for (_, layer) in &self.layers {
+            result = result.patch(*layer);
+        }
+        result
+    }
+
+    /// Number of layers currently on the stack.
+    pub fn depth(&self) -> usize {
+        self.layers.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.layers.is_empty()
+    }
+
+    /// Clear all layers.
+    pub fn clear(&mut self) {
+        self.layers.clear();
+    }
+}
+
+impl Default for StyleOverrideStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorPalette extensions
+// ---------------------------------------------------------------------------
+
+impl ColorPalette {
+    /// Derive a lighter variant of a named color. Returns `None` if the name
+    /// is missing or the color is not RGB.
+    pub fn lighter(&self, name: &str, factor: f32) -> Option<Color> {
+        self.get(name).and_then(|c| lighten(c, factor))
+    }
+
+    /// Derive a darker variant of a named color.
+    pub fn darker(&self, name: &str, factor: f32) -> Option<Color> {
+        self.get(name).and_then(|c| darken(c, factor))
+    }
+
+    /// Check whether two named colors have sufficient contrast for WCAG AA.
+    pub fn check_contrast_aa(&self, name_a: &str, name_b: &str) -> Option<bool> {
+        let a = self.get(name_a)?;
+        let b = self.get(name_b)?;
+        let (r1, g1, b1) = color_to_rgb(a)?;
+        let (r2, g2, b2) = color_to_rgb(b)?;
+        let ratio = ContrastChecker::color_contrast(r1, g1, b1, r2, g2, b2);
+        Some(ContrastChecker::meets_aa(ratio))
+    }
+
+    /// Merge another palette into this one; existing names are overwritten.
+    pub fn merge(&mut self, other: &ColorPalette) {
+        for (name, color) in &other.colors {
+            self.colors.insert(name.clone(), *color);
+        }
+    }
+
+    /// Remove a named color. Returns `true` if it existed.
+    pub fn remove(&mut self, name: &str) -> bool {
+        self.colors.remove(name).is_some()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1752,5 +1974,118 @@ mod tests {
         let chain = inh.chain("a");
         // Should not infinite loop, chain should stop
         assert!(chain.len() <= 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests — color utilities, ThemeScope, StyleOverrideStack, palette
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn color_to_hex_roundtrip() {
+        let color = Color::Rgb(0, 122, 204);
+        let hex = color_to_hex(color).unwrap();
+        assert_eq!(hex, "#007acc");
+        assert_eq!(parse_hex_color(&hex), Some(color));
+    }
+
+    #[test]
+    fn lighten_and_darken() {
+        let base = Color::Rgb(100, 100, 100);
+        let lighter = lighten(base, 0.5).unwrap();
+        let darker = darken(base, 0.5).unwrap();
+        let (lr, _, _) = color_to_rgb(lighter).unwrap();
+        let (dr, _, _) = color_to_rgb(darker).unwrap();
+        assert!(lr > 100, "lighten should increase component");
+        assert!(dr < 100, "darken should decrease component");
+        // Extremes
+        assert_eq!(lighten(base, 1.0), Some(Color::Rgb(255, 255, 255)));
+        assert_eq!(darken(base, 1.0), Some(Color::Rgb(0, 0, 0)));
+        // Non-RGB returns None
+        assert!(lighten(Color::Red, 0.5).is_none());
+    }
+
+    #[test]
+    fn invert_and_grayscale() {
+        assert_eq!(invert_color(Color::Rgb(0, 0, 0)), Some(Color::Rgb(255, 255, 255)));
+        assert_eq!(invert_color(Color::Rgb(255, 255, 255)), Some(Color::Rgb(0, 0, 0)));
+        let gray = grayscale(Color::Rgb(255, 0, 0)).unwrap();
+        if let Color::Rgb(r, g, b) = gray {
+            assert_eq!(r, g);
+            assert_eq!(g, b);
+            assert!(r > 0 && r < 255);
+        } else {
+            panic!("expected Rgb");
+        }
+    }
+
+    #[test]
+    fn theme_scope_prefix_and_color() {
+        let tc = ThemeScope::Editor.color("background");
+        assert_eq!(tc.0, "editor.background");
+        assert_eq!(tc.scope(), Some(ThemeScope::Editor));
+        assert_eq!(tc.suffix(), Some("background"));
+
+        let tc2 = ThemeScope::StatusBar.color("foreground");
+        assert_eq!(tc2.0, "statusBar.foreground");
+        assert_eq!(tc2.scope(), Some(ThemeScope::StatusBar));
+    }
+
+    #[test]
+    fn theme_color_scope_unrecognized() {
+        let tc = ThemeColor::new("custom.something");
+        assert_eq!(tc.scope(), None);
+        assert_eq!(tc.suffix(), Some("something"));
+    }
+
+    #[test]
+    fn style_override_stack_flatten() {
+        let mut stack = StyleOverrideStack::new();
+        assert!(stack.is_empty());
+
+        stack.push("base", Style::default().fg(Color::White).bg(Color::Black));
+        stack.push("highlight", Style::default().fg(Color::Yellow));
+
+        let flat = stack.flatten();
+        let expected = Style::default().fg(Color::Yellow).bg(Color::Black);
+        assert_eq!(flat, expected);
+        assert_eq!(stack.depth(), 2);
+
+        assert!(stack.remove("highlight"));
+        assert_eq!(stack.depth(), 1);
+        let flat2 = stack.flatten();
+        assert_eq!(flat2, Style::default().fg(Color::White).bg(Color::Black));
+    }
+
+    #[test]
+    fn color_palette_lighter_darker_contrast() {
+        let p = ColorPalette::dark_default();
+        let lighter_bg = p.lighter("background", 0.3);
+        assert!(lighter_bg.is_some());
+        let (r, _, _) = color_to_rgb(lighter_bg.unwrap()).unwrap();
+        assert!(r > 30, "lighter background should be brighter");
+
+        // foreground vs background should have good contrast
+        let meets = p.check_contrast_aa("foreground", "background");
+        assert_eq!(meets, Some(true));
+    }
+
+    #[test]
+    fn color_palette_merge_and_remove() {
+        let mut base = ColorPalette::new();
+        base.set("a", Color::Rgb(10, 10, 10));
+        base.set("b", Color::Rgb(20, 20, 20));
+
+        let mut overlay = ColorPalette::new();
+        overlay.set("b", Color::Rgb(99, 99, 99));
+        overlay.set("c", Color::Rgb(30, 30, 30));
+
+        base.merge(&overlay);
+        assert_eq!(base.len(), 3);
+        assert_eq!(base.get("b"), Some(Color::Rgb(99, 99, 99)));
+        assert!(base.get("c").is_some());
+
+        assert!(base.remove("a"));
+        assert!(!base.remove("a"));
+        assert_eq!(base.len(), 2);
     }
 }

@@ -1222,6 +1222,83 @@ impl fmt::Display for LayoutPreset {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Layout analysis utilities
+// ---------------------------------------------------------------------------
+
+/// Compute the total area (in cells) consumed by a `Rect`.
+pub fn rect_area(r: &Rect) -> u32 {
+    r.width as u32 * r.height as u32
+}
+
+/// Check if `inner` is fully contained within `outer`.
+pub fn rect_contains(outer: &Rect, inner: &Rect) -> bool {
+    inner.x >= outer.x
+        && inner.y >= outer.y
+        && inner.x + inner.width <= outer.x + outer.width
+        && inner.y + inner.height <= outer.y + outer.height
+}
+
+/// Compute the intersection of two rectangles, returning `None` if they
+/// don't overlap.
+pub fn rect_intersection(a: &Rect, b: &Rect) -> Option<Rect> {
+    let x1 = a.x.max(b.x);
+    let y1 = a.y.max(b.y);
+    let x2 = (a.x + a.width).min(b.x + b.width);
+    let y2 = (a.y + a.height).min(b.y + b.height);
+    if x1 < x2 && y1 < y2 {
+        Some(Rect::new(x1, y1, x2 - x1, y2 - y1))
+    } else {
+        None
+    }
+}
+
+/// Split a rectangle into two parts along the given direction at the
+/// specified `offset` from the start.
+pub fn rect_split(r: &Rect, direction: Direction, offset: u16) -> (Rect, Rect) {
+    match direction {
+        Direction::Horizontal => {
+            let w1 = offset.min(r.width);
+            let w2 = r.width.saturating_sub(w1);
+            (
+                Rect::new(r.x, r.y, w1, r.height),
+                Rect::new(r.x + w1, r.y, w2, r.height),
+            )
+        }
+        Direction::Vertical => {
+            let h1 = offset.min(r.height);
+            let h2 = r.height.saturating_sub(h1);
+            (
+                Rect::new(r.x, r.y, r.width, h1),
+                Rect::new(r.x, r.y + h1, r.width, h2),
+            )
+        }
+    }
+}
+
+/// Apply `Padding` to a `Rect`, shrinking it inward. Returns a zero-sized
+/// rect if padding exceeds the available space.
+pub fn apply_padding(r: &Rect, p: &Padding) -> Rect {
+    let x = r.x + p.left;
+    let y = r.y + p.top;
+    let w = r.width.saturating_sub(p.left + p.right);
+    let h = r.height.saturating_sub(p.top + p.bottom);
+    Rect::new(x, y, w, h)
+}
+
+/// Distribute `total` space among `count` items as evenly as possible,
+/// returning the sizes. Leftover is given to the first items.
+pub fn distribute_evenly(total: u16, count: u16) -> Vec<u16> {
+    if count == 0 {
+        return vec![];
+    }
+    let base = total / count;
+    let extra = total % count;
+    (0..count)
+        .map(|i| if i < extra { base + 1 } else { base })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1793,6 +1870,80 @@ mod tests {
     #[test]
     fn layout_preset_display() {
         assert_eq!(format!("{}", LayoutPreset::CenteredEditor), "Centered Editor");
+    }
+
+    // -- rect_area -------------------------------------------------------------
+
+    #[test]
+    fn rect_area_computed() {
+        assert_eq!(rect_area(&rect(0, 0, 10, 5)), 50);
+    }
+
+    // -- rect_contains ---------------------------------------------------------
+
+    #[test]
+    fn rect_contains_true() {
+        let outer = rect(0, 0, 100, 100);
+        let inner = rect(10, 10, 20, 20);
+        assert!(rect_contains(&outer, &inner));
+    }
+
+    #[test]
+    fn rect_contains_false() {
+        let outer = rect(0, 0, 10, 10);
+        let inner = rect(5, 5, 20, 20);
+        assert!(!rect_contains(&outer, &inner));
+    }
+
+    // -- rect_intersection -----------------------------------------------------
+
+    #[test]
+    fn rect_intersection_overlap() {
+        let a = rect(0, 0, 10, 10);
+        let b = rect(5, 5, 10, 10);
+        let i = rect_intersection(&a, &b).unwrap();
+        assert_eq!(i, rect(5, 5, 5, 5));
+    }
+
+    #[test]
+    fn rect_intersection_none() {
+        let a = rect(0, 0, 5, 5);
+        let b = rect(10, 10, 5, 5);
+        assert!(rect_intersection(&a, &b).is_none());
+    }
+
+    // -- rect_split ------------------------------------------------------------
+
+    #[test]
+    fn rect_split_horizontal() {
+        let r = rect(0, 0, 100, 50);
+        let (left, right) = rect_split(&r, Direction::Horizontal, 30);
+        assert_eq!(left, rect(0, 0, 30, 50));
+        assert_eq!(right, rect(30, 0, 70, 50));
+    }
+
+    // -- apply_padding ---------------------------------------------------------
+
+    #[test]
+    fn apply_padding_shrinks() {
+        let r = rect(0, 0, 100, 100);
+        let p = Padding::uniform(10);
+        let result = apply_padding(&r, &p);
+        assert_eq!(result, rect(10, 10, 80, 80));
+    }
+
+    // -- distribute_evenly -----------------------------------------------------
+
+    #[test]
+    fn distribute_evenly_exact() {
+        assert_eq!(distribute_evenly(12, 3), vec![4, 4, 4]);
+    }
+
+    #[test]
+    fn distribute_evenly_remainder() {
+        let sizes = distribute_evenly(10, 3);
+        assert_eq!(sizes, vec![4, 3, 3]);
+        assert_eq!(sizes.iter().sum::<u16>(), 10);
     }
 
 }

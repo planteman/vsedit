@@ -1005,6 +1005,126 @@ impl fmt::Display for ExpansionSummary {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Emmet snippet library – reusable named abbreviations
+// ---------------------------------------------------------------------------
+
+/// A named Emmet snippet that stores a frequently-used abbreviation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EmmetSnippet {
+    pub name: String,
+    pub abbreviation: String,
+    pub description: Option<String>,
+    pub language: String,
+}
+
+impl EmmetSnippet {
+    /// Create a new snippet.
+    pub fn new(
+        name: impl Into<String>,
+        abbreviation: impl Into<String>,
+        language: impl Into<String>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            abbreviation: abbreviation.into(),
+            description: None,
+            language: language.into(),
+        }
+    }
+
+    /// Set description.
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+
+    /// Expand the snippet's abbreviation.
+    pub fn expand(&self) -> Option<String> {
+        expand_abbreviation(&self.abbreviation)
+    }
+
+    /// Returns true if this snippet is for the given language.
+    pub fn matches_language(&self, lang: &str) -> bool {
+        self.language.eq_ignore_ascii_case(lang)
+    }
+}
+
+impl fmt::Display for EmmetSnippet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({}) → {}", self.name, self.language, self.abbreviation)
+    }
+}
+
+/// A library of reusable Emmet snippets with search and filtering.
+#[derive(Debug, Clone, Default)]
+pub struct EmmetSnippetLibrary {
+    snippets: Vec<EmmetSnippet>,
+}
+
+impl EmmetSnippetLibrary {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a snippet. Returns false if a snippet with the same name already exists.
+    pub fn add(&mut self, snippet: EmmetSnippet) -> bool {
+        if self.snippets.iter().any(|s| s.name == snippet.name) {
+            return false;
+        }
+        self.snippets.push(snippet);
+        true
+    }
+
+    /// Remove a snippet by name.
+    pub fn remove(&mut self, name: &str) -> bool {
+        let before = self.snippets.len();
+        self.snippets.retain(|s| s.name != name);
+        self.snippets.len() < before
+    }
+
+    /// Look up a snippet by name.
+    pub fn get(&self, name: &str) -> Option<&EmmetSnippet> {
+        self.snippets.iter().find(|s| s.name == name)
+    }
+
+    /// Return all snippets for a given language.
+    pub fn for_language(&self, lang: &str) -> Vec<&EmmetSnippet> {
+        self.snippets.iter().filter(|s| s.matches_language(lang)).collect()
+    }
+
+    /// Search snippets by name substring (case-insensitive).
+    pub fn search(&self, query: &str) -> Vec<&EmmetSnippet> {
+        let q = query.to_lowercase();
+        self.snippets
+            .iter()
+            .filter(|s| s.name.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.snippets.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.snippets.is_empty()
+    }
+
+    /// Return all unique languages in the library.
+    pub fn languages(&self) -> Vec<&str> {
+        let mut langs: Vec<&str> = self.snippets.iter().map(|s| s.language.as_str()).collect();
+        langs.sort_unstable();
+        langs.dedup();
+        langs
+    }
+}
+
+impl fmt::Display for EmmetSnippetLibrary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EmmetSnippetLibrary({} snippets)", self.snippets.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1680,5 +1800,76 @@ mod tests {
             "abbreviation is empty",
         );
         assert!(AbbreviationError::InvalidChar('~').to_string().contains('~'));
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn snippet_creation_and_expansion() {
+        let snip = EmmetSnippet::new("boilerplate", "html>head+body", "html")
+            .with_description("HTML boilerplate");
+        assert_eq!(snip.name, "boilerplate");
+        assert!(snip.matches_language("HTML"));
+        assert!(snip.description.is_some());
+        let expanded = snip.expand();
+        assert!(expanded.is_some());
+        let html = expanded.unwrap();
+        assert!(html.contains("<html>"));
+        assert!(html.contains("<head>"));
+    }
+
+    #[test]
+    fn snippet_library_add_and_search() {
+        let mut lib = EmmetSnippetLibrary::new();
+        let s1 = EmmetSnippet::new("nav-bar", "nav>ul>li*3", "html");
+        let s2 = EmmetSnippet::new("css-reset", "m0", "css");
+        assert!(lib.add(s1));
+        assert!(lib.add(s2));
+        assert_eq!(lib.len(), 2);
+        // duplicate rejected
+        assert!(!lib.add(EmmetSnippet::new("nav-bar", "div", "html")));
+        // search
+        let results = lib.search("nav");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "nav-bar");
+    }
+
+    #[test]
+    fn snippet_library_filter_by_language() {
+        let mut lib = EmmetSnippetLibrary::new();
+        lib.add(EmmetSnippet::new("a", "div", "html"));
+        lib.add(EmmetSnippet::new("b", "span", "html"));
+        lib.add(EmmetSnippet::new("c", "p0", "css"));
+        assert_eq!(lib.for_language("html").len(), 2);
+        assert_eq!(lib.for_language("css").len(), 1);
+        assert_eq!(lib.for_language("xml").len(), 0);
+    }
+
+    #[test]
+    fn snippet_library_languages() {
+        let mut lib = EmmetSnippetLibrary::new();
+        lib.add(EmmetSnippet::new("a", "div", "html"));
+        lib.add(EmmetSnippet::new("b", "p0", "css"));
+        lib.add(EmmetSnippet::new("c", "span", "html"));
+        let langs = lib.languages();
+        assert_eq!(langs, vec!["css", "html"]);
+    }
+
+    #[test]
+    fn snippet_library_remove() {
+        let mut lib = EmmetSnippetLibrary::new();
+        lib.add(EmmetSnippet::new("x", "div", "html"));
+        assert!(lib.remove("x"));
+        assert!(!lib.remove("x"));
+        assert!(lib.is_empty());
+    }
+
+    #[test]
+    fn snippet_display() {
+        let s = EmmetSnippet::new("test", "div>p", "html");
+        let text = format!("{}", s);
+        assert!(text.contains("test"));
+        assert!(text.contains("html"));
+        assert!(text.contains("div>p"));
     }
 }

@@ -1004,6 +1004,176 @@ impl ActivationPerformanceTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ActivationGroup – logical grouping of related extensions
+// ---------------------------------------------------------------------------
+
+/// Groups related extensions together for batch activation management.
+#[derive(Debug, Clone)]
+pub struct ActivationGroup {
+    pub name: String,
+    pub extension_ids: Vec<String>,
+    pub policy: ActivationPolicy,
+}
+
+impl ActivationGroup {
+    /// Create a new activation group with a lazy policy.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            extension_ids: Vec::new(),
+            policy: ActivationPolicy::Lazy,
+        }
+    }
+
+    /// Add an extension to this group.
+    pub fn add(&mut self, ext_id: impl Into<String>) {
+        let id = ext_id.into();
+        if !self.extension_ids.contains(&id) {
+            self.extension_ids.push(id);
+        }
+    }
+
+    /// Remove an extension from this group.
+    pub fn remove(&mut self, ext_id: &str) -> bool {
+        let before = self.extension_ids.len();
+        self.extension_ids.retain(|id| id != ext_id);
+        self.extension_ids.len() < before
+    }
+
+    /// Set the activation policy for this group.
+    pub fn with_policy(mut self, policy: ActivationPolicy) -> Self {
+        self.policy = policy;
+        self
+    }
+
+    /// Number of extensions in the group.
+    pub fn len(&self) -> usize {
+        self.extension_ids.len()
+    }
+
+    /// Whether the group is empty.
+    pub fn is_empty(&self) -> bool {
+        self.extension_ids.is_empty()
+    }
+
+    /// Check if an extension belongs to this group.
+    pub fn contains(&self, ext_id: &str) -> bool {
+        self.extension_ids.iter().any(|id| id == ext_id)
+    }
+
+    /// Filter extension IDs to only those present in a provided set.
+    pub fn intersect(&self, available: &HashSet<String>) -> Vec<String> {
+        self.extension_ids
+            .iter()
+            .filter(|id| available.contains(id.as_str()))
+            .cloned()
+            .collect()
+    }
+}
+
+impl fmt::Display for ActivationGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ActivationGroup(\"{}\", {} exts, policy={})",
+            self.name,
+            self.extension_ids.len(),
+            self.policy,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivationSummary – aggregate report on activation state
+// ---------------------------------------------------------------------------
+
+/// Summarises the current activation state across all extensions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActivationSummary {
+    pub total_registered: usize,
+    pub total_activated: usize,
+    pub total_pending: usize,
+    pub events_by_kind: HashMap<String, usize>,
+}
+
+impl ActivationSummary {
+    /// Build a summary from an [`ExtensionActivationQueue`].
+    ///
+    /// Because the queue's internal registry is private, this constructor
+    /// captures only the high-level counts available through the public API.
+    pub fn from_queue(queue: &ExtensionActivationQueue) -> Self {
+        let total_registered = queue.registered_count();
+        let total_activated = queue.activated_count();
+        let total_pending = queue.pending_count();
+
+        Self {
+            total_registered,
+            total_activated,
+            total_pending,
+            events_by_kind: HashMap::new(),
+        }
+    }
+
+    /// Build a summary with explicit event counts (for callers that
+    /// have access to the individual event lists).
+    pub fn with_events(
+        total_registered: usize,
+        total_activated: usize,
+        total_pending: usize,
+        events: &[ActivationEvent],
+    ) -> Self {
+        let mut events_by_kind: HashMap<String, usize> = HashMap::new();
+        for event in events {
+            let key = match event {
+                ActivationEvent::Star => "Star",
+                ActivationEvent::OnLanguage(_) => "OnLanguage",
+                ActivationEvent::OnCommand(_) => "OnCommand",
+                ActivationEvent::OnFileSystem(_) => "OnFileSystem",
+                ActivationEvent::OnView(_) => "OnView",
+                ActivationEvent::OnUri(_) => "OnUri",
+                ActivationEvent::WorkspaceContains(_) => "WorkspaceContains",
+                ActivationEvent::OnDebug => "OnDebug",
+                ActivationEvent::OnAuthenticationRequest(_) => "OnAuthenticationRequest",
+                ActivationEvent::OnStartupFinished => "OnStartupFinished",
+            };
+            *events_by_kind.entry(key.to_string()).or_insert(0) += 1;
+        }
+        Self {
+            total_registered,
+            total_activated,
+            total_pending,
+            events_by_kind,
+        }
+    }
+
+    /// The fraction of registered extensions that have been activated.
+    pub fn activation_ratio(&self) -> f64 {
+        if self.total_registered == 0 {
+            return 0.0;
+        }
+        self.total_activated as f64 / self.total_registered as f64
+    }
+
+    /// Whether all registered extensions have been activated.
+    pub fn all_activated(&self) -> bool {
+        self.total_pending == 0 && self.total_registered == self.total_activated
+    }
+}
+
+impl fmt::Display for ActivationSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ActivationSummary(registered={}, activated={}, pending={}, ratio={:.1}%)",
+            self.total_registered,
+            self.total_activated,
+            self.total_pending,
+            self.activation_ratio() * 100.0,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1653,5 +1823,95 @@ mod tests {
         let p0 = tracker.percentile_ms(0).unwrap();
         let p100 = tracker.percentile_ms(100).unwrap();
         assert!(p0 <= p100);
+    }
+
+    #[test]
+    fn activation_group_add_remove() {
+        let mut group = ActivationGroup::new("python-tools");
+        group.add("pylint");
+        group.add("pyright");
+        group.add("pylint"); // duplicate
+        assert_eq!(group.len(), 2);
+        assert!(group.contains("pylint"));
+        assert!(group.remove("pylint"));
+        assert_eq!(group.len(), 1);
+        assert!(!group.contains("pylint"));
+        assert!(!group.remove("nonexistent"));
+    }
+
+    #[test]
+    fn activation_group_intersect() {
+        let mut group = ActivationGroup::new("web");
+        group.add("eslint");
+        group.add("prettier");
+        group.add("stylelint");
+        let available: HashSet<String> =
+            ["eslint", "stylelint"].iter().map(|s| s.to_string()).collect();
+        let result = group.intersect(&available);
+        assert_eq!(result.len(), 2);
+        assert!(result.contains(&"eslint".to_string()));
+        assert!(!result.contains(&"prettier".to_string()));
+    }
+
+    #[test]
+    fn activation_group_display_and_policy() {
+        let group = ActivationGroup::new("test-group")
+            .with_policy(ActivationPolicy::Eager);
+        assert!(group.policy.is_eager());
+        let display = format!("{group}");
+        assert!(display.contains("test-group"));
+        assert!(display.contains("eager"));
+    }
+
+    #[test]
+    fn activation_summary_from_queue() {
+        let mut queue = ExtensionActivationQueue::new();
+        queue.register(
+            "ext-a".into(),
+            vec![ActivationEvent::Star],
+        );
+        queue.register(
+            "ext-b".into(),
+            vec![ActivationEvent::OnLanguage("rust".into())],
+        );
+        let summary = ActivationSummary::from_queue(&queue);
+        assert_eq!(summary.total_registered, 2);
+        assert_eq!(summary.total_activated, 0);
+        assert_eq!(summary.total_pending, 0);
+        assert!(!summary.all_activated());
+    }
+
+    #[test]
+    fn activation_summary_with_events() {
+        let events = vec![
+            ActivationEvent::Star,
+            ActivationEvent::OnLanguage("rust".into()),
+            ActivationEvent::OnLanguage("python".into()),
+        ];
+        let summary = ActivationSummary::with_events(3, 1, 0, &events);
+        assert_eq!(*summary.events_by_kind.get("Star").unwrap(), 1);
+        assert_eq!(*summary.events_by_kind.get("OnLanguage").unwrap(), 2);
+    }
+
+    #[test]
+    fn activation_summary_ratio_and_display() {
+        let mut queue = ExtensionActivationQueue::new();
+        queue.register("ext-a".into(), vec![ActivationEvent::Star]);
+        queue.register("ext-b".into(), vec![ActivationEvent::Star]);
+        let mut matcher = ActivationEventMatcher::new();
+        matcher.finish_startup();
+        let _ = queue.evaluate(&matcher);
+        let _ = queue.pop_pending();
+        let summary = ActivationSummary::from_queue(&queue);
+        assert!(summary.activation_ratio() > 0.0);
+        let display = format!("{summary}");
+        assert!(display.contains("ActivationSummary"));
+    }
+
+    #[test]
+    fn activation_group_empty() {
+        let group = ActivationGroup::new("empty");
+        assert!(group.is_empty());
+        assert_eq!(group.len(), 0);
     }
 }

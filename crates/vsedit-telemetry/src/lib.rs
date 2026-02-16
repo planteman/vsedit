@@ -1011,6 +1011,56 @@ pub fn most_recent_event(events: &[TelemetryEvent]) -> Option<&TelemetryEvent> {
     events.iter().max_by_key(|e| e.timestamp)
 }
 
+/// Group events by name, returning a map of event name to count.
+pub fn events_grouped_by_name(events: &[TelemetryEvent]) -> HashMap<String, usize> {
+    let mut map = HashMap::new();
+    for e in events { *map.entry(e.name.clone()).or_insert(0) += 1; }
+    map
+}
+
+/// Return events within a given timestamp range (inclusive).
+pub fn events_in_time_range<'a>(events: &'a [TelemetryEvent], start_ms: u64, end_ms: u64) -> Vec<&'a TelemetryEvent> {
+    events.iter().filter(|e| e.timestamp >= start_ms && e.timestamp <= end_ms).collect()
+}
+
+/// Return the time span (in ms) between earliest and latest events.
+pub fn event_time_span(events: &[TelemetryEvent]) -> u64 {
+    if events.len() < 2 { return 0; }
+    let min_ts = events.iter().map(|e| e.timestamp).min().unwrap_or(0);
+    let max_ts = events.iter().map(|e| e.timestamp).max().unwrap_or(0);
+    max_ts.saturating_sub(min_ts)
+}
+
+/// Return the average measurement value for a given key.
+pub fn avg_measurement(events: &[TelemetryEvent], key: &str) -> Option<f64> {
+    let values: Vec<f64> = events.iter().flat_map(|e| &e.measurements).filter(|(k, _)| k == key).map(|(_, v)| *v).collect();
+    if values.is_empty() { return None; }
+    Some(values.iter().sum::<f64>() / values.len() as f64)
+}
+
+/// Return the min and max measurement values for a given key.
+pub fn measurement_min_max(events: &[TelemetryEvent], key: &str) -> Option<(f64, f64)> {
+    let values: Vec<f64> = events.iter().flat_map(|e| &e.measurements).filter(|(k, _)| k == key).map(|(_, v)| *v).collect();
+    if values.is_empty() { return None; }
+    Some((values.iter().cloned().fold(f64::INFINITY, f64::min), values.iter().cloned().fold(f64::NEG_INFINITY, f64::max)))
+}
+
+/// Return all distinct event names sorted alphabetically.
+pub fn distinct_event_names(events: &[TelemetryEvent]) -> Vec<String> {
+    let mut names: Vec<String> = events.iter().map(|e| e.name.clone()).collect();
+    names.sort(); names.dedup(); names
+}
+
+/// Return events that have at least one measurement.
+pub fn events_with_measurements<'a>(events: &'a [TelemetryEvent]) -> Vec<&'a TelemetryEvent> {
+    events.iter().filter(|e| !e.measurements.is_empty()).collect()
+}
+
+/// Return events that have a specific property key.
+pub fn events_with_property_key<'a>(events: &'a [TelemetryEvent], key: &str) -> Vec<&'a TelemetryEvent> {
+    events.iter().filter(|e| e.properties.iter().any(|(k, _)| k == key)).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1765,5 +1815,77 @@ mod tests {
     fn test_most_recent_event() {
         let events: Vec<TelemetryEvent> = vec![];
         assert!(most_recent_event(&events).is_none());
+    }
+
+    #[test]
+    fn events_grouped_by_name_counts() {
+        let events = vec![
+            TelemetryEventBuilder::new().name("open").build().unwrap(),
+            TelemetryEventBuilder::new().name("save").build().unwrap(),
+            TelemetryEventBuilder::new().name("open").build().unwrap(),
+        ];
+        let grouped = events_grouped_by_name(&events);
+        assert_eq!(grouped.get("open"), Some(&2));
+        assert_eq!(grouped.get("save"), Some(&1));
+    }
+
+    #[test]
+    fn events_in_time_range_filters() {
+        let e1 = TelemetryEventBuilder::new().name("a").timestamp(100).build().unwrap();
+        let e2 = TelemetryEventBuilder::new().name("b").timestamp(200).build().unwrap();
+        let e3 = TelemetryEventBuilder::new().name("c").timestamp(300).build().unwrap();
+        let events = vec![e1, e2, e3];
+        assert_eq!(events_in_time_range(&events, 150, 250).len(), 1);
+    }
+
+    #[test]
+    fn event_time_span_computes() {
+        let e1 = TelemetryEventBuilder::new().name("a").timestamp(100).build().unwrap();
+        let e2 = TelemetryEventBuilder::new().name("b").timestamp(500).build().unwrap();
+        assert_eq!(event_time_span(&[e1, e2]), 400);
+        let e3 = TelemetryEventBuilder::new().name("c").timestamp(100).build().unwrap();
+        assert_eq!(event_time_span(&[e3]), 0);
+    }
+
+    #[test]
+    fn avg_measurement_computes() {
+        let e1 = TelemetryEventBuilder::new().name("a").measurement("dur", 10.0).build().unwrap();
+        let e2 = TelemetryEventBuilder::new().name("b").measurement("dur", 20.0).build().unwrap();
+        assert!((avg_measurement(&[e1, e2], "dur").unwrap() - 15.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn measurement_min_max_computes() {
+        let e1 = TelemetryEventBuilder::new().name("a").measurement("dur", 5.0).build().unwrap();
+        let e2 = TelemetryEventBuilder::new().name("b").measurement("dur", 25.0).build().unwrap();
+        let (min, max) = measurement_min_max(&[e1, e2], "dur").unwrap();
+        assert!((min - 5.0).abs() < f64::EPSILON);
+        assert!((max - 25.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn distinct_event_names_sorts() {
+        let events = vec![
+            TelemetryEventBuilder::new().name("open").build().unwrap(),
+            TelemetryEventBuilder::new().name("save").build().unwrap(),
+            TelemetryEventBuilder::new().name("open").build().unwrap(),
+        ];
+        assert_eq!(distinct_event_names(&events), vec!["open", "save"]);
+    }
+
+    #[test]
+    fn events_with_measurements_filters() {
+        let e1 = TelemetryEventBuilder::new().name("a").measurement("dur", 10.0).build().unwrap();
+        let e2 = TelemetryEventBuilder::new().name("b").build().unwrap();
+        let events = vec![e1, e2];
+        assert_eq!(events_with_measurements(&events).len(), 1);
+    }
+
+    #[test]
+    fn events_with_property_key_filters() {
+        let e1 = TelemetryEventBuilder::new().name("a").property("env", "prod").build().unwrap();
+        let e2 = TelemetryEventBuilder::new().name("b").property("src", "ui").build().unwrap();
+        let events = vec![e1, e2];
+        assert_eq!(events_with_property_key(&events, "env").len(), 1);
     }
 }

@@ -931,6 +931,247 @@ impl Default for ScrollbarZoom {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ScrollState – additional helpers
+// ---------------------------------------------------------------------------
+
+impl ScrollState {
+    /// Create a new scroll state with the given viewport and content dimensions.
+    pub fn new(viewport_width: f64, viewport_height: f64, content_width: f64, content_height: f64) -> Self {
+        Self {
+            scroll_top: 0.0,
+            scroll_left: 0.0,
+            viewport_height,
+            viewport_width,
+            content_height,
+            content_width,
+        }
+    }
+
+    /// Returns `true` when the content fits entirely within the viewport
+    /// (no scrolling needed in either direction).
+    pub fn content_fits(&self) -> bool {
+        self.content_height <= self.viewport_height && self.content_width <= self.viewport_width
+    }
+
+    /// Maximum vertical scroll offset.
+    pub fn max_scroll_top(&self) -> f64 {
+        (self.content_height - self.viewport_height).max(0.0)
+    }
+
+    /// Maximum horizontal scroll offset.
+    pub fn max_scroll_left(&self) -> f64 {
+        (self.content_width - self.viewport_width).max(0.0)
+    }
+
+    /// Scroll vertically by `delta` pixels, clamping to valid bounds.
+    pub fn scroll_by_vertical(&mut self, delta: f64) {
+        self.scroll_top += delta;
+        self.clamp_scroll();
+    }
+
+    /// Scroll horizontally by `delta` pixels, clamping to valid bounds.
+    pub fn scroll_by_horizontal(&mut self, delta: f64) {
+        self.scroll_left += delta;
+        self.clamp_scroll();
+    }
+
+    /// Ensure the given vertical line (in content-pixel coordinates) is visible.
+    /// If it is above the viewport, scroll up. If below, scroll down.
+    pub fn ensure_visible_vertical(&mut self, y: f64, margin: f64) {
+        if y < self.scroll_top + margin {
+            self.scroll_top = (y - margin).max(0.0);
+        } else if y > self.scroll_top + self.viewport_height - margin {
+            self.scroll_top = y - self.viewport_height + margin;
+        }
+        self.clamp_scroll();
+    }
+
+    /// Ensure the given horizontal position is visible, scrolling if needed.
+    pub fn ensure_visible_horizontal(&mut self, x: f64, margin: f64) {
+        if x < self.scroll_left + margin {
+            self.scroll_left = (x - margin).max(0.0);
+        } else if x > self.scroll_left + self.viewport_width - margin {
+            self.scroll_left = x - self.viewport_width + margin;
+        }
+        self.clamp_scroll();
+    }
+
+    /// Returns the visible vertical range as `(top, bottom)` in content coordinates.
+    pub fn visible_vertical_range(&self) -> (f64, f64) {
+        (self.scroll_top, self.scroll_top + self.viewport_height)
+    }
+
+    /// Returns the visible horizontal range as `(left, right)` in content coordinates.
+    pub fn visible_horizontal_range(&self) -> (f64, f64) {
+        (self.scroll_left, self.scroll_left + self.viewport_width)
+    }
+
+    /// Returns `true` if the given point (in content coordinates) is within the viewport.
+    pub fn is_point_visible(&self, x: f64, y: f64) -> bool {
+        let (top, bottom) = self.visible_vertical_range();
+        let (left, right) = self.visible_horizontal_range();
+        x >= left && x <= right && y >= top && y <= bottom
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScrollbarWidget – additional navigation methods
+// ---------------------------------------------------------------------------
+
+impl ScrollbarWidget {
+    /// Scroll to the very left of the content.
+    pub fn scroll_to_left(&mut self) {
+        self.state.scroll_left = 0.0;
+    }
+
+    /// Scroll to the very right of the content.
+    pub fn scroll_to_right(&mut self) {
+        self.state.scroll_left = self.state.max_scroll_left();
+    }
+
+    /// Scroll left by one viewport width.
+    pub fn scroll_page_left(&mut self) {
+        self.state.scroll_left -= self.state.viewport_width;
+        self.state.clamp_scroll();
+    }
+
+    /// Scroll right by one viewport width.
+    pub fn scroll_page_right(&mut self) {
+        self.state.scroll_left += self.state.viewport_width;
+        self.state.clamp_scroll();
+    }
+
+    /// Scroll to a specific line number (assuming `line_height_px` per line).
+    pub fn scroll_to_line(&mut self, line: usize, line_height_px: f64) {
+        self.state.scroll_top = line as f64 * line_height_px;
+        self.state.clamp_scroll();
+    }
+
+    /// Returns the currently visible line range `(first, last)` for the given line height.
+    pub fn visible_line_range(&self, line_height_px: f64) -> (usize, usize) {
+        if line_height_px <= 0.0 {
+            return (0, 0);
+        }
+        let first = (self.state.scroll_top / line_height_px).floor() as usize;
+        let last = ((self.state.scroll_top + self.state.viewport_height) / line_height_px).ceil() as usize;
+        (first, last)
+    }
+
+    /// Whether the vertical scrollbar should be shown based on config.
+    pub fn should_show_vertical(&self) -> bool {
+        match self.config.vertical {
+            ScrollbarVisibility::Visible => true,
+            ScrollbarVisibility::Hidden => false,
+            ScrollbarVisibility::Auto => self.state.content_height > self.state.viewport_height,
+        }
+    }
+
+    /// Whether the horizontal scrollbar should be shown based on config.
+    pub fn should_show_horizontal(&self) -> bool {
+        match self.config.horizontal {
+            ScrollbarVisibility::Visible => true,
+            ScrollbarVisibility::Hidden => false,
+            ScrollbarVisibility::Auto => self.state.content_width > self.state.viewport_width,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScrollbarConfig – builder methods
+// ---------------------------------------------------------------------------
+
+impl ScrollbarConfig {
+    /// Builder: set vertical visibility.
+    pub fn with_vertical(mut self, v: ScrollbarVisibility) -> Self {
+        self.vertical = v;
+        self
+    }
+
+    /// Builder: set horizontal visibility.
+    pub fn with_horizontal(mut self, v: ScrollbarVisibility) -> Self {
+        self.horizontal = v;
+        self
+    }
+
+    /// Builder: set scroll sensitivity.
+    pub fn with_sensitivity(mut self, s: f64) -> Self {
+        self.scroll_sensitivity = s;
+        self
+    }
+
+    /// Builder: set fast scroll sensitivity.
+    pub fn with_fast_sensitivity(mut self, s: f64) -> Self {
+        self.fast_scroll_sensitivity = s;
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScrollbarAnimation – additional helpers
+// ---------------------------------------------------------------------------
+
+impl ScrollbarAnimation {
+    /// Remaining time in milliseconds.
+    pub fn remaining_ms(&self) -> u64 {
+        self.duration_ms.saturating_sub(self.elapsed_ms)
+    }
+
+    /// Reset the animation to replay from the beginning.
+    pub fn restart(&mut self) {
+        self.elapsed_ms = 0;
+    }
+
+    /// Reverse the animation direction (swap `from` and `to`) and reset elapsed time.
+    pub fn reverse(&mut self) {
+        std::mem::swap(&mut self.from, &mut self.to);
+        self.elapsed_ms = 0;
+    }
+
+    /// Retarget the animation to a new destination, keeping current position as `from`.
+    pub fn retarget(&mut self, new_to: f64) {
+        self.from = self.current_value();
+        self.to = new_to;
+        self.elapsed_ms = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MinimapRenderer – additional helpers
+// ---------------------------------------------------------------------------
+
+impl MinimapRenderer {
+    /// Returns `true` if a given line is visible in the minimap viewport.
+    pub fn is_line_visible(&self, line: usize) -> bool {
+        let y = self.line_to_y(line);
+        y >= 0.0 && y < self.viewport_height
+    }
+
+    /// Clamp a line number to valid range `[0, total_lines)`.
+    pub fn clamp_line(&self, line: usize) -> usize {
+        line.min(self.total_lines.saturating_sub(1))
+    }
+
+    /// Returns the number of lines that can be shown in the minimap at once.
+    /// If `total_lines` is 0, returns 0.
+    pub fn visible_line_count(&self) -> usize {
+        self.total_lines
+    }
+
+    /// Returns all markers that overlap the given line range `[start, end]`.
+    pub fn markers_in_range<'a>(
+        &self,
+        markers: &'a [MinimapMarker],
+        range_start: usize,
+        range_end: usize,
+    ) -> Vec<&'a MinimapMarker> {
+        markers
+            .iter()
+            .filter(|m| m.line_end >= range_start && m.line_start <= range_end)
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1711,5 +1952,278 @@ mod tests {
         assert!(!z.is_default());
         z.reset();
         assert!(z.is_default());
+    }
+
+    // ---------------------------------------------------------------
+    // ScrollState extended helpers
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn scroll_state_new_starts_at_origin() {
+        let s = ScrollState::new(200.0, 100.0, 400.0, 800.0);
+        assert!((s.scroll_top - 0.0).abs() < f64::EPSILON);
+        assert!((s.scroll_left - 0.0).abs() < f64::EPSILON);
+        assert!((s.viewport_width - 200.0).abs() < f64::EPSILON);
+        assert!((s.content_height - 800.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn content_fits_when_small() {
+        let s = ScrollState::new(200.0, 100.0, 100.0, 50.0);
+        assert!(s.content_fits());
+        let s2 = ScrollState::new(200.0, 100.0, 400.0, 800.0);
+        assert!(!s2.content_fits());
+    }
+
+    #[test]
+    fn max_scroll_offsets() {
+        let s = ScrollState::new(100.0, 100.0, 300.0, 500.0);
+        assert!((s.max_scroll_top() - 400.0).abs() < f64::EPSILON);
+        assert!((s.max_scroll_left() - 200.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scroll_by_vertical_clamps() {
+        let mut s = ScrollState::new(100.0, 100.0, 100.0, 500.0);
+        s.scroll_by_vertical(100.0);
+        assert!((s.scroll_top - 100.0).abs() < f64::EPSILON);
+        s.scroll_by_vertical(-200.0);
+        assert!((s.scroll_top - 0.0).abs() < f64::EPSILON);
+        s.scroll_by_vertical(9999.0);
+        assert!((s.scroll_top - 400.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn scroll_by_horizontal_clamps() {
+        let mut s = ScrollState::new(100.0, 100.0, 300.0, 100.0);
+        s.scroll_by_horizontal(50.0);
+        assert!((s.scroll_left - 50.0).abs() < f64::EPSILON);
+        s.scroll_by_horizontal(9999.0);
+        assert!((s.scroll_left - 200.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn ensure_visible_vertical_scrolls_down() {
+        let mut s = ScrollState::new(100.0, 100.0, 100.0, 1000.0);
+        // y=500 is far below viewport [0..100]
+        s.ensure_visible_vertical(500.0, 10.0);
+        // After call, 500 should be within the viewport
+        assert!(s.scroll_top <= 500.0);
+        assert!(s.scroll_top + s.viewport_height >= 500.0);
+    }
+
+    #[test]
+    fn ensure_visible_vertical_scrolls_up() {
+        let mut s = ScrollState::new(100.0, 100.0, 100.0, 1000.0);
+        s.scroll_top = 500.0;
+        s.ensure_visible_vertical(100.0, 10.0);
+        assert!(s.scroll_top <= 100.0);
+    }
+
+    #[test]
+    fn ensure_visible_horizontal_scrolls() {
+        let mut s = ScrollState::new(100.0, 100.0, 800.0, 100.0);
+        s.ensure_visible_horizontal(600.0, 5.0);
+        assert!(s.scroll_left <= 600.0);
+        assert!(s.scroll_left + s.viewport_width >= 600.0);
+    }
+
+    #[test]
+    fn visible_ranges() {
+        let s = ScrollState {
+            scroll_top: 50.0,
+            scroll_left: 30.0,
+            viewport_height: 100.0,
+            viewport_width: 200.0,
+            content_height: 500.0,
+            content_width: 500.0,
+        };
+        let (top, bottom) = s.visible_vertical_range();
+        assert!((top - 50.0).abs() < f64::EPSILON);
+        assert!((bottom - 150.0).abs() < f64::EPSILON);
+        let (left, right) = s.visible_horizontal_range();
+        assert!((left - 30.0).abs() < f64::EPSILON);
+        assert!((right - 230.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn is_point_visible_checks() {
+        let s = ScrollState {
+            scroll_top: 100.0,
+            scroll_left: 50.0,
+            viewport_height: 200.0,
+            viewport_width: 300.0,
+            content_height: 1000.0,
+            content_width: 1000.0,
+        };
+        assert!(s.is_point_visible(100.0, 200.0));
+        assert!(!s.is_point_visible(0.0, 0.0));
+        assert!(!s.is_point_visible(400.0, 200.0));
+    }
+
+    // ---------------------------------------------------------------
+    // ScrollbarWidget extended methods
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn widget_scroll_to_left_right() {
+        let mut w = ScrollbarWidget::new(
+            ScrollbarConfig::default(),
+            ScrollState::new(100.0, 100.0, 500.0, 100.0),
+        );
+        w.scroll_to_right();
+        assert!((w.state.scroll_left - 400.0).abs() < f64::EPSILON);
+        w.scroll_to_left();
+        assert!((w.state.scroll_left - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn widget_page_left_right() {
+        let mut w = ScrollbarWidget::new(
+            ScrollbarConfig::default(),
+            ScrollState::new(100.0, 100.0, 500.0, 100.0),
+        );
+        w.scroll_page_right();
+        assert!((w.state.scroll_left - 100.0).abs() < f64::EPSILON);
+        w.scroll_page_left();
+        assert!((w.state.scroll_left - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn widget_scroll_to_line() {
+        let mut w = ScrollbarWidget::new(
+            ScrollbarConfig::default(),
+            ScrollState::new(100.0, 100.0, 100.0, 5000.0),
+        );
+        w.scroll_to_line(10, 20.0);
+        assert!((w.state.scroll_top - 200.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn widget_visible_line_range() {
+        let mut w = ScrollbarWidget::new(
+            ScrollbarConfig::default(),
+            ScrollState::new(100.0, 100.0, 100.0, 5000.0),
+        );
+        w.state.scroll_top = 200.0;
+        let (first, last) = w.visible_line_range(20.0);
+        assert_eq!(first, 10);
+        assert_eq!(last, 15);
+    }
+
+    #[test]
+    fn widget_should_show_scrollbars() {
+        let w = ScrollbarWidget::new(
+            ScrollbarConfig::default(),
+            ScrollState::new(100.0, 100.0, 50.0, 500.0),
+        );
+        assert!(w.should_show_vertical());
+        assert!(!w.should_show_horizontal());
+
+        let w2 = ScrollbarWidget::new(
+            ScrollbarConfig::default().with_vertical(ScrollbarVisibility::Hidden),
+            ScrollState::new(100.0, 100.0, 50.0, 500.0),
+        );
+        assert!(!w2.should_show_vertical());
+
+        let w3 = ScrollbarWidget::new(
+            ScrollbarConfig::default().with_horizontal(ScrollbarVisibility::Visible),
+            ScrollState::new(100.0, 100.0, 50.0, 500.0),
+        );
+        assert!(w3.should_show_horizontal());
+    }
+
+    // ---------------------------------------------------------------
+    // ScrollbarConfig builder tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn config_builder_methods() {
+        let cfg = ScrollbarConfig::default()
+            .with_vertical(ScrollbarVisibility::Hidden)
+            .with_horizontal(ScrollbarVisibility::Visible)
+            .with_sensitivity(2.5)
+            .with_fast_sensitivity(10.0);
+        assert_eq!(cfg.vertical, ScrollbarVisibility::Hidden);
+        assert_eq!(cfg.horizontal, ScrollbarVisibility::Visible);
+        assert!((cfg.scroll_sensitivity - 2.5).abs() < f64::EPSILON);
+        assert!((cfg.fast_scroll_sensitivity - 10.0).abs() < f64::EPSILON);
+    }
+
+    // ---------------------------------------------------------------
+    // ScrollbarAnimation extended helpers
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn animation_remaining_ms() {
+        let mut anim = ScrollbarAnimation::new(0.0, 100.0, 300, ScrollEasing::Linear);
+        assert_eq!(anim.remaining_ms(), 300);
+        anim.tick(100);
+        assert_eq!(anim.remaining_ms(), 200);
+        anim.tick(300);
+        assert_eq!(anim.remaining_ms(), 0);
+    }
+
+    #[test]
+    fn animation_restart() {
+        let mut anim = ScrollbarAnimation::new(0.0, 100.0, 200, ScrollEasing::Linear);
+        anim.tick(200);
+        assert!(anim.is_complete());
+        anim.restart();
+        assert!(!anim.is_complete());
+        assert!((anim.current_value() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn animation_reverse() {
+        let mut anim = ScrollbarAnimation::new(0.0, 100.0, 200, ScrollEasing::Linear);
+        anim.tick(100);
+        anim.reverse();
+        assert!((anim.from - 100.0).abs() < f64::EPSILON);
+        assert!((anim.to - 0.0).abs() < f64::EPSILON);
+        assert!(!anim.is_complete());
+    }
+
+    #[test]
+    fn animation_retarget() {
+        let mut anim = ScrollbarAnimation::new(0.0, 100.0, 200, ScrollEasing::Linear);
+        anim.tick(100); // at 50.0
+        anim.retarget(200.0);
+        assert!((anim.from - 50.0).abs() < f64::EPSILON);
+        assert!((anim.to - 200.0).abs() < f64::EPSILON);
+        assert_eq!(anim.elapsed_ms, 0);
+    }
+
+    // ---------------------------------------------------------------
+    // MinimapRenderer extended helpers
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn minimap_is_line_visible() {
+        let r = MinimapRenderer::new(100, 200.0, 50.0);
+        assert!(r.is_line_visible(0));
+        assert!(r.is_line_visible(50));
+        assert!(r.is_line_visible(99));
+    }
+
+    #[test]
+    fn minimap_clamp_line() {
+        let r = MinimapRenderer::new(100, 200.0, 50.0);
+        assert_eq!(r.clamp_line(50), 50);
+        assert_eq!(r.clamp_line(999), 99);
+    }
+
+    #[test]
+    fn minimap_markers_in_range() {
+        let r = MinimapRenderer::new(200, 400.0, 60.0);
+        let markers = vec![
+            MinimapMarker { line_start: 0, line_end: 10, color: 0xFF0000FF },
+            MinimapMarker { line_start: 50, line_end: 60, color: 0x00FF00FF },
+            MinimapMarker { line_start: 100, line_end: 110, color: 0x0000FFFF },
+        ];
+        let found = r.markers_in_range(&markers, 5, 55);
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].line_start, 0);
+        assert_eq!(found[1].line_start, 50);
     }
 }

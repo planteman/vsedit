@@ -970,6 +970,163 @@ impl CallGraph {
     pub fn key_for_public(item: &CallHierarchyItem) -> String {
         Self::key_for(item)
     }
+
+    /// Return the out-degree (number of callees) for a given item.
+    pub fn out_degree(&self, item: &CallHierarchyItem) -> usize {
+        let key = Self::key_for(item);
+        self.edges.get(&key).map_or(0, |s| s.len())
+    }
+
+    /// Return the in-degree (number of callers) for a given item.
+    pub fn in_degree(&self, item: &CallHierarchyItem) -> usize {
+        let key = Self::key_for(item);
+        self.reverse_edges.get(&key).map_or(0, |s| s.len())
+    }
+
+    /// Compute the longest shortest path from `start` to any reachable node (eccentricity).
+    pub fn eccentricity(&self, start: &CallHierarchyItem) -> usize {
+        let start_key = Self::key_for(start);
+        let mut visited = HashSet::new();
+        visited.insert(start_key.clone());
+        let mut queue = VecDeque::new();
+        queue.push_back((start_key, 0usize));
+        let mut max_depth = 0;
+        while let Some((key, depth)) = queue.pop_front() {
+            if depth > max_depth {
+                max_depth = depth;
+            }
+            if let Some(neighbors) = self.edges.get(&key) {
+                for n in neighbors {
+                    if visited.insert(n.clone()) {
+                        queue.push_back((n.clone(), depth + 1));
+                    }
+                }
+            }
+        }
+        max_depth
+    }
+
+    /// Return all items in the graph.
+    pub fn all_items(&self) -> Vec<&CallHierarchyItem> {
+        self.items.values().collect()
+    }
+
+    /// Topological sort of graph nodes. Returns `None` if the graph contains a cycle.
+    pub fn topological_sort(&self) -> Option<Vec<&CallHierarchyItem>> {
+        let mut in_deg: HashMap<&String, usize> = HashMap::new();
+        for key in self.items.keys() {
+            in_deg.entry(key).or_insert(0);
+        }
+        for callees in self.edges.values() {
+            for callee_key in callees {
+                if self.items.contains_key(callee_key) {
+                    *in_deg.entry(callee_key).or_insert(0) += 1;
+                }
+            }
+        }
+        let mut queue: VecDeque<&String> = in_deg
+            .iter()
+            .filter(|&(_, &deg)| deg == 0)
+            .map(|(k, _)| *k)
+            .collect();
+        let mut result = Vec::new();
+        while let Some(key) = queue.pop_front() {
+            if let Some(item) = self.items.get(key) {
+                result.push(item);
+            }
+            if let Some(neighbors) = self.edges.get(key) {
+                for n in neighbors {
+                    if let Some(deg) = in_deg.get_mut(n) {
+                        *deg -= 1;
+                        if *deg == 0 {
+                            queue.push_back(n);
+                        }
+                    }
+                }
+            }
+        }
+        if result.len() == self.items.len() {
+            Some(result)
+        } else {
+            None
+        }
+    }
+
+    /// Compute the shortest path length from `from` to `to`. Returns `None` if unreachable.
+    pub fn shortest_path_length(
+        &self,
+        from: &CallHierarchyItem,
+        to: &CallHierarchyItem,
+    ) -> Option<usize> {
+        let start_key = Self::key_for(from);
+        let target_key = Self::key_for(to);
+        if start_key == target_key {
+            return Some(0);
+        }
+        let mut visited = HashSet::new();
+        visited.insert(start_key.clone());
+        let mut queue = VecDeque::new();
+        queue.push_back((start_key, 0usize));
+        while let Some((key, depth)) = queue.pop_front() {
+            if let Some(neighbors) = self.edges.get(&key) {
+                for n in neighbors {
+                    if *n == target_key {
+                        return Some(depth + 1);
+                    }
+                    if visited.insert(n.clone()) {
+                        queue.push_back((n.clone(), depth + 1));
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Filter items in the graph by symbol kind.
+    pub fn items_by_kind(&self, kind: SymbolKind) -> Vec<&CallHierarchyItem> {
+        self.items.values().filter(|item| item.kind == kind).collect()
+    }
+}
+
+/// Summary statistics computed from a `CallGraph`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GraphSummary {
+    pub node_count: usize,
+    pub edge_count: usize,
+    pub root_count: usize,
+    pub leaf_count: usize,
+    pub max_out_degree: usize,
+    pub max_in_degree: usize,
+    pub has_cycles: bool,
+}
+
+impl GraphSummary {
+    /// Compute a summary from the given call graph.
+    pub fn from_graph(graph: &CallGraph) -> Self {
+        let items: Vec<&CallHierarchyItem> = graph.all_items();
+        let max_out = items.iter().map(|i| graph.out_degree(i)).max().unwrap_or(0);
+        let max_in = items.iter().map(|i| graph.in_degree(i)).max().unwrap_or(0);
+        let has_cycles = items.iter().any(|i| graph.has_cycle_from(i));
+        Self {
+            node_count: graph.node_count(),
+            edge_count: graph.edge_count(),
+            root_count: graph.find_roots().len(),
+            leaf_count: graph.find_leaves().len(),
+            max_out_degree: max_out,
+            max_in_degree: max_in,
+            has_cycles,
+        }
+    }
+}
+
+impl fmt::Display for GraphSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "nodes={} edges={} roots={} leaves={} cycles={}",
+            self.node_count, self.edge_count, self.root_count, self.leaf_count, self.has_cycles
+        )
+    }
 }
 
 #[cfg(test)]
@@ -1657,5 +1814,104 @@ mod tests {
         // depth 3: all four
         let r3 = graph.reachable_within(&a, 3);
         assert_eq!(r3.len(), 4);
+    }
+
+    #[test]
+    fn edge_count_and_degree() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Method);
+        let c = sample_item("c", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&a, &c);
+        graph.add_edge(&b, &c);
+        assert_eq!(graph.edge_count(), 3);
+        assert_eq!(graph.out_degree(&a), 2);
+        assert_eq!(graph.in_degree(&c), 2);
+        assert_eq!(graph.in_degree(&a), 0);
+    }
+
+    #[test]
+    fn eccentricity_linear_chain() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &c);
+        assert_eq!(graph.eccentricity(&a), 2);
+        assert_eq!(graph.eccentricity(&c), 0);
+    }
+
+    #[test]
+    fn topological_sort_dag() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &c);
+        let sorted = graph.topological_sort();
+        assert!(sorted.is_some());
+        let names: Vec<&str> = sorted.unwrap().iter().map(|i| i.name.as_str()).collect();
+        assert_eq!(names, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn topological_sort_returns_none_on_cycle() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &a);
+        assert!(graph.topological_sort().is_none());
+    }
+
+    #[test]
+    fn shortest_path_length_works() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Function);
+        let c = sample_item("c", SymbolKind::Function);
+        let d = sample_item("d", SymbolKind::Function);
+        graph.add_edge(&a, &b);
+        graph.add_edge(&b, &c);
+        graph.add_edge(&a, &c);
+        graph.add_item(d.clone());
+        assert_eq!(graph.shortest_path_length(&a, &a), Some(0));
+        assert_eq!(graph.shortest_path_length(&a, &c), Some(1)); // direct edge
+        assert_eq!(graph.shortest_path_length(&c, &a), None); // unreachable
+        assert_eq!(graph.shortest_path_length(&a, &d), None); // isolated node
+    }
+
+    #[test]
+    fn graph_summary_display() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Method);
+        graph.add_edge(&a, &b);
+        let summary = GraphSummary::from_graph(&graph);
+        assert_eq!(summary.node_count, 2);
+        assert_eq!(summary.edge_count, 1);
+        assert_eq!(summary.root_count, 1);
+        assert_eq!(summary.leaf_count, 1);
+        assert!(!summary.has_cycles);
+        let display = format!("{}", summary);
+        assert!(display.contains("nodes=2"));
+    }
+
+    #[test]
+    fn items_by_kind_filter() {
+        let mut graph = CallGraph::new();
+        let a = sample_item("a", SymbolKind::Function);
+        let b = sample_item("b", SymbolKind::Method);
+        let c = sample_item("c", SymbolKind::Function);
+        graph.add_item(a);
+        graph.add_item(b);
+        graph.add_item(c);
+        let fns = graph.items_by_kind(SymbolKind::Function);
+        assert_eq!(fns.len(), 2);
+        let methods = graph.items_by_kind(SymbolKind::Method);
+        assert_eq!(methods.len(), 1);
     }
 }

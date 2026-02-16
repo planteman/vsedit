@@ -993,6 +993,188 @@ impl CancellationTokenGroup {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CancellationBarrier – waits for ALL tokens to be cancelled
+// ---------------------------------------------------------------------------
+
+/// A barrier that tracks multiple [`CancellationToken`]s and reports
+/// completion only when *every* token has been cancelled.
+#[derive(Debug, Clone)]
+pub struct CancellationBarrier {
+    tokens: Vec<CancellationToken>,
+}
+
+impl CancellationBarrier {
+    /// Create a barrier over the given tokens.
+    pub fn new(tokens: Vec<CancellationToken>) -> Self {
+        Self { tokens }
+    }
+
+    /// Returns `true` when every token in the barrier has been cancelled.
+    /// An empty barrier is considered complete.
+    pub fn is_complete(&self) -> bool {
+        self.tokens.iter().all(|t| t.is_cancelled())
+    }
+
+    /// Number of tokens that have been cancelled so far.
+    pub fn completed(&self) -> usize {
+        self.tokens.iter().filter(|t| t.is_cancelled()).count()
+    }
+
+    /// Total number of tokens tracked by this barrier.
+    pub fn total(&self) -> usize {
+        self.tokens.len()
+    }
+
+    /// Return progress as a fraction in `[0.0, 1.0]`.
+    pub fn progress(&self) -> f64 {
+        if self.tokens.is_empty() {
+            return 1.0;
+        }
+        self.completed() as f64 / self.tokens.len() as f64
+    }
+
+    /// Number of tokens still pending (not yet cancelled).
+    pub fn remaining(&self) -> usize {
+        self.total() - self.completed()
+    }
+
+    /// Wait asynchronously until every token has been cancelled.
+    pub async fn wait(&mut self) {
+        for token in &mut self.tokens {
+            token.cancelled().await;
+        }
+    }
+}
+
+impl fmt::Display for CancellationBarrier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "CancellationBarrier({}/{})",
+            self.completed(),
+            self.total()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CancellationMap – keyed collection of cancellation sources
+// ---------------------------------------------------------------------------
+
+/// A keyed collection of [`CancellationTokenSource`]s, allowing cancellation
+/// of individual tasks by name.
+pub struct CancellationMap {
+    sources: std::collections::HashMap<String, CancellationTokenSource>,
+}
+
+impl CancellationMap {
+    /// Create an empty map.
+    pub fn new() -> Self {
+        Self {
+            sources: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Insert a new cancellation source for `key`, returning the source for
+    /// external control. Overwrites any prior entry with the same key.
+    pub fn insert(&mut self, key: impl Into<String>) -> &CancellationTokenSource {
+        let key = key.into();
+        self.sources
+            .entry(key)
+            .or_insert_with(CancellationTokenSource::new)
+    }
+
+    /// Get a token for the given key, if it exists.
+    pub fn get(&self, key: &str) -> Option<CancellationToken> {
+        self.sources.get(key).map(|s| s.token())
+    }
+
+    /// Cancel the source associated with `key`.
+    pub fn cancel(&self, key: &str) {
+        if let Some(source) = self.sources.get(key) {
+            source.cancel();
+        }
+    }
+
+    /// Cancel every source in the map.
+    pub fn cancel_all(&self) {
+        for source in self.sources.values() {
+            source.cancel();
+        }
+    }
+
+    /// Remove a source by key, returning it if it existed.
+    pub fn remove(&mut self, key: &str) -> Option<CancellationTokenSource> {
+        self.sources.remove(key)
+    }
+
+    /// Number of entries.
+    pub fn len(&self) -> usize {
+        self.sources.len()
+    }
+
+    /// Whether the map is empty.
+    pub fn is_empty(&self) -> bool {
+        self.sources.is_empty()
+    }
+
+    /// Check if the token for `key` is cancelled. Returns `false` if key
+    /// does not exist.
+    pub fn is_cancelled(&self, key: &str) -> bool {
+        self.sources
+            .get(key)
+            .map(|s| s.is_cancelled())
+            .unwrap_or(false)
+    }
+
+    /// Return keys whose tokens are *not* cancelled.
+    pub fn active_keys(&self) -> Vec<&str> {
+        self.sources
+            .iter()
+            .filter(|(_, s)| !s.is_cancelled())
+            .map(|(k, _)| k.as_str())
+            .collect()
+    }
+
+    /// Return keys whose tokens *are* cancelled.
+    pub fn cancelled_keys(&self) -> Vec<&str> {
+        self.sources
+            .iter()
+            .filter(|(_, s)| s.is_cancelled())
+            .map(|(k, _)| k.as_str())
+            .collect()
+    }
+}
+
+impl Default for CancellationMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Debug for CancellationMap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CancellationMap")
+            .field("len", &self.len())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OperationGuard – conditional execution helper
+// ---------------------------------------------------------------------------
+
+impl OperationGuard {
+    /// Execute `f` only if the guard's token is still active.
+    /// Returns `Err(CancellationError::AlreadyCancelled)` without calling `f`
+    /// if the token has been cancelled.
+    pub fn run_if_active<T, F: FnOnce() -> T>(&self, f: F) -> Result<T, CancellationError> {
+        self.check()?;
+        Ok(f())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1700,6 +1882,136 @@ mod tests {
         let s = format!("{entry}");
         assert!(s.contains("fetch"));
         assert!(s.contains("immediate"));
+    }
+
+    // -- CancellationBarrier tests -----------------------------------------
+
+    #[test]
+    fn barrier_completes_when_all_cancelled() {
+        let s1 = CancellationTokenSource::new();
+        let s2 = CancellationTokenSource::new();
+        let barrier = CancellationBarrier::new(vec![s1.token(), s2.token()]);
+        assert!(!barrier.is_complete());
+        s1.cancel();
+        assert!(!barrier.is_complete());
+        s2.cancel();
+        assert!(barrier.is_complete());
+    }
+
+    #[test]
+    fn barrier_progress_tracking() {
+        let s1 = CancellationTokenSource::new();
+        let s2 = CancellationTokenSource::new();
+        let s3 = CancellationTokenSource::new();
+        let barrier =
+            CancellationBarrier::new(vec![s1.token(), s2.token(), s3.token()]);
+        assert_eq!(barrier.total(), 3);
+        assert_eq!(barrier.completed(), 0);
+        assert!((barrier.progress() - 0.0).abs() < f64::EPSILON);
+
+        s1.cancel();
+        assert_eq!(barrier.completed(), 1);
+        assert_eq!(barrier.remaining(), 2);
+
+        s2.cancel();
+        s3.cancel();
+        assert!((barrier.progress() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn barrier_empty_is_complete() {
+        let barrier = CancellationBarrier::new(vec![]);
+        assert!(barrier.is_complete());
+        assert_eq!(barrier.total(), 0);
+        assert!((barrier.progress() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn barrier_display() {
+        let s1 = CancellationTokenSource::new();
+        let barrier = CancellationBarrier::new(vec![s1.token()]);
+        assert_eq!(format!("{barrier}"), "CancellationBarrier(0/1)");
+        s1.cancel();
+        assert_eq!(format!("{barrier}"), "CancellationBarrier(1/1)");
+    }
+
+    // -- CancellationMap tests ---------------------------------------------
+
+    #[test]
+    fn map_insert_cancel_get() {
+        let mut map = CancellationMap::new();
+        let source = map.insert("task-a");
+        assert!(!source.is_cancelled());
+        let token = map.get("task-a").unwrap();
+        assert!(!token.is_cancelled());
+
+        map.cancel("task-a");
+        let token2 = map.get("task-a").unwrap();
+        assert!(token2.is_cancelled());
+    }
+
+    #[test]
+    fn map_cancel_by_key() {
+        let mut map = CancellationMap::new();
+        map.insert("task-b");
+        assert!(!map.is_cancelled("task-b"));
+        map.cancel("task-b");
+        assert!(map.is_cancelled("task-b"));
+    }
+
+    #[test]
+    fn map_cancel_all_and_keys() {
+        let mut map = CancellationMap::new();
+        map.insert("x");
+        map.insert("y");
+        map.insert("z");
+        assert_eq!(map.len(), 3);
+        assert!(!map.is_empty());
+
+        map.cancel_all();
+        assert_eq!(map.cancelled_keys().len(), 3);
+        assert_eq!(map.active_keys().len(), 0);
+    }
+
+    #[test]
+    fn map_remove_returns_source() {
+        let mut map = CancellationMap::new();
+        map.insert("item");
+        assert!(map.remove("item").is_some());
+        assert!(map.get("item").is_none());
+        assert!(map.remove("item").is_none());
+    }
+
+    #[test]
+    fn map_missing_key_returns_false() {
+        let map = CancellationMap::new();
+        assert!(!map.is_cancelled("nonexistent"));
+        assert!(map.get("nonexistent").is_none());
+    }
+
+    #[test]
+    fn map_debug_format() {
+        let map = CancellationMap::new();
+        let s = format!("{map:?}");
+        assert!(s.contains("CancellationMap"));
+    }
+
+    // -- OperationGuard::run_if_active tests --------------------------------
+
+    #[test]
+    fn guard_run_if_active_executes_when_active() {
+        let token = CancellationToken::none();
+        let guard = OperationGuard::new(token, "op");
+        let result = guard.run_if_active(|| 42);
+        assert_eq!(result, Ok(42));
+    }
+
+    #[test]
+    fn guard_run_if_active_errors_when_cancelled() {
+        let token = CancellationToken::cancelled_token();
+        let guard = OperationGuard::new(token, "op");
+        let result = guard.run_if_active(|| 42);
+        assert_eq!(result, Err(CancellationError::AlreadyCancelled));
     }
 
     // -- CancellationTokenGroup merge/split tests --------------------------

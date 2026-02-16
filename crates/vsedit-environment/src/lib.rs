@@ -1120,6 +1120,277 @@ impl fmt::Display for EnvProfile {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Additional impl blocks for existing types
+// ---------------------------------------------------------------------------
+
+impl AppPaths {
+    /// Return the path for a session-specific temporary directory.
+    pub fn tmp_for_session(&self, session_id: &str) -> PathBuf {
+        self.tmp.join(session_id)
+    }
+
+    /// Return the path for a named global storage bucket.
+    pub fn global_storage_for(&self, bucket: &str) -> PathBuf {
+        self.global_storage.join(bucket)
+    }
+
+    /// Return the User directory (parent of settings / keybindings).
+    pub fn user_dir(&self) -> PathBuf {
+        self.user_data.join("User")
+    }
+
+    /// Check whether the settings file exists on disk.
+    pub fn has_settings_file(&self) -> bool {
+        self.settings_file.is_file()
+    }
+
+    /// Check whether the keybindings file exists on disk.
+    pub fn has_keybindings_file(&self) -> bool {
+        self.keybindings_file.is_file()
+    }
+
+    /// Return the number of managed directory paths.
+    pub fn directory_count(&self) -> usize {
+        self.all_directories().len()
+    }
+}
+
+impl CliArgs {
+    /// Whether this invocation is in any special mode (diff, merge).
+    pub fn is_special_mode(&self) -> bool {
+        self.diff || self.merge
+    }
+
+    /// Return the first path, if any.
+    pub fn first_path(&self) -> Option<&Path> {
+        self.paths.first().map(|p| p.as_path())
+    }
+
+    /// Return a human-readable summary of the invocation.
+    pub fn summary(&self) -> String {
+        let mut parts = Vec::new();
+        if self.diff {
+            parts.push("diff".to_string());
+        }
+        if self.merge {
+            parts.push("merge".to_string());
+        }
+        if self.wait {
+            parts.push("wait".to_string());
+        }
+        if self.new_window {
+            parts.push("new-window".to_string());
+        }
+        if self.reuse_window {
+            parts.push("reuse-window".to_string());
+        }
+        if self.verbose {
+            parts.push("verbose".to_string());
+        }
+        if self.disable_extensions {
+            parts.push("no-extensions".to_string());
+        }
+        if let Some((l, c)) = self.goto {
+            parts.push(format!("goto={l}:{c}"));
+        }
+        parts.push(format!("{} path(s)", self.paths.len()));
+        parts.join(", ")
+    }
+
+    /// Return the effective locale, defaulting to `"en-US"`.
+    pub fn effective_locale(&self) -> &str {
+        self.locale.as_deref().unwrap_or("en-US")
+    }
+}
+
+impl fmt::Display for CliArgs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CliArgs({})", self.summary())
+    }
+}
+
+impl ShellEnvironment {
+    /// Return all key-value pairs as a sorted vector of tuples.
+    pub fn sorted_pairs(&self) -> Vec<(&str, &str)> {
+        let mut pairs: Vec<(&str, &str)> = self
+            .variables
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
+        pairs.sort_by_key(|(k, _)| *k);
+        pairs
+    }
+
+    /// Return only the variables whose keys start with the given prefix.
+    pub fn filter_by_prefix(&self, prefix: &str) -> HashMap<String, String> {
+        self.variables
+            .iter()
+            .filter(|(k, _)| k.starts_with(prefix))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+
+    /// Return true if a variable is set and non-empty.
+    pub fn has_nonempty(&self, key: &str) -> bool {
+        self.variables
+            .get(key)
+            .map(|v| !v.is_empty())
+            .unwrap_or(false)
+    }
+
+    /// Resolve a template string using this environment as the variable source.
+    pub fn resolve(&self, template: &str) -> String {
+        resolve_env_variables(template, &self.as_getter())
+    }
+}
+
+impl EnvSnapshot {
+    /// Compute the diff from this snapshot to another.
+    pub fn diff_to(&self, other: &EnvSnapshot) -> EnvDiff {
+        EnvDiff::between(self, other)
+    }
+
+    /// Return all keys in the snapshot, sorted.
+    pub fn sorted_keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.variables.keys().map(|s| s.as_str()).collect();
+        keys.sort();
+        keys
+    }
+
+    /// Check whether a specific key is present.
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.variables.contains_key(key)
+    }
+}
+
+impl EnvDiff {
+    /// Apply this diff to a `ShellEnvironment`, producing the "after" state.
+    pub fn apply_to(&self, env: &mut ShellEnvironment) {
+        for key in self.removed.keys() {
+            env.remove(key);
+        }
+        for (key, value) in &self.added {
+            env.set(key.clone(), value.clone());
+        }
+        for (key, (_old, new)) in &self.changed {
+            env.set(key.clone(), new.clone());
+        }
+    }
+
+    /// Return true if only additions exist (no removals or modifications).
+    pub fn is_additive_only(&self) -> bool {
+        self.removed.is_empty() && self.changed.is_empty()
+    }
+}
+
+impl EnvPathManager {
+    /// Return the entry at the given index, if it exists.
+    pub fn get(&self, index: usize) -> Option<&Path> {
+        self.entries.get(index).map(|p| p.as_path())
+    }
+
+    /// Swap two entries by index. Returns false if either index is out of bounds.
+    pub fn swap(&mut self, a: usize, b: usize) -> bool {
+        if a >= self.entries.len() || b >= self.entries.len() {
+            return false;
+        }
+        self.entries.swap(a, b);
+        true
+    }
+
+    /// Return the position of a path, if present.
+    pub fn position(&self, path: &Path) -> Option<usize> {
+        self.entries.iter().position(|p| p == path)
+    }
+
+    /// Create from an iterator of paths.
+    pub fn from_iter(paths: impl IntoIterator<Item = PathBuf>) -> Self {
+        Self {
+            entries: paths.into_iter().collect(),
+        }
+    }
+}
+
+impl EnvProfile {
+    /// Merge another profile into this one (other's overrides take precedence).
+    pub fn merge(&mut self, other: &EnvProfile) {
+        for (k, v) in &other.overrides {
+            self.overrides.insert(k.clone(), v.clone());
+        }
+    }
+
+    /// Check whether a specific key is affected by this profile.
+    pub fn affects(&self, key: &str) -> bool {
+        self.overrides.contains_key(key)
+    }
+
+    /// Return the override value for a key, if any (None means "unset").
+    pub fn get_override(&self, key: &str) -> Option<Option<&str>> {
+        self.overrides.get(key).map(|v| v.as_deref())
+    }
+}
+
+impl EnvironmentStats {
+    /// Return true if no failures have been recorded.
+    pub fn is_all_success(&self) -> bool {
+        self.failed_operations == 0
+    }
+
+    /// Return the total time spent in operations, in milliseconds.
+    pub fn total_time_ms(&self) -> f64 {
+        self.total_time_ns as f64 / 1_000_000.0
+    }
+
+    /// Return a human-readable summary string.
+    pub fn summary(&self) -> String {
+        format!(
+            "{} ops ({} ok, {} err) avg={:.2}ms",
+            self.total_operations,
+            self.successful_operations,
+            self.failed_operations,
+            self.total_time_ms() / self.total_operations.max(1) as f64,
+        )
+    }
+}
+
+impl EnvironmentValidator {
+    /// Validate a path string, ensuring it is non-empty and does not contain null bytes.
+    pub fn validate_path(path: &str) -> Result<(), EnvironmentError> {
+        if path.is_empty() {
+            return Err(EnvironmentError::InvalidPath(
+                "path must not be empty".into(),
+            ));
+        }
+        if path.contains('\0') {
+            return Err(EnvironmentError::InvalidPath(
+                "path must not contain null bytes".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Normalize a path string by collapsing consecutive separators.
+    pub fn normalize_path(path: &str) -> String {
+        let sep = std::path::MAIN_SEPARATOR;
+        let mut result = String::with_capacity(path.len());
+        let mut prev_sep = false;
+        for ch in path.chars() {
+            let is_sep = ch == '/' || ch == '\\';
+            if is_sep {
+                if !prev_sep {
+                    result.push(sep);
+                }
+                prev_sep = true;
+            } else {
+                result.push(ch);
+                prev_sep = false;
+            }
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1710,5 +1981,258 @@ mod tests {
         let keys = profile.affected_keys();
         assert_eq!(keys.len(), 3);
         assert!(keys.contains(&"NEW_VAR"));
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for deepened functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn app_paths_tmp_for_session() {
+        let paths = AppPaths::from_user_data(PathBuf::from("/data"));
+        assert_eq!(
+            paths.tmp_for_session("sess-1"),
+            PathBuf::from("/data/tmp/sess-1")
+        );
+    }
+
+    #[test]
+    fn app_paths_global_storage_for() {
+        let paths = AppPaths::from_user_data(PathBuf::from("/data"));
+        assert_eq!(
+            paths.global_storage_for("bucket-a"),
+            PathBuf::from("/data/globalStorage/bucket-a")
+        );
+    }
+
+    #[test]
+    fn app_paths_user_dir_and_counts() {
+        let paths = AppPaths::from_user_data(PathBuf::from("/data"));
+        assert_eq!(paths.user_dir(), PathBuf::from("/data/User"));
+        assert!(paths.directory_count() >= 7);
+        // Non-existent paths should report false
+        assert!(!paths.has_settings_file());
+        assert!(!paths.has_keybindings_file());
+    }
+
+    #[test]
+    fn cli_args_special_mode_and_first_path() {
+        let args = CliArgs {
+            diff: true,
+            paths: vec![PathBuf::from("a"), PathBuf::from("b")],
+            ..Default::default()
+        };
+        assert!(args.is_special_mode());
+        assert_eq!(args.first_path(), Some(Path::new("a")));
+
+        let empty = CliArgs::default();
+        assert!(!empty.is_special_mode());
+        assert_eq!(empty.first_path(), None);
+    }
+
+    #[test]
+    fn cli_args_summary_includes_flags() {
+        let args = CliArgs {
+            verbose: true,
+            wait: true,
+            goto: Some((10, 3)),
+            paths: vec![PathBuf::from("file.rs")],
+            ..Default::default()
+        };
+        let s = args.summary();
+        assert!(s.contains("verbose"));
+        assert!(s.contains("wait"));
+        assert!(s.contains("goto=10:3"));
+        assert!(s.contains("1 path(s)"));
+    }
+
+    #[test]
+    fn cli_args_effective_locale_default_and_override() {
+        let args = CliArgs::default();
+        assert_eq!(args.effective_locale(), "en-US");
+
+        let args2 = CliArgs {
+            locale: Some("fr-FR".into()),
+            ..Default::default()
+        };
+        assert_eq!(args2.effective_locale(), "fr-FR");
+    }
+
+    #[test]
+    fn cli_args_display_trait() {
+        let args = CliArgs {
+            diff: true,
+            paths: vec![PathBuf::from("a"), PathBuf::from("b")],
+            ..Default::default()
+        };
+        let s = format!("{args}");
+        assert!(s.starts_with("CliArgs("));
+        assert!(s.contains("diff"));
+    }
+
+    #[test]
+    fn shell_environment_sorted_pairs() {
+        let env = ShellEnvironment::from_pairs(vec![("Z", "3"), ("A", "1"), ("M", "2")]);
+        let pairs = env.sorted_pairs();
+        assert_eq!(pairs[0].0, "A");
+        assert_eq!(pairs[1].0, "M");
+        assert_eq!(pairs[2].0, "Z");
+    }
+
+    #[test]
+    fn shell_environment_filter_by_prefix() {
+        let env = ShellEnvironment::from_pairs(vec![
+            ("APP_NAME", "vsedit"),
+            ("APP_VERSION", "1.0"),
+            ("HOME", "/home/user"),
+        ]);
+        let filtered = env.filter_by_prefix("APP_");
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.contains_key("APP_NAME"));
+        assert!(filtered.contains_key("APP_VERSION"));
+        assert!(!filtered.contains_key("HOME"));
+    }
+
+    #[test]
+    fn shell_environment_has_nonempty() {
+        let mut env = ShellEnvironment::new();
+        env.set("FILLED", "value");
+        env.set("EMPTY", "");
+        assert!(env.has_nonempty("FILLED"));
+        assert!(!env.has_nonempty("EMPTY"));
+        assert!(!env.has_nonempty("MISSING"));
+    }
+
+    #[test]
+    fn shell_environment_resolve_template() {
+        let env = ShellEnvironment::from_pairs(vec![("USER", "bob"), ("DIR", "/opt")]);
+        let result = env.resolve("Hello ${env:USER}, dir=${env:DIR}");
+        assert_eq!(result, "Hello bob, dir=/opt");
+    }
+
+    #[test]
+    fn env_snapshot_diff_to() {
+        let a = EnvSnapshot::from_pairs(vec![("X", "1")], Some("a"));
+        let b = EnvSnapshot::from_pairs(vec![("X", "2"), ("Y", "3")], Some("b"));
+        let diff = a.diff_to(&b);
+        assert_eq!(diff.changed.len(), 1);
+        assert_eq!(diff.added.len(), 1);
+        assert!(diff.removed.is_empty());
+    }
+
+    #[test]
+    fn env_snapshot_sorted_keys_and_contains() {
+        let snap = EnvSnapshot::from_pairs(vec![("C", "3"), ("A", "1"), ("B", "2")], None);
+        let keys = snap.sorted_keys();
+        assert_eq!(keys, vec!["A", "B", "C"]);
+        assert!(snap.contains_key("B"));
+        assert!(!snap.contains_key("D"));
+    }
+
+    #[test]
+    fn env_diff_apply_to() {
+        let before = EnvSnapshot::from_pairs(vec![("A", "1"), ("B", "2"), ("C", "3")], None);
+        let after = EnvSnapshot::from_pairs(vec![("A", "1"), ("B", "changed"), ("D", "4")], None);
+        let diff = EnvDiff::between(&before, &after);
+
+        let mut env = ShellEnvironment::from_pairs(vec![("A", "1"), ("B", "2"), ("C", "3")]);
+        diff.apply_to(&mut env);
+        assert_eq!(env.get("A"), Some("1"));
+        assert_eq!(env.get("B"), Some("changed"));
+        assert_eq!(env.get("C"), None);
+        assert_eq!(env.get("D"), Some("4"));
+    }
+
+    #[test]
+    fn env_diff_is_additive_only() {
+        let before = EnvSnapshot::from_pairs(vec![("A", "1")], None);
+        let after = EnvSnapshot::from_pairs(vec![("A", "1"), ("B", "2")], None);
+        let diff = EnvDiff::between(&before, &after);
+        assert!(diff.is_additive_only());
+
+        let after2 = EnvSnapshot::from_pairs(vec![("A", "changed"), ("B", "2")], None);
+        let diff2 = EnvDiff::between(&before, &after2);
+        assert!(!diff2.is_additive_only());
+    }
+
+    #[test]
+    fn env_path_manager_get_swap_position() {
+        let mut mgr = EnvPathManager::from_iter(vec![
+            PathBuf::from("/a"),
+            PathBuf::from("/b"),
+            PathBuf::from("/c"),
+        ]);
+        assert_eq!(mgr.get(0), Some(Path::new("/a")));
+        assert_eq!(mgr.get(5), None);
+        assert_eq!(mgr.position(Path::new("/b")), Some(1));
+        assert_eq!(mgr.position(Path::new("/z")), None);
+
+        assert!(mgr.swap(0, 2));
+        assert_eq!(mgr.get(0), Some(Path::new("/c")));
+        assert_eq!(mgr.get(2), Some(Path::new("/a")));
+        assert!(!mgr.swap(0, 99));
+    }
+
+    #[test]
+    fn env_profile_merge_and_affects() {
+        let mut base = EnvProfile::new("base");
+        base.set_var("A", "1");
+        base.set_var("B", "2");
+
+        let mut overlay = EnvProfile::new("overlay");
+        overlay.set_var("B", "override");
+        overlay.set_var("C", "3");
+
+        base.merge(&overlay);
+        assert_eq!(base.len(), 3);
+        assert!(base.affects("C"));
+        assert!(!base.affects("Z"));
+        assert_eq!(base.get_override("B"), Some(Some("override")));
+        assert_eq!(base.get_override("MISSING"), None);
+    }
+
+    #[test]
+    fn env_profile_get_override_unset() {
+        let mut p = EnvProfile::new("p");
+        p.unset_var("GONE");
+        // An unset entry yields Some(None)
+        assert_eq!(p.get_override("GONE"), Some(None));
+    }
+
+    #[test]
+    fn environment_stats_is_all_success_and_summary() {
+        let mut stats = EnvironmentStats::new();
+        assert!(stats.is_all_success());
+        stats.record_success(1_000_000);
+        assert!(stats.is_all_success());
+        let s = stats.summary();
+        assert!(s.contains("1 ops"));
+        assert!(s.contains("1 ok"));
+        assert!(s.contains("0 err"));
+
+        stats.record_failure(2_000_000);
+        assert!(!stats.is_all_success());
+    }
+
+    #[test]
+    fn environment_stats_total_time_ms() {
+        let mut stats = EnvironmentStats::new();
+        stats.record_success(5_000_000); // 5ms
+        stats.record_success(3_000_000); // 3ms
+        let ms = stats.total_time_ms();
+        assert!((ms - 8.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn validator_validate_path_ok_and_errors() {
+        assert!(EnvironmentValidator::validate_path("/usr/bin").is_ok());
+        assert!(EnvironmentValidator::validate_path("").is_err());
+        assert!(EnvironmentValidator::validate_path("/bad\0path").is_err());
+    }
+
+    #[test]
+    fn validator_normalize_path_collapses_separators() {
+        let norm = EnvironmentValidator::normalize_path("/usr///local//bin");
+        assert_eq!(norm, "/usr/local/bin");
     }
 }

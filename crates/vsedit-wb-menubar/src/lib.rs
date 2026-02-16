@@ -978,6 +978,95 @@ impl MenuBarService {
         }
         count
     }
+
+    /// Disable all entries across every menu. Returns how many were changed.
+    pub fn disable_all_entries(&mut self) -> usize {
+        let mut count = 0;
+        for entries in self.menus.values_mut() {
+            for e in entries.iter_mut() {
+                if e.enabled {
+                    e.enabled = false;
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+
+    /// Return a sorted list of all unique shortcuts across all menus.
+    pub fn all_shortcuts(&self) -> Vec<String> {
+        let mut shortcuts: Vec<String> = self
+            .menus
+            .values()
+            .flat_map(|entries| entries.iter())
+            .filter_map(|e| e.shortcut.clone())
+            .collect();
+        shortcuts.sort();
+        shortcuts.dedup();
+        shortcuts
+    }
+
+    /// Find entries whose title contains the given query (case-insensitive).
+    pub fn search_entries(&self, query: &str) -> Vec<(String, &MenuEntry)> {
+        let lower_q = query.to_lowercase();
+        let mut results = Vec::new();
+        for (key, entries) in &self.menus {
+            for e in entries {
+                if e.title.to_lowercase().contains(&lower_q) {
+                    results.push((key.clone(), e));
+                }
+            }
+        }
+        results
+    }
+
+    /// Return the total number of disabled entries across all menus.
+    pub fn disabled_entry_count(&self) -> usize {
+        self.menus
+            .values()
+            .flat_map(|entries| entries.iter())
+            .filter(|e| !e.enabled)
+            .count()
+    }
+
+    /// Return the total number of entries that have shortcuts.
+    pub fn shortcut_count(&self) -> usize {
+        self.menus
+            .values()
+            .flat_map(|entries| entries.iter())
+            .filter(|e| e.shortcut.is_some())
+            .count()
+    }
+}
+
+impl MenuEntry {
+    /// Return the group name or "ungrouped" if none.
+    pub fn group_label(&self) -> &str {
+        self.group.as_deref().unwrap_or("ungrouped")
+    }
+
+    /// Return a summary string: "command_id (order)".
+    pub fn summary(&self) -> String {
+        format!("{} (order={})", self.command_id, self.order)
+    }
+}
+
+impl MenuId {
+    /// Return the standard menu ordering index for sorting.
+    /// Custom menus sort after all standard menus.
+    pub fn sort_order(&self) -> u8 {
+        match self {
+            MenuId::File => 0,
+            MenuId::Edit => 1,
+            MenuId::Selection => 2,
+            MenuId::View => 3,
+            MenuId::Go => 4,
+            MenuId::Run => 5,
+            MenuId::Terminal => 6,
+            MenuId::Help => 7,
+            MenuId::Custom(_) => 8,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1777,5 +1866,75 @@ mod tests {
         svc.add_entry(&MenuId::File, entry("a", 1));
         let changed = svc.enable_all_entries();
         assert_eq!(changed, 0);
+    }
+
+    #[test]
+    fn disable_all_entries() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("a", 1));
+        svc.add_entry(&MenuId::Edit, entry("b", 2));
+        let changed = svc.disable_all_entries();
+        assert_eq!(changed, 2);
+        assert_eq!(svc.disabled_entry_count(), 2);
+    }
+
+    #[test]
+    fn all_shortcuts_deduped() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("a", 1).with_shortcut("Ctrl+S"));
+        svc.add_entry(&MenuId::File, entry("b", 2).with_shortcut("Ctrl+O"));
+        svc.add_entry(&MenuId::Edit, entry("c", 1).with_shortcut("Ctrl+S"));
+        let shortcuts = svc.all_shortcuts();
+        assert_eq!(shortcuts.len(), 2);
+        assert!(shortcuts.contains(&"Ctrl+S".to_string()));
+        assert!(shortcuts.contains(&"Ctrl+O".to_string()));
+    }
+
+    #[test]
+    fn search_entries_case_insensitive() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, titled_entry("save", "Save File", 1));
+        svc.add_entry(&MenuId::Edit, titled_entry("undo", "Undo Action", 1));
+        let results = svc.search_entries("save");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].1.command_id, "save");
+    }
+
+    #[test]
+    fn search_entries_no_match() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("a", 1));
+        let results = svc.search_entries("nonexistent");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn shortcut_count() {
+        let mut svc = MenuBarService::new();
+        svc.add_entry(&MenuId::File, entry("a", 1).with_shortcut("Ctrl+S"));
+        svc.add_entry(&MenuId::File, entry("b", 2));
+        assert_eq!(svc.shortcut_count(), 1);
+    }
+
+    #[test]
+    fn entry_group_label() {
+        let e = entry("a", 1).with_group("navigation");
+        assert_eq!(e.group_label(), "navigation");
+        let e2 = entry("b", 1);
+        assert_eq!(e2.group_label(), "ungrouped");
+    }
+
+    #[test]
+    fn entry_summary() {
+        let e = entry("save", 3);
+        let s = e.summary();
+        assert!(s.contains("save"));
+        assert!(s.contains("order=3"));
+    }
+
+    #[test]
+    fn menu_id_sort_order() {
+        assert!(MenuId::File.sort_order() < MenuId::Edit.sort_order());
+        assert!(MenuId::Help.sort_order() < MenuId::Custom("x".into()).sort_order());
     }
 }

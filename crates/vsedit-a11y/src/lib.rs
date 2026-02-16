@@ -1101,6 +1101,83 @@ pub fn format_focus_summary(tracker: &FocusTracker) -> String {
     }
 }
 
+/// Build a textual description of an accessibility tree suitable for debugging.
+pub fn describe_tree(node: &AccessibilityNode, indent: usize) -> String {
+    let mut out = String::new();
+    let prefix = " ".repeat(indent * 2);
+    out.push_str(&format!("{}{} \"{}\"\n", prefix, node.role, node.label));
+    for child in &node.children {
+        out.push_str(&describe_tree(child, indent + 1));
+    }
+    out
+}
+
+/// Count the total number of interactive roles in an accessibility tree.
+pub fn count_interactive_nodes(node: &AccessibilityNode) -> usize {
+    let self_count = if node.role.is_interactive() { 1 } else { 0 };
+    self_count + node.children.iter().map(count_interactive_nodes).sum::<usize>()
+}
+
+impl AccessibilityConfig {
+    /// Return true if announcements should be verbose (High verbosity).
+    pub fn is_verbose(&self) -> bool {
+        self.verbosity == Verbosity::High
+    }
+
+    /// Return true if announcements should be minimal (Low verbosity).
+    pub fn is_minimal(&self) -> bool {
+        self.verbosity == Verbosity::Low
+    }
+}
+
+impl KeyboardNavigation {
+    /// Return true if there are any skip links configured.
+    pub fn has_skip_links(&self) -> bool {
+        !self.skip_links.is_empty()
+    }
+
+    /// Clear all skip links.
+    pub fn clear_skip_links(&mut self) {
+        self.skip_links.clear();
+    }
+
+    /// Return the skip links as a comma-separated string.
+    pub fn skip_links_display(&self) -> String {
+        self.skip_links.join(", ")
+    }
+}
+
+impl LandmarkRegistry {
+    /// Return all registered landmark labels.
+    pub fn all_labels(&self) -> Vec<&str> {
+        self.landmarks.iter().map(|(l, _)| l.as_str()).collect()
+    }
+
+    /// Return all unique roles that have landmarks registered.
+    pub fn unique_roles(&self) -> Vec<AriaRole> {
+        let mut roles: Vec<AriaRole> = self.landmarks.iter().map(|(_, r)| *r).collect();
+        roles.sort_by_key(|r| format!("{:?}", r));
+        roles.dedup();
+        roles
+    }
+}
+
+impl FocusHistory {
+    /// Return the full history as a slice.
+    pub fn entries(&self) -> &[String] {
+        &self.history
+    }
+
+    /// Return the number of unique elements that have been focused.
+    pub fn unique_count(&self) -> usize {
+        let mut seen = std::collections::HashSet::new();
+        for h in &self.history {
+            seen.insert(h.as_str());
+        }
+        seen.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1783,5 +1860,77 @@ mod tests {
         let s = format_focus_summary(&ft);
         assert!(s.contains("editor"));
         assert!(s.contains("1 of 2"));
+    }
+
+    #[test]
+    fn describe_tree_output() {
+        let mut root = AccessibilityNode::new("root", AriaRole::Tree);
+        root.add_child(AccessibilityNode::new("item1", AriaRole::TreeItem));
+        root.add_child(AccessibilityNode::new("item2", AriaRole::TreeItem));
+        let desc = describe_tree(&root, 0);
+        assert!(desc.contains("root"));
+        assert!(desc.contains("item1"));
+        assert!(desc.contains("item2"));
+    }
+
+    #[test]
+    fn count_interactive_nodes_mixed() {
+        let mut root = AccessibilityNode::new("list", AriaRole::List);
+        root.add_child(AccessibilityNode::new("btn", AriaRole::Button));
+        root.add_child(AccessibilityNode::new("text", AriaRole::TextBox));
+        root.add_child(AccessibilityNode::new("item", AriaRole::ListItem));
+        // Button and TextBox are interactive; List and ListItem are not
+        assert_eq!(count_interactive_nodes(&root), 2);
+    }
+
+    #[test]
+    fn config_verbose_and_minimal() {
+        let cfg = AccessibilityConfig::default().with_verbosity(Verbosity::High);
+        assert!(cfg.is_verbose());
+        assert!(!cfg.is_minimal());
+        let cfg2 = AccessibilityConfig::default().with_verbosity(Verbosity::Low);
+        assert!(cfg2.is_minimal());
+        assert!(!cfg2.is_verbose());
+    }
+
+    #[test]
+    fn keyboard_nav_skip_links() {
+        let mut nav = KeyboardNavigation::new();
+        assert!(!nav.has_skip_links());
+        nav.add_skip_link("main-content".into());
+        nav.add_skip_link("sidebar".into());
+        assert!(nav.has_skip_links());
+        assert_eq!(nav.skip_links_display(), "main-content, sidebar");
+        nav.clear_skip_links();
+        assert!(!nav.has_skip_links());
+    }
+
+    #[test]
+    fn landmark_registry_all_labels() {
+        let mut reg = LandmarkRegistry::new();
+        reg.register("main", AriaRole::Menu);
+        reg.register("sidebar", AriaRole::List);
+        let labels = reg.all_labels();
+        assert_eq!(labels, vec!["main", "sidebar"]);
+    }
+
+    #[test]
+    fn landmark_registry_unique_roles() {
+        let mut reg = LandmarkRegistry::new();
+        reg.register("a", AriaRole::Menu);
+        reg.register("b", AriaRole::Menu);
+        reg.register("c", AriaRole::List);
+        let roles = reg.unique_roles();
+        assert_eq!(roles.len(), 2);
+    }
+
+    #[test]
+    fn focus_history_entries_and_unique() {
+        let mut fh = FocusHistory::new(10);
+        fh.record("editor");
+        fh.record("panel");
+        fh.record("editor");
+        assert_eq!(fh.entries().len(), 3);
+        assert_eq!(fh.unique_count(), 2);
     }
 }

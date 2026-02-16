@@ -1041,6 +1041,133 @@ pub fn file_stat_batch(paths: &[&str]) -> Vec<FileStatResult> {
     }).collect()
 }
 
+// ---------------------------------------------------------------------------
+// FileExtensionStats – extension-based statistics
+// ---------------------------------------------------------------------------
+
+/// Statistics about file extensions in a set of paths.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FileExtensionStats {
+    pub extension_counts: HashMap<String, usize>,
+    pub total_files: usize,
+    pub total_dirs: usize,
+}
+
+impl FileExtensionStats {
+    /// Compute extension stats from a batch of `FileStatResult` items.
+    pub fn from_results(results: &[FileStatResult]) -> Self {
+        let mut extension_counts: HashMap<String, usize> = HashMap::new();
+        let mut total_files = 0usize;
+        let mut total_dirs = 0usize;
+        for r in results {
+            if r.is_dir {
+                total_dirs += 1;
+            } else {
+                total_files += 1;
+                if let Some(ref ext) = r.extension {
+                    *extension_counts.entry(ext.clone()).or_insert(0) += 1;
+                }
+            }
+        }
+        Self { extension_counts, total_files, total_dirs }
+    }
+
+    /// Return the most common extension, if any.
+    pub fn most_common_extension(&self) -> Option<(&str, usize)> {
+        self.extension_counts
+            .iter()
+            .max_by_key(|(_, count)| **count)
+            .map(|(ext, &count)| (ext.as_str(), count))
+    }
+
+    /// Return the number of distinct extensions.
+    pub fn distinct_extensions(&self) -> usize {
+        self.extension_counts.len()
+    }
+}
+
+impl fmt::Display for FileExtensionStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Files: {}, Dirs: {}, Extensions: {}",
+            self.total_files, self.total_dirs, self.distinct_extensions()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathMatcher – glob-like path filtering
+// ---------------------------------------------------------------------------
+
+/// Simple path matcher supporting `*` (any segment characters) and `**` (any
+/// number of path segments) patterns. This is a basic utility for filtering
+/// file paths without pulling in a full glob crate.
+pub struct PathMatcher {
+    pattern: String,
+}
+
+impl PathMatcher {
+    pub fn new(pattern: impl Into<String>) -> Self {
+        Self { pattern: pattern.into() }
+    }
+
+    /// Returns `true` if the path matches the pattern.
+    ///
+    /// Supports:
+    /// - `*` matches any characters except `/`
+    /// - exact string match
+    /// - suffix match when pattern starts with `*`
+    pub fn matches(&self, path: &str) -> bool {
+        if self.pattern == "*" {
+            return true;
+        }
+        if self.pattern.starts_with("*.") {
+            let suffix = &self.pattern[1..];
+            return path.ends_with(suffix);
+        }
+        if self.pattern.ends_with("/*") {
+            let prefix = &self.pattern[..self.pattern.len() - 1];
+            return path.starts_with(prefix);
+        }
+        self.pattern == path
+    }
+
+    /// Filter a list of paths, returning only those that match.
+    pub fn filter<'a>(&self, paths: &'a [&str]) -> Vec<&'a str> {
+        paths.iter().copied().filter(|p| self.matches(p)).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DiffSummary Display
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for DiffSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "+{} -{} ={} (total {})",
+            self.added, self.removed, self.equal, self.total_lines
+        )
+    }
+}
+
+/// Compute a simple similarity ratio between two byte slices based on
+/// their diff. Returns a value between 0.0 (completely different) and
+/// 1.0 (identical).
+pub fn file_similarity(old: &[u8], new: &[u8]) -> f64 {
+    if old.is_empty() && new.is_empty() {
+        return 1.0;
+    }
+    let diff = file_compare(old, new);
+    let summary = diff_summary(&diff);
+    if summary.total_lines == 0 {
+        return 1.0;
+    }
+    summary.equal as f64 / summary.total_lines as f64
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1692,5 +1819,56 @@ mod tests {
         let summary = diff_summary(&diff);
         assert_eq!(summary.added, 2);
         assert_eq!(summary.removed, 0);
+    }
+
+    #[test]
+    fn test_file_extension_stats() {
+        let results = file_stat_batch(&["src/main.rs", "src/lib.rs", "Cargo.toml", "docs/"]);
+        let stats = FileExtensionStats::from_results(&results);
+        assert_eq!(stats.total_files, 3);
+        assert_eq!(stats.total_dirs, 1);
+        assert_eq!(stats.extension_counts.get("rs"), Some(&2));
+        assert_eq!(stats.extension_counts.get("toml"), Some(&1));
+    }
+
+    #[test]
+    fn test_most_common_extension() {
+        let results = file_stat_batch(&["a.rs", "b.rs", "c.toml"]);
+        let stats = FileExtensionStats::from_results(&results);
+        let (ext, count) = stats.most_common_extension().unwrap();
+        assert_eq!(ext, "rs");
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_extension_stats_display() {
+        let results = file_stat_batch(&["a.rs", "b.toml", "dir/"]);
+        let stats = FileExtensionStats::from_results(&results);
+        let display = stats.to_string();
+        assert!(display.contains("Files: 2"));
+        assert!(display.contains("Dirs: 1"));
+    }
+
+    #[test]
+    fn test_path_matcher_suffix() {
+        let m = PathMatcher::new("*.rs");
+        assert!(m.matches("src/main.rs"));
+        assert!(!m.matches("src/main.toml"));
+    }
+
+    #[test]
+    fn test_path_matcher_prefix() {
+        let m = PathMatcher::new("src/*");
+        assert!(m.matches("src/main.rs"));
+        assert!(!m.matches("tests/test.rs"));
+    }
+
+    #[test]
+    fn test_file_similarity() {
+        assert!((file_similarity(b"hello\n", b"hello\n") - 1.0).abs() < f64::EPSILON);
+        assert!((file_similarity(b"a\nb\n", b"x\ny\n") - 0.0).abs() < f64::EPSILON);
+        let sim = file_similarity(b"a\nb\nc\n", b"a\nb\nd\n");
+        assert!(sim >= 0.5);
+        assert!(sim < 1.0);
     }
 }

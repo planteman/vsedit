@@ -1094,6 +1094,220 @@ impl FormattingConfigBuilder {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TextEdit – construction helpers
+// ---------------------------------------------------------------------------
+
+impl TextEdit {
+    /// Create an insertion edit at the given position.
+    pub fn insert(line: u32, column: u32, text: impl Into<String>) -> Self {
+        Self {
+            start_line: line,
+            start_column: column,
+            end_line: line,
+            end_column: column,
+            new_text: text.into(),
+        }
+    }
+
+    /// Create a deletion edit spanning the given range.
+    pub fn delete(start_line: u32, start_column: u32, end_line: u32, end_column: u32) -> Self {
+        Self {
+            start_line,
+            start_column,
+            end_line,
+            end_column,
+            new_text: String::new(),
+        }
+    }
+
+    /// Create a replacement edit spanning the given range.
+    pub fn replace(
+        start_line: u32,
+        start_column: u32,
+        end_line: u32,
+        end_column: u32,
+        text: impl Into<String>,
+    ) -> Self {
+        Self {
+            start_line,
+            start_column,
+            end_line,
+            end_column,
+            new_text: text.into(),
+        }
+    }
+
+    /// Return whether the edit range comes strictly before `other`.
+    pub fn is_before(&self, other: &TextEdit) -> bool {
+        self.end_line < other.start_line
+            || (self.end_line == other.start_line && self.end_column <= other.start_column)
+    }
+
+    /// Return whether the edit range comes strictly after `other`.
+    pub fn is_after(&self, other: &TextEdit) -> bool {
+        other.is_before(self)
+    }
+
+    /// Shift this edit's position by the given line and column deltas.
+    pub fn shifted(&self, line_delta: i64, col_delta: i64) -> Self {
+        Self {
+            start_line: (self.start_line as i64 + line_delta).max(0) as u32,
+            start_column: (self.start_column as i64 + col_delta).max(0) as u32,
+            end_line: (self.end_line as i64 + line_delta).max(0) as u32,
+            end_column: (self.end_column as i64 + col_delta).max(0) as u32,
+            new_text: self.new_text.clone(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FormattingOptions – indentation string helpers
+// ---------------------------------------------------------------------------
+
+impl FormattingOptions {
+    /// Return the single-level indentation string according to current settings.
+    pub fn indent_str(&self) -> String {
+        if self.insert_spaces {
+            " ".repeat(self.tab_size as usize)
+        } else {
+            "\t".to_string()
+        }
+    }
+
+    /// Return an indentation string for the given nesting level.
+    pub fn indent_at_level(&self, level: u32) -> String {
+        self.indent_str().repeat(level as usize)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FormattingService – provider counts and clearing
+// ---------------------------------------------------------------------------
+
+impl FormattingService {
+    /// Return the total number of registered providers across all categories.
+    pub fn provider_count(&self) -> usize {
+        self.document_providers.len()
+            + self.range_providers.len()
+            + self.on_type_providers.len()
+    }
+
+    /// Remove all registered providers.
+    pub fn clear_providers(&mut self) {
+        self.document_providers.clear();
+        self.range_providers.clear();
+        self.on_type_providers.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FormatStats – percentage helpers
+// ---------------------------------------------------------------------------
+
+impl FormatStats {
+    /// Return the number of successful operations.
+    pub fn successes(&self) -> u64 {
+        self.successful_operations
+    }
+
+    /// Return the number of failed operations.
+    pub fn failures(&self) -> u64 {
+        self.failed_operations
+    }
+
+    /// Return total elapsed time across all operations in milliseconds.
+    pub fn total_time_ms(&self) -> u64 {
+        self.total_time_ns / 1_000_000
+    }
+
+    /// Return the average operation time in milliseconds.
+    pub fn average_time_ms(&self) -> u64 {
+        self.average_time_ns() / 1_000_000
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Diff-based edit generation
+// ---------------------------------------------------------------------------
+
+/// Generate the minimal set of line-level `TextEdit`s that transform
+/// `original` into `formatted`.  Each changed line produces one replace edit;
+/// inserted/deleted lines are handled similarly.
+pub fn diff_edits(original: &str, formatted: &str) -> Vec<TextEdit> {
+    let orig_lines: Vec<&str> = original.lines().collect();
+    let fmt_lines: Vec<&str> = formatted.lines().collect();
+    let mut edits = Vec::new();
+
+    let max_len = orig_lines.len().max(fmt_lines.len());
+    for i in 0..max_len {
+        let orig_line = orig_lines.get(i).copied();
+        let fmt_line = fmt_lines.get(i).copied();
+        match (orig_line, fmt_line) {
+            (Some(o), Some(f)) if o != f => {
+                edits.push(TextEdit::replace(
+                    i as u32,
+                    0,
+                    i as u32,
+                    o.len() as u32,
+                    f,
+                ));
+            }
+            (Some(o), None) => {
+                edits.push(TextEdit::delete(i as u32, 0, i as u32, o.len() as u32));
+            }
+            (None, Some(f)) => {
+                edits.push(TextEdit::insert(i as u32, 0, f));
+            }
+            _ => {}
+        }
+    }
+    edits
+}
+
+/// Remove consecutive blank lines, collapsing runs of 2+ empty lines into one.
+pub fn collapse_blank_lines(text: &str) -> String {
+    let mut result = Vec::new();
+    let mut prev_blank = false;
+    for line in text.lines() {
+        let blank = line.trim().is_empty();
+        if blank && prev_blank {
+            continue;
+        }
+        result.push(line);
+        prev_blank = blank;
+    }
+    result.join("\n")
+}
+
+/// Ensure there is exactly one blank line between top-level blocks.
+/// A "block boundary" is defined as a non-empty line followed (or preceded)
+/// by a line with zero indentation.
+pub fn ensure_blank_line_between_blocks(text: &str) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.is_empty() {
+        return String::new();
+    }
+    let mut result = vec![lines[0].to_string()];
+    for i in 1..lines.len() {
+        let prev = lines[i - 1];
+        let curr = lines[i];
+        let prev_content = !prev.trim().is_empty();
+        let curr_at_root = !curr.trim().is_empty()
+            && curr.len() == curr.trim_start().len();
+        if prev_content && curr_at_root {
+            // Insert blank separator if missing
+            if let Some(last) = result.last() {
+                if !last.trim().is_empty() {
+                    result.push(String::new());
+                }
+            }
+        }
+        result.push(curr.to_string());
+    }
+    result.join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1739,5 +1953,208 @@ mod tests {
         assert!(cfg.format_on_save);
         assert!(!cfg.format_on_paste);
         assert_eq!(cfg.default_provider.as_deref(), Some("rustfmt"));
+    }
+
+    // -- TextEdit construction helpers -------------------------------------
+
+    #[test]
+    fn text_edit_insert_constructor() {
+        let edit = TextEdit::insert(3, 5, "hello");
+        assert_eq!(edit.start_line, 3);
+        assert_eq!(edit.start_column, 5);
+        assert_eq!(edit.end_line, 3);
+        assert_eq!(edit.end_column, 5);
+        assert_eq!(edit.new_text, "hello");
+        assert_eq!(edit.kind(), EditKind::Insert);
+    }
+
+    #[test]
+    fn text_edit_delete_constructor() {
+        let edit = TextEdit::delete(1, 0, 1, 10);
+        assert_eq!(edit.new_text, "");
+        assert_eq!(edit.kind(), EditKind::Delete);
+        assert_eq!(edit.replaced_length(), 10);
+    }
+
+    #[test]
+    fn text_edit_replace_constructor() {
+        let edit = TextEdit::replace(0, 0, 0, 5, "world");
+        assert_eq!(edit.kind(), EditKind::Replace);
+        assert_eq!(edit.new_text, "world");
+    }
+
+    #[test]
+    fn text_edit_is_before_and_after() {
+        let a = TextEdit::insert(1, 5, "x");
+        let b = TextEdit::insert(2, 0, "y");
+        assert!(a.is_before(&b));
+        assert!(!b.is_before(&a));
+        assert!(b.is_after(&a));
+        assert!(!a.is_after(&b));
+    }
+
+    #[test]
+    fn text_edit_is_before_same_line() {
+        let a = TextEdit::replace(1, 0, 1, 3, "aa");
+        let b = TextEdit::replace(1, 3, 1, 6, "bb");
+        assert!(a.is_before(&b));
+        assert!(!b.is_before(&a));
+    }
+
+    #[test]
+    fn text_edit_shifted() {
+        let edit = TextEdit::replace(2, 4, 3, 0, "new");
+        let shifted = edit.shifted(1, -2);
+        assert_eq!(shifted.start_line, 3);
+        assert_eq!(shifted.start_column, 2);
+        assert_eq!(shifted.end_line, 4);
+        assert_eq!(shifted.end_column, 0); // max(0-2, 0) = 0
+        assert_eq!(shifted.new_text, "new");
+    }
+
+    #[test]
+    fn text_edit_shifted_clamps_to_zero() {
+        let edit = TextEdit::insert(0, 1, "x");
+        let shifted = edit.shifted(-5, -5);
+        assert_eq!(shifted.start_line, 0);
+        assert_eq!(shifted.start_column, 0);
+    }
+
+    // -- FormattingOptions indent helpers -----------------------------------
+
+    #[test]
+    fn formatting_options_indent_str_spaces() {
+        let opts = FormattingOptions::default();
+        assert_eq!(opts.indent_str(), "    ");
+    }
+
+    #[test]
+    fn formatting_options_indent_str_tabs() {
+        let opts = FormattingOptions::default().with_insert_spaces(false);
+        assert_eq!(opts.indent_str(), "\t");
+    }
+
+    #[test]
+    fn formatting_options_indent_at_level() {
+        let opts = FormattingOptions::default().with_tab_size(2);
+        assert_eq!(opts.indent_at_level(0), "");
+        assert_eq!(opts.indent_at_level(1), "  ");
+        assert_eq!(opts.indent_at_level(3), "      ");
+    }
+
+    // -- FormattingService provider management ------------------------------
+
+    #[test]
+    fn formatting_service_provider_count_and_clear() {
+        struct Dp;
+        impl DocumentFormattingProvider for Dp {
+            fn format_document(&self, _: &str, _: &FormattingOptions) -> Vec<TextEdit> {
+                vec![]
+            }
+        }
+        struct Rp;
+        impl DocumentRangeFormattingProvider for Rp {
+            fn format_range(&self, _: &str, _: u32, _: u32, _: &FormattingOptions) -> Vec<TextEdit> {
+                vec![]
+            }
+        }
+
+        let mut svc = FormattingService::new();
+        assert_eq!(svc.provider_count(), 0);
+        svc.register_document_provider(Box::new(Dp));
+        svc.register_range_provider(Box::new(Rp));
+        assert_eq!(svc.provider_count(), 2);
+        svc.clear_providers();
+        assert_eq!(svc.provider_count(), 0);
+    }
+
+    // -- FormatStats millisecond helpers ------------------------------------
+
+    #[test]
+    fn format_stats_millisecond_accessors() {
+        let mut stats = FormatStats::new();
+        stats.record_success(5_000_000); // 5ms
+        stats.record_success(3_000_000); // 3ms
+        assert_eq!(stats.total_time_ms(), 8);
+        assert_eq!(stats.average_time_ms(), 4);
+        assert_eq!(stats.successes(), 2);
+        assert_eq!(stats.failures(), 0);
+    }
+
+    #[test]
+    fn format_stats_failures_accessor() {
+        let mut stats = FormatStats::new();
+        stats.record_failure(1_000_000);
+        stats.record_failure(2_000_000);
+        assert_eq!(stats.failures(), 2);
+        assert_eq!(stats.successes(), 0);
+        assert_eq!(stats.total_time_ms(), 3);
+    }
+
+    // -- diff_edits --------------------------------------------------------
+
+    #[test]
+    fn diff_edits_identical_text() {
+        let text = "line 1\nline 2\nline 3";
+        assert!(diff_edits(text, text).is_empty());
+    }
+
+    #[test]
+    fn diff_edits_single_line_change() {
+        let edits = diff_edits("hello\nworld", "hello\nearth");
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].start_line, 1);
+        assert_eq!(edits[0].new_text, "earth");
+    }
+
+    #[test]
+    fn diff_edits_line_added() {
+        let edits = diff_edits("a", "a\nb");
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].kind(), EditKind::Insert);
+        assert_eq!(edits[0].new_text, "b");
+    }
+
+    #[test]
+    fn diff_edits_line_removed() {
+        let edits = diff_edits("a\nb", "a");
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].kind(), EditKind::Delete);
+    }
+
+    // -- collapse_blank_lines ----------------------------------------------
+
+    #[test]
+    fn collapse_blank_lines_removes_runs() {
+        let input = "a\n\n\n\nb\n\nc";
+        let result = collapse_blank_lines(input);
+        assert_eq!(result, "a\n\nb\n\nc");
+    }
+
+    #[test]
+    fn collapse_blank_lines_preserves_single() {
+        let input = "a\n\nb";
+        assert_eq!(collapse_blank_lines(input), "a\n\nb");
+    }
+
+    #[test]
+    fn collapse_blank_lines_empty_input() {
+        assert_eq!(collapse_blank_lines(""), "");
+    }
+
+    // -- ensure_blank_line_between_blocks ----------------------------------
+
+    #[test]
+    fn ensure_blank_line_between_blocks_inserts() {
+        let input = "fn a() {}\nfn b() {}";
+        let result = ensure_blank_line_between_blocks(input);
+        assert_eq!(result, "fn a() {}\n\nfn b() {}");
+    }
+
+    #[test]
+    fn ensure_blank_line_between_blocks_already_present() {
+        let input = "fn a() {}\n\nfn b() {}";
+        let result = ensure_blank_line_between_blocks(input);
+        assert_eq!(result, "fn a() {}\n\nfn b() {}");
     }
 }

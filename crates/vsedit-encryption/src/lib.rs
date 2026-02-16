@@ -174,6 +174,7 @@ pub fn hmac_verify(key: &[u8], data: &[u8], signature: &[u8]) -> bool {
 }
 
 /// XOR-based encryption service.
+#[derive(Debug)]
 pub struct EncryptionService {
     key: Vec<u8>,
 }
@@ -1108,6 +1109,29 @@ impl EncryptionThroughputStats {
     pub fn total_bytes(&self) -> u64 {
         self.bytes_encrypted + self.bytes_decrypted
     }
+
+    /// Reset all counters to zero.
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    /// Merge another stats instance into this one.
+    pub fn merge(&mut self, other: &EncryptionThroughputStats) {
+        self.encrypt_count += other.encrypt_count;
+        self.decrypt_count += other.decrypt_count;
+        self.bytes_encrypted += other.bytes_encrypted;
+        self.bytes_decrypted += other.bytes_decrypted;
+    }
+
+    /// Average bytes per operation, or 0 if none recorded.
+    pub fn avg_bytes_per_op(&self) -> u64 {
+        let total_ops = self.total_operations();
+        if total_ops == 0 {
+            0
+        } else {
+            self.total_bytes() / total_ops
+        }
+    }
 }
 
 impl fmt::Display for EncryptionThroughputStats {
@@ -1118,6 +1142,291 @@ impl fmt::Display for EncryptionThroughputStats {
             self.encrypt_count, self.bytes_encrypted,
             self.decrypt_count, self.bytes_decrypted
         )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeyRing – re-encryption helpers
+// ---------------------------------------------------------------------------
+
+impl KeyRing {
+    /// Re-encrypt data from one named key to another.
+    /// Returns `Err` if either key is missing.
+    pub fn re_encrypt(&self, data: &[u8], from: &str, to: &str) -> Result<Vec<u8>, String> {
+        let from_key = self
+            .get(from)
+            .ok_or_else(|| format!("source key '{}' not found", from))?;
+        let to_key = self
+            .get(to)
+            .ok_or_else(|| format!("target key '{}' not found", to))?;
+        let from_svc = EncryptionService::new(from_key.to_vec());
+        let to_svc = EncryptionService::new(to_key.to_vec());
+        let plaintext = from_svc.decrypt(data);
+        Ok(to_svc.encrypt(&plaintext))
+    }
+
+    /// Encrypt data using the currently active key.
+    /// Returns `Err` if no active key is set.
+    pub fn encrypt_with_active(&self, data: &[u8]) -> Result<Vec<u8>, String> {
+        let key = self
+            .active_key()
+            .ok_or_else(|| "no active key set".to_string())?;
+        let svc = EncryptionService::new(key.to_vec());
+        Ok(svc.encrypt(data))
+    }
+
+    /// Decrypt data using the currently active key.
+    /// Returns `Err` if no active key is set.
+    pub fn decrypt_with_active(&self, data: &[u8]) -> Result<Vec<u8>, String> {
+        let key = self
+            .active_key()
+            .ok_or_else(|| "no active key set".to_string())?;
+        let svc = EncryptionService::new(key.to_vec());
+        Ok(svc.decrypt(data))
+    }
+
+    /// Returns the names of all keys sorted alphabetically.
+    pub fn sorted_names(&self) -> Vec<&str> {
+        let mut names = self.list_names();
+        names.sort();
+        names
+    }
+
+    /// Returns `true` if a key with the given name exists.
+    pub fn contains(&self, name: &str) -> bool {
+        self.keys.iter().any(|k| k.name == name)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SecretStore – in-memory encrypted key-value store
+// ---------------------------------------------------------------------------
+
+/// An in-memory key-value store where values are encrypted at rest.
+#[derive(Debug)]
+pub struct SecretStore {
+    entries: Vec<(String, Vec<u8>)>,
+    service: EncryptionService,
+}
+
+impl SecretStore {
+    /// Create a new store backed by the given encryption key.
+    pub fn new(key: Vec<u8>) -> Self {
+        Self {
+            entries: Vec::new(),
+            service: EncryptionService::new(key),
+        }
+    }
+
+    /// Create a store from a passphrase.
+    pub fn from_passphrase(passphrase: &str) -> Self {
+        Self::new(derive_key(passphrase))
+    }
+
+    /// Store a secret under `name`. Overwrites if name already exists.
+    pub fn set(&mut self, name: impl Into<String>, value: &[u8]) {
+        let name = name.into();
+        let encrypted = self.service.encrypt(value);
+        if let Some(entry) = self.entries.iter_mut().find(|(n, _)| *n == name) {
+            entry.1 = encrypted;
+        } else {
+            self.entries.push((name, encrypted));
+        }
+    }
+
+    /// Retrieve and decrypt a secret by name. Returns `None` if not found.
+    pub fn get(&self, name: &str) -> Option<Vec<u8>> {
+        self.entries
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, enc)| self.service.decrypt(enc))
+    }
+
+    /// Retrieve a secret as a UTF-8 string.
+    pub fn get_string(&self, name: &str) -> Option<String> {
+        self.get(name)
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+    }
+
+    /// Remove a secret by name. Returns `true` if it existed.
+    pub fn remove(&mut self, name: &str) -> bool {
+        let len = self.entries.len();
+        self.entries.retain(|(n, _)| n != name);
+        self.entries.len() < len
+    }
+
+    /// Returns the number of stored secrets.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` if no secrets are stored.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Returns the names of all stored secrets.
+    pub fn names(&self) -> Vec<&str> {
+        self.entries.iter().map(|(n, _)| n.as_str()).collect()
+    }
+
+    /// Returns `true` if a secret with the given name exists.
+    pub fn contains(&self, name: &str) -> bool {
+        self.entries.iter().any(|(n, _)| n == name)
+    }
+
+    /// Clear all stored secrets.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+impl fmt::Display for SecretStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SecretStore({} secrets)", self.entries.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EncryptionPipeline – chain multiple encryption passes
+// ---------------------------------------------------------------------------
+
+/// Chains multiple encryption keys for layered encryption.
+#[derive(Debug)]
+pub struct EncryptionPipeline {
+    layers: Vec<EncryptionService>,
+}
+
+impl EncryptionPipeline {
+    /// Create an empty pipeline.
+    pub fn new() -> Self {
+        Self { layers: Vec::new() }
+    }
+
+    /// Add an encryption layer with the given key.
+    pub fn add_layer(mut self, key: Vec<u8>) -> Self {
+        self.layers.push(EncryptionService::new(key));
+        self
+    }
+
+    /// Add a layer from a passphrase.
+    pub fn add_passphrase_layer(self, passphrase: &str) -> Self {
+        self.add_layer(derive_key(passphrase))
+    }
+
+    /// Encrypt data through all layers in order.
+    pub fn encrypt(&self, data: &[u8]) -> Vec<u8> {
+        let mut result = data.to_vec();
+        for layer in &self.layers {
+            result = layer.encrypt(&result);
+        }
+        result
+    }
+
+    /// Decrypt data through all layers in reverse order.
+    pub fn decrypt(&self, data: &[u8]) -> Vec<u8> {
+        let mut result = data.to_vec();
+        for layer in self.layers.iter().rev() {
+            result = layer.decrypt(&result);
+        }
+        result
+    }
+
+    /// Returns the number of encryption layers.
+    pub fn depth(&self) -> usize {
+        self.layers.len()
+    }
+}
+
+impl Default for EncryptionPipeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for EncryptionPipeline {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EncryptionPipeline({} layers)", self.layers.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hex encoding utilities
+// ---------------------------------------------------------------------------
+
+/// Encode bytes as a lowercase hex string.
+pub fn hex_encode(data: &[u8]) -> String {
+    data.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+/// Decode a hex string back to bytes. Returns `None` on invalid input.
+pub fn hex_decode(hex: &str) -> Option<Vec<u8>> {
+    if hex.len() % 2 != 0 {
+        return None;
+    }
+    let mut result = Vec::with_capacity(hex.len() / 2);
+    let bytes = hex.as_bytes();
+    for pair in bytes.chunks(2) {
+        let hi = hex_nibble(pair[0])?;
+        let lo = hex_nibble(pair[1])?;
+        result.push((hi << 4) | lo);
+    }
+    Some(result)
+}
+
+fn hex_nibble(c: u8) -> Option<u8> {
+    match c {
+        b'0'..=b'9' => Some(c - b'0'),
+        b'a'..=b'f' => Some(c - b'a' + 10),
+        b'A'..=b'F' => Some(c - b'A' + 10),
+        _ => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EncryptionService – additional helpers
+// ---------------------------------------------------------------------------
+
+impl EncryptionService {
+    /// Sign data with the service's key using the HMAC-like scheme.
+    pub fn sign(&self, data: &[u8]) -> Vec<u8> {
+        hmac_sign(&self.key, data)
+    }
+
+    /// Verify a signature against data using the service's key.
+    pub fn verify(&self, data: &[u8], signature: &[u8]) -> bool {
+        hmac_verify(&self.key, data, signature)
+    }
+
+    /// Encrypt and sign: returns `(ciphertext, signature)`.
+    pub fn encrypt_and_sign(&self, data: &[u8]) -> (Vec<u8>, Vec<u8>) {
+        let ciphertext = self.encrypt(data);
+        let signature = self.sign(&ciphertext);
+        (ciphertext, signature)
+    }
+
+    /// Verify signature, then decrypt. Returns `None` if signature is invalid.
+    pub fn verify_and_decrypt(&self, ciphertext: &[u8], signature: &[u8]) -> Option<Vec<u8>> {
+        if !self.verify(ciphertext, signature) {
+            return None;
+        }
+        Some(self.decrypt(ciphertext))
+    }
+
+    /// Encrypt data and return as a hex-encoded string.
+    pub fn encrypt_to_hex(&self, data: &[u8]) -> String {
+        hex_encode(&self.encrypt(data))
+    }
+
+    /// Decrypt from a hex-encoded string. Returns `None` on invalid hex.
+    pub fn decrypt_from_hex(&self, hex: &str) -> Option<Vec<u8>> {
+        let encrypted = hex_decode(hex)?;
+        Some(self.decrypt(&encrypted))
+    }
+
+    /// Returns the key length in bytes.
+    pub fn key_len(&self) -> usize {
+        self.key.len()
     }
 }
 
@@ -1732,5 +2041,230 @@ mod tests {
         let s = format!("{stats}");
         assert!(s.contains("enc=2/300"));
         assert!(s.contains("dec=1/150"));
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for deepened functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_secret_store_set_get() {
+        let mut store = SecretStore::from_passphrase("store-pass");
+        assert!(store.is_empty());
+        store.set("api-key", b"sk-12345");
+        store.set("token", b"tok-abcdef");
+        assert_eq!(store.len(), 2);
+        assert!(store.contains("api-key"));
+        assert!(!store.contains("missing"));
+        assert_eq!(store.get("api-key").unwrap(), b"sk-12345");
+        assert_eq!(store.get_string("token").unwrap(), "tok-abcdef");
+        assert!(store.get("missing").is_none());
+    }
+
+    #[test]
+    fn test_secret_store_overwrite() {
+        let mut store = SecretStore::from_passphrase("pw");
+        store.set("key", b"value1");
+        store.set("key", b"value2");
+        assert_eq!(store.len(), 1);
+        assert_eq!(store.get("key").unwrap(), b"value2");
+    }
+
+    #[test]
+    fn test_secret_store_remove_and_clear() {
+        let mut store = SecretStore::from_passphrase("pw");
+        store.set("a", b"1");
+        store.set("b", b"2");
+        assert!(store.remove("a"));
+        assert!(!store.remove("a"));
+        assert_eq!(store.len(), 1);
+        assert_eq!(store.names(), vec!["b"]);
+        store.clear();
+        assert!(store.is_empty());
+    }
+
+    #[test]
+    fn test_secret_store_display() {
+        let store = SecretStore::from_passphrase("pw");
+        let s = format!("{store}");
+        assert!(s.contains("0 secrets"));
+    }
+
+    #[test]
+    fn test_encryption_pipeline_round_trip() {
+        let pipeline = EncryptionPipeline::new()
+            .add_passphrase_layer("layer1")
+            .add_passphrase_layer("layer2")
+            .add_layer(vec![0xAA; 16]);
+        assert_eq!(pipeline.depth(), 3);
+        let data = b"multi-layer secret";
+        let encrypted = pipeline.encrypt(data);
+        assert_ne!(encrypted, data.to_vec());
+        let decrypted = pipeline.decrypt(&encrypted);
+        assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn test_encryption_pipeline_empty() {
+        let pipeline = EncryptionPipeline::default();
+        assert_eq!(pipeline.depth(), 0);
+        let data = b"pass-through";
+        assert_eq!(pipeline.encrypt(data), data.to_vec());
+        assert_eq!(pipeline.decrypt(data), data.to_vec());
+        assert!(format!("{pipeline}").contains("0 layers"));
+    }
+
+    #[test]
+    fn test_hex_encode_decode_round_trip() {
+        let data = vec![0x00, 0xFF, 0xAB, 0x12, 0x34];
+        let hex = hex_encode(&data);
+        assert_eq!(hex, "00ffab1234");
+        let decoded = hex_decode(&hex).unwrap();
+        assert_eq!(decoded, data);
+    }
+
+    #[test]
+    fn test_hex_decode_invalid() {
+        assert!(hex_decode("0").is_none()); // odd length
+        assert!(hex_decode("zz").is_none()); // invalid chars
+        assert!(hex_decode("").unwrap().is_empty()); // empty is valid
+    }
+
+    #[test]
+    fn test_hex_decode_uppercase() {
+        assert_eq!(hex_decode("ABCD").unwrap(), vec![0xAB, 0xCD]);
+    }
+
+    #[test]
+    fn test_encrypt_to_hex_round_trip() {
+        let svc = EncryptionService::from_passphrase("hex-key");
+        let data = b"hex test data";
+        let hex = svc.encrypt_to_hex(data);
+        let decrypted = svc.decrypt_from_hex(&hex).unwrap();
+        assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn test_decrypt_from_hex_invalid() {
+        let svc = EncryptionService::from_passphrase("k");
+        assert!(svc.decrypt_from_hex("zz").is_none());
+    }
+
+    #[test]
+    fn test_encrypt_and_sign_verify_and_decrypt() {
+        let svc = EncryptionService::from_passphrase("sign-key");
+        let data = b"signed message";
+        let (ct, sig) = svc.encrypt_and_sign(data);
+        let plaintext = svc.verify_and_decrypt(&ct, &sig).unwrap();
+        assert_eq!(plaintext, data);
+    }
+
+    #[test]
+    fn test_verify_and_decrypt_bad_signature() {
+        let svc = EncryptionService::from_passphrase("sign-key");
+        let data = b"message";
+        let (ct, _sig) = svc.encrypt_and_sign(data);
+        let bad_sig = vec![0u8; 32];
+        assert!(svc.verify_and_decrypt(&ct, &bad_sig).is_none());
+    }
+
+    #[test]
+    fn test_service_sign_verify() {
+        let svc = EncryptionService::from_passphrase("hmac-key");
+        let data = b"to be signed";
+        let sig = svc.sign(data);
+        assert!(svc.verify(data, &sig));
+        assert!(!svc.verify(b"different data", &sig));
+    }
+
+    #[test]
+    fn test_service_key_len() {
+        let svc = EncryptionService::new(vec![1, 2, 3, 4]);
+        assert_eq!(svc.key_len(), 4);
+        let svc2 = EncryptionService::from_passphrase("test");
+        assert_eq!(svc2.key_len(), 32);
+    }
+
+    #[test]
+    fn test_keyring_re_encrypt() {
+        let mut ring = KeyRing::new();
+        ring.add("k1", vec![0xAA, 0xBB, 0xCC]);
+        ring.add("k2", vec![0x11, 0x22, 0x33]);
+        let svc1 = EncryptionService::new(vec![0xAA, 0xBB, 0xCC]);
+        let original = b"migrate me";
+        let encrypted_k1 = svc1.encrypt(original);
+        let encrypted_k2 = ring.re_encrypt(&encrypted_k1, "k1", "k2").unwrap();
+        let svc2 = EncryptionService::new(vec![0x11, 0x22, 0x33]);
+        assert_eq!(svc2.decrypt(&encrypted_k2), original);
+    }
+
+    #[test]
+    fn test_keyring_re_encrypt_missing_key() {
+        let ring = KeyRing::new();
+        assert!(ring.re_encrypt(b"data", "k1", "k2").is_err());
+    }
+
+    #[test]
+    fn test_keyring_encrypt_decrypt_with_active() {
+        let mut ring = KeyRing::new();
+        ring.add("main", derive_key("ring-key"));
+        let data = b"active key test";
+        let encrypted = ring.encrypt_with_active(data).unwrap();
+        let decrypted = ring.decrypt_with_active(&encrypted).unwrap();
+        assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn test_keyring_encrypt_no_active() {
+        let ring = KeyRing::new();
+        assert!(ring.encrypt_with_active(b"x").is_err());
+        assert!(ring.decrypt_with_active(b"x").is_err());
+    }
+
+    #[test]
+    fn test_keyring_sorted_names() {
+        let mut ring = KeyRing::new();
+        ring.add("charlie", vec![3]);
+        ring.add("alpha", vec![1]);
+        ring.add("bravo", vec![2]);
+        assert_eq!(ring.sorted_names(), vec!["alpha", "bravo", "charlie"]);
+    }
+
+    #[test]
+    fn test_keyring_contains() {
+        let mut ring = KeyRing::new();
+        ring.add("exists", vec![1]);
+        assert!(ring.contains("exists"));
+        assert!(!ring.contains("nope"));
+    }
+
+    #[test]
+    fn test_throughput_stats_merge() {
+        let mut a = EncryptionThroughputStats::default();
+        a.record_encrypt(100);
+        let mut b = EncryptionThroughputStats::default();
+        b.record_decrypt(200);
+        a.merge(&b);
+        assert_eq!(a.encrypt_count, 1);
+        assert_eq!(a.decrypt_count, 1);
+        assert_eq!(a.total_bytes(), 300);
+    }
+
+    #[test]
+    fn test_throughput_stats_reset() {
+        let mut stats = EncryptionThroughputStats::default();
+        stats.record_encrypt(500);
+        stats.reset();
+        assert_eq!(stats.total_operations(), 0);
+        assert_eq!(stats.total_bytes(), 0);
+    }
+
+    #[test]
+    fn test_throughput_stats_avg_bytes() {
+        let mut stats = EncryptionThroughputStats::default();
+        assert_eq!(stats.avg_bytes_per_op(), 0);
+        stats.record_encrypt(100);
+        stats.record_decrypt(200);
+        assert_eq!(stats.avg_bytes_per_op(), 150);
     }
 }

@@ -1221,6 +1221,59 @@ impl CommentSearchEngine {
     }
 }
 
+// ── Thread statistics ──
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThreadStats {
+    pub thread_count: usize,
+    pub comment_count: usize,
+    pub collapsed_count: usize,
+    pub empty_thread_count: usize,
+    pub uri_count: usize,
+}
+
+pub fn compute_thread_stats(threads: &[CommentThread]) -> ThreadStats {
+    let mut uris = Vec::new();
+    let mut comment_count = 0;
+    let mut collapsed_count = 0;
+    let mut empty_thread_count = 0;
+    for t in threads {
+        comment_count += t.comments.len();
+        if t.is_collapsed { collapsed_count += 1; }
+        if t.comments.is_empty() { empty_thread_count += 1; }
+        if !uris.contains(&t.uri) { uris.push(t.uri.clone()); }
+    }
+    ThreadStats { thread_count: threads.len(), comment_count, collapsed_count, empty_thread_count, uri_count: uris.len() }
+}
+
+pub fn threads_by_uri<'a>(threads: &'a [CommentThread]) -> std::collections::HashMap<&'a str, Vec<&'a CommentThread>> {
+    let mut map: std::collections::HashMap<&str, Vec<&CommentThread>> = std::collections::HashMap::new();
+    for t in threads { map.entry(t.uri.as_str()).or_default().push(t); }
+    map
+}
+
+pub fn newest_comment<'a>(threads: &'a [CommentThread]) -> Option<&'a Comment> {
+    threads.iter().flat_map(|t| t.comments.iter()).filter(|c| c.timestamp.is_some()).max_by_key(|c| c.timestamp.unwrap_or(0))
+}
+
+pub fn threads_overlapping_range<'a>(threads: &'a [CommentThread], uri: &str, start_line: u32, end_line: u32) -> Vec<&'a CommentThread> {
+    threads.iter().filter(|t| t.uri == uri && t.range_start_line <= end_line && t.range_end_line >= start_line).collect()
+}
+
+pub fn comment_count_by_author(threads: &[CommentThread], author: &str) -> usize {
+    threads.iter().flat_map(|t| t.comments.iter()).filter(|c| c.author.name == author).count()
+}
+
+pub fn all_comment_bodies(threads: &[CommentThread]) -> Vec<&str> {
+    threads.iter().flat_map(|t| t.comments.iter()).map(|c| c.body.as_str()).collect()
+}
+
+pub fn collapse_empty_threads(threads: &mut [CommentThread]) {
+    for t in threads.iter_mut() {
+        if t.comments.is_empty() { t.is_collapsed = true; }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1765,5 +1818,92 @@ mod tests {
         ];
         let authors = CommentSearchEngine::unique_authors(&threads, &CommentSearchFilter::all());
         assert_eq!(authors, vec!["alice", "bob"]);
+    }
+
+    #[test]
+    fn compute_thread_stats_basic() {
+        let threads = vec![
+            CommentThread { id: "t1".into(), uri: "file:///a.rs".into(), range_start_line: 1, range_end_line: 5, comments: vec![Comment::new("c1", "hi", "alice")], is_collapsed: false },
+            CommentThread { id: "t2".into(), uri: "file:///b.rs".into(), range_start_line: 10, range_end_line: 15, comments: vec![], is_collapsed: true },
+        ];
+        let stats = compute_thread_stats(&threads);
+        assert_eq!(stats.thread_count, 2);
+        assert_eq!(stats.comment_count, 1);
+        assert_eq!(stats.collapsed_count, 1);
+        assert_eq!(stats.empty_thread_count, 1);
+        assert_eq!(stats.uri_count, 2);
+    }
+
+    #[test]
+    fn threads_by_uri_groups_correctly() {
+        let threads = vec![
+            CommentThread { id: "t1".into(), uri: "file:///a.rs".into(), range_start_line: 1, range_end_line: 5, comments: vec![], is_collapsed: false },
+            CommentThread { id: "t2".into(), uri: "file:///a.rs".into(), range_start_line: 10, range_end_line: 15, comments: vec![], is_collapsed: false },
+            CommentThread { id: "t3".into(), uri: "file:///b.rs".into(), range_start_line: 1, range_end_line: 2, comments: vec![], is_collapsed: false },
+        ];
+        let grouped = threads_by_uri(&threads);
+        assert_eq!(grouped.len(), 2);
+        assert_eq!(grouped["file:///a.rs"].len(), 2);
+        assert_eq!(grouped["file:///b.rs"].len(), 1);
+    }
+
+    #[test]
+    fn newest_comment_finds_latest() {
+        let threads = vec![
+            CommentThread { id: "t1".into(), uri: "file:///a.rs".into(), range_start_line: 1, range_end_line: 5,
+                comments: vec![Comment::new("c1", "old", "alice").with_timestamp(100), Comment::new("c2", "new", "bob").with_timestamp(200)],
+                is_collapsed: false },
+        ];
+        assert_eq!(newest_comment(&threads).unwrap().id, "c2");
+    }
+
+    #[test]
+    fn newest_comment_none_when_no_timestamps() {
+        let threads = vec![
+            CommentThread { id: "t1".into(), uri: "file:///a.rs".into(), range_start_line: 1, range_end_line: 5, comments: vec![Comment::new("c1", "hi", "alice")], is_collapsed: false },
+        ];
+        assert!(newest_comment(&threads).is_none());
+    }
+
+    #[test]
+    fn threads_overlapping_range_filters() {
+        let threads = vec![
+            CommentThread { id: "t1".into(), uri: "file:///a.rs".into(), range_start_line: 1, range_end_line: 5, comments: vec![], is_collapsed: false },
+            CommentThread { id: "t2".into(), uri: "file:///a.rs".into(), range_start_line: 10, range_end_line: 20, comments: vec![], is_collapsed: false },
+        ];
+        assert_eq!(threads_overlapping_range(&threads, "file:///a.rs", 3, 12).len(), 2);
+        assert_eq!(threads_overlapping_range(&threads, "file:///a.rs", 6, 9).len(), 0);
+    }
+
+    #[test]
+    fn comment_count_by_author_counts() {
+        let threads = vec![
+            CommentThread { id: "t1".into(), uri: "file:///a.rs".into(), range_start_line: 1, range_end_line: 5,
+                comments: vec![Comment::new("c1", "hi", "alice"), Comment::new("c2", "hey", "bob"), Comment::new("c3", "yo", "alice")],
+                is_collapsed: false },
+        ];
+        assert_eq!(comment_count_by_author(&threads, "alice"), 2);
+        assert_eq!(comment_count_by_author(&threads, "charlie"), 0);
+    }
+
+    #[test]
+    fn all_comment_bodies_collects() {
+        let threads = vec![
+            CommentThread { id: "t1".into(), uri: "file:///a.rs".into(), range_start_line: 1, range_end_line: 5,
+                comments: vec![Comment::new("c1", "hello", "alice"), Comment::new("c2", "world", "bob")],
+                is_collapsed: false },
+        ];
+        assert_eq!(all_comment_bodies(&threads), vec!["hello", "world"]);
+    }
+
+    #[test]
+    fn collapse_empty_threads_collapses() {
+        let mut threads = vec![
+            CommentThread { id: "t1".into(), uri: "file:///a.rs".into(), range_start_line: 1, range_end_line: 5, comments: vec![Comment::new("c1", "hi", "alice")], is_collapsed: false },
+            CommentThread { id: "t2".into(), uri: "file:///b.rs".into(), range_start_line: 1, range_end_line: 2, comments: vec![], is_collapsed: false },
+        ];
+        collapse_empty_threads(&mut threads);
+        assert!(!threads[0].is_collapsed);
+        assert!(threads[1].is_collapsed);
     }
 }

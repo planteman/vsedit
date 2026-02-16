@@ -1119,6 +1119,132 @@ where
 }
 
 // ---------------------------------------------------------------------------
+// LinkedList — additional methods
+// ---------------------------------------------------------------------------
+
+impl<T> LinkedList<T> {
+    /// Returns a reference to the front element, or `None` if empty.
+    pub fn front(&self) -> Option<&T> {
+        self.head.and_then(|idx| self.nodes[idx].value.as_ref())
+    }
+
+    /// Returns a reference to the back element, or `None` if empty.
+    pub fn back(&self) -> Option<&T> {
+        self.tail.and_then(|idx| self.nodes[idx].value.as_ref())
+    }
+
+    /// Removes and returns the front element.
+    pub fn pop_front(&mut self) -> Option<T> {
+        let head = self.head?;
+        self.remove(NodeId(head))
+    }
+
+    /// Removes and returns the back element.
+    pub fn pop_back(&mut self) -> Option<T> {
+        let tail = self.tail?;
+        self.remove(NodeId(tail))
+    }
+
+    /// Collects all values into a `Vec`, consuming the list.
+    pub fn into_vec(mut self) -> Vec<T> {
+        let mut result = Vec::with_capacity(self.len);
+        while let Some(val) = self.pop_front() {
+            result.push(val);
+        }
+        result
+    }
+
+    /// Returns the number of arena slots currently allocated (including freed).
+    pub fn arena_capacity(&self) -> usize {
+        self.nodes.len()
+    }
+}
+
+impl<T: PartialEq> LinkedList<T> {
+    /// Returns `true` if the list contains the given value.
+    pub fn contains(&self, value: &T) -> bool {
+        self.iter().any(|v| v == value)
+    }
+
+    /// Finds the `NodeId` of the first element equal to `value`.
+    pub fn find(&self, value: &T) -> Option<NodeId> {
+        let mut idx = self.head;
+        while let Some(i) = idx {
+            if self.nodes[i].alive {
+                if let Some(ref v) = self.nodes[i].value {
+                    if v == value {
+                        return Some(NodeId(i));
+                    }
+                }
+            }
+            idx = self.nodes[i].next;
+        }
+        None
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SetMap — additional methods
+// ---------------------------------------------------------------------------
+
+impl<K, V> SetMap<K, V>
+where
+    K: Eq + Hash,
+    V: Eq + Hash,
+{
+    /// Returns the total number of values across all keys.
+    pub fn total_values(&self) -> usize {
+        self.map.values().map(|s| s.len()).sum()
+    }
+
+    /// Returns the number of keys in the map.
+    pub fn key_count(&self) -> usize {
+        self.map.len()
+    }
+
+    /// Returns `true` if the key exists and its set contains `value`.
+    pub fn contains(&self, key: &K, value: &V) -> bool {
+        self.map.get(key).map_or(false, |s| s.contains(value))
+    }
+
+    /// Removes all values for a key, returning the removed set.
+    pub fn remove_key(&mut self, key: &K) -> Option<HashSet<V>> {
+        self.map.remove(key)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BidirectionalMap — additional methods
+// ---------------------------------------------------------------------------
+
+impl<L, R> BidirectionalMap<L, R>
+where
+    L: Eq + Hash + Clone,
+    R: Eq + Hash + Clone,
+{
+    /// Clears all mappings.
+    pub fn clear(&mut self) {
+        self.left_to_right.clear();
+        self.right_to_left.clear();
+    }
+
+    /// Returns `true` if a mapping exists for the given left value.
+    pub fn contains_left(&self, left: &L) -> bool {
+        self.left_to_right.contains_key(left)
+    }
+
+    /// Returns `true` if a mapping exists for the given right value.
+    pub fn contains_right(&self, right: &R) -> bool {
+        self.right_to_left.contains_key(right)
+    }
+
+    /// Returns an iterator over all `(left, right)` pairs.
+    pub fn iter(&self) -> impl Iterator<Item = (&L, &R)> {
+        self.left_to_right.iter()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1652,5 +1778,110 @@ mod tests {
         let b = vec![2, 3, 4];
         let merged: Vec<i32> = sorted_merge(a, b).collect();
         assert_eq!(merged, vec![1, 2, 3, 3, 3, 4]);
+    }
+
+    // -- LinkedList front/back/pop/contains/find ----------------------------
+
+    #[test]
+    fn linked_list_front_and_back() {
+        let mut list = LinkedList::new();
+        assert!(list.front().is_none());
+        assert!(list.back().is_none());
+        list.push_back(10);
+        list.push_back(20);
+        list.push_back(30);
+        assert_eq!(list.front(), Some(&10));
+        assert_eq!(list.back(), Some(&30));
+    }
+
+    #[test]
+    fn linked_list_pop_front_and_pop_back() {
+        let mut list = LinkedList::new();
+        list.push_back(1);
+        list.push_back(2);
+        list.push_back(3);
+        assert_eq!(list.pop_front(), Some(1));
+        assert_eq!(list.pop_back(), Some(3));
+        assert_eq!(list.len(), 1);
+        assert_eq!(list.front(), Some(&2));
+    }
+
+    #[test]
+    fn linked_list_into_vec() {
+        let mut list = LinkedList::new();
+        list.push_back(10);
+        list.push_back(20);
+        list.push_back(30);
+        assert_eq!(list.into_vec(), vec![10, 20, 30]);
+    }
+
+    #[test]
+    fn linked_list_contains_and_find() {
+        let mut list = LinkedList::new();
+        list.push_back(5);
+        list.push_back(10);
+        list.push_back(15);
+        assert!(list.contains(&10));
+        assert!(!list.contains(&99));
+        let id = list.find(&10).unwrap();
+        assert_eq!(list.remove(id), Some(10));
+        assert!(!list.contains(&10));
+    }
+
+    #[test]
+    fn linked_list_arena_capacity() {
+        let mut list = LinkedList::new();
+        list.push_back(1);
+        list.push_back(2);
+        assert!(list.arena_capacity() >= 2);
+    }
+
+    // -- SetMap additional ---------------------------------------------------
+
+    #[test]
+    fn set_map_total_values_and_key_count() {
+        let mut sm = SetMap::new();
+        sm.add("a", 1);
+        sm.add("a", 2);
+        sm.add("b", 3);
+        assert_eq!(sm.key_count(), 2);
+        assert_eq!(sm.total_values(), 3);
+    }
+
+    #[test]
+    fn set_map_contains_and_remove_key() {
+        let mut sm = SetMap::new();
+        sm.add("k", 10);
+        sm.add("k", 20);
+        assert!(sm.contains(&"k", &10));
+        assert!(!sm.contains(&"k", &99));
+        let removed = sm.remove_key(&"k").unwrap();
+        assert_eq!(removed.len(), 2);
+        assert!(sm.get(&"k").is_none());
+    }
+
+    // -- BidirectionalMap additional -----------------------------------------
+
+    #[test]
+    fn bidir_map_clear_and_contains() {
+        let mut bm = BidirectionalMap::new();
+        bm.set("x", 1);
+        bm.set("y", 2);
+        assert!(bm.contains_left(&"x"));
+        assert!(bm.contains_right(&2));
+        assert!(!bm.contains_left(&"z"));
+        bm.clear();
+        assert!(bm.is_empty());
+        assert!(!bm.contains_left(&"x"));
+    }
+
+    #[test]
+    fn bidir_map_iter() {
+        let mut bm = BidirectionalMap::new();
+        bm.set("a", 1);
+        bm.set("b", 2);
+        let mut pairs: Vec<_> = bm.iter().map(|(l, r)| (*l, *r)).collect();
+        pairs.sort();
+        assert_eq!(pairs, vec![("a", 1), ("b", 2)]);
     }
 }

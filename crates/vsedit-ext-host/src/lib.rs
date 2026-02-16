@@ -500,6 +500,281 @@ impl Default for ExtensionHostManager {
 }
 
 // ---------------------------------------------------------------------------
+// Additional impl blocks – utility helpers, predicates, conversions
+// ---------------------------------------------------------------------------
+
+impl ContributedCommand {
+    /// Return the qualified command string: `"category: title"` when a category
+    /// is present, or just the title otherwise.
+    pub fn qualified_title(&self) -> String {
+        match &self.category {
+            Some(cat) => format!("{}: {}", cat, self.title),
+            None => self.title.clone(),
+        }
+    }
+
+    /// Whether this command belongs to the given category (case-insensitive).
+    pub fn is_in_category(&self, category: &str) -> bool {
+        self.category
+            .as_deref()
+            .map(|c| c.eq_ignore_ascii_case(category))
+            .unwrap_or(false)
+    }
+}
+
+impl ContributedLanguage {
+    /// Check whether a file extension (e.g. `".rs"`) is associated with this
+    /// language.
+    pub fn matches_extension(&self, ext: &str) -> bool {
+        self.extensions.iter().any(|e| e == ext)
+    }
+
+    /// Check whether `name` matches any of this language's aliases
+    /// (case-insensitive).
+    pub fn has_alias(&self, name: &str) -> bool {
+        self.aliases
+            .iter()
+            .any(|a| a.eq_ignore_ascii_case(name))
+    }
+}
+
+impl ContributedGrammar {
+    /// Whether this grammar targets the given language id.
+    pub fn is_for_language(&self, lang: &str) -> bool {
+        self.language == lang
+    }
+}
+
+impl ContributedTheme {
+    /// Whether this is a dark theme (ui_theme contains "dark").
+    pub fn is_dark(&self) -> bool {
+        self.ui_theme.contains("dark")
+    }
+
+    /// Whether this is a light theme (ui_theme contains "light").
+    pub fn is_light(&self) -> bool {
+        self.ui_theme.contains("light")
+    }
+
+    /// Whether this is a high-contrast theme.
+    pub fn is_high_contrast(&self) -> bool {
+        self.ui_theme.contains("hc")
+    }
+}
+
+impl ContributedKeybinding {
+    /// Whether this keybinding is conditional (has a `when` clause).
+    pub fn is_conditional(&self) -> bool {
+        self.when.is_some()
+    }
+
+    /// Whether the key chord contains the given modifier (case-insensitive),
+    /// e.g. `"ctrl"`, `"shift"`, `"alt"`, `"meta"`.
+    pub fn has_modifier(&self, modifier: &str) -> bool {
+        self.key
+            .to_ascii_lowercase()
+            .contains(&modifier.to_ascii_lowercase())
+    }
+}
+
+impl ExtensionContributions {
+    /// Return `true` when the extension contributes nothing at all.
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
+            && self.languages.is_empty()
+            && self.grammars.is_empty()
+            && self.themes.is_empty()
+            && self.keybindings.is_empty()
+            && self.views.is_empty()
+            && self.configuration.is_empty()
+            && self.menus.as_object().map_or(true, |m| m.is_empty())
+    }
+
+    /// Total number of contribution items across all categories.
+    pub fn total_count(&self) -> usize {
+        self.commands.len()
+            + self.languages.len()
+            + self.grammars.len()
+            + self.themes.len()
+            + self.keybindings.len()
+            + self.views.len()
+            + self.configuration.len()
+    }
+
+    /// Find a command contribution by its command id.
+    pub fn find_command(&self, command_id: &str) -> Option<&ContributedCommand> {
+        self.commands.iter().find(|c| c.command == command_id)
+    }
+
+    /// Find a language contribution by file extension (e.g. `".rs"`).
+    pub fn language_for_extension(&self, ext: &str) -> Option<&ContributedLanguage> {
+        self.languages.iter().find(|l| l.matches_extension(ext))
+    }
+}
+
+impl ExtensionKind {
+    /// Whether this kind includes workspace functionality.
+    pub fn includes_workspace(&self) -> bool {
+        matches!(self, ExtensionKind::Workspace | ExtensionKind::Both)
+    }
+
+    /// Whether this kind includes UI functionality.
+    pub fn includes_ui(&self) -> bool {
+        matches!(self, ExtensionKind::UI | ExtensionKind::Both)
+    }
+}
+
+impl ExtensionDescription {
+    /// Whether this extension has a runnable entry-point (`main` field).
+    pub fn is_runnable(&self) -> bool {
+        self.main.is_some()
+    }
+
+    /// Whether this extension activates eagerly (has `"*"` activation event).
+    pub fn is_eager(&self) -> bool {
+        self.activation_events.iter().any(|e| e == "*")
+    }
+
+    /// Return parsed activation events.
+    pub fn parsed_activation_events(&self) -> Vec<ActivationEvent> {
+        self.activation_events
+            .iter()
+            .map(|raw| ActivationEvent::parse(raw))
+            .collect()
+    }
+
+    /// Whether this extension responds to the given language activation.
+    pub fn activates_on_language(&self, lang: &str) -> bool {
+        let needle = format!("onLanguage:{lang}");
+        self.activation_events.iter().any(|e| e == &needle || e == "*")
+    }
+}
+
+impl ExtensionHostState {
+    /// Whether the host is in an operational state (Starting or Running).
+    pub fn is_alive(&self) -> bool {
+        matches!(self, ExtensionHostState::Starting | ExtensionHostState::Running)
+    }
+
+    /// Whether the host terminated with an error.
+    pub fn is_error(&self) -> bool {
+        matches!(self, ExtensionHostState::Error(_))
+    }
+
+    /// Extract the error message, if any.
+    pub fn error_message(&self) -> Option<&str> {
+        match self {
+            ExtensionHostState::Error(msg) => Some(msg.as_str()),
+            _ => None,
+        }
+    }
+}
+
+impl ExtensionHostManager {
+    /// Return the number of registered extensions.
+    pub fn extension_count(&self) -> usize {
+        self.extensions.len()
+    }
+
+    /// Return the number of activated extensions.
+    pub fn activated_count(&self) -> usize {
+        self.activated.len()
+    }
+
+    /// Remove all registered extensions and reset activation state.
+    pub fn clear_extensions(&mut self) {
+        self.extensions.clear();
+        self.activated.clear();
+    }
+
+    /// Return ids of all activated extensions.
+    pub fn activated_ids(&self) -> &[String] {
+        &self.activated
+    }
+
+    /// Find all extensions that contribute a given command id.
+    pub fn extensions_for_command(&self, command_id: &str) -> Vec<&ExtensionDescription> {
+        self.extensions
+            .iter()
+            .filter(|ext| ext.contributes.find_command(command_id).is_some())
+            .collect()
+    }
+}
+
+impl ActivationEvent {
+    /// Whether this is a wildcard event.
+    pub fn is_star(&self) -> bool {
+        matches!(self, ActivationEvent::Star)
+    }
+
+    /// Extract the language id if this is an `OnLanguage` event.
+    pub fn language(&self) -> Option<&str> {
+        match self {
+            ActivationEvent::OnLanguage(lang) => Some(lang.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Extract the command id if this is an `OnCommand` event.
+    pub fn command(&self) -> Option<&str> {
+        match self {
+            ActivationEvent::OnCommand(cmd) => Some(cmd.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Serialize back to the raw activation event string.
+    pub fn to_raw(&self) -> String {
+        match self {
+            ActivationEvent::Star => "*".to_string(),
+            ActivationEvent::OnStartupFinished => "onStartupFinished".to_string(),
+            ActivationEvent::OnLanguage(l) => format!("onLanguage:{l}"),
+            ActivationEvent::OnCommand(c) => format!("onCommand:{c}"),
+            ActivationEvent::WorkspaceContains(p) => format!("workspaceContains:{p}"),
+            ActivationEvent::Unknown(s) => s.clone(),
+        }
+    }
+}
+
+impl ContributionPointRegistry {
+    /// Look up a command by its command id across all extensions.
+    pub fn find_command(&self, command_id: &str) -> Option<&CommandContribution> {
+        self.commands.iter().find(|c| c.command == command_id)
+    }
+
+    /// Look up a language by its id.
+    pub fn find_language(&self, lang_id: &str) -> Option<&LanguageContribution> {
+        self.languages.iter().find(|l| l.id == lang_id)
+    }
+
+    /// Find the language contribution that matches a file extension.
+    pub fn language_for_file_extension(&self, ext: &str) -> Option<&LanguageContribution> {
+        self.languages
+            .iter()
+            .find(|l| l.extensions.iter().any(|e| e == ext))
+    }
+
+    /// Return all commands contributed by a specific extension.
+    pub fn commands_by_extension(&self, ext_id: &str) -> Vec<&CommandContribution> {
+        self.commands
+            .iter()
+            .filter(|c| c.extension_id == ext_id)
+            .collect()
+    }
+
+    /// Total number of contribution items across all categories.
+    pub fn total_count(&self) -> usize {
+        self.commands.len()
+            + self.languages.len()
+            + self.themes.len()
+            + self.snippets.len()
+            + self.grammars.len()
+            + self.debuggers.len()
+            + self.views.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1709,5 +1984,424 @@ mod tests {
         assert_eq!(reg.get_commands().len(), 2);
         assert_eq!(reg.get_commands()[0].extension_id, "ext-a");
         assert_eq!(reg.get_commands()[1].extension_id, "ext-b");
+    }
+
+    // -- ContributedCommand helpers -------------------------------------------
+
+    #[test]
+    fn contributed_command_qualified_title_with_category() {
+        let cmd = ContributedCommand {
+            command: "rust.build".into(),
+            title: "Build".into(),
+            category: Some("Rust".into()),
+        };
+        assert_eq!(cmd.qualified_title(), "Rust: Build");
+    }
+
+    #[test]
+    fn contributed_command_qualified_title_without_category() {
+        let cmd = ContributedCommand {
+            command: "editor.format".into(),
+            title: "Format Document".into(),
+            category: None,
+        };
+        assert_eq!(cmd.qualified_title(), "Format Document");
+    }
+
+    #[test]
+    fn contributed_command_is_in_category() {
+        let cmd = ContributedCommand {
+            command: "rust.build".into(),
+            title: "Build".into(),
+            category: Some("Rust".into()),
+        };
+        assert!(cmd.is_in_category("rust"));
+        assert!(cmd.is_in_category("RUST"));
+        assert!(!cmd.is_in_category("Go"));
+
+        let uncategorized = ContributedCommand {
+            command: "x".into(),
+            title: "X".into(),
+            category: None,
+        };
+        assert!(!uncategorized.is_in_category("anything"));
+    }
+
+    // -- ContributedLanguage helpers ------------------------------------------
+
+    #[test]
+    fn contributed_language_matches_extension() {
+        let lang = ContributedLanguage {
+            id: "rust".into(),
+            extensions: vec![".rs".into(), ".rlib".into()],
+            aliases: vec!["Rust".into()],
+        };
+        assert!(lang.matches_extension(".rs"));
+        assert!(lang.matches_extension(".rlib"));
+        assert!(!lang.matches_extension(".py"));
+    }
+
+    #[test]
+    fn contributed_language_has_alias() {
+        let lang = ContributedLanguage {
+            id: "rust".into(),
+            extensions: vec![".rs".into()],
+            aliases: vec!["Rust".into(), "rs".into()],
+        };
+        assert!(lang.has_alias("rust"));
+        assert!(lang.has_alias("RS"));
+        assert!(!lang.has_alias("python"));
+    }
+
+    // -- ContributedGrammar helpers -------------------------------------------
+
+    #[test]
+    fn contributed_grammar_is_for_language() {
+        let gram = ContributedGrammar {
+            language: "rust".into(),
+            scope_name: "source.rust".into(),
+            path: "./rust.json".into(),
+        };
+        assert!(gram.is_for_language("rust"));
+        assert!(!gram.is_for_language("python"));
+    }
+
+    // -- ContributedTheme helpers ---------------------------------------------
+
+    #[test]
+    fn contributed_theme_dark_light_hc() {
+        let dark = ContributedTheme {
+            label: "My Dark".into(),
+            ui_theme: "vs-dark".into(),
+            path: "./dark.json".into(),
+        };
+        assert!(dark.is_dark());
+        assert!(!dark.is_light());
+        assert!(!dark.is_high_contrast());
+
+        let light = ContributedTheme {
+            label: "My Light".into(),
+            ui_theme: "vs-light".into(),
+            path: "./light.json".into(),
+        };
+        assert!(light.is_light());
+        assert!(!light.is_dark());
+
+        let hc = ContributedTheme {
+            label: "High Contrast".into(),
+            ui_theme: "hc-black".into(),
+            path: "./hc.json".into(),
+        };
+        assert!(hc.is_high_contrast());
+    }
+
+    // -- ContributedKeybinding helpers ----------------------------------------
+
+    #[test]
+    fn contributed_keybinding_is_conditional() {
+        let conditional = ContributedKeybinding {
+            command: "rust.build".into(),
+            key: "ctrl+shift+b".into(),
+            when: Some("editorLangId == rust".into()),
+        };
+        assert!(conditional.is_conditional());
+
+        let unconditional = ContributedKeybinding {
+            command: "editor.save".into(),
+            key: "ctrl+s".into(),
+            when: None,
+        };
+        assert!(!unconditional.is_conditional());
+    }
+
+    #[test]
+    fn contributed_keybinding_has_modifier() {
+        let kb = ContributedKeybinding {
+            command: "x".into(),
+            key: "Ctrl+Shift+B".into(),
+            when: None,
+        };
+        assert!(kb.has_modifier("ctrl"));
+        assert!(kb.has_modifier("shift"));
+        assert!(!kb.has_modifier("alt"));
+    }
+
+    // -- ExtensionContributions helpers ---------------------------------------
+
+    #[test]
+    fn extension_contributions_is_empty() {
+        let empty = ExtensionContributions::default();
+        assert!(empty.is_empty());
+        assert_eq!(empty.total_count(), 0);
+    }
+
+    #[test]
+    fn extension_contributions_total_count() {
+        let loc = VsUri::file("/ext/rust");
+        let ext = ExtensionDescription::from_package_json(sample_package_json(), loc).unwrap();
+        // 1 command + 1 language + 1 grammar + 1 theme + 1 keybinding = 5
+        assert_eq!(ext.contributes.total_count(), 5);
+        assert!(!ext.contributes.is_empty());
+    }
+
+    #[test]
+    fn extension_contributions_find_command() {
+        let loc = VsUri::file("/ext/rust");
+        let ext = ExtensionDescription::from_package_json(sample_package_json(), loc).unwrap();
+        assert!(ext.contributes.find_command("rust.build").is_some());
+        assert!(ext.contributes.find_command("nonexistent").is_none());
+    }
+
+    #[test]
+    fn extension_contributions_language_for_extension() {
+        let loc = VsUri::file("/ext/rust");
+        let ext = ExtensionDescription::from_package_json(sample_package_json(), loc).unwrap();
+        let lang = ext.contributes.language_for_extension(".rs");
+        assert!(lang.is_some());
+        assert_eq!(lang.unwrap().id, "rust");
+        assert!(ext.contributes.language_for_extension(".py").is_none());
+    }
+
+    // -- ExtensionKind helpers ------------------------------------------------
+
+    #[test]
+    fn extension_kind_includes() {
+        assert!(ExtensionKind::Both.includes_workspace());
+        assert!(ExtensionKind::Both.includes_ui());
+        assert!(ExtensionKind::UI.includes_ui());
+        assert!(!ExtensionKind::UI.includes_workspace());
+        assert!(ExtensionKind::Workspace.includes_workspace());
+        assert!(!ExtensionKind::Workspace.includes_ui());
+    }
+
+    // -- ExtensionDescription helpers -----------------------------------------
+
+    #[test]
+    fn extension_description_is_runnable() {
+        let loc = VsUri::file("/ext/rust");
+        let ext = ExtensionDescription::from_package_json(sample_package_json(), loc).unwrap();
+        assert!(ext.is_runnable());
+
+        let minimal = ExtensionDescription::from_package_json(
+            r#"{"name":"no-main"}"#,
+            VsUri::file("/x"),
+        ).unwrap();
+        assert!(!minimal.is_runnable());
+    }
+
+    #[test]
+    fn extension_description_is_eager() {
+        let eager = ExtensionDescription {
+            id: "eager".into(),
+            name: "eager".into(),
+            display_name: "Eager".into(),
+            version: "1.0.0".into(),
+            publisher: "test".into(),
+            main: None,
+            activation_events: vec!["*".into()],
+            contributes: ExtensionContributions::default(),
+            extension_kind: ExtensionKind::Both,
+            is_builtin: false,
+            location: VsUri::file("/ext/eager"),
+        };
+        assert!(eager.is_eager());
+
+        let lazy = ExtensionDescription {
+            id: "lazy".into(),
+            name: "lazy".into(),
+            display_name: "Lazy".into(),
+            version: "1.0.0".into(),
+            publisher: "test".into(),
+            main: None,
+            activation_events: vec!["onLanguage:rust".into()],
+            contributes: ExtensionContributions::default(),
+            extension_kind: ExtensionKind::Both,
+            is_builtin: false,
+            location: VsUri::file("/ext/lazy"),
+        };
+        assert!(!lazy.is_eager());
+    }
+
+    #[test]
+    fn extension_description_parsed_activation_events() {
+        let loc = VsUri::file("/ext/rust");
+        let ext = ExtensionDescription::from_package_json(sample_package_json(), loc).unwrap();
+        let events = ext.parsed_activation_events();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0], ActivationEvent::OnLanguage("rust".into()));
+        assert_eq!(events[1], ActivationEvent::OnCommand("rust.build".into()));
+    }
+
+    #[test]
+    fn extension_description_activates_on_language() {
+        let loc = VsUri::file("/ext/rust");
+        let ext = ExtensionDescription::from_package_json(sample_package_json(), loc).unwrap();
+        assert!(ext.activates_on_language("rust"));
+        assert!(!ext.activates_on_language("python"));
+    }
+
+    // -- ExtensionHostState helpers -------------------------------------------
+
+    #[test]
+    fn extension_host_state_predicates() {
+        assert!(ExtensionHostState::Starting.is_alive());
+        assert!(ExtensionHostState::Running.is_alive());
+        assert!(!ExtensionHostState::Stopped.is_alive());
+        assert!(!ExtensionHostState::Error("x".into()).is_alive());
+
+        assert!(!ExtensionHostState::Running.is_error());
+        assert!(ExtensionHostState::Error("boom".into()).is_error());
+
+        assert_eq!(ExtensionHostState::Running.error_message(), None);
+        assert_eq!(
+            ExtensionHostState::Error("boom".into()).error_message(),
+            Some("boom")
+        );
+    }
+
+    // -- ExtensionHostManager helpers -----------------------------------------
+
+    #[test]
+    fn manager_extension_count_and_clear() {
+        let mut mgr = ExtensionHostManager::new();
+        assert_eq!(mgr.extension_count(), 0);
+        assert_eq!(mgr.activated_count(), 0);
+
+        let loc = VsUri::file("/ext/rust");
+        let ext = ExtensionDescription::from_package_json(sample_package_json(), loc).unwrap();
+        let id = ext.id.clone();
+        mgr.register_extension(ext);
+        mgr.mark_activated(&id);
+
+        assert_eq!(mgr.extension_count(), 1);
+        assert_eq!(mgr.activated_count(), 1);
+        assert_eq!(mgr.activated_ids(), &[id]);
+
+        mgr.clear_extensions();
+        assert_eq!(mgr.extension_count(), 0);
+        assert_eq!(mgr.activated_count(), 0);
+    }
+
+    #[test]
+    fn manager_extensions_for_command() {
+        let mut mgr = ExtensionHostManager::new();
+        let loc = VsUri::file("/ext/rust");
+        let ext = ExtensionDescription::from_package_json(sample_package_json(), loc).unwrap();
+        mgr.register_extension(ext);
+
+        let found = mgr.extensions_for_command("rust.build");
+        assert_eq!(found.len(), 1);
+        assert!(mgr.extensions_for_command("nonexistent").is_empty());
+    }
+
+    // -- ActivationEvent helpers ----------------------------------------------
+
+    #[test]
+    fn activation_event_accessors() {
+        assert!(ActivationEvent::Star.is_star());
+        assert!(!ActivationEvent::OnStartupFinished.is_star());
+
+        assert_eq!(
+            ActivationEvent::OnLanguage("rust".into()).language(),
+            Some("rust")
+        );
+        assert_eq!(ActivationEvent::Star.language(), None);
+
+        assert_eq!(
+            ActivationEvent::OnCommand("x.y".into()).command(),
+            Some("x.y")
+        );
+        assert_eq!(ActivationEvent::Star.command(), None);
+    }
+
+    #[test]
+    fn activation_event_roundtrip_to_raw() {
+        let cases = vec![
+            ("*", ActivationEvent::Star),
+            ("onStartupFinished", ActivationEvent::OnStartupFinished),
+            ("onLanguage:rust", ActivationEvent::OnLanguage("rust".into())),
+            ("onCommand:x.y", ActivationEvent::OnCommand("x.y".into())),
+            (
+                "workspaceContains:Cargo.toml",
+                ActivationEvent::WorkspaceContains("Cargo.toml".into()),
+            ),
+            ("onFoo", ActivationEvent::Unknown("onFoo".into())),
+        ];
+        for (raw, event) in &cases {
+            assert_eq!(ActivationEvent::parse(raw), *event);
+            assert_eq!(event.to_raw(), *raw);
+        }
+    }
+
+    // -- ContributionPointRegistry helpers ------------------------------------
+
+    #[test]
+    fn registry_find_command() {
+        let mut reg = ContributionPointRegistry::new();
+        let json: serde_json::Value = serde_json::from_str(r#"{
+            "commands": [
+                {"command": "ext.hello", "title": "Hello"}
+            ]
+        }"#).unwrap();
+        reg.register_contributions("test-ext", &json);
+        assert!(reg.find_command("ext.hello").is_some());
+        assert!(reg.find_command("missing").is_none());
+    }
+
+    #[test]
+    fn registry_find_language() {
+        let mut reg = ContributionPointRegistry::new();
+        let json: serde_json::Value = serde_json::from_str(r#"{
+            "languages": [{"id": "rust", "extensions": [".rs"]}]
+        }"#).unwrap();
+        reg.register_contributions("r", &json);
+        assert!(reg.find_language("rust").is_some());
+        assert!(reg.find_language("python").is_none());
+    }
+
+    #[test]
+    fn registry_language_for_file_extension() {
+        let mut reg = ContributionPointRegistry::new();
+        let json: serde_json::Value = serde_json::from_str(r#"{
+            "languages": [
+                {"id": "rust", "extensions": [".rs"]},
+                {"id": "python", "extensions": [".py", ".pyw"]}
+            ]
+        }"#).unwrap();
+        reg.register_contributions("multi", &json);
+        let lang = reg.language_for_file_extension(".py");
+        assert_eq!(lang.unwrap().id, "python");
+        assert!(reg.language_for_file_extension(".java").is_none());
+    }
+
+    #[test]
+    fn registry_commands_by_extension() {
+        let mut reg = ContributionPointRegistry::new();
+        let json1: serde_json::Value = serde_json::from_str(r#"{
+            "commands": [
+                {"command": "a.one", "title": "One"},
+                {"command": "a.two", "title": "Two"}
+            ]
+        }"#).unwrap();
+        let json2: serde_json::Value = serde_json::from_str(r#"{
+            "commands": [{"command": "b.one", "title": "B1"}]
+        }"#).unwrap();
+        reg.register_contributions("ext-a", &json1);
+        reg.register_contributions("ext-b", &json2);
+        assert_eq!(reg.commands_by_extension("ext-a").len(), 2);
+        assert_eq!(reg.commands_by_extension("ext-b").len(), 1);
+        assert!(reg.commands_by_extension("ext-c").is_empty());
+    }
+
+    #[test]
+    fn registry_total_count() {
+        let mut reg = ContributionPointRegistry::new();
+        let json: serde_json::Value = serde_json::from_str(r#"{
+            "commands": [{"command": "c", "title": "C"}],
+            "languages": [{"id": "l"}],
+            "themes": [{"label": "T", "uiTheme": "vs-dark", "path": "t.json"}]
+        }"#).unwrap();
+        reg.register_contributions("ext", &json);
+        assert_eq!(reg.total_count(), 3);
     }
 }

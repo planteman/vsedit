@@ -405,6 +405,315 @@ pub fn register() {
     // Registration will connect RPC handlers when extension host starts
 }
 
+// ── FileType helpers ──
+
+impl FileType {
+    /// Returns `true` for `FileType::File`.
+    pub fn is_file(self) -> bool {
+        self == Self::File
+    }
+
+    /// Returns `true` for `FileType::Directory`.
+    pub fn is_directory(self) -> bool {
+        self == Self::Directory
+    }
+
+    /// Returns `true` for `FileType::SymbolicLink`.
+    pub fn is_symlink(self) -> bool {
+        self == Self::SymbolicLink
+    }
+
+    /// Returns `true` for `FileType::Unknown`.
+    pub fn is_unknown(self) -> bool {
+        self == Self::Unknown
+    }
+}
+
+// ── FsMessage helpers ──
+
+impl FsMessage {
+    /// Return the primary URI referenced by this message.
+    pub fn primary_uri(&self) -> &str {
+        match self {
+            Self::ReadFile { uri }
+            | Self::WriteFile { uri, .. }
+            | Self::Delete { uri, .. }
+            | Self::Stat { uri }
+            | Self::ReadDirectory { uri }
+            | Self::CreateDirectory { uri }
+            | Self::Watch { uri, .. } => uri,
+            Self::Rename { old_uri, .. } => old_uri,
+        }
+    }
+
+    /// Returns `true` if this message is a read-only operation.
+    pub fn is_read_only(&self) -> bool {
+        matches!(
+            self,
+            Self::ReadFile { .. }
+                | Self::Stat { .. }
+                | Self::ReadDirectory { .. }
+                | Self::Watch { .. }
+        )
+    }
+
+    /// Returns `true` if this message mutates the file system.
+    pub fn is_mutating(&self) -> bool {
+        !self.is_read_only()
+    }
+
+    /// Return a human-readable operation name.
+    pub fn operation_name(&self) -> &'static str {
+        match self {
+            Self::ReadFile { .. } => "read_file",
+            Self::WriteFile { .. } => "write_file",
+            Self::Delete { .. } => "delete",
+            Self::Rename { .. } => "rename",
+            Self::Stat { .. } => "stat",
+            Self::ReadDirectory { .. } => "read_directory",
+            Self::CreateDirectory { .. } => "create_directory",
+            Self::Watch { .. } => "watch",
+        }
+    }
+}
+
+// ── FsResponse helpers ──
+
+impl FsResponse {
+    /// Returns `true` if this is an `Ok` response.
+    pub fn is_ok(&self) -> bool {
+        matches!(self, Self::Ok)
+    }
+
+    /// Returns `true` if this is an `Error` response.
+    pub fn is_error(&self) -> bool {
+        matches!(self, Self::Error { .. })
+    }
+
+    /// Extract the error message, if any.
+    pub fn error_message(&self) -> Option<&str> {
+        match self {
+            Self::Error { message } => Some(message),
+            _ => None,
+        }
+    }
+
+    /// Extract file content bytes, if this is a `FileContent` response.
+    pub fn into_data(self) -> Option<Vec<u8>> {
+        match self {
+            Self::FileContent { data } => Some(data),
+            _ => None,
+        }
+    }
+
+    /// Extract `FileStat`, if this is a `Stat` response.
+    pub fn into_stat(self) -> Option<FileStat> {
+        match self {
+            Self::Stat { stat } => Some(stat),
+            _ => None,
+        }
+    }
+
+    /// Extract directory entries, if this is a `Directory` response.
+    pub fn into_entries(self) -> Option<Vec<DirEntry>> {
+        match self {
+            Self::Directory { entries } => Some(entries),
+            _ => None,
+        }
+    }
+}
+
+// ── DirEntry helpers ──
+
+impl DirEntry {
+    /// Create a new `DirEntry`.
+    pub fn new(name: impl Into<String>, file_type: FileType) -> Self {
+        Self {
+            name: name.into(),
+            file_type,
+        }
+    }
+
+    /// Returns `true` if this entry is a file.
+    pub fn is_file(&self) -> bool {
+        self.file_type.is_file()
+    }
+
+    /// Returns `true` if this entry is a directory.
+    pub fn is_directory(&self) -> bool {
+        self.file_type.is_directory()
+    }
+
+    /// Return the file extension, if any (e.g. `"rs"` for `"main.rs"`).
+    pub fn extension(&self) -> Option<&str> {
+        self.name.rsplit('.').next().and_then(|ext| {
+            if ext == self.name {
+                None
+            } else {
+                Some(ext)
+            }
+        })
+    }
+}
+
+// ── FsBridge convenience methods ──
+
+impl FsBridge {
+    /// Directly read file content by URI, returning `None` if not found.
+    pub fn read_file(&self, uri: &str) -> Option<&[u8]> {
+        self.files.get(uri).map(|v| v.as_slice())
+    }
+
+    /// Directly write file content by URI.
+    pub fn write_file(&mut self, uri: impl Into<String>, content: Vec<u8>) {
+        self.files.insert(uri.into(), content);
+    }
+
+    /// Remove all files from the in-memory store.
+    pub fn clear(&mut self) {
+        self.files.clear();
+    }
+
+    /// Return URIs that contain the given substring.
+    pub fn files_matching(&self, pattern: &str) -> Vec<&str> {
+        self.files
+            .keys()
+            .filter(|k| k.contains(pattern))
+            .map(|k| k.as_str())
+            .collect()
+    }
+
+    /// Return the content of a file as a UTF-8 string, if valid.
+    pub fn read_text(&self, uri: &str) -> Option<String> {
+        self.files
+            .get(uri)
+            .and_then(|data| std::str::from_utf8(data).ok().map(String::from))
+    }
+
+    /// Append bytes to an existing file, or create it if it doesn't exist.
+    pub fn append(&mut self, uri: &str, data: &[u8]) {
+        self.files
+            .entry(uri.to_string())
+            .or_default()
+            .extend_from_slice(data);
+    }
+
+    /// Copy a file from one URI to another. Returns `false` if source not found.
+    pub fn copy_file(&mut self, src_uri: &str, dst_uri: &str) -> bool {
+        if let Some(data) = self.files.get(src_uri).cloned() {
+            self.files.insert(dst_uri.to_string(), data);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+// ── VirtualDirectory additional methods ──
+
+impl VirtualDirectory {
+    /// Returns `true` if this directory directly contains a file with the given name.
+    pub fn contains_file(&self, name: &str) -> bool {
+        self.files.iter().any(|f| f == name)
+    }
+
+    /// Remove a file by name. Returns `true` if the file was present.
+    pub fn remove_file(&mut self, name: &str) -> bool {
+        let before = self.files.len();
+        self.files.retain(|f| f != name);
+        self.files.len() < before
+    }
+
+    /// Remove a sub-directory by name. Returns `true` if it was present.
+    pub fn remove_dir(&mut self, name: &str) -> bool {
+        let before = self.children_dirs.len();
+        self.children_dirs.retain(|d| d.name != name);
+        self.children_dirs.len() < before
+    }
+
+    /// Returns `true` if this directory has no files and no sub-directories.
+    pub fn is_empty(&self) -> bool {
+        self.files.is_empty() && self.children_dirs.is_empty()
+    }
+
+    /// Compute the maximum depth of the directory tree (this node = 0).
+    pub fn max_depth(&self) -> usize {
+        if self.children_dirs.is_empty() {
+            0
+        } else {
+            1 + self
+                .children_dirs
+                .iter()
+                .map(|d| d.max_depth())
+                .max()
+                .unwrap_or(0)
+        }
+    }
+
+    /// Collect all sub-directory names (non-recursive).
+    pub fn child_dir_names(&self) -> Vec<&str> {
+        self.children_dirs.iter().map(|d| d.name.as_str()).collect()
+    }
+}
+
+// ── FileWatchEvent helpers ──
+
+impl fmt::Display for FileWatchEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Created { uri } => write!(f, "created: {uri}"),
+            Self::Changed { uri } => write!(f, "changed: {uri}"),
+            Self::Deleted { uri } => write!(f, "deleted: {uri}"),
+        }
+    }
+}
+
+// ── FileChangeAccumulator helpers ──
+
+impl FileChangeAccumulator {
+    /// Merge events from another accumulator into this one.
+    pub fn merge(&mut self, other: &mut FileChangeAccumulator) {
+        self.events.append(&mut other.events);
+        if let Some(other_last) = other.last_event_ms {
+            self.last_event_ms = Some(
+                self.last_event_ms
+                    .map_or(other_last, |mine| mine.max(other_last)),
+            );
+        }
+    }
+
+    /// Filter events, keeping only those whose URI contains the given substring.
+    pub fn filter_by_uri(&mut self, pattern: &str) {
+        self.events.retain(|e| e.uri().contains(pattern));
+    }
+
+    /// Returns `true` if there are no pending events.
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
+    /// Discard all pending events without flushing.
+    pub fn discard(&mut self) {
+        self.events.clear();
+        self.last_event_ms = None;
+    }
+
+    /// Count events of each kind: (created, changed, deleted).
+    pub fn event_counts(&self) -> (usize, usize, usize) {
+        let mut created = 0;
+        let mut changed = 0;
+        let mut deleted = 0;
+        for event in &self.events {
+            match event {
+                FileWatchEvent::Created { .. } => created += 1,
+                FileWatchEvent::Changed { .. } => changed += 1,
+                FileWatchEvent::Deleted { .. } => deleted += 1,
+            }
+        }
+        (created, changed, deleted)
+    }
+}
+
 /// Accumulated statistics for ext-fs operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtFsStats {
@@ -1723,5 +2032,210 @@ mod tests {
         let results = store.search_by_content("hello");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].uri, "file:///a.rs");
+    }
+
+    // -----------------------------------------------------------------------
+    // Deepened tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn file_type_predicate_methods() {
+        assert!(FileType::File.is_file());
+        assert!(!FileType::File.is_directory());
+        assert!(FileType::Directory.is_directory());
+        assert!(!FileType::Directory.is_file());
+        assert!(FileType::SymbolicLink.is_symlink());
+        assert!(!FileType::SymbolicLink.is_unknown());
+        assert!(FileType::Unknown.is_unknown());
+    }
+
+    #[test]
+    fn fs_message_primary_uri_and_classification() {
+        let read = FsMessage::ReadFile { uri: "file:///r.txt".into() };
+        assert_eq!(read.primary_uri(), "file:///r.txt");
+        assert!(read.is_read_only());
+        assert!(!read.is_mutating());
+        assert_eq!(read.operation_name(), "read_file");
+
+        let write = FsMessage::WriteFile {
+            uri: "file:///w.txt".into(),
+            content: vec![],
+        };
+        assert_eq!(write.primary_uri(), "file:///w.txt");
+        assert!(!write.is_read_only());
+        assert!(write.is_mutating());
+        assert_eq!(write.operation_name(), "write_file");
+
+        let rename = FsMessage::Rename {
+            old_uri: "file:///old".into(),
+            new_uri: "file:///new".into(),
+            overwrite: false,
+        };
+        assert_eq!(rename.primary_uri(), "file:///old");
+        assert!(rename.is_mutating());
+        assert_eq!(rename.operation_name(), "rename");
+
+        let del = FsMessage::Delete { uri: "file:///d".into(), recursive: true };
+        assert_eq!(del.operation_name(), "delete");
+
+        let stat = FsMessage::Stat { uri: "file:///s".into() };
+        assert!(stat.is_read_only());
+        assert_eq!(stat.operation_name(), "stat");
+
+        let rd = FsMessage::ReadDirectory { uri: "file:///dir".into() };
+        assert!(rd.is_read_only());
+        assert_eq!(rd.operation_name(), "read_directory");
+
+        let cd = FsMessage::CreateDirectory { uri: "file:///newdir".into() };
+        assert!(cd.is_mutating());
+        assert_eq!(cd.operation_name(), "create_directory");
+
+        let w = FsMessage::Watch { uri: "file:///w".into(), recursive: true };
+        assert!(w.is_read_only());
+        assert_eq!(w.operation_name(), "watch");
+    }
+
+    #[test]
+    fn fs_response_helpers() {
+        assert!(FsResponse::Ok.is_ok());
+        assert!(!FsResponse::Ok.is_error());
+        assert_eq!(FsResponse::Ok.error_message(), None);
+
+        let err = FsResponse::Error { message: "boom".into() };
+        assert!(err.is_error());
+        assert!(!err.is_ok());
+        assert_eq!(err.error_message(), Some("boom"));
+
+        let fc = FsResponse::FileContent { data: vec![1, 2, 3] };
+        assert_eq!(fc.into_data(), Some(vec![1, 2, 3]));
+
+        let stat_resp = FsResponse::Stat {
+            stat: FileStat {
+                file_type: FileType::File,
+                ctime: 10,
+                mtime: 20,
+                size: 100,
+            },
+        };
+        let stat = stat_resp.into_stat().unwrap();
+        assert_eq!(stat.size, 100);
+
+        let dir_resp = FsResponse::Directory {
+            entries: vec![DirEntry::new("a.txt", FileType::File)],
+        };
+        let entries = dir_resp.into_entries().unwrap();
+        assert_eq!(entries.len(), 1);
+
+        // into_data on non-FileContent returns None
+        assert_eq!(FsResponse::Ok.into_data(), None);
+    }
+
+    #[test]
+    fn dir_entry_helpers() {
+        let file = DirEntry::new("main.rs", FileType::File);
+        assert!(file.is_file());
+        assert!(!file.is_directory());
+        assert_eq!(file.extension(), Some("rs"));
+
+        let dir = DirEntry::new("src", FileType::Directory);
+        assert!(dir.is_directory());
+        assert!(!dir.is_file());
+        assert_eq!(dir.extension(), None);
+
+        let dotfile = DirEntry::new(".gitignore", FileType::File);
+        assert_eq!(dotfile.extension(), Some("gitignore"));
+
+        let no_ext = DirEntry::new("Makefile", FileType::File);
+        assert_eq!(no_ext.extension(), None);
+    }
+
+    #[test]
+    fn bridge_read_write_clear_shortcuts() {
+        let mut bridge = FsBridge::new();
+        bridge.write_file("file:///test.txt", b"content".to_vec());
+        assert_eq!(bridge.read_file("file:///test.txt"), Some(b"content".as_ref()));
+        assert_eq!(bridge.read_text("file:///test.txt"), Some("content".to_string()));
+        assert!(bridge.read_file("file:///missing").is_none());
+
+        bridge.write_file("file:///other.txt", b"other".to_vec());
+        assert_eq!(bridge.file_count(), 2);
+
+        let matching = bridge.files_matching("test");
+        assert_eq!(matching.len(), 1);
+        assert!(matching[0].contains("test"));
+
+        bridge.clear();
+        assert_eq!(bridge.file_count(), 0);
+    }
+
+    #[test]
+    fn bridge_append_and_copy() {
+        let mut bridge = FsBridge::new();
+        bridge.append("file:///log.txt", b"line1\n");
+        bridge.append("file:///log.txt", b"line2\n");
+        assert_eq!(bridge.read_text("file:///log.txt"), Some("line1\nline2\n".to_string()));
+
+        assert!(bridge.copy_file("file:///log.txt", "file:///log_backup.txt"));
+        assert_eq!(bridge.read_file("file:///log_backup.txt"), bridge.read_file("file:///log.txt"));
+        assert!(!bridge.copy_file("file:///nonexistent", "file:///dst"));
+    }
+
+    #[test]
+    fn virtual_directory_remove_and_depth() {
+        let mut root = VirtualDirectory::new("root");
+        root.add_file("a.txt");
+        root.add_file("b.txt");
+        assert!(root.contains_file("a.txt"));
+        assert!(root.remove_file("a.txt"));
+        assert!(!root.contains_file("a.txt"));
+        assert!(!root.remove_file("nonexistent"));
+
+        let sub = root.ensure_dir("sub");
+        sub.add_file("c.txt");
+        let deep = sub.ensure_dir("deep");
+        deep.add_file("d.txt");
+
+        assert_eq!(root.max_depth(), 2);
+        assert_eq!(root.child_dir_names(), vec!["sub"]);
+
+        assert!(root.remove_dir("sub"));
+        assert!(root.is_empty() || root.file_count() > 0);
+        assert_eq!(root.dir_count(), 0);
+    }
+
+    #[test]
+    fn file_watch_event_display() {
+        let c = FileWatchEvent::Created { uri: "file:///a".into() };
+        assert_eq!(c.to_string(), "created: file:///a");
+        let ch = FileWatchEvent::Changed { uri: "file:///b".into() };
+        assert_eq!(ch.to_string(), "changed: file:///b");
+        let d = FileWatchEvent::Deleted { uri: "file:///c".into() };
+        assert_eq!(d.to_string(), "deleted: file:///c");
+    }
+
+    #[test]
+    fn file_change_accumulator_merge_filter_counts() {
+        let mut acc1 = FileChangeAccumulator::new(50);
+        acc1.push(FileWatchEvent::Created { uri: "file:///a.rs".into() }, 100);
+        acc1.push(FileWatchEvent::Changed { uri: "file:///b.rs".into() }, 110);
+
+        let mut acc2 = FileChangeAccumulator::new(50);
+        acc2.push(FileWatchEvent::Deleted { uri: "file:///c.rs".into() }, 200);
+
+        acc1.merge(&mut acc2);
+        assert_eq!(acc1.pending_count(), 3);
+
+        let (created, changed, deleted) = acc1.event_counts();
+        assert_eq!(created, 1);
+        assert_eq!(changed, 1);
+        assert_eq!(deleted, 1);
+
+        acc1.filter_by_uri("a.rs");
+        assert_eq!(acc1.pending_count(), 1);
+
+        assert!(!acc1.is_empty());
+        acc1.discard();
+        assert!(acc1.is_empty());
+        assert_eq!(acc1.pending_count(), 0);
     }
 }

@@ -948,6 +948,120 @@ impl RenameHistory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RenameRefactorPlan — plan multi-step renames
+// ---------------------------------------------------------------------------
+
+/// A planned rename step with an ordering priority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenameStep {
+    pub old_name: String,
+    pub new_name: String,
+    pub scope: RenameScope,
+    pub priority: u32,
+}
+
+/// A multi-step rename plan that can be validated and executed in order.
+#[derive(Debug, Clone, Default)]
+pub struct RenameRefactorPlan {
+    steps: Vec<RenameStep>,
+}
+
+impl RenameRefactorPlan {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a rename step to the plan.
+    pub fn add_step(&mut self, old_name: &str, new_name: &str, scope: RenameScope, priority: u32) {
+        self.steps.push(RenameStep {
+            old_name: old_name.to_string(),
+            new_name: new_name.to_string(),
+            scope,
+            priority,
+        });
+    }
+
+    /// Return steps sorted by priority (lower first).
+    pub fn ordered_steps(&self) -> Vec<&RenameStep> {
+        let mut sorted: Vec<&RenameStep> = self.steps.iter().collect();
+        sorted.sort_by_key(|s| s.priority);
+        sorted
+    }
+
+    /// Validate all steps in the plan. Returns a list of (step_index, errors) for invalid steps.
+    pub fn validate(&self) -> Vec<(usize, Vec<String>)> {
+        let mut issues = Vec::new();
+        for (i, step) in self.steps.iter().enumerate() {
+            if let Err(errors) = rename_validate(&step.old_name, &step.new_name) {
+                issues.push((i, errors));
+            }
+        }
+        issues
+    }
+
+    /// Check for chained renames (output of one step is input of a later step).
+    pub fn chained_steps(&self) -> Vec<(usize, usize)> {
+        let mut chains = Vec::new();
+        for (i, a) in self.steps.iter().enumerate() {
+            for (j, b) in self.steps.iter().enumerate() {
+                if i != j && a.new_name == b.old_name {
+                    chains.push((i, j));
+                }
+            }
+        }
+        chains
+    }
+
+    /// Number of steps in the plan.
+    pub fn len(&self) -> usize {
+        self.steps.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.steps.is_empty()
+    }
+
+    /// Return all unique file URIs affected by SingleFile or Files scopes.
+    pub fn affected_files(&self) -> Vec<&str> {
+        let mut files: Vec<&str> = self.steps.iter().filter_map(|s| {
+            match &s.scope {
+                RenameScope::SingleFile(f) => Some(f.as_str()),
+                RenameScope::Range { file, .. } => Some(file.as_str()),
+                _ => None,
+            }
+        }).collect();
+        files.sort_unstable();
+        files.dedup();
+        files
+    }
+
+    /// Remove a step by index. Returns the removed step or None.
+    pub fn remove_step(&mut self, index: usize) -> Option<RenameStep> {
+        if index < self.steps.len() {
+            Some(self.steps.remove(index))
+        } else {
+            None
+        }
+    }
+}
+
+impl std::fmt::Display for RenameStep {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} → {} (priority {})", self.old_name, self.new_name, self.priority)
+    }
+}
+
+impl std::fmt::Display for RenameRefactorPlan {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Rename plan ({} steps):", self.steps.len())?;
+        for (i, step) in self.ordered_steps().iter().enumerate() {
+            writeln!(f, "  {}. {}", i + 1, step)?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1642,5 +1756,81 @@ mod tests {
         });
         assert_eq!(history.entries_for_file("main.rs").len(), 1);
         assert_eq!(history.entries_for_file("other.rs").len(), 0);
+    }
+
+    // -- RenameRefactorPlan --
+
+    #[test]
+    fn refactor_plan_ordered_steps() {
+        let mut plan = RenameRefactorPlan::new();
+        plan.add_step("c", "c2", RenameScope::Workspace, 3);
+        plan.add_step("a", "a2", RenameScope::Workspace, 1);
+        plan.add_step("b", "b2", RenameScope::Workspace, 2);
+        let ordered = plan.ordered_steps();
+        assert_eq!(ordered[0].old_name, "a");
+        assert_eq!(ordered[1].old_name, "b");
+        assert_eq!(ordered[2].old_name, "c");
+    }
+
+    #[test]
+    fn refactor_plan_validate() {
+        let mut plan = RenameRefactorPlan::new();
+        plan.add_step("foo", "bar", RenameScope::Workspace, 1);
+        plan.add_step("baz", "", RenameScope::Workspace, 2); // invalid: empty new name
+        let issues = plan.validate();
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].0, 1); // index of invalid step
+    }
+
+    #[test]
+    fn refactor_plan_chained_steps() {
+        let mut plan = RenameRefactorPlan::new();
+        plan.add_step("a", "b", RenameScope::Workspace, 1);
+        plan.add_step("b", "c", RenameScope::Workspace, 2);
+        let chains = plan.chained_steps();
+        assert_eq!(chains.len(), 1);
+        assert_eq!(chains[0], (0, 1));
+    }
+
+    #[test]
+    fn refactor_plan_affected_files() {
+        let mut plan = RenameRefactorPlan::new();
+        plan.add_step("x", "y", RenameScope::SingleFile("main.rs".into()), 1);
+        plan.add_step("a", "b", RenameScope::SingleFile("lib.rs".into()), 2);
+        plan.add_step("c", "d", RenameScope::Workspace, 3);
+        let files = plan.affected_files();
+        assert_eq!(files, vec!["lib.rs", "main.rs"]);
+    }
+
+    #[test]
+    fn refactor_plan_remove_step() {
+        let mut plan = RenameRefactorPlan::new();
+        plan.add_step("a", "b", RenameScope::Workspace, 1);
+        plan.add_step("c", "d", RenameScope::Workspace, 2);
+        assert_eq!(plan.len(), 2);
+        let removed = plan.remove_step(0).unwrap();
+        assert_eq!(removed.old_name, "a");
+        assert_eq!(plan.len(), 1);
+        assert!(plan.remove_step(5).is_none());
+    }
+
+    #[test]
+    fn refactor_plan_display() {
+        let mut plan = RenameRefactorPlan::new();
+        plan.add_step("foo", "bar", RenameScope::Workspace, 1);
+        let display = format!("{}", plan);
+        assert!(display.contains("1 steps"));
+        assert!(display.contains("foo → bar"));
+    }
+
+    #[test]
+    fn rename_step_display() {
+        let step = RenameStep {
+            old_name: "old".into(),
+            new_name: "new".into(),
+            scope: RenameScope::Workspace,
+            priority: 5,
+        };
+        assert_eq!(format!("{}", step), "old → new (priority 5)");
     }
 }

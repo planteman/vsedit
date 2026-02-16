@@ -897,6 +897,33 @@ impl Default for StagingArea {
     }
 }
 
+impl StagingArea {
+    /// Returns true if a file is currently staged.
+    pub fn is_staged(&self, uri: &str) -> bool {
+        self.staged.iter().any(|r| r.uri == uri)
+    }
+
+    /// Returns true if a file is currently unstaged.
+    pub fn is_unstaged(&self, uri: &str) -> bool {
+        self.unstaged.iter().any(|r| r.uri == uri)
+    }
+
+    /// Total number of files (staged + unstaged).
+    pub fn total_count(&self) -> usize {
+        self.staged.len() + self.unstaged.len()
+    }
+
+    /// Returns all URIs currently staged.
+    pub fn staged_uris(&self) -> Vec<&str> {
+        self.staged.iter().map(|r| r.uri.as_str()).collect()
+    }
+
+    /// Returns all URIs currently unstaged.
+    pub fn unstaged_uris(&self) -> Vec<&str> {
+        self.unstaged.iter().map(|r| r.uri.as_str()).collect()
+    }
+}
+
 // ---------------------------------------------------------------------------
 // ConflictResolver — helpers for resolving merge conflicts
 // ---------------------------------------------------------------------------
@@ -974,12 +1001,254 @@ impl Default for ConflictResolver {
     }
 }
 
+impl ConflictResolver {
+    /// Remove a previously recorded resolution. Returns true if it existed.
+    pub fn remove_resolution(&mut self, uri: &str) -> bool {
+        let before = self.resolutions.len();
+        self.resolutions.retain(|(u, _)| u != uri);
+        self.resolutions.len() < before
+    }
+
+    /// Clear all recorded resolutions.
+    pub fn clear(&mut self) {
+        self.resolutions.clear();
+    }
+
+    /// Return URIs of all resolved conflicts (regardless of strategy).
+    pub fn resolved_uris(&self) -> Vec<&str> {
+        self.resolutions.iter().map(|(u, _)| u.as_str()).collect()
+    }
+}
+
 // ---------------------------------------------------------------------------
 // WorkingCopyExporter — serialize working copy state for external consumption
 // ---------------------------------------------------------------------------
 
 /// Exports a working copy provider state into a portable text format.
 pub struct WorkingCopyExporter;
+
+impl ScmStatus {
+    /// Returns true for statuses that represent an active change (not ignored).
+    pub fn is_active(&self) -> bool {
+        !matches!(self, ScmStatus::Ignored)
+    }
+
+    /// Returns true for statuses that modify existing file content.
+    pub fn is_content_change(&self) -> bool {
+        matches!(self, ScmStatus::Modified | ScmStatus::Renamed)
+    }
+
+    /// Returns a single-character short code for display.
+    pub fn short_code(&self) -> char {
+        match self {
+            ScmStatus::Untracked => '?',
+            ScmStatus::Modified => 'M',
+            ScmStatus::Added => 'A',
+            ScmStatus::Deleted => 'D',
+            ScmStatus::Renamed => 'R',
+            ScmStatus::Conflict => 'C',
+            ScmStatus::Ignored => '!',
+        }
+    }
+}
+
+impl fmt::Display for ScmStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(status_label(*self))
+    }
+}
+
+impl ScmResource {
+    /// Create a new resource with no original URI.
+    pub fn new(uri: impl Into<String>, status: ScmStatus) -> Self {
+        Self {
+            uri: uri.into(),
+            status,
+            original_uri: None,
+        }
+    }
+
+    /// Create a renamed resource tracking the original URI.
+    pub fn renamed(uri: impl Into<String>, original: impl Into<String>) -> Self {
+        Self {
+            uri: uri.into(),
+            status: ScmStatus::Renamed,
+            original_uri: Some(original.into()),
+        }
+    }
+
+    /// Returns the file extension from the URI, if any.
+    pub fn extension(&self) -> Option<&str> {
+        self.uri.rsplit_once('.').map(|(_, ext)| ext)
+    }
+
+    /// Returns the file name portion of the URI (after the last `/`).
+    pub fn file_name(&self) -> &str {
+        self.uri.rsplit('/').next().unwrap_or(&self.uri)
+    }
+
+    /// Returns the directory portion of the URI (before the last `/`).
+    pub fn directory(&self) -> Option<&str> {
+        self.uri.rsplit_once('/').map(|(dir, _)| dir)
+    }
+}
+
+impl fmt::Display for ScmResource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} {}", self.status.short_code(), self.uri)?;
+        if let Some(ref orig) = self.original_uri {
+            write!(f, " (was {})", orig)?;
+        }
+        Ok(())
+    }
+}
+
+impl ScmGroup {
+    /// Create a new empty group.
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            resources: Vec::new(),
+        }
+    }
+
+    /// Number of resources in this group.
+    pub fn len(&self) -> usize {
+        self.resources.len()
+    }
+
+    /// Whether this group has no resources.
+    pub fn is_empty(&self) -> bool {
+        self.resources.is_empty()
+    }
+
+    /// Return all URIs in this group.
+    pub fn uris(&self) -> Vec<&str> {
+        self.resources.iter().map(|r| r.uri.as_str()).collect()
+    }
+
+    /// Return resources filtered by status.
+    pub fn by_status(&self, status: ScmStatus) -> Vec<&ScmResource> {
+        self.resources.iter().filter(|r| r.status == status).collect()
+    }
+
+    /// Returns true if any resource has the given status.
+    pub fn has_status(&self, status: ScmStatus) -> bool {
+        self.resources.iter().any(|r| r.status == status)
+    }
+
+    /// Retain only resources matching a predicate.
+    pub fn retain<F: Fn(&ScmResource) -> bool>(&mut self, predicate: F) {
+        self.resources.retain(|r| predicate(r));
+    }
+}
+
+impl DiffSummary {
+    /// Create a new diff summary for a file.
+    pub fn new(file_path: impl Into<String>, insertions: usize, deletions: usize) -> Self {
+        Self {
+            file_path: file_path.into(),
+            insertions,
+            deletions,
+        }
+    }
+
+    /// Returns true if the diff only has insertions.
+    pub fn is_pure_addition(&self) -> bool {
+        self.insertions > 0 && self.deletions == 0
+    }
+
+    /// Returns true if the diff only has deletions.
+    pub fn is_pure_deletion(&self) -> bool {
+        self.deletions > 0 && self.insertions == 0
+    }
+
+    /// Returns the ratio of insertions to total changes (0.0..=1.0).
+    /// Returns 0.0 if there are no changes.
+    pub fn insertion_ratio(&self) -> f64 {
+        let total = self.total_changes();
+        if total == 0 {
+            0.0
+        } else {
+            self.insertions as f64 / total as f64
+        }
+    }
+}
+
+impl fmt::Display for DiffSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.file_path.is_empty() {
+            write!(f, "+{} -{}", self.insertions, self.deletions)
+        } else {
+            write!(f, "{}: +{} -{}", self.file_path, self.insertions, self.deletions)
+        }
+    }
+}
+
+impl WorkingCopyDiff {
+    /// Remove a diff by file path. Returns true if found.
+    pub fn remove(&mut self, file_path: &str) -> bool {
+        let before = self.diffs.len();
+        self.diffs.retain(|d| d.file_path != file_path);
+        self.diffs.len() < before
+    }
+
+    /// Returns true when there are no diffs at all.
+    pub fn is_empty(&self) -> bool {
+        self.diffs.is_empty()
+    }
+
+    /// Returns file paths that have the most changes, sorted descending.
+    pub fn top_changed(&self, limit: usize) -> Vec<&DiffSummary> {
+        let mut sorted: Vec<&DiffSummary> = self.diffs.iter().filter(|d| !d.is_empty()).collect();
+        sorted.sort_by(|a, b| b.total_changes().cmp(&a.total_changes()));
+        sorted.truncate(limit);
+        sorted
+    }
+
+    /// Merge another WorkingCopyDiff into this one.
+    pub fn merge(&mut self, other: &WorkingCopyDiff) {
+        for diff in &other.diffs {
+            if let Some(existing) = self.diffs.iter_mut().find(|d| d.file_path == diff.file_path) {
+                existing.insertions += diff.insertions;
+                existing.deletions += diff.deletions;
+            } else {
+                self.diffs.push(diff.clone());
+            }
+        }
+    }
+}
+
+impl ScmChangeSet {
+    /// Return resources matching a status.
+    pub fn by_status(&self, status: ScmStatus) -> Vec<&ScmResource> {
+        self.resources.iter().filter(|r| r.status == status).collect()
+    }
+
+    /// Returns true if any resource has the given status.
+    pub fn has_status(&self, status: ScmStatus) -> bool {
+        self.resources.iter().any(|r| r.status == status)
+    }
+
+    /// Split this change set into two: resources matching the predicate and
+    /// those that don't. Returns (matching, rest).
+    pub fn partition<F: Fn(&ScmResource) -> bool>(self, predicate: F) -> (Self, Self) {
+        let (matching, rest): (Vec<_>, Vec<_>) = self.resources.into_iter().partition(|r| predicate(r));
+        (
+            ScmChangeSet {
+                label: format!("{} (selected)", self.label),
+                resources: matching,
+                staged: self.staged,
+            },
+            ScmChangeSet {
+                label: format!("{} (remaining)", self.label),
+                resources: rest,
+                staged: self.staged,
+            },
+        )
+    }
+}
 
 impl WorkingCopyExporter {
     /// Export a provider's state as a list of status lines, one per resource.
@@ -1732,5 +2001,238 @@ mod tests {
         let export_str = WorkingCopyExporter::export_string(&provider);
         assert!(export_str.contains("changes\tModified\ta.rs"));
         assert!(export_str.contains('\n'));
+    }
+
+    // -- ScmStatus impl tests -----------------------------------------------
+
+    #[test]
+    fn scm_status_is_active() {
+        assert!(ScmStatus::Modified.is_active());
+        assert!(ScmStatus::Added.is_active());
+        assert!(ScmStatus::Deleted.is_active());
+        assert!(ScmStatus::Conflict.is_active());
+        assert!(ScmStatus::Untracked.is_active());
+        assert!(ScmStatus::Renamed.is_active());
+        assert!(!ScmStatus::Ignored.is_active());
+    }
+
+    #[test]
+    fn scm_status_is_content_change() {
+        assert!(ScmStatus::Modified.is_content_change());
+        assert!(ScmStatus::Renamed.is_content_change());
+        assert!(!ScmStatus::Added.is_content_change());
+        assert!(!ScmStatus::Deleted.is_content_change());
+    }
+
+    #[test]
+    fn scm_status_short_code_and_display() {
+        assert_eq!(ScmStatus::Modified.short_code(), 'M');
+        assert_eq!(ScmStatus::Added.short_code(), 'A');
+        assert_eq!(ScmStatus::Deleted.short_code(), 'D');
+        assert_eq!(ScmStatus::Renamed.short_code(), 'R');
+        assert_eq!(ScmStatus::Conflict.short_code(), 'C');
+        assert_eq!(ScmStatus::Untracked.short_code(), '?');
+        assert_eq!(ScmStatus::Ignored.short_code(), '!');
+        assert_eq!(format!("{}", ScmStatus::Modified), "Modified");
+        assert_eq!(format!("{}", ScmStatus::Conflict), "Conflict");
+    }
+
+    // -- ScmResource impl tests ---------------------------------------------
+
+    #[test]
+    fn scm_resource_constructors() {
+        let r = ScmResource::new("src/main.rs", ScmStatus::Modified);
+        assert_eq!(r.uri, "src/main.rs");
+        assert_eq!(r.status, ScmStatus::Modified);
+        assert!(r.original_uri.is_none());
+
+        let r2 = ScmResource::renamed("new.rs", "old.rs");
+        assert_eq!(r2.status, ScmStatus::Renamed);
+        assert_eq!(r2.original_uri.as_deref(), Some("old.rs"));
+    }
+
+    #[test]
+    fn scm_resource_path_helpers() {
+        let r = ScmResource::new("src/utils/helpers.rs", ScmStatus::Added);
+        assert_eq!(r.extension(), Some("rs"));
+        assert_eq!(r.file_name(), "helpers.rs");
+        assert_eq!(r.directory(), Some("src/utils"));
+
+        let r2 = ScmResource::new("Makefile", ScmStatus::Modified);
+        assert_eq!(r2.extension(), None);
+        assert_eq!(r2.file_name(), "Makefile");
+        assert_eq!(r2.directory(), None);
+    }
+
+    #[test]
+    fn scm_resource_display() {
+        let r = ScmResource::new("src/main.rs", ScmStatus::Modified);
+        assert_eq!(format!("{r}"), "M src/main.rs");
+
+        let r2 = ScmResource::renamed("new.rs", "old.rs");
+        assert_eq!(format!("{r2}"), "R new.rs (was old.rs)");
+    }
+
+    // -- ScmGroup impl tests ------------------------------------------------
+
+    #[test]
+    fn scm_group_methods() {
+        let mut g = ScmGroup::new("changes", "Changes");
+        assert!(g.is_empty());
+        assert_eq!(g.len(), 0);
+        g.resources.push(ScmResource::new("a.rs", ScmStatus::Modified));
+        g.resources.push(ScmResource::new("b.rs", ScmStatus::Added));
+        g.resources.push(ScmResource::new("c.rs", ScmStatus::Modified));
+        assert_eq!(g.len(), 3);
+        assert!(!g.is_empty());
+        assert_eq!(g.uris(), vec!["a.rs", "b.rs", "c.rs"]);
+        assert_eq!(g.by_status(ScmStatus::Modified).len(), 2);
+        assert!(g.has_status(ScmStatus::Added));
+        assert!(!g.has_status(ScmStatus::Deleted));
+        g.retain(|r| r.status == ScmStatus::Modified);
+        assert_eq!(g.len(), 2);
+        assert!(!g.has_status(ScmStatus::Added));
+    }
+
+    // -- DiffSummary impl tests ---------------------------------------------
+
+    #[test]
+    fn diff_summary_new_and_helpers() {
+        let d = DiffSummary::new("a.rs", 10, 0);
+        assert!(d.is_pure_addition());
+        assert!(!d.is_pure_deletion());
+        assert!((d.insertion_ratio() - 1.0).abs() < f64::EPSILON);
+
+        let d2 = DiffSummary::new("b.rs", 0, 5);
+        assert!(!d2.is_pure_addition());
+        assert!(d2.is_pure_deletion());
+        assert!((d2.insertion_ratio() - 0.0).abs() < f64::EPSILON);
+
+        let d3 = DiffSummary::new("c.rs", 3, 7);
+        assert!(!d3.is_pure_addition());
+        assert!(!d3.is_pure_deletion());
+        assert!((d3.insertion_ratio() - 0.3).abs() < f64::EPSILON);
+
+        let d4 = DiffSummary::new("d.rs", 0, 0);
+        assert!((d4.insertion_ratio() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn diff_summary_display() {
+        let d = DiffSummary::new("main.rs", 5, 3);
+        assert_eq!(format!("{d}"), "main.rs: +5 -3");
+
+        let d2 = DiffSummary { file_path: String::new(), insertions: 2, deletions: 1 };
+        assert_eq!(format!("{d2}"), "+2 -1");
+    }
+
+    // -- WorkingCopyDiff extended tests --------------------------------------
+
+    #[test]
+    fn working_copy_diff_remove_and_empty() {
+        let mut wcd = WorkingCopyDiff::new();
+        assert!(wcd.is_empty());
+        wcd.add(DiffSummary::new("a.rs", 5, 2));
+        wcd.add(DiffSummary::new("b.rs", 3, 1));
+        assert!(!wcd.is_empty());
+        assert!(wcd.remove("a.rs"));
+        assert!(!wcd.remove("nonexistent.rs"));
+        assert_eq!(wcd.diffs.len(), 1);
+        assert_eq!(wcd.diffs[0].file_path, "b.rs");
+    }
+
+    #[test]
+    fn working_copy_diff_top_changed() {
+        let mut wcd = WorkingCopyDiff::new();
+        wcd.add(DiffSummary::new("small.rs", 1, 0));
+        wcd.add(DiffSummary::new("big.rs", 100, 50));
+        wcd.add(DiffSummary::new("medium.rs", 10, 5));
+        wcd.add(DiffSummary::new("empty.rs", 0, 0));
+        let top = wcd.top_changed(2);
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0].file_path, "big.rs");
+        assert_eq!(top[1].file_path, "medium.rs");
+    }
+
+    #[test]
+    fn working_copy_diff_merge() {
+        let mut wcd1 = WorkingCopyDiff::new();
+        wcd1.add(DiffSummary::new("a.rs", 5, 2));
+        wcd1.add(DiffSummary::new("b.rs", 3, 1));
+
+        let mut wcd2 = WorkingCopyDiff::new();
+        wcd2.add(DiffSummary::new("a.rs", 2, 1)); // same file, should merge
+        wcd2.add(DiffSummary::new("c.rs", 4, 0)); // new file
+
+        wcd1.merge(&wcd2);
+        assert_eq!(wcd1.diffs.len(), 3);
+        let a = wcd1.get("a.rs").unwrap();
+        assert_eq!(a.insertions, 7);
+        assert_eq!(a.deletions, 3);
+        assert!(wcd1.get("c.rs").is_some());
+    }
+
+    // -- ScmChangeSet extended tests ----------------------------------------
+
+    #[test]
+    fn changeset_by_status_and_has_status() {
+        let mut cs = ScmChangeSet::new("test");
+        cs.add(ScmResource::new("a.rs", ScmStatus::Modified));
+        cs.add(ScmResource::new("b.rs", ScmStatus::Added));
+        cs.add(ScmResource::new("c.rs", ScmStatus::Modified));
+        assert_eq!(cs.by_status(ScmStatus::Modified).len(), 2);
+        assert!(cs.has_status(ScmStatus::Added));
+        assert!(!cs.has_status(ScmStatus::Deleted));
+    }
+
+    #[test]
+    fn changeset_partition() {
+        let mut cs = ScmChangeSet::new("all");
+        cs.add(ScmResource::new("a.rs", ScmStatus::Modified));
+        cs.add(ScmResource::new("b.rs", ScmStatus::Added));
+        cs.add(ScmResource::new("c.rs", ScmStatus::Modified));
+        let (selected, rest) = cs.partition(|r| r.status == ScmStatus::Modified);
+        assert_eq!(selected.len(), 2);
+        assert_eq!(rest.len(), 1);
+        assert!(selected.label.contains("selected"));
+        assert!(rest.label.contains("remaining"));
+    }
+
+    // -- StagingArea extended tests -----------------------------------------
+
+    #[test]
+    fn staging_area_query_helpers() {
+        let mut sa = StagingArea::new();
+        sa.unstaged.push(ScmResource::new("a.rs", ScmStatus::Modified));
+        sa.unstaged.push(ScmResource::new("b.rs", ScmStatus::Added));
+        assert_eq!(sa.total_count(), 2);
+        assert!(sa.is_unstaged("a.rs"));
+        assert!(!sa.is_staged("a.rs"));
+        assert_eq!(sa.unstaged_uris(), vec!["a.rs", "b.rs"]);
+
+        sa.stage("a.rs");
+        assert!(sa.is_staged("a.rs"));
+        assert!(!sa.is_unstaged("a.rs"));
+        assert_eq!(sa.staged_uris(), vec!["a.rs"]);
+        assert_eq!(sa.total_count(), 2);
+    }
+
+    // -- ConflictResolver extended tests ------------------------------------
+
+    #[test]
+    fn conflict_resolver_remove_and_clear() {
+        let mut cr = ConflictResolver::new();
+        cr.resolve("a.rs", ConflictResolution::AcceptCurrent);
+        cr.resolve("b.rs", ConflictResolution::Manual);
+        cr.resolve("c.rs", ConflictResolution::AcceptIncoming);
+        assert_eq!(cr.resolved_uris(), vec!["a.rs", "b.rs", "c.rs"]);
+
+        assert!(cr.remove_resolution("b.rs"));
+        assert!(!cr.remove_resolution("nonexistent.rs"));
+        assert_eq!(cr.resolved_count(), 2);
+
+        cr.clear();
+        assert_eq!(cr.resolved_count(), 0);
+        assert!(cr.resolved_uris().is_empty());
     }
 }

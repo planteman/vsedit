@@ -1050,6 +1050,107 @@ impl DataIntegrityChecker {
         Self::compute_checksum(data) == expected
     }
 }
+
+// ---------------------------------------------------------------------------
+// UserDataPath utilities – additional path resolution helpers
+// ---------------------------------------------------------------------------
+
+impl UserDataPath {
+    /// Return the path for a workspace-specific storage directory.
+    pub fn workspace_storage_path(&self, workspace_id: &str) -> String {
+        self.resolve(&format!("workspaceStorage/{workspace_id}"))
+    }
+
+    /// Return the path for a global storage directory.
+    pub fn global_storage_path(&self) -> String {
+        self.resolve("globalStorage")
+    }
+
+    /// Return the path for cached data (e.g. downloaded extensions).
+    pub fn cache_path(&self) -> String {
+        self.resolve("CachedData")
+    }
+
+    /// Return the path for crash reports.
+    pub fn crash_reports_path(&self) -> String {
+        self.resolve("crash-reports")
+    }
+
+    /// Check if a relative sub-path is contained in the standard paths.
+    pub fn is_standard_subpath(&self, path: &str) -> bool {
+        self.standard_paths().iter().any(|p| p.ends_with(path))
+    }
+}
+
+/// Classify a file path as belonging to a particular user data category.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UserDataCategory {
+    Settings,
+    Keybindings,
+    Snippets,
+    Extensions,
+    Logs,
+    StateDb,
+    WorkspaceStorage,
+    GlobalStorage,
+    CachedData,
+    Unknown,
+}
+
+impl fmt::Display for UserDataCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            Self::Settings => "settings",
+            Self::Keybindings => "keybindings",
+            Self::Snippets => "snippets",
+            Self::Extensions => "extensions",
+            Self::Logs => "logs",
+            Self::StateDb => "state-db",
+            Self::WorkspaceStorage => "workspace-storage",
+            Self::GlobalStorage => "global-storage",
+            Self::CachedData => "cached-data",
+            Self::Unknown => "unknown",
+        };
+        write!(f, "{label}")
+    }
+}
+
+/// Classify a path within the user data directory.
+pub fn classify_user_data_path(path: &str) -> UserDataCategory {
+    if path.contains("settings.json") {
+        UserDataCategory::Settings
+    } else if path.contains("keybindings.json") {
+        UserDataCategory::Keybindings
+    } else if path.contains("snippets") {
+        UserDataCategory::Snippets
+    } else if path.contains("extensions") {
+        UserDataCategory::Extensions
+    } else if path.contains("logs") {
+        UserDataCategory::Logs
+    } else if path.contains("state.db") {
+        UserDataCategory::StateDb
+    } else if path.contains("workspaceStorage") {
+        UserDataCategory::WorkspaceStorage
+    } else if path.contains("globalStorage") {
+        UserDataCategory::GlobalStorage
+    } else if path.contains("CachedData") {
+        UserDataCategory::CachedData
+    } else {
+        UserDataCategory::Unknown
+    }
+}
+
+/// Validate a profile ID string. Must be non-empty, alphanumeric/dash/underscore only.
+pub fn validate_profile_id(id: &str) -> Result<(), UserDataError> {
+    if id.is_empty() {
+        return Err(UserDataError::InvalidProfileId(id.to_string()));
+    }
+    if !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+        return Err(UserDataError::InvalidProfileId(id.to_string()));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1773,5 +1874,101 @@ mod tests {
         let checksum = DataIntegrityChecker::compute_checksum(data);
         assert!(DataIntegrityChecker::verify(data, checksum));
         assert!(!DataIntegrityChecker::verify("different", checksum));
+    }
+
+    #[test]
+    fn workspace_storage_path() {
+        let p = UserDataPath::new("/home/user/.config/vsedit");
+        assert_eq!(
+            p.workspace_storage_path("abc123"),
+            "/home/user/.config/vsedit/workspaceStorage/abc123"
+        );
+    }
+
+    #[test]
+    fn global_storage_path() {
+        let p = UserDataPath::new("/base");
+        assert_eq!(p.global_storage_path(), "/base/globalStorage");
+    }
+
+    #[test]
+    fn cache_path() {
+        let p = UserDataPath::new("/base");
+        assert_eq!(p.cache_path(), "/base/CachedData");
+    }
+
+    #[test]
+    fn crash_reports_path() {
+        let p = UserDataPath::new("/base");
+        assert_eq!(p.crash_reports_path(), "/base/crash-reports");
+    }
+
+    #[test]
+    fn is_standard_subpath_true() {
+        let p = UserDataPath::new("/base");
+        assert!(p.is_standard_subpath("settings.json"));
+        assert!(p.is_standard_subpath("logs"));
+    }
+
+    #[test]
+    fn is_standard_subpath_false() {
+        let p = UserDataPath::new("/base");
+        assert!(!p.is_standard_subpath("randomfile.txt"));
+    }
+
+    #[test]
+    fn classify_settings_path() {
+        assert_eq!(
+            classify_user_data_path("/base/settings.json"),
+            UserDataCategory::Settings
+        );
+    }
+
+    #[test]
+    fn classify_extensions_path() {
+        assert_eq!(
+            classify_user_data_path("/base/extensions/my-ext"),
+            UserDataCategory::Extensions
+        );
+    }
+
+    #[test]
+    fn classify_unknown_path() {
+        assert_eq!(
+            classify_user_data_path("/random/path"),
+            UserDataCategory::Unknown
+        );
+    }
+
+    #[test]
+    fn classify_workspace_storage_path() {
+        assert_eq!(
+            classify_user_data_path("/base/workspaceStorage/abc"),
+            UserDataCategory::WorkspaceStorage
+        );
+    }
+
+    #[test]
+    fn user_data_category_display() {
+        assert_eq!(format!("{}", UserDataCategory::Settings), "settings");
+        assert_eq!(format!("{}", UserDataCategory::Unknown), "unknown");
+    }
+
+    #[test]
+    fn validate_profile_id_valid() {
+        assert!(validate_profile_id("my-profile").is_ok());
+        assert!(validate_profile_id("default").is_ok());
+        assert!(validate_profile_id("test_123").is_ok());
+    }
+
+    #[test]
+    fn validate_profile_id_empty() {
+        assert!(validate_profile_id("").is_err());
+    }
+
+    #[test]
+    fn validate_profile_id_bad_chars() {
+        assert!(validate_profile_id("has spaces").is_err());
+        assert!(validate_profile_id("has/slash").is_err());
     }
 }

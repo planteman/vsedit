@@ -1088,6 +1088,263 @@ pub fn parse_kv(text: &str) -> Vec<(String, String)> {
 // SettingsAccessibility helpers
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Display impls
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for SettingType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Boolean => write!(f, "boolean"),
+            Self::String => write!(f, "string"),
+            Self::Number => write!(f, "number"),
+            Self::Enum(opts) => write!(f, "enum({})", opts.join(", ")),
+            Self::Array => write!(f, "array"),
+            Self::Object => write!(f, "object"),
+        }
+    }
+}
+
+impl fmt::Display for SettingsScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::User => write!(f, "User"),
+            Self::Workspace => write!(f, "Workspace"),
+            Self::Folder => write!(f, "Folder"),
+        }
+    }
+}
+
+impl fmt::Display for SettingEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mod_marker = if self.modified { " [modified]" } else { "" };
+        write!(
+            f,
+            "{} ({}) = {}{}",
+            self.id, self.setting_type, self.current_value, mod_marker
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingEntry — additional methods
+// ---------------------------------------------------------------------------
+
+impl SettingEntry {
+    /// Returns `true` if the current value differs from the default.
+    pub fn is_modified(&self) -> bool {
+        self.modified || self.current_value != self.default_value
+    }
+
+    /// Reset this entry to its default value and clear the modified flag.
+    pub fn reset(&mut self) {
+        self.current_value = self.default_value.clone();
+        self.modified = false;
+    }
+
+    /// Validate that the current value is acceptable for the setting type.
+    /// Returns an error message on failure, or `None` if valid.
+    pub fn validate(&self) -> Option<String> {
+        match &self.setting_type {
+            SettingType::Boolean => {
+                if self.current_value != "true" && self.current_value != "false" {
+                    Some(format!(
+                        "{}: expected 'true' or 'false', got '{}'",
+                        self.id, self.current_value
+                    ))
+                } else {
+                    None
+                }
+            }
+            SettingType::Number => {
+                if self.current_value.parse::<f64>().is_err() {
+                    Some(format!(
+                        "{}: expected a number, got '{}'",
+                        self.id, self.current_value
+                    ))
+                } else {
+                    None
+                }
+            }
+            SettingType::Enum(opts) => {
+                if !opts.contains(&self.current_value) {
+                    Some(format!(
+                        "{}: '{}' is not one of [{}]",
+                        self.id,
+                        self.current_value,
+                        opts.join(", ")
+                    ))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Return the category hierarchy as segments split on `.` in the id.
+    /// For `editor.font.size` this returns `["editor", "font", "size"]`.
+    pub fn id_segments(&self) -> Vec<&str> {
+        self.id.split('.').collect()
+    }
+
+    /// The top-level namespace of the setting id (the part before the first dot).
+    pub fn namespace(&self) -> &str {
+        self.id.split('.').next().unwrap_or(&self.id)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingsView — additional methods
+// ---------------------------------------------------------------------------
+
+impl SettingsView {
+    /// Return the currently selected `SettingEntry`, if any.
+    pub fn selected_entry(&self) -> Option<&SettingEntry> {
+        self.filtered_entries
+            .get(self.selected_index)
+            .and_then(|&idx| self.entries.get(idx))
+    }
+
+    /// Return a mutable reference to the currently selected entry.
+    pub fn selected_entry_mut(&mut self) -> Option<&mut SettingEntry> {
+        let idx = self.filtered_entries.get(self.selected_index).copied();
+        idx.and_then(move |i| self.entries.get_mut(i))
+    }
+
+    /// Return the number of entries that have been modified.
+    pub fn modified_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.is_modified()).count()
+    }
+
+    /// Validate all entries, returning a vec of error messages.
+    pub fn validate_all(&self) -> Vec<String> {
+        self.entries.iter().filter_map(|e| e.validate()).collect()
+    }
+
+    /// Set the active scope.
+    pub fn set_scope(&mut self, scope: SettingsScope) {
+        self.active_scope = scope;
+    }
+
+    /// Cycle to the next scope (User → Workspace → Folder → User).
+    pub fn cycle_scope(&mut self) {
+        self.active_scope = match self.active_scope {
+            SettingsScope::User => SettingsScope::Workspace,
+            SettingsScope::Workspace => SettingsScope::Folder,
+            SettingsScope::Folder => SettingsScope::User,
+        };
+    }
+
+    /// Return how many entries match the current filter.
+    pub fn visible_count(&self) -> usize {
+        self.filtered_entries.len()
+    }
+
+    /// Return an iterator over the entries visible after filtering.
+    pub fn visible_entries(&self) -> impl Iterator<Item = &SettingEntry> {
+        self.filtered_entries
+            .iter()
+            .filter_map(move |&idx| self.entries.get(idx))
+    }
+
+    /// Cycle the selected enum setting to its next variant.
+    /// Returns `true` if a change was made.
+    pub fn cycle_enum(&mut self, filtered_index: usize) -> bool {
+        if let Some(&entry_idx) = self.filtered_entries.get(filtered_index) {
+            if let Some(entry) = self.entries.get_mut(entry_idx) {
+                if let SettingType::Enum(ref opts) = entry.setting_type {
+                    if opts.is_empty() {
+                        return false;
+                    }
+                    let current_pos = opts.iter().position(|o| *o == entry.current_value);
+                    let next = match current_pos {
+                        Some(pos) => (pos + 1) % opts.len(),
+                        None => 0,
+                    };
+                    entry.current_value = opts[next].clone();
+                    entry.modified = entry.current_value != entry.default_value;
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingsTreeNode — additional methods
+// ---------------------------------------------------------------------------
+
+impl SettingsTreeNode {
+    /// Count the total number of leaf nodes (settings) in this subtree.
+    pub fn leaf_count(&self) -> usize {
+        if self.is_leaf() {
+            return 1;
+        }
+        self.children.iter().map(|c| c.leaf_count()).sum()
+    }
+
+    /// Expand all nodes in the subtree recursively.
+    pub fn expand_all(&mut self) {
+        self.expanded = true;
+        for child in &mut self.children {
+            child.expand_all();
+        }
+    }
+
+    /// Collapse all nodes in the subtree recursively.
+    pub fn collapse_all(&mut self) {
+        self.expanded = false;
+        for child in &mut self.children {
+            child.collapse_all();
+        }
+    }
+
+    /// Collect all entry indices from leaf nodes in depth-first order.
+    pub fn collect_entry_indices(&self) -> Vec<usize> {
+        let mut out = Vec::new();
+        self.collect_entry_indices_inner(&mut out);
+        out
+    }
+
+    fn collect_entry_indices_inner(&self, out: &mut Vec<usize>) {
+        if let Some(idx) = self.entry_index {
+            out.push(idx);
+        }
+        for child in &self.children {
+            child.collect_entry_indices_inner(out);
+        }
+    }
+
+    /// Return the maximum depth of the subtree.
+    pub fn max_depth(&self) -> usize {
+        if self.children.is_empty() {
+            return 0;
+        }
+        1 + self.children.iter().map(|c| c.max_depth()).max().unwrap_or(0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingsSnapshot — additional methods
+// ---------------------------------------------------------------------------
+
+impl SettingsSnapshot {
+    /// Return an iterator over all `(id, value)` pairs.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.entries.iter().map(|(k, v)| (k.as_str(), v.as_str()))
+    }
+
+    /// Return the ids of settings whose values differ between two snapshots.
+    pub fn changed_ids(&self, other: &SettingsSnapshot) -> Vec<String> {
+        diff_snapshots(self, other)
+            .into_iter()
+            .map(|d| d.id)
+            .collect()
+    }
+}
+
 /// Summary line for screen readers: "{title}: {value} ({type})".
 pub fn accessibility_label(entry: &SettingEntry) -> String {
     let type_label = match &entry.setting_type {
@@ -1709,5 +1966,329 @@ mod tests {
         entry.modified = true;
         let label = accessibility_label(&entry);
         assert!(label.contains(", modified"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Display impl tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn setting_type_display() {
+        assert_eq!(SettingType::Boolean.to_string(), "boolean");
+        assert_eq!(SettingType::String.to_string(), "string");
+        assert_eq!(SettingType::Number.to_string(), "number");
+        assert_eq!(SettingType::Array.to_string(), "array");
+        assert_eq!(SettingType::Object.to_string(), "object");
+        let e = SettingType::Enum(vec!["a".into(), "b".into()]);
+        assert_eq!(e.to_string(), "enum(a, b)");
+    }
+
+    #[test]
+    fn settings_scope_display() {
+        assert_eq!(SettingsScope::User.to_string(), "User");
+        assert_eq!(SettingsScope::Workspace.to_string(), "Workspace");
+        assert_eq!(SettingsScope::Folder.to_string(), "Folder");
+    }
+
+    #[test]
+    fn setting_entry_display() {
+        let entry = &sample_entries()[0];
+        let s = entry.to_string();
+        assert!(s.contains("editor.fontSize"));
+        assert!(s.contains("14"));
+        assert!(!s.contains("[modified]"));
+
+        let mut modified = sample_entries()[0].clone();
+        modified.modified = true;
+        assert!(modified.to_string().contains("[modified]"));
+    }
+
+    // -----------------------------------------------------------------------
+    // SettingEntry additional method tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn entry_is_modified() {
+        let mut entry = sample_entries()[0].clone();
+        assert!(!entry.is_modified());
+        entry.current_value = "99".to_string();
+        assert!(entry.is_modified());
+    }
+
+    #[test]
+    fn entry_reset() {
+        let mut entry = sample_entries()[0].clone();
+        entry.current_value = "99".to_string();
+        entry.modified = true;
+        entry.reset();
+        assert_eq!(entry.current_value, "14");
+        assert!(!entry.modified);
+    }
+
+    #[test]
+    fn entry_validate_boolean_ok() {
+        let entry = sample_entries()[2].clone(); // Boolean, value "true"
+        assert!(entry.validate().is_none());
+    }
+
+    #[test]
+    fn entry_validate_boolean_bad() {
+        let mut entry = sample_entries()[2].clone();
+        entry.current_value = "maybe".to_string();
+        let err = entry.validate().unwrap();
+        assert!(err.contains("expected 'true' or 'false'"));
+    }
+
+    #[test]
+    fn entry_validate_number_ok() {
+        let entry = sample_entries()[0].clone(); // Number, value "14"
+        assert!(entry.validate().is_none());
+    }
+
+    #[test]
+    fn entry_validate_number_bad() {
+        let mut entry = sample_entries()[0].clone();
+        entry.current_value = "abc".to_string();
+        let err = entry.validate().unwrap();
+        assert!(err.contains("expected a number"));
+    }
+
+    #[test]
+    fn entry_validate_enum_ok() {
+        let entry = sample_entries()[1].clone(); // Enum, value "off"
+        assert!(entry.validate().is_none());
+    }
+
+    #[test]
+    fn entry_validate_enum_bad() {
+        let mut entry = sample_entries()[1].clone();
+        entry.current_value = "invalid".to_string();
+        let err = entry.validate().unwrap();
+        assert!(err.contains("is not one of"));
+    }
+
+    #[test]
+    fn entry_validate_string_always_ok() {
+        let entry = sample_entries()[3].clone(); // String type
+        assert!(entry.validate().is_none());
+    }
+
+    #[test]
+    fn entry_id_segments() {
+        let entry = &sample_entries()[2]; // editor.minimap.enabled
+        let segs = entry.id_segments();
+        assert_eq!(segs, vec!["editor", "minimap", "enabled"]);
+    }
+
+    #[test]
+    fn entry_namespace() {
+        assert_eq!(sample_entries()[0].namespace(), "editor");
+        assert_eq!(sample_entries()[3].namespace(), "terminal");
+    }
+
+    // -----------------------------------------------------------------------
+    // SettingsView additional method tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn view_selected_entry() {
+        let mut v = SettingsView::new();
+        assert!(v.selected_entry().is_none());
+        for e in sample_entries() {
+            v.add_entry(e);
+        }
+        let sel = v.selected_entry().unwrap();
+        assert_eq!(sel.id, "editor.fontSize");
+        v.select_next();
+        let sel = v.selected_entry().unwrap();
+        assert_eq!(sel.id, "editor.wordWrap");
+    }
+
+    #[test]
+    fn view_selected_entry_mut() {
+        let mut v = SettingsView::new();
+        for e in sample_entries() {
+            v.add_entry(e);
+        }
+        if let Some(entry) = v.selected_entry_mut() {
+            entry.current_value = "42".to_string();
+            entry.modified = true;
+        }
+        assert_eq!(v.entries[0].current_value, "42");
+    }
+
+    #[test]
+    fn view_modified_count() {
+        let mut v = SettingsView::new();
+        for e in sample_entries() {
+            v.add_entry(e);
+        }
+        assert_eq!(v.modified_count(), 0);
+        v.update_value(0, "20");
+        assert_eq!(v.modified_count(), 1);
+        v.update_value(1, "on");
+        assert_eq!(v.modified_count(), 2);
+    }
+
+    #[test]
+    fn view_validate_all() {
+        let mut v = SettingsView::new();
+        for e in sample_entries() {
+            v.add_entry(e);
+        }
+        assert!(v.validate_all().is_empty());
+        v.entries[2].current_value = "maybe".to_string(); // bad bool
+        let errs = v.validate_all();
+        assert_eq!(errs.len(), 1);
+    }
+
+    #[test]
+    fn view_cycle_scope() {
+        let mut v = SettingsView::new();
+        assert_eq!(v.active_scope, SettingsScope::User);
+        v.cycle_scope();
+        assert_eq!(v.active_scope, SettingsScope::Workspace);
+        v.cycle_scope();
+        assert_eq!(v.active_scope, SettingsScope::Folder);
+        v.cycle_scope();
+        assert_eq!(v.active_scope, SettingsScope::User);
+    }
+
+    #[test]
+    fn view_set_scope() {
+        let mut v = SettingsView::new();
+        v.set_scope(SettingsScope::Folder);
+        assert_eq!(v.active_scope, SettingsScope::Folder);
+    }
+
+    #[test]
+    fn view_visible_count() {
+        let mut v = SettingsView::new();
+        for e in sample_entries() {
+            v.add_entry(e);
+        }
+        assert_eq!(v.visible_count(), 4);
+        v.filter_by_query("font");
+        assert_eq!(v.visible_count(), 2);
+    }
+
+    #[test]
+    fn view_visible_entries_iter() {
+        let mut v = SettingsView::new();
+        for e in sample_entries() {
+            v.add_entry(e);
+        }
+        v.filter_by_query("terminal");
+        let ids: Vec<&str> = v.visible_entries().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, vec!["terminal.fontFamily"]);
+    }
+
+    #[test]
+    fn view_cycle_enum() {
+        let mut v = SettingsView::new();
+        for e in sample_entries() {
+            v.add_entry(e);
+        }
+        // wordWrap is Enum with ["off", "on", "bounded"], default "off"
+        let pos = v
+            .filtered_entries
+            .iter()
+            .position(|&i| v.entries[i].id == "editor.wordWrap")
+            .unwrap();
+        assert!(v.cycle_enum(pos));
+        assert_eq!(v.entries[1].current_value, "on");
+        assert!(v.cycle_enum(pos));
+        assert_eq!(v.entries[1].current_value, "bounded");
+        assert!(v.cycle_enum(pos));
+        assert_eq!(v.entries[1].current_value, "off"); // wraps around
+
+        // cycling a non-enum entry returns false
+        let bool_pos = v
+            .filtered_entries
+            .iter()
+            .position(|&i| v.entries[i].id == "editor.minimap.enabled")
+            .unwrap();
+        assert!(!v.cycle_enum(bool_pos));
+    }
+
+    // -----------------------------------------------------------------------
+    // SettingsTreeNode additional method tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn tree_leaf_count() {
+        let entries = sample_entries();
+        let tree = build_tree(&entries);
+        assert_eq!(tree.leaf_count(), 4);
+
+        let editor = tree.find_by_key("editor").unwrap();
+        assert_eq!(editor.leaf_count(), 3);
+    }
+
+    #[test]
+    fn tree_expand_collapse_all() {
+        let entries = sample_entries();
+        let mut tree = build_tree(&entries);
+        tree.expand_all();
+        // All nodes should be expanded
+        assert!(tree.find_by_key("editor").unwrap().expanded);
+        assert!(tree.find_by_key("minimap").unwrap().expanded);
+
+        tree.collapse_all();
+        assert!(!tree.find_by_key("editor").unwrap().expanded);
+        assert!(!tree.expanded);
+    }
+
+    #[test]
+    fn tree_collect_entry_indices() {
+        let entries = sample_entries();
+        let tree = build_tree(&entries);
+        let indices = tree.collect_entry_indices();
+        assert_eq!(indices.len(), 4);
+        // All entry indices should be present
+        for i in 0..4 {
+            assert!(indices.contains(&i), "missing index {}", i);
+        }
+    }
+
+    #[test]
+    fn tree_max_depth() {
+        let entries = sample_entries();
+        let tree = build_tree(&entries);
+        // root -> editor -> minimap -> enabled is depth 3
+        assert_eq!(tree.max_depth(), 3);
+
+        let leaf = SettingsTreeNode::new("leaf", "Leaf");
+        assert_eq!(leaf.max_depth(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // SettingsSnapshot additional method tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn snapshot_iter() {
+        let entries = sample_entries();
+        let snap = SettingsSnapshot::capture(&entries, "test");
+        let pairs: Vec<(&str, &str)> = snap.iter().collect();
+        assert_eq!(pairs.len(), 4);
+        // Sorted by id
+        assert_eq!(pairs[0].0, "editor.fontSize");
+    }
+
+    #[test]
+    fn snapshot_changed_ids() {
+        let entries = sample_entries();
+        let snap1 = SettingsSnapshot::capture(&entries, "before");
+
+        let mut entries2 = sample_entries();
+        entries2[0].current_value = "20".to_string();
+        entries2[3].current_value = "Courier".to_string();
+        let snap2 = SettingsSnapshot::capture(&entries2, "after");
+
+        let changed = snap1.changed_ids(&snap2);
+        assert_eq!(changed.len(), 2);
+        assert!(changed.contains(&"editor.fontSize".to_string()));
+        assert!(changed.contains(&"terminal.fontFamily".to_string()));
     }
 }

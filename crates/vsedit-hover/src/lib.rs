@@ -1094,6 +1094,122 @@ pub fn truncate_hover(hover: &Hover, max_items: usize) -> Hover {
     Hover { contents, range: hover.range }
 }
 
+/// Check if a hover contains any plain text content.
+pub fn has_text(hover: &Hover) -> bool {
+    hover.contents.iter().any(|c| matches!(c, HoverContent::Text(_)))
+}
+
+/// Check if a hover contains any code content.
+pub fn has_code(hover: &Hover) -> bool {
+    hover.contents.iter().any(|c| matches!(c, HoverContent::Code { .. }))
+}
+
+/// Extract all text content from a hover, ignoring code and markdown blocks.
+pub fn extract_text_content(hover: &Hover) -> Vec<&str> {
+    hover
+        .contents
+        .iter()
+        .filter_map(|c| match c {
+            HoverContent::Text(t) => Some(t.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Extract all languages referenced in code blocks.
+pub fn extract_languages(hover: &Hover) -> Vec<&str> {
+    hover
+        .contents
+        .iter()
+        .filter_map(|c| match c {
+            HoverContent::Code { language, .. } => language.as_deref(),
+            _ => None,
+        })
+        .collect()
+}
+
+impl HoverSession {
+    /// Return true if the session has a hover at the given position.
+    pub fn is_at(&self, line: u32, col: u32) -> bool {
+        self.visible && self.line == line && self.col == col
+    }
+
+    /// Unpin the session if pinned, hiding the hover.
+    pub fn unpin(&mut self) {
+        if self.pinned {
+            self.pinned = false;
+            self.visible = false;
+            self.current_hover = None;
+        }
+    }
+
+    /// Return true if there is currently a hover shown (visible and non-empty).
+    pub fn has_content(&self) -> bool {
+        self.visible && self.current_hover.is_some()
+    }
+}
+
+impl HoverRange {
+    /// Create a new hover range.
+    pub fn new(start_line: u32, start_column: u32, end_line: u32, end_column: u32) -> Self {
+        Self {
+            start_line,
+            start_column,
+            end_line,
+            end_column,
+        }
+    }
+
+    /// Return the number of lines this range spans (inclusive).
+    pub fn line_span(&self) -> u32 {
+        self.end_line.saturating_sub(self.start_line) + 1
+    }
+
+    /// Return true if this is a single-line range.
+    pub fn is_single_line(&self) -> bool {
+        self.start_line == self.end_line
+    }
+
+    /// Return true if the given position is within this range.
+    pub fn contains(&self, line: u32, col: u32) -> bool {
+        is_position_in_range(self, line, col)
+    }
+}
+
+impl HoverHistory {
+    /// Return the number of unique positions that have been hovered.
+    pub fn unique_positions(&self) -> usize {
+        let mut seen = std::collections::HashSet::new();
+        for &pos in &self.entries {
+            seen.insert(pos);
+        }
+        seen.len()
+    }
+
+    /// Return true if a specific position was ever hovered.
+    pub fn was_hovered(&self, line: u32, col: u32) -> bool {
+        self.entries.iter().any(|&(l, c)| l == line && c == col)
+    }
+}
+
+impl HoverConfig {
+    /// Return a config with hover disabled.
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            ..Self::default()
+        }
+    }
+
+    /// Return a config with sticky mode off.
+    pub fn non_sticky() -> Self {
+        Self {
+            sticky: false,
+            ..Self::default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1785,5 +1901,121 @@ mod tests {
         assert_eq!(truncated.contents.len(), 2);
         let full = truncate_hover(&hover, 10);
         assert_eq!(full.contents.len(), 3);
+    }
+
+    #[test]
+    fn has_text_detection() {
+        let hover = Hover::text("hello");
+        assert!(has_text(&hover));
+        let code_hover = Hover::code("fn main()", Some("rust"));
+        assert!(!has_text(&code_hover));
+    }
+
+    #[test]
+    fn has_code_detection() {
+        let hover = Hover::code("fn main()", Some("rust"));
+        assert!(has_code(&hover));
+        let text_hover = Hover::text("hello");
+        assert!(!has_code(&text_hover));
+    }
+
+    #[test]
+    fn extract_text_content_filters() {
+        let hover = Hover::from_contents(vec![
+            HoverContent::Text("hello".into()),
+            HoverContent::Markdown("**bold**".into()),
+            HoverContent::Text("world".into()),
+        ]);
+        let texts = extract_text_content(&hover);
+        assert_eq!(texts, vec!["hello", "world"]);
+    }
+
+    #[test]
+    fn extract_languages_from_code() {
+        let hover = Hover::from_contents(vec![
+            HoverContent::Code { value: "x".into(), language: Some("rust".into()) },
+            HoverContent::Code { value: "y".into(), language: Some("python".into()) },
+            HoverContent::Text("z".into()),
+        ]);
+        let langs = extract_languages(&hover);
+        assert_eq!(langs, vec!["rust", "python"]);
+    }
+
+    #[test]
+    fn session_is_at_position() {
+        let mut session = HoverSession::new();
+        session.show(Hover::text("hi"), 5, 10);
+        assert!(session.is_at(5, 10));
+        assert!(!session.is_at(5, 11));
+    }
+
+    #[test]
+    fn session_unpin() {
+        let mut session = HoverSession::new();
+        session.show(Hover::text("hi"), 1, 1);
+        session.toggle_pin();
+        assert!(session.pinned);
+        session.unpin();
+        assert!(!session.pinned);
+        assert!(!session.visible);
+    }
+
+    #[test]
+    fn session_has_content() {
+        let mut session = HoverSession::new();
+        assert!(!session.has_content());
+        session.show(Hover::text("hi"), 1, 1);
+        assert!(session.has_content());
+    }
+
+    #[test]
+    fn hover_range_line_span() {
+        let r = HoverRange::new(5, 0, 10, 20);
+        assert_eq!(r.line_span(), 6);
+        assert!(!r.is_single_line());
+    }
+
+    #[test]
+    fn hover_range_single_line() {
+        let r = HoverRange::new(5, 0, 5, 20);
+        assert!(r.is_single_line());
+        assert_eq!(r.line_span(), 1);
+    }
+
+    #[test]
+    fn hover_range_contains() {
+        let r = HoverRange::new(5, 0, 5, 20);
+        assert!(r.contains(5, 10));
+        assert!(!r.contains(6, 0));
+    }
+
+    #[test]
+    fn history_unique_positions() {
+        let mut h = HoverHistory::new();
+        h.record(1, 1);
+        h.record(1, 1);
+        h.record(2, 2);
+        assert_eq!(h.unique_positions(), 2);
+    }
+
+    #[test]
+    fn history_was_hovered() {
+        let mut h = HoverHistory::new();
+        h.record(3, 7);
+        assert!(h.was_hovered(3, 7));
+        assert!(!h.was_hovered(3, 8));
+    }
+
+    #[test]
+    fn config_disabled() {
+        let cfg = HoverConfig::disabled();
+        assert!(!cfg.enabled);
+    }
+
+    #[test]
+    fn config_non_sticky() {
+        let cfg = HoverConfig::non_sticky();
+        assert!(!cfg.sticky);
+        assert!(cfg.enabled);
     }
 }

@@ -1113,6 +1113,203 @@ impl<S> fmt::Display for EnumerateStream<S> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ScanStream adapter
+// ---------------------------------------------------------------------------
+
+/// A stream adapter that maintains an accumulator and yields the running
+/// result after processing each item (similar to `Iterator::scan`).
+pub struct ScanStream<S, B, F> {
+    inner: S,
+    state: B,
+    folder: F,
+}
+
+impl<S, B, F> ScanStream<S, B, F> {
+    pub fn new(inner: S, initial: B, folder: F) -> Self {
+        Self {
+            inner,
+            state: initial,
+            folder,
+        }
+    }
+}
+
+impl<S, B, F> ReadableStream for ScanStream<S, B, F>
+where
+    S: ReadableStream,
+    B: Clone + Send,
+    F: FnMut(&mut B, S::Item) + Send,
+    Self: Send,
+{
+    type Item = B;
+
+    fn read(&mut self) -> Option<B> {
+        let item = self.inner.read()?;
+        (self.folder)(&mut self.state, item);
+        Some(self.state.clone())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DeduplicateStream adapter
+// ---------------------------------------------------------------------------
+
+/// A stream that suppresses consecutive duplicate items.
+pub struct DeduplicateStream<S: ReadableStream> {
+    inner: S,
+    last: Option<S::Item>,
+}
+
+impl<S: ReadableStream> DeduplicateStream<S> {
+    pub fn new(inner: S) -> Self {
+        Self { inner, last: None }
+    }
+}
+
+impl<S> ReadableStream for DeduplicateStream<S>
+where
+    S: ReadableStream,
+    S::Item: PartialEq + Clone,
+    Self: Send,
+{
+    type Item = S::Item;
+
+    fn read(&mut self) -> Option<S::Item> {
+        loop {
+            let item = self.inner.read()?;
+            if self.last.as_ref() == Some(&item) {
+                continue;
+            }
+            self.last = Some(item.clone());
+            return Some(item);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BufferStream – sliced reading
+// ---------------------------------------------------------------------------
+
+impl BufferStream {
+    /// Read a contiguous byte range across all chunks. Returns `None` if the
+    /// range exceeds the total remaining data. Does **not** advance the read
+    /// position.
+    pub fn slice_bytes(&self, start: usize, len: usize) -> Option<VsBuffer> {
+        let remaining = &self.chunks[self.position..];
+        let total: usize = remaining.iter().map(|c| c.len()).sum();
+        if start + len > total {
+            return None;
+        }
+
+        let mut collected = Vec::with_capacity(len);
+        let mut offset = 0;
+        for chunk in remaining {
+            let chunk_end = offset + chunk.len();
+            if chunk_end <= start {
+                offset = chunk_end;
+                continue;
+            }
+            let local_start = start.saturating_sub(offset);
+            let local_end = (start + len - offset).min(chunk.len());
+            collected.extend_from_slice(&chunk.as_bytes()[local_start..local_end]);
+            if collected.len() >= len {
+                break;
+            }
+            offset = chunk_end;
+        }
+        Some(VsBuffer::new(collected))
+    }
+
+    /// Reset the stream position so it can be read again from the beginning.
+    pub fn reset(&mut self) {
+        self.position = 0;
+    }
+
+    /// Total number of chunks (read and unread).
+    pub fn total_chunks(&self) -> usize {
+        self.chunks.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StringStream – additional constructors
+// ---------------------------------------------------------------------------
+
+impl StringStream {
+    /// Create a `StringStream` by splitting a string on a given delimiter.
+    pub fn split(s: &str, delimiter: char) -> Self {
+        let items: Vec<String> = s.split(delimiter).map(|p| p.to_string()).collect();
+        Self { items, position: 0 }
+    }
+
+    /// Reset the stream position so it can be read again from the beginning.
+    pub fn reset(&mut self) {
+        self.position = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Free-function utilities
+// ---------------------------------------------------------------------------
+
+/// Fold all items in a readable stream into a single accumulator value.
+pub fn fold<S, B, F>(stream: &mut S, init: B, mut f: F) -> B
+where
+    S: ReadableStream,
+    F: FnMut(B, S::Item) -> B,
+{
+    let mut acc = init;
+    while let Some(item) = stream.read() {
+        acc = f(acc, item);
+    }
+    acc
+}
+
+/// Check whether any item in the stream satisfies a predicate.
+/// Short-circuits on the first match.
+pub fn any_match<S, F>(stream: &mut S, mut predicate: F) -> bool
+where
+    S: ReadableStream,
+    F: FnMut(&S::Item) -> bool,
+{
+    while let Some(item) = stream.read() {
+        if predicate(&item) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Check whether every item in the stream satisfies a predicate.
+/// Short-circuits on the first failure. Returns `true` for an empty stream.
+pub fn all_match<S, F>(stream: &mut S, mut predicate: F) -> bool
+where
+    S: ReadableStream,
+    F: FnMut(&S::Item) -> bool,
+{
+    while let Some(item) = stream.read() {
+        if !predicate(&item) {
+            return false;
+        }
+    }
+    true
+}
+
+/// Find the first item satisfying a predicate, if any.
+pub fn find_first<S, F>(stream: &mut S, mut predicate: F) -> Option<S::Item>
+where
+    S: ReadableStream,
+    F: FnMut(&S::Item) -> bool,
+{
+    while let Some(item) = stream.read() {
+        if predicate(&item) {
+            return Some(item);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1741,5 +1938,194 @@ mod tests {
 
         let en = EnumerateStream::new(StringStream::from_strings(vec![]));
         assert_eq!(en.to_string(), "EnumerateStream(index=0)");
+    }
+
+    // -- ScanStream --------------------------------------------------------
+
+    #[test]
+    fn scan_stream_running_sum() {
+        let inner = StringStream::from_strings(vec![
+            "ab".into(), "cde".into(), "f".into(),
+        ]);
+        let mut scan = ScanStream::new(inner, 0usize, |acc: &mut usize, s: String| {
+            *acc += s.len();
+        });
+        assert_eq!(scan.read(), Some(2));
+        assert_eq!(scan.read(), Some(5));
+        assert_eq!(scan.read(), Some(6));
+        assert!(scan.read().is_none());
+    }
+
+    #[test]
+    fn scan_stream_empty() {
+        let inner = StringStream::from_strings(vec![]);
+        let mut scan = ScanStream::new(inner, 0usize, |acc: &mut usize, _s: String| {
+            *acc += 1;
+        });
+        assert!(scan.read().is_none());
+    }
+
+    // -- DeduplicateStream -------------------------------------------------
+
+    #[test]
+    fn deduplicate_stream_removes_consecutive_dups() {
+        let inner = StringStream::from_strings(vec![
+            "a".into(), "a".into(), "b".into(), "b".into(), "b".into(), "a".into(),
+        ]);
+        let mut dedup = DeduplicateStream::new(inner);
+        let result = dedup.collect_all();
+        assert_eq!(result, vec!["a", "b", "a"]);
+    }
+
+    #[test]
+    fn deduplicate_stream_no_dups() {
+        let inner = StringStream::from_strings(vec!["x".into(), "y".into(), "z".into()]);
+        let mut dedup = DeduplicateStream::new(inner);
+        assert_eq!(dedup.collect_all(), vec!["x", "y", "z"]);
+    }
+
+    // -- BufferStream slice_bytes / reset / total_chunks --------------------
+
+    #[test]
+    fn buffer_stream_slice_bytes_single_chunk() {
+        let stream = BufferStream::from_buffer(VsBuffer::from_string("hello world"));
+        let sliced = stream.slice_bytes(6, 5).unwrap();
+        assert_eq!(sliced.to_string_lossy(), "world");
+    }
+
+    #[test]
+    fn buffer_stream_slice_bytes_across_chunks() {
+        let stream = BufferStream::from_chunks(vec![
+            VsBuffer::from_string("hel"),
+            VsBuffer::from_string("lo "),
+            VsBuffer::from_string("world"),
+        ]);
+        let sliced = stream.slice_bytes(2, 6).unwrap();
+        assert_eq!(sliced.to_string_lossy(), "llo wo");
+    }
+
+    #[test]
+    fn buffer_stream_slice_bytes_out_of_range() {
+        let stream = BufferStream::from_buffer(VsBuffer::from_string("abc"));
+        assert!(stream.slice_bytes(0, 10).is_none());
+    }
+
+    #[test]
+    fn buffer_stream_reset() {
+        let mut stream = BufferStream::from_chunks(vec![
+            VsBuffer::from_string("a"),
+            VsBuffer::from_string("b"),
+        ]);
+        assert_eq!(stream.read().unwrap().to_string_lossy(), "a");
+        assert_eq!(stream.remaining(), 1);
+        stream.reset();
+        assert_eq!(stream.remaining(), 2);
+        assert_eq!(stream.read().unwrap().to_string_lossy(), "a");
+    }
+
+    #[test]
+    fn buffer_stream_total_chunks() {
+        let mut stream = BufferStream::from_chunks(vec![
+            VsBuffer::from_string("a"),
+            VsBuffer::from_string("b"),
+        ]);
+        assert_eq!(stream.total_chunks(), 2);
+        stream.read();
+        assert_eq!(stream.total_chunks(), 2); // total stays constant
+    }
+
+    // -- StringStream split / reset ----------------------------------------
+
+    #[test]
+    fn string_stream_split() {
+        let mut stream = StringStream::split("one,two,three", ',');
+        assert_eq!(stream.read(), Some("one".to_string()));
+        assert_eq!(stream.read(), Some("two".to_string()));
+        assert_eq!(stream.read(), Some("three".to_string()));
+        assert!(stream.read().is_none());
+    }
+
+    #[test]
+    fn string_stream_reset() {
+        let mut stream = StringStream::from_strings(vec!["a".into(), "b".into()]);
+        stream.read();
+        stream.read();
+        assert!(stream.is_exhausted());
+        stream.reset();
+        assert_eq!(stream.remaining(), 2);
+        assert_eq!(stream.read(), Some("a".to_string()));
+    }
+
+    // -- fold, any, all, find_first ----------------------------------------
+
+    #[test]
+    fn fold_concatenates_strings() {
+        let mut stream = StringStream::from_strings(vec![
+            "hello".into(), " ".into(), "world".into(),
+        ]);
+        let result = fold(&mut stream, String::new(), |mut acc: String, s: String| {
+            acc.push_str(&s);
+            acc
+        });
+        assert_eq!(result, "hello world");
+    }
+
+    #[test]
+    fn fold_empty_stream() {
+        let mut stream = StringStream::from_strings(vec![]);
+        let result = fold(&mut stream, 42, |acc, _s: String| acc + 1);
+        assert_eq!(result, 42);
+    }
+
+    #[test]
+    fn any_finds_match() {
+        let mut stream = StringStream::from_strings(vec![
+            "foo".into(), "bar".into(), "baz".into(),
+        ]);
+        assert!(any_match(&mut stream, |s: &String| s.starts_with('b')));
+    }
+
+    #[test]
+    fn any_no_match() {
+        let mut stream = StringStream::from_strings(vec!["foo".into(), "far".into()]);
+        assert!(!any_match(&mut stream, |s: &String| s.starts_with('z')));
+    }
+
+    #[test]
+    fn all_true() {
+        let mut stream = StringStream::from_strings(vec![
+            "abc".into(), "ab".into(), "a".into(),
+        ]);
+        assert!(all_match(&mut stream, |s: &String| s.starts_with('a')));
+    }
+
+    #[test]
+    fn all_false() {
+        let mut stream = StringStream::from_strings(vec![
+            "abc".into(), "xyz".into(),
+        ]);
+        assert!(!all_match(&mut stream, |s: &String| s.starts_with('a')));
+    }
+
+    #[test]
+    fn all_empty_stream_is_true() {
+        let mut stream = StringStream::from_strings(vec![]);
+        assert!(all_match(&mut stream, |_s: &String| false));
+    }
+
+    #[test]
+    fn find_first_returns_match() {
+        let mut stream = StringStream::from_strings(vec![
+            "apple".into(), "banana".into(), "avocado".into(),
+        ]);
+        let found = find_first(&mut stream, |s: &String| s.len() > 5);
+        assert_eq!(found, Some("banana".to_string()));
+    }
+
+    #[test]
+    fn find_first_returns_none() {
+        let mut stream = StringStream::from_strings(vec!["a".into(), "b".into()]);
+        let found = find_first(&mut stream, |s: &String| s.len() > 5);
+        assert!(found.is_none());
     }
 }

@@ -1074,6 +1074,132 @@ impl TokenizationCache {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TokenRangeExtractor – extract text ranges from tokens
+// ---------------------------------------------------------------------------
+
+/// Extract a specific token's text from the source line given the token index
+/// and the full line text.
+pub fn extract_token_text(tokens: &LineTokens, index: usize, line: &str) -> Option<String> {
+    if index >= tokens.tokens.len() {
+        return None;
+    }
+    let start = tokens.tokens[index].start_offset as usize;
+    let end = if index + 1 < tokens.tokens.len() {
+        tokens.tokens[index + 1].start_offset as usize
+    } else {
+        line.len()
+    };
+    if start > line.len() || end > line.len() || start > end {
+        return None;
+    }
+    Some(line[start..end].to_string())
+}
+
+/// Count how many tokens of each `StandardTokenType` appear in a `LineTokens`.
+pub fn token_type_histogram(tokens: &LineTokens) -> std::collections::HashMap<StandardTokenType, usize> {
+    let mut map = std::collections::HashMap::new();
+    for t in &tokens.tokens {
+        *map.entry(t.metadata.token_type()).or_insert(0) += 1;
+    }
+    map
+}
+
+// ---------------------------------------------------------------------------
+// TokenSummary – high-level summary of tokenization results
+// ---------------------------------------------------------------------------
+
+/// A high-level summary of tokens on a line.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TokenSummary {
+    pub total_tokens: usize,
+    pub comment_count: usize,
+    pub string_count: usize,
+    pub regexp_count: usize,
+    pub other_count: usize,
+    pub has_bold: bool,
+    pub has_italic: bool,
+}
+
+impl TokenSummary {
+    /// Create a summary from a `LineTokens` instance.
+    pub fn from_line_tokens(lt: &LineTokens) -> Self {
+        let mut comment_count = 0;
+        let mut string_count = 0;
+        let mut regexp_count = 0;
+        let mut other_count = 0;
+        let mut has_bold = false;
+        let mut has_italic = false;
+        for t in &lt.tokens {
+            match t.metadata.token_type() {
+                StandardTokenType::Comment => comment_count += 1,
+                StandardTokenType::String => string_count += 1,
+                StandardTokenType::RegExp => regexp_count += 1,
+                StandardTokenType::Other => other_count += 1,
+            }
+            let style = t.metadata.font_style();
+            if style.is_bold() {
+                has_bold = true;
+            }
+            if style.is_italic() {
+                has_italic = true;
+            }
+        }
+        Self {
+            total_tokens: lt.tokens.len(),
+            comment_count,
+            string_count,
+            regexp_count,
+            other_count,
+            has_bold,
+            has_italic,
+        }
+    }
+
+    /// Return the dominant token type (the one with highest count).
+    pub fn dominant_type(&self) -> StandardTokenType {
+        let counts = [
+            (StandardTokenType::Other, self.other_count),
+            (StandardTokenType::Comment, self.comment_count),
+            (StandardTokenType::String, self.string_count),
+            (StandardTokenType::RegExp, self.regexp_count),
+        ];
+        counts.into_iter().max_by_key(|(_, c)| *c).map(|(t, _)| t).unwrap_or(StandardTokenType::Other)
+    }
+}
+
+impl fmt::Display for TokenSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Tokens: {} (comment={}, string={}, regexp={}, other={})",
+            self.total_tokens, self.comment_count, self.string_count,
+            self.regexp_count, self.other_count,
+        )
+    }
+}
+
+/// Validate that all tokens in a `LineTokens` have strictly increasing start offsets.
+pub fn validate_token_offsets(lt: &LineTokens) -> bool {
+    lt.tokens.windows(2).all(|w| w[0].start_offset < w[1].start_offset)
+}
+
+/// Find the token index at a given character offset within a line.
+pub fn token_at_offset(lt: &LineTokens, offset: u32) -> Option<usize> {
+    if lt.tokens.is_empty() {
+        return None;
+    }
+    let mut result = 0;
+    for (i, t) in lt.tokens.iter().enumerate() {
+        if t.start_offset <= offset {
+            result = i;
+        } else {
+            break;
+        }
+    }
+    Some(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1693,5 +1819,96 @@ mod tests {
         assert_eq!(cache.capacity(), 5);
         cache.trim_to(3);
         assert_eq!(cache.capacity(), 3);
+    }
+
+    #[test]
+    fn test_extract_token_text() {
+        let meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: meta },
+            Token { start_offset: 3, metadata: meta },
+            Token { start_offset: 5, metadata: meta },
+        ]);
+        assert_eq!(extract_token_text(&lt, 0, "fn foo()"), Some("fn ".to_string()));
+        assert_eq!(extract_token_text(&lt, 1, "fn foo()"), Some("fo".to_string()));
+        assert_eq!(extract_token_text(&lt, 2, "fn foo()"), Some("o()".to_string()));
+        assert_eq!(extract_token_text(&lt, 5, "fn foo()"), None);
+    }
+
+    #[test]
+    fn test_token_type_histogram() {
+        let m_other = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let m_comment = TokenMetadata::new(0, StandardTokenType::Comment, FontStyle::NONE, 0, 0);
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: m_other },
+            Token { start_offset: 5, metadata: m_comment },
+            Token { start_offset: 10, metadata: m_comment },
+        ]);
+        let hist = token_type_histogram(&lt);
+        assert_eq!(hist.get(&StandardTokenType::Other), Some(&1));
+        assert_eq!(hist.get(&StandardTokenType::Comment), Some(&2));
+    }
+
+    #[test]
+    fn test_token_summary() {
+        let m_comment = TokenMetadata::new(0, StandardTokenType::Comment, FontStyle::BOLD, 0, 0);
+        let m_string = TokenMetadata::new(0, StandardTokenType::String, FontStyle::ITALIC, 0, 0);
+        let m_other = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: m_comment },
+            Token { start_offset: 5, metadata: m_string },
+            Token { start_offset: 10, metadata: m_other },
+        ]);
+        let summary = TokenSummary::from_line_tokens(&lt);
+        assert_eq!(summary.total_tokens, 3);
+        assert_eq!(summary.comment_count, 1);
+        assert_eq!(summary.string_count, 1);
+        assert_eq!(summary.other_count, 1);
+        assert!(summary.has_bold);
+        assert!(summary.has_italic);
+    }
+
+    #[test]
+    fn test_token_summary_dominant_type() {
+        let m = TokenMetadata::new(0, StandardTokenType::Comment, FontStyle::NONE, 0, 0);
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: m },
+            Token { start_offset: 5, metadata: m },
+        ]);
+        let summary = TokenSummary::from_line_tokens(&lt);
+        assert_eq!(summary.dominant_type(), StandardTokenType::Comment);
+    }
+
+    #[test]
+    fn test_validate_token_offsets() {
+        let meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let valid = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: meta },
+            Token { start_offset: 5, metadata: meta },
+            Token { start_offset: 10, metadata: meta },
+        ]);
+        assert!(validate_token_offsets(&valid));
+
+        let invalid = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: meta },
+            Token { start_offset: 0, metadata: meta },
+        ]);
+        assert!(!validate_token_offsets(&invalid));
+    }
+
+    #[test]
+    fn test_token_at_offset() {
+        let meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: meta },
+            Token { start_offset: 5, metadata: meta },
+            Token { start_offset: 10, metadata: meta },
+        ]);
+        assert_eq!(token_at_offset(&lt, 0), Some(0));
+        assert_eq!(token_at_offset(&lt, 3), Some(0));
+        assert_eq!(token_at_offset(&lt, 5), Some(1));
+        assert_eq!(token_at_offset(&lt, 7), Some(1));
+        assert_eq!(token_at_offset(&lt, 10), Some(2));
+        assert_eq!(token_at_offset(&lt, 15), Some(2));
     }
 }

@@ -836,6 +836,160 @@ impl HistoryCompactor {
     }
 }
 
+// ---------------------------------------------------------------------------
+// HistorySnapshot — capture and restore full navigation state
+// ---------------------------------------------------------------------------
+
+/// A point-in-time snapshot of the entire navigation history state.
+#[derive(Debug, Clone)]
+pub struct HistorySnapshot {
+    pub entries: Vec<HistoryNavigationEntry>,
+    pub current_index: Option<usize>,
+    pub timestamp: u64,
+    pub label: Option<String>,
+}
+
+impl HistorySnapshot {
+    /// Capture a snapshot from the current state of a `NavigationHistory`.
+    pub fn capture(history: &NavigationHistory, timestamp: u64) -> Self {
+        Self {
+            entries: history.entries.clone(),
+            current_index: history.current,
+            timestamp,
+            label: None,
+        }
+    }
+
+    /// Attach a label to this snapshot.
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    /// Restore a `NavigationHistory` from this snapshot.
+    pub fn restore(&self, max_size: usize) -> NavigationHistory {
+        NavigationHistory {
+            entries: self.entries.clone(),
+            current: self.current_index,
+            max_size,
+        }
+    }
+
+    /// Number of entries in the snapshot.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the snapshot is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl fmt::Display for HistorySnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "HistorySnapshot({} entries, ts={}{})",
+            self.entries.len(),
+            self.timestamp,
+            self.label
+                .as_ref()
+                .map(|l| format!(", label={l}"))
+                .unwrap_or_default()
+        )
+    }
+}
+
+/// Manages multiple named snapshots for undo/redo of history state.
+#[derive(Debug, Clone, Default)]
+pub struct SnapshotManager {
+    snapshots: Vec<HistorySnapshot>,
+    max_snapshots: usize,
+}
+
+impl SnapshotManager {
+    pub fn new(max_snapshots: usize) -> Self {
+        Self {
+            snapshots: Vec::new(),
+            max_snapshots,
+        }
+    }
+
+    /// Save a snapshot. Oldest is evicted if at capacity.
+    pub fn save(&mut self, snapshot: HistorySnapshot) {
+        if self.snapshots.len() >= self.max_snapshots {
+            self.snapshots.remove(0);
+        }
+        self.snapshots.push(snapshot);
+    }
+
+    /// Pop and return the most recent snapshot.
+    pub fn pop(&mut self) -> Option<HistorySnapshot> {
+        self.snapshots.pop()
+    }
+
+    /// Get the most recent snapshot without removing it.
+    pub fn latest(&self) -> Option<&HistorySnapshot> {
+        self.snapshots.last()
+    }
+
+    /// Number of stored snapshots.
+    pub fn len(&self) -> usize {
+        self.snapshots.len()
+    }
+
+    /// Whether no snapshots are stored.
+    pub fn is_empty(&self) -> bool {
+        self.snapshots.is_empty()
+    }
+
+    /// Clear all stored snapshots.
+    pub fn clear(&mut self) {
+        self.snapshots.clear();
+    }
+
+    /// Find a snapshot by label.
+    pub fn find_by_label(&self, label: &str) -> Option<&HistorySnapshot> {
+        self.snapshots
+            .iter()
+            .rev()
+            .find(|s| s.label.as_deref() == Some(label))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NavigationHistoryService — additional methods
+// ---------------------------------------------------------------------------
+
+impl NavigationHistoryService {
+    /// Return all entries in the back stack (oldest first).
+    pub fn back_stack_entries(&self) -> &[NavigationEntry] {
+        &self.back_stack
+    }
+
+    /// Return all entries in the forward stack (oldest first).
+    pub fn forward_stack_entries(&self) -> &[NavigationEntry] {
+        &self.forward_stack
+    }
+
+    /// Remove all entries whose URI matches the given string.
+    pub fn remove_entries_for_uri(&mut self, uri: &str) {
+        self.back_stack.retain(|e| e.uri != uri);
+        self.forward_stack.retain(|e| e.uri != uri);
+        if self.current.as_ref().map(|c| c.uri.as_str()) == Some(uri) {
+            self.current = self.back_stack.pop();
+        }
+    }
+
+    /// Total number of entries across back stack, current, and forward stack.
+    pub fn total_entries(&self) -> usize {
+        self.back_stack.len()
+            + self.forward_stack.len()
+            + if self.current.is_some() { 1 } else { 0 }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1646,5 +1800,74 @@ mod tests {
         assert_eq!(stats.total_visits(), 0);
         assert_eq!(stats.unique_uris(), 0);
         assert!(stats.most_visited().is_none());
+    }
+
+    // -- Snapshot tests -------------------------------------------------------
+
+    #[test]
+    fn snapshot_capture_and_restore() {
+        let mut h = NavigationHistory::new(10);
+        h.push(entry("a.rs", 1));
+        h.push(entry("b.rs", 5));
+        let snap = HistorySnapshot::capture(&h, 1000);
+        assert_eq!(snap.len(), 2);
+        assert_eq!(snap.timestamp, 1000);
+        let restored = snap.restore(10);
+        assert_eq!(restored.len(), 2);
+        assert_eq!(restored.current().unwrap().uri, "b.rs");
+    }
+
+    #[test]
+    fn snapshot_with_label() {
+        let h = NavigationHistory::new(10);
+        let snap = HistorySnapshot::capture(&h, 42).with_label("before-refactor");
+        assert_eq!(snap.label.as_deref(), Some("before-refactor"));
+        let display = format!("{snap}");
+        assert!(display.contains("before-refactor"));
+    }
+
+    #[test]
+    fn snapshot_manager_capacity() {
+        let mut mgr = SnapshotManager::new(2);
+        let h = NavigationHistory::new(5);
+        mgr.save(HistorySnapshot::capture(&h, 1));
+        mgr.save(HistorySnapshot::capture(&h, 2));
+        mgr.save(HistorySnapshot::capture(&h, 3));
+        assert_eq!(mgr.len(), 2);
+        assert_eq!(mgr.latest().unwrap().timestamp, 3);
+    }
+
+    #[test]
+    fn snapshot_manager_find_by_label() {
+        let mut mgr = SnapshotManager::new(10);
+        let h = NavigationHistory::new(5);
+        mgr.save(HistorySnapshot::capture(&h, 1).with_label("alpha"));
+        mgr.save(HistorySnapshot::capture(&h, 2).with_label("beta"));
+        assert!(mgr.find_by_label("alpha").is_some());
+        assert_eq!(mgr.find_by_label("alpha").unwrap().timestamp, 1);
+        assert!(mgr.find_by_label("gamma").is_none());
+    }
+
+    #[test]
+    fn nav_service_remove_entries_for_uri() {
+        let mut svc = NavigationHistoryService::new(50);
+        svc.push_navigation(NavigationEntry::new("a.rs", 1, 0));
+        svc.push_navigation(NavigationEntry::new("b.rs", 2, 0));
+        svc.push_navigation(NavigationEntry::new("a.rs", 3, 0));
+        assert_eq!(svc.total_entries(), 3);
+        svc.remove_entries_for_uri("a.rs");
+        assert_eq!(svc.current().unwrap().uri, "b.rs");
+    }
+
+    #[test]
+    fn nav_service_total_entries() {
+        let mut svc = NavigationHistoryService::new(50);
+        assert_eq!(svc.total_entries(), 0);
+        svc.push_navigation(NavigationEntry::new("x.rs", 1, 0));
+        assert_eq!(svc.total_entries(), 1);
+        svc.push_navigation(NavigationEntry::new("y.rs", 2, 0));
+        assert_eq!(svc.total_entries(), 2);
+        svc.navigate_back();
+        assert_eq!(svc.total_entries(), 2);
     }
 }

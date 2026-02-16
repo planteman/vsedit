@@ -1154,6 +1154,118 @@ impl ContrastChecker {
     pub fn evaluate(lum1: f64, lum2: f64) -> &'static str {
         Self::wcag_level(Self::check_ratio(lum1, lum2))
     }
+
+    /// Check contrast between two `Rgb` colors and return the ratio.
+    pub fn check_rgb(a: &Rgb, b: &Rgb) -> f64 {
+        Self::check_ratio(a.luminance(), b.luminance())
+    }
+
+    /// Evaluate WCAG level for two `Rgb` colors.
+    pub fn evaluate_rgb(a: &Rgb, b: &Rgb) -> &'static str {
+        Self::wcag_level(Self::check_rgb(a, b))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Accessible keyboard shortcuts
+// ---------------------------------------------------------------------------
+
+/// Describes an accessible keyboard shortcut with a description.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccessibleShortcut {
+    pub keys: String,
+    pub action: String,
+    pub category: String,
+}
+
+impl AccessibleShortcut {
+    pub fn new(
+        keys: impl Into<String>,
+        action: impl Into<String>,
+        category: impl Into<String>,
+    ) -> Self {
+        Self {
+            keys: keys.into(),
+            action: action.into(),
+            category: category.into(),
+        }
+    }
+
+    /// Format as a screen-reader-friendly announcement.
+    pub fn announce(&self) -> String {
+        format!("{}: press {} to {}", self.category, self.keys, self.action)
+    }
+}
+
+impl fmt::Display for AccessibleShortcut {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {} → {}", self.category, self.keys, self.action)
+    }
+}
+
+/// A registry of accessible keyboard shortcuts with lookup and filtering.
+#[derive(Debug, Clone, Default)]
+pub struct ShortcutRegistry {
+    shortcuts: Vec<AccessibleShortcut>,
+}
+
+impl ShortcutRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, shortcut: AccessibleShortcut) {
+        self.shortcuts.push(shortcut);
+    }
+
+    /// Return shortcuts filtered by category.
+    pub fn by_category(&self, category: &str) -> Vec<&AccessibleShortcut> {
+        self.shortcuts
+            .iter()
+            .filter(|s| s.category.eq_ignore_ascii_case(category))
+            .collect()
+    }
+
+    /// Search shortcuts by action substring (case-insensitive).
+    pub fn search(&self, query: &str) -> Vec<&AccessibleShortcut> {
+        let q = query.to_lowercase();
+        self.shortcuts
+            .iter()
+            .filter(|s| s.action.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    /// Return all unique categories.
+    pub fn categories(&self) -> Vec<&str> {
+        let mut cats: Vec<&str> = self.shortcuts.iter().map(|s| s.category.as_str()).collect();
+        cats.sort_unstable();
+        cats.dedup();
+        cats
+    }
+
+    /// Generate a full announcement of all shortcuts, suitable for
+    /// screen reader consumption.
+    pub fn announce_all(&self) -> String {
+        self.shortcuts
+            .iter()
+            .map(|s| s.announce())
+            .collect::<Vec<_>>()
+            .join(". ")
+    }
+
+    pub fn len(&self) -> usize {
+        self.shortcuts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.shortcuts.is_empty()
+    }
+}
+
+impl fmt::Display for ShortcutRegistry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ShortcutRegistry({} shortcuts)", self.shortcuts.len())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1681,5 +1793,80 @@ mod tests {
     fn test_contrast_checker_evaluate() {
         assert_eq!(ContrastChecker::evaluate(1.0, 0.0), "AAA");
         assert_eq!(ContrastChecker::evaluate(0.5, 0.5), "fail");
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn contrast_checker_rgb_evaluation() {
+        let white = Rgb(255, 255, 255);
+        let black = Rgb(0, 0, 0);
+        let ratio = ContrastChecker::check_rgb(&white, &black);
+        assert!(ratio > 20.0);
+        assert_eq!(ContrastChecker::evaluate_rgb(&white, &black), "AAA");
+    }
+
+    #[test]
+    fn accessible_shortcut_creation_and_announce() {
+        let sc = AccessibleShortcut::new("Ctrl+S", "save file", "Editor");
+        assert_eq!(sc.keys, "Ctrl+S");
+        let announcement = sc.announce();
+        assert!(announcement.contains("Editor"));
+        assert!(announcement.contains("Ctrl+S"));
+        assert!(announcement.contains("save file"));
+    }
+
+    #[test]
+    fn shortcut_registry_add_and_search() {
+        let mut reg = ShortcutRegistry::new();
+        reg.add(AccessibleShortcut::new("Ctrl+S", "save file", "Editor"));
+        reg.add(AccessibleShortcut::new("Ctrl+P", "open file", "Editor"));
+        reg.add(AccessibleShortcut::new("Ctrl+`", "toggle terminal", "Terminal"));
+        assert_eq!(reg.len(), 3);
+        let results = reg.search("save");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].keys, "Ctrl+S");
+    }
+
+    #[test]
+    fn shortcut_registry_by_category() {
+        let mut reg = ShortcutRegistry::new();
+        reg.add(AccessibleShortcut::new("Ctrl+S", "save", "Editor"));
+        reg.add(AccessibleShortcut::new("Ctrl+B", "toggle sidebar", "View"));
+        reg.add(AccessibleShortcut::new("Ctrl+P", "open", "Editor"));
+        let editor_shortcuts = reg.by_category("Editor");
+        assert_eq!(editor_shortcuts.len(), 2);
+        let view_shortcuts = reg.by_category("View");
+        assert_eq!(view_shortcuts.len(), 1);
+    }
+
+    #[test]
+    fn shortcut_registry_categories() {
+        let mut reg = ShortcutRegistry::new();
+        reg.add(AccessibleShortcut::new("a", "action a", "Editor"));
+        reg.add(AccessibleShortcut::new("b", "action b", "Terminal"));
+        reg.add(AccessibleShortcut::new("c", "action c", "Editor"));
+        let cats = reg.categories();
+        assert_eq!(cats, vec!["Editor", "Terminal"]);
+    }
+
+    #[test]
+    fn shortcut_registry_announce_all() {
+        let mut reg = ShortcutRegistry::new();
+        reg.add(AccessibleShortcut::new("Ctrl+S", "save", "Editor"));
+        reg.add(AccessibleShortcut::new("Ctrl+Q", "quit", "App"));
+        let announcement = reg.announce_all();
+        assert!(announcement.contains("save"));
+        assert!(announcement.contains("quit"));
+        assert!(announcement.contains(". ")); // separator
+    }
+
+    #[test]
+    fn shortcut_display() {
+        let sc = AccessibleShortcut::new("Ctrl+Z", "undo", "Edit");
+        let text = format!("{}", sc);
+        assert!(text.contains("Ctrl+Z"));
+        assert!(text.contains("undo"));
+        assert!(text.contains("Edit"));
     }
 }

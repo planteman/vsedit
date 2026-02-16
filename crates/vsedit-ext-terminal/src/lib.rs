@@ -1144,6 +1144,138 @@ impl TerminalProfileContribution {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// TerminalOutput – search and filtering helpers
+// ---------------------------------------------------------------------------
+
+impl TerminalOutput {
+    /// Return lines matching a substring filter.
+    pub fn grep(&self, pattern: &str) -> Vec<&str> {
+        self.buffer
+            .lines()
+            .filter(|line| line.contains(pattern))
+            .collect()
+    }
+
+    /// Return the byte offset of the first occurrence of `needle`, if any.
+    pub fn find_offset(&self, needle: &str) -> Option<usize> {
+        self.buffer.find(needle)
+    }
+
+    /// Return true if the buffer is non-empty and its last line matches `suffix`.
+    pub fn last_line_ends_with(&self, suffix: &str) -> bool {
+        self.buffer.lines().last().map_or(false, |l| l.ends_with(suffix))
+    }
+
+    /// Count occurrences of `needle` in the output buffer.
+    pub fn count_occurrences(&self, needle: &str) -> usize {
+        self.buffer.matches(needle).count()
+    }
+
+    /// Split the buffer into two halves at the midpoint line.
+    pub fn split_at_midpoint(&self) -> (Vec<&str>, Vec<&str>) {
+        let lines: Vec<&str> = self.buffer.lines().collect();
+        let mid = lines.len() / 2;
+        (lines[..mid].to_vec(), lines[mid..].to_vec())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalProfileRegistry – query helpers
+// ---------------------------------------------------------------------------
+
+impl TerminalProfileRegistry {
+    /// Return profiles whose shell path contains the given substring.
+    pub fn find_by_shell(&self, shell_substr: &str) -> Vec<&TerminalProfileContribution> {
+        self.profiles
+            .iter()
+            .filter(|p| p.shell_path.contains(shell_substr))
+            .collect()
+    }
+
+    /// Return all unique shell paths across registered profiles.
+    pub fn unique_shells(&self) -> Vec<&str> {
+        let mut shells: Vec<&str> = self.profiles.iter().map(|p| p.shell_path.as_str()).collect();
+        shells.sort();
+        shells.dedup();
+        shells
+    }
+
+    /// Return profile IDs as a sorted vector.
+    pub fn sorted_ids(&self) -> Vec<&str> {
+        let mut ids: Vec<&str> = self.profiles.iter().map(|p| p.id.as_str()).collect();
+        ids.sort();
+        ids
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalBridge – batch and query helpers
+// ---------------------------------------------------------------------------
+
+impl TerminalBridge {
+    /// Return names of all terminals, sorted alphabetically.
+    pub fn sorted_names(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self.terminals.iter().map(|t| t.name.as_str()).collect();
+        names.sort();
+        names
+    }
+
+    /// Dispose all terminals, returning how many were removed.
+    pub fn dispose_all(&mut self) -> usize {
+        let count = self.terminals.len();
+        self.terminals.clear();
+        count
+    }
+
+    /// Return terminals whose name contains the given substring (case-insensitive).
+    pub fn search_by_name(&self, query: &str) -> Vec<&Terminal> {
+        let q = query.to_lowercase();
+        self.terminals
+            .iter()
+            .filter(|t| t.name.to_lowercase().contains(&q))
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ParsedCommand helpers
+// ---------------------------------------------------------------------------
+
+impl ParsedCommand {
+    /// Returns the total number of tokens (program + arguments).
+    pub fn token_count(&self) -> usize {
+        1 + self.args.len()
+    }
+
+    /// Returns true if the command has no arguments.
+    pub fn is_simple(&self) -> bool {
+        self.args.is_empty()
+    }
+
+    /// Returns the full command as a single string with arguments joined by spaces.
+    pub fn to_command_string(&self) -> String {
+        if self.args.is_empty() {
+            self.program.clone()
+        } else {
+            format!("{} {}", self.program, self.args.join(" "))
+        }
+    }
+
+    /// Returns a new `ParsedCommand` with the given additional argument appended.
+    pub fn with_arg(&self, arg: impl Into<String>) -> Self {
+        let mut new_args = self.args.clone();
+        new_args.push(arg.into());
+        Self {
+            program: self.program.clone(),
+            args: new_args,
+            background: self.background,
+        }
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1759,4 +1891,108 @@ mod tests {
         let first = out.first_n_lines(5);
         assert!(first.is_empty());
     }
+
+    #[test]
+    fn terminal_output_grep() {
+        let mut out = TerminalOutput::new("t1");
+        out.append("error: file not found\nwarning: unused var\nerror: syntax\n");
+        let errors = out.grep("error");
+        assert_eq!(errors.len(), 2);
+        assert!(errors[0].contains("file not found"));
+        assert!(errors[1].contains("syntax"));
+    }
+
+    #[test]
+    fn terminal_output_count_occurrences() {
+        let mut out = TerminalOutput::new("t1");
+        out.append("aaa bbb aaa ccc aaa\n");
+        assert_eq!(out.count_occurrences("aaa"), 3);
+        assert_eq!(out.count_occurrences("zzz"), 0);
+    }
+
+    #[test]
+    fn terminal_output_split_at_midpoint() {
+        let mut out = TerminalOutput::new("t1");
+        out.append("line1\nline2\nline3\nline4\n");
+        let (first, second) = out.split_at_midpoint();
+        assert_eq!(first.len(), 2);
+        assert_eq!(second.len(), 2);
+    }
+
+    #[test]
+    fn terminal_output_last_line_ends_with() {
+        let mut out = TerminalOutput::new("t1");
+        out.append("hello world\ndone!");
+        assert!(out.last_line_ends_with("!"));
+        assert!(!out.last_line_ends_with("world"));
+    }
+
+    #[test]
+    fn terminal_output_find_offset() {
+        let mut out = TerminalOutput::new("t1");
+        out.append("prefix:target:suffix");
+        assert_eq!(out.find_offset("target"), Some(7));
+        assert_eq!(out.find_offset("missing"), None);
+    }
+
+    #[test]
+    fn profile_registry_find_by_shell() {
+        let mut reg = TerminalProfileRegistry::new();
+        reg.register(TerminalProfileContribution::new("a", "Bash", "/bin/bash"));
+        reg.register(TerminalProfileContribution::new("b", "Zsh", "/bin/zsh"));
+        reg.register(TerminalProfileContribution::new("c", "Fish", "/usr/bin/fish"));
+        let bash = reg.find_by_shell("bash");
+        assert_eq!(bash.len(), 1);
+        assert_eq!(bash[0].id, "a");
+    }
+
+    #[test]
+    fn profile_registry_unique_shells() {
+        let mut reg = TerminalProfileRegistry::new();
+        reg.register(TerminalProfileContribution::new("a", "B1", "/bin/bash"));
+        reg.register(TerminalProfileContribution::new("b", "B2", "/bin/bash"));
+        reg.register(TerminalProfileContribution::new("c", "Z1", "/bin/zsh"));
+        let shells = reg.unique_shells();
+        assert_eq!(shells.len(), 2);
+    }
+
+    #[test]
+    fn bridge_dispose_all() {
+        let mut bridge = TerminalBridge::new();
+        bridge.create_terminal(&test_opts());
+        bridge.create_terminal(&test_opts());
+        assert_eq!(bridge.terminal_count(), 2);
+        let removed = bridge.dispose_all();
+        assert_eq!(removed, 2);
+        assert_eq!(bridge.terminal_count(), 0);
+    }
+
+    #[test]
+    fn bridge_search_by_name() {
+        let mut bridge = TerminalBridge::new();
+        bridge.create_terminal(&TerminalOptions {
+            name: Some("Dev Server".into()),
+            ..test_opts()
+        });
+        bridge.create_terminal(&TerminalOptions {
+            name: Some("Build".into()),
+            ..test_opts()
+        });
+        let results = bridge.search_by_name("dev");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "Dev Server");
+    }
+
+    #[test]
+    fn parsed_command_helpers() {
+        let cmd = parse_command_line("git commit -m \"hello world\"").unwrap();
+        assert_eq!(cmd.token_count(), 4);
+        assert!(!cmd.is_simple());
+        let with_flag = cmd.with_arg("--amend");
+        assert_eq!(with_flag.args.len(), 4);
+        let simple = parse_command_line("ls").unwrap();
+        assert!(simple.is_simple());
+        assert_eq!(simple.to_command_string(), "ls");
+    }
+
 }

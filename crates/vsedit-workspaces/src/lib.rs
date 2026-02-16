@@ -1060,6 +1060,238 @@ impl WorkspaceHealthCheck {
     }
 }
 
+// ── Setting Scope ──
+
+/// Identifies where a setting value originates from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingScope {
+    /// A default value provided by the application.
+    Default,
+    /// Set at the user/global level.
+    User,
+    /// Set at the workspace level.
+    Workspace,
+    /// Set at the workspace-folder level.
+    WorkspaceFolder,
+}
+
+impl fmt::Display for SettingScope {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SettingScope::Default => write!(f, "default"),
+            SettingScope::User => write!(f, "user"),
+            SettingScope::Workspace => write!(f, "workspace"),
+            SettingScope::WorkspaceFolder => write!(f, "workspace-folder"),
+        }
+    }
+}
+
+/// A resolved setting value with its originating scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedSetting {
+    pub key: String,
+    pub value: String,
+    pub scope: SettingScope,
+}
+
+/// Layered setting resolution across multiple scopes.
+///
+/// Settings are resolved in order of increasing specificity:
+/// default → user → workspace → workspace-folder.
+pub struct SettingResolver {
+    defaults: HashMap<String, String>,
+    user: HashMap<String, String>,
+    workspace: HashMap<String, String>,
+    folder_overrides: HashMap<String, HashMap<String, String>>,
+}
+
+impl SettingResolver {
+    pub fn new() -> Self {
+        Self {
+            defaults: HashMap::new(),
+            user: HashMap::new(),
+            workspace: HashMap::new(),
+            folder_overrides: HashMap::new(),
+        }
+    }
+
+    /// Register a default value for a setting key.
+    pub fn set_default(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.defaults.insert(key.into(), value.into());
+    }
+
+    /// Register a user-level value for a setting key.
+    pub fn set_user(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.user.insert(key.into(), value.into());
+    }
+
+    /// Register a workspace-level value for a setting key.
+    pub fn set_workspace(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.workspace.insert(key.into(), value.into());
+    }
+
+    /// Register a folder-level override for a setting key.
+    pub fn set_folder_override(
+        &mut self,
+        folder_uri: impl Into<String>,
+        key: impl Into<String>,
+        value: impl Into<String>,
+    ) {
+        self.folder_overrides
+            .entry(folder_uri.into())
+            .or_default()
+            .insert(key.into(), value.into());
+    }
+
+    /// Resolve a setting key to its most specific value and scope.
+    ///
+    /// If `folder_uri` is provided, folder-level overrides are considered.
+    pub fn resolve(&self, key: &str, folder_uri: Option<&str>) -> Option<ResolvedSetting> {
+        // Check folder overrides first (most specific).
+        if let Some(uri) = folder_uri {
+            if let Some(overrides) = self.folder_overrides.get(uri) {
+                if let Some(val) = overrides.get(key) {
+                    return Some(ResolvedSetting {
+                        key: key.to_string(),
+                        value: val.clone(),
+                        scope: SettingScope::WorkspaceFolder,
+                    });
+                }
+            }
+        }
+
+        if let Some(val) = self.workspace.get(key) {
+            return Some(ResolvedSetting {
+                key: key.to_string(),
+                value: val.clone(),
+                scope: SettingScope::Workspace,
+            });
+        }
+
+        if let Some(val) = self.user.get(key) {
+            return Some(ResolvedSetting {
+                key: key.to_string(),
+                value: val.clone(),
+                scope: SettingScope::User,
+            });
+        }
+
+        if let Some(val) = self.defaults.get(key) {
+            return Some(ResolvedSetting {
+                key: key.to_string(),
+                value: val.clone(),
+                scope: SettingScope::Default,
+            });
+        }
+
+        None
+    }
+
+    /// Resolve a setting, returning just the value string or a fallback.
+    pub fn resolve_value(&self, key: &str, folder_uri: Option<&str>, fallback: &str) -> String {
+        self.resolve(key, folder_uri)
+            .map(|r| r.value)
+            .unwrap_or_else(|| fallback.to_string())
+    }
+
+    /// Return all keys that have at least one value registered at any scope.
+    pub fn all_keys(&self) -> Vec<String> {
+        let mut keys = std::collections::HashSet::new();
+        keys.extend(self.defaults.keys().cloned());
+        keys.extend(self.user.keys().cloned());
+        keys.extend(self.workspace.keys().cloned());
+        for overrides in self.folder_overrides.values() {
+            keys.extend(overrides.keys().cloned());
+        }
+        let mut sorted: Vec<String> = keys.into_iter().collect();
+        sorted.sort();
+        sorted
+    }
+}
+
+impl Default for SettingResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Workspace Event Log ──
+
+/// The kind of mutation that occurred on a workspace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WorkspaceEventKind {
+    FolderAdded { uri: String },
+    FolderRemoved { uri: String },
+    FolderRenamed { uri: String, old_name: String, new_name: String },
+    SettingChanged { key: String },
+    NameChanged { old: Option<String>, new: Option<String> },
+}
+
+/// A timestamped workspace mutation event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceEvent {
+    pub kind: WorkspaceEventKind,
+    pub timestamp: u64,
+}
+
+/// An append-only log of workspace mutation events.
+#[derive(Debug, Clone)]
+pub struct WorkspaceEventLog {
+    events: Vec<WorkspaceEvent>,
+}
+
+impl WorkspaceEventLog {
+    pub fn new() -> Self {
+        Self { events: Vec::new() }
+    }
+
+    /// Record a new event.
+    pub fn record(&mut self, kind: WorkspaceEventKind, timestamp: u64) {
+        self.events.push(WorkspaceEvent { kind, timestamp });
+    }
+
+    /// Return all events in chronological order.
+    pub fn events(&self) -> &[WorkspaceEvent] {
+        &self.events
+    }
+
+    /// Return events that occurred at or after the given timestamp.
+    pub fn events_since(&self, since: u64) -> Vec<&WorkspaceEvent> {
+        self.events.iter().filter(|e| e.timestamp >= since).collect()
+    }
+
+    /// Return events that match a specific kind discriminant.
+    pub fn folder_events(&self) -> Vec<&WorkspaceEvent> {
+        self.events
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e.kind,
+                    WorkspaceEventKind::FolderAdded { .. }
+                        | WorkspaceEventKind::FolderRemoved { .. }
+                        | WorkspaceEventKind::FolderRenamed { .. }
+                )
+            })
+            .collect()
+    }
+
+    /// Number of recorded events.
+    pub fn len(&self) -> usize {
+        self.events.len()
+    }
+
+    /// Whether the log is empty.
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+}
+
+impl Default for WorkspaceEventLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1757,5 +1989,120 @@ mod tests {
         assert!(hc.has_warnings());
         let warnings = hc.findings_by_severity(HealthSeverity::Warning);
         assert!(warnings.iter().any(|f| f.message.contains("Duplicate folder name")));
+    }
+
+    // ── SettingResolver tests ──
+
+    #[test]
+    fn setting_resolver_layered_precedence() {
+        let mut resolver = SettingResolver::new();
+        resolver.set_default("editor.tabSize", "4");
+        resolver.set_user("editor.tabSize", "2");
+        resolver.set_workspace("editor.tabSize", "8");
+        resolver.set_folder_override("/src", "editor.tabSize", "3");
+
+        // Without folder context, workspace wins.
+        let resolved = resolver.resolve("editor.tabSize", None).unwrap();
+        assert_eq!(resolved.value, "8");
+        assert_eq!(resolved.scope, SettingScope::Workspace);
+
+        // With folder context, folder override wins.
+        let resolved = resolver.resolve("editor.tabSize", Some("/src")).unwrap();
+        assert_eq!(resolved.value, "3");
+        assert_eq!(resolved.scope, SettingScope::WorkspaceFolder);
+
+        // Different folder falls back to workspace.
+        let resolved = resolver.resolve("editor.tabSize", Some("/lib")).unwrap();
+        assert_eq!(resolved.value, "8");
+        assert_eq!(resolved.scope, SettingScope::Workspace);
+    }
+
+    #[test]
+    fn setting_resolver_fallback_through_scopes() {
+        let mut resolver = SettingResolver::new();
+        resolver.set_default("theme", "light");
+
+        // Only default is set.
+        let resolved = resolver.resolve("theme", None).unwrap();
+        assert_eq!(resolved.value, "light");
+        assert_eq!(resolved.scope, SettingScope::Default);
+
+        // User overrides default.
+        resolver.set_user("theme", "dark");
+        let resolved = resolver.resolve("theme", None).unwrap();
+        assert_eq!(resolved.value, "dark");
+        assert_eq!(resolved.scope, SettingScope::User);
+
+        // Unknown key returns None.
+        assert!(resolver.resolve("unknown.key", None).is_none());
+    }
+
+    #[test]
+    fn setting_resolver_resolve_value_with_fallback() {
+        let resolver = SettingResolver::new();
+        assert_eq!(resolver.resolve_value("missing", None, "default"), "default");
+
+        let mut resolver = SettingResolver::new();
+        resolver.set_default("font", "monospace");
+        assert_eq!(resolver.resolve_value("font", None, "serif"), "monospace");
+    }
+
+    #[test]
+    fn setting_resolver_all_keys() {
+        let mut resolver = SettingResolver::new();
+        resolver.set_default("a.one", "1");
+        resolver.set_user("b.two", "2");
+        resolver.set_workspace("a.one", "override");
+        resolver.set_folder_override("/x", "c.three", "3");
+
+        let keys = resolver.all_keys();
+        assert_eq!(keys, vec!["a.one", "b.two", "c.three"]);
+    }
+
+    #[test]
+    fn setting_scope_display() {
+        assert_eq!(format!("{}", SettingScope::Default), "default");
+        assert_eq!(format!("{}", SettingScope::User), "user");
+        assert_eq!(format!("{}", SettingScope::Workspace), "workspace");
+        assert_eq!(format!("{}", SettingScope::WorkspaceFolder), "workspace-folder");
+    }
+
+    // ── WorkspaceEventLog tests ──
+
+    #[test]
+    fn event_log_record_and_query() {
+        let mut log = WorkspaceEventLog::new();
+        assert!(log.is_empty());
+
+        log.record(WorkspaceEventKind::FolderAdded { uri: "/src".into() }, 100);
+        log.record(WorkspaceEventKind::SettingChanged { key: "editor.tabSize".into() }, 200);
+        log.record(WorkspaceEventKind::FolderRemoved { uri: "/old".into() }, 300);
+        log.record(
+            WorkspaceEventKind::FolderRenamed {
+                uri: "/src".into(),
+                old_name: "source".into(),
+                new_name: "src-code".into(),
+            },
+            400,
+        );
+        log.record(
+            WorkspaceEventKind::NameChanged {
+                old: Some("old-ws".into()),
+                new: Some("new-ws".into()),
+            },
+            500,
+        );
+
+        assert_eq!(log.len(), 5);
+        assert!(!log.is_empty());
+
+        // Filter folder events only.
+        let folder_events = log.folder_events();
+        assert_eq!(folder_events.len(), 3);
+
+        // Filter by timestamp.
+        let since_300 = log.events_since(300);
+        assert_eq!(since_300.len(), 3);
+        assert_eq!(since_300[0].timestamp, 300);
     }
 }

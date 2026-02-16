@@ -1046,6 +1046,180 @@ pub fn file_common_prefix(paths: &[&str]) -> String {
     }
 }
 
+// ---------------------------------------------------------------------------
+// FileEvent helpers
+// ---------------------------------------------------------------------------
+
+impl FileEvent {
+    /// Return the path associated with this event.
+    pub fn path(&self) -> &str {
+        match self {
+            FileEvent::Created(p) | FileEvent::Changed(p) | FileEvent::Deleted(p) => p,
+        }
+    }
+
+    /// Return `true` if this is a `Created` event.
+    pub fn is_created(&self) -> bool {
+        matches!(self, FileEvent::Created(_))
+    }
+
+    /// Return `true` if this is a `Changed` event.
+    pub fn is_changed(&self) -> bool {
+        matches!(self, FileEvent::Changed(_))
+    }
+
+    /// Return `true` if this is a `Deleted` event.
+    pub fn is_deleted(&self) -> bool {
+        matches!(self, FileEvent::Deleted(_))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileWatcherConfig builder helpers
+// ---------------------------------------------------------------------------
+
+impl FileWatcherConfig {
+    /// Create a new watcher config with the given pattern.
+    pub fn new(glob_pattern: impl Into<String>) -> Self {
+        Self {
+            glob_pattern: glob_pattern.into(),
+            recursive: false,
+            exclude_patterns: Vec::new(),
+        }
+    }
+
+    /// Set recursive flag.
+    pub fn with_recursive(mut self, recursive: bool) -> Self {
+        self.recursive = recursive;
+        self
+    }
+
+    /// Add an exclusion pattern.
+    pub fn with_exclude(mut self, pattern: impl Into<String>) -> Self {
+        self.exclude_patterns.push(pattern.into());
+        self
+    }
+
+    /// Return `true` if `path` matches the glob and is not excluded.
+    pub fn accepts(&self, path: &str) -> bool {
+        glob_match(&self.glob_pattern, path) && !self.is_excluded(path)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileStat helpers
+// ---------------------------------------------------------------------------
+
+impl FileStat {
+    /// Return a human-readable size string.
+    pub fn human_size(&self) -> String {
+        FileSizeFormatter::format_bytes(self.size)
+    }
+
+    /// Return `true` if the file was modified after it was created.
+    pub fn was_modified_after_creation(&self) -> bool {
+        self.modified > self.created
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileService – filtering and replay
+// ---------------------------------------------------------------------------
+
+impl FileService {
+    /// Return events that match a predicate.
+    pub fn filter_events<F>(&self, predicate: F) -> Vec<&FileEvent>
+    where
+        F: Fn(&FileEvent) -> bool,
+    {
+        self.events.iter().filter(|e| predicate(e)).collect()
+    }
+
+    /// Remove all events whose path matches the given glob pattern.
+    pub fn remove_events_matching(&mut self, pattern: &str) {
+        self.events.retain(|e| !glob_match(pattern, e.path()));
+    }
+
+    /// Replay all recorded events into the supplied closure.
+    pub fn replay_events<F>(&self, mut handler: F)
+    where
+        F: FnMut(&FileEvent),
+    {
+        for event in &self.events {
+            handler(event);
+        }
+    }
+
+    /// Return the most recent event (last recorded).
+    pub fn last_event(&self) -> Option<&FileEvent> {
+        self.events.last()
+    }
+
+    /// Find watchers whose pattern matches the given path.
+    pub fn matching_watchers(&self, path: &str) -> Vec<&FileWatcherConfig> {
+        self.watchers
+            .iter()
+            .filter(|w| glob_match(&w.glob_pattern, path))
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FilePathUtils – additional path manipulation
+// ---------------------------------------------------------------------------
+
+impl FilePathUtils {
+    /// Return the file name without its extension.
+    pub fn stem(path: &str) -> Option<&str> {
+        let name = Self::file_name(path)?;
+        match name.rfind('.') {
+            Some(0) | None => Some(name),
+            Some(pos) => Some(&name[..pos]),
+        }
+    }
+
+    /// Return `true` if `child` is a direct or nested child of `parent`.
+    pub fn is_descendant(parent: &str, child: &str) -> bool {
+        let p = parent.trim_end_matches('/');
+        let c = child.trim_end_matches('/');
+        if p.is_empty() {
+            return true;
+        }
+        c.starts_with(p) && c.as_bytes().get(p.len()) == Some(&b'/')
+    }
+
+    /// Return the relative path of `full` with respect to `base`.
+    /// Returns `None` if `full` is not under `base`.
+    pub fn relative(base: &str, full: &str) -> Option<String> {
+        let b = base.trim_end_matches('/');
+        let f = full.trim_end_matches('/');
+        if !f.starts_with(b) {
+            return None;
+        }
+        let rest = &f[b.len()..];
+        if rest.is_empty() {
+            return Some(String::new());
+        }
+        if rest.starts_with('/') {
+            Some(rest[1..].to_string())
+        } else {
+            None
+        }
+    }
+
+    /// Split a path into all of its segments.
+    pub fn segments(path: &str) -> Vec<&str> {
+        path.split('/').filter(|s| !s.is_empty()).collect()
+    }
+
+    /// Return `true` if the filename starts with `.` (hidden file on Unix).
+    pub fn is_hidden(path: &str) -> bool {
+        Self::file_name(path)
+            .map(|n| n.starts_with('.'))
+            .unwrap_or(false)
+    }
+}
+
 /// Return `true` if the file extension matches any in the given set (case-insensitive).
 pub fn file_has_extension(path: &str, extensions: &[&str]) -> bool {
     if let Some(ext) = FilePathUtils::extension(path) {
@@ -1747,5 +1921,146 @@ mod tests {
     #[test]
     fn file_has_extension_no_ext() {
         assert!(!file_has_extension("Makefile", &["rs"]));
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for added functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn file_event_path_accessor() {
+        let c = FileEvent::Created("/src/main.rs".into());
+        let ch = FileEvent::Changed("/src/lib.rs".into());
+        let d = FileEvent::Deleted("/old.rs".into());
+        assert_eq!(c.path(), "/src/main.rs");
+        assert_eq!(ch.path(), "/src/lib.rs");
+        assert_eq!(d.path(), "/old.rs");
+        assert!(c.is_created());
+        assert!(!c.is_changed());
+        assert!(!c.is_deleted());
+        assert!(ch.is_changed());
+        assert!(d.is_deleted());
+    }
+
+    #[test]
+    fn file_watcher_config_builder() {
+        let cfg = FileWatcherConfig::new("*.rs")
+            .with_recursive(true)
+            .with_exclude("*.test.rs");
+        assert_eq!(cfg.glob_pattern, "*.rs");
+        assert!(cfg.recursive);
+        assert_eq!(cfg.exclude_patterns, vec!["*.test.rs"]);
+        assert!(cfg.accepts("main.rs"));
+        assert!(!cfg.accepts("foo.test.rs"));
+        assert!(!cfg.accepts("readme.md"));
+    }
+
+    #[test]
+    fn file_stat_human_size_and_modified() {
+        let stat = FileStat {
+            file_type: FileType::File,
+            size: 2048,
+            modified: 200,
+            created: 100,
+            readonly: false,
+        };
+        assert_eq!(stat.human_size(), "2.0 KB");
+        assert!(stat.was_modified_after_creation());
+
+        let unmodified = FileStat { modified: 100, ..stat };
+        assert!(!unmodified.was_modified_after_creation());
+    }
+
+    #[test]
+    fn file_service_filter_and_remove_events() {
+        let mut svc = FileService::new();
+        svc.record_event(FileEvent::Created("a.rs".into()));
+        svc.record_event(FileEvent::Changed("b.py".into()));
+        svc.record_event(FileEvent::Deleted("c.rs".into()));
+
+        let rs_events = svc.filter_events(|e| e.path().ends_with(".rs"));
+        assert_eq!(rs_events.len(), 2);
+
+        svc.remove_events_matching("*.py");
+        assert_eq!(svc.event_count(), 2);
+        assert!(svc.get_events().iter().all(|e| e.path().ends_with(".rs")));
+    }
+
+    #[test]
+    fn file_service_replay_and_last_event() {
+        let mut svc = FileService::new();
+        assert!(svc.last_event().is_none());
+
+        svc.record_event(FileEvent::Created("x.rs".into()));
+        svc.record_event(FileEvent::Changed("y.rs".into()));
+
+        let mut replayed = Vec::new();
+        svc.replay_events(|e| replayed.push(e.path().to_string()));
+        assert_eq!(replayed, vec!["x.rs", "y.rs"]);
+
+        assert_eq!(svc.last_event().unwrap().path(), "y.rs");
+    }
+
+    #[test]
+    fn file_service_matching_watchers() {
+        let mut svc = FileService::new();
+        svc.add_watcher(FileWatcherConfig::new("*.rs"));
+        svc.add_watcher(FileWatcherConfig::new("*.toml"));
+        svc.add_watcher(FileWatcherConfig::new("src/*"));
+
+        let matches = svc.matching_watchers("main.rs");
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].glob_pattern, "*.rs");
+
+        assert!(svc.matching_watchers("readme.md").is_empty());
+    }
+
+    #[test]
+    fn file_path_utils_stem() {
+        assert_eq!(FilePathUtils::stem("main.rs"), Some("main"));
+        assert_eq!(FilePathUtils::stem("archive.tar.gz"), Some("archive.tar"));
+        assert_eq!(FilePathUtils::stem("noext"), Some("noext"));
+        assert_eq!(FilePathUtils::stem(".hidden"), Some(".hidden"));
+        assert_eq!(FilePathUtils::stem("/path/to/file.txt"), Some("file"));
+    }
+
+    #[test]
+    fn file_path_utils_is_descendant() {
+        assert!(FilePathUtils::is_descendant("/src", "/src/main.rs"));
+        assert!(FilePathUtils::is_descendant("/src", "/src/sub/deep.rs"));
+        assert!(!FilePathUtils::is_descendant("/src", "/other/main.rs"));
+        assert!(!FilePathUtils::is_descendant("/src", "/src"));
+        assert!(FilePathUtils::is_descendant("", "/anything"));
+    }
+
+    #[test]
+    fn file_path_utils_relative() {
+        assert_eq!(
+            FilePathUtils::relative("/home/user", "/home/user/project/a.rs"),
+            Some("project/a.rs".to_string())
+        );
+        assert_eq!(
+            FilePathUtils::relative("/home/user", "/home/user"),
+            Some(String::new())
+        );
+        assert_eq!(
+            FilePathUtils::relative("/home/user", "/other/path"),
+            None
+        );
+    }
+
+    #[test]
+    fn file_path_utils_segments() {
+        assert_eq!(FilePathUtils::segments("/usr/local/bin"), vec!["usr", "local", "bin"]);
+        assert_eq!(FilePathUtils::segments("a/b"), vec!["a", "b"]);
+        assert!(FilePathUtils::segments("/").is_empty());
+    }
+
+    #[test]
+    fn file_path_utils_is_hidden() {
+        assert!(FilePathUtils::is_hidden(".gitignore"));
+        assert!(FilePathUtils::is_hidden("/home/.config"));
+        assert!(!FilePathUtils::is_hidden("visible.txt"));
+        assert!(!FilePathUtils::is_hidden("/path/to/normal"));
     }
 }

@@ -1001,6 +1001,185 @@ pub fn find_action_by_title<'a>(actions: &'a [CodeAction], title: &str) -> Optio
         .find(|a| a.title.to_lowercase() == lower)
 }
 
+// ---------------------------------------------------------------------------
+// Diagnostic helpers
+// ---------------------------------------------------------------------------
+
+impl DiagnosticSeverity {
+    /// Return a human-readable label for this severity.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Warning => "warning",
+            Self::Information => "info",
+            Self::Hint => "hint",
+        }
+    }
+
+    /// Return a numeric level (1 = Error … 4 = Hint) for sorting.
+    pub fn level(&self) -> u8 {
+        match self {
+            Self::Error => 1,
+            Self::Warning => 2,
+            Self::Information => 3,
+            Self::Hint => 4,
+        }
+    }
+
+    /// Returns `true` for `Error` or `Warning`.
+    pub fn is_actionable(&self) -> bool {
+        matches!(self, Self::Error | Self::Warning)
+    }
+}
+
+impl fmt::Display for DiagnosticSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+impl Diagnostic {
+    /// Format the diagnostic as `severity(line:col): message`.
+    pub fn format_short(&self) -> String {
+        format!(
+            "{}({}:{}): {}",
+            self.severity.label(),
+            self.line,
+            self.column,
+            self.message,
+        )
+    }
+
+    /// Returns `true` when the diagnostic falls within the given line range (inclusive).
+    pub fn in_line_range(&self, start: u32, end: u32) -> bool {
+        self.line >= start && self.line <= end
+    }
+}
+
+impl fmt::Display for Diagnostic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.format_short())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TextEdit helpers
+// ---------------------------------------------------------------------------
+
+impl TextEdit {
+    /// Create a simple insertion at a position.
+    pub fn insert(line: u32, col: u32, text: impl Into<String>) -> Self {
+        Self {
+            start_line: line,
+            start_col: col,
+            end_line: line,
+            end_col: col,
+            new_text: text.into(),
+        }
+    }
+
+    /// Create a deletion spanning a range on a single line.
+    pub fn delete(line: u32, start_col: u32, end_col: u32) -> Self {
+        Self {
+            start_line: line,
+            start_col,
+            end_line: line,
+            end_col,
+            new_text: String::new(),
+        }
+    }
+
+    /// Create a replacement on a single line.
+    pub fn replace(line: u32, start_col: u32, end_col: u32, text: impl Into<String>) -> Self {
+        Self {
+            start_line: line,
+            start_col,
+            end_line: line,
+            end_col,
+            new_text: text.into(),
+        }
+    }
+
+    /// Returns `true` if this edit inserts text without removing any.
+    pub fn is_insert(&self) -> bool {
+        self.start_line == self.end_line && self.start_col == self.end_col && !self.new_text.is_empty()
+    }
+
+    /// Returns `true` if this edit removes text without inserting any.
+    pub fn is_delete(&self) -> bool {
+        self.new_text.is_empty() && (self.start_line != self.end_line || self.start_col != self.end_col)
+    }
+
+    /// Returns `true` if this is a no-op (same position, empty new text).
+    pub fn is_noop(&self) -> bool {
+        self.start_line == self.end_line && self.start_col == self.end_col && self.new_text.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CodeActionContext filtering
+// ---------------------------------------------------------------------------
+
+impl CodeActionContext {
+    /// Add a diagnostic to the context.
+    pub fn with_diagnostic(mut self, diag: Diagnostic) -> Self {
+        self.diagnostics.push(diag);
+        self
+    }
+
+    /// Restrict the context to a set of kinds.
+    pub fn with_only(mut self, kinds: Vec<CodeActionKind>) -> Self {
+        self.only = Some(kinds);
+        self
+    }
+
+    /// Returns diagnostics that fall within the given line range (inclusive).
+    pub fn diagnostics_in_range(&self, start: u32, end: u32) -> Vec<&Diagnostic> {
+        self.diagnostics
+            .iter()
+            .filter(|d| d.in_line_range(start, end))
+            .collect()
+    }
+
+    /// Returns only error-severity diagnostics.
+    pub fn errors(&self) -> Vec<&Diagnostic> {
+        self.diagnostics
+            .iter()
+            .filter(|d| d.severity == DiagnosticSeverity::Error)
+            .collect()
+    }
+
+    /// Returns `true` if any diagnostic is an error.
+    pub fn has_errors(&self) -> bool {
+        self.diagnostics.iter().any(|d| d.severity == DiagnosticSeverity::Error)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WorkspaceEdit merging
+// ---------------------------------------------------------------------------
+
+impl WorkspaceEdit {
+    /// Merge another edit into this one, appending edits per file.
+    pub fn merge(&mut self, other: &WorkspaceEdit) {
+        for (uri, edits) in &other.changes {
+            self.changes
+                .entry(uri.clone())
+                .or_default()
+                .extend(edits.iter().cloned());
+        }
+    }
+
+    /// Return a new edit containing only changes for the given URI.
+    pub fn filter_file(&self, uri: &str) -> Self {
+        let mut changes = HashMap::new();
+        if let Some(edits) = self.changes.get(uri) {
+            changes.insert(uri.to_string(), edits.clone());
+        }
+        Self { changes }
+    }
+}
+
 /// Partition actions into two groups: quick-fixes and everything else.
 pub fn partition_quickfixes(actions: &[CodeAction]) -> (Vec<CodeAction>, Vec<CodeAction>) {
     let mut fixes = Vec::new();
@@ -1752,5 +1931,122 @@ mod tests {
         let (fixes, rest) = partition_quickfixes(&[]);
         assert!(fixes.is_empty());
         assert!(rest.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for added functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn diagnostic_severity_label_and_level() {
+        assert_eq!(DiagnosticSeverity::Error.label(), "error");
+        assert_eq!(DiagnosticSeverity::Warning.label(), "warning");
+        assert_eq!(DiagnosticSeverity::Information.label(), "info");
+        assert_eq!(DiagnosticSeverity::Hint.label(), "hint");
+        assert!(DiagnosticSeverity::Error.level() < DiagnosticSeverity::Hint.level());
+        assert!(DiagnosticSeverity::Error.is_actionable());
+        assert!(DiagnosticSeverity::Warning.is_actionable());
+        assert!(!DiagnosticSeverity::Hint.is_actionable());
+    }
+
+    #[test]
+    fn diagnostic_format_short_and_display() {
+        let d = Diagnostic {
+            message: "unused".into(),
+            line: 10,
+            column: 5,
+            severity: DiagnosticSeverity::Warning,
+        };
+        assert_eq!(d.format_short(), "warning(10:5): unused");
+        assert_eq!(format!("{d}"), "warning(10:5): unused");
+    }
+
+    #[test]
+    fn diagnostic_in_line_range() {
+        let d = Diagnostic {
+            message: "x".into(), line: 5, column: 0,
+            severity: DiagnosticSeverity::Error,
+        };
+        assert!(d.in_line_range(0, 10));
+        assert!(d.in_line_range(5, 5));
+        assert!(!d.in_line_range(6, 10));
+    }
+
+    #[test]
+    fn text_edit_insert_delete_replace() {
+        let ins = TextEdit::insert(3, 0, "hello");
+        assert!(ins.is_insert());
+        assert!(!ins.is_delete());
+
+        let del = TextEdit::delete(1, 2, 8);
+        assert!(del.is_delete());
+        assert!(!del.is_insert());
+
+        let rep = TextEdit::replace(0, 0, 5, "world");
+        assert!(!rep.is_insert());
+        assert!(!rep.is_delete());
+        assert!(!rep.is_noop());
+
+        let noop = TextEdit { start_line: 0, start_col: 0, end_line: 0, end_col: 0, new_text: String::new() };
+        assert!(noop.is_noop());
+    }
+
+    #[test]
+    fn context_diagnostics_in_range_and_errors() {
+        let ctx = CodeActionContext::new(CodeActionTrigger::Invoke)
+            .with_diagnostic(Diagnostic {
+                message: "e".into(), line: 2, column: 0,
+                severity: DiagnosticSeverity::Error,
+            })
+            .with_diagnostic(Diagnostic {
+                message: "w".into(), line: 8, column: 0,
+                severity: DiagnosticSeverity::Warning,
+            })
+            .with_only(vec![CodeActionKind::QuickFix]);
+
+        assert!(ctx.has_errors());
+        assert_eq!(ctx.errors().len(), 1);
+        assert_eq!(ctx.diagnostics_in_range(0, 5).len(), 1);
+        assert_eq!(ctx.diagnostics_in_range(0, 10).len(), 2);
+        assert!(ctx.only.is_some());
+    }
+
+    #[test]
+    fn workspace_edit_merge() {
+        let mut a = WorkspaceEdit::single_file("a.rs", vec![
+            TextEdit::insert(0, 0, "x"),
+        ]);
+        let b = WorkspaceEdit::single_file("a.rs", vec![
+            TextEdit::insert(1, 0, "y"),
+        ]);
+        a.merge(&b);
+        assert_eq!(a.edit_count(), 2);
+        assert_eq!(a.file_count(), 1);
+
+        let c = WorkspaceEdit::single_file("b.rs", vec![
+            TextEdit::insert(0, 0, "z"),
+        ]);
+        a.merge(&c);
+        assert_eq!(a.file_count(), 2);
+    }
+
+    #[test]
+    fn workspace_edit_filter_file() {
+        let mut we = WorkspaceEdit::new();
+        we.add_edit("a.rs", TextEdit::insert(0, 0, "x"));
+        we.add_edit("b.rs", TextEdit::insert(0, 0, "y"));
+
+        let filtered = we.filter_file("a.rs");
+        assert_eq!(filtered.file_count(), 1);
+        assert_eq!(filtered.edit_count(), 1);
+
+        let empty = we.filter_file("c.rs");
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn diagnostic_severity_display() {
+        assert_eq!(format!("{}", DiagnosticSeverity::Error), "error");
+        assert_eq!(format!("{}", DiagnosticSeverity::Information), "info");
     }
 }

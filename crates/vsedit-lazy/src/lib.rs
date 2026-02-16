@@ -1025,6 +1025,256 @@ pub fn counting_cached(counter: std::rc::Rc<std::cell::Cell<u32>>) -> CachedValu
     })
 }
 
+// ---------------------------------------------------------------------------
+// Lazy<T> – additional methods
+// ---------------------------------------------------------------------------
+
+impl<T: fmt::Debug> fmt::Debug for Lazy<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.cell.get() {
+            Some(v) => f.debug_tuple("Lazy").field(v).finish(),
+            None => f.write_str("Lazy(<uninit>)"),
+        }
+    }
+}
+
+impl<T: Clone> Lazy<T> {
+    /// Clone the inner value if it has been initialized.
+    pub fn cloned(&self) -> Option<T> {
+        self.cell.get().cloned()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SyncLazy<T> – additional methods
+// ---------------------------------------------------------------------------
+
+impl<T> SyncLazy<T> {
+    /// Try to get the value without initializing it.
+    pub fn try_get(&self) -> Option<&T> {
+        self.cell.get()
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for SyncLazy<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.cell.get() {
+            Some(v) => f.debug_tuple("SyncLazy").field(v).finish(),
+            None => f.write_str("SyncLazy(<uninit>)"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MemoizedFn – additional methods
+// ---------------------------------------------------------------------------
+
+impl<K: Eq + std::hash::Hash + Clone, V> MemoizedFn<K, V> {
+    /// Remove a single entry from the cache, returning the value if present.
+    pub fn evict(&mut self, key: &K) -> Option<V> {
+        self.cache.remove(key)
+    }
+
+    /// Return `true` if the cache contains an entry for `key`.
+    pub fn contains(&self, key: &K) -> bool {
+        self.cache.contains_key(key)
+    }
+
+    /// Return an iterator over all cached keys.
+    pub fn keys(&self) -> impl Iterator<Item = &K> {
+        self.cache.keys()
+    }
+
+    /// Peek at a cached value without triggering computation.
+    pub fn peek(&self, key: &K) -> Option<&V> {
+        self.cache.get(key)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LazyStats – additional methods
+// ---------------------------------------------------------------------------
+
+impl LazyStats {
+    /// Return the number of successful operations.
+    pub fn successes(&self) -> u64 {
+        self.successful_operations
+    }
+
+    /// Return the number of failed operations.
+    pub fn failures(&self) -> u64 {
+        self.failed_operations
+    }
+
+    /// Return total accumulated time in nanoseconds.
+    pub fn total_time_ns(&self) -> u64 {
+        self.total_time_ns
+    }
+
+    /// Return the median estimate (average of min and max) in nanoseconds.
+    /// Returns `None` when no operations have been recorded.
+    pub fn midrange_ns(&self) -> Option<u64> {
+        if self.total_operations == 0 {
+            return None;
+        }
+        Some((self.min_operation_ns + self.max_operation_ns) / 2)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LazyValidator – additional methods
+// ---------------------------------------------------------------------------
+
+impl LazyValidator {
+    /// Validate that a string is non-empty and at most `max` bytes long.
+    pub fn validate_byte_length(s: &str, max: usize) -> Result<(), String> {
+        if s.is_empty() {
+            return Err("string must not be empty".to_string());
+        }
+        if s.len() > max {
+            return Err(format!(
+                "byte length {} exceeds maximum {}",
+                s.len(),
+                max
+            ));
+        }
+        Ok(())
+    }
+
+    /// Normalize whitespace: collapse runs of whitespace into a single space
+    /// and trim leading/trailing whitespace.
+    pub fn normalize_whitespace(s: &str) -> String {
+        let mut result = String::with_capacity(s.len());
+        let mut prev_ws = true; // treat start as whitespace to trim leading
+        for ch in s.chars() {
+            if ch.is_whitespace() {
+                if !prev_ws {
+                    result.push(' ');
+                }
+                prev_ws = true;
+            } else {
+                result.push(ch);
+                prev_ws = false;
+            }
+        }
+        // trim trailing space
+        if result.ends_with(' ') {
+            result.pop();
+        }
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LazyFallback
+// ---------------------------------------------------------------------------
+
+/// A lazy value with a fallback computation used when the primary fails.
+pub struct LazyFallback<T> {
+    primary: Option<Box<dyn FnOnce() -> Result<T, String>>>,
+    fallback: Option<Box<dyn FnOnce() -> T>>,
+    value: Option<T>,
+    used_fallback: bool,
+}
+
+impl<T> LazyFallback<T> {
+    /// Create a new lazy value with a primary and fallback computation.
+    pub fn new(
+        primary: impl FnOnce() -> Result<T, String> + 'static,
+        fallback: impl FnOnce() -> T + 'static,
+    ) -> Self {
+        Self {
+            primary: Some(Box::new(primary)),
+            fallback: Some(Box::new(fallback)),
+            value: None,
+            used_fallback: false,
+        }
+    }
+
+    /// Get the value, trying the primary computation first and falling back
+    /// if it returns an error.
+    pub fn get(&mut self) -> &T {
+        if self.value.is_none() {
+            let primary = self.primary.take().expect("primary already consumed");
+            match primary() {
+                Ok(v) => {
+                    self.value = Some(v);
+                }
+                Err(_) => {
+                    let fallback = self.fallback.take().expect("fallback already consumed");
+                    self.value = Some(fallback());
+                    self.used_fallback = true;
+                }
+            }
+        }
+        self.value.as_ref().unwrap()
+    }
+
+    /// Return `true` if the fallback was used.
+    pub fn used_fallback(&self) -> bool {
+        self.used_fallback
+    }
+
+    /// Return `true` if the value has been resolved.
+    pub fn is_resolved(&self) -> bool {
+        self.value.is_some()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WriteOnceLazy
+// ---------------------------------------------------------------------------
+
+/// A value that can be set exactly once and then read many times.
+/// Unlike `Lazy`, the value is provided externally rather than by a closure.
+pub struct WriteOnceLazy<T> {
+    cell: OnceCell<T>,
+}
+
+impl<T> WriteOnceLazy<T> {
+    /// Create a new empty write-once cell.
+    pub fn new() -> Self {
+        Self {
+            cell: OnceCell::new(),
+        }
+    }
+
+    /// Set the value. Returns `Err` with the value back if already set.
+    pub fn set(&self, value: T) -> Result<(), T> {
+        self.cell.set(value).map_err(|v| v)
+    }
+
+    /// Get the value. Returns `None` if not yet set.
+    pub fn get(&self) -> Option<&T> {
+        self.cell.get()
+    }
+
+    /// Return `true` if a value has been written.
+    pub fn is_set(&self) -> bool {
+        self.cell.get().is_some()
+    }
+
+    /// Consume and return the inner value.
+    pub fn into_inner(self) -> Option<T> {
+        self.cell.into_inner()
+    }
+}
+
+impl<T> Default for WriteOnceLazy<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for WriteOnceLazy<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.cell.get() {
+            Some(v) => f.debug_tuple("WriteOnceLazy").field(v).finish(),
+            None => f.write_str("WriteOnceLazy(<empty>)"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1750,5 +2000,197 @@ mod tests {
         c.invalidate();
         assert_eq!(*c.get(), 2);
         assert_eq!(counter.get(), 2);
+    }
+
+    // ── New tests for extended functionality ──
+
+    #[test]
+    fn lazy_debug_uninit() {
+        let lazy = Lazy::new(|| 42);
+        assert_eq!(format!("{:?}", lazy), "Lazy(<uninit>)");
+    }
+
+    #[test]
+    fn lazy_debug_init() {
+        let mut lazy = Lazy::new(|| 42);
+        lazy.get();
+        assert_eq!(format!("{:?}", lazy), "Lazy(42)");
+    }
+
+    #[test]
+    fn lazy_cloned_returns_none_uninit() {
+        let lazy = Lazy::new(|| 42);
+        assert_eq!(lazy.cloned(), None);
+    }
+
+    #[test]
+    fn lazy_cloned_returns_value() {
+        let mut lazy = Lazy::new(|| String::from("val"));
+        lazy.get();
+        assert_eq!(lazy.cloned(), Some(String::from("val")));
+    }
+
+    #[test]
+    fn sync_lazy_try_get_before_init() {
+        let sl = SyncLazy::new(|| 7);
+        assert!(sl.try_get().is_none());
+    }
+
+    #[test]
+    fn sync_lazy_try_get_after_init() {
+        let sl = SyncLazy::new(|| 7);
+        sl.get();
+        assert_eq!(sl.try_get(), Some(&7));
+    }
+
+    #[test]
+    fn sync_lazy_debug_uninit() {
+        let sl = SyncLazy::new(|| 99);
+        assert_eq!(format!("{:?}", sl), "SyncLazy(<uninit>)");
+    }
+
+    #[test]
+    fn sync_lazy_debug_init() {
+        let sl = SyncLazy::new(|| 99);
+        sl.get();
+        assert_eq!(format!("{:?}", sl), "SyncLazy(99)");
+    }
+
+    #[test]
+    fn memoized_fn_evict() {
+        let mut memo = MemoizedFn::new(|k: &i32| k * 10);
+        memo.call(1);
+        memo.call(2);
+        assert_eq!(memo.len(), 2);
+        let evicted = memo.evict(&1);
+        assert_eq!(evicted, Some(10));
+        assert_eq!(memo.len(), 1);
+        assert!(!memo.contains(&1));
+        assert!(memo.contains(&2));
+    }
+
+    #[test]
+    fn memoized_fn_peek() {
+        let mut memo = MemoizedFn::new(|k: &i32| k + 100);
+        assert_eq!(memo.peek(&5), None);
+        memo.call(5);
+        assert_eq!(memo.peek(&5), Some(&105));
+    }
+
+    #[test]
+    fn memoized_fn_keys() {
+        let mut memo = MemoizedFn::new(|k: &String| k.len());
+        memo.call("abc".to_string());
+        memo.call("de".to_string());
+        let mut keys: Vec<&String> = memo.keys().collect();
+        keys.sort();
+        assert_eq!(keys, vec![&"abc".to_string(), &"de".to_string()]);
+    }
+
+    #[test]
+    fn lazy_stats_accessors() {
+        let mut stats = LazyStats::new();
+        stats.record_success(100);
+        stats.record_failure(200);
+        assert_eq!(stats.successes(), 1);
+        assert_eq!(stats.failures(), 1);
+        assert_eq!(stats.total_time_ns(), 300);
+    }
+
+    #[test]
+    fn lazy_stats_midrange() {
+        let stats = LazyStats::new();
+        assert_eq!(stats.midrange_ns(), None);
+
+        let mut stats = LazyStats::new();
+        stats.record_success(100);
+        stats.record_success(300);
+        assert_eq!(stats.midrange_ns(), Some(200));
+    }
+
+    #[test]
+    fn lazy_validator_byte_length_ok() {
+        assert!(LazyValidator::validate_byte_length("hi", 10).is_ok());
+    }
+
+    #[test]
+    fn lazy_validator_byte_length_empty() {
+        assert!(LazyValidator::validate_byte_length("", 10).is_err());
+    }
+
+    #[test]
+    fn lazy_validator_byte_length_too_long() {
+        assert!(LazyValidator::validate_byte_length("toolong", 3).is_err());
+    }
+
+    #[test]
+    fn lazy_validator_normalize_whitespace() {
+        assert_eq!(
+            LazyValidator::normalize_whitespace("  hello   world  "),
+            "hello world"
+        );
+        assert_eq!(
+            LazyValidator::normalize_whitespace("no_extra"),
+            "no_extra"
+        );
+        assert_eq!(
+            LazyValidator::normalize_whitespace("  a\t\nb  "),
+            "a b"
+        );
+    }
+
+    #[test]
+    fn lazy_fallback_uses_primary() {
+        let mut fb = LazyFallback::new(|| Ok(42), || 0);
+        assert!(!fb.is_resolved());
+        assert_eq!(*fb.get(), 42);
+        assert!(fb.is_resolved());
+        assert!(!fb.used_fallback());
+    }
+
+    #[test]
+    fn lazy_fallback_uses_fallback_on_error() {
+        let mut fb = LazyFallback::new(|| Err("fail".to_string()), || 99);
+        assert_eq!(*fb.get(), 99);
+        assert!(fb.used_fallback());
+    }
+
+    #[test]
+    fn write_once_lazy_set_and_get() {
+        let wol = WriteOnceLazy::new();
+        assert!(!wol.is_set());
+        assert!(wol.get().is_none());
+        assert!(wol.set(42).is_ok());
+        assert!(wol.is_set());
+        assert_eq!(wol.get(), Some(&42));
+    }
+
+    #[test]
+    fn write_once_lazy_double_set_fails() {
+        let wol = WriteOnceLazy::new();
+        assert!(wol.set(1).is_ok());
+        assert!(wol.set(2).is_err());
+        assert_eq!(wol.get(), Some(&1));
+    }
+
+    #[test]
+    fn write_once_lazy_into_inner() {
+        let wol = WriteOnceLazy::new();
+        wol.set("hello".to_string()).unwrap();
+        assert_eq!(wol.into_inner(), Some("hello".to_string()));
+    }
+
+    #[test]
+    fn write_once_lazy_debug() {
+        let wol: WriteOnceLazy<i32> = WriteOnceLazy::new();
+        assert_eq!(format!("{:?}", wol), "WriteOnceLazy(<empty>)");
+        wol.set(7).unwrap();
+        assert_eq!(format!("{:?}", wol), "WriteOnceLazy(7)");
+    }
+
+    #[test]
+    fn write_once_lazy_default() {
+        let wol: WriteOnceLazy<i32> = WriteOnceLazy::default();
+        assert!(!wol.is_set());
     }
 }

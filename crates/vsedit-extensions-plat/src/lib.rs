@@ -1018,6 +1018,136 @@ impl CompatibilityChecker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Extension recommendation engine
+// ---------------------------------------------------------------------------
+
+/// A recommendation for an extension based on file types in the workspace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtensionRecommendation {
+    pub extension_id: String,
+    pub reason: String,
+    pub file_pattern: String,
+    pub priority: u8,
+}
+
+impl ExtensionRecommendation {
+    pub fn new(
+        extension_id: impl Into<String>,
+        reason: impl Into<String>,
+        file_pattern: impl Into<String>,
+        priority: u8,
+    ) -> Self {
+        Self {
+            extension_id: extension_id.into(),
+            reason: reason.into(),
+            file_pattern: file_pattern.into(),
+            priority,
+        }
+    }
+}
+
+impl fmt::Display for ExtensionRecommendation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} (priority {}) – {}",
+            self.extension_id, self.priority, self.reason
+        )
+    }
+}
+
+/// Recommends extensions based on file patterns present in the workspace.
+#[derive(Debug, Clone, Default)]
+pub struct ExtensionRecommender {
+    rules: Vec<(String, ExtensionRecommendation)>,
+}
+
+impl ExtensionRecommender {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a recommendation rule: when a file matching `file_ext`
+    /// is present, suggest the given extension.
+    pub fn add_rule(&mut self, file_ext: impl Into<String>, rec: ExtensionRecommendation) {
+        self.rules.push((file_ext.into(), rec));
+    }
+
+    /// Given a list of file extensions present in the workspace, return
+    /// matching recommendations sorted by priority (highest first).
+    pub fn recommend(&self, present_extensions: &[&str]) -> Vec<&ExtensionRecommendation> {
+        let mut recs: Vec<&ExtensionRecommendation> = self
+            .rules
+            .iter()
+            .filter(|(ext, _)| present_extensions.contains(&ext.as_str()))
+            .map(|(_, rec)| rec)
+            .collect();
+        recs.sort_by(|a, b| b.priority.cmp(&a.priority));
+        recs
+    }
+
+    /// Return all unique extension IDs that would be recommended.
+    pub fn recommended_ids(&self, present_extensions: &[&str]) -> Vec<String> {
+        let mut ids: Vec<String> = self
+            .recommend(present_extensions)
+            .iter()
+            .map(|r| r.extension_id.clone())
+            .collect();
+        ids.dedup();
+        ids
+    }
+
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+}
+
+impl fmt::Display for ExtensionRecommender {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ExtensionRecommender({} rules)", self.rules.len())
+    }
+}
+
+/// Summarizes the status of all extensions in the service.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtensionStatusSummary {
+    pub installed: usize,
+    pub enabled: usize,
+    pub disabled: usize,
+    pub uninstalled: usize,
+}
+
+impl ExtensionStatusSummary {
+    /// Build a summary from an `ExtensionService`.
+    pub fn from_service(service: &ExtensionService) -> Self {
+        Self {
+            installed: service.get_by_status(ExtensionStatus::Installed).len(),
+            enabled: service.get_by_status(ExtensionStatus::Enabled).len(),
+            disabled: service.get_by_status(ExtensionStatus::Disabled).len(),
+            uninstalled: service.get_by_status(ExtensionStatus::Uninstalled).len(),
+        }
+    }
+
+    pub fn total(&self) -> usize {
+        self.installed + self.enabled + self.disabled + self.uninstalled
+    }
+
+    pub fn active(&self) -> usize {
+        self.installed + self.enabled
+    }
+}
+
+impl fmt::Display for ExtensionStatusSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "installed={}, enabled={}, disabled={}, uninstalled={}",
+            self.installed, self.enabled, self.disabled, self.uninstalled
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1680,5 +1810,89 @@ mod tests {
         g.add_extension("x");
         g.add_extension("y");
         assert_eq!(format!("{g}"), "ExtensionDependencyGraph(2 extensions)");
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn extension_recommendation_basic() {
+        let rec = ExtensionRecommendation::new(
+            "rust-analyzer",
+            "Rust files detected",
+            "*.rs",
+            10,
+        );
+        assert_eq!(rec.extension_id, "rust-analyzer");
+        assert_eq!(rec.priority, 10);
+        let display = format!("{}", rec);
+        assert!(display.contains("rust-analyzer"));
+    }
+
+    #[test]
+    fn recommender_filters_by_file_ext() {
+        let mut recommender = ExtensionRecommender::new();
+        recommender.add_rule(
+            "rs",
+            ExtensionRecommendation::new("rust-analyzer", "Rust", "*.rs", 10),
+        );
+        recommender.add_rule(
+            "py",
+            ExtensionRecommendation::new("pylance", "Python", "*.py", 8),
+        );
+        recommender.add_rule(
+            "ts",
+            ExtensionRecommendation::new("typescript", "TypeScript", "*.ts", 9),
+        );
+        let recs = recommender.recommend(&["rs", "py"]);
+        assert_eq!(recs.len(), 2);
+        // highest priority first
+        assert_eq!(recs[0].extension_id, "rust-analyzer");
+        assert_eq!(recs[1].extension_id, "pylance");
+    }
+
+    #[test]
+    fn recommender_no_matches() {
+        let recommender = ExtensionRecommender::new();
+        let recs = recommender.recommend(&["go"]);
+        assert!(recs.is_empty());
+    }
+
+    #[test]
+    fn extension_status_summary() {
+        let mut svc = ExtensionService::new();
+        svc.install(make_manifest("ext-a"));
+        svc.install(make_manifest("ext-b"));
+        svc.enable("ext-a");
+        let summary = ExtensionStatusSummary::from_service(&svc);
+        assert_eq!(summary.enabled, 1);
+        assert_eq!(summary.installed, 1);
+        assert_eq!(summary.total(), 2);
+        assert_eq!(summary.active(), 2);
+    }
+
+    #[test]
+    fn extension_status_summary_display() {
+        let summary = ExtensionStatusSummary {
+            installed: 2,
+            enabled: 3,
+            disabled: 1,
+            uninstalled: 0,
+        };
+        let text = format!("{}", summary);
+        assert!(text.contains("installed=2"));
+        assert!(text.contains("enabled=3"));
+    }
+
+    #[test]
+    fn recommender_recommended_ids() {
+        let mut recommender = ExtensionRecommender::new();
+        recommender.add_rule(
+            "rs",
+            ExtensionRecommendation::new("rust-analyzer", "Rust", "*.rs", 10),
+        );
+        let ids = recommender.recommended_ids(&["rs"]);
+        assert_eq!(ids, vec!["rust-analyzer"]);
+        let ids_empty = recommender.recommended_ids(&["java"]);
+        assert!(ids_empty.is_empty());
     }
 }

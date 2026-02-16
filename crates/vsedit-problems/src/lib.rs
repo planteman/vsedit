@@ -979,6 +979,125 @@ pub fn export_problems(problems: &[Problem], format: ExportFormat) -> String {
     out
 }
 
+// ---------------------------------------------------------------------------
+// ProblemBatch — bulk operations on problem sets
+// ---------------------------------------------------------------------------
+
+/// Batch operations for adding/removing problems from multiple sources.
+#[derive(Debug, Clone, Default)]
+pub struct ProblemBatch {
+    /// Problems to add, grouped by source.
+    additions: Vec<Problem>,
+    /// Sources whose existing problems should be cleared before adding.
+    clear_sources: Vec<String>,
+}
+
+impl ProblemBatch {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Queue a problem for addition.
+    pub fn add(&mut self, problem: Problem) {
+        self.additions.push(problem);
+    }
+
+    /// Mark a source to be cleared before additions are applied.
+    pub fn clear_source(&mut self, source: impl Into<String>) {
+        self.clear_sources.push(source.into());
+    }
+
+    /// Number of queued additions.
+    pub fn addition_count(&self) -> usize {
+        self.additions.len()
+    }
+
+    /// Apply the batch to a [`ProblemsPanel`]: first clear the listed sources,
+    /// then add all queued problems.
+    pub fn apply(self, panel: &mut ProblemsPanel) -> BatchResult {
+        let mut removed = 0usize;
+        for src in &self.clear_sources {
+            removed += panel.clear_source(src);
+        }
+        let added = self.additions.len();
+        for p in self.additions {
+            panel.add_problem(p);
+        }
+        BatchResult { added, removed }
+    }
+}
+
+/// Outcome of applying a [`ProblemBatch`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchResult {
+    pub added: usize,
+    pub removed: usize,
+}
+
+impl fmt::Display for BatchResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Batch: +{} -{}", self.added, self.removed)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Problem deduplication
+// ---------------------------------------------------------------------------
+
+impl ProblemsPanel {
+    /// Remove duplicate problems (same file, line, column, severity, message).
+    /// Returns the number of duplicates removed.
+    pub fn dedup(&mut self) -> usize {
+        let before = self.problems.len();
+        let mut seen = HashSet::new();
+        self.problems.retain(|p| {
+            let key = (
+                p.file_path.clone(),
+                p.line,
+                p.column,
+                p.severity,
+                p.message.clone(),
+            );
+            seen.insert(key)
+        });
+        before - self.problems.len()
+    }
+
+    /// Return problems whose message matches a substring (case-insensitive).
+    pub fn search(&self, query: &str) -> Vec<&Problem> {
+        let lower = query.to_lowercase();
+        self.problems
+            .iter()
+            .filter(|p| p.message.to_lowercase().contains(&lower))
+            .collect()
+    }
+
+    /// Return the highest-severity level present in the panel, or None if empty.
+    pub fn worst_severity(&self) -> Option<ProblemSeverity> {
+        self.problems.iter().map(|p| p.severity).min()
+    }
+
+    /// Partition problems into (errors, warnings, info_and_hints).
+    pub fn partition(&self) -> (Vec<&Problem>, Vec<&Problem>, Vec<&Problem>) {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        let mut rest = Vec::new();
+        for p in &self.problems {
+            match p.severity {
+                ProblemSeverity::Error => errors.push(p),
+                ProblemSeverity::Warning => warnings.push(p),
+                ProblemSeverity::Info | ProblemSeverity::Hint => rest.push(p),
+            }
+        }
+        (errors, warnings, rest)
+    }
+
+    /// Count problems in a specific file.
+    pub fn count_for_file(&self, file_path: &str) -> usize {
+        self.problems.iter().filter(|p| p.file_path == file_path).count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1665,5 +1784,89 @@ src/b.rs:5:3: warning: msg2
         assert_eq!(tsv.lines().count(), 1);
         let plain = export_problems(&[], ExportFormat::Plain);
         assert!(plain.is_empty());
+    }
+
+    // -- ProblemBatch tests -------------------------------------------------
+
+    #[test]
+    fn batch_add_and_clear() {
+        let mut panel = ProblemsPanel::new();
+        panel.add_problem(Problem::new(ProblemSeverity::Error, "old", "rustc", "a.rs", 1, 1));
+
+        let mut batch = ProblemBatch::new();
+        batch.clear_source("rustc");
+        batch.add(Problem::new(ProblemSeverity::Warning, "new", "rustc", "a.rs", 2, 1));
+        batch.add(Problem::new(ProblemSeverity::Info, "info", "clippy", "b.rs", 3, 1));
+        assert_eq!(batch.addition_count(), 2);
+
+        let result = batch.apply(&mut panel);
+        assert_eq!(result.removed, 1);
+        assert_eq!(result.added, 2);
+        assert_eq!(panel.total_count(), 2);
+        assert_eq!(format!("{}", result), "Batch: +2 -1");
+    }
+
+    #[test]
+    fn dedup_removes_duplicates() {
+        let mut panel = ProblemsPanel::new();
+        let p = Problem::new(ProblemSeverity::Error, "dup", "src", "a.rs", 1, 1);
+        panel.add_problem(p.clone());
+        panel.add_problem(p.clone());
+        panel.add_problem(p);
+        assert_eq!(panel.total_count(), 3);
+        let removed = panel.dedup();
+        assert_eq!(removed, 2);
+        assert_eq!(panel.total_count(), 1);
+    }
+
+    #[test]
+    fn search_finds_matching_problems() {
+        let mut panel = ProblemsPanel::new();
+        panel.add_problem(Problem::new(ProblemSeverity::Error, "unused variable", "rustc", "a.rs", 1, 1));
+        panel.add_problem(Problem::new(ProblemSeverity::Warning, "dead code", "rustc", "b.rs", 2, 1));
+        panel.add_problem(Problem::new(ProblemSeverity::Info, "UNUSED import", "clippy", "c.rs", 3, 1));
+
+        let results = panel.search("unused");
+        assert_eq!(results.len(), 2); // case-insensitive match
+    }
+
+    #[test]
+    fn worst_severity_returns_most_severe() {
+        let mut panel = ProblemsPanel::new();
+        panel.add_problem(Problem::new(ProblemSeverity::Hint, "hint", "src", "a.rs", 1, 1));
+        panel.add_problem(Problem::new(ProblemSeverity::Warning, "warn", "src", "a.rs", 2, 1));
+        assert_eq!(panel.worst_severity(), Some(ProblemSeverity::Warning));
+
+        panel.add_problem(Problem::new(ProblemSeverity::Error, "err", "src", "a.rs", 3, 1));
+        assert_eq!(panel.worst_severity(), Some(ProblemSeverity::Error));
+
+        let empty = ProblemsPanel::new();
+        assert_eq!(empty.worst_severity(), None);
+    }
+
+    #[test]
+    fn partition_splits_by_severity() {
+        let mut panel = ProblemsPanel::new();
+        panel.add_problem(Problem::new(ProblemSeverity::Error, "e1", "s", "a.rs", 1, 1));
+        panel.add_problem(Problem::new(ProblemSeverity::Warning, "w1", "s", "a.rs", 2, 1));
+        panel.add_problem(Problem::new(ProblemSeverity::Info, "i1", "s", "a.rs", 3, 1));
+        panel.add_problem(Problem::new(ProblemSeverity::Hint, "h1", "s", "a.rs", 4, 1));
+        panel.add_problem(Problem::new(ProblemSeverity::Error, "e2", "s", "b.rs", 5, 1));
+
+        let (errors, warnings, rest) = panel.partition();
+        assert_eq!(errors.len(), 2);
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(rest.len(), 2);
+    }
+
+    #[test]
+    fn count_for_file() {
+        let mut panel = ProblemsPanel::new();
+        panel.add_problem(Problem::new(ProblemSeverity::Error, "e1", "s", "a.rs", 1, 1));
+        panel.add_problem(Problem::new(ProblemSeverity::Error, "e2", "s", "a.rs", 2, 1));
+        panel.add_problem(Problem::new(ProblemSeverity::Warning, "w1", "s", "b.rs", 1, 1));
+        assert_eq!(panel.count_for_file("a.rs"), 2);
+        assert_eq!(panel.count_for_file("b.rs"), 1);
+        assert_eq!(panel.count_for_file("c.rs"), 0);
     }
 }

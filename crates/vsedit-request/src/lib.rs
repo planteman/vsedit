@@ -55,6 +55,8 @@ impl fmt::Display for RequestState {
 pub struct Request {
     pub id: RequestId,
     pub method: String,
+    pub url: Option<String>,
+    pub headers: Vec<(String, String)>,
     pub state: RequestState,
     pub created_at: u64,
 }
@@ -68,6 +70,8 @@ impl fmt::Display for Request {
 pub struct RequestBuilder {
     method: String,
     created_at: Option<u64>,
+    url: Option<String>,
+    headers: Vec<(String, String)>,
 }
 
 impl RequestBuilder {
@@ -75,6 +79,8 @@ impl RequestBuilder {
         Self {
             method: method.into(),
             created_at: None,
+            url: None,
+            headers: Vec::new(),
         }
     }
 
@@ -89,6 +95,8 @@ impl RequestBuilder {
         service.requests.push(Request {
             id,
             method: self.method,
+            url: self.url,
+            headers: self.headers,
             state: RequestState::Pending,
             created_at: self.created_at.unwrap_or(0),
         });
@@ -115,6 +123,8 @@ impl RequestService {
         self.requests.push(Request {
             id,
             method: method.into(),
+            url: None,
+            headers: Vec::new(),
             state: RequestState::Pending,
             created_at: 0,
         });
@@ -1038,6 +1048,158 @@ impl RequestBatch {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RequestState transition validation
+// ---------------------------------------------------------------------------
+
+impl RequestState {
+    /// Returns the set of state discriminants reachable from the current state.
+    pub fn valid_transitions(&self) -> Vec<RequestState> {
+        match self {
+            RequestState::Pending => vec![
+                RequestState::InProgress,
+                RequestState::Cancelled,
+            ],
+            RequestState::InProgress => vec![
+                RequestState::Completed,
+                RequestState::Cancelled,
+                RequestState::Failed(String::new()),
+            ],
+            // Terminal states have no valid transitions.
+            RequestState::Completed
+            | RequestState::Cancelled
+            | RequestState::Failed(_) => vec![],
+        }
+    }
+
+    /// Returns `true` if transitioning from `self` to `target` is valid.
+    pub fn can_transition_to(&self, target: &RequestState) -> bool {
+        self.valid_transitions()
+            .iter()
+            .any(|s| std::mem::discriminant(s) == std::mem::discriminant(target))
+    }
+}
+
+impl RequestService {
+    /// Attempt a validated state transition. Returns an error when the
+    /// transition is not permitted by the state machine.
+    pub fn try_transition(
+        &mut self,
+        id: RequestId,
+        target: RequestState,
+    ) -> Result<(), RequestError> {
+        let req = self
+            .requests
+            .iter_mut()
+            .find(|r| r.id == id)
+            .ok_or(RequestError::RequestNotFound(id))?;
+
+        if !req.state.can_transition_to(&target) {
+            return Err(RequestError::InvalidTransition {
+                id,
+                from: req.state.to_string(),
+                to: target.to_string(),
+            });
+        }
+        req.state = target;
+        Ok(())
+    }
+
+    /// Drain and return all requests in a terminal state, leaving only
+    /// active (Pending / InProgress) requests in the service.
+    pub fn drain_terminal(&mut self) -> Vec<Request> {
+        let (terminal, active): (Vec<_>, Vec<_>) = self
+            .requests
+            .drain(..)
+            .partition(|r| r.state.is_terminal());
+        self.requests = active;
+        terminal
+    }
+
+    /// Return an iterator over all tracked requests.
+    pub fn iter(&self) -> impl Iterator<Item = &Request> {
+        self.requests.iter()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RequestBuilder: headers and url support
+// ---------------------------------------------------------------------------
+
+impl RequestBuilder {
+    /// Attach a URL to the request.
+    pub fn url(mut self, url: impl Into<String>) -> Self {
+        self.url = Some(url.into());
+        self
+    }
+
+    /// Add a header key-value pair to the request.
+    pub fn header(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.headers.push((key.into(), value.into()));
+        self
+    }
+}
+
+impl Request {
+    /// Returns `true` when the request is in a terminal state.
+    pub fn is_done(&self) -> bool {
+        self.state.is_terminal()
+    }
+
+    /// Returns the elapsed time since the request was created, given the
+    /// current timestamp.
+    pub fn age(&self, now: u64) -> u64 {
+        now.saturating_sub(self.created_at)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RequestId helpers
+// ---------------------------------------------------------------------------
+
+impl RequestId {
+    /// The inner numeric identifier.
+    pub fn as_u64(self) -> u64 {
+        self.0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PriorityRequestQueue: cancel, fail, and drain helpers
+// ---------------------------------------------------------------------------
+
+impl PriorityRequestQueue {
+    /// Cancel a request by ID. Returns `true` if the request was found and
+    /// was in a non-terminal state.
+    pub fn cancel(&mut self, id: RequestId) -> bool {
+        if let Some(req) = self.requests.iter_mut().find(|r| r.id == id) {
+            if !req.state.is_terminal() {
+                req.state = RequestState::Cancelled;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Drain all completed/cancelled/failed requests, returning them.
+    pub fn drain_completed(&mut self) -> Vec<PrioritizedRequest> {
+        let (terminal, active): (Vec<_>, Vec<_>) = self
+            .requests
+            .drain(..)
+            .partition(|r| r.state.is_terminal());
+        self.requests = active;
+        terminal
+    }
+
+    /// Peek at the highest-priority pending request without changing state.
+    pub fn peek(&self) -> Option<&PrioritizedRequest> {
+        self.requests
+            .iter()
+            .filter(|r| r.state == RequestState::Pending)
+            .max_by_key(|r| r.priority)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1184,6 +1346,8 @@ mod tests {
         let req = Request {
             id: RequestId(7),
             method: "GET /health".into(),
+            url: None,
+            headers: Vec::new(),
             state: RequestState::Pending,
             created_at: 0,
         };
@@ -1737,5 +1901,156 @@ mod tests {
         assert!(batch.contains_method("textDocument/completion"));
         assert!(!batch.contains_method("textDocument/hover"));
         assert_eq!(batch.methods().len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for state transitions, drain, builder extensions, and queue ops
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn valid_transitions_from_pending() {
+        let pending = RequestState::Pending;
+        assert!(pending.can_transition_to(&RequestState::InProgress));
+        assert!(pending.can_transition_to(&RequestState::Cancelled));
+        assert!(!pending.can_transition_to(&RequestState::Completed));
+        assert!(!pending.can_transition_to(&RequestState::Failed("x".into())));
+    }
+
+    #[test]
+    fn valid_transitions_from_in_progress() {
+        let ip = RequestState::InProgress;
+        assert!(ip.can_transition_to(&RequestState::Completed));
+        assert!(ip.can_transition_to(&RequestState::Cancelled));
+        assert!(ip.can_transition_to(&RequestState::Failed("err".into())));
+        assert!(!ip.can_transition_to(&RequestState::Pending));
+    }
+
+    #[test]
+    fn terminal_states_have_no_transitions() {
+        for state in &[
+            RequestState::Completed,
+            RequestState::Cancelled,
+            RequestState::Failed("err".into()),
+        ] {
+            assert!(state.valid_transitions().is_empty());
+            assert!(!state.can_transition_to(&RequestState::Pending));
+        }
+    }
+
+    #[test]
+    fn try_transition_success() {
+        let mut svc = RequestService::new();
+        let id = svc.create_request("GET /api");
+        assert!(svc.try_transition(id, RequestState::InProgress).is_ok());
+        assert_eq!(svc.get_state(id), Some(&RequestState::InProgress));
+        assert!(svc.try_transition(id, RequestState::Completed).is_ok());
+        assert_eq!(svc.get_state(id), Some(&RequestState::Completed));
+    }
+
+    #[test]
+    fn try_transition_invalid() {
+        let mut svc = RequestService::new();
+        let id = svc.create_request("GET /api");
+        // Pending -> Completed is not allowed
+        let err = svc.try_transition(id, RequestState::Completed).unwrap_err();
+        assert!(matches!(err, RequestError::InvalidTransition { .. }));
+    }
+
+    #[test]
+    fn try_transition_not_found() {
+        let mut svc = RequestService::new();
+        let err = svc.try_transition(RequestId(999), RequestState::InProgress).unwrap_err();
+        assert!(matches!(err, RequestError::RequestNotFound(_)));
+    }
+
+    #[test]
+    fn drain_terminal_removes_done_requests() {
+        let mut svc = RequestService::new();
+        let id1 = svc.create_request("a");
+        let id2 = svc.create_request("b");
+        let _id3 = svc.create_request("c");
+        svc.start(id1);
+        svc.complete(id1);
+        svc.cancel(id2);
+        let drained = svc.drain_terminal();
+        assert_eq!(drained.len(), 2);
+        assert_eq!(svc.total_count(), 1);
+    }
+
+    #[test]
+    fn request_builder_with_url_and_headers() {
+        let mut svc = RequestService::new();
+        let id = RequestBuilder::new("POST")
+            .url("https://example.com/api")
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer tok")
+            .created_at(42)
+            .build(&mut svc);
+        let req = svc.get_request(id).unwrap();
+        assert_eq!(req.url.as_deref(), Some("https://example.com/api"));
+        assert_eq!(req.headers.len(), 2);
+        assert_eq!(req.headers[0], ("Content-Type".into(), "application/json".into()));
+    }
+
+    #[test]
+    fn request_is_done_and_age() {
+        let mut svc = RequestService::new();
+        let id = RequestBuilder::new("GET").created_at(100).build(&mut svc);
+        let req = svc.get_request(id).unwrap();
+        assert!(!req.is_done());
+        assert_eq!(req.age(150), 50);
+
+        svc.start(id);
+        svc.complete(id);
+        let req = svc.get_request(id).unwrap();
+        assert!(req.is_done());
+    }
+
+    #[test]
+    fn request_id_as_u64() {
+        let id = RequestId(42);
+        assert_eq!(id.as_u64(), 42);
+    }
+
+    #[test]
+    fn service_iter_yields_all_requests() {
+        let mut svc = RequestService::new();
+        svc.create_request("a");
+        svc.create_request("b");
+        svc.create_request("c");
+        let methods: Vec<&str> = svc.iter().map(|r| r.method.as_str()).collect();
+        assert_eq!(methods, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn priority_queue_cancel() {
+        let mut q = PriorityRequestQueue::new();
+        let id = q.enqueue("x", RequestPriority::Normal);
+        assert!(q.cancel(id));
+        assert_eq!(q.get(id).unwrap().state, RequestState::Cancelled);
+        // cancelling again should return false (already terminal)
+        assert!(!q.cancel(id));
+    }
+
+    #[test]
+    fn priority_queue_drain_completed() {
+        let mut q = PriorityRequestQueue::new();
+        let id1 = q.enqueue("a", RequestPriority::Low);
+        let _id2 = q.enqueue("b", RequestPriority::High);
+        q.cancel(id1);
+        let drained = q.drain_completed();
+        assert_eq!(drained.len(), 1);
+        assert_eq!(q.total_count(), 1);
+    }
+
+    #[test]
+    fn priority_queue_peek() {
+        let mut q = PriorityRequestQueue::new();
+        q.enqueue("low", RequestPriority::Low);
+        q.enqueue("high", RequestPriority::High);
+        let peeked = q.peek().unwrap();
+        assert_eq!(peeked.method, "high");
+        // peek should not change state
+        assert_eq!(q.pending_count(), 2);
     }
 }

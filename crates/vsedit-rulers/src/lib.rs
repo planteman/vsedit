@@ -1069,6 +1069,138 @@ impl RulerVisibility {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RulerGuide: descriptive guide lines for code style enforcement
+// ---------------------------------------------------------------------------
+
+/// A named guide that pairs a ruler column with a human-readable purpose,
+/// making it easy to display tooltips or status-bar hints.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RulerGuide {
+    pub column: u32,
+    pub label: String,
+    pub severity: GuideSeverity,
+}
+
+/// How strictly the ruler guide should be treated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GuideSeverity {
+    /// Informational – shown as a faint line.
+    Info,
+    /// Soft limit – highlight but don't warn.
+    Soft,
+    /// Hard limit – lines exceeding this should produce a warning.
+    Hard,
+}
+
+impl fmt::Display for GuideSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GuideSeverity::Info => write!(f, "info"),
+            GuideSeverity::Soft => write!(f, "soft"),
+            GuideSeverity::Hard => write!(f, "hard"),
+        }
+    }
+}
+
+impl RulerGuide {
+    /// Create a new guide with validation.
+    pub fn new(column: u32, label: impl Into<String>, severity: GuideSeverity) -> Result<Self, RulerError> {
+        if column > MAX_COLUMN {
+            return Err(RulerError::ColumnOutOfRange(column));
+        }
+        Ok(Self {
+            column,
+            label: label.into(),
+            severity,
+        })
+    }
+
+    /// Returns true if this guide represents a hard limit.
+    pub fn is_hard_limit(&self) -> bool {
+        self.severity == GuideSeverity::Hard
+    }
+
+    /// Check whether a line length exceeds this guide's column.
+    pub fn exceeds(&self, line_length: u32) -> bool {
+        line_length > self.column
+    }
+}
+
+impl fmt::Display for RulerGuide {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} @{} [{}]", self.label, self.column, self.severity)
+    }
+}
+
+/// A collection of ruler guides with lookup and filtering capabilities.
+#[derive(Debug, Clone, Default)]
+pub struct RulerGuideSet {
+    guides: Vec<RulerGuide>,
+}
+
+impl RulerGuideSet {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a guide to the set. Rejects duplicates at the same column.
+    pub fn add(&mut self, guide: RulerGuide) -> Result<(), RulerError> {
+        if self.guides.iter().any(|g| g.column == guide.column) {
+            return Err(RulerError::DuplicateColumn(guide.column));
+        }
+        self.guides.push(guide);
+        self.guides.sort_by_key(|g| g.column);
+        Ok(())
+    }
+
+    /// Return all hard-limit guides.
+    pub fn hard_limits(&self) -> Vec<&RulerGuide> {
+        self.guides.iter().filter(|g| g.is_hard_limit()).collect()
+    }
+
+    /// Return all guides that a given line length exceeds.
+    pub fn exceeded_by(&self, line_length: u32) -> Vec<&RulerGuide> {
+        self.guides.iter().filter(|g| g.exceeds(line_length)).collect()
+    }
+
+    /// Convert the guide set into a `RulersConfig`.
+    pub fn to_rulers_config(&self, default_color: &str) -> RulersConfig {
+        let rulers = self
+            .guides
+            .iter()
+            .map(|g| RulerConfig { column: g.column, color: None })
+            .collect();
+        RulersConfig {
+            rulers,
+            default_color: default_color.to_string(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.guides.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.guides.is_empty()
+    }
+
+    /// Return a summary string listing each guide.
+    pub fn summary(&self) -> String {
+        self.guides
+            .iter()
+            .map(|g| format!("{}", g))
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
+impl fmt::Display for RulerGuideSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RulerGuideSet({} guides)", self.guides.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1678,6 +1810,70 @@ mod tests {
     fn ruler_preset_display() {
         assert!(format!("{}", RulerPreset::PEP8).contains("79"));
         assert!(format!("{}", RulerPreset::StandardRust).contains("100"));
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn ruler_guide_creation_and_display() {
+        let guide = RulerGuide::new(80, "PEP8 line limit", GuideSeverity::Hard).unwrap();
+        assert_eq!(guide.column, 80);
+        assert!(guide.is_hard_limit());
+        assert!(guide.exceeds(81));
+        assert!(!guide.exceeds(80));
+        let s = format!("{}", guide);
+        assert!(s.contains("PEP8 line limit"));
+        assert!(s.contains("hard"));
+    }
+
+    #[test]
+    fn ruler_guide_out_of_range() {
+        let err = RulerGuide::new(MAX_COLUMN + 1, "too far", GuideSeverity::Info);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn ruler_guide_set_operations() {
+        let mut set = RulerGuideSet::new();
+        set.add(RulerGuide::new(80, "soft", GuideSeverity::Soft).unwrap()).unwrap();
+        set.add(RulerGuide::new(120, "hard", GuideSeverity::Hard).unwrap()).unwrap();
+        set.add(RulerGuide::new(40, "info", GuideSeverity::Info).unwrap()).unwrap();
+        assert_eq!(set.len(), 3);
+        assert_eq!(set.hard_limits().len(), 1);
+        assert_eq!(set.hard_limits()[0].column, 120);
+        // Duplicate rejection
+        assert!(set.add(RulerGuide::new(80, "dup", GuideSeverity::Info).unwrap()).is_err());
+    }
+
+    #[test]
+    fn ruler_guide_exceeded_by() {
+        let mut set = RulerGuideSet::new();
+        set.add(RulerGuide::new(80, "soft", GuideSeverity::Soft).unwrap()).unwrap();
+        set.add(RulerGuide::new(120, "hard", GuideSeverity::Hard).unwrap()).unwrap();
+        let exceeded = set.exceeded_by(100);
+        assert_eq!(exceeded.len(), 1);
+        assert_eq!(exceeded[0].column, 80);
+        let exceeded_all = set.exceeded_by(200);
+        assert_eq!(exceeded_all.len(), 2);
+    }
+
+    #[test]
+    fn ruler_guide_set_to_rulers_config() {
+        let mut set = RulerGuideSet::new();
+        set.add(RulerGuide::new(79, "pep8", GuideSeverity::Hard).unwrap()).unwrap();
+        set.add(RulerGuide::new(100, "rust", GuideSeverity::Soft).unwrap()).unwrap();
+        let cfg = set.to_rulers_config("#aaa");
+        assert_eq!(cfg.rulers.len(), 2);
+        assert_eq!(cfg.default_color, "#aaa");
+        assert_eq!(cfg.rulers[0].column, 79);
+        assert_eq!(cfg.rulers[1].column, 100);
+    }
+
+    #[test]
+    fn guide_severity_display() {
+        assert_eq!(format!("{}", GuideSeverity::Info), "info");
+        assert_eq!(format!("{}", GuideSeverity::Soft), "soft");
+        assert_eq!(format!("{}", GuideSeverity::Hard), "hard");
     }
 
 }

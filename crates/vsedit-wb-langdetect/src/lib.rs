@@ -1100,6 +1100,144 @@ pub fn group_by_family<'a>(
     map
 }
 
+// ---------------------------------------------------------------------------
+// Language alias resolution
+// ---------------------------------------------------------------------------
+
+/// Map common language aliases and alternative names to canonical identifiers.
+pub fn resolve_alias(alias: &str) -> &str {
+    match alias.to_lowercase().as_str() {
+        "c++" | "cplusplus" => "cpp",
+        "c#" | "csharp" => "csharp",
+        "js" => "javascript",
+        "ts" => "typescript",
+        "py" | "python3" => "python",
+        "rb" => "ruby",
+        "sh" | "bash" | "zsh" => "shellscript",
+        "yml" => "yaml",
+        "rs" => "rust",
+        "md" => "markdown",
+        "tex" => "latex",
+        "htm" => "html",
+        "golang" => "go",
+        other => {
+            // Can't return a borrow of a temporary — return the input as-is
+            // when no alias matches (the input already has 'static-compatible lifetime
+            // through the match).
+            // We leak nothing because all arms return string literals or the input.
+            let _ = other;
+            alias
+        }
+    }
+}
+
+/// Return `true` if two language identifiers are equivalent after alias resolution.
+pub fn languages_equivalent(a: &str, b: &str) -> bool {
+    resolve_alias(a).eq_ignore_ascii_case(resolve_alias(b))
+}
+
+// ---------------------------------------------------------------------------
+// Language feature hints
+// ---------------------------------------------------------------------------
+
+/// Rough feature set hints for a detected language.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanguageFeatures {
+    pub language_id: String,
+    pub has_types: bool,
+    pub has_classes: bool,
+    pub has_pattern_matching: bool,
+    pub is_compiled: bool,
+}
+
+impl LanguageFeatures {
+    /// Infer feature hints from a language id.
+    pub fn from_language(lang: &str) -> Self {
+        let lower = lang.to_lowercase();
+        let has_types = matches!(
+            lower.as_str(),
+            "rust" | "typescript" | "java" | "go" | "cpp" | "c" | "csharp" | "haskell"
+        );
+        let has_classes = matches!(
+            lower.as_str(),
+            "java" | "python" | "ruby" | "typescript" | "javascript" | "cpp" | "csharp" | "php"
+        );
+        let has_pattern_matching = matches!(
+            lower.as_str(),
+            "rust" | "haskell" | "ocaml" | "erlang" | "elixir" | "scala"
+        );
+        let is_compiled = matches!(
+            lower.as_str(),
+            "rust" | "go" | "c" | "cpp" | "java" | "csharp" | "haskell"
+        );
+        Self {
+            language_id: lang.to_string(),
+            has_types,
+            has_classes,
+            has_pattern_matching,
+            is_compiled,
+        }
+    }
+}
+
+impl fmt::Display for LanguageFeatures {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut feats = Vec::new();
+        if self.has_types {
+            feats.push("typed");
+        }
+        if self.has_classes {
+            feats.push("OOP");
+        }
+        if self.has_pattern_matching {
+            feats.push("pattern-matching");
+        }
+        if self.is_compiled {
+            feats.push("compiled");
+        }
+        write!(f, "{}: [{}]", self.language_id, feats.join(", "))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Detection priority ordering
+// ---------------------------------------------------------------------------
+
+/// Compare two detection results, preferring higher confidence, then shorter
+/// language id (as a tiebreaker for determinism).
+pub fn compare_detections(a: &DetectionResult, b: &DetectionResult) -> std::cmp::Ordering {
+    b.confidence
+        .partial_cmp(&a.confidence)
+        .unwrap_or(std::cmp::Ordering::Equal)
+        .then_with(|| a.language_id.len().cmp(&b.language_id.len()))
+        .then_with(|| a.language_id.cmp(&b.language_id))
+}
+
+/// Sort a list of detection results by confidence descending.
+pub fn sort_detections(results: &mut [DetectionResult]) {
+    results.sort_by(compare_detections);
+}
+
+/// Merge multiple detection results for the same language by keeping the highest confidence.
+pub fn merge_detections(results: &[DetectionResult]) -> Vec<DetectionResult> {
+    let mut best: HashMap<String, f64> = HashMap::new();
+    for r in results {
+        let entry = best.entry(r.language_id.clone()).or_insert(0.0);
+        if r.confidence > *entry {
+            *entry = r.confidence;
+        }
+    }
+    let mut merged: Vec<DetectionResult> = best
+        .into_iter()
+        .map(|(lang, conf)| DetectionResult {
+            language_id: lang,
+            confidence: conf,
+        })
+        .collect();
+    sort_detections(&mut merged);
+    merged
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1661,5 +1799,77 @@ mod tests {
         let langs = vec!["c", "cpp", "python", "java"];
         let c_fam = filter_by_family(&langs, LanguageFamily::CFamily);
         assert_eq!(c_fam, vec!["c", "cpp", "java"]);
+    }
+
+    #[test]
+    fn resolve_alias_common() {
+        assert_eq!(resolve_alias("c++"), "cpp");
+        assert_eq!(resolve_alias("js"), "javascript");
+        assert_eq!(resolve_alias("py"), "python");
+        assert_eq!(resolve_alias("golang"), "go");
+        assert_eq!(resolve_alias("unknown"), "unknown");
+    }
+
+    #[test]
+    fn languages_equivalent_with_aliases() {
+        assert!(languages_equivalent("js", "javascript"));
+        assert!(languages_equivalent("py", "python3"));
+        assert!(languages_equivalent("c++", "cplusplus"));
+        assert!(!languages_equivalent("rust", "python"));
+    }
+
+    #[test]
+    fn language_features_rust() {
+        let feats = LanguageFeatures::from_language("rust");
+        assert!(feats.has_types);
+        assert!(!feats.has_classes);
+        assert!(feats.has_pattern_matching);
+        assert!(feats.is_compiled);
+        let display = format!("{}", feats);
+        assert!(display.contains("typed"));
+        assert!(display.contains("compiled"));
+    }
+
+    #[test]
+    fn language_features_python() {
+        let feats = LanguageFeatures::from_language("python");
+        assert!(!feats.has_types);
+        assert!(feats.has_classes);
+        assert!(!feats.is_compiled);
+    }
+
+    #[test]
+    fn sort_detections_by_confidence() {
+        let mut results = vec![
+            DetectionResult { language_id: "python".into(), confidence: 0.5 },
+            DetectionResult { language_id: "rust".into(), confidence: 0.9 },
+            DetectionResult { language_id: "go".into(), confidence: 0.7 },
+        ];
+        sort_detections(&mut results);
+        assert_eq!(results[0].language_id, "rust");
+        assert_eq!(results[1].language_id, "go");
+        assert_eq!(results[2].language_id, "python");
+    }
+
+    #[test]
+    fn merge_detections_keeps_best() {
+        let results = vec![
+            DetectionResult { language_id: "rust".into(), confidence: 0.5 },
+            DetectionResult { language_id: "rust".into(), confidence: 0.9 },
+            DetectionResult { language_id: "python".into(), confidence: 0.7 },
+        ];
+        let merged = merge_detections(&results);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].language_id, "rust");
+        assert!((merged[0].confidence - 0.9).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compare_detections_ordering() {
+        let a = DetectionResult { language_id: "rust".into(), confidence: 0.8 };
+        let b = DetectionResult { language_id: "python".into(), confidence: 0.8 };
+        // Same confidence — shorter name first
+        let ord = compare_detections(&a, &b);
+        assert_eq!(ord, std::cmp::Ordering::Less);
     }
 }

@@ -1020,6 +1020,104 @@ pub fn unfold_region(model: &mut FoldingModel, start_line: u32, recursive: bool)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Folding analysis utilities
+// ---------------------------------------------------------------------------
+
+/// Summary statistics for a set of folding ranges.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoldingSummary {
+    /// Total number of folding ranges.
+    pub total: usize,
+    /// Number of currently collapsed ranges.
+    pub collapsed: usize,
+    /// Maximum nesting depth across all ranges.
+    pub max_depth: u32,
+    /// Total number of hidden lines (lines inside collapsed ranges).
+    pub hidden_lines: u32,
+    /// Count of ranges per kind.
+    pub comment_count: usize,
+    pub imports_count: usize,
+    pub region_count: usize,
+}
+
+/// Compute a summary of the current folding state.
+pub fn compute_folding_summary(model: &FoldingModel) -> FoldingSummary {
+    let ranges = model.get_ranges();
+    let total = ranges.len();
+    let collapsed = ranges.iter().filter(|r| r.is_collapsed).count();
+    let hidden_lines: u32 = ranges
+        .iter()
+        .filter(|r| r.is_collapsed)
+        .map(|r| r.end_line.saturating_sub(r.start_line))
+        .sum();
+    let max_depth = ranges
+        .iter()
+        .map(|r| {
+            ranges
+                .iter()
+                .filter(|outer| outer.start_line < r.start_line && outer.end_line > r.end_line)
+                .count() as u32
+                + 1
+        })
+        .max()
+        .unwrap_or(0);
+    let comment_count = ranges.iter().filter(|r| r.kind == FoldingRangeKind::Comment).count();
+    let imports_count = ranges.iter().filter(|r| r.kind == FoldingRangeKind::Imports).count();
+    let region_count = ranges.iter().filter(|r| r.kind == FoldingRangeKind::Region).count();
+    FoldingSummary {
+        total,
+        collapsed,
+        max_depth,
+        hidden_lines,
+        comment_count,
+        imports_count,
+        region_count,
+    }
+}
+
+/// Return only the ranges that overlap a given line span `[start, end]`.
+pub fn ranges_overlapping(model: &FoldingModel, start: u32, end: u32) -> Vec<&FoldingRange> {
+    model
+        .get_ranges()
+        .iter()
+        .filter(|r| r.start_line <= end && r.end_line >= start)
+        .collect()
+}
+
+/// Return ranges sorted by span length (smallest first).
+pub fn ranges_by_span(model: &FoldingModel) -> Vec<&FoldingRange> {
+    let mut sorted: Vec<&FoldingRange> = model.get_ranges().iter().collect();
+    sorted.sort_by_key(|r| r.end_line - r.start_line);
+    sorted
+}
+
+/// Compute the visible line count (total lines minus hidden lines from
+/// collapsed ranges). `total_lines` is the document line count.
+pub fn visible_line_count(model: &FoldingModel, total_lines: u32) -> u32 {
+    let hidden: u32 = model
+        .get_ranges()
+        .iter()
+        .filter(|r| r.is_collapsed)
+        .map(|r| r.end_line.saturating_sub(r.start_line))
+        .sum();
+    total_lines.saturating_sub(hidden)
+}
+
+/// Find the innermost folding range at a given line (deepest nesting).
+pub fn innermost_range_at(model: &FoldingModel, line: u32) -> Option<&FoldingRange> {
+    model
+        .get_ranges()
+        .iter()
+        .filter(|r| r.start_line <= line && r.end_line >= line)
+        .min_by_key(|r| r.end_line - r.start_line)
+}
+
+/// Return the lines that are "fold headers" – i.e. start lines of folding ranges.
+pub fn fold_header_lines(model: &FoldingModel) -> Vec<u32> {
+    model.get_ranges().iter().map(|r| r.start_line).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1791,5 +1889,91 @@ mod tests {
         assert!(model.get_range_at(1).unwrap().is_collapsed);   // was false -> true
         assert!(!model.get_range_at(5).unwrap().is_collapsed);   // Region untouched
         assert!(!model.get_range_at(12).unwrap().is_collapsed);  // was true -> false
+    }
+
+    // -- compute_folding_summary -----------------------------------------------
+
+    #[test]
+    fn folding_summary_basic() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Comment, is_collapsed: true },
+            FoldingRange { start_line: 7, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let summary = compute_folding_summary(&model);
+        assert_eq!(summary.total, 2);
+        assert_eq!(summary.collapsed, 1);
+        assert_eq!(summary.hidden_lines, 4); // lines 2..5
+        assert_eq!(summary.comment_count, 1);
+        assert_eq!(summary.region_count, 1);
+    }
+
+    #[test]
+    fn folding_summary_empty() {
+        let model = FoldingModel::new();
+        let summary = compute_folding_summary(&model);
+        assert_eq!(summary.total, 0);
+        assert_eq!(summary.max_depth, 0);
+    }
+
+    // -- ranges_overlapping ----------------------------------------------------
+
+    #[test]
+    fn ranges_overlapping_finds_overlap() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 10, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let overlapping = ranges_overlapping(&model, 3, 12);
+        assert_eq!(overlapping.len(), 2);
+    }
+
+    #[test]
+    fn ranges_overlapping_none() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let overlapping = ranges_overlapping(&model, 10, 20);
+        assert_eq!(overlapping.len(), 0);
+    }
+
+    // -- visible_line_count ----------------------------------------------------
+
+    #[test]
+    fn visible_line_count_with_collapsed() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 2, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: true },
+        ]);
+        assert_eq!(visible_line_count(&model, 10), 7);
+    }
+
+    // -- innermost_range_at ----------------------------------------------------
+
+    #[test]
+    fn innermost_range_at_finds_deepest() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 5, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let inner = innermost_range_at(&model, 7).unwrap();
+        assert_eq!(inner.start_line, 5);
+        assert_eq!(inner.end_line, 10);
+    }
+
+    // -- fold_header_lines -----------------------------------------------------
+
+    #[test]
+    fn fold_header_lines_collects_starts() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 10, end_line: 15, kind: FoldingRangeKind::Comment, is_collapsed: false },
+        ]);
+        let headers = fold_header_lines(&model);
+        assert_eq!(headers, vec![1, 10]);
     }
 }

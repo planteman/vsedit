@@ -944,6 +944,218 @@ pub fn all_sessions_active(tracker: &SessionTracker, ttl: u64, now: u64) -> bool
     tracker.expired_sessions(ttl, now).is_empty()
 }
 
+// ---------------------------------------------------------------------------
+// AuthSession builder
+// ---------------------------------------------------------------------------
+
+/// Fluent builder for constructing [`AuthSession`] instances.
+#[derive(Debug, Clone)]
+pub struct AuthSessionBuilder {
+    id: Option<String>,
+    access_token: Option<String>,
+    account_id: Option<String>,
+    account_label: Option<String>,
+    scopes: Vec<String>,
+}
+
+impl AuthSessionBuilder {
+    pub fn new() -> Self {
+        Self {
+            id: None,
+            access_token: None,
+            account_id: None,
+            account_label: None,
+            scopes: Vec::new(),
+        }
+    }
+
+    pub fn id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
+    }
+
+    pub fn access_token(mut self, token: impl Into<String>) -> Self {
+        self.access_token = Some(token.into());
+        self
+    }
+
+    pub fn account(mut self, id: impl Into<String>, label: impl Into<String>) -> Self {
+        self.account_id = Some(id.into());
+        self.account_label = Some(label.into());
+        self
+    }
+
+    pub fn scope(mut self, scope: impl Into<String>) -> Self {
+        self.scopes.push(scope.into());
+        self
+    }
+
+    pub fn scopes(mut self, scopes: &[&str]) -> Self {
+        self.scopes.extend(scopes.iter().map(|s| s.to_string()));
+        self
+    }
+
+    /// Build the session. Returns `Err` if required fields are missing.
+    pub fn build(self) -> Result<AuthSession, AuthError> {
+        let id = self.id.ok_or(AuthError::NetworkError("missing session id".into()))?;
+        let access_token = self
+            .access_token
+            .ok_or(AuthError::NetworkError("missing access token".into()))?;
+        let account_id = self
+            .account_id
+            .ok_or(AuthError::NetworkError("missing account id".into()))?;
+        let account_label = self
+            .account_label
+            .ok_or(AuthError::NetworkError("missing account label".into()))?;
+        Ok(AuthSession {
+            id,
+            access_token,
+            account: AuthAccount {
+                id: account_id,
+                label: account_label,
+            },
+            scopes: self.scopes,
+        })
+    }
+}
+
+impl Default for AuthSessionBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Scope diff utility
+// ---------------------------------------------------------------------------
+
+/// Describes the difference between two scope sets.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScopeDiff {
+    /// Scopes present in `new` but not in `old`.
+    pub added: Vec<String>,
+    /// Scopes present in `old` but not in `new`.
+    pub removed: Vec<String>,
+    /// Scopes present in both.
+    pub unchanged: Vec<String>,
+}
+
+/// Compute the difference between two scope slices.
+pub fn diff_scopes(old: &[String], new: &[String]) -> ScopeDiff {
+    let mut added: Vec<String> = new.iter().filter(|s| !old.contains(s)).cloned().collect();
+    let mut removed: Vec<String> = old.iter().filter(|s| !new.contains(s)).cloned().collect();
+    let mut unchanged: Vec<String> = old.iter().filter(|s| new.contains(s)).cloned().collect();
+    added.sort();
+    removed.sort();
+    unchanged.sort();
+    ScopeDiff {
+        added,
+        removed,
+        unchanged,
+    }
+}
+
+impl ScopeDiff {
+    /// Returns `true` if scopes are identical (nothing added or removed).
+    pub fn is_unchanged(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SessionStore: find_by_account, replace_session
+// ---------------------------------------------------------------------------
+
+impl SessionStore {
+    /// Find all sessions belonging to a specific account across all providers.
+    pub fn find_by_account(&self, account_id: &str) -> Vec<(&str, &AuthSession)> {
+        self.sessions
+            .iter()
+            .flat_map(|(pid, sessions)| {
+                sessions
+                    .iter()
+                    .filter(|s| s.account.id == account_id)
+                    .map(move |s| (pid.as_str(), s))
+            })
+            .collect()
+    }
+
+    /// Replace a session in-place by its id, returning the old session if found.
+    pub fn replace_session(
+        &mut self,
+        provider_id: &str,
+        session_id: &str,
+        replacement: AuthSession,
+    ) -> Option<AuthSession> {
+        if let Some(sessions) = self.sessions.get_mut(provider_id) {
+            for slot in sessions.iter_mut() {
+                if slot.id == session_id {
+                    let old = std::mem::replace(slot, replacement);
+                    return Some(old);
+                }
+            }
+        }
+        None
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AuthBridge: handle_message_result with AuthError
+// ---------------------------------------------------------------------------
+
+impl AuthBridge {
+    /// Process a message, returning `Err` when the target provider is not registered.
+    pub fn handle_message_checked(
+        &mut self,
+        msg: &AuthMessage,
+    ) -> Result<serde_json::Value, AuthError> {
+        match msg {
+            AuthMessage::RegisterProvider { provider_id, .. } => {
+                self.register_provider(provider_id);
+                Ok(serde_json::json!({"registered": true}))
+            }
+            AuthMessage::UnregisterProvider { provider_id } => {
+                if !self.has_provider(provider_id) {
+                    return Err(AuthError::ProviderNotFound);
+                }
+                self.unregister_provider(provider_id);
+                Ok(serde_json::json!({"unregistered": true}))
+            }
+            AuthMessage::GetSessions { provider_id, .. } => {
+                if !self.has_provider(provider_id) {
+                    return Err(AuthError::ProviderNotFound);
+                }
+                Ok(serde_json::json!({"provider": provider_id, "sessions": []}))
+            }
+            AuthMessage::SessionsChanged { provider_id } => {
+                if !self.has_provider(provider_id) {
+                    return Err(AuthError::ProviderNotFound);
+                }
+                Ok(serde_json::json!({"provider": provider_id, "changed": true}))
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AuthSession: scope helpers
+// ---------------------------------------------------------------------------
+
+impl AuthSession {
+    /// Returns `true` if the session has a specific scope.
+    pub fn has_scope(&self, scope: &str) -> bool {
+        self.scopes.iter().any(|s| s == scope)
+    }
+
+    /// Returns a new session with an updated access token.
+    pub fn with_token(&self, new_token: impl Into<String>) -> Self {
+        Self {
+            access_token: new_token.into(),
+            ..self.clone()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1747,5 +1959,220 @@ mod tests {
         });
         let pids = providers_with_sessions(&store);
         assert_eq!(pids, vec!["gh"]);
+    }
+
+    // ── AuthSessionBuilder tests ──
+
+    #[test]
+    fn session_builder_builds_valid_session() {
+        let session = AuthSessionBuilder::new()
+            .id("s1")
+            .access_token("tok123")
+            .account("acc1", "Alice")
+            .scope("repo")
+            .scope("user")
+            .build()
+            .unwrap();
+        assert_eq!(session.id, "s1");
+        assert_eq!(session.access_token, "tok123");
+        assert_eq!(session.account.id, "acc1");
+        assert_eq!(session.account.label, "Alice");
+        assert_eq!(session.scopes, vec!["repo", "user"]);
+    }
+
+    #[test]
+    fn session_builder_missing_id_fails() {
+        let result = AuthSessionBuilder::new()
+            .access_token("tok")
+            .account("a", "A")
+            .build();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn session_builder_missing_token_fails() {
+        let result = AuthSessionBuilder::new()
+            .id("s1")
+            .account("a", "A")
+            .build();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn session_builder_missing_account_fails() {
+        let result = AuthSessionBuilder::new()
+            .id("s1")
+            .access_token("tok")
+            .build();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn session_builder_scopes_batch() {
+        let session = AuthSessionBuilder::new()
+            .id("s1")
+            .access_token("tok")
+            .account("a", "A")
+            .scopes(&["read", "write", "admin"])
+            .build()
+            .unwrap();
+        assert_eq!(session.scopes.len(), 3);
+        assert!(session.scopes.contains(&"admin".to_string()));
+    }
+
+    // ── ScopeDiff tests ──
+
+    #[test]
+    fn diff_scopes_detects_added_removed() {
+        let old: Vec<String> = vec!["read".into(), "write".into()];
+        let new: Vec<String> = vec!["write".into(), "admin".into()];
+        let diff = diff_scopes(&old, &new);
+        assert_eq!(diff.added, vec!["admin"]);
+        assert_eq!(diff.removed, vec!["read"]);
+        assert_eq!(diff.unchanged, vec!["write"]);
+        assert!(!diff.is_unchanged());
+    }
+
+    #[test]
+    fn diff_scopes_identical_is_unchanged() {
+        let scopes: Vec<String> = vec!["a".into(), "b".into()];
+        let diff = diff_scopes(&scopes, &scopes);
+        assert!(diff.is_unchanged());
+        assert!(diff.added.is_empty());
+        assert!(diff.removed.is_empty());
+    }
+
+    #[test]
+    fn diff_scopes_empty_to_full() {
+        let diff = diff_scopes(&[], &["x".into(), "y".into()]);
+        assert_eq!(diff.added, vec!["x", "y"]);
+        assert!(diff.removed.is_empty());
+    }
+
+    // ── SessionStore: find_by_account, replace_session tests ──
+
+    #[test]
+    fn session_store_find_by_account() {
+        let mut store = SessionStore::new();
+        store.add_session("gh", AuthSession {
+            id: "s1".into(), access_token: "t".into(),
+            account: AuthAccount { id: "acc1".into(), label: "Alice".into() },
+            scopes: vec!["repo".into()],
+        });
+        store.add_session("gl", AuthSession {
+            id: "s2".into(), access_token: "t".into(),
+            account: AuthAccount { id: "acc1".into(), label: "Alice".into() },
+            scopes: vec!["read".into()],
+        });
+        store.add_session("gh", AuthSession {
+            id: "s3".into(), access_token: "t".into(),
+            account: AuthAccount { id: "acc2".into(), label: "Bob".into() },
+            scopes: vec![],
+        });
+        let results = store.find_by_account("acc1");
+        assert_eq!(results.len(), 2);
+        assert!(store.find_by_account("unknown").is_empty());
+    }
+
+    #[test]
+    fn session_store_replace_session() {
+        let mut store = SessionStore::new();
+        let original = AuthSession {
+            id: "s1".into(), access_token: "old-tok".into(),
+            account: AuthAccount { id: "a".into(), label: "A".into() },
+            scopes: vec!["read".into()],
+        };
+        store.add_session("gh", original.clone());
+        let replacement = AuthSession {
+            id: "s1".into(), access_token: "new-tok".into(),
+            account: AuthAccount { id: "a".into(), label: "A".into() },
+            scopes: vec!["read".into(), "write".into()],
+        };
+        let old = store.replace_session("gh", "s1", replacement).unwrap();
+        assert_eq!(old.access_token, "old-tok");
+        let sessions = store.get_sessions("gh", &[]);
+        assert_eq!(sessions[0].access_token, "new-tok");
+        assert_eq!(sessions[0].scopes.len(), 2);
+    }
+
+    #[test]
+    fn session_store_replace_missing_returns_none() {
+        let mut store = SessionStore::new();
+        let session = AuthSession {
+            id: "s1".into(), access_token: "t".into(),
+            account: AuthAccount { id: "a".into(), label: "A".into() },
+            scopes: vec![],
+        };
+        assert!(store.replace_session("gh", "s1", session).is_none());
+    }
+
+    // ── AuthBridge: handle_message_checked tests ──
+
+    #[test]
+    fn bridge_checked_rejects_unknown_provider() {
+        let mut bridge = AuthBridge::new();
+        let msg = AuthMessage::GetSessions {
+            provider_id: "unknown".into(),
+            scopes: vec![],
+        };
+        let result = bridge.handle_message_checked(&msg);
+        assert_eq!(result, Err(AuthError::ProviderNotFound));
+    }
+
+    #[test]
+    fn bridge_checked_register_then_get() {
+        let mut bridge = AuthBridge::new();
+        let reg = AuthMessage::RegisterProvider {
+            provider_id: "gh".into(),
+            label: "GitHub".into(),
+        };
+        assert!(bridge.handle_message_checked(&reg).is_ok());
+        let get = AuthMessage::GetSessions {
+            provider_id: "gh".into(),
+            scopes: vec!["repo".into()],
+        };
+        let result = bridge.handle_message_checked(&get).unwrap();
+        assert_eq!(result["provider"], "gh");
+    }
+
+    #[test]
+    fn bridge_checked_unregister_unknown_fails() {
+        let mut bridge = AuthBridge::new();
+        let msg = AuthMessage::UnregisterProvider {
+            provider_id: "nope".into(),
+        };
+        assert_eq!(
+            bridge.handle_message_checked(&msg),
+            Err(AuthError::ProviderNotFound)
+        );
+    }
+
+    // ── AuthSession scope helper tests ──
+
+    #[test]
+    fn session_has_scope() {
+        let session = AuthSession {
+            id: "s1".into(), access_token: "t".into(),
+            account: AuthAccount { id: "a".into(), label: "A".into() },
+            scopes: vec!["read".into(), "write".into()],
+        };
+        assert!(session.has_scope("read"));
+        assert!(session.has_scope("write"));
+        assert!(!session.has_scope("admin"));
+    }
+
+    #[test]
+    fn session_with_token_creates_copy() {
+        let session = AuthSession {
+            id: "s1".into(), access_token: "old".into(),
+            account: AuthAccount { id: "a".into(), label: "A".into() },
+            scopes: vec!["read".into()],
+        };
+        let refreshed = session.with_token("new-tok");
+        assert_eq!(refreshed.access_token, "new-tok");
+        assert_eq!(refreshed.id, "s1");
+        assert_eq!(refreshed.scopes, vec!["read"]);
+        // original unchanged
+        assert_eq!(session.access_token, "old");
     }
 }

@@ -892,6 +892,161 @@ impl CompletionScoring {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CompletionItemKind utilities
+// ---------------------------------------------------------------------------
+
+impl CompletionItemKind {
+    /// Returns a short icon character for display.
+    pub fn icon_char(&self) -> char {
+        match self {
+            Self::Method => 'm',
+            Self::Function => 'f',
+            Self::Constructor => 'k',
+            Self::Field => 'F',
+            Self::Variable => 'v',
+            Self::Class => 'C',
+            Self::Interface => 'I',
+            Self::Module => 'M',
+            Self::Property => 'p',
+            Self::Keyword => 'K',
+            Self::Snippet => 'S',
+            Self::Text => 't',
+            Self::Color => 'c',
+            Self::File => 'D',
+            Self::Folder => 'd',
+        }
+    }
+
+    /// Returns `true` if this kind represents a callable symbol.
+    pub fn is_callable(&self) -> bool {
+        matches!(self, Self::Method | Self::Function | Self::Constructor)
+    }
+
+    /// Returns `true` if this kind represents a type-level symbol.
+    pub fn is_type(&self) -> bool {
+        matches!(self, Self::Class | Self::Interface | Self::Module)
+    }
+}
+
+impl fmt::Display for CompletionItemKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Method => "Method",
+            Self::Function => "Function",
+            Self::Constructor => "Constructor",
+            Self::Field => "Field",
+            Self::Variable => "Variable",
+            Self::Class => "Class",
+            Self::Interface => "Interface",
+            Self::Module => "Module",
+            Self::Property => "Property",
+            Self::Keyword => "Keyword",
+            Self::Snippet => "Snippet",
+            Self::Text => "Text",
+            Self::Color => "Color",
+            Self::File => "File",
+            Self::Folder => "Folder",
+        };
+        f.write_str(s)
+    }
+}
+
+use std::fmt;
+
+// ---------------------------------------------------------------------------
+// CompletionItem builder & utilities
+// ---------------------------------------------------------------------------
+
+impl CompletionItem {
+    /// Create a basic completion item with the given label and kind.
+    pub fn new(label: impl Into<String>, kind: CompletionItemKind) -> Self {
+        Self {
+            label: label.into(),
+            kind,
+            detail: None,
+            insert_text: None,
+            sort_text: None,
+            filter_text: None,
+            preselect: false,
+        }
+    }
+
+    /// Set detail text (builder pattern).
+    pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    /// Set insert text (builder pattern).
+    pub fn with_insert_text(mut self, text: impl Into<String>) -> Self {
+        self.insert_text = Some(text.into());
+        self
+    }
+
+    /// Set preselect flag (builder pattern).
+    pub fn with_preselect(mut self, preselect: bool) -> Self {
+        self.preselect = preselect;
+        self
+    }
+
+    /// Returns the effective text used for insertion.
+    pub fn effective_insert_text(&self) -> &str {
+        self.insert_text.as_deref().unwrap_or(&self.label)
+    }
+
+    /// Returns the effective text used for filtering.
+    pub fn effective_filter_text(&self) -> &str {
+        self.filter_text.as_deref().unwrap_or(&self.label)
+    }
+}
+
+impl fmt::Display for CompletionItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}", self.kind, self.label)?;
+        if let Some(ref detail) = self.detail {
+            write!(f, " — {}", detail)?;
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SuggestModel statistics
+// ---------------------------------------------------------------------------
+
+impl SuggestModel {
+    /// Count items grouped by kind.
+    pub fn count_by_kind(&self) -> Vec<(CompletionItemKind, usize)> {
+        let mut counts: Vec<(CompletionItemKind, usize)> = Vec::new();
+        for item in &self.items {
+            if let Some(entry) = counts.iter_mut().find(|(k, _)| *k == item.kind) {
+                entry.1 += 1;
+            } else {
+                counts.push((item.kind, 1));
+            }
+        }
+        counts
+    }
+
+    /// Return only items with a detail string.
+    pub fn items_with_detail(&self) -> Vec<&CompletionItem> {
+        self.items.iter().filter(|i| i.detail.is_some()).collect()
+    }
+
+    /// Return the top N items scored against the given query.
+    pub fn top_matches(&self, query: &str, n: usize) -> Vec<&CompletionItem> {
+        let mut scored: Vec<(&CompletionItem, u32)> = self
+            .items
+            .iter()
+            .map(|item| (item, CompletionScoring::score_item(query, item)))
+            .filter(|(_, s)| *s > 0)
+            .collect();
+        scored.sort_by(|a, b| b.1.cmp(&a.1));
+        scored.into_iter().take(n).map(|(item, _)| item).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1660,5 +1815,83 @@ mod tests {
         let s_var = CompletionScoring::score_contextual("for", &item_var, Some(CompletionItemKind::Function));
         // Function should get the kind boost
         assert!(s_fn > s_var);
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests: CompletionItemKind, CompletionItem builder, SuggestModel
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn completion_item_kind_icon_and_callable() {
+        assert_eq!(CompletionItemKind::Function.icon_char(), 'f');
+        assert_eq!(CompletionItemKind::Class.icon_char(), 'C');
+        assert!(CompletionItemKind::Method.is_callable());
+        assert!(!CompletionItemKind::Variable.is_callable());
+        assert!(CompletionItemKind::Class.is_type());
+        assert!(!CompletionItemKind::Function.is_type());
+    }
+
+    #[test]
+    fn completion_item_kind_display() {
+        assert_eq!(format!("{}", CompletionItemKind::Function), "Function");
+        assert_eq!(format!("{}", CompletionItemKind::Snippet), "Snippet");
+    }
+
+    #[test]
+    fn completion_item_builder() {
+        let item = CompletionItem::new("foo", CompletionItemKind::Function)
+            .with_detail("does stuff")
+            .with_insert_text("foo()")
+            .with_preselect(true);
+        assert_eq!(item.label, "foo");
+        assert_eq!(item.detail.as_deref(), Some("does stuff"));
+        assert_eq!(item.effective_insert_text(), "foo()");
+        assert!(item.preselect);
+    }
+
+    #[test]
+    fn completion_item_effective_defaults() {
+        let item = make_item("bar", CompletionItemKind::Variable);
+        assert_eq!(item.effective_insert_text(), "bar");
+        assert_eq!(item.effective_filter_text(), "bar");
+    }
+
+    #[test]
+    fn completion_item_display() {
+        let item = CompletionItem::new("println", CompletionItemKind::Function)
+            .with_detail("macro");
+        let s = format!("{}", item);
+        assert!(s.contains("[Function]"));
+        assert!(s.contains("println"));
+        assert!(s.contains("macro"));
+    }
+
+    #[test]
+    fn suggest_model_count_by_kind() {
+        let model = SuggestModel {
+            items: vec![
+                make_item("a", CompletionItemKind::Function),
+                make_item("b", CompletionItemKind::Function),
+                make_item("c", CompletionItemKind::Variable),
+            ],
+        };
+        let counts = model.count_by_kind();
+        let fn_count = counts.iter().find(|(k, _)| *k == CompletionItemKind::Function).map(|(_, c)| *c);
+        assert_eq!(fn_count, Some(2));
+    }
+
+    #[test]
+    fn suggest_model_top_matches() {
+        let model = SuggestModel {
+            items: vec![
+                make_item("format", CompletionItemKind::Function),
+                make_item("forEach", CompletionItemKind::Method),
+                make_item("bar", CompletionItemKind::Variable),
+            ],
+        };
+        let top = model.top_matches("for", 2);
+        assert_eq!(top.len(), 2);
+        // both should start with "for"
+        assert!(top.iter().all(|i| i.label.to_lowercase().starts_with("for")));
     }
 }

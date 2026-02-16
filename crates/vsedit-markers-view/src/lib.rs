@@ -919,6 +919,69 @@ pub fn marker_has_any_tag(marker: &Marker, tags: &[MarkerTag]) -> bool {
     marker.tags.iter().any(|t| tags.contains(t))
 }
 
+/// Remove all markers matching a given source across all URIs.
+pub fn remove_markers_by_source(markers: &mut Vec<Marker>, source: &str) {
+    markers.retain(|m| m.source.as_deref() != Some(source));
+}
+
+/// Deduplicate markers that have the same URI, line range, severity, and message.
+pub fn deduplicate_markers(markers: &mut Vec<Marker>) {
+    let mut seen = std::collections::HashSet::new();
+    markers.retain(|m| {
+        let key = (m.uri.clone(), m.start_line, m.start_col, m.end_line, m.end_col, format!("{:?}", m.severity), m.message.clone());
+        seen.insert(key)
+    });
+}
+
+/// Split markers into actionable (Error/Warning) and informational (Info/Hint).
+pub fn split_actionable(markers: &[Marker]) -> (Vec<&Marker>, Vec<&Marker>) {
+    let mut actionable = Vec::new();
+    let mut informational = Vec::new();
+    for m in markers {
+        match m.severity {
+            MarkerSeverity::Error | MarkerSeverity::Warning => actionable.push(m),
+            MarkerSeverity::Info | MarkerSeverity::Hint => informational.push(m),
+        }
+    }
+    (actionable, informational)
+}
+
+/// Return markers sorted by severity (most severe first), then by URI and line.
+pub fn markers_sorted_by_severity(markers: &[Marker]) -> Vec<&Marker> {
+    let mut sorted: Vec<&Marker> = markers.iter().collect();
+    sorted.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.uri.cmp(&b.uri)).then(a.start_line.cmp(&b.start_line)));
+    sorted
+}
+
+/// Return a map of source -> count of markers from that source.
+pub fn count_by_source(markers: &[Marker]) -> std::collections::HashMap<String, usize> {
+    let mut counts = std::collections::HashMap::new();
+    for m in markers {
+        let src = m.source.clone().unwrap_or_else(|| "(none)".to_string());
+        *counts.entry(src).or_insert(0) += 1;
+    }
+    counts
+}
+
+/// Return the average line span of all markers (0.0 if empty).
+pub fn average_line_span(markers: &[Marker]) -> f64 {
+    if markers.is_empty() { return 0.0; }
+    let total: u32 = markers.iter().map(|m| m.end_line.saturating_sub(m.start_line) + 1).sum();
+    total as f64 / markers.len() as f64
+}
+
+/// Format all markers for a URI as a diagnostic report string.
+pub fn format_uri_report(markers: &[Marker], uri: &str) -> String {
+    let relevant: Vec<&Marker> = markers.iter().filter(|m| m.uri == uri).collect();
+    if relevant.is_empty() { return format!("{uri}: no diagnostics"); }
+    let mut lines = vec![format!("{uri}: {} diagnostic(s)", relevant.len())];
+    for m in &relevant {
+        let src = m.source.as_deref().unwrap_or("unknown");
+        lines.push(format!("  L{}:{} [{}] {}: {}", m.start_line, m.start_col, src, m.severity.label(), m.message));
+    }
+    lines.join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1765,5 +1828,87 @@ mod tests {
     fn marker_has_any_tag_empty_tags() {
         let m = make_marker("a.rs", MarkerSeverity::Info, "info");
         assert!(!marker_has_any_tag(&m, &[MarkerTag::Unnecessary]));
+    }
+
+    #[test]
+    fn remove_markers_by_source_filters() {
+        let mut m1 = make_marker("a.rs", MarkerSeverity::Error, "e1"); m1.source = Some("rustc".into());
+        let mut m2 = make_marker("b.rs", MarkerSeverity::Warning, "w1"); m2.source = Some("clippy".into());
+        let mut m3 = make_marker("c.rs", MarkerSeverity::Info, "i1"); m3.source = Some("rustc".into());
+        let mut markers = vec![m1, m2, m3];
+        remove_markers_by_source(&mut markers, "rustc");
+        assert_eq!(markers.len(), 1);
+    }
+
+    #[test]
+    fn deduplicate_markers_removes_dupes() {
+        let m1 = make_marker("a.rs", MarkerSeverity::Error, "same");
+        let m2 = make_marker("a.rs", MarkerSeverity::Error, "same");
+        let m3 = make_marker("a.rs", MarkerSeverity::Warning, "same");
+        let mut markers = vec![m1, m2, m3];
+        deduplicate_markers(&mut markers);
+        assert_eq!(markers.len(), 2);
+    }
+
+    #[test]
+    fn split_actionable_separates() {
+        let markers = vec![
+            make_marker("a.rs", MarkerSeverity::Error, "e"),
+            make_marker("a.rs", MarkerSeverity::Info, "i"),
+            make_marker("a.rs", MarkerSeverity::Warning, "w"),
+            make_marker("a.rs", MarkerSeverity::Hint, "h"),
+        ];
+        let (act, info) = split_actionable(&markers);
+        assert_eq!(act.len(), 2);
+        assert_eq!(info.len(), 2);
+    }
+
+    #[test]
+    fn markers_sorted_by_severity_orders() {
+        let markers = vec![
+            make_marker("a.rs", MarkerSeverity::Hint, "h"),
+            make_marker("a.rs", MarkerSeverity::Error, "e"),
+            make_marker("a.rs", MarkerSeverity::Warning, "w"),
+        ];
+        let sorted = markers_sorted_by_severity(&markers);
+        assert_eq!(sorted[0].severity, MarkerSeverity::Error);
+        assert_eq!(sorted[2].severity, MarkerSeverity::Hint);
+    }
+
+    #[test]
+    fn count_by_source_tallies() {
+        let mut m1 = make_marker("a.rs", MarkerSeverity::Error, "e1"); m1.source = Some("rustc".into());
+        let mut m2 = make_marker("b.rs", MarkerSeverity::Warning, "w1"); m2.source = Some("clippy".into());
+        let mut m3 = make_marker("c.rs", MarkerSeverity::Info, "i1"); m3.source = Some("rustc".into());
+        let counts = count_by_source(&[m1, m2, m3]);
+        assert_eq!(counts.get("rustc"), Some(&2));
+        assert_eq!(counts.get("clippy"), Some(&1));
+    }
+
+    #[test]
+    fn average_line_span_computes() {
+        let m1 = make_marker("a.rs", MarkerSeverity::Error, "e1");
+        let mut m2 = make_marker("b.rs", MarkerSeverity::Warning, "w1"); m2.end_line = 5;
+        let avg = average_line_span(&[m1, m2]);
+        assert!((avg - 3.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn average_line_span_empty() {
+        assert!((average_line_span(&[]) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn format_uri_report_with_markers() {
+        let mut m = make_marker("src/main.rs", MarkerSeverity::Error, "expected `;`");
+        m.source = Some("rustc".into());
+        let report = format_uri_report(&[m], "src/main.rs");
+        assert!(report.contains("1 diagnostic(s)"));
+        assert!(report.contains("[rustc]"));
+    }
+
+    #[test]
+    fn format_uri_report_no_markers() {
+        assert!(format_uri_report(&[], "src/main.rs").contains("no diagnostics"));
     }
 }

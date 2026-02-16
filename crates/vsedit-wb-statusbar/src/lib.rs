@@ -995,6 +995,81 @@ impl StatusBarLayout {
     }
 }
 
+impl StatusBarItem {
+    /// Return a compact summary string: "id: text (alignment, priority)".
+    pub fn summary(&self) -> String {
+        format!("{}: {} ({}, p={})", self.id, self.text, self.alignment, self.priority)
+    }
+
+    /// Return the display width (character count) of this item's text.
+    pub fn text_width(&self) -> usize {
+        self.text.len()
+    }
+
+    /// Return true if this item has custom colors set.
+    pub fn has_custom_colors(&self) -> bool {
+        self.background_color.is_some() || self.foreground_color.is_some()
+    }
+}
+
+impl StatusBarService {
+    /// Return items sorted by priority across all alignments (highest first).
+    pub fn items_sorted_by_priority(&self) -> Vec<&StatusBarItem> {
+        let mut items: Vec<&StatusBarItem> = self.items.iter().collect();
+        items.sort_by(|a, b| b.priority.cmp(&a.priority));
+        items
+    }
+
+    /// Return the sum of all text widths for visible items.
+    pub fn total_visible_text_width(&self) -> usize {
+        self.items
+            .iter()
+            .filter(|i| i.visible)
+            .map(|i| i.text.len())
+            .sum()
+    }
+
+    /// Return distinct alignment types present among visible items.
+    pub fn active_alignments(&self) -> Vec<StatusBarAlignment> {
+        let mut aligns = Vec::new();
+        for &a in &[StatusBarAlignment::Left, StatusBarAlignment::Center, StatusBarAlignment::Right] {
+            if self.items.iter().any(|i| i.visible && i.alignment == a) {
+                aligns.push(a);
+            }
+        }
+        aligns
+    }
+}
+
+impl StatusBarSection {
+    /// Return the total text width of visible items in this section.
+    pub fn total_text_width(&self) -> usize {
+        self.items.iter().filter(|i| i.visible).map(|i| i.text.len()).sum()
+    }
+
+    /// Return the number of visible items in this section.
+    pub fn visible_count(&self) -> usize {
+        self.items.iter().filter(|i| i.visible).count()
+    }
+}
+
+impl StatusBarGroup {
+    /// Return the item IDs as a comma-separated string.
+    pub fn ids_display(&self) -> String {
+        self.item_ids.join(", ")
+    }
+}
+
+impl StatusBarNotification {
+    /// Return the remaining time as a percentage (0.0–100.0).
+    pub fn remaining_pct(&self) -> f64 {
+        if self.duration_ms == 0 {
+            return 0.0;
+        }
+        (self.remaining_ms() as f64 / self.duration_ms as f64) * 100.0
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -1776,5 +1851,93 @@ mod tests {
         hidden.visible = false;
         layout.add_to_right(hidden);
         assert_eq!(layout.visible_count(), 1);
+    }
+
+    #[test]
+    fn item_summary_format() {
+        let item = make_item("git", StatusBarAlignment::Left, 50);
+        let s = item.summary();
+        assert!(s.contains("git"));
+        assert!(s.contains("Left"));
+        assert!(s.contains("p=50"));
+    }
+
+    #[test]
+    fn item_text_width() {
+        let item = make_item("enc", StatusBarAlignment::Right, 10);
+        assert_eq!(item.text_width(), 3); // "enc"
+    }
+
+    #[test]
+    fn item_has_custom_colors() {
+        let mut item = make_item("x", StatusBarAlignment::Left, 1);
+        assert!(!item.has_custom_colors());
+        item.background_color = Some("#ff0000".into());
+        assert!(item.has_custom_colors());
+    }
+
+    #[test]
+    fn service_items_sorted_by_priority() {
+        let mut svc = StatusBarService::new();
+        svc.add_item(make_item("low", StatusBarAlignment::Left, 10));
+        svc.add_item(make_item("high", StatusBarAlignment::Right, 100));
+        svc.add_item(make_item("mid", StatusBarAlignment::Left, 50));
+        let sorted = svc.items_sorted_by_priority();
+        assert_eq!(sorted[0].id, "high");
+        assert_eq!(sorted[1].id, "mid");
+        assert_eq!(sorted[2].id, "low");
+    }
+
+    #[test]
+    fn service_total_visible_text_width() {
+        let mut svc = StatusBarService::new();
+        svc.add_item(make_item("ab", StatusBarAlignment::Left, 1));
+        svc.add_item(make_item("cde", StatusBarAlignment::Right, 2));
+        // text is same as id in make_item, so "ab" (2) + "cde" (3)
+        assert_eq!(svc.total_visible_text_width(), 5);
+    }
+
+    #[test]
+    fn service_active_alignments() {
+        let mut svc = StatusBarService::new();
+        svc.add_item(make_item("a", StatusBarAlignment::Left, 1));
+        svc.add_item(make_item("b", StatusBarAlignment::Right, 1));
+        let aligns = svc.active_alignments();
+        assert!(aligns.contains(&StatusBarAlignment::Left));
+        assert!(aligns.contains(&StatusBarAlignment::Right));
+        assert!(!aligns.contains(&StatusBarAlignment::Center));
+    }
+
+    #[test]
+    fn section_total_text_width() {
+        let mut section = StatusBarSection::new("test", StatusBarAlignment::Left);
+        section.add_item(make_item("abc", StatusBarAlignment::Left, 1));
+        section.add_item(make_item("de", StatusBarAlignment::Left, 2));
+        assert_eq!(section.total_text_width(), 5); // "abc" (3) + "de" (2)
+    }
+
+    #[test]
+    fn section_visible_count() {
+        let mut section = StatusBarSection::new("test", StatusBarAlignment::Left);
+        section.add_item(make_item("a", StatusBarAlignment::Left, 1));
+        let mut hidden = make_item("b", StatusBarAlignment::Left, 1);
+        hidden.visible = false;
+        section.add_item(hidden);
+        assert_eq!(section.visible_count(), 1);
+    }
+
+    #[test]
+    fn group_ids_display() {
+        let mut g = StatusBarGroup::new("test");
+        g.add("a");
+        g.add("b");
+        g.add("c");
+        assert_eq!(g.ids_display(), "a, b, c");
+    }
+
+    #[test]
+    fn notification_remaining_pct() {
+        let n = StatusBarNotification::new("n1", "hello", 5000);
+        assert!((n.remaining_pct() - 100.0).abs() < 0.1);
     }
 }

@@ -1094,6 +1094,107 @@ pub fn uri_has_extension(uri: &ResourceUri, ext: &str) -> bool {
         .unwrap_or(false)
 }
 
+// ---------------------------------------------------------------------------
+// URI path manipulation utilities
+// ---------------------------------------------------------------------------
+
+/// Return the directory portion of the URI path (everything before the last `/`).
+pub fn uri_dirname(uri: &ResourceUri) -> String {
+    match uri.path.rfind('/') {
+        Some(pos) if pos > 0 => uri.path[..pos].to_string(),
+        _ => "/".to_string(),
+    }
+}
+
+/// Return the base name (last path segment) of the URI.
+pub fn uri_basename(uri: &ResourceUri) -> &str {
+    uri.path.rsplit('/').next().unwrap_or(&uri.path)
+}
+
+/// Return the URI path with its extension replaced.
+pub fn uri_with_extension(uri: &ResourceUri, new_ext: &str) -> ResourceUri {
+    let new_path = match uri.path.rfind('.') {
+        Some(pos) => format!("{}.{}", &uri.path[..pos], new_ext),
+        None => format!("{}.{}", uri.path, new_ext),
+    };
+    ResourceUri {
+        scheme: uri.scheme.clone(),
+        authority: uri.authority.clone(),
+        path: new_path,
+        query: uri.query.clone(),
+        fragment: uri.fragment.clone(),
+    }
+}
+
+/// Append a path segment to a URI (ensures single `/` separator).
+pub fn uri_append_path(uri: &ResourceUri, segment: &str) -> ResourceUri {
+    let base = uri.path.trim_end_matches('/');
+    let seg = segment.trim_start_matches('/');
+    ResourceUri {
+        scheme: uri.scheme.clone(),
+        authority: uri.authority.clone(),
+        path: format!("{base}/{seg}"),
+        query: uri.query.clone(),
+        fragment: uri.fragment.clone(),
+    }
+}
+
+/// Count the number of path segments in the URI path.
+pub fn uri_segment_count(uri: &ResourceUri) -> usize {
+    uri.path
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .count()
+}
+
+/// Return true if the URI path is at the root level (single segment or empty).
+pub fn uri_is_root(uri: &ResourceUri) -> bool {
+    uri_segment_count(uri) <= 1
+}
+
+/// Return the path segments as a vector of string slices.
+pub fn uri_path_segments(uri: &ResourceUri) -> Vec<&str> {
+    uri.path.split('/').filter(|s| !s.is_empty()).collect()
+}
+
+/// Return a URI with query parameters set from a key-value map.
+pub fn uri_with_query(uri: &ResourceUri, params: &[(&str, &str)]) -> ResourceUri {
+    let query_str = params
+        .iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect::<Vec<_>>()
+        .join("&");
+    ResourceUri {
+        scheme: uri.scheme.clone(),
+        authority: uri.authority.clone(),
+        path: uri.path.clone(),
+        query: if query_str.is_empty() { None } else { Some(query_str) },
+        fragment: uri.fragment.clone(),
+    }
+}
+
+/// Return a URI with the fragment set.
+pub fn uri_with_fragment(uri: &ResourceUri, fragment: &str) -> ResourceUri {
+    ResourceUri {
+        scheme: uri.scheme.clone(),
+        authority: uri.authority.clone(),
+        path: uri.path.clone(),
+        query: uri.query.clone(),
+        fragment: if fragment.is_empty() { None } else { Some(fragment.to_string()) },
+    }
+}
+
+/// Strip query and fragment from a URI, returning a clean path-only URI.
+pub fn uri_strip_query_fragment(uri: &ResourceUri) -> ResourceUri {
+    ResourceUri {
+        scheme: uri.scheme.clone(),
+        authority: uri.authority.clone(),
+        path: uri.path.clone(),
+        query: None,
+        fragment: None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1773,5 +1874,93 @@ mod tests {
     fn uri_has_extension_no_ext() {
         let uri = ResourceUri::file("/Makefile");
         assert!(!uri_has_extension(&uri, "rs"));
+    }
+
+    #[test]
+    fn uri_dirname_basic() {
+        let uri = ResourceUri::file("/home/user/file.rs");
+        assert_eq!(uri_dirname(&uri), "/home/user");
+    }
+
+    #[test]
+    fn uri_dirname_root_file() {
+        let uri = ResourceUri::file("/file.rs");
+        assert_eq!(uri_dirname(&uri), "/");
+    }
+
+    #[test]
+    fn uri_basename_basic() {
+        let uri = ResourceUri::file("/home/user/file.rs");
+        assert_eq!(uri_basename(&uri), "file.rs");
+    }
+
+    #[test]
+    fn uri_with_extension_replaces() {
+        let uri = ResourceUri::file("/src/main.rs");
+        let changed = uri_with_extension(&uri, "ts");
+        assert_eq!(changed.path, "/src/main.ts");
+    }
+
+    #[test]
+    fn uri_with_extension_adds_when_missing() {
+        let uri = ResourceUri::file("/Makefile");
+        let changed = uri_with_extension(&uri, "bak");
+        assert_eq!(changed.path, "/Makefile.bak");
+    }
+
+    #[test]
+    fn uri_append_path_basic() {
+        let uri = ResourceUri::file("/home/user");
+        let appended = uri_append_path(&uri, "docs/readme.md");
+        assert_eq!(appended.path, "/home/user/docs/readme.md");
+    }
+
+    #[test]
+    fn uri_segment_count_works() {
+        let uri = ResourceUri::file("/a/b/c/d");
+        assert_eq!(uri_segment_count(&uri), 4);
+    }
+
+    #[test]
+    fn uri_is_root_single_segment() {
+        let uri = ResourceUri::file("/file");
+        assert!(uri_is_root(&uri));
+    }
+
+    #[test]
+    fn uri_is_root_deep_path() {
+        let uri = ResourceUri::file("/a/b");
+        assert!(!uri_is_root(&uri));
+    }
+
+    #[test]
+    fn uri_path_segments_splits() {
+        let uri = ResourceUri::file("/src/lib.rs");
+        assert_eq!(uri_path_segments(&uri), vec!["src", "lib.rs"]);
+    }
+
+    #[test]
+    fn uri_with_query_sets_params() {
+        let uri = ResourceUri::file("/path");
+        let with_q = uri_with_query(&uri, &[("key", "val"), ("a", "b")]);
+        assert_eq!(with_q.query, Some("key=val&a=b".to_string()));
+    }
+
+    #[test]
+    fn uri_with_fragment_sets() {
+        let uri = ResourceUri::file("/path");
+        let with_f = uri_with_fragment(&uri, "section-1");
+        assert_eq!(with_f.fragment, Some("section-1".to_string()));
+    }
+
+    #[test]
+    fn uri_strip_query_fragment_cleans() {
+        let mut uri = ResourceUri::file("/path");
+        uri.query = Some("x=1".into());
+        uri.fragment = Some("top".into());
+        let clean = uri_strip_query_fragment(&uri);
+        assert!(clean.query.is_none());
+        assert!(clean.fragment.is_none());
+        assert_eq!(clean.path, "/path");
     }
 }

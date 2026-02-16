@@ -1038,6 +1038,164 @@ impl ProductConfiguration {
     }
 }
 
+/// Parsed semantic version with comparison support.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SemVer {
+    pub major: u32,
+    pub minor: u32,
+    pub patch: u32,
+}
+
+impl SemVer {
+    /// Parse a "major.minor.patch" string into a `SemVer`.
+    pub fn parse(s: &str) -> Option<Self> {
+        let parts: Vec<&str> = s.split('.').collect();
+        if parts.len() != 3 {
+            return None;
+        }
+        Some(Self {
+            major: parts[0].parse().ok()?,
+            minor: parts[1].parse().ok()?,
+            patch: parts[2].parse().ok()?,
+        })
+    }
+
+    /// Returns `true` if this version satisfies a `^major.minor.patch` compatible range,
+    /// i.e. same major version and >= the given version.
+    pub fn is_compatible_with(&self, other: &SemVer) -> bool {
+        if self.major != other.major {
+            return false;
+        }
+        (self.minor, self.patch) >= (other.minor, other.patch)
+    }
+
+    /// Bump the patch component, returning a new `SemVer`.
+    pub fn bump_patch(&self) -> Self {
+        Self { major: self.major, minor: self.minor, patch: self.patch + 1 }
+    }
+
+    /// Bump the minor component (resets patch to 0), returning a new `SemVer`.
+    pub fn bump_minor(&self) -> Self {
+        Self { major: self.major, minor: self.minor + 1, patch: 0 }
+    }
+
+    /// Bump the major component (resets minor and patch to 0), returning a new `SemVer`.
+    pub fn bump_major(&self) -> Self {
+        Self { major: self.major + 1, minor: 0, patch: 0 }
+    }
+}
+
+impl fmt::Display for SemVer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
+impl Ord for SemVer {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (self.major, self.minor, self.patch).cmp(&(other.major, other.minor, other.patch))
+    }
+}
+
+impl PartialOrd for SemVer {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl ProductConfiguration {
+    /// Parse the product version into a [`SemVer`].
+    pub fn semver(&self) -> Option<SemVer> {
+        SemVer::parse(&self.version)
+    }
+
+    /// Returns a compact "name@version" identifier string.
+    pub fn name_at_version(&self) -> String {
+        format!("{}@{}", self.name_short, self.version)
+    }
+
+    /// Returns the gallery service URL if configured, or `None`.
+    pub fn gallery_service_url(&self) -> Option<&str> {
+        self.extensions_gallery.as_ref().map(|g| g.service_url.as_str())
+    }
+
+    /// Produce a diagnostic string describing what is and isn't configured.
+    pub fn diagnostics(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push(format!("product: {}", self.name_at_version()));
+        lines.push(format!("quality: {}", self.quality.as_deref().unwrap_or("(none)")));
+        lines.push(format!("gallery: {}", if self.has_gallery() { "yes" } else { "no" }));
+        lines.push(format!("telemetry: {}", if self.enable_telemetry { "on" } else { "off" }));
+        lines.push(format!("urls configured: {}", self.configured_url_count()));
+        lines.join("\n")
+    }
+}
+
+impl ExtensionsGallery {
+    /// Build a URL for downloading a specific extension version.
+    pub fn download_url(&self, publisher: &str, name: &str, version: &str) -> String {
+        format!(
+            "{}/publishers/{}/vsextensions/{}/{}",
+            self.service_url, publisher, name, version
+        )
+    }
+
+    /// Build a statistics URL for an extension.
+    pub fn stats_url(&self, identifier: &str) -> String {
+        format!("{}/extensionstatistics/{}", self.service_url, identifier)
+    }
+}
+
+impl ProductStats {
+    /// Returns the total elapsed time in milliseconds.
+    pub fn total_time_ms(&self) -> f64 {
+        self.total_time_ns as f64 / 1_000_000.0
+    }
+
+    /// Returns the number of successful operations.
+    pub fn successes(&self) -> u64 {
+        self.successful_operations
+    }
+
+    /// Returns the number of failed operations.
+    pub fn failures(&self) -> u64 {
+        self.failed_operations
+    }
+
+    /// Snapshot the current stats into a serialisable summary.
+    pub fn snapshot(&self) -> StatsSummary {
+        StatsSummary {
+            total: self.total_operations,
+            successes: self.successful_operations,
+            failures: self.failed_operations,
+            avg_ns: self.average_time_ns(),
+            min_ns: self.min_time_ns(),
+            max_ns: self.max_time_ns(),
+        }
+    }
+}
+
+/// A serialisable point-in-time summary of [`ProductStats`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatsSummary {
+    pub total: u64,
+    pub successes: u64,
+    pub failures: u64,
+    pub avg_ns: u64,
+    pub min_ns: Option<u64>,
+    pub max_ns: Option<u64>,
+}
+
+impl fmt::Display for StatsSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "total={} ok={} err={} avg_ns={}",
+            self.total, self.successes, self.failures, self.avg_ns
+        )
+    }
+}
+
 /// Compare two version strings, returning the ordering.
 /// Returns None if either version is not parseable.
 pub fn compare_versions(a: &str, b: &str) -> Option<std::cmp::Ordering> {

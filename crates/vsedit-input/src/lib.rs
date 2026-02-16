@@ -46,6 +46,48 @@ pub struct KeyInput {
     pub meta: bool,
 }
 
+impl KeyInput {
+    /// Create a `KeyInput` with no modifiers.
+    pub fn plain(key_code: KeyCode) -> Self {
+        Self { key_code, ctrl: false, shift: false, alt: false, meta: false }
+    }
+
+    /// Whether any modifier (ctrl, shift, alt, meta) is active.
+    pub fn has_modifier(&self) -> bool {
+        self.ctrl || self.shift || self.alt || self.meta
+    }
+
+    /// Whether this is a plain key press with no modifiers.
+    pub fn is_plain(&self) -> bool {
+        !self.has_modifier()
+    }
+
+    /// Count the number of active modifiers (0–4).
+    pub fn modifier_count(&self) -> u8 {
+        self.ctrl as u8 + self.shift as u8 + self.alt as u8 + self.meta as u8
+    }
+
+    /// Check if this key input matches the given chord.
+    pub fn matches_chord(&self, chord: &KeyCodeChord) -> bool {
+        self.ctrl == chord.ctrl
+            && self.shift == chord.shift
+            && self.alt == chord.alt
+            && self.meta == chord.meta
+            && self.key_code == chord.key_code
+    }
+
+    /// Return a human-readable representation like `"Ctrl+Shift+A"`.
+    pub fn display_name(&self) -> String {
+        let mut parts = Vec::new();
+        if self.ctrl { parts.push("Ctrl"); }
+        if self.shift { parts.push("Shift"); }
+        if self.alt { parts.push("Alt"); }
+        if self.meta { parts.push("Meta"); }
+        parts.push(self.key_code.display_name());
+        parts.join("+")
+    }
+}
+
 // ---------------------------------------------------------------------------
 // MouseInput
 // ---------------------------------------------------------------------------
@@ -62,6 +104,31 @@ pub struct MouseInput {
     pub alt: bool,
 }
 
+impl MouseInput {
+    /// Whether this is a click (button down) event.
+    pub fn is_click(&self) -> bool {
+        matches!(self.action, MouseAction::Down)
+    }
+
+    /// Whether this is a scroll event (up or down).
+    pub fn is_scroll(&self) -> bool {
+        matches!(self.action, MouseAction::ScrollUp | MouseAction::ScrollDown)
+    }
+
+    /// Whether any modifier key is held during this mouse event.
+    pub fn has_modifier(&self) -> bool {
+        self.ctrl || self.shift || self.alt
+    }
+
+    /// Compute the Chebyshev (chessboard) distance from this event's position
+    /// to another `(col, row)` coordinate.
+    pub fn distance_to(&self, col: u16, row: u16) -> u16 {
+        let dc = (self.column as i32 - col as i32).unsigned_abs() as u16;
+        let dr = (self.row as i32 - row as i32).unsigned_abs() as u16;
+        dc.max(dr)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // InputEvent
 // ---------------------------------------------------------------------------
@@ -73,6 +140,42 @@ pub enum InputEvent {
     Mouse(MouseInput),
     Paste(String),
     Resize { width: u16, height: u16 },
+}
+
+impl InputEvent {
+    /// Returns `true` if this is a key event.
+    pub fn is_key(&self) -> bool {
+        matches!(self, InputEvent::Key(_))
+    }
+
+    /// Returns `true` if this is a mouse event.
+    pub fn is_mouse(&self) -> bool {
+        matches!(self, InputEvent::Mouse(_))
+    }
+
+    /// Returns the contained `KeyInput` if this is a key event.
+    pub fn as_key(&self) -> Option<&KeyInput> {
+        match self {
+            InputEvent::Key(k) => Some(k),
+            _ => None,
+        }
+    }
+
+    /// Returns the contained `MouseInput` if this is a mouse event.
+    pub fn as_mouse(&self) -> Option<&MouseInput> {
+        match self {
+            InputEvent::Mouse(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    /// Returns the paste text if this is a paste event.
+    pub fn as_paste(&self) -> Option<&str> {
+        match self {
+            InputEvent::Paste(s) => Some(s),
+            _ => None,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -246,6 +349,20 @@ impl InputDispatcher {
             InputEvent::Mouse(mouse) => self.on_mouse.fire(&mouse),
             InputEvent::Paste(_) | InputEvent::Resize { .. } => {}
         }
+    }
+
+    /// Dispatch a batch of [`InputEvent`]s in order. Returns the number of
+    /// events that were routed to a listener (key or mouse events).
+    pub fn dispatch_all(&self, events: impl IntoIterator<Item = InputEvent>) -> usize {
+        let mut routed = 0;
+        for event in events {
+            match &event {
+                InputEvent::Key(_) | InputEvent::Mouse(_) => routed += 1,
+                _ => {}
+            }
+            self.dispatch(event);
+        }
+        routed
     }
 
     /// The key-down event stream.
@@ -891,6 +1008,100 @@ impl KeyPressCounter {
 
     pub fn total(&self) -> u64 {
         self.counts.values().sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InputFilter
+// ---------------------------------------------------------------------------
+
+/// Configurable filter that decides whether an [`InputEvent`] should be
+/// accepted or suppressed. Useful for implementing modal input or
+/// restricting events during certain UI states.
+#[derive(Debug, Clone)]
+pub struct InputFilter {
+    allow_keys: bool,
+    allow_mouse: bool,
+    allow_paste: bool,
+    allow_resize: bool,
+    suppressed_keys: Vec<KeyCode>,
+}
+
+impl InputFilter {
+    /// Create a filter that accepts all events.
+    pub fn accept_all() -> Self {
+        Self {
+            allow_keys: true,
+            allow_mouse: true,
+            allow_paste: true,
+            allow_resize: true,
+            suppressed_keys: Vec::new(),
+        }
+    }
+
+    /// Create a filter that blocks all events.
+    pub fn block_all() -> Self {
+        Self {
+            allow_keys: false,
+            allow_mouse: false,
+            allow_paste: false,
+            allow_resize: false,
+            suppressed_keys: Vec::new(),
+        }
+    }
+
+    /// Set whether key events are allowed.
+    pub fn keys(mut self, allow: bool) -> Self {
+        self.allow_keys = allow;
+        self
+    }
+
+    /// Set whether mouse events are allowed.
+    pub fn mouse(mut self, allow: bool) -> Self {
+        self.allow_mouse = allow;
+        self
+    }
+
+    /// Set whether paste events are allowed.
+    pub fn paste(mut self, allow: bool) -> Self {
+        self.allow_paste = allow;
+        self
+    }
+
+    /// Set whether resize events are allowed.
+    pub fn resize(mut self, allow: bool) -> Self {
+        self.allow_resize = allow;
+        self
+    }
+
+    /// Add a key code to the suppression list. Suppressed keys are blocked
+    /// even when `allow_keys` is true.
+    pub fn suppress_key(mut self, key: KeyCode) -> Self {
+        self.suppressed_keys.push(key);
+        self
+    }
+
+    /// Test whether the given event passes this filter.
+    pub fn accepts(&self, event: &InputEvent) -> bool {
+        match event {
+            InputEvent::Key(k) => {
+                self.allow_keys && !self.suppressed_keys.contains(&k.key_code)
+            }
+            InputEvent::Mouse(_) => self.allow_mouse,
+            InputEvent::Paste(_) => self.allow_paste,
+            InputEvent::Resize { .. } => self.allow_resize,
+        }
+    }
+
+    /// Filter an iterator of events, returning only accepted ones.
+    pub fn filter_events(&self, events: Vec<InputEvent>) -> Vec<InputEvent> {
+        events.into_iter().filter(|e| self.accepts(e)).collect()
+    }
+}
+
+impl Default for InputFilter {
+    fn default() -> Self {
+        Self::accept_all()
     }
 }
 
@@ -1750,6 +1961,248 @@ mod tests {
         assert_eq!(top.len(), 2);
         assert_eq!(top[0].0, KeyCode::KeyA);
         assert_eq!(top[0].1, 5);
+    }
+
+    // -----------------------------------------------------------------------
+    // KeyInput method tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn key_input_plain_constructor() {
+        let k = KeyInput::plain(KeyCode::KeyA);
+        assert_eq!(k.key_code, KeyCode::KeyA);
+        assert!(k.is_plain());
+        assert!(!k.has_modifier());
+        assert_eq!(k.modifier_count(), 0);
+    }
+
+    #[test]
+    fn key_input_has_modifier_and_count() {
+        let k = KeyInput {
+            key_code: KeyCode::KeyS,
+            ctrl: true,
+            shift: true,
+            alt: false,
+            meta: false,
+        };
+        assert!(k.has_modifier());
+        assert!(!k.is_plain());
+        assert_eq!(k.modifier_count(), 2);
+
+        let all = KeyInput {
+            key_code: KeyCode::KeyA,
+            ctrl: true,
+            shift: true,
+            alt: true,
+            meta: true,
+        };
+        assert_eq!(all.modifier_count(), 4);
+    }
+
+    #[test]
+    fn key_input_matches_chord() {
+        let k = KeyInput {
+            key_code: KeyCode::KeyS,
+            ctrl: true,
+            shift: false,
+            alt: false,
+            meta: false,
+        };
+        let chord = KeyCodeChord::new(true, false, false, false, KeyCode::KeyS);
+        assert!(k.matches_chord(&chord));
+
+        let wrong = KeyCodeChord::new(false, false, false, false, KeyCode::KeyS);
+        assert!(!k.matches_chord(&wrong));
+    }
+
+    #[test]
+    fn key_input_display_name() {
+        let k = KeyInput {
+            key_code: KeyCode::KeyS,
+            ctrl: true,
+            shift: true,
+            alt: false,
+            meta: false,
+        };
+        let name = k.display_name();
+        assert!(name.contains("Ctrl"));
+        assert!(name.contains("Shift"));
+        // should not contain Alt or Meta
+        assert!(!name.contains("Alt"));
+        assert!(!name.contains("Meta"));
+    }
+
+    // -----------------------------------------------------------------------
+    // MouseInput method tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn mouse_input_is_click_and_scroll() {
+        let click = MouseInput {
+            action: MouseAction::Down,
+            button: MouseButton::Left,
+            column: 0, row: 0,
+            ctrl: false, shift: false, alt: false,
+        };
+        assert!(click.is_click());
+        assert!(!click.is_scroll());
+
+        let scroll = MouseInput {
+            action: MouseAction::ScrollUp,
+            button: MouseButton::None,
+            column: 0, row: 0,
+            ctrl: false, shift: false, alt: false,
+        };
+        assert!(!scroll.is_click());
+        assert!(scroll.is_scroll());
+    }
+
+    #[test]
+    fn mouse_input_distance_to() {
+        let m = MouseInput {
+            action: MouseAction::Move,
+            button: MouseButton::None,
+            column: 10, row: 20,
+            ctrl: false, shift: false, alt: false,
+        };
+        assert_eq!(m.distance_to(10, 20), 0);
+        assert_eq!(m.distance_to(13, 22), 3); // max(3, 2)
+        assert_eq!(m.distance_to(5, 20), 5);
+    }
+
+    #[test]
+    fn mouse_input_has_modifier() {
+        let plain = MouseInput {
+            action: MouseAction::Down,
+            button: MouseButton::Left,
+            column: 0, row: 0,
+            ctrl: false, shift: false, alt: false,
+        };
+        assert!(!plain.has_modifier());
+
+        let modified = MouseInput { ctrl: true, ..plain };
+        assert!(modified.has_modifier());
+    }
+
+    // -----------------------------------------------------------------------
+    // InputEvent method tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn input_event_accessors() {
+        let key_evt = InputEvent::Key(KeyInput::plain(KeyCode::KeyA));
+        assert!(key_evt.is_key());
+        assert!(!key_evt.is_mouse());
+        assert_eq!(key_evt.as_key().unwrap().key_code, KeyCode::KeyA);
+        assert!(key_evt.as_mouse().is_none());
+        assert!(key_evt.as_paste().is_none());
+
+        let mouse_evt = InputEvent::Mouse(MouseInput {
+            action: MouseAction::Down,
+            button: MouseButton::Left,
+            column: 5, row: 10,
+            ctrl: false, shift: false, alt: false,
+        });
+        assert!(mouse_evt.is_mouse());
+        assert!(!mouse_evt.is_key());
+        assert_eq!(mouse_evt.as_mouse().unwrap().column, 5);
+
+        let paste_evt = InputEvent::Paste("hello".into());
+        assert_eq!(paste_evt.as_paste(), Some("hello"));
+        assert!(!paste_evt.is_key());
+    }
+
+    // -----------------------------------------------------------------------
+    // InputDispatcher dispatch_all tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn dispatcher_dispatch_all_counts_routed() {
+        let dispatcher = InputDispatcher::new();
+        let events = vec![
+            InputEvent::Key(KeyInput::plain(KeyCode::KeyA)),
+            InputEvent::Paste("text".into()),
+            InputEvent::Mouse(MouseInput {
+                action: MouseAction::Down,
+                button: MouseButton::Left,
+                column: 0, row: 0,
+                ctrl: false, shift: false, alt: false,
+            }),
+            InputEvent::Resize { width: 80, height: 24 },
+        ];
+        let routed = dispatcher.dispatch_all(events);
+        assert_eq!(routed, 2); // key + mouse
+    }
+
+    // -----------------------------------------------------------------------
+    // InputFilter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn filter_accept_all_passes_everything() {
+        let f = InputFilter::accept_all();
+        assert!(f.accepts(&InputEvent::Key(KeyInput::plain(KeyCode::KeyA))));
+        assert!(f.accepts(&InputEvent::Mouse(MouseInput {
+            action: MouseAction::Down,
+            button: MouseButton::Left,
+            column: 0, row: 0,
+            ctrl: false, shift: false, alt: false,
+        })));
+        assert!(f.accepts(&InputEvent::Paste("x".into())));
+        assert!(f.accepts(&InputEvent::Resize { width: 80, height: 24 }));
+    }
+
+    #[test]
+    fn filter_block_all_blocks_everything() {
+        let f = InputFilter::block_all();
+        assert!(!f.accepts(&InputEvent::Key(KeyInput::plain(KeyCode::KeyA))));
+        assert!(!f.accepts(&InputEvent::Paste("x".into())));
+        assert!(!f.accepts(&InputEvent::Resize { width: 80, height: 24 }));
+    }
+
+    #[test]
+    fn filter_suppress_specific_key() {
+        let f = InputFilter::accept_all().suppress_key(KeyCode::Escape);
+        // Escape is suppressed
+        assert!(!f.accepts(&InputEvent::Key(KeyInput::plain(KeyCode::Escape))));
+        // Other keys still pass
+        assert!(f.accepts(&InputEvent::Key(KeyInput::plain(KeyCode::KeyA))));
+    }
+
+    #[test]
+    fn filter_selective_channels() {
+        let f = InputFilter::block_all().keys(true).resize(true);
+        assert!(f.accepts(&InputEvent::Key(KeyInput::plain(KeyCode::Enter))));
+        assert!(f.accepts(&InputEvent::Resize { width: 120, height: 40 }));
+        assert!(!f.accepts(&InputEvent::Mouse(MouseInput {
+            action: MouseAction::Down,
+            button: MouseButton::Left,
+            column: 0, row: 0,
+            ctrl: false, shift: false, alt: false,
+        })));
+        assert!(!f.accepts(&InputEvent::Paste("x".into())));
+    }
+
+    #[test]
+    fn filter_events_returns_only_accepted() {
+        let f = InputFilter::accept_all()
+            .mouse(false)
+            .suppress_key(KeyCode::Escape);
+        let events = vec![
+            InputEvent::Key(KeyInput::plain(KeyCode::KeyA)),
+            InputEvent::Key(KeyInput::plain(KeyCode::Escape)),
+            InputEvent::Mouse(MouseInput {
+                action: MouseAction::Move,
+                button: MouseButton::None,
+                column: 0, row: 0,
+                ctrl: false, shift: false, alt: false,
+            }),
+            InputEvent::Paste("hello".into()),
+        ];
+        let accepted = f.filter_events(events);
+        assert_eq!(accepted.len(), 2); // KeyA + Paste
+        assert!(accepted[0].is_key());
+        assert_eq!(accepted[1].as_paste(), Some("hello"));
     }
 
 }

@@ -1132,6 +1132,127 @@ pub fn boolean_keys(store: &Storage) -> Vec<String> {
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Namespace helpers
+// ---------------------------------------------------------------------------
+
+/// A namespaced view over a [`Storage`], prefixing all keys with a namespace.
+pub struct NamespacedStorage<'a> {
+    storage: &'a Storage,
+    prefix: String,
+}
+
+impl<'a> NamespacedStorage<'a> {
+    pub fn new(storage: &'a Storage, namespace: &str) -> Self {
+        Self {
+            storage,
+            prefix: format!("{namespace}."),
+        }
+    }
+
+    fn prefixed_key(&self, key: &str) -> String {
+        format!("{}{}", self.prefix, key)
+    }
+
+    pub fn get(&self, key: &str) -> Option<String> {
+        self.storage.get(&self.prefixed_key(key))
+    }
+
+    pub fn set(&self, key: &str, value: &str) -> StorageResult<()> {
+        self.storage.set(&self.prefixed_key(key), value)
+    }
+
+    pub fn remove(&self, key: &str) -> StorageResult<()> {
+        self.storage.remove(&self.prefixed_key(key))
+    }
+
+    pub fn has(&self, key: &str) -> bool {
+        self.storage.has(&self.prefixed_key(key))
+    }
+
+    pub fn keys(&self) -> Vec<String> {
+        self.storage
+            .keys()
+            .into_iter()
+            .filter_map(|k| k.strip_prefix(&self.prefix).map(String::from))
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.keys().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn entries(&self) -> Vec<(String, String)> {
+        self.storage
+            .entries()
+            .into_iter()
+            .filter_map(|(k, v)| {
+                k.strip_prefix(&self.prefix)
+                    .map(|stripped| (stripped.to_string(), v))
+            })
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Diff / merge helpers
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StorageDiff {
+    LeftOnly { key: String, value: String },
+    RightOnly { key: String, value: String },
+    Changed { key: String, left: String, right: String },
+}
+
+/// Compute the differences between two stores.
+pub fn diff_stores(left: &Storage, right: &Storage) -> Vec<StorageDiff> {
+    let l = left.get_all();
+    let r = right.get_all();
+    let mut diffs = Vec::new();
+    for (k, lv) in &l {
+        match r.get(k.as_str()) {
+            Some(rv) if *rv != *lv => diffs.push(StorageDiff::Changed {
+                key: k.clone(), left: lv.clone(), right: rv.clone(),
+            }),
+            None => diffs.push(StorageDiff::LeftOnly { key: k.clone(), value: lv.clone() }),
+            _ => {}
+        }
+    }
+    for (k, rv) in &r {
+        if !l.contains_key(k.as_str()) {
+            diffs.push(StorageDiff::RightOnly { key: k.clone(), value: rv.clone() });
+        }
+    }
+    diffs.sort_by(|a, b| {
+        let ka = match a { StorageDiff::LeftOnly { key, .. } | StorageDiff::RightOnly { key, .. } | StorageDiff::Changed { key, .. } => key };
+        let kb = match b { StorageDiff::LeftOnly { key, .. } | StorageDiff::RightOnly { key, .. } | StorageDiff::Changed { key, .. } => key };
+        ka.cmp(kb)
+    });
+    diffs
+}
+
+/// Merge entries from `src` into `dst`, only setting keys that do not already exist.
+pub fn merge_missing(src: &Storage, dst: &Storage) -> StorageResult<usize> {
+    let mut count = 0;
+    for (k, v) in src.entries() {
+        if !dst.has(&k) {
+            dst.set(&k, &v)?;
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+/// Returns keys whose values exceed the given byte length.
+pub fn keys_exceeding_length(store: &Storage, max_len: usize) -> Vec<String> {
+    store.get_all().into_iter().filter(|(_, v)| v.len() > max_len).map(|(k, _)| k).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1764,5 +1885,90 @@ mod tests {
         let mut bk = boolean_keys(&store);
         bk.sort();
         assert_eq!(bk, vec!["enabled", "verbose"]);
+    }
+
+    #[test]
+    fn namespaced_get_set() {
+        let store = Storage::in_memory().unwrap();
+        let ns = NamespacedStorage::new(&store, "ext.myext");
+        ns.set("color", "blue").unwrap();
+        assert_eq!(ns.get("color"), Some("blue".to_string()));
+        assert_eq!(store.get("ext.myext.color"), Some("blue".to_string()));
+        assert!(ns.has("color"));
+        assert!(!ns.has("missing"));
+    }
+
+    #[test]
+    fn namespaced_keys_and_entries() {
+        let store = Storage::in_memory().unwrap();
+        let ns = NamespacedStorage::new(&store, "app");
+        ns.set("a", "1").unwrap();
+        ns.set("b", "2").unwrap();
+        store.set("other", "3").unwrap();
+        let mut keys = ns.keys();
+        keys.sort();
+        assert_eq!(keys, vec!["a", "b"]);
+        assert_eq!(ns.len(), 2);
+        assert!(!ns.is_empty());
+    }
+
+    #[test]
+    fn namespaced_remove() {
+        let store = Storage::in_memory().unwrap();
+        let ns = NamespacedStorage::new(&store, "ns");
+        ns.set("x", "10").unwrap();
+        assert!(ns.has("x"));
+        ns.remove("x").unwrap();
+        assert!(!ns.has("x"));
+    }
+
+    #[test]
+    fn diff_stores_detects_differences() {
+        let left = Storage::in_memory().unwrap();
+        let right = Storage::in_memory().unwrap();
+        left.set("a", "1").unwrap();
+        left.set("b", "same").unwrap();
+        left.set("c", "left_val").unwrap();
+        right.set("b", "same").unwrap();
+        right.set("c", "right_val").unwrap();
+        right.set("d", "4").unwrap();
+        let diffs = diff_stores(&left, &right);
+        assert_eq!(diffs.len(), 3);
+        assert_eq!(diffs[0], StorageDiff::LeftOnly { key: "a".into(), value: "1".into() });
+        assert_eq!(diffs[1], StorageDiff::Changed { key: "c".into(), left: "left_val".into(), right: "right_val".into() });
+        assert_eq!(diffs[2], StorageDiff::RightOnly { key: "d".into(), value: "4".into() });
+    }
+
+    #[test]
+    fn diff_stores_identical() {
+        let left = Storage::in_memory().unwrap();
+        let right = Storage::in_memory().unwrap();
+        left.set("x", "1").unwrap();
+        right.set("x", "1").unwrap();
+        assert!(diff_stores(&left, &right).is_empty());
+    }
+
+    #[test]
+    fn merge_missing_only_adds_new_keys() {
+        let src = Storage::in_memory().unwrap();
+        let dst = Storage::in_memory().unwrap();
+        src.set("a", "1").unwrap();
+        src.set("b", "2").unwrap();
+        dst.set("b", "existing").unwrap();
+        let count = merge_missing(&src, &dst).unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(dst.get("a"), Some("1".to_string()));
+        assert_eq!(dst.get("b"), Some("existing".to_string()));
+    }
+
+    #[test]
+    fn keys_exceeding_length_filters() {
+        let store = Storage::in_memory().unwrap();
+        store.set("short", "ab").unwrap();
+        store.set("long", "abcdefghij").unwrap();
+        store.set("exact", "abcde").unwrap();
+        let mut keys = keys_exceeding_length(&store, 5);
+        keys.sort();
+        assert_eq!(keys, vec!["long"]);
     }
 }

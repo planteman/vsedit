@@ -1117,6 +1117,164 @@ pub fn count_chords_with_ctrl(chords: &[KeyCodeChord]) -> usize {
     chords.iter().filter(|c| c.ctrl).count()
 }
 
+// ---------------------------------------------------------------------------
+// KeyCode → letter/digit conversion
+// ---------------------------------------------------------------------------
+
+impl KeyCode {
+    /// Convert a letter key code to its lowercase ASCII character.
+    /// Returns `None` for non-letter key codes.
+    pub fn to_char(self) -> Option<char> {
+        if self.is_letter() {
+            let offset = self as u16 - KeyCode::KeyA as u16;
+            Some((b'a' + offset as u8) as char)
+        } else if self.is_digit() {
+            let offset = self as u16 - KeyCode::Digit0 as u16;
+            Some((b'0' + offset as u8) as char)
+        } else {
+            None
+        }
+    }
+
+    /// Create a `KeyCode` from an ASCII character.
+    /// Supports `a`–`z`, `A`–`Z`, and `0`–`9`.
+    pub fn from_char(ch: char) -> Option<Self> {
+        match ch {
+            'a'..='z' => {
+                let offset = ch as u16 - b'a' as u16;
+                Some(KeyCode::from_u16(KeyCode::KeyA as u16 + offset))
+            }
+            'A'..='Z' => {
+                let offset = ch as u16 - b'A' as u16;
+                Some(KeyCode::from_u16(KeyCode::KeyA as u16 + offset))
+            }
+            '0'..='9' => {
+                let offset = ch as u16 - b'0' as u16;
+                Some(KeyCode::from_u16(KeyCode::Digit0 as u16 + offset))
+            }
+            _ => None,
+        }
+    }
+
+    /// Return the function key number (1–24) if this is an F-key, else `None`.
+    pub fn function_key_number(self) -> Option<u8> {
+        if self.is_function_key() {
+            Some((self as u16 - KeyCode::F1 as u16 + 1) as u8)
+        } else {
+            None
+        }
+    }
+
+    /// Create a function key code from a number (1–24).
+    pub fn from_function_key(n: u8) -> Option<Self> {
+        if (1..=24).contains(&n) {
+            Some(KeyCode::from_u16(KeyCode::F1 as u16 + n as u16 - 1))
+        } else {
+            None
+        }
+    }
+
+    /// Return the numpad digit (0–9) if this is a numpad digit key, else `None`.
+    pub fn numpad_digit(self) -> Option<u8> {
+        let v = self as u16;
+        let start = KeyCode::Numpad0 as u16;
+        let end = KeyCode::Numpad9 as u16;
+        if v >= start && v <= end {
+            Some((v - start) as u8)
+        } else {
+            None
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeyCodeChord ↔ KeyMod encoded integer
+// ---------------------------------------------------------------------------
+
+impl KeyCodeChord {
+    /// Construct a chord from a combined `KeyMod` | `KeyCode` integer,
+    /// matching VS Code's `KeyMod.CtrlCmd | KeyCode.KeyS` pattern.
+    pub fn from_keymod_value(value: u32) -> Self {
+        Self {
+            ctrl: value & KeyMod::CTRL_CMD != 0,
+            shift: value & KeyMod::SHIFT != 0,
+            alt: value & KeyMod::ALT != 0,
+            meta: value & KeyMod::WIN_CTRL != 0,
+            key_code: KeyCode::from_u16((value & 0xFF) as u16),
+        }
+    }
+
+    /// Encode this chord using the `KeyMod` bit layout (high-nibble modifiers).
+    pub fn to_keymod_value(&self) -> u32 {
+        let mut v = self.key_code as u32 & 0xFF;
+        if self.ctrl { v |= KeyMod::CTRL_CMD; }
+        if self.shift { v |= KeyMod::SHIFT; }
+        if self.alt { v |= KeyMod::ALT; }
+        if self.meta { v |= KeyMod::WIN_CTRL; }
+        v
+    }
+
+    /// Strip all modifiers, returning a plain chord with the same key.
+    pub fn strip_modifiers(&self) -> Self {
+        Self::just(self.key_code)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Batch encoding helpers
+// ---------------------------------------------------------------------------
+
+/// Encode a slice of chords into a `Vec<u32>`.
+pub fn encode_chords(chords: &[KeyCodeChord]) -> Vec<u32> {
+    chords.iter().map(encode_chord).collect()
+}
+
+/// Decode a slice of `u32` values into chords.
+pub fn decode_chords(values: &[u32]) -> Vec<KeyCodeChord> {
+    values.iter().map(|&v| decode_chord(v)).collect()
+}
+
+/// Split a combined two-chord value produced by [`key_chord`] back into
+/// its two encoded parts. Returns `(first, second)` where `second` is 0
+/// if the value only encodes a single chord.
+pub fn split_key_chord(combined: u32) -> (u32, u32) {
+    let first = combined & 0x0000_FFFF;
+    let second = (combined >> 16) & 0x0000_FFFF;
+    (first, second)
+}
+
+// ---------------------------------------------------------------------------
+// KeyCombo encoding
+// ---------------------------------------------------------------------------
+
+impl KeyCombo {
+    /// Encode the combo into a vector of `u32` values (one per chord).
+    pub fn encode(&self) -> Vec<u32> {
+        encode_chords(&self.chords)
+    }
+
+    /// Decode a combo from a slice of encoded `u32` values.
+    pub fn decode(values: &[u32]) -> Self {
+        Self::new(decode_chords(values))
+    }
+
+    /// Push a new chord onto this combo.
+    pub fn push(&mut self, chord: KeyCodeChord) {
+        self.chords.push(chord);
+    }
+
+    /// Return the combo with an additional chord appended.
+    pub fn then(mut self, chord: KeyCodeChord) -> Self {
+        self.chords.push(chord);
+        self
+    }
+
+    /// Returns true if every chord in the combo uses no modifiers.
+    pub fn is_all_plain(&self) -> bool {
+        self.chords.iter().all(|c| c.is_plain())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1744,5 +1902,158 @@ mod tests {
             KeyCodeChord::new(true, true, false, false, KeyCode::KeyC),
         ];
         assert_eq!(count_chords_with_ctrl(&chords), 2);
+    }
+
+    // -- KeyCode char/function conversions ----------------------------------
+
+    #[test]
+    fn keycode_to_char_letters() {
+        assert_eq!(KeyCode::KeyA.to_char(), Some('a'));
+        assert_eq!(KeyCode::KeyZ.to_char(), Some('z'));
+        assert_eq!(KeyCode::KeyM.to_char(), Some('m'));
+    }
+
+    #[test]
+    fn keycode_to_char_digits() {
+        assert_eq!(KeyCode::Digit0.to_char(), Some('0'));
+        assert_eq!(KeyCode::Digit9.to_char(), Some('9'));
+    }
+
+    #[test]
+    fn keycode_to_char_non_printable_returns_none() {
+        assert_eq!(KeyCode::Ctrl.to_char(), None);
+        assert_eq!(KeyCode::F1.to_char(), None);
+        assert_eq!(KeyCode::LeftArrow.to_char(), None);
+    }
+
+    #[test]
+    fn keycode_from_char_roundtrip() {
+        for ch in 'a'..='z' {
+            let kc = KeyCode::from_char(ch).unwrap();
+            assert_eq!(kc.to_char(), Some(ch));
+        }
+        for ch in 'A'..='Z' {
+            let kc = KeyCode::from_char(ch).unwrap();
+            assert_eq!(kc.to_char(), Some(ch.to_ascii_lowercase()));
+        }
+        for ch in '0'..='9' {
+            let kc = KeyCode::from_char(ch).unwrap();
+            assert_eq!(kc.to_char(), Some(ch));
+        }
+        assert_eq!(KeyCode::from_char('!'), None);
+        assert_eq!(KeyCode::from_char(' '), None);
+    }
+
+    #[test]
+    fn function_key_number_roundtrip() {
+        for n in 1..=24u8 {
+            let kc = KeyCode::from_function_key(n).unwrap();
+            assert_eq!(kc.function_key_number(), Some(n));
+        }
+        assert_eq!(KeyCode::from_function_key(0), None);
+        assert_eq!(KeyCode::from_function_key(25), None);
+        assert_eq!(KeyCode::KeyA.function_key_number(), None);
+    }
+
+    #[test]
+    fn numpad_digit_values() {
+        assert_eq!(KeyCode::Numpad0.numpad_digit(), Some(0));
+        assert_eq!(KeyCode::Numpad9.numpad_digit(), Some(9));
+        assert_eq!(KeyCode::NumpadAdd.numpad_digit(), None);
+        assert_eq!(KeyCode::KeyA.numpad_digit(), None);
+    }
+
+    // -- KeyCodeChord KeyMod encoding ---------------------------------------
+
+    #[test]
+    fn chord_keymod_value_roundtrip() {
+        let chord = KeyCodeChord::new(true, true, false, false, KeyCode::KeyS);
+        let val = chord.to_keymod_value();
+        let decoded = KeyCodeChord::from_keymod_value(val);
+        assert_eq!(decoded, chord);
+    }
+
+    #[test]
+    fn chord_strip_modifiers() {
+        let chord = KeyCodeChord::new(true, true, true, true, KeyCode::KeyP);
+        let stripped = chord.strip_modifiers();
+        assert!(stripped.is_plain());
+        assert_eq!(stripped.key_code, KeyCode::KeyP);
+    }
+
+    // -- Batch encode/decode ------------------------------------------------
+
+    #[test]
+    fn encode_decode_chords_batch() {
+        let chords = vec![
+            KeyCodeChord::just(KeyCode::KeyA).with_ctrl(),
+            KeyCodeChord::just(KeyCode::KeyB).with_shift(),
+            KeyCodeChord::just(KeyCode::Escape),
+        ];
+        let encoded = encode_chords(&chords);
+        assert_eq!(encoded.len(), 3);
+        let decoded = decode_chords(&encoded);
+        assert_eq!(decoded, chords);
+    }
+
+    #[test]
+    fn split_key_chord_roundtrip() {
+        let first = encode_chord(&KeyCodeChord::just(KeyCode::KeyK).with_ctrl());
+        let second = encode_chord(&KeyCodeChord::just(KeyCode::KeyC).with_ctrl());
+        let combined = key_chord(first, second);
+        let (f, s) = split_key_chord(combined);
+        assert_eq!(f, first);
+        assert_eq!(s, second);
+    }
+
+    #[test]
+    fn split_key_chord_single() {
+        let first = encode_chord(&KeyCodeChord::just(KeyCode::F5));
+        let (f, s) = split_key_chord(first);
+        assert_eq!(f, first);
+        assert_eq!(s, 0);
+    }
+
+    // -- KeyCombo encoding / builder ----------------------------------------
+
+    #[test]
+    fn key_combo_encode_decode_roundtrip() {
+        let combo = KeyCombo::new(vec![
+            KeyCodeChord::just(KeyCode::KeyK).with_ctrl(),
+            KeyCodeChord::just(KeyCode::KeyC).with_ctrl(),
+        ]);
+        let encoded = combo.encode();
+        let decoded = KeyCombo::decode(&encoded);
+        assert_eq!(decoded, combo);
+    }
+
+    #[test]
+    fn key_combo_then_builder() {
+        let combo = KeyCombo::single(KeyCodeChord::just(KeyCode::KeyK).with_ctrl())
+            .then(KeyCodeChord::just(KeyCode::KeyC).with_ctrl());
+        assert_eq!(combo.len(), 2);
+        assert_eq!(combo.chords[1].key_code, KeyCode::KeyC);
+    }
+
+    #[test]
+    fn key_combo_is_all_plain() {
+        let plain = KeyCombo::new(vec![
+            KeyCodeChord::just(KeyCode::KeyA),
+            KeyCodeChord::just(KeyCode::KeyB),
+        ]);
+        assert!(plain.is_all_plain());
+
+        let modified = KeyCombo::new(vec![
+            KeyCodeChord::just(KeyCode::KeyA),
+            KeyCodeChord::just(KeyCode::KeyB).with_ctrl(),
+        ]);
+        assert!(!modified.is_all_plain());
+    }
+
+    #[test]
+    fn key_combo_push() {
+        let mut combo = KeyCombo::single(KeyCodeChord::just(KeyCode::KeyA));
+        combo.push(KeyCodeChord::just(KeyCode::KeyB));
+        assert_eq!(combo.len(), 2);
     }
 }

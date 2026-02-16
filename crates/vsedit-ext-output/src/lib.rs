@@ -414,6 +414,272 @@ impl fmt::Debug for OutputBridge {
     }
 }
 
+// ── OutputMessage helpers ──
+
+impl OutputMessage {
+    /// Returns the channel_id referenced by this message, if any.
+    /// `CreateChannel` does not reference an existing channel, so returns `None`.
+    pub fn channel_id(&self) -> Option<&str> {
+        match self {
+            OutputMessage::CreateChannel { .. } => None,
+            OutputMessage::AppendLine { channel_id, .. }
+            | OutputMessage::Clear { channel_id }
+            | OutputMessage::Show { channel_id, .. }
+            | OutputMessage::Dispose { channel_id } => Some(channel_id),
+        }
+    }
+
+    /// Returns `true` if this message mutates channel content.
+    pub fn is_mutating(&self) -> bool {
+        matches!(
+            self,
+            OutputMessage::CreateChannel { .. }
+                | OutputMessage::AppendLine { .. }
+                | OutputMessage::Clear { .. }
+                | OutputMessage::Dispose { .. }
+        )
+    }
+
+    /// Returns a short human-readable label for the message variant.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            OutputMessage::CreateChannel { .. } => "create",
+            OutputMessage::AppendLine { .. } => "append",
+            OutputMessage::Clear { .. } => "clear",
+            OutputMessage::Show { .. } => "show",
+            OutputMessage::Dispose { .. } => "dispose",
+        }
+    }
+}
+
+impl fmt::Display for OutputMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OutputMessage::CreateChannel { name, language_id } => {
+                write!(f, "CreateChannel(name={name}")?;
+                if let Some(lid) = language_id {
+                    write!(f, ", lang={lid}")?;
+                }
+                write!(f, ")")
+            }
+            OutputMessage::AppendLine { channel_id, line } => {
+                let preview = if line.len() > 40 {
+                    format!("{}…", &line[..39])
+                } else {
+                    line.clone()
+                };
+                write!(f, "AppendLine(ch={channel_id}, line={preview:?})")
+            }
+            OutputMessage::Clear { channel_id } => write!(f, "Clear(ch={channel_id})"),
+            OutputMessage::Show { channel_id, preserve_focus } => {
+                write!(f, "Show(ch={channel_id}, preserve={preserve_focus})")
+            }
+            OutputMessage::Dispose { channel_id } => write!(f, "Dispose(ch={channel_id})"),
+        }
+    }
+}
+
+// ── OutputChannel additional helpers ──
+
+impl OutputChannel {
+    /// Returns the first `n` lines of the content.
+    pub fn head_lines(&self, n: usize) -> Vec<&str> {
+        self.content.lines().take(n).collect()
+    }
+
+    /// Returns `true` if the content contains the given substring.
+    pub fn contains(&self, needle: &str) -> bool {
+        self.content.contains(needle)
+    }
+
+    /// Returns `true` if a language_id is set.
+    pub fn has_language(&self) -> bool {
+        self.language_id.is_some()
+    }
+
+    /// Returns lines matching a predicate.
+    pub fn filter_lines<F: Fn(&str) -> bool>(&self, predicate: F) -> Vec<&str> {
+        self.content.lines().filter(|l| predicate(l)).collect()
+    }
+
+    /// Append a line, returning the new total line count.
+    pub fn push_line(&mut self, line: &str) -> usize {
+        if !self.content.is_empty() {
+            self.content.push('\n');
+        }
+        self.content.push_str(line);
+        self.line_count()
+    }
+
+    /// Returns the content split into lines.
+    pub fn lines(&self) -> Vec<&str> {
+        if self.content.is_empty() {
+            Vec::new()
+        } else {
+            self.content.lines().collect()
+        }
+    }
+}
+
+// ── LogOutputChannel additional helpers ──
+
+impl LogOutputChannel {
+    /// Returns `true` if the given level would be logged by this channel.
+    pub fn would_log(&self, level: LogLevel) -> bool {
+        level.is_enabled(self.log_level)
+    }
+
+    /// Create a new `LogOutputChannel` with the given parameters.
+    pub fn new(id: impl Into<String>, name: impl Into<String>, log_level: LogLevel) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            log_level,
+        }
+    }
+
+    /// Set the log level threshold, returning self for chaining in tests.
+    pub fn with_level(mut self, level: LogLevel) -> Self {
+        self.log_level = level;
+        self
+    }
+}
+
+// ── LogLevel additional helpers ──
+
+impl LogLevel {
+    /// Returns `true` if this is an error-class level (Warning or Error).
+    pub fn is_error_class(self) -> bool {
+        matches!(self, LogLevel::Warning | LogLevel::Error)
+    }
+
+    /// Returns `true` if this is a diagnostic-class level (Trace or Debug).
+    pub fn is_diagnostic(self) -> bool {
+        matches!(self, LogLevel::Trace | LogLevel::Debug)
+    }
+
+    /// Returns the next more severe level, or `None` if already at `Error`.
+    pub fn escalate(self) -> Option<LogLevel> {
+        match self {
+            LogLevel::Trace => Some(LogLevel::Debug),
+            LogLevel::Debug => Some(LogLevel::Info),
+            LogLevel::Info => Some(LogLevel::Warning),
+            LogLevel::Warning => Some(LogLevel::Error),
+            LogLevel::Error => None,
+        }
+    }
+
+    /// Returns the next less severe level, or `None` if already at `Trace`.
+    pub fn deescalate(self) -> Option<LogLevel> {
+        match self {
+            LogLevel::Trace => None,
+            LogLevel::Debug => Some(LogLevel::Trace),
+            LogLevel::Info => Some(LogLevel::Debug),
+            LogLevel::Warning => Some(LogLevel::Info),
+            LogLevel::Error => Some(LogLevel::Warning),
+        }
+    }
+}
+
+// ── OutputError helpers ──
+
+impl OutputError {
+    /// Returns `true` if this error indicates a missing channel.
+    pub fn is_not_found(&self) -> bool {
+        matches!(self, OutputError::ChannelNotFound(_))
+    }
+
+    /// Returns `true` if this error is a buffer overflow.
+    pub fn is_overflow(&self) -> bool {
+        matches!(self, OutputError::BufferOverflow { .. })
+    }
+
+    /// Returns the channel id associated with this error, if any.
+    pub fn channel_id(&self) -> Option<&str> {
+        match self {
+            OutputError::ChannelNotFound(id) => Some(id),
+            OutputError::BufferOverflow { channel_id, .. } => Some(channel_id),
+            _ => None,
+        }
+    }
+}
+
+// ── OutputBuffer additional helpers ──
+
+impl OutputBuffer {
+    /// Returns the total number of lines ever appended (buffered + flushed).
+    pub fn total_appended(&self) -> usize {
+        self.total_flushed + self.lines.len()
+    }
+
+    /// Returns how many more lines can be appended before the buffer is full.
+    pub fn remaining_capacity(&self) -> usize {
+        self.capacity.saturating_sub(self.lines.len())
+    }
+
+    /// Resize the buffer capacity. Does not discard existing lines.
+    pub fn set_capacity(&mut self, new_capacity: usize) {
+        self.capacity = new_capacity.max(1);
+    }
+}
+
+// ── OutputChannelMerger additional helpers ──
+
+impl OutputChannelMerger {
+    /// Search merged lines for content containing `needle`.
+    pub fn search(&self, needle: &str) -> Vec<&MergedLine> {
+        self.merged.iter().filter(|l| l.content.contains(needle)).collect()
+    }
+
+    /// Returns `true` if there are no merged lines.
+    pub fn is_empty(&self) -> bool {
+        self.merged.is_empty()
+    }
+
+    /// Returns the number of distinct source channels.
+    pub fn channel_count(&self) -> usize {
+        self.active_channels().len()
+    }
+}
+
+// ── MergedLine helpers ──
+
+impl MergedLine {
+    /// Create a new merged line.
+    pub fn new(source_channel: impl Into<String>, content: impl Into<String>, sequence: usize) -> Self {
+        Self {
+            source_channel: source_channel.into(),
+            content: content.into(),
+            sequence,
+        }
+    }
+
+    /// Returns `true` if content contains the given substring.
+    pub fn contains(&self, needle: &str) -> bool {
+        self.content.contains(needle)
+    }
+}
+
+// ── TimestampFormat helpers ──
+
+impl TimestampFormat {
+    /// Returns `true` if timestamps are disabled.
+    pub fn is_none(self) -> bool {
+        matches!(self, TimestampFormat::None)
+    }
+
+    /// Parse from a case-insensitive string.
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_ascii_lowercase().as_str() {
+            "none" => Some(TimestampFormat::None),
+            "seconds" | "secs" | "s" => Some(TimestampFormat::Seconds),
+            "millis" | "ms" => Some(TimestampFormat::Millis),
+            "iso8601" | "iso" => Some(TimestampFormat::Iso8601),
+            _ => None,
+        }
+    }
+}
+
 /// Initialize the output extension API bridge.
 pub fn register() {
     // Registration will connect RPC handlers when extension host starts
@@ -1701,5 +1967,371 @@ mod tests {
             sequence: 0,
         };
         assert_eq!(format!("{line}"), "[build] ok");
+    }
+
+    // ── New tests ──
+
+    #[test]
+    fn output_message_channel_id() {
+        let create = OutputMessage::CreateChannel {
+            name: "Build".into(),
+            language_id: None,
+        };
+        assert_eq!(create.channel_id(), None);
+
+        let append = OutputMessage::AppendLine {
+            channel_id: "ch1".into(),
+            line: "hi".into(),
+        };
+        assert_eq!(append.channel_id(), Some("ch1"));
+
+        let clear = OutputMessage::Clear { channel_id: "ch2".into() };
+        assert_eq!(clear.channel_id(), Some("ch2"));
+
+        let show = OutputMessage::Show {
+            channel_id: "ch3".into(),
+            preserve_focus: false,
+        };
+        assert_eq!(show.channel_id(), Some("ch3"));
+
+        let dispose = OutputMessage::Dispose { channel_id: "ch4".into() };
+        assert_eq!(dispose.channel_id(), Some("ch4"));
+    }
+
+    #[test]
+    fn output_message_is_mutating() {
+        let create = OutputMessage::CreateChannel {
+            name: "X".into(),
+            language_id: None,
+        };
+        assert!(create.is_mutating());
+
+        let show = OutputMessage::Show {
+            channel_id: "ch1".into(),
+            preserve_focus: true,
+        };
+        assert!(!show.is_mutating());
+
+        let append = OutputMessage::AppendLine {
+            channel_id: "ch1".into(),
+            line: "x".into(),
+        };
+        assert!(append.is_mutating());
+    }
+
+    #[test]
+    fn output_message_kind() {
+        let msg = OutputMessage::Clear { channel_id: "ch1".into() };
+        assert_eq!(msg.kind(), "clear");
+
+        let msg2 = OutputMessage::CreateChannel { name: "A".into(), language_id: None };
+        assert_eq!(msg2.kind(), "create");
+    }
+
+    #[test]
+    fn output_message_display() {
+        let msg = OutputMessage::CreateChannel {
+            name: "Build".into(),
+            language_id: Some("log".into()),
+        };
+        let s = format!("{msg}");
+        assert!(s.contains("CreateChannel"));
+        assert!(s.contains("Build"));
+        assert!(s.contains("log"));
+
+        let msg2 = OutputMessage::Clear { channel_id: "ch1".into() };
+        assert!(format!("{msg2}").contains("Clear"));
+
+        let msg3 = OutputMessage::Show {
+            channel_id: "ch1".into(),
+            preserve_focus: true,
+        };
+        assert!(format!("{msg3}").contains("preserve=true"));
+    }
+
+    #[test]
+    fn output_channel_head_lines() {
+        let ch = OutputChannel {
+            id: "o1".into(),
+            name: "Test".into(),
+            language_id: None,
+            content: "one\ntwo\nthree\nfour".into(),
+        };
+        assert_eq!(ch.head_lines(2), vec!["one", "two"]);
+        assert_eq!(ch.head_lines(10).len(), 4);
+        assert_eq!(ch.head_lines(0), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn output_channel_contains() {
+        let ch = OutputChannel {
+            id: "o1".into(),
+            name: "T".into(),
+            language_id: None,
+            content: "error: something failed".into(),
+        };
+        assert!(ch.contains("error"));
+        assert!(ch.contains("failed"));
+        assert!(!ch.contains("success"));
+    }
+
+    #[test]
+    fn output_channel_has_language() {
+        let with = OutputChannel {
+            id: "o1".into(),
+            name: "T".into(),
+            language_id: Some("rust".into()),
+            content: String::new(),
+        };
+        assert!(with.has_language());
+
+        let without = OutputChannel {
+            id: "o2".into(),
+            name: "T".into(),
+            language_id: None,
+            content: String::new(),
+        };
+        assert!(!without.has_language());
+    }
+
+    #[test]
+    fn output_channel_filter_lines() {
+        let ch = OutputChannel {
+            id: "o1".into(),
+            name: "Logs".into(),
+            language_id: None,
+            content: "INFO: ok\nERROR: bad\nINFO: done\nWARN: slow".into(),
+        };
+        let errors = ch.filter_lines(|l| l.starts_with("ERROR"));
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0], "ERROR: bad");
+
+        let infos = ch.filter_lines(|l| l.starts_with("INFO"));
+        assert_eq!(infos.len(), 2);
+    }
+
+    #[test]
+    fn output_channel_push_line() {
+        let mut ch = OutputChannel {
+            id: "o1".into(),
+            name: "T".into(),
+            language_id: None,
+            content: String::new(),
+        };
+        assert_eq!(ch.push_line("first"), 1);
+        assert_eq!(ch.push_line("second"), 2);
+        assert_eq!(ch.content, "first\nsecond");
+    }
+
+    #[test]
+    fn output_channel_lines_method() {
+        let ch = OutputChannel {
+            id: "o1".into(),
+            name: "T".into(),
+            language_id: None,
+            content: "a\nb\nc".into(),
+        };
+        assert_eq!(ch.lines(), vec!["a", "b", "c"]);
+
+        let empty = OutputChannel {
+            id: "o2".into(),
+            name: "E".into(),
+            language_id: None,
+            content: String::new(),
+        };
+        assert!(empty.lines().is_empty());
+    }
+
+    #[test]
+    fn log_output_channel_new_and_would_log() {
+        let ch = LogOutputChannel::new("l1", "Server", LogLevel::Warning);
+        assert_eq!(ch.id, "l1");
+        assert_eq!(ch.name, "Server");
+        assert!(ch.would_log(LogLevel::Error));
+        assert!(ch.would_log(LogLevel::Warning));
+        assert!(!ch.would_log(LogLevel::Info));
+        assert!(!ch.would_log(LogLevel::Debug));
+    }
+
+    #[test]
+    fn log_output_channel_with_level() {
+        let ch = LogOutputChannel::new("l1", "S", LogLevel::Error)
+            .with_level(LogLevel::Debug);
+        assert_eq!(ch.log_level, LogLevel::Debug);
+        assert!(ch.would_log(LogLevel::Info));
+    }
+
+    #[test]
+    fn log_level_is_error_class() {
+        assert!(LogLevel::Error.is_error_class());
+        assert!(LogLevel::Warning.is_error_class());
+        assert!(!LogLevel::Info.is_error_class());
+        assert!(!LogLevel::Debug.is_error_class());
+        assert!(!LogLevel::Trace.is_error_class());
+    }
+
+    #[test]
+    fn log_level_is_diagnostic() {
+        assert!(LogLevel::Trace.is_diagnostic());
+        assert!(LogLevel::Debug.is_diagnostic());
+        assert!(!LogLevel::Info.is_diagnostic());
+        assert!(!LogLevel::Warning.is_diagnostic());
+        assert!(!LogLevel::Error.is_diagnostic());
+    }
+
+    #[test]
+    fn log_level_escalate_and_deescalate() {
+        assert_eq!(LogLevel::Trace.escalate(), Some(LogLevel::Debug));
+        assert_eq!(LogLevel::Debug.escalate(), Some(LogLevel::Info));
+        assert_eq!(LogLevel::Info.escalate(), Some(LogLevel::Warning));
+        assert_eq!(LogLevel::Warning.escalate(), Some(LogLevel::Error));
+        assert_eq!(LogLevel::Error.escalate(), None);
+
+        assert_eq!(LogLevel::Error.deescalate(), Some(LogLevel::Warning));
+        assert_eq!(LogLevel::Warning.deescalate(), Some(LogLevel::Info));
+        assert_eq!(LogLevel::Info.deescalate(), Some(LogLevel::Debug));
+        assert_eq!(LogLevel::Debug.deescalate(), Some(LogLevel::Trace));
+        assert_eq!(LogLevel::Trace.deescalate(), None);
+    }
+
+    #[test]
+    fn log_level_escalate_deescalate_roundtrip() {
+        for &level in LogLevel::all_levels() {
+            if let Some(up) = level.escalate() {
+                assert_eq!(up.deescalate(), Some(level));
+            }
+            if let Some(down) = level.deescalate() {
+                assert_eq!(down.escalate(), Some(level));
+            }
+        }
+    }
+
+    #[test]
+    fn output_error_predicates() {
+        let not_found = OutputError::ChannelNotFound("ch1".into());
+        assert!(not_found.is_not_found());
+        assert!(!not_found.is_overflow());
+        assert_eq!(not_found.channel_id(), Some("ch1"));
+
+        let overflow = OutputError::BufferOverflow {
+            channel_id: "ch2".into(),
+            max_bytes: 1024,
+        };
+        assert!(!overflow.is_not_found());
+        assert!(overflow.is_overflow());
+        assert_eq!(overflow.channel_id(), Some("ch2"));
+
+        let invalid = OutputError::InvalidName("bad".into());
+        assert!(!invalid.is_not_found());
+        assert!(!invalid.is_overflow());
+        assert_eq!(invalid.channel_id(), None);
+
+        let dup = OutputError::DuplicateChannelName("dup".into());
+        assert_eq!(dup.channel_id(), None);
+    }
+
+    #[test]
+    fn output_buffer_remaining_capacity() {
+        let mut buf = OutputBuffer::new(5);
+        assert_eq!(buf.remaining_capacity(), 5);
+        buf.append("a");
+        buf.append("b");
+        assert_eq!(buf.remaining_capacity(), 3);
+    }
+
+    #[test]
+    fn output_buffer_total_appended() {
+        let mut buf = OutputBuffer::new(2);
+        buf.append("a");
+        buf.append("b");
+        buf.flush();
+        buf.append("c");
+        assert_eq!(buf.total_appended(), 3); // 2 flushed + 1 buffered
+    }
+
+    #[test]
+    fn output_buffer_set_capacity() {
+        let mut buf = OutputBuffer::new(10);
+        assert_eq!(buf.capacity(), 10);
+        buf.set_capacity(5);
+        assert_eq!(buf.capacity(), 5);
+        buf.set_capacity(0); // should clamp to 1
+        assert_eq!(buf.capacity(), 1);
+    }
+
+    #[test]
+    fn output_merger_search() {
+        let mut merger = OutputChannelMerger::new();
+        merger.append("build", "compiling main.rs");
+        merger.append("build", "error: type mismatch");
+        merger.append("test", "test passed");
+        merger.append("build", "error: missing semicolon");
+
+        let errors = merger.search("error");
+        assert_eq!(errors.len(), 2);
+        assert!(errors.iter().all(|l| l.source_channel == "build"));
+    }
+
+    #[test]
+    fn output_merger_is_empty_and_channel_count() {
+        let mut merger = OutputChannelMerger::new();
+        assert!(merger.is_empty());
+        assert_eq!(merger.channel_count(), 0);
+
+        merger.append("ch1", "line");
+        merger.append("ch2", "line");
+        assert!(!merger.is_empty());
+        assert_eq!(merger.channel_count(), 2);
+    }
+
+    #[test]
+    fn merged_line_new_and_contains() {
+        let ml = MergedLine::new("build", "compiling OK", 42);
+        assert_eq!(ml.source_channel, "build");
+        assert_eq!(ml.content, "compiling OK");
+        assert_eq!(ml.sequence, 42);
+        assert!(ml.contains("OK"));
+        assert!(!ml.contains("ERROR"));
+    }
+
+    #[test]
+    fn timestamp_format_is_none() {
+        assert!(TimestampFormat::None.is_none());
+        assert!(!TimestampFormat::Seconds.is_none());
+        assert!(!TimestampFormat::Millis.is_none());
+        assert!(!TimestampFormat::Iso8601.is_none());
+    }
+
+    #[test]
+    fn timestamp_format_from_str() {
+        assert_eq!(TimestampFormat::from_str("none"), Some(TimestampFormat::None));
+        assert_eq!(TimestampFormat::from_str("seconds"), Some(TimestampFormat::Seconds));
+        assert_eq!(TimestampFormat::from_str("secs"), Some(TimestampFormat::Seconds));
+        assert_eq!(TimestampFormat::from_str("s"), Some(TimestampFormat::Seconds));
+        assert_eq!(TimestampFormat::from_str("millis"), Some(TimestampFormat::Millis));
+        assert_eq!(TimestampFormat::from_str("ms"), Some(TimestampFormat::Millis));
+        assert_eq!(TimestampFormat::from_str("iso8601"), Some(TimestampFormat::Iso8601));
+        assert_eq!(TimestampFormat::from_str("ISO"), Some(TimestampFormat::Iso8601));
+        assert_eq!(TimestampFormat::from_str("unknown"), None);
+    }
+
+    #[test]
+    fn timestamp_format_display() {
+        assert_eq!(format!("{}", TimestampFormat::None), "none");
+        assert_eq!(format!("{}", TimestampFormat::Seconds), "seconds");
+        assert_eq!(format!("{}", TimestampFormat::Millis), "millis");
+        assert_eq!(format!("{}", TimestampFormat::Iso8601), "iso8601");
+    }
+
+    #[test]
+    fn output_message_display_long_line_truncation() {
+        let long = "a".repeat(100);
+        let msg = OutputMessage::AppendLine {
+            channel_id: "ch1".into(),
+            line: long,
+        };
+        let display = format!("{msg}");
+        assert!(display.contains("AppendLine"));
+        assert!(display.contains("…"));
     }
 }

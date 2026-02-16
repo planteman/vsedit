@@ -1114,6 +1114,166 @@ impl Default for HealthCheckAggregator {
 }
 
 // ---------------------------------------------------------------------------
+// DisposableTimeout – deferred disposal after a duration
+// ---------------------------------------------------------------------------
+
+/// Wraps a disposable with a minimum time before it may be disposed.
+/// Useful for scheduling cleanup that should not happen immediately.
+pub struct DisposableTimeout {
+    inner: Option<Box<dyn Disposable + Send>>,
+    created_at: std::time::Instant,
+    min_age: std::time::Duration,
+    disposed: AtomicBool,
+}
+
+impl DisposableTimeout {
+    /// Create a new timeout wrapper. The inner disposable will only be
+    /// disposed once `min_age` has elapsed since creation.
+    pub fn new(inner: impl Disposable + Send + 'static, min_age: std::time::Duration) -> Self {
+        Self {
+            inner: Some(Box::new(inner)),
+            created_at: std::time::Instant::now(),
+            min_age,
+            disposed: AtomicBool::new(false),
+        }
+    }
+
+    /// Whether enough time has elapsed for disposal.
+    pub fn is_ready(&self) -> bool {
+        self.created_at.elapsed() >= self.min_age
+    }
+
+    /// Try to dispose. Returns `true` if disposal happened, `false` if
+    /// it's too early or already disposed.
+    pub fn try_dispose(&mut self) -> bool {
+        if self.disposed.load(Ordering::Acquire) {
+            return false;
+        }
+        if !self.is_ready() {
+            return false;
+        }
+        if let Some(inner) = self.inner.take() {
+            inner.dispose();
+        }
+        self.disposed.store(true, Ordering::Release);
+        true
+    }
+
+    /// Elapsed time since creation.
+    pub fn age(&self) -> std::time::Duration {
+        self.created_at.elapsed()
+    }
+
+    /// The minimum age configured for this timeout.
+    pub fn min_age(&self) -> std::time::Duration {
+        self.min_age
+    }
+}
+
+impl Disposable for DisposableTimeout {
+    fn dispose(&self) {
+        // Force-dispose regardless of timing.
+        self.disposed.store(true, Ordering::Release);
+        // Note: cannot take inner here since &self is immutable.
+        // The inner will be dropped when this struct is dropped.
+    }
+
+    fn is_disposed(&self) -> bool {
+        self.disposed.load(Ordering::Acquire)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ShutdownCoordinator – orders shutdown of multiple subsystems
+// ---------------------------------------------------------------------------
+
+/// Coordinates an orderly shutdown across named subsystems.
+#[derive(Debug)]
+pub struct ShutdownCoordinator {
+    subsystems: Vec<String>,
+    shutdown_complete: Vec<String>,
+}
+
+impl ShutdownCoordinator {
+    pub fn new() -> Self {
+        Self {
+            subsystems: Vec::new(),
+            shutdown_complete: Vec::new(),
+        }
+    }
+
+    /// Register a subsystem that needs to be shut down.
+    pub fn register(&mut self, name: impl Into<String>) {
+        let name = name.into();
+        if !self.subsystems.contains(&name) {
+            self.subsystems.push(name);
+        }
+    }
+
+    /// Mark a subsystem as having completed shutdown.
+    pub fn mark_complete(&mut self, name: &str) {
+        if self.subsystems.contains(&name.to_string())
+            && !self.shutdown_complete.contains(&name.to_string())
+        {
+            self.shutdown_complete.push(name.to_string());
+        }
+    }
+
+    /// Whether all registered subsystems have completed shutdown.
+    pub fn is_complete(&self) -> bool {
+        !self.subsystems.is_empty()
+            && self.subsystems.iter().all(|s| self.shutdown_complete.contains(s))
+    }
+
+    /// Number of subsystems still pending shutdown.
+    pub fn pending_count(&self) -> usize {
+        self.subsystems
+            .iter()
+            .filter(|s| !self.shutdown_complete.contains(s))
+            .count()
+    }
+
+    /// Total registered subsystems.
+    pub fn total(&self) -> usize {
+        self.subsystems.len()
+    }
+
+    /// Names of subsystems that have not yet completed shutdown.
+    pub fn pending_subsystems(&self) -> Vec<&str> {
+        self.subsystems
+            .iter()
+            .filter(|s| !self.shutdown_complete.contains(s))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    /// Completion ratio (0.0 – 1.0).
+    pub fn progress(&self) -> f64 {
+        if self.subsystems.is_empty() {
+            return 1.0;
+        }
+        self.shutdown_complete.len() as f64 / self.subsystems.len() as f64
+    }
+}
+
+impl Default for ShutdownCoordinator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ShutdownCoordinator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ShutdownCoordinator({}/{} complete)",
+            self.shutdown_complete.len(),
+            self.subsystems.len(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1656,5 +1816,89 @@ mod tests {
     fn lifecycle_phase_display() {
         assert_eq!(format!("{}", LifecyclePhase::Starting), "Starting");
         assert_eq!(format!("{}", LifecyclePhase::ShuttingDown), "ShuttingDown");
+    }
+
+    #[test]
+    fn shutdown_coordinator_basic_flow() {
+        let mut coord = ShutdownCoordinator::new();
+        coord.register("editor");
+        coord.register("extensions");
+        coord.register("terminal");
+        assert_eq!(coord.total(), 3);
+        assert_eq!(coord.pending_count(), 3);
+        assert!(!coord.is_complete());
+
+        coord.mark_complete("editor");
+        assert_eq!(coord.pending_count(), 2);
+        assert!(!coord.is_complete());
+
+        coord.mark_complete("extensions");
+        coord.mark_complete("terminal");
+        assert!(coord.is_complete());
+        assert_eq!(coord.pending_count(), 0);
+    }
+
+    #[test]
+    fn shutdown_coordinator_progress() {
+        let mut coord = ShutdownCoordinator::new();
+        coord.register("a");
+        coord.register("b");
+        assert!((coord.progress() - 0.0).abs() < f64::EPSILON);
+        coord.mark_complete("a");
+        assert!((coord.progress() - 0.5).abs() < f64::EPSILON);
+        coord.mark_complete("b");
+        assert!((coord.progress() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn shutdown_coordinator_pending_subsystems() {
+        let mut coord = ShutdownCoordinator::new();
+        coord.register("db");
+        coord.register("cache");
+        coord.mark_complete("db");
+        let pending = coord.pending_subsystems();
+        assert_eq!(pending, vec!["cache"]);
+    }
+
+    #[test]
+    fn shutdown_coordinator_display() {
+        let mut coord = ShutdownCoordinator::new();
+        coord.register("x");
+        let display = format!("{coord}");
+        assert!(display.contains("0/1"));
+        coord.mark_complete("x");
+        let display2 = format!("{coord}");
+        assert!(display2.contains("1/1"));
+    }
+
+    #[test]
+    fn shutdown_coordinator_duplicate_register() {
+        let mut coord = ShutdownCoordinator::new();
+        coord.register("svc");
+        coord.register("svc"); // duplicate
+        assert_eq!(coord.total(), 1);
+        // duplicate mark_complete is safe
+        coord.mark_complete("svc");
+        coord.mark_complete("svc");
+        assert!(coord.is_complete());
+    }
+
+    #[test]
+    fn disposable_timeout_is_ready() {
+        let inner = to_disposable(|| {});
+        let timeout = DisposableTimeout::new(inner, std::time::Duration::from_secs(0));
+        assert!(timeout.is_ready());
+        assert!(!timeout.is_disposed());
+    }
+
+    #[test]
+    fn disposable_timeout_force_dispose() {
+        let flag = Arc::new(AtomicUsize::new(0));
+        let f = flag.clone();
+        let inner = to_disposable(move || { f.fetch_add(1, Ordering::SeqCst); });
+        let timeout = DisposableTimeout::new(inner, std::time::Duration::from_secs(3600));
+        assert!(!timeout.is_ready());
+        timeout.dispose(); // force dispose
+        assert!(timeout.is_disposed());
     }
 }

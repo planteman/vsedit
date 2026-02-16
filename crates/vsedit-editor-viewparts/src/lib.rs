@@ -950,6 +950,90 @@ pub fn visible_line_number_count(total_lines: u32, current_line: u32, mode: Line
         .count() as u32
 }
 
+// ---------------------------------------------------------------------------
+// View-part analysis utilities
+// ---------------------------------------------------------------------------
+
+/// Compute aggregate metrics across a slice of prioritized view parts.
+pub fn compute_view_part_metrics(parts: &[PrioritizedViewPart]) -> ViewPartMetrics {
+    let total_parts = parts.len();
+    let visible_count = parts.iter().filter(|p| p.visible).count();
+    let hidden_count = total_parts - visible_count;
+    let total_render_time_us = parts.iter().map(|p| p.render_time_us).sum();
+    ViewPartMetrics {
+        total_parts,
+        visible_count,
+        hidden_count,
+        total_render_time_us,
+    }
+}
+
+/// Return only the view parts that are currently visible, sorted by
+/// priority (High first, then Normal, then Low).
+pub fn visible_parts_sorted(parts: &[PrioritizedViewPart]) -> Vec<&PrioritizedViewPart> {
+    let mut visible: Vec<&PrioritizedViewPart> = parts.iter().filter(|p| p.visible).collect();
+    visible.sort_by_key(|p| match p.priority {
+        ViewPartPriority::High => 0u8,
+        ViewPartPriority::Normal => 1,
+        ViewPartPriority::Low => 2,
+    });
+    visible
+}
+
+/// Check whether two `WidgetLayout` rectangles overlap.
+pub fn layouts_overlap(a: &WidgetLayout, b: &WidgetLayout) -> bool {
+    let a_right = a.left + a.width;
+    let a_bottom = a.top + a.height;
+    let b_right = b.left + b.width;
+    let b_bottom = b.top + b.height;
+    a.left < b_right && b.left < a_right && a.top < b_bottom && b.top < a_bottom
+}
+
+/// Compute the bounding box that contains all the given widget layouts.
+pub fn bounding_box(layouts: &[WidgetLayout]) -> Option<WidgetLayout> {
+    if layouts.is_empty() {
+        return None;
+    }
+    let min_top = layouts.iter().map(|l| l.top).min().unwrap();
+    let min_left = layouts.iter().map(|l| l.left).min().unwrap();
+    let max_bottom = layouts.iter().map(|l| l.top + l.height).max().unwrap();
+    let max_right = layouts.iter().map(|l| l.left + l.width).max().unwrap();
+    Some(WidgetLayout {
+        top: min_top,
+        left: min_left,
+        width: max_right - min_left,
+        height: max_bottom - min_top,
+    })
+}
+
+/// Build a `BreadcrumbBar` from a `/`-separated path string.
+pub fn breadcrumbs_from_path(path: &str) -> BreadcrumbBar {
+    let items: Vec<BreadcrumbItem> = path
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .enumerate()
+        .map(|(i, segment)| {
+            let kind = if i == 0 {
+                BreadcrumbKind::Module
+            } else {
+                BreadcrumbKind::File
+            };
+            BreadcrumbItem {
+                label: segment.to_string(),
+                kind,
+                uri: String::new(),
+            }
+        })
+        .collect();
+    BreadcrumbBar { items }
+}
+
+/// Calculate total gutter width from glyph margin config and line-number width.
+pub fn total_gutter_width(glyph: &GlyphMarginConfig, line_number_chars: u32) -> u32 {
+    let glyph_width = if glyph.enabled { glyph.width_chars } else { 0 };
+    glyph_width + line_number_chars
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1793,5 +1877,95 @@ mod tests {
         // With interval 5 and current_line=1: lines 1,5,10 are shown
         let count = visible_line_number_count(10, 1, LineNumberMode::Interval(5));
         assert_eq!(count, 3); // 1 (current), 5, 10
+    }
+
+    // -- compute_view_part_metrics ---------------------------------------------
+
+    #[test]
+    fn view_part_metrics_basic() {
+        let parts = vec![
+            PrioritizedViewPart { name: "a".into(), priority: ViewPartPriority::High, visible: true, render_time_us: 100 },
+            PrioritizedViewPart { name: "b".into(), priority: ViewPartPriority::Low, visible: false, render_time_us: 50 },
+        ];
+        let m = compute_view_part_metrics(&parts);
+        assert_eq!(m.total_parts, 2);
+        assert_eq!(m.visible_count, 1);
+        assert_eq!(m.hidden_count, 1);
+        assert_eq!(m.total_render_time_us, 150);
+    }
+
+    // -- visible_parts_sorted --------------------------------------------------
+
+    #[test]
+    fn visible_parts_sorted_by_priority() {
+        let parts = vec![
+            PrioritizedViewPart { name: "low".into(), priority: ViewPartPriority::Low, visible: true, render_time_us: 0 },
+            PrioritizedViewPart { name: "high".into(), priority: ViewPartPriority::High, visible: true, render_time_us: 0 },
+            PrioritizedViewPart { name: "hidden".into(), priority: ViewPartPriority::High, visible: false, render_time_us: 0 },
+        ];
+        let sorted = visible_parts_sorted(&parts);
+        assert_eq!(sorted.len(), 2);
+        assert_eq!(sorted[0].name, "high");
+        assert_eq!(sorted[1].name, "low");
+    }
+
+    // -- layouts_overlap -------------------------------------------------------
+
+    #[test]
+    fn layouts_overlap_true() {
+        let a = WidgetLayout { top: 0, left: 0, width: 10, height: 10 };
+        let b = WidgetLayout { top: 5, left: 5, width: 10, height: 10 };
+        assert!(layouts_overlap(&a, &b));
+    }
+
+    #[test]
+    fn layouts_overlap_false() {
+        let a = WidgetLayout { top: 0, left: 0, width: 5, height: 5 };
+        let b = WidgetLayout { top: 10, left: 10, width: 5, height: 5 };
+        assert!(!layouts_overlap(&a, &b));
+    }
+
+    // -- bounding_box ----------------------------------------------------------
+
+    #[test]
+    fn bounding_box_computed() {
+        let layouts = vec![
+            WidgetLayout { top: 5, left: 10, width: 20, height: 10 },
+            WidgetLayout { top: 0, left: 0, width: 5, height: 5 },
+        ];
+        let bb = bounding_box(&layouts).unwrap();
+        assert_eq!(bb.top, 0);
+        assert_eq!(bb.left, 0);
+        assert_eq!(bb.width, 30); // 0..30
+        assert_eq!(bb.height, 15); // 0..15
+    }
+
+    #[test]
+    fn bounding_box_empty() {
+        assert!(bounding_box(&[]).is_none());
+    }
+
+    // -- breadcrumbs_from_path -------------------------------------------------
+
+    #[test]
+    fn breadcrumbs_from_path_basic() {
+        let bar = breadcrumbs_from_path("/src/components/App.tsx");
+        assert_eq!(bar.items.len(), 3);
+        assert_eq!(bar.items[0].label, "src");
+        assert_eq!(bar.items[2].label, "App.tsx");
+    }
+
+    // -- total_gutter_width ----------------------------------------------------
+
+    #[test]
+    fn total_gutter_width_enabled() {
+        let config = GlyphMarginConfig { enabled: true, width_chars: 2, decorations_enabled: true };
+        assert_eq!(total_gutter_width(&config, 4), 6);
+    }
+
+    #[test]
+    fn total_gutter_width_disabled() {
+        let config = GlyphMarginConfig { enabled: false, width_chars: 2, decorations_enabled: false };
+        assert_eq!(total_gutter_width(&config, 4), 4);
     }
 }

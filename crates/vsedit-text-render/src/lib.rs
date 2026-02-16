@@ -1106,6 +1106,244 @@ pub fn extract_line_range(text: &str, start: usize, end: usize) -> String {
         .join("\n")
 }
 
+// ---------------------------------------------------------------------------
+// TextMeasurement – additional analysis methods
+// ---------------------------------------------------------------------------
+
+impl TextMeasurement {
+    /// True when the text is pure ASCII with no wide characters.
+    pub fn is_ascii_only(&self) -> bool {
+        !self.contains_wide_chars && self.byte_length == self.char_count
+    }
+
+    /// Ratio of display width to character count.
+    ///
+    /// Returns 1.0 for pure narrow-character text, > 1.0 when wide characters
+    /// are present, and 0.0 for empty text.
+    pub fn width_ratio(&self) -> f64 {
+        if self.char_count == 0 {
+            return 0.0;
+        }
+        self.visible_width as f64 / self.char_count as f64
+    }
+
+    /// True when the measured text is empty.
+    pub fn is_empty(&self) -> bool {
+        self.byte_length == 0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenderedLine – additional query and transformation methods
+// ---------------------------------------------------------------------------
+
+impl RenderedLine {
+    /// Split the rendered text at the given display column, returning the
+    /// left and right halves as new `String`s.
+    ///
+    /// If `col` is beyond the end of the text, the left half is the full text
+    /// and the right half is empty.
+    pub fn split_at_column(&self, col: usize) -> (String, String) {
+        if col >= self.text.len() {
+            return (self.text.clone(), String::new());
+        }
+        let mut current_col = 0usize;
+        let mut byte_pos = 0usize;
+        for (i, ch) in self.text.char_indices() {
+            if current_col >= col {
+                byte_pos = i;
+                break;
+            }
+            let w = UnicodeWidthChar::width(ch).unwrap_or(0).max(1);
+            current_col += w;
+            byte_pos = i + ch.len_utf8();
+        }
+        let left = self.text[..byte_pos].to_string();
+        let right = self.text[byte_pos..].to_string();
+        (left, right)
+    }
+
+    /// Return an iterator over display-column / source-offset pairs.
+    pub fn column_offset_pairs(&self) -> Vec<(usize, usize)> {
+        self.column_to_offset
+            .iter()
+            .enumerate()
+            .map(|(col, &off)| (col, off))
+            .collect()
+    }
+
+    /// Count the number of source byte offsets that map to this rendered line.
+    ///
+    /// This is the number of distinct source bytes referenced by the column map,
+    /// which is useful for determining how many original characters contributed
+    /// to the rendering.
+    pub fn distinct_source_offsets(&self) -> usize {
+        let mut seen = std::collections::HashSet::new();
+        for &off in &self.column_to_offset {
+            seen.insert(off);
+        }
+        seen.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutLine – query helpers
+// ---------------------------------------------------------------------------
+
+impl LayoutLine {
+    /// True when this visual line is blank (whitespace only).
+    pub fn is_blank(&self) -> bool {
+        self.text.trim().is_empty()
+    }
+
+    /// The display width remaining before `max_width` is reached.
+    pub fn remaining_width(&self, max_width: usize) -> usize {
+        max_width.saturating_sub(self.width)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TextLayoutEngine – additional layout helpers
+// ---------------------------------------------------------------------------
+
+impl TextLayoutEngine {
+    /// Lay out text and return only lines whose source line index is in the
+    /// given range `[start, end)`.
+    pub fn layout_range(&self, text: &str, start: usize, end: usize) -> Vec<LayoutLine> {
+        self.layout(text)
+            .into_iter()
+            .filter(|ll| ll.source_line >= start && ll.source_line < end)
+            .collect()
+    }
+
+    /// Return the visual line index that corresponds to the given source line.
+    ///
+    /// Returns `None` if the source line does not exist.
+    pub fn visual_line_for_source(&self, text: &str, source_line: usize) -> Option<usize> {
+        self.layout(text)
+            .iter()
+            .position(|ll| ll.source_line == source_line)
+    }
+
+    /// Return the maximum display width across all visual lines produced by
+    /// layout.
+    pub fn max_visual_width(&self, text: &str) -> usize {
+        self.layout(text)
+            .iter()
+            .map(|ll| ll.width)
+            .max()
+            .unwrap_or(0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SyntaxHighlightRegion – merge and containment helpers
+// ---------------------------------------------------------------------------
+
+impl SyntaxHighlightRegion {
+    /// True when `col` falls within this region (`start <= col < end`).
+    pub fn contains_column(&self, col: usize) -> bool {
+        col >= self.start && col < self.end
+    }
+
+    /// Merge two overlapping regions of the same kind into a single region.
+    ///
+    /// Returns `None` if the regions do not overlap or have different kinds.
+    pub fn merge(&self, other: &SyntaxHighlightRegion) -> Option<SyntaxHighlightRegion> {
+        if self.kind != other.kind || !self.overlaps(other) {
+            return None;
+        }
+        Some(SyntaxHighlightRegion {
+            start: self.start.min(other.start),
+            end: self.end.max(other.end),
+            kind: self.kind.clone(),
+        })
+    }
+
+    /// Intersect two regions, returning the overlapping portion.
+    ///
+    /// Returns `None` if the regions do not overlap.
+    pub fn intersect(&self, other: &SyntaxHighlightRegion) -> Option<SyntaxHighlightRegion> {
+        if !self.overlaps(other) {
+            return None;
+        }
+        Some(SyntaxHighlightRegion {
+            start: self.start.max(other.start),
+            end: self.end.min(other.end),
+            kind: self.kind.clone(),
+        })
+    }
+
+    /// Shift the region by `offset` columns to the right.
+    pub fn shift(&self, offset: usize) -> SyntaxHighlightRegion {
+        SyntaxHighlightRegion {
+            start: self.start + offset,
+            end: self.end + offset,
+            kind: self.kind.clone(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IndentStyle – query helpers
+// ---------------------------------------------------------------------------
+
+impl IndentStyle {
+    /// Return the effective number of spaces per indent level.
+    ///
+    /// Tabs default to `default_tab` spaces.  `Mixed` and `Unknown` also
+    /// return `default_tab`.
+    pub fn spaces_per_level(&self, default_tab: u32) -> u32 {
+        match self {
+            IndentStyle::Tabs => default_tab,
+            IndentStyle::Spaces(n) => *n,
+            IndentStyle::Mixed | IndentStyle::Unknown => default_tab,
+        }
+    }
+
+    /// Human-readable label for display in status bars, etc.
+    pub fn label(&self) -> &'static str {
+        match self {
+            IndentStyle::Tabs => "Tabs",
+            IndentStyle::Spaces(n) if *n == 2 => "Spaces: 2",
+            IndentStyle::Spaces(n) if *n == 4 => "Spaces: 4",
+            IndentStyle::Spaces(_) => "Spaces",
+            IndentStyle::Mixed => "Mixed",
+            IndentStyle::Unknown => "Unknown",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenderConfig – additional helpers
+// ---------------------------------------------------------------------------
+
+impl RenderConfig {
+    /// Render multiple lines at once, returning results for each.
+    pub fn render_lines(&self, text: &str) -> Result<Vec<RenderedLine>, RenderError> {
+        self.validate()?;
+        text.lines().map(|line| self.render(line)).collect()
+    }
+
+    /// Return a copy of this config with a different tab size.
+    pub fn with_tab_size(&self, tab_size: u32) -> Self {
+        Self {
+            tab_size,
+            max_width: self.max_width,
+            whitespace_mode: self.whitespace_mode,
+        }
+    }
+
+    /// Return a copy of this config with a different max width.
+    pub fn with_max_width(&self, max_width: usize) -> Self {
+        Self {
+            tab_size: self.tab_size,
+            max_width,
+            whitespace_mode: self.whitespace_mode,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1734,5 +1972,226 @@ mod tests {
         assert_eq!(extract_line_range(text, 1, 3), "one\ntwo");
         assert_eq!(extract_line_range(text, 0, 1), "zero");
         assert_eq!(extract_line_range(text, 3, 3), "");
+    }
+
+    // ---- TextMeasurement impl tests ----
+
+    #[test]
+    fn text_measurement_is_ascii_only() {
+        let m = measure_text("hello");
+        assert!(m.is_ascii_only());
+        let m2 = measure_text("你好");
+        assert!(!m2.is_ascii_only());
+    }
+
+    #[test]
+    fn text_measurement_width_ratio() {
+        let m = measure_text("hello");
+        assert!((m.width_ratio() - 1.0).abs() < f64::EPSILON);
+        let m2 = measure_text("你好");
+        assert!(m2.width_ratio() > 1.0);
+        let m3 = measure_text("");
+        assert!((m3.width_ratio() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn text_measurement_is_empty() {
+        assert!(measure_text("").is_empty());
+        assert!(!measure_text("x").is_empty());
+    }
+
+    // ---- RenderedLine split / query tests ----
+
+    #[test]
+    fn rendered_line_split_at_column() {
+        let r = render_line("hello world", 4);
+        let (left, right) = r.split_at_column(5);
+        assert_eq!(left, "hello");
+        assert_eq!(right, " world");
+    }
+
+    #[test]
+    fn rendered_line_split_at_column_beyond_end() {
+        let r = render_line("abc", 4);
+        let (left, right) = r.split_at_column(100);
+        assert_eq!(left, "abc");
+        assert_eq!(right, "");
+    }
+
+    #[test]
+    fn rendered_line_column_offset_pairs() {
+        let r = render_line("ab", 4);
+        let pairs = r.column_offset_pairs();
+        assert_eq!(pairs, vec![(0, 0), (1, 1)]);
+    }
+
+    #[test]
+    fn rendered_line_distinct_source_offsets() {
+        let r = render_line("a\tb", 4);
+        // "a   b" — columns 0→offset 0, 1-3→offset 1 (tab), 4→offset 2
+        // distinct offsets: {0, 1, 2} = 3
+        assert_eq!(r.distinct_source_offsets(), 3);
+    }
+
+    // ---- LayoutLine tests ----
+
+    #[test]
+    fn layout_line_is_blank() {
+        let ll = LayoutLine {
+            text: "   ".to_string(),
+            width: 3,
+            source_line: 0,
+            is_wrapped: false,
+        };
+        assert!(ll.is_blank());
+
+        let ll2 = LayoutLine {
+            text: "abc".to_string(),
+            width: 3,
+            source_line: 0,
+            is_wrapped: false,
+        };
+        assert!(!ll2.is_blank());
+    }
+
+    #[test]
+    fn layout_line_remaining_width() {
+        let ll = LayoutLine {
+            text: "abc".to_string(),
+            width: 3,
+            source_line: 0,
+            is_wrapped: false,
+        };
+        assert_eq!(ll.remaining_width(10), 7);
+        assert_eq!(ll.remaining_width(2), 0);
+    }
+
+    // ---- TextLayoutEngine extended tests ----
+
+    #[test]
+    fn layout_engine_layout_range() {
+        let engine = TextLayoutEngine::new(80, 4);
+        let text = "line0\nline1\nline2\nline3";
+        let lines = engine.layout_range(text, 1, 3);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0].text, "line1");
+        assert_eq!(lines[1].text, "line2");
+    }
+
+    #[test]
+    fn layout_engine_visual_line_for_source() {
+        let engine = TextLayoutEngine::new(80, 4);
+        let text = "aaa\nbbb\nccc";
+        assert_eq!(engine.visual_line_for_source(text, 0), Some(0));
+        assert_eq!(engine.visual_line_for_source(text, 2), Some(2));
+        assert_eq!(engine.visual_line_for_source(text, 5), None);
+    }
+
+    #[test]
+    fn layout_engine_max_visual_width() {
+        let engine = TextLayoutEngine::new(80, 4);
+        let text = "short\na much longer line\nmed";
+        let max_w = engine.max_visual_width(text);
+        assert_eq!(max_w, display_width("a much longer line", 4));
+    }
+
+    // ---- SyntaxHighlightRegion extended tests ----
+
+    #[test]
+    fn highlight_region_contains_column() {
+        let r = SyntaxHighlightRegion::new(2, 7, "keyword");
+        assert!(!r.contains_column(1));
+        assert!(r.contains_column(2));
+        assert!(r.contains_column(6));
+        assert!(!r.contains_column(7));
+    }
+
+    #[test]
+    fn highlight_region_merge() {
+        let a = SyntaxHighlightRegion::new(0, 5, "keyword");
+        let b = SyntaxHighlightRegion::new(3, 8, "keyword");
+        let merged = a.merge(&b).unwrap();
+        assert_eq!(merged.start, 0);
+        assert_eq!(merged.end, 8);
+        assert_eq!(merged.kind, "keyword");
+    }
+
+    #[test]
+    fn highlight_region_merge_different_kind() {
+        let a = SyntaxHighlightRegion::new(0, 5, "keyword");
+        let b = SyntaxHighlightRegion::new(3, 8, "string");
+        assert!(a.merge(&b).is_none());
+    }
+
+    #[test]
+    fn highlight_region_intersect() {
+        let a = SyntaxHighlightRegion::new(0, 5, "keyword");
+        let b = SyntaxHighlightRegion::new(3, 8, "keyword");
+        let inter = a.intersect(&b).unwrap();
+        assert_eq!(inter.start, 3);
+        assert_eq!(inter.end, 5);
+    }
+
+    #[test]
+    fn highlight_region_intersect_no_overlap() {
+        let a = SyntaxHighlightRegion::new(0, 3, "keyword");
+        let b = SyntaxHighlightRegion::new(5, 8, "keyword");
+        assert!(a.intersect(&b).is_none());
+    }
+
+    #[test]
+    fn highlight_region_shift() {
+        let r = SyntaxHighlightRegion::new(2, 5, "comment");
+        let shifted = r.shift(10);
+        assert_eq!(shifted.start, 12);
+        assert_eq!(shifted.end, 15);
+        assert_eq!(shifted.kind, "comment");
+    }
+
+    // ---- IndentStyle tests ----
+
+    #[test]
+    fn indent_style_spaces_per_level() {
+        assert_eq!(IndentStyle::Tabs.spaces_per_level(4), 4);
+        assert_eq!(IndentStyle::Spaces(2).spaces_per_level(4), 2);
+        assert_eq!(IndentStyle::Mixed.spaces_per_level(8), 8);
+        assert_eq!(IndentStyle::Unknown.spaces_per_level(4), 4);
+    }
+
+    #[test]
+    fn indent_style_label() {
+        assert_eq!(IndentStyle::Tabs.label(), "Tabs");
+        assert_eq!(IndentStyle::Spaces(2).label(), "Spaces: 2");
+        assert_eq!(IndentStyle::Spaces(4).label(), "Spaces: 4");
+        assert_eq!(IndentStyle::Spaces(3).label(), "Spaces");
+        assert_eq!(IndentStyle::Mixed.label(), "Mixed");
+        assert_eq!(IndentStyle::Unknown.label(), "Unknown");
+    }
+
+    // ---- RenderConfig extended tests ----
+
+    #[test]
+    fn render_config_render_lines() {
+        let cfg = RenderConfig::default_config();
+        let lines = cfg.render_lines("hello\nworld").unwrap();
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0].text, "hello");
+        assert_eq!(lines[1].text, "world");
+    }
+
+    #[test]
+    fn render_config_with_tab_size() {
+        let cfg = RenderConfig::default_config();
+        let cfg2 = cfg.with_tab_size(8);
+        assert_eq!(cfg2.tab_size, 8);
+        assert_eq!(cfg2.max_width, cfg.max_width);
+    }
+
+    #[test]
+    fn render_config_with_max_width() {
+        let cfg = RenderConfig::default_config();
+        let cfg2 = cfg.with_max_width(120);
+        assert_eq!(cfg2.max_width, 120);
+        assert_eq!(cfg2.tab_size, cfg.tab_size);
     }
 }

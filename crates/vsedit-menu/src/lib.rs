@@ -1007,6 +1007,129 @@ impl MenuNavigationState {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MenuDiff — detect differences between two menu hierarchies
+// ---------------------------------------------------------------------------
+
+/// Describes a single difference between two menu trees.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MenuDiffKind {
+    /// Item exists only in the left tree.
+    Added(String),
+    /// Item exists only in the right tree.
+    Removed(String),
+    /// Item exists in both but label changed.
+    LabelChanged { id: String, old: String, new: String },
+    /// Item exists in both but enabled state changed.
+    EnabledChanged { id: String, was: bool, now: bool },
+}
+
+/// Compute differences between two flat lists of menu items.
+pub fn diff_menus(old: &[MenuItem], new: &[MenuItem]) -> Vec<MenuDiffKind> {
+    let mut diffs = Vec::new();
+    let old_map: std::collections::HashMap<&str, &MenuItem> =
+        old.iter().map(|i| (i.id.as_str(), i)).collect();
+    let new_map: std::collections::HashMap<&str, &MenuItem> =
+        new.iter().map(|i| (i.id.as_str(), i)).collect();
+
+    for (id, _new_item) in &new_map {
+        if !old_map.contains_key(id) {
+            diffs.push(MenuDiffKind::Added(id.to_string()));
+        }
+    }
+    for (id, old_item) in &old_map {
+        match new_map.get(id) {
+            None => diffs.push(MenuDiffKind::Removed(id.to_string())),
+            Some(new_item) => {
+                if old_item.label != new_item.label {
+                    diffs.push(MenuDiffKind::LabelChanged {
+                        id: id.to_string(),
+                        old: old_item.label.clone(),
+                        new: new_item.label.clone(),
+                    });
+                }
+                if old_item.enabled != new_item.enabled {
+                    diffs.push(MenuDiffKind::EnabledChanged {
+                        id: id.to_string(),
+                        was: old_item.enabled,
+                        now: new_item.enabled,
+                    });
+                }
+            }
+        }
+    }
+    diffs
+}
+
+// ---------------------------------------------------------------------------
+// MenuAccessKey — extract mnemonic / access keys from labels
+// ---------------------------------------------------------------------------
+
+/// Extract the access key from a label that uses `&` prefix convention
+/// (e.g. "&File" → Some('F')).
+pub fn extract_access_key(label: &str) -> Option<char> {
+    let mut chars = label.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '&' {
+            if let Some(&next) = chars.peek() {
+                if next != '&' {
+                    return Some(next);
+                }
+                chars.next(); // skip escaped &&
+            }
+        }
+    }
+    None
+}
+
+/// Strip the `&` access key marker from a label for display.
+pub fn strip_access_key(label: &str) -> String {
+    let mut result = String::with_capacity(label.len());
+    let mut chars = label.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '&' {
+            if let Some(&next) = chars.peek() {
+                if next != '&' {
+                    result.push(next);
+                    chars.next();
+                    continue;
+                }
+                // escaped &&, emit single &
+                chars.next();
+            }
+        }
+        result.push(ch);
+    }
+    result
+}
+
+/// Count total actionable items in a menu hierarchy (excludes separators and submenus).
+pub fn count_actions(items: &[MenuItem]) -> usize {
+    let mut count = 0;
+    for item in items {
+        if item.kind == MenuItemKind::Action {
+            count += 1;
+        }
+        count += count_actions(&item.children);
+    }
+    count
+}
+
+/// Collect all keybinding strings from a menu hierarchy.
+pub fn collect_keybindings(items: &[MenuItem]) -> Vec<(&str, &str)> {
+    let mut bindings = Vec::new();
+    fn walk<'a>(items: &'a [MenuItem], out: &mut Vec<(&'a str, &'a str)>) {
+        for item in items {
+            if let Some(ref kb) = item.keybinding {
+                out.push((item.id.as_str(), kb.as_str()));
+            }
+            walk(&item.children, out);
+        }
+    }
+    walk(items, &mut bindings);
+    bindings
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1645,5 +1768,84 @@ mod tests {
         nav.close();
         assert!(!nav.is_open);
         assert_eq!(nav.focused_item, None);
+    }
+
+    // -- MenuDiff --
+
+    #[test]
+    fn diff_menus_detects_added() {
+        let old = vec![MenuItem::action("save", "Save")];
+        let new = vec![
+            MenuItem::action("save", "Save"),
+            MenuItem::action("open", "Open"),
+        ];
+        let diffs = diff_menus(&old, &new);
+        assert!(diffs.iter().any(|d| matches!(d, MenuDiffKind::Added(id) if id == "open")));
+    }
+
+    #[test]
+    fn diff_menus_detects_removed() {
+        let old = vec![
+            MenuItem::action("save", "Save"),
+            MenuItem::action("open", "Open"),
+        ];
+        let new = vec![MenuItem::action("save", "Save")];
+        let diffs = diff_menus(&old, &new);
+        assert!(diffs.iter().any(|d| matches!(d, MenuDiffKind::Removed(id) if id == "open")));
+    }
+
+    #[test]
+    fn diff_menus_detects_label_change() {
+        let old = vec![MenuItem::action("save", "Save")];
+        let new = vec![MenuItem::action("save", "Save File")];
+        let diffs = diff_menus(&old, &new);
+        assert!(diffs.iter().any(|d| matches!(d, MenuDiffKind::LabelChanged { id, old, new } if id == "save" && old == "Save" && new == "Save File")));
+    }
+
+    #[test]
+    fn diff_menus_detects_enabled_change() {
+        let old = vec![MenuItem::action("save", "Save")];
+        let new = vec![MenuItem::action("save", "Save").with_enabled(false)];
+        let diffs = diff_menus(&old, &new);
+        assert!(diffs.iter().any(|d| matches!(d, MenuDiffKind::EnabledChanged { id, was: true, now: false } if id == "save")));
+    }
+
+    // -- Access keys --
+
+    #[test]
+    fn extract_access_key_basic() {
+        assert_eq!(extract_access_key("&File"), Some('F'));
+        assert_eq!(extract_access_key("Save &As"), Some('A'));
+        assert_eq!(extract_access_key("No key"), None);
+        assert_eq!(extract_access_key("&&Escaped"), None); // && means literal &
+    }
+
+    #[test]
+    fn strip_access_key_basic() {
+        assert_eq!(strip_access_key("&File"), "File");
+        assert_eq!(strip_access_key("Save &As"), "Save As");
+        assert_eq!(strip_access_key("No key"), "No key");
+    }
+
+    // -- count_actions / collect_keybindings --
+
+    #[test]
+    fn count_actions_recursive() {
+        let mut file = MenuItem::submenu("file", "File");
+        file.children.push(MenuItem::action("open", "Open"));
+        file.children.push(MenuItem::action("save", "Save"));
+        file.children.push(MenuItem::separator());
+        assert_eq!(count_actions(&[file]), 2);
+    }
+
+    #[test]
+    fn collect_keybindings_from_hierarchy() {
+        let mut file = MenuItem::submenu("file", "File");
+        file.children.push(MenuItem::action("open", "Open").with_keybinding("Ctrl+O"));
+        file.children.push(MenuItem::action("save", "Save"));
+        let items = [file];
+        let bindings = collect_keybindings(&items);
+        assert_eq!(bindings.len(), 1);
+        assert_eq!(bindings[0], ("open", "Ctrl+O"));
     }
 }

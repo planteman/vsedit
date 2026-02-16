@@ -1158,6 +1158,121 @@ pub fn detect_dominant_indentation(text: &str) -> WhitespaceKind {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Line-level whitespace analysis
+// ---------------------------------------------------------------------------
+
+/// Per-line whitespace summary.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineWhitespaceInfo {
+    /// 0-based line index.
+    pub line_index: usize,
+    /// Number of leading whitespace columns.
+    pub leading_columns: usize,
+    /// Number of trailing whitespace characters.
+    pub trailing_chars: usize,
+    /// Whether the line is entirely blank.
+    pub is_blank: bool,
+    /// The indentation style detected on this line.
+    pub indent_style: IndentationStyle,
+}
+
+/// Analyse every line of `text` and return per-line whitespace information.
+pub fn analyse_lines(text: &str, tab_size: usize) -> Vec<LineWhitespaceInfo> {
+    text.lines()
+        .enumerate()
+        .map(|(idx, line)| {
+            let leading_columns = leading_width(line, tab_size);
+            let trailing_chars = line.len() - line.trim_end().len();
+            let is_blank = line.trim().is_empty();
+            let indent_style = detect_line_indent_style(line);
+            LineWhitespaceInfo {
+                line_index: idx,
+                leading_columns,
+                trailing_chars,
+                is_blank,
+                indent_style,
+            }
+        })
+        .collect()
+}
+
+/// Compute the visual column width of leading whitespace in a single line.
+pub fn leading_width(line: &str, tab_size: usize) -> usize {
+    let mut col = 0;
+    for ch in line.chars() {
+        match ch {
+            ' ' => col += 1,
+            '\t' => col += tab_size - (col % tab_size),
+            _ => break,
+        }
+    }
+    col
+}
+
+/// Detect the indentation style used on a single line.
+fn detect_line_indent_style(line: &str) -> IndentationStyle {
+    let mut has_tab = false;
+    let mut space_count: u32 = 0;
+    for ch in line.chars() {
+        match ch {
+            '\t' => has_tab = true,
+            ' ' => space_count += 1,
+            _ => break,
+        }
+    }
+    if has_tab && space_count > 0 {
+        IndentationStyle::Mixed
+    } else if has_tab {
+        IndentationStyle::Tab
+    } else if space_count > 0 {
+        IndentationStyle::Spaces(space_count)
+    } else {
+        IndentationStyle::Unknown
+    }
+}
+
+/// Return the set of unique indentation widths present in `text`.
+pub fn unique_indent_widths(text: &str, tab_size: usize) -> Vec<usize> {
+    let mut widths: Vec<usize> = text
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| leading_width(l, tab_size))
+        .collect();
+    widths.sort_unstable();
+    widths.dedup();
+    widths
+}
+
+/// Guess the indentation unit size (e.g. 2 or 4 spaces) from text.
+///
+/// Returns `None` if no indentation is found.
+pub fn guess_indent_size(text: &str, tab_size: usize) -> Option<usize> {
+    let widths = unique_indent_widths(text, tab_size);
+    if widths.len() < 2 {
+        return widths.first().copied().filter(|&w| w > 0);
+    }
+    // GCD of all non-zero widths is a good heuristic.
+    let non_zero: Vec<usize> = widths.into_iter().filter(|&w| w > 0).collect();
+    if non_zero.is_empty() {
+        return None;
+    }
+    let mut g = non_zero[0];
+    for &w in &non_zero[1..] {
+        g = gcd_usize(g, w);
+    }
+    Some(g)
+}
+
+fn gcd_usize(mut a: usize, mut b: usize) -> usize {
+    while b != 0 {
+        let t = b;
+        b = a % b;
+        a = t;
+    }
+    a
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1785,5 +1900,74 @@ mod tests {
     fn detect_dominant_indentation_spaces() {
         let text = "  line1\n  line2\n\tline3";
         assert_eq!(detect_dominant_indentation(text), WhitespaceKind::Space);
+    }
+
+    // -- analyse_lines ---------------------------------------------------------
+
+    #[test]
+    fn analyse_lines_basic() {
+        let info = analyse_lines("  hello  \n\tworld", 4);
+        assert_eq!(info.len(), 2);
+        assert_eq!(info[0].leading_columns, 2);
+        assert_eq!(info[0].trailing_chars, 2);
+        assert!(!info[0].is_blank);
+    }
+
+    #[test]
+    fn analyse_lines_blank() {
+        let info = analyse_lines("   \nhello", 4);
+        assert!(info[0].is_blank);
+        assert!(!info[1].is_blank);
+    }
+
+    #[test]
+    fn analyse_lines_mixed_indent() {
+        let info = analyse_lines("\t code", 4);
+        assert_eq!(info[0].indent_style, IndentationStyle::Mixed);
+    }
+
+    // -- leading_width ---------------------------------------------------------
+
+    #[test]
+    fn leading_width_spaces() {
+        assert_eq!(leading_width("    hello", 4), 4);
+    }
+
+    #[test]
+    fn leading_width_tab() {
+        assert_eq!(leading_width("\thello", 4), 4);
+    }
+
+    #[test]
+    fn leading_width_mixed() {
+        // tab at col 0 -> 4, then 2 spaces -> 6
+        assert_eq!(leading_width("\t  hello", 4), 6);
+    }
+
+    // -- unique_indent_widths --------------------------------------------------
+
+    #[test]
+    fn unique_indent_widths_basic() {
+        let widths = unique_indent_widths("  a\n    b\n  c\n      d", 4);
+        assert_eq!(widths, vec![2, 4, 6]);
+    }
+
+    // -- guess_indent_size -----------------------------------------------------
+
+    #[test]
+    fn guess_indent_size_two() {
+        let text = "  a\n    b\n      c";
+        assert_eq!(guess_indent_size(text, 4), Some(2));
+    }
+
+    #[test]
+    fn guess_indent_size_four() {
+        let text = "    a\n        b";
+        assert_eq!(guess_indent_size(text, 4), Some(4));
+    }
+
+    #[test]
+    fn guess_indent_size_none() {
+        assert_eq!(guess_indent_size("hello\nworld", 4), None);
     }
 }

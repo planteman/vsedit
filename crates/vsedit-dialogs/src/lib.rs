@@ -1078,6 +1078,318 @@ impl InputValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Additional impl blocks — utility helpers, predicates, conversions
+// ---------------------------------------------------------------------------
+
+impl Severity {
+    /// Returns `true` for `Error` or `Warning`.
+    pub fn is_actionable(&self) -> bool {
+        matches!(self, Severity::Error | Severity::Warning)
+    }
+
+    /// Returns a short human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Severity::Info => "Info",
+            Severity::Warning => "Warning",
+            Severity::Error => "Error",
+        }
+    }
+
+    /// Numeric level: Error=2, Warning=1, Info=0.
+    pub fn level(&self) -> u8 {
+        match self {
+            Severity::Info => 0,
+            Severity::Warning => 1,
+            Severity::Error => 2,
+        }
+    }
+
+    /// Returns `true` if `self` is at least as severe as `other`.
+    pub fn at_least(&self, other: Severity) -> bool {
+        self.level() >= other.level()
+    }
+}
+
+impl std::fmt::Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+impl DialogButton {
+    /// Create a primary button with the given label.
+    pub fn primary(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            is_secondary: false,
+        }
+    }
+
+    /// Create a secondary button with the given label.
+    pub fn secondary(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            is_secondary: true,
+        }
+    }
+}
+
+impl FileFilter {
+    /// Returns `true` if the given extension (without the dot) matches this filter.
+    pub fn matches_extension(&self, ext: &str) -> bool {
+        self.extensions
+            .iter()
+            .any(|e| e.eq_ignore_ascii_case(ext))
+    }
+
+    /// Returns `true` if this filter has no extensions (matches everything).
+    pub fn is_wildcard(&self) -> bool {
+        self.extensions.is_empty()
+            || self.extensions.iter().any(|e| e == "*")
+    }
+}
+
+impl FileDialogOptions {
+    /// Returns `true` if neither files nor folders can be selected.
+    pub fn is_noop(&self) -> bool {
+        !self.can_select_files && !self.can_select_folders
+    }
+
+    /// Enable multi-select.
+    pub fn with_multi_select(mut self) -> Self {
+        self.can_select_many = true;
+        self
+    }
+
+    /// Set the dialog title.
+    pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    /// Returns all unique extensions across every filter.
+    pub fn all_extensions(&self) -> Vec<&str> {
+        let mut exts: Vec<&str> = self
+            .filters
+            .iter()
+            .flat_map(|f| f.extensions.iter().map(|e| e.as_str()))
+            .collect();
+        exts.sort_unstable();
+        exts.dedup();
+        exts
+    }
+}
+
+impl MessageDialogOptions {
+    /// Returns `true` if the dialog has a checkbox.
+    pub fn has_checkbox(&self) -> bool {
+        self.checkbox_label.is_some()
+    }
+
+    /// Total number of interactive buttons (including cancel if present).
+    pub fn total_button_count(&self) -> usize {
+        self.buttons.len() + if self.cancel_button.is_some() { 1 } else { 0 }
+    }
+
+    /// Builder: add a detail message.
+    pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+}
+
+impl ConfirmValue {
+    /// Returns `true` for `Yes` or any `Custom` value.
+    pub fn is_affirmative(&self) -> bool {
+        matches!(self, ConfirmValue::Yes | ConfirmValue::Custom(_))
+    }
+
+    /// Returns `true` for `Cancel`.
+    pub fn is_cancel(&self) -> bool {
+        *self == ConfirmValue::Cancel
+    }
+}
+
+impl std::fmt::Display for ConfirmValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfirmValue::Yes => f.write_str("Yes"),
+            ConfirmValue::No => f.write_str("No"),
+            ConfirmValue::Cancel => f.write_str("Cancel"),
+            ConfirmValue::Custom(s) => f.write_str(s),
+        }
+    }
+}
+
+impl FilePickerEntry {
+    /// Human-readable size string (e.g. "1.2 KB").
+    pub fn human_size(&self) -> String {
+        if self.is_dir {
+            return String::new();
+        }
+        const KB: u64 = 1024;
+        const MB: u64 = KB * 1024;
+        const GB: u64 = MB * 1024;
+        if self.size >= GB {
+            format!("{:.1} GB", self.size as f64 / GB as f64)
+        } else if self.size >= MB {
+            format!("{:.1} MB", self.size as f64 / MB as f64)
+        } else if self.size >= KB {
+            format!("{:.1} KB", self.size as f64 / KB as f64)
+        } else {
+            format!("{} B", self.size)
+        }
+    }
+
+    /// Returns the file extension, if any.
+    pub fn extension(&self) -> Option<&str> {
+        self.path.extension().and_then(|s| s.to_str())
+    }
+}
+
+impl FilePickerState {
+    /// Returns `true` if the filter text is non-empty.
+    pub fn has_filter(&self) -> bool {
+        !self.filter.is_empty()
+    }
+
+    /// Clear the filter text and reset the selection index.
+    pub fn clear_filter(&mut self) {
+        self.filter.clear();
+        self.selected_index = 0;
+    }
+
+    /// Number of currently chosen paths.
+    pub fn chosen_count(&self) -> usize {
+        self.chosen.len()
+    }
+
+    /// Returns `true` if the given path has been chosen.
+    pub fn is_chosen(&self, path: &std::path::Path) -> bool {
+        self.chosen.iter().any(|p| p == path)
+    }
+}
+
+impl DialogHistory {
+    /// Returns the total number of recorded paths.
+    pub fn len(&self) -> usize {
+        self.paths.len()
+    }
+
+    /// Returns `true` if `path` is already recorded.
+    pub fn contains(&self, path: &str) -> bool {
+        self.paths.iter().any(|p| p == path)
+    }
+}
+
+impl ProgressDialogOptions {
+    /// Returns `true` if the total number of steps is known.
+    pub fn is_determinate(&self) -> bool {
+        self.total.is_some()
+    }
+
+    /// Compute progress as a fraction in `[0.0, 1.0]`, or `None` if indeterminate.
+    pub fn fraction(&self, current: u64) -> Option<f64> {
+        self.total.map(|t| {
+            if t == 0 {
+                1.0
+            } else {
+                (current as f64 / t as f64).min(1.0)
+            }
+        })
+    }
+}
+
+impl InputDialogState {
+    /// Delete the character at the cursor position (forward delete).
+    pub fn delete_forward(&mut self) {
+        if self.cursor_pos < self.input_text.len() {
+            let char_len = self.input_text[self.cursor_pos..]
+                .chars()
+                .next()
+                .map(|c| c.len_utf8())
+                .unwrap_or(0);
+            self.input_text
+                .drain(self.cursor_pos..self.cursor_pos + char_len);
+        }
+    }
+
+    /// Move the cursor to the beginning.
+    pub fn move_home(&mut self) {
+        self.cursor_pos = 0;
+    }
+
+    /// Move the cursor to the end.
+    pub fn move_end(&mut self) {
+        self.cursor_pos = self.input_text.len();
+    }
+
+    /// Clear all text and reset the cursor.
+    pub fn clear(&mut self) {
+        self.input_text.clear();
+        self.cursor_pos = 0;
+        self.error = None;
+    }
+
+    /// Returns `true` if the input field is empty.
+    pub fn is_empty(&self) -> bool {
+        self.input_text.is_empty()
+    }
+
+    /// Character count (not byte count).
+    pub fn char_count(&self) -> usize {
+        self.input_text.chars().count()
+    }
+}
+
+impl ConfirmDialog {
+    /// Returns `true` if the currently selected option is affirmative.
+    pub fn is_affirmative(&self) -> bool {
+        self.options
+            .get(self.selected)
+            .map_or(false, |o| o.value.is_affirmative())
+    }
+
+    /// Find the index of the option with the given value, if any.
+    pub fn index_of(&self, value: &ConfirmValue) -> Option<usize> {
+        self.options.iter().position(|o| &o.value == value)
+    }
+
+    /// Select the option with the given value, returning `true` if found.
+    pub fn select_value(&mut self, value: &ConfirmValue) -> bool {
+        if let Some(idx) = self.index_of(value) {
+            self.selected = idx;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Default for InputValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DialogQueue {
+    /// Drain all queued dialogs into a `Vec`.
+    pub fn drain_all(&mut self) -> Vec<QueuedDialog> {
+        std::mem::take(&mut self.queue)
+    }
+
+    /// Returns `true` if any queued dialog has the given severity.
+    pub fn has_severity(&self, severity: Severity) -> bool {
+        self.queue.iter().any(|d| match d {
+            QueuedDialog::Message(m) => m.severity == severity,
+            QueuedDialog::Confirm(c) => c.severity == severity,
+            QueuedDialog::Input(_) => false,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1695,5 +2007,276 @@ mod tests {
         assert!(v.is_valid("hello"));
         assert!(!v.is_valid("hi"));
         assert!(!v.is_valid("way too long string here"));
+    }
+
+    // --- New tests for added functionality ---
+
+    #[test]
+    fn severity_label_and_level() {
+        assert_eq!(Severity::Info.label(), "Info");
+        assert_eq!(Severity::Warning.label(), "Warning");
+        assert_eq!(Severity::Error.label(), "Error");
+
+        assert_eq!(Severity::Info.level(), 0);
+        assert_eq!(Severity::Warning.level(), 1);
+        assert_eq!(Severity::Error.level(), 2);
+    }
+
+    #[test]
+    fn severity_is_actionable() {
+        assert!(!Severity::Info.is_actionable());
+        assert!(Severity::Warning.is_actionable());
+        assert!(Severity::Error.is_actionable());
+    }
+
+    #[test]
+    fn severity_at_least() {
+        assert!(Severity::Error.at_least(Severity::Warning));
+        assert!(Severity::Warning.at_least(Severity::Info));
+        assert!(!Severity::Info.at_least(Severity::Warning));
+        assert!(Severity::Error.at_least(Severity::Error));
+    }
+
+    #[test]
+    fn severity_display() {
+        assert_eq!(format!("{}", Severity::Error), "Error");
+        assert_eq!(format!("{}", Severity::Info), "Info");
+    }
+
+    #[test]
+    fn dialog_button_constructors() {
+        let p = DialogButton::primary("OK");
+        assert_eq!(p.label, "OK");
+        assert!(!p.is_secondary);
+
+        let s = DialogButton::secondary("Cancel");
+        assert_eq!(s.label, "Cancel");
+        assert!(s.is_secondary);
+    }
+
+    #[test]
+    fn file_filter_matches_extension() {
+        let f = FileFilter {
+            name: "Images".into(),
+            extensions: vec!["png".into(), "jpg".into()],
+        };
+        assert!(f.matches_extension("png"));
+        assert!(f.matches_extension("PNG"));
+        assert!(!f.matches_extension("gif"));
+    }
+
+    #[test]
+    fn file_filter_is_wildcard() {
+        let empty = FileFilter { name: "All".into(), extensions: vec![] };
+        assert!(empty.is_wildcard());
+
+        let star = FileFilter { name: "All".into(), extensions: vec!["*".into()] };
+        assert!(star.is_wildcard());
+
+        let specific = FileFilter { name: "Rust".into(), extensions: vec!["rs".into()] };
+        assert!(!specific.is_wildcard());
+    }
+
+    #[test]
+    fn file_dialog_options_helpers() {
+        let opts = FileDialogOptions::open_file()
+            .with_filter("Rust", vec!["rs".into()])
+            .with_filter("TOML", vec!["toml".into()])
+            .with_multi_select()
+            .with_title("Pick files");
+        assert!(opts.can_select_many);
+        assert_eq!(opts.title, Some("Pick files".into()));
+        assert_eq!(opts.all_extensions(), vec!["rs", "toml"]);
+        assert!(!opts.is_noop());
+
+        let noop = FileDialogOptions {
+            title: None,
+            default_path: None,
+            can_select_files: false,
+            can_select_folders: false,
+            can_select_many: false,
+            filters: vec![],
+        };
+        assert!(noop.is_noop());
+    }
+
+    #[test]
+    fn message_dialog_options_helpers() {
+        let opts = DialogPreset::info("hello").with_detail("detail text");
+        assert_eq!(opts.detail, Some("detail text".into()));
+        assert!(!opts.has_checkbox());
+        assert_eq!(opts.total_button_count(), 1);
+    }
+
+    #[test]
+    fn confirm_value_predicates_and_display() {
+        assert!(ConfirmValue::Yes.is_affirmative());
+        assert!(ConfirmValue::Custom("save".into()).is_affirmative());
+        assert!(!ConfirmValue::No.is_affirmative());
+        assert!(ConfirmValue::Cancel.is_cancel());
+        assert!(!ConfirmValue::Yes.is_cancel());
+
+        assert_eq!(format!("{}", ConfirmValue::Yes), "Yes");
+        assert_eq!(format!("{}", ConfirmValue::Custom("x".into())), "x");
+    }
+
+    #[test]
+    fn file_picker_entry_human_size() {
+        let dir_entry = FilePickerEntry {
+            name: "src".into(), path: PathBuf::from("/src"), is_dir: true, size: 0,
+        };
+        assert_eq!(dir_entry.human_size(), "");
+
+        let small = FilePickerEntry {
+            name: "a.txt".into(), path: PathBuf::from("/a.txt"), is_dir: false, size: 512,
+        };
+        assert_eq!(small.human_size(), "512 B");
+
+        let kb = FilePickerEntry {
+            name: "b.txt".into(), path: PathBuf::from("/b.txt"), is_dir: false, size: 2048,
+        };
+        assert!(kb.human_size().contains("KB"));
+
+        let mb = FilePickerEntry {
+            name: "c.bin".into(), path: PathBuf::from("/c.bin"), is_dir: false, size: 5 * 1024 * 1024,
+        };
+        assert!(mb.human_size().contains("MB"));
+    }
+
+    #[test]
+    fn file_picker_entry_extension() {
+        let e = FilePickerEntry {
+            name: "main.rs".into(), path: PathBuf::from("/main.rs"), is_dir: false, size: 0,
+        };
+        assert_eq!(e.extension(), Some("rs"));
+
+        let no_ext = FilePickerEntry {
+            name: "Makefile".into(), path: PathBuf::from("/Makefile"), is_dir: false, size: 0,
+        };
+        assert_eq!(no_ext.extension(), None);
+    }
+
+    #[test]
+    fn file_picker_state_filter_and_chosen() {
+        let opts = FileDialogOptions::open_file();
+        let mut state = FilePickerState::new(PathBuf::from("/tmp"), opts);
+        assert!(!state.has_filter());
+
+        state.filter = "main".into();
+        assert!(state.has_filter());
+
+        state.clear_filter();
+        assert!(!state.has_filter());
+        assert_eq!(state.selected_index, 0);
+
+        state.chosen.push(PathBuf::from("/tmp/a.txt"));
+        assert_eq!(state.chosen_count(), 1);
+        assert!(state.is_chosen(std::path::Path::new("/tmp/a.txt")));
+        assert!(!state.is_chosen(std::path::Path::new("/tmp/b.txt")));
+    }
+
+    #[test]
+    fn dialog_history_len_and_contains() {
+        let mut h = DialogHistory::new();
+        assert_eq!(h.len(), 0);
+        assert!(!h.contains("/a"));
+
+        h.record_path("/a");
+        h.record_path("/b");
+        assert_eq!(h.len(), 2);
+        assert!(h.contains("/a"));
+        assert!(!h.contains("/c"));
+    }
+
+    #[test]
+    fn progress_dialog_fraction() {
+        let indeterminate = ProgressDialogOptions::new("Working...");
+        assert!(!indeterminate.is_determinate());
+        assert_eq!(indeterminate.fraction(50), None);
+
+        let determinate = ProgressDialogOptions::new("Loading").with_total(200);
+        assert!(determinate.is_determinate());
+        let frac = determinate.fraction(100).unwrap();
+        assert!((frac - 0.5).abs() < f64::EPSILON);
+
+        // Clamp to 1.0 when current > total
+        let over = determinate.fraction(999).unwrap();
+        assert!((over - 1.0).abs() < f64::EPSILON);
+
+        // Zero total → 1.0
+        let zero_total = ProgressDialogOptions::new("X").with_total(0);
+        assert!((zero_total.fraction(0).unwrap() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn input_dialog_state_delete_forward() {
+        let opts = InputDialogOptions::new("P").with_value("abc");
+        let mut s = InputDialogState::new(opts);
+        s.move_home();
+        assert_eq!(s.cursor_pos, 0);
+        s.delete_forward(); // removes 'a'
+        assert_eq!(s.input_text, "bc");
+        assert_eq!(s.cursor_pos, 0);
+    }
+
+    #[test]
+    fn input_dialog_state_clear_and_char_count() {
+        let opts = InputDialogOptions::new("P");
+        let mut s = InputDialogState::new(opts);
+        s.insert_char('h');
+        s.insert_char('i');
+        assert_eq!(s.char_count(), 2);
+        assert!(!s.is_empty());
+
+        s.clear();
+        assert!(s.is_empty());
+        assert_eq!(s.cursor_pos, 0);
+        assert!(s.error.is_none());
+    }
+
+    #[test]
+    fn input_dialog_state_move_home_end() {
+        let opts = InputDialogOptions::new("P").with_value("hello");
+        let mut s = InputDialogState::new(opts);
+        assert_eq!(s.cursor_pos, 5);
+        s.move_home();
+        assert_eq!(s.cursor_pos, 0);
+        s.move_end();
+        assert_eq!(s.cursor_pos, 5);
+    }
+
+    #[test]
+    fn confirm_dialog_affirmative_and_select_value() {
+        let mut d = ConfirmDialog::new("Save?").yes_no_cancel();
+        assert!(d.is_affirmative()); // selected=0 → Yes
+        d.select_next(); // → No
+        assert!(!d.is_affirmative());
+
+        assert_eq!(d.index_of(&ConfirmValue::Cancel), Some(2));
+        assert!(d.select_value(&ConfirmValue::Cancel));
+        assert_eq!(d.selected, 2);
+        assert!(!d.select_value(&ConfirmValue::Custom("nope".into())));
+    }
+
+    #[test]
+    fn dialog_queue_drain_and_has_severity() {
+        let mut q = DialogQueue::new();
+        q.push(QueuedDialog::Message(DialogPreset::error("err")));
+        q.push(QueuedDialog::Confirm(ConfirmDialogOptions::new("ok")));
+
+        assert!(q.has_severity(Severity::Error));
+        assert!(q.has_severity(Severity::Info)); // confirm defaults to Info
+        assert!(!q.has_severity(Severity::Warning));
+
+        let drained = q.drain_all();
+        assert_eq!(drained.len(), 2);
+        assert!(q.is_empty());
+    }
+
+    #[test]
+    fn input_validator_default() {
+        let v = InputValidator::default();
+        assert!(v.is_valid("anything"));
+        assert!(v.is_valid(""));
     }
 }

@@ -958,6 +958,152 @@ impl Default for CommandBatchExecutor {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CommandAliasRegistry — user-defined command aliases
+// ---------------------------------------------------------------------------
+
+/// Maps user-defined alias names to canonical command IDs.
+#[derive(Debug, Clone, Default)]
+pub struct CommandAliasRegistry {
+    aliases: HashMap<String, String>,
+}
+
+impl CommandAliasRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register an alias that maps to a canonical command ID.
+    pub fn add_alias(&mut self, alias: &str, command_id: &str) {
+        self.aliases.insert(alias.to_string(), command_id.to_string());
+    }
+
+    /// Remove an alias. Returns true if it existed.
+    pub fn remove_alias(&mut self, alias: &str) -> bool {
+        self.aliases.remove(alias).is_some()
+    }
+
+    /// Resolve an alias to its canonical command ID.
+    /// If the input is not an alias, returns the input unchanged.
+    pub fn resolve<'a>(&'a self, name: &'a str) -> &'a str {
+        self.aliases.get(name).map(|s| s.as_str()).unwrap_or(name)
+    }
+
+    /// Check if a name is a registered alias.
+    pub fn is_alias(&self, name: &str) -> bool {
+        self.aliases.contains_key(name)
+    }
+
+    /// Return all aliases pointing to a given command ID.
+    pub fn aliases_for(&self, command_id: &str) -> Vec<&str> {
+        self.aliases
+            .iter()
+            .filter(|(_, v)| v.as_str() == command_id)
+            .map(|(k, _)| k.as_str())
+            .collect()
+    }
+
+    /// Number of registered aliases.
+    pub fn count(&self) -> usize {
+        self.aliases.len()
+    }
+
+    /// Return all alias names sorted alphabetically.
+    pub fn all_aliases(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self.aliases.keys().map(|s| s.as_str()).collect();
+        names.sort_unstable();
+        names
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandDependencyGraph — declare execution dependencies between commands
+// ---------------------------------------------------------------------------
+
+/// Tracks which commands must run before others.
+#[derive(Debug, Clone, Default)]
+pub struct CommandDependencyGraph {
+    /// Maps command_id → list of command_ids that must run first.
+    deps: HashMap<String, Vec<String>>,
+}
+
+impl CommandDependencyGraph {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Declare that `command_id` depends on `depends_on`.
+    pub fn add_dependency(&mut self, command_id: &str, depends_on: &str) {
+        self.deps
+            .entry(command_id.to_string())
+            .or_default()
+            .push(depends_on.to_string());
+    }
+
+    /// Return direct dependencies of a command.
+    pub fn dependencies_of(&self, command_id: &str) -> &[String] {
+        self.deps.get(command_id).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+
+    /// Return commands that depend on the given command (reverse lookup).
+    pub fn dependents_of(&self, command_id: &str) -> Vec<&str> {
+        self.deps
+            .iter()
+            .filter(|(_, deps)| deps.iter().any(|d| d == command_id))
+            .map(|(k, _)| k.as_str())
+            .collect()
+    }
+
+    /// Produce a topological execution order, or return `None` if cycles exist.
+    /// Uses Kahn's algorithm.
+    pub fn execution_order(&self) -> Option<Vec<String>> {
+        let mut all_nodes: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for (k, vs) in &self.deps {
+            all_nodes.insert(k.as_str());
+            for v in vs {
+                all_nodes.insert(v.as_str());
+            }
+        }
+
+        let mut in_deg: HashMap<&str, usize> = all_nodes.iter().map(|n| (*n, 0)).collect();
+        for (node, deps) in &self.deps {
+            in_deg.insert(node.as_str(), deps.len());
+        }
+
+        let mut queue: std::collections::VecDeque<&str> = in_deg
+            .iter()
+            .filter(|&(_, &d)| d == 0)
+            .map(|(&n, _)| n)
+            .collect();
+        let mut result = Vec::new();
+
+        while let Some(n) = queue.pop_front() {
+            result.push(n.to_string());
+            for (node, deps) in &self.deps {
+                if deps.iter().any(|d| d == n) {
+                    if let Some(deg) = in_deg.get_mut(node.as_str()) {
+                        *deg -= 1;
+                        if *deg == 0 {
+                            queue.push_back(node.as_str());
+                        }
+                    }
+                }
+            }
+        }
+
+        if result.len() == all_nodes.len() {
+            Some(result)
+        } else {
+            None // cycle detected
+        }
+    }
+
+    /// Check if a command has any dependencies declared.
+    pub fn has_dependencies(&self, command_id: &str) -> bool {
+        self.deps.get(command_id).is_some_and(|v| !v.is_empty())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1640,5 +1786,86 @@ mod tests {
         assert_eq!(batch.results().len(), 1);
         batch.clear();
         assert_eq!(batch.results().len(), 0);
+    }
+
+    // -- CommandAliasRegistry --
+
+    #[test]
+    fn alias_registry_resolve() {
+        let mut reg = CommandAliasRegistry::new();
+        reg.add_alias("fmt", "editor.format");
+        reg.add_alias("save", "editor.save");
+        assert_eq!(reg.resolve("fmt"), "editor.format");
+        assert_eq!(reg.resolve("save"), "editor.save");
+        assert_eq!(reg.resolve("unknown"), "unknown");
+        assert!(reg.is_alias("fmt"));
+        assert!(!reg.is_alias("editor.format"));
+    }
+
+    #[test]
+    fn alias_registry_remove_and_count() {
+        let mut reg = CommandAliasRegistry::new();
+        reg.add_alias("fmt", "editor.format");
+        reg.add_alias("s", "editor.save");
+        assert_eq!(reg.count(), 2);
+        assert!(reg.remove_alias("fmt"));
+        assert_eq!(reg.count(), 1);
+        assert!(!reg.remove_alias("fmt"));
+    }
+
+    #[test]
+    fn alias_registry_aliases_for() {
+        let mut reg = CommandAliasRegistry::new();
+        reg.add_alias("fmt", "editor.format");
+        reg.add_alias("f", "editor.format");
+        reg.add_alias("s", "editor.save");
+        let mut aliases = reg.aliases_for("editor.format");
+        aliases.sort();
+        assert_eq!(aliases, vec!["f", "fmt"]);
+        assert_eq!(reg.aliases_for("editor.save"), vec!["s"]);
+    }
+
+    #[test]
+    fn alias_registry_all_aliases_sorted() {
+        let mut reg = CommandAliasRegistry::new();
+        reg.add_alias("z", "cmd.z");
+        reg.add_alias("a", "cmd.a");
+        reg.add_alias("m", "cmd.m");
+        assert_eq!(reg.all_aliases(), vec!["a", "m", "z"]);
+    }
+
+    // -- CommandDependencyGraph --
+
+    #[test]
+    fn dependency_graph_basic() {
+        let mut graph = CommandDependencyGraph::new();
+        graph.add_dependency("build", "compile");
+        graph.add_dependency("build", "lint");
+        assert_eq!(graph.dependencies_of("build"), &["compile", "lint"]);
+        assert!(graph.has_dependencies("build"));
+        assert!(!graph.has_dependencies("compile"));
+    }
+
+    #[test]
+    fn dependency_graph_dependents_of() {
+        let mut graph = CommandDependencyGraph::new();
+        graph.add_dependency("test", "build");
+        graph.add_dependency("deploy", "build");
+        let mut deps = graph.dependents_of("build");
+        deps.sort();
+        assert_eq!(deps, vec!["deploy", "test"]);
+    }
+
+    #[test]
+    fn dependency_graph_execution_order() {
+        let mut graph = CommandDependencyGraph::new();
+        graph.add_dependency("test", "build");
+        graph.add_dependency("build", "compile");
+        let order = graph.execution_order().unwrap();
+        let compile_pos = order.iter().position(|s| s == "compile").unwrap();
+        let build_pos = order.iter().position(|s| s == "build").unwrap();
+        let test_pos = order.iter().position(|s| s == "test").unwrap();
+        assert!(compile_pos < build_pos);
+        assert!(build_pos < test_pos);
     }
 }

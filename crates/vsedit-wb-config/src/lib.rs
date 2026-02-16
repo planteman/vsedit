@@ -1031,6 +1031,107 @@ pub fn config_group_by_namespace<'a>(
     groups
 }
 
+
+// ---------------------------------------------------------------------------
+// Configuration filtering and transformation utilities
+// ---------------------------------------------------------------------------
+
+/// Return keys matching a glob-like pattern where `*` matches any segment.
+/// Only supports trailing wildcard: `"editor.*"` matches `"editor.fontSize"`.
+pub fn config_keys_matching(model: &ConfigurationModel, pattern: &str) -> Vec<String> {
+    if let Some(prefix) = pattern.strip_suffix(".*") {
+        model
+            .keys()
+            .into_iter()
+            .filter(|k| k.starts_with(prefix) && k.len() > prefix.len() && k.as_bytes()[prefix.len()] == b'.')
+            .map(|k| k.to_string())
+            .collect()
+    } else {
+        model
+            .keys()
+            .into_iter()
+            .filter(|k| *k == pattern)
+            .map(|k| k.to_string())
+            .collect()
+    }
+}
+
+/// Count the number of entries at each scope.
+pub fn count_by_scope(model: &ConfigurationModel) -> HashMap<ConfigurationScope, usize> {
+    let mut counts: HashMap<ConfigurationScope, usize> = HashMap::new();
+    for entry in model.snapshot() {
+        *counts.entry(entry.scope).or_insert(0) += 1;
+    }
+    counts
+}
+
+/// Produce a sorted list of `"key=value"` strings from the model.
+pub fn config_to_sorted_pairs(model: &ConfigurationModel) -> Vec<String> {
+    let mut pairs: Vec<String> = model
+        .snapshot()
+        .iter()
+        .map(|e| format!("{}={}", e.key, e.value))
+        .collect();
+    pairs.sort();
+    pairs
+}
+
+/// Return keys whose values are parseable as an integer.
+pub fn numeric_config_keys(model: &ConfigurationModel) -> Vec<String> {
+    model
+        .snapshot()
+        .into_iter()
+        .filter(|e| e.value.parse::<i64>().is_ok())
+        .map(|e| e.key)
+        .collect()
+}
+
+/// Return keys whose values are parseable as a boolean (`"true"` or `"false"`).
+pub fn boolean_config_keys(model: &ConfigurationModel) -> Vec<String> {
+    model
+        .snapshot()
+        .into_iter()
+        .filter(|e| e.value == "true" || e.value == "false")
+        .map(|e| e.key)
+        .collect()
+}
+
+/// Apply a set of overrides from `(key, value)` pairs at the given scope.
+pub fn apply_overrides(
+    model: &mut ConfigurationModel,
+    overrides: &[(&str, &str)],
+    scope: ConfigurationScope,
+) -> usize {
+    let mut count = 0;
+    for (key, value) in overrides {
+        model.set(key.to_string(), value.to_string(), scope);
+        count += 1;
+    }
+    count
+}
+
+/// Return entries where the key has exactly `depth` dot-separated segments.
+pub fn config_entries_at_depth(model: &ConfigurationModel, depth: usize) -> Vec<String> {
+    model
+        .keys()
+        .into_iter()
+        .filter(|k| k.split('.').count() == depth)
+        .map(|k| k.to_string())
+        .collect()
+}
+
+/// Produce a human-readable summary of the configuration model.
+pub fn config_summary(model: &ConfigurationModel) -> String {
+    let total = model.entry_count();
+    let ns = config_namespaces(model);
+    format!(
+        "{} entries across {} namespaces",
+        total,
+        ns.len()
+    )
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1761,4 +1862,101 @@ mod tests {
         assert_eq!(groups.get("editor").unwrap().len(), 2);
         assert_eq!(groups.get("terminal").unwrap().len(), 1);
     }
+
+    #[test]
+    fn config_keys_matching_wildcard() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        model.set("editor.tabSize".into(), "4".into(), ConfigurationScope::User);
+        model.set("terminal.shell".into(), "bash".into(), ConfigurationScope::Workspace);
+        let matches = config_keys_matching(&model, "editor.*");
+        assert_eq!(matches.len(), 2);
+        assert!(matches.contains(&"editor.fontSize".to_string()));
+        assert!(matches.contains(&"editor.tabSize".to_string()));
+    }
+
+    #[test]
+    fn config_keys_matching_exact() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        let matches = config_keys_matching(&model, "editor.fontSize");
+        assert_eq!(matches.len(), 1);
+        let no_match = config_keys_matching(&model, "nonexistent");
+        assert!(no_match.is_empty());
+    }
+
+    #[test]
+    fn count_by_scope_correct() {
+        let mut model = ConfigurationModel::new();
+        model.set("a".into(), "1".into(), ConfigurationScope::User);
+        model.set("b".into(), "2".into(), ConfigurationScope::User);
+        model.set("c".into(), "3".into(), ConfigurationScope::Workspace);
+        let counts = count_by_scope(&model);
+        assert_eq!(counts[&ConfigurationScope::User], 2);
+        assert_eq!(counts[&ConfigurationScope::Workspace], 1);
+    }
+
+    #[test]
+    fn config_to_sorted_pairs_sorted() {
+        let mut model = ConfigurationModel::new();
+        model.set("z.key".into(), "zval".into(), ConfigurationScope::User);
+        model.set("a.key".into(), "aval".into(), ConfigurationScope::User);
+        let pairs = config_to_sorted_pairs(&model);
+        assert_eq!(pairs[0], "a.key=aval");
+        assert_eq!(pairs[1], "z.key=zval");
+    }
+
+    #[test]
+    fn numeric_config_keys_filters() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        model.set("editor.wordWrap".into(), "on".into(), ConfigurationScope::User);
+        model.set("editor.tabSize".into(), "4".into(), ConfigurationScope::User);
+        let nums = numeric_config_keys(&model);
+        assert_eq!(nums.len(), 2);
+        assert!(!nums.contains(&"editor.wordWrap".to_string()));
+    }
+
+    #[test]
+    fn boolean_config_keys_filters() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.minimap".into(), "true".into(), ConfigurationScope::User);
+        model.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        model.set("editor.wordWrap".into(), "false".into(), ConfigurationScope::User);
+        let bools = boolean_config_keys(&model);
+        assert_eq!(bools.len(), 2);
+    }
+
+    #[test]
+    fn apply_overrides_sets_values() {
+        let mut model = ConfigurationModel::new();
+        let count = apply_overrides(&mut model, &[("a", "1"), ("b", "2")], ConfigurationScope::Workspace);
+        assert_eq!(count, 2);
+        assert_eq!(model.get("a"), Some("1"));
+        assert_eq!(model.get("b"), Some("2"));
+    }
+
+    #[test]
+    fn config_entries_at_depth_works() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        model.set("a.b.c".into(), "deep".into(), ConfigurationScope::User);
+        model.set("simple".into(), "val".into(), ConfigurationScope::User);
+        let depth2 = config_entries_at_depth(&model, 2);
+        assert_eq!(depth2.len(), 1);
+        assert!(depth2.contains(&"editor.fontSize".to_string()));
+        let depth3 = config_entries_at_depth(&model, 3);
+        assert_eq!(depth3.len(), 1);
+    }
+
+    #[test]
+    fn config_summary_format() {
+        let mut model = ConfigurationModel::new();
+        model.set("editor.fontSize".into(), "14".into(), ConfigurationScope::User);
+        model.set("terminal.shell".into(), "bash".into(), ConfigurationScope::User);
+        let s = config_summary(&model);
+        assert!(s.contains("2 entries"));
+        assert!(s.contains("2 namespaces"));
+    }
+
 }

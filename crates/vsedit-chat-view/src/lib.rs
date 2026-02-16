@@ -1065,6 +1065,65 @@ pub fn count_by_status(session: &ChatSession) -> Vec<(ChatMessageStatus, usize)>
     counts
 }
 
+/// Return the total character count of all message content.
+pub fn total_content_length(session: &ChatSession) -> usize {
+    session.get_messages().iter().map(|m| m.content.len()).sum()
+}
+
+/// A user→assistant exchange pair.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Exchange<'a> {
+    pub user_message: &'a ChatMessage,
+    pub assistant_message: &'a ChatMessage,
+}
+
+/// Extract consecutive user→assistant exchanges.
+pub fn extract_exchanges(session: &ChatSession) -> Vec<Exchange<'_>> {
+    let msgs = session.get_messages();
+    let mut exchanges = Vec::new();
+    let mut i = 0;
+    while i + 1 < msgs.len() {
+        if msgs[i].role == ChatRole::User && msgs[i + 1].role == ChatRole::Assistant {
+            exchanges.push(Exchange { user_message: &msgs[i], assistant_message: &msgs[i + 1] });
+            i += 2;
+        } else { i += 1; }
+    }
+    exchanges
+}
+
+/// Response ratio: assistant messages / user messages.
+pub fn response_ratio(session: &ChatSession) -> Option<f64> {
+    let user_count = session.messages_by_role(ChatRole::User).len();
+    if user_count == 0 { return None; }
+    Some(session.messages_by_role(ChatRole::Assistant).len() as f64 / user_count as f64)
+}
+
+/// Average response length (assistant messages only).
+pub fn avg_response_length(session: &ChatSession) -> Option<f64> {
+    let msgs: Vec<&ChatMessage> = session.messages_by_role(ChatRole::Assistant);
+    if msgs.is_empty() { return None; }
+    let total: usize = msgs.iter().map(|m| m.content.len()).sum();
+    Some(total as f64 / msgs.len() as f64)
+}
+
+/// Find first message containing text (case-insensitive).
+pub fn find_message_containing<'a>(session: &'a ChatSession, text: &str) -> Option<&'a ChatMessage> {
+    let lower = text.to_lowercase();
+    session.get_messages().iter().find(|m| m.content.to_lowercase().contains(&lower))
+}
+
+/// Return messages longer than a given threshold.
+pub fn messages_longer_than(session: &ChatSession, threshold: usize) -> Vec<&ChatMessage> {
+    session.get_messages().iter().filter(|m| m.content.len() > threshold).collect()
+}
+
+/// Time span between first and last message.
+pub fn session_duration(session: &ChatSession) -> u64 {
+    let msgs = session.get_messages();
+    if msgs.len() < 2 { return 0; }
+    msgs.last().map(|m| m.timestamp).unwrap_or(0).saturating_sub(msgs.first().map(|m| m.timestamp).unwrap_or(0))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1765,7 +1824,78 @@ mod tests {
         session.add_message(ChatRole::Assistant, "hello", 2);
         let counts = count_by_status(&session);
         let complete = counts.iter().find(|(s, _)| *s == ChatMessageStatus::Complete);
-        assert!(complete.is_some());
         assert_eq!(complete.unwrap().1, 2);
+    }
+
+    #[test]
+    fn total_content_length_sums() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::User, "hi", 1);
+        session.add_message(ChatRole::Assistant, "hello", 2);
+        assert_eq!(total_content_length(&session), 7);
+    }
+
+    #[test]
+    fn extract_exchanges_pairs() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::User, "q1", 1);
+        session.add_message(ChatRole::Assistant, "a1", 2);
+        session.add_message(ChatRole::User, "q2", 3);
+        session.add_message(ChatRole::Assistant, "a2", 4);
+        let exchanges = extract_exchanges(&session);
+        assert_eq!(exchanges.len(), 2);
+        assert_eq!(exchanges[0].user_message.content, "q1");
+    }
+
+    #[test]
+    fn extract_exchanges_skips_unpaired() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::System, "init", 0);
+        session.add_message(ChatRole::User, "q", 1);
+        session.add_message(ChatRole::Assistant, "a", 2);
+        assert_eq!(extract_exchanges(&session).len(), 1);
+    }
+
+    #[test]
+    fn response_ratio_computes() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::User, "q", 1);
+        session.add_message(ChatRole::Assistant, "a", 2);
+        assert!((response_ratio(&session).unwrap() - 1.0).abs() < f64::EPSILON);
+        assert!(response_ratio(&ChatSession::new("s2")).is_none());
+    }
+
+    #[test]
+    fn avg_response_length_computes() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::Assistant, "short", 1);
+        session.add_message(ChatRole::Assistant, "a longer response", 2);
+        let avg = avg_response_length(&session).unwrap();
+        assert!((avg - 11.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn find_message_containing_finds() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::User, "How does Rust work?", 1);
+        assert!(find_message_containing(&session, "rust").is_some());
+        assert!(find_message_containing(&session, "python").is_none());
+    }
+
+    #[test]
+    fn messages_longer_than_filters() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::User, "hi", 1);
+        session.add_message(ChatRole::Assistant, "a much longer response", 2);
+        assert_eq!(messages_longer_than(&session, 10).len(), 1);
+    }
+
+    #[test]
+    fn session_duration_computes() {
+        let mut session = ChatSession::new("s1");
+        session.add_message(ChatRole::User, "hi", 100);
+        session.add_message(ChatRole::Assistant, "hello", 500);
+        assert_eq!(session_duration(&session), 400);
+        assert_eq!(session_duration(&ChatSession::new("s2")), 0);
     }
 }

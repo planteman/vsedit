@@ -12,7 +12,10 @@
 //! - **50+ default keybindings** matching VS Code
 
 use vsedit_contextkey::{ContextKeyExpr, IContext};
-use vsedit_keybindings::{keybinding_matches, parse_keybinding, Keybinding};
+use vsedit_keybindings::{
+    keybinding_matches, parse_keybinding, serialize_keybinding, Keybinding,
+    ResolvedKeybinding, SimpleResolvedKeybinding,
+};
 use vsedit_keycodes::{KeyCode, KeyCodeChord};
 use vsedit_platform::Platform;
 
@@ -367,6 +370,172 @@ fn pick_best_rule<'a>(prev: &'a KeybindingRule, candidate: &'a KeybindingRule) -
 impl Default for KeybindingResolver {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingRule — additional methods
+// ---------------------------------------------------------------------------
+
+impl KeybindingRule {
+    /// Returns `true` if this rule is a removal/negation rule (command starts
+    /// with `-`).
+    pub fn is_removal(&self) -> bool {
+        self.command.starts_with('-')
+    }
+
+    /// For removal rules, returns the command name being removed (without the
+    /// leading `-`). Returns `None` for normal rules.
+    pub fn removal_target(&self) -> Option<&str> {
+        if self.is_removal() {
+            Some(&self.command[1..])
+        } else {
+            None
+        }
+    }
+
+    /// Returns true if this rule has a when-clause guard.
+    pub fn is_conditional(&self) -> bool {
+        self.when.is_some()
+    }
+
+    /// Returns the number of chords in the keybinding (1 for single-chord,
+    /// 2 for two-chord sequences like Ctrl+K Ctrl+C).
+    pub fn chord_count(&self) -> usize {
+        self.keybinding.parts.len()
+    }
+
+    /// Returns a human-readable label for this rule's keybinding on the given
+    /// platform.
+    pub fn label(&self, platform: Platform) -> String {
+        let resolved = SimpleResolvedKeybinding::new(
+            self.keybinding.clone(),
+            platform,
+        );
+        resolved.get_label()
+    }
+
+    /// Serialize the keybinding to a canonical dispatch string
+    /// (e.g. `"ctrl+k ctrl+c"`).
+    pub fn serialize_key(&self) -> String {
+        serialize_keybinding(&self.keybinding)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingSource — additional methods
+// ---------------------------------------------------------------------------
+
+impl KeybindingSource {
+    /// Returns the extension ID if this source is an extension, `None`
+    /// otherwise.
+    pub fn extension_id(&self) -> Option<&str> {
+        match self {
+            Self::Extension(id) => Some(id),
+            _ => None,
+        }
+    }
+
+    /// Returns `true` when this source represents a user-defined keybinding.
+    pub fn is_user(&self) -> bool {
+        matches!(self, Self::User)
+    }
+
+    /// Returns a display string for UI purposes.
+    pub fn display_name(&self) -> String {
+        match self {
+            Self::Default => "Default".to_string(),
+            Self::Extension(id) => format!("Extension ({id})"),
+            Self::User => "User".to_string(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ResolveResult — additional methods
+// ---------------------------------------------------------------------------
+
+impl ResolveResult {
+    /// Returns `true` when the result is a successful command match.
+    pub fn is_match(&self) -> bool {
+        matches!(self, Self::CommandMatch { .. })
+    }
+
+    /// Extract the matched command name, if any.
+    pub fn command(&self) -> Option<&str> {
+        match self {
+            Self::CommandMatch { command, .. } => Some(command),
+            _ => None,
+        }
+    }
+
+    /// Extract the matched command args, if any.
+    pub fn args(&self) -> Option<&[String]> {
+        match self {
+            Self::CommandMatch { args: Some(a), .. } => Some(a),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingResolver — additional query / bulk methods
+// ---------------------------------------------------------------------------
+
+impl KeybindingResolver {
+    /// Return the number of registered rules (including removals).
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+
+    /// Remove all rules whose command matches the given string exactly.
+    pub fn remove_rules_for_command(&mut self, command: &str) {
+        self.rules.retain(|r| r.command != command);
+    }
+
+    /// Remove all rules originating from a given extension ID.
+    pub fn remove_rules_from_extension(&mut self, ext_id: &str) {
+        self.rules.retain(|r| match &r.source {
+            KeybindingSource::Extension(id) => id != ext_id,
+            _ => true,
+        });
+    }
+
+    /// Return all unique command IDs (excluding removal rules).
+    pub fn command_ids(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self
+            .rules
+            .iter()
+            .filter(|r| !r.is_removal())
+            .map(|r| r.command.clone())
+            .collect();
+        ids.sort();
+        ids.dedup();
+        ids
+    }
+
+    /// Bulk-add rules from a JSON keybindings string.  Convenience wrapper
+    /// around [`load_keybindings_json`].
+    pub fn load_json(&mut self, json: &str, platform: Platform) -> Result<usize, String> {
+        let rules = load_keybindings_json(json, platform)?;
+        let count = rules.len();
+        for rule in rules {
+            self.add_rule(rule);
+        }
+        Ok(count)
+    }
+
+    /// Returns true if any registered rule maps to the given command.
+    pub fn has_command(&self, command: &str) -> bool {
+        self.rules.iter().any(|r| r.command == command)
+    }
+
+    /// Returns all rules contributed by the given extension.
+    pub fn rules_from_extension(&self, ext_id: &str) -> Vec<&KeybindingRule> {
+        self.rules
+            .iter()
+            .filter(|r| r.source.extension_id() == Some(ext_id))
+            .collect()
     }
 }
 
@@ -1735,5 +1904,300 @@ mod tests {
 
         resolver.reset_chord_state();
         assert_eq!(resolver.chord_state(), &ChordState::None);
+    }
+
+    // =====================================================================
+    // KeybindingRule methods
+    // =====================================================================
+
+    #[test]
+    fn rule_is_removal() {
+        let normal = rule(
+            &[KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)],
+            "save",
+        );
+        assert!(!normal.is_removal());
+        assert!(normal.removal_target().is_none());
+
+        let removal = rule(
+            &[KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)],
+            "-save",
+        );
+        assert!(removal.is_removal());
+        assert_eq!(removal.removal_target(), Some("save"));
+    }
+
+    #[test]
+    fn rule_is_conditional() {
+        let uncond = rule(
+            &[KeyCodeChord::just(KeyCode::F5)],
+            "debug.start",
+        );
+        assert!(!uncond.is_conditional());
+
+        let cond = rule_when(
+            &[KeyCodeChord::just(KeyCode::F5)],
+            "debug.start",
+            "inDebugMode",
+        );
+        assert!(cond.is_conditional());
+    }
+
+    #[test]
+    fn rule_chord_count() {
+        let single = rule(
+            &[KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)],
+            "save",
+        );
+        assert_eq!(single.chord_count(), 1);
+
+        let multi = rule(
+            &[
+                KeyCodeChord::new(true, false, false, false, KeyCode::KeyK),
+                KeyCodeChord::new(true, false, false, false, KeyCode::KeyC),
+            ],
+            "comment",
+        );
+        assert_eq!(multi.chord_count(), 2);
+    }
+
+    #[test]
+    fn rule_serialize_key() {
+        let r = rule(
+            &[KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)],
+            "save",
+        );
+        let serialized = r.serialize_key();
+        assert!(!serialized.is_empty());
+        // Should contain 'ctrl' and 's' (case-insensitive)
+        let lower = serialized.to_lowercase();
+        assert!(lower.contains("ctrl"), "expected ctrl in '{lower}'");
+    }
+
+    #[test]
+    fn rule_label_not_empty() {
+        let r = rule(
+            &[KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)],
+            "save",
+        );
+        let label = r.label(Platform::Linux);
+        assert!(!label.is_empty());
+    }
+
+    // =====================================================================
+    // KeybindingSource methods
+    // =====================================================================
+
+    #[test]
+    fn source_extension_id() {
+        assert_eq!(
+            KeybindingSource::Extension("rust-analyzer".into()).extension_id(),
+            Some("rust-analyzer"),
+        );
+        assert_eq!(KeybindingSource::Default.extension_id(), None);
+        assert_eq!(KeybindingSource::User.extension_id(), None);
+    }
+
+    #[test]
+    fn source_is_user() {
+        assert!(KeybindingSource::User.is_user());
+        assert!(!KeybindingSource::Default.is_user());
+        assert!(!KeybindingSource::Extension("x".into()).is_user());
+    }
+
+    #[test]
+    fn source_display_name() {
+        assert_eq!(KeybindingSource::Default.display_name(), "Default");
+        assert_eq!(KeybindingSource::User.display_name(), "User");
+        assert_eq!(
+            KeybindingSource::Extension("myext".into()).display_name(),
+            "Extension (myext)",
+        );
+    }
+
+    // =====================================================================
+    // ResolveResult methods
+    // =====================================================================
+
+    #[test]
+    fn resolve_result_accessors() {
+        let no_match = ResolveResult::NoMatch;
+        assert!(!no_match.is_match());
+        assert!(no_match.command().is_none());
+        assert!(no_match.args().is_none());
+
+        let more = ResolveResult::MoreChordsNeeded;
+        assert!(!more.is_match());
+        assert!(more.command().is_none());
+
+        let matched = ResolveResult::CommandMatch {
+            command: "save".into(),
+            args: Some(vec!["--force".into()]),
+        };
+        assert!(matched.is_match());
+        assert_eq!(matched.command(), Some("save"));
+        assert_eq!(matched.args(), Some(&["--force".to_string()][..]));
+    }
+
+    #[test]
+    fn resolve_result_no_args() {
+        let matched = ResolveResult::CommandMatch {
+            command: "save".into(),
+            args: None,
+        };
+        assert!(matched.is_match());
+        assert!(matched.args().is_none());
+    }
+
+    // =====================================================================
+    // KeybindingResolver — additional methods
+    // =====================================================================
+
+    #[test]
+    fn resolver_rule_count() {
+        let mut resolver = KeybindingResolver::new();
+        assert_eq!(resolver.rule_count(), 0);
+
+        resolver.add_rule(rule(
+            &[KeyCodeChord::just(KeyCode::F1)],
+            "cmd1",
+        ));
+        resolver.add_rule(rule(
+            &[KeyCodeChord::just(KeyCode::F2)],
+            "cmd2",
+        ));
+        assert_eq!(resolver.rule_count(), 2);
+    }
+
+    #[test]
+    fn resolver_remove_rules_for_command() {
+        let mut resolver = KeybindingResolver::new();
+        resolver.add_rule(rule(&[KeyCodeChord::just(KeyCode::F1)], "save"));
+        resolver.add_rule(rule(&[KeyCodeChord::just(KeyCode::F2)], "save"));
+        resolver.add_rule(rule(&[KeyCodeChord::just(KeyCode::F3)], "copy"));
+        assert_eq!(resolver.rule_count(), 3);
+
+        resolver.remove_rules_for_command("save");
+        assert_eq!(resolver.rule_count(), 1);
+        assert_eq!(resolver.rules()[0].command, "copy");
+    }
+
+    #[test]
+    fn resolver_remove_rules_from_extension() {
+        let mut resolver = KeybindingResolver::new();
+        resolver.add_rule(rule_with_source(
+            &[KeyCodeChord::just(KeyCode::F1)],
+            "ext.cmd",
+            KeybindingSource::Extension("ext-a".into()),
+        ));
+        resolver.add_rule(rule_with_source(
+            &[KeyCodeChord::just(KeyCode::F2)],
+            "ext.cmd2",
+            KeybindingSource::Extension("ext-b".into()),
+        ));
+        resolver.add_rule(rule(
+            &[KeyCodeChord::just(KeyCode::F3)],
+            "default.cmd",
+        ));
+        assert_eq!(resolver.rule_count(), 3);
+
+        resolver.remove_rules_from_extension("ext-a");
+        assert_eq!(resolver.rule_count(), 2);
+        assert!(resolver.rules_from_extension("ext-a").is_empty());
+        assert_eq!(resolver.rules_from_extension("ext-b").len(), 1);
+    }
+
+    #[test]
+    fn resolver_command_ids() {
+        let mut resolver = KeybindingResolver::new();
+        resolver.add_rule(rule(&[KeyCodeChord::just(KeyCode::F1)], "zzz.cmd"));
+        resolver.add_rule(rule(&[KeyCodeChord::just(KeyCode::F2)], "aaa.cmd"));
+        resolver.add_rule(rule(&[KeyCodeChord::just(KeyCode::F3)], "aaa.cmd")); // dup
+        resolver.add_rule(rule(&[KeyCodeChord::just(KeyCode::F4)], "-zzz.removed"));
+
+        let ids = resolver.command_ids();
+        assert_eq!(ids, vec!["aaa.cmd", "zzz.cmd"]);
+    }
+
+    #[test]
+    fn resolver_has_command() {
+        let mut resolver = KeybindingResolver::new();
+        resolver.add_rule(rule(&[KeyCodeChord::just(KeyCode::F1)], "save"));
+        assert!(resolver.has_command("save"));
+        assert!(!resolver.has_command("copy"));
+    }
+
+    #[test]
+    fn resolver_load_json() {
+        let mut resolver = KeybindingResolver::new();
+        let json = r#"[
+            { "key": "ctrl+s", "command": "save" },
+            { "key": "ctrl+z", "command": "undo" }
+        ]"#;
+        let count = resolver.load_json(json, Platform::Linux).unwrap();
+        assert_eq!(count, 2);
+        assert_eq!(resolver.rule_count(), 2);
+        assert!(resolver.has_command("save"));
+        assert!(resolver.has_command("undo"));
+    }
+
+    #[test]
+    fn resolver_load_json_error() {
+        let mut resolver = KeybindingResolver::new();
+        let result = resolver.load_json("not json", Platform::Linux);
+        assert!(result.is_err());
+        assert_eq!(resolver.rule_count(), 0);
+    }
+
+    #[test]
+    fn resolver_rules_from_extension() {
+        let mut resolver = KeybindingResolver::new();
+        resolver.add_rule(rule_with_source(
+            &[KeyCodeChord::just(KeyCode::F1)],
+            "ext.cmd1",
+            KeybindingSource::Extension("my-ext".into()),
+        ));
+        resolver.add_rule(rule_with_source(
+            &[KeyCodeChord::just(KeyCode::F2)],
+            "ext.cmd2",
+            KeybindingSource::Extension("my-ext".into()),
+        ));
+        resolver.add_rule(rule(
+            &[KeyCodeChord::just(KeyCode::F3)],
+            "default.cmd",
+        ));
+
+        let ext_rules = resolver.rules_from_extension("my-ext");
+        assert_eq!(ext_rules.len(), 2);
+        assert!(resolver.rules_from_extension("other").is_empty());
+    }
+
+    // =====================================================================
+    // Default resolver builder integration
+    // =====================================================================
+
+    #[test]
+    fn default_resolver_command_ids_are_sorted_and_deduped() {
+        let mut resolver = KeybindingResolver::new();
+        register_default_keybindings(&mut resolver);
+        let ids = resolver.command_ids();
+        // Must be sorted
+        for w in ids.windows(2) {
+            assert!(w[0] <= w[1], "not sorted: {} > {}", w[0], w[1]);
+        }
+        // No duplicates
+        let unique: std::collections::HashSet<&String> = ids.iter().collect();
+        assert_eq!(ids.len(), unique.len());
+    }
+
+    #[test]
+    fn default_resolver_has_expected_commands() {
+        let mut resolver = KeybindingResolver::new();
+        register_default_keybindings(&mut resolver);
+        assert!(resolver.has_command("undo"));
+        assert!(resolver.has_command("redo"));
+        assert!(resolver.has_command("workbench.action.files.save"));
+        assert!(resolver.has_command("workbench.action.showCommands"));
+        assert!(!resolver.has_command("nonexistent.command"));
     }
 }

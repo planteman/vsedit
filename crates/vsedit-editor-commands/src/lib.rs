@@ -1152,6 +1152,247 @@ pub fn remove_duplicate_lines(text: &str) -> String {
     result.join("\n")
 }
 
+// ---------------------------------------------------------------------------
+// Text editing operations
+// ---------------------------------------------------------------------------
+
+/// Delete a word to the left of the cursor position on a single line.
+/// Returns the new line content and the new cursor column, or `None` if
+/// the cursor is at position 0.
+pub fn delete_word_left(line: &str, cursor_col: usize) -> Option<(String, usize)> {
+    let chars: Vec<char> = line.chars().collect();
+    if cursor_col == 0 || chars.is_empty() {
+        return None;
+    }
+    let col = cursor_col.min(chars.len());
+
+    // Skip whitespace to the left
+    let mut pos = col;
+    while pos > 0 && chars[pos - 1].is_whitespace() {
+        pos -= 1;
+    }
+    // Skip word characters to the left
+    while pos > 0 && !chars[pos - 1].is_whitespace() {
+        pos -= 1;
+    }
+
+    let mut result: Vec<char> = Vec::with_capacity(chars.len());
+    result.extend_from_slice(&chars[..pos]);
+    result.extend_from_slice(&chars[col..]);
+    Some((result.into_iter().collect(), pos))
+}
+
+/// Delete a word to the right of the cursor position on a single line.
+/// Returns the new line content, or `None` if the cursor is at the end.
+pub fn delete_word_right(line: &str, cursor_col: usize) -> Option<(String, usize)> {
+    let chars: Vec<char> = line.chars().collect();
+    if cursor_col >= chars.len() {
+        return None;
+    }
+
+    let mut pos = cursor_col;
+    // Skip word characters to the right
+    while pos < chars.len() && !chars[pos].is_whitespace() {
+        pos += 1;
+    }
+    // Skip whitespace to the right
+    while pos < chars.len() && chars[pos].is_whitespace() {
+        pos += 1;
+    }
+
+    let mut result: Vec<char> = Vec::with_capacity(chars.len());
+    result.extend_from_slice(&chars[..cursor_col]);
+    result.extend_from_slice(&chars[pos..]);
+    Some((result.into_iter().collect(), cursor_col))
+}
+
+/// Delete everything to the left of the cursor on a single line.
+pub fn delete_all_left(line: &str, cursor_col: usize) -> String {
+    let chars: Vec<char> = line.chars().collect();
+    let col = cursor_col.min(chars.len());
+    chars[col..].iter().collect()
+}
+
+/// Delete everything to the right of the cursor on a single line.
+pub fn delete_all_right(line: &str, cursor_col: usize) -> String {
+    let chars: Vec<char> = line.chars().collect();
+    let col = cursor_col.min(chars.len());
+    chars[..col].iter().collect()
+}
+
+/// Transform the selected text to title case (first letter of each word uppercase).
+pub fn transform_to_title_case(text: &str) -> String {
+    text.split_whitespace()
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => {
+                    let upper: String = first.to_uppercase().collect();
+                    let rest: String = chars.flat_map(|c| c.to_lowercase()).collect();
+                    format!("{upper}{rest}")
+                }
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Convert a camelCase or PascalCase identifier to snake_case.
+pub fn to_snake_case(text: &str) -> String {
+    let mut result = String::with_capacity(text.len() + 4);
+    for (i, ch) in text.chars().enumerate() {
+        if ch.is_uppercase() && i > 0 {
+            result.push('_');
+        }
+        for lc in ch.to_lowercase() {
+            result.push(lc);
+        }
+    }
+    result
+}
+
+/// Convert a snake_case identifier to camelCase.
+pub fn to_camel_case(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut capitalize_next = false;
+    for ch in text.chars() {
+        if ch == '_' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            for uc in ch.to_uppercase() {
+                result.push(uc);
+            }
+            capitalize_next = false;
+        } else {
+            result.push(ch);
+        }
+    }
+    result
+}
+
+/// Reverse the characters in each line, preserving line structure.
+pub fn reverse_lines_content(text: &str) -> String {
+    text.lines()
+        .map(|l| l.chars().rev().collect::<String>())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Trim trailing whitespace from every line.
+pub fn trim_trailing_whitespace(text: &str) -> String {
+    text.lines()
+        .map(|l| l.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Insert text at a specific line and column position.
+/// Returns the modified full text, or `None` if line is out of bounds.
+pub fn insert_text_at(text: &str, line_index: usize, col: usize, insertion: &str) -> Option<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    if line_index >= lines.len() {
+        return None;
+    }
+    let line = lines[line_index];
+    let chars: Vec<char> = line.chars().collect();
+    let col = col.min(chars.len());
+
+    let mut new_line = String::with_capacity(line.len() + insertion.len());
+    new_line.extend(&chars[..col]);
+    new_line.push_str(insertion);
+    new_line.extend(&chars[col..]);
+
+    let mut result: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
+    result[line_index] = new_line;
+    Some(result.join("\n"))
+}
+
+/// Extract a substring from a specific line by column range.
+/// Returns `None` if the line is out of bounds or the range is invalid.
+pub fn extract_range(text: &str, line_index: usize, start_col: usize, end_col: usize) -> Option<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    if line_index >= lines.len() {
+        return None;
+    }
+    let chars: Vec<char> = lines[line_index].chars().collect();
+    if start_col > end_col || end_col > chars.len() {
+        return None;
+    }
+    Some(chars[start_col..end_col].iter().collect())
+}
+
+/// Remove all blank lines from the text.
+pub fn remove_blank_lines(text: &str) -> String {
+    text.lines()
+        .filter(|l| !l.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Collapse runs of multiple blank lines into a single blank line.
+pub fn collapse_blank_lines(text: &str) -> String {
+    let mut result: Vec<&str> = Vec::new();
+    let mut prev_blank = false;
+    for line in text.lines() {
+        let is_blank = line.trim().is_empty();
+        if is_blank && prev_blank {
+            continue;
+        }
+        result.push(line);
+        prev_blank = is_blank;
+    }
+    result.join("\n")
+}
+
+impl CoreEditorCommand {
+    /// Returns `true` if this command requires an active text selection to be meaningful.
+    pub fn requires_selection(&self) -> bool {
+        matches!(
+            self,
+            Self::TransformToUppercase | Self::TransformToLowercase | Self::Cut | Self::Copy
+        )
+    }
+
+    /// Returns `true` if this command is an undo/redo operation.
+    pub fn is_history_navigation(&self) -> bool {
+        matches!(self, Self::Undo | Self::Redo)
+    }
+
+    /// Returns the opposite/inverse command, if one exists.
+    pub fn inverse(&self) -> Option<CoreEditorCommand> {
+        match self {
+            Self::Undo => Some(Self::Redo),
+            Self::Redo => Some(Self::Undo),
+            Self::DeleteLeft => Some(Self::DeleteRight),
+            Self::DeleteRight => Some(Self::DeleteLeft),
+            Self::CursorLeft => Some(Self::CursorRight),
+            Self::CursorRight => Some(Self::CursorLeft),
+            Self::CursorUp => Some(Self::CursorDown),
+            Self::CursorDown => Some(Self::CursorUp),
+            Self::CursorWordLeft => Some(Self::CursorWordRight),
+            Self::CursorWordRight => Some(Self::CursorWordLeft),
+            Self::CursorLineStart => Some(Self::CursorLineEnd),
+            Self::CursorLineEnd => Some(Self::CursorLineStart),
+            Self::CursorTop => Some(Self::CursorBottom),
+            Self::CursorBottom => Some(Self::CursorTop),
+            Self::CursorPageUp => Some(Self::CursorPageDown),
+            Self::CursorPageDown => Some(Self::CursorPageUp),
+            Self::IndentLine => Some(Self::OutdentLine),
+            Self::OutdentLine => Some(Self::IndentLine),
+            Self::MoveLinesUp => Some(Self::MoveLinesDown),
+            Self::MoveLinesDown => Some(Self::MoveLinesUp),
+            Self::SelectLeft => Some(Self::SelectRight),
+            Self::SelectRight => Some(Self::SelectLeft),
+            Self::SelectUp => Some(Self::SelectDown),
+            Self::SelectDown => Some(Self::SelectUp),
+            Self::TransformToUppercase => Some(Self::TransformToLowercase),
+            Self::TransformToLowercase => Some(Self::TransformToUppercase),
+            _ => None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1739,5 +1980,220 @@ mod tests {
     #[test]
     fn remove_duplicate_lines_empty() {
         assert_eq!(remove_duplicate_lines(""), "");
+    }
+
+    // ── delete_word_left / delete_word_right tests ──
+
+    #[test]
+    fn delete_word_left_middle_of_line() {
+        // "hello world foo" cursor at col 11 (after "world "), deletes "world " → "hello foo"
+        let (result, col) = delete_word_left("hello world foo", 11).unwrap();
+        assert_eq!(result, "hello  foo");
+        assert_eq!(col, 6);
+    }
+
+    #[test]
+    fn delete_word_left_at_start() {
+        assert!(delete_word_left("hello", 0).is_none());
+    }
+
+    #[test]
+    fn delete_word_left_single_word() {
+        let (result, col) = delete_word_left("hello", 5).unwrap();
+        assert_eq!(result, "");
+        assert_eq!(col, 0);
+    }
+
+    #[test]
+    fn delete_word_right_middle_of_line() {
+        let (result, col) = delete_word_right("hello world foo", 6).unwrap();
+        assert_eq!(result, "hello foo");
+        assert_eq!(col, 6);
+    }
+
+    #[test]
+    fn delete_word_right_at_end() {
+        assert!(delete_word_right("hello", 5).is_none());
+    }
+
+    #[test]
+    fn delete_word_right_from_start() {
+        let (result, col) = delete_word_right("hello world", 0).unwrap();
+        assert_eq!(result, "world");
+        assert_eq!(col, 0);
+    }
+
+    // ── delete_all_left / delete_all_right tests ──
+
+    #[test]
+    fn delete_all_left_middle() {
+        assert_eq!(delete_all_left("hello world", 5), " world");
+    }
+
+    #[test]
+    fn delete_all_left_at_start() {
+        assert_eq!(delete_all_left("hello", 0), "hello");
+    }
+
+    #[test]
+    fn delete_all_right_middle() {
+        assert_eq!(delete_all_right("hello world", 5), "hello");
+    }
+
+    #[test]
+    fn delete_all_right_at_end() {
+        assert_eq!(delete_all_right("hello", 5), "hello");
+    }
+
+    // ── transform_to_title_case tests ──
+
+    #[test]
+    fn title_case_basic() {
+        assert_eq!(transform_to_title_case("hello world"), "Hello World");
+    }
+
+    #[test]
+    fn title_case_already_upper() {
+        assert_eq!(transform_to_title_case("HELLO WORLD"), "Hello World");
+    }
+
+    #[test]
+    fn title_case_empty() {
+        assert_eq!(transform_to_title_case(""), "");
+    }
+
+    // ── to_snake_case / to_camel_case tests ──
+
+    #[test]
+    fn snake_case_from_camel() {
+        assert_eq!(to_snake_case("helloWorld"), "hello_world");
+    }
+
+    #[test]
+    fn snake_case_from_pascal() {
+        assert_eq!(to_snake_case("HelloWorld"), "hello_world");
+    }
+
+    #[test]
+    fn camel_case_from_snake() {
+        assert_eq!(to_camel_case("hello_world"), "helloWorld");
+    }
+
+    #[test]
+    fn camel_case_no_underscores() {
+        assert_eq!(to_camel_case("hello"), "hello");
+    }
+
+    // ── reverse_lines_content tests ──
+
+    #[test]
+    fn reverse_lines_content_basic() {
+        assert_eq!(reverse_lines_content("abc\ndef"), "cba\nfed");
+    }
+
+    #[test]
+    fn reverse_lines_content_single() {
+        assert_eq!(reverse_lines_content("hello"), "olleh");
+    }
+
+    // ── trim_trailing_whitespace tests ──
+
+    #[test]
+    fn trim_trailing_whitespace_basic() {
+        assert_eq!(
+            trim_trailing_whitespace("hello  \nworld\t\nfoo"),
+            "hello\nworld\nfoo"
+        );
+    }
+
+    #[test]
+    fn trim_trailing_whitespace_preserves_leading() {
+        assert_eq!(
+            trim_trailing_whitespace("  hello  \n  world  "),
+            "  hello\n  world"
+        );
+    }
+
+    // ── insert_text_at tests ──
+
+    #[test]
+    fn insert_text_at_middle() {
+        let result = insert_text_at("hello world", 0, 5, " beautiful").unwrap();
+        assert_eq!(result, "hello beautiful world");
+    }
+
+    #[test]
+    fn insert_text_at_start() {
+        let result = insert_text_at("world", 0, 0, "hello ").unwrap();
+        assert_eq!(result, "hello world");
+    }
+
+    #[test]
+    fn insert_text_at_out_of_bounds_line() {
+        assert!(insert_text_at("hello", 5, 0, "x").is_none());
+    }
+
+    // ── extract_range tests ──
+
+    #[test]
+    fn extract_range_basic() {
+        let result = extract_range("hello world", 0, 6, 11).unwrap();
+        assert_eq!(result, "world");
+    }
+
+    #[test]
+    fn extract_range_invalid() {
+        assert!(extract_range("hello", 0, 3, 1).is_none());
+        assert!(extract_range("hello", 0, 0, 10).is_none());
+    }
+
+    // ── remove_blank_lines / collapse_blank_lines tests ──
+
+    #[test]
+    fn remove_blank_lines_basic() {
+        assert_eq!(remove_blank_lines("a\n\nb\n  \nc"), "a\nb\nc");
+    }
+
+    #[test]
+    fn collapse_blank_lines_basic() {
+        assert_eq!(collapse_blank_lines("a\n\n\nb\n\nc"), "a\n\nb\n\nc");
+    }
+
+    // ── CoreEditorCommand extension method tests ──
+
+    #[test]
+    fn requires_selection_correct() {
+        assert!(CoreEditorCommand::TransformToUppercase.requires_selection());
+        assert!(CoreEditorCommand::Cut.requires_selection());
+        assert!(!CoreEditorCommand::Undo.requires_selection());
+        assert!(!CoreEditorCommand::CursorLeft.requires_selection());
+    }
+
+    #[test]
+    fn is_history_navigation_correct() {
+        assert!(CoreEditorCommand::Undo.is_history_navigation());
+        assert!(CoreEditorCommand::Redo.is_history_navigation());
+        assert!(!CoreEditorCommand::Type.is_history_navigation());
+    }
+
+    #[test]
+    fn inverse_symmetry() {
+        let undo_inv = CoreEditorCommand::Undo.inverse().unwrap();
+        assert_eq!(undo_inv, CoreEditorCommand::Redo);
+        let redo_inv = undo_inv.inverse().unwrap();
+        assert_eq!(redo_inv, CoreEditorCommand::Undo);
+    }
+
+    #[test]
+    fn inverse_cursor_pairs() {
+        assert_eq!(CoreEditorCommand::CursorLeft.inverse(), Some(CoreEditorCommand::CursorRight));
+        assert_eq!(CoreEditorCommand::CursorUp.inverse(), Some(CoreEditorCommand::CursorDown));
+        assert_eq!(CoreEditorCommand::CursorTop.inverse(), Some(CoreEditorCommand::CursorBottom));
+        assert_eq!(CoreEditorCommand::IndentLine.inverse(), Some(CoreEditorCommand::OutdentLine));
+    }
+
+    #[test]
+    fn inverse_none_for_type() {
+        assert!(CoreEditorCommand::Type.inverse().is_none());
     }
 }

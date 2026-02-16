@@ -1050,6 +1050,169 @@ impl ZoneTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CellSearchResult – structured search results
+// ---------------------------------------------------------------------------
+
+/// A single match found within a cell's source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CellSearchMatch {
+    /// The cell ID where the match was found.
+    pub cell_id: String,
+    /// Zero-based line number within the cell source.
+    pub line: usize,
+    /// Zero-based column where the match starts.
+    pub col: usize,
+    /// The matched text fragment.
+    pub matched_text: String,
+}
+
+/// Performs a structured search across all cells in a session.
+pub fn search_cells_detailed(session: &InteractiveSession, query: &str) -> Vec<CellSearchMatch> {
+    let q = query.to_lowercase();
+    let mut results = Vec::new();
+    for cell in session.get_cells() {
+        for (line_idx, line) in cell.source.lines().enumerate() {
+            let lower = line.to_lowercase();
+            let mut start = 0;
+            while let Some(pos) = lower[start..].find(&q) {
+                let col = start + pos;
+                let end = col + query.len();
+                let matched_text = line[col..end.min(line.len())].to_string();
+                results.push(CellSearchMatch {
+                    cell_id: cell.id.clone(),
+                    line: line_idx,
+                    col,
+                    matched_text,
+                });
+                start = col + 1;
+            }
+        }
+    }
+    results
+}
+
+// ---------------------------------------------------------------------------
+// SessionStatistics – aggregate session metrics
+// ---------------------------------------------------------------------------
+
+/// Aggregate statistics about an interactive session.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionStatistics {
+    pub total_cells: usize,
+    pub code_cells: usize,
+    pub markup_cells: usize,
+    pub total_lines: usize,
+    pub total_outputs: usize,
+    pub error_cells: usize,
+    pub idle_cells: usize,
+}
+
+impl SessionStatistics {
+    /// Compute statistics from a session.
+    pub fn from_session(session: &InteractiveSession) -> Self {
+        let cells = session.get_cells();
+        let total_cells = cells.len();
+        let code_cells = cells.iter().filter(|c| c.kind == CellKind::Code).count();
+        let markup_cells = cells.iter().filter(|c| c.kind == CellKind::Markup).count();
+        let total_lines: usize = cells.iter().map(|c| c.source_line_count()).sum();
+        let total_outputs: usize = cells.iter().map(|c| c.output_count()).sum();
+        let error_cells = cells.iter().filter(|c| c.status == CellStatus::Error).count();
+        let idle_cells = cells.iter().filter(|c| c.status == CellStatus::Idle).count();
+        Self {
+            total_cells,
+            code_cells,
+            markup_cells,
+            total_lines,
+            total_outputs,
+            error_cells,
+            idle_cells,
+        }
+    }
+
+    /// Fraction of cells that are code cells.
+    pub fn code_ratio(&self) -> f64 {
+        if self.total_cells == 0 {
+            return 0.0;
+        }
+        self.code_cells as f64 / self.total_cells as f64
+    }
+
+    /// Average lines per cell.
+    pub fn avg_lines_per_cell(&self) -> f64 {
+        if self.total_cells == 0 {
+            return 0.0;
+        }
+        self.total_lines as f64 / self.total_cells as f64
+    }
+}
+
+impl fmt::Display for SessionStatistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SessionStats(cells={}, code={}, markup={}, lines={}, outputs={})",
+            self.total_cells, self.code_cells, self.markup_cells,
+            self.total_lines, self.total_outputs,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CellLanguageMap – tracks language distribution
+// ---------------------------------------------------------------------------
+
+/// Counts how many cells use each programming language.
+#[derive(Debug, Clone, Default)]
+pub struct CellLanguageMap {
+    counts: HashMap<String, usize>,
+}
+
+impl CellLanguageMap {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Build a language map from a session's cells.
+    pub fn from_session(session: &InteractiveSession) -> Self {
+        let mut counts = HashMap::new();
+        for cell in session.get_cells() {
+            if cell.kind == CellKind::Code {
+                let lang = cell.language.as_deref().unwrap_or("unknown");
+                *counts.entry(lang.to_string()).or_insert(0) += 1;
+            }
+        }
+        Self { counts }
+    }
+
+    /// Get the count for a specific language.
+    pub fn count(&self, language: &str) -> usize {
+        self.counts.get(language).copied().unwrap_or(0)
+    }
+
+    /// The most common language (ties broken alphabetically).
+    pub fn dominant_language(&self) -> Option<&str> {
+        self.counts
+            .iter()
+            .max_by(|a, b| a.1.cmp(b.1).then_with(|| b.0.cmp(a.0)))
+            .map(|(k, _)| k.as_str())
+    }
+
+    /// Number of distinct languages.
+    pub fn language_count(&self) -> usize {
+        self.counts.len()
+    }
+
+    /// All languages sorted alphabetically.
+    pub fn languages(&self) -> Vec<&str> {
+        let mut langs: Vec<&str> = self.counts.keys().map(|s| s.as_str()).collect();
+        langs.sort();
+        langs
+    }
+}
+
+use std::collections::HashMap;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1653,5 +1816,75 @@ mod tests {
         assert!(unified.contains("+changed"));
         assert!(unified.contains("-line2"));
         assert!(unified.contains(" line1"));
+    }
+
+    #[test]
+    fn search_cells_detailed_finds_matches() {
+        let mut s = InteractiveSession::new();
+        s.add_cell(CellKind::Code, "let x = 42;\nlet y = x + 1;", Some("rust".into()));
+        s.add_cell(CellKind::Code, "println!(\"x is {}\", x);", Some("rust".into()));
+        let results = search_cells_detailed(&s, "x");
+        assert!(results.len() >= 3);
+        assert!(results.iter().all(|r| r.matched_text == "x"));
+    }
+
+    #[test]
+    fn search_cells_detailed_case_insensitive() {
+        let mut s = InteractiveSession::new();
+        s.add_cell(CellKind::Code, "Hello WORLD", None);
+        let results = search_cells_detailed(&s, "hello");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].matched_text, "Hello");
+    }
+
+    #[test]
+    fn session_statistics_basic() {
+        let mut s = InteractiveSession::new();
+        s.add_cell(CellKind::Code, "line1\nline2", Some("python".into()));
+        s.add_cell(CellKind::Markup, "# Title", None);
+        s.add_cell(CellKind::Code, "x = 1", Some("python".into()));
+        let stats = SessionStatistics::from_session(&s);
+        assert_eq!(stats.total_cells, 3);
+        assert_eq!(stats.code_cells, 2);
+        assert_eq!(stats.markup_cells, 1);
+        assert_eq!(stats.total_lines, 4); // 2 + 1 + 1
+        assert!((stats.code_ratio() - 2.0 / 3.0).abs() < 0.01);
+        let display = format!("{stats}");
+        assert!(display.contains("SessionStats"));
+    }
+
+    #[test]
+    fn session_statistics_empty() {
+        let s = InteractiveSession::new();
+        let stats = SessionStatistics::from_session(&s);
+        assert_eq!(stats.total_cells, 0);
+        assert_eq!(stats.code_ratio(), 0.0);
+        assert_eq!(stats.avg_lines_per_cell(), 0.0);
+    }
+
+    #[test]
+    fn cell_language_map_from_session() {
+        let mut s = InteractiveSession::new();
+        s.add_cell(CellKind::Code, "x = 1", Some("python".into()));
+        s.add_cell(CellKind::Code, "let x = 1;", Some("rust".into()));
+        s.add_cell(CellKind::Code, "y = 2", Some("python".into()));
+        s.add_cell(CellKind::Markup, "# Header", None);
+        let map = CellLanguageMap::from_session(&s);
+        assert_eq!(map.count("python"), 2);
+        assert_eq!(map.count("rust"), 1);
+        assert_eq!(map.count("java"), 0);
+        assert_eq!(map.dominant_language(), Some("python"));
+        assert_eq!(map.language_count(), 2);
+        let langs = map.languages();
+        assert_eq!(langs, vec!["python", "rust"]);
+    }
+
+    #[test]
+    fn cell_language_map_unknown_language() {
+        let mut s = InteractiveSession::new();
+        s.add_cell(CellKind::Code, "code", None);
+        let map = CellLanguageMap::from_session(&s);
+        assert_eq!(map.count("unknown"), 1);
+        assert_eq!(map.dominant_language(), Some("unknown"));
     }
 }

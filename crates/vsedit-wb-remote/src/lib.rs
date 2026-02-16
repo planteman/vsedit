@@ -1048,6 +1048,140 @@ impl fmt::Display for ReconnectionStrategy {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Port forwarding
+// ---------------------------------------------------------------------------
+
+/// Describes a forwarded port on a remote connection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ForwardedPort {
+    pub local_port: u16,
+    pub remote_port: u16,
+    pub label: Option<String>,
+    pub protocol: PortProtocol,
+}
+
+/// Protocol for forwarded ports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PortProtocol {
+    Tcp,
+    Udp,
+}
+
+impl fmt::Display for PortProtocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PortProtocol::Tcp => write!(f, "TCP"),
+            PortProtocol::Udp => write!(f, "UDP"),
+        }
+    }
+}
+
+impl ForwardedPort {
+    pub fn new(local: u16, remote: u16) -> Self {
+        Self {
+            local_port: local,
+            remote_port: remote,
+            label: None,
+            protocol: PortProtocol::Tcp,
+        }
+    }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    pub fn with_protocol(mut self, proto: PortProtocol) -> Self {
+        self.protocol = proto;
+        self
+    }
+
+    pub fn is_same_port(&self) -> bool {
+        self.local_port == self.remote_port
+    }
+}
+
+impl fmt::Display for ForwardedPort {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = self.label.as_deref().unwrap_or("unnamed");
+        write!(
+            f,
+            "{} {}:{} → :{}",
+            self.protocol, label, self.local_port, self.remote_port
+        )
+    }
+}
+
+/// Manages a collection of forwarded ports for a remote session.
+#[derive(Debug, Clone, Default)]
+pub struct PortForwardingTable {
+    ports: Vec<ForwardedPort>,
+}
+
+impl PortForwardingTable {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a forwarded port. Returns an error if the local port is already in use.
+    pub fn add(&mut self, port: ForwardedPort) -> Result<(), RemoteError> {
+        if self.ports.iter().any(|p| p.local_port == port.local_port) {
+            return Err(RemoteError::Other(format!(
+                "local port {} already forwarded",
+                port.local_port
+            )));
+        }
+        self.ports.push(port);
+        Ok(())
+    }
+
+    /// Remove a forwarded port by local port number.
+    pub fn remove(&mut self, local_port: u16) -> bool {
+        let before = self.ports.len();
+        self.ports.retain(|p| p.local_port != local_port);
+        self.ports.len() < before
+    }
+
+    /// Find a forwarded port by local port number.
+    pub fn find_by_local(&self, local_port: u16) -> Option<&ForwardedPort> {
+        self.ports.iter().find(|p| p.local_port == local_port)
+    }
+
+    /// Return all forwarded ports.
+    pub fn all(&self) -> &[ForwardedPort] {
+        &self.ports
+    }
+
+    pub fn len(&self) -> usize {
+        self.ports.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.ports.is_empty()
+    }
+
+    /// Remove all forwarded ports.
+    pub fn clear(&mut self) {
+        self.ports.clear();
+    }
+
+    /// Return a summary of forwarded ports as a display string.
+    pub fn summary(&self) -> String {
+        if self.ports.is_empty() {
+            return "No forwarded ports".to_string();
+        }
+        let entries: Vec<String> = self.ports.iter().map(|p| format!("{}", p)).collect();
+        entries.join(", ")
+    }
+}
+
+impl fmt::Display for PortForwardingTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PortForwarding({} ports)", self.ports.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1680,5 +1814,68 @@ mod tests {
         assert_eq!(pool.connected_count(), 2);
         pool.disconnect_all();
         assert_eq!(pool.connected_count(), 0);
+    }
+
+    // --- new tests ---
+
+    #[test]
+    fn forwarded_port_creation() {
+        let port = ForwardedPort::new(3000, 3000)
+            .with_label("dev server")
+            .with_protocol(PortProtocol::Tcp);
+        assert!(port.is_same_port());
+        assert_eq!(port.label.as_deref(), Some("dev server"));
+        let display = format!("{}", port);
+        assert!(display.contains("3000"));
+        assert!(display.contains("TCP"));
+    }
+
+    #[test]
+    fn port_forwarding_table_add_remove() {
+        let mut table = PortForwardingTable::new();
+        assert!(table.is_empty());
+        table.add(ForwardedPort::new(8080, 80)).unwrap();
+        table.add(ForwardedPort::new(3000, 3000)).unwrap();
+        assert_eq!(table.len(), 2);
+        // duplicate local port
+        assert!(table.add(ForwardedPort::new(8080, 9090)).is_err());
+        // find
+        assert!(table.find_by_local(8080).is_some());
+        assert!(table.find_by_local(9999).is_none());
+        // remove
+        assert!(table.remove(8080));
+        assert_eq!(table.len(), 1);
+        assert!(!table.remove(8080));
+    }
+
+    #[test]
+    fn port_forwarding_table_summary() {
+        let table = PortForwardingTable::new();
+        assert_eq!(table.summary(), "No forwarded ports");
+        let mut table2 = PortForwardingTable::new();
+        table2.add(ForwardedPort::new(8080, 80).with_label("web")).unwrap();
+        let summary = table2.summary();
+        assert!(summary.contains("8080"));
+    }
+
+    #[test]
+    fn port_forwarding_table_clear() {
+        let mut table = PortForwardingTable::new();
+        table.add(ForwardedPort::new(1111, 2222)).unwrap();
+        table.add(ForwardedPort::new(3333, 4444)).unwrap();
+        table.clear();
+        assert!(table.is_empty());
+    }
+
+    #[test]
+    fn port_protocol_display() {
+        assert_eq!(format!("{}", PortProtocol::Tcp), "TCP");
+        assert_eq!(format!("{}", PortProtocol::Udp), "UDP");
+    }
+
+    #[test]
+    fn forwarded_port_different_ports() {
+        let port = ForwardedPort::new(3000, 8080);
+        assert!(!port.is_same_port());
     }
 }

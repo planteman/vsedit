@@ -955,6 +955,202 @@ impl OutputChannelSearch {
 // OutputChannelService — channel grouping
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// OutputChannelState — content manipulation helpers
+// ---------------------------------------------------------------------------
+
+impl OutputChannelState {
+    /// Returns the byte length of the content.
+    pub fn content_len(&self) -> usize {
+        self.content.len()
+    }
+
+    /// Returns true if the content is empty.
+    pub fn is_empty(&self) -> bool {
+        self.content.is_empty()
+    }
+
+    /// Returns a specific line by zero-based index, or `None` if out of range.
+    pub fn get_line(&self, index: usize) -> Option<&str> {
+        self.content.lines().nth(index)
+    }
+
+    /// Returns the last line of content, or `None` if empty.
+    pub fn last_line(&self) -> Option<&str> {
+        self.content.lines().last()
+    }
+
+    /// Returns true if content contains the given substring.
+    pub fn contains(&self, needle: &str) -> bool {
+        self.content.contains(needle)
+    }
+
+    /// Truncate content to the last `n` lines, discarding earlier lines.
+    pub fn retain_last_lines(&mut self, n: usize) {
+        let lines: Vec<&str> = self.content.lines().collect();
+        if lines.len() <= n {
+            return;
+        }
+        let start = lines.len() - n;
+        let mut result = lines[start..].join("\n");
+        if self.content.ends_with('\n') {
+            result.push('\n');
+        }
+        self.content = result;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScrollLockState — additional helpers
+// ---------------------------------------------------------------------------
+
+impl ScrollLockState {
+    /// Returns true if the lock is currently engaged.
+    pub fn is_locked(&self) -> bool {
+        self.locked
+    }
+
+    /// Returns the frozen line number, or 0 if not locked.
+    pub fn frozen_line_or_zero(&self) -> usize {
+        self.frozen_line.unwrap_or(0)
+    }
+
+    /// Reset lock state to unlocked defaults.
+    pub fn reset(&mut self) {
+        self.locked = false;
+        self.frozen_line = None;
+        self.lines_at_lock = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LogStore — structured log entry storage and querying
+// ---------------------------------------------------------------------------
+
+/// A store for structured log entries with filtering and querying capabilities.
+#[derive(Debug, Clone)]
+pub struct LogStore {
+    entries: Vec<LogEntry>,
+    max_entries: Option<usize>,
+}
+
+impl LogStore {
+    /// Create a new empty log store with no entry limit.
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries: None,
+        }
+    }
+
+    /// Create a log store with a maximum number of entries (oldest evicted first).
+    pub fn with_capacity(max: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries: Some(max),
+        }
+    }
+
+    /// Add a log entry. If a capacity limit is set, evicts the oldest entry when full.
+    pub fn push(&mut self, entry: LogEntry) {
+        if let Some(max) = self.max_entries {
+            if self.entries.len() >= max && max > 0 {
+                self.entries.remove(0);
+            }
+        }
+        self.entries.push(entry);
+    }
+
+    /// Number of stored entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns true if the store is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Get all entries.
+    pub fn entries(&self) -> &[LogEntry] {
+        &self.entries
+    }
+
+    /// Get entries filtered by minimum severity.
+    pub fn filter_by_severity(&self, min: &OutputSeverity) -> Vec<&LogEntry> {
+        self.entries.iter().filter(|e| e.matches_filter(min)).collect()
+    }
+
+    /// Get entries for a specific channel.
+    pub fn filter_by_channel(&self, channel_id: &str) -> Vec<&LogEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.channel_id == channel_id)
+            .collect()
+    }
+
+    /// Get entries matching both a channel id and minimum severity.
+    pub fn filter(&self, channel_id: &str, min_severity: &OutputSeverity) -> Vec<&LogEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.channel_id == channel_id && e.matches_filter(min_severity))
+            .collect()
+    }
+
+    /// Count entries by severity.
+    pub fn count_by_severity(&self, severity: &OutputSeverity) -> usize {
+        self.entries.iter().filter(|e| e.severity == *severity).count()
+    }
+
+    /// Get the most recent entry, or `None` if empty.
+    pub fn last(&self) -> Option<&LogEntry> {
+        self.entries.last()
+    }
+
+    /// Get entries whose message contains the given substring.
+    pub fn search(&self, query: &str) -> Vec<&LogEntry> {
+        self.entries.iter().filter(|e| e.message.contains(query)).collect()
+    }
+
+    /// Return entries within the given timestamp range (inclusive).
+    pub fn in_time_range(&self, start_ms: u64, end_ms: u64) -> Vec<&LogEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.timestamp_ms >= start_ms && e.timestamp_ms <= end_ms)
+            .collect()
+    }
+
+    /// Return all error entries.
+    pub fn errors(&self) -> Vec<&LogEntry> {
+        self.filter_by_severity(&OutputSeverity::Error)
+    }
+
+    /// Return all warning entries.
+    pub fn warnings(&self) -> Vec<&LogEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.severity == OutputSeverity::Warning)
+            .collect()
+    }
+}
+
+impl Default for LogStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for LogStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LogStore({} entries)", self.entries.len())
+    }
+}
+
 /// A named group of output channels.
 #[derive(Debug, Clone)]
 pub struct OutputChannelGroup {
@@ -1715,5 +1911,206 @@ mod tests {
         assert!(csv.contains("line,content"));
         let json = OutputChannelExporter::export(content, ExportFormat::Json);
         assert!(json.contains("\"text\""));
+    }
+
+    // --- OutputChannelState helpers ---
+
+    #[test]
+    fn channel_state_content_helpers() {
+        let mut svc = OutputChannelService::new();
+        svc.create_channel(desc("h"));
+        assert!(svc.get_channel("h").unwrap().is_empty());
+        assert_eq!(svc.get_channel("h").unwrap().content_len(), 0);
+
+        svc.append_line("h", "alpha");
+        svc.append_line("h", "beta");
+        svc.append_line("h", "gamma");
+
+        let ch = svc.get_channel("h").unwrap();
+        assert!(!ch.is_empty());
+        assert_eq!(ch.get_line(0), Some("alpha"));
+        assert_eq!(ch.get_line(1), Some("beta"));
+        assert_eq!(ch.get_line(5), None);
+        assert_eq!(ch.last_line(), Some("gamma"));
+        assert!(ch.contains("beta"));
+        assert!(!ch.contains("delta"));
+    }
+
+    #[test]
+    fn channel_state_retain_last_lines() {
+        let mut state = OutputChannelState {
+            descriptor: desc("r"),
+            content: "a\nb\nc\nd\ne\n".to_string(),
+            visible: false,
+        };
+        state.retain_last_lines(3);
+        assert_eq!(state.line_count(), 3);
+        assert_eq!(state.get_line(0), Some("c"));
+        assert_eq!(state.get_line(2), Some("e"));
+    }
+
+    #[test]
+    fn channel_state_retain_when_fewer_lines() {
+        let mut state = OutputChannelState {
+            descriptor: desc("r"),
+            content: "a\nb\n".to_string(),
+            visible: false,
+        };
+        state.retain_last_lines(10);
+        assert_eq!(state.line_count(), 2);
+    }
+
+    // --- ScrollLockState helpers ---
+
+    #[test]
+    fn scroll_lock_state_helpers() {
+        let mut lock = ScrollLockState::new("ch1");
+        assert!(!lock.is_locked());
+        assert_eq!(lock.frozen_line_or_zero(), 0);
+
+        lock.locked = true;
+        lock.frozen_line = Some(42);
+        lock.lines_at_lock = 50;
+        assert!(lock.is_locked());
+        assert_eq!(lock.frozen_line_or_zero(), 42);
+
+        lock.reset();
+        assert!(!lock.is_locked());
+        assert_eq!(lock.frozen_line_or_zero(), 0);
+        assert_eq!(lock.lines_at_lock, 0);
+    }
+
+    // --- LogStore tests ---
+
+    #[test]
+    fn log_store_push_and_len() {
+        let mut store = LogStore::new();
+        assert!(store.is_empty());
+        store.push(LogEntry::new(OutputSeverity::Info, "msg1", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Error, "msg2", "ch1"));
+        assert_eq!(store.len(), 2);
+        assert!(!store.is_empty());
+    }
+
+    #[test]
+    fn log_store_capacity_eviction() {
+        let mut store = LogStore::with_capacity(3);
+        store.push(LogEntry::new(OutputSeverity::Info, "a", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Info, "b", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Info, "c", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Info, "d", "ch1"));
+        assert_eq!(store.len(), 3);
+        // Oldest entry "a" should have been evicted
+        assert_eq!(store.entries()[0].message, "b");
+        assert_eq!(store.entries()[2].message, "d");
+    }
+
+    #[test]
+    fn log_store_filter_by_severity() {
+        let mut store = LogStore::new();
+        store.push(LogEntry::new(OutputSeverity::Debug, "d", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Info, "i", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Warning, "w", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Error, "e", "ch1"));
+
+        let warnings_up = store.filter_by_severity(&OutputSeverity::Warning);
+        assert_eq!(warnings_up.len(), 2);
+        assert_eq!(warnings_up[0].message, "w");
+        assert_eq!(warnings_up[1].message, "e");
+    }
+
+    #[test]
+    fn log_store_filter_by_channel() {
+        let mut store = LogStore::new();
+        store.push(LogEntry::new(OutputSeverity::Info, "a", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Info, "b", "ch2"));
+        store.push(LogEntry::new(OutputSeverity::Info, "c", "ch1"));
+
+        let ch1 = store.filter_by_channel("ch1");
+        assert_eq!(ch1.len(), 2);
+        let ch2 = store.filter_by_channel("ch2");
+        assert_eq!(ch2.len(), 1);
+    }
+
+    #[test]
+    fn log_store_combined_filter() {
+        let mut store = LogStore::new();
+        store.push(LogEntry::new(OutputSeverity::Debug, "d", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Error, "e1", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Error, "e2", "ch2"));
+        store.push(LogEntry::new(OutputSeverity::Info, "i", "ch1"));
+
+        let result = store.filter("ch1", &OutputSeverity::Warning);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message, "e1");
+    }
+
+    #[test]
+    fn log_store_count_by_severity() {
+        let mut store = LogStore::new();
+        store.push(LogEntry::new(OutputSeverity::Error, "e1", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Error, "e2", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Info, "i", "ch1"));
+        assert_eq!(store.count_by_severity(&OutputSeverity::Error), 2);
+        assert_eq!(store.count_by_severity(&OutputSeverity::Info), 1);
+        assert_eq!(store.count_by_severity(&OutputSeverity::Warning), 0);
+    }
+
+    #[test]
+    fn log_store_search_and_last() {
+        let mut store = LogStore::new();
+        store.push(LogEntry::new(OutputSeverity::Info, "build started", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Error, "build failed: timeout", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Info, "build retry", "ch1"));
+
+        let matches = store.search("build");
+        assert_eq!(matches.len(), 3);
+        let timeout = store.search("timeout");
+        assert_eq!(timeout.len(), 1);
+        assert!(timeout[0].is_error());
+
+        let last = store.last().unwrap();
+        assert_eq!(last.message, "build retry");
+    }
+
+    #[test]
+    fn log_store_time_range() {
+        let mut store = LogStore::new();
+        store.push(LogEntry::new(OutputSeverity::Info, "a", "ch1").with_timestamp(100));
+        store.push(LogEntry::new(OutputSeverity::Info, "b", "ch1").with_timestamp(200));
+        store.push(LogEntry::new(OutputSeverity::Info, "c", "ch1").with_timestamp(300));
+        store.push(LogEntry::new(OutputSeverity::Info, "d", "ch1").with_timestamp(400));
+
+        let range = store.in_time_range(150, 350);
+        assert_eq!(range.len(), 2);
+        assert_eq!(range[0].message, "b");
+        assert_eq!(range[1].message, "c");
+    }
+
+    #[test]
+    fn log_store_errors_and_warnings() {
+        let mut store = LogStore::new();
+        store.push(LogEntry::new(OutputSeverity::Info, "i", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Warning, "w", "ch1"));
+        store.push(LogEntry::new(OutputSeverity::Error, "e", "ch1"));
+
+        assert_eq!(store.errors().len(), 1);
+        assert_eq!(store.warnings().len(), 1);
+    }
+
+    #[test]
+    fn log_store_clear_and_display() {
+        let mut store = LogStore::new();
+        store.push(LogEntry::new(OutputSeverity::Info, "x", "ch1"));
+        assert_eq!(store.to_string(), "LogStore(1 entries)");
+        store.clear();
+        assert!(store.is_empty());
+        assert_eq!(store.to_string(), "LogStore(0 entries)");
+    }
+
+    #[test]
+    fn log_store_default() {
+        let store = LogStore::default();
+        assert!(store.is_empty());
     }
 }

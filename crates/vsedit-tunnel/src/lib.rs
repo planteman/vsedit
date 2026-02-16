@@ -1023,6 +1023,131 @@ impl TunnelBandwidthStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TunnelPortMapping — maps local ports to remote ports
+// ---------------------------------------------------------------------------
+
+/// Maps a local port to a remote port with an optional label.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TunnelPortMapping {
+    pub local_port: u16,
+    pub remote_port: u16,
+    pub label: Option<String>,
+    pub protocol: PortProtocol,
+}
+
+/// Protocol used by a port mapping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PortProtocol {
+    Http,
+    Https,
+    Tcp,
+}
+
+impl fmt::Display for PortProtocol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PortProtocol::Http => write!(f, "http"),
+            PortProtocol::Https => write!(f, "https"),
+            PortProtocol::Tcp => write!(f, "tcp"),
+        }
+    }
+}
+
+impl TunnelPortMapping {
+    pub fn new(local_port: u16, remote_port: u16, protocol: PortProtocol) -> Self {
+        Self {
+            local_port,
+            remote_port,
+            label: None,
+            protocol,
+        }
+    }
+
+    pub fn with_label(mut self, label: &str) -> Self {
+        self.label = Some(label.to_string());
+        self
+    }
+
+    /// Generate the full URL for this mapping.
+    pub fn url(&self, host: &str) -> String {
+        format!("{}://{}:{}", self.protocol, host, self.remote_port)
+    }
+
+    /// Check if this is an identity mapping (local == remote).
+    pub fn is_identity(&self) -> bool {
+        self.local_port == self.remote_port
+    }
+}
+
+impl fmt::Display for TunnelPortMapping {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.label {
+            Some(lbl) => write!(f, "{} ({}) {} → {}", lbl, self.protocol, self.local_port, self.remote_port),
+            None => write!(f, "{} {} → {}", self.protocol, self.local_port, self.remote_port),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TunnelPortRouter — route requests to the correct port mapping
+// ---------------------------------------------------------------------------
+
+/// Manages a collection of port mappings for a tunnel.
+#[derive(Debug, Clone, Default)]
+pub struct TunnelPortRouter {
+    mappings: Vec<TunnelPortMapping>,
+}
+
+impl TunnelPortRouter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a port mapping.
+    pub fn add_mapping(&mut self, mapping: TunnelPortMapping) {
+        self.mappings.push(mapping);
+    }
+
+    /// Look up the remote port for a given local port.
+    pub fn resolve_local(&self, local_port: u16) -> Option<u16> {
+        self.mappings
+            .iter()
+            .find(|m| m.local_port == local_port)
+            .map(|m| m.remote_port)
+    }
+
+    /// Look up the local port for a given remote port.
+    pub fn resolve_remote(&self, remote_port: u16) -> Option<u16> {
+        self.mappings
+            .iter()
+            .find(|m| m.remote_port == remote_port)
+            .map(|m| m.local_port)
+    }
+
+    /// Return all mappings using a specific protocol.
+    pub fn by_protocol(&self, protocol: PortProtocol) -> Vec<&TunnelPortMapping> {
+        self.mappings.iter().filter(|m| m.protocol == protocol).collect()
+    }
+
+    /// Check if a local port is already mapped.
+    pub fn has_local_port(&self, port: u16) -> bool {
+        self.mappings.iter().any(|m| m.local_port == port)
+    }
+
+    /// Remove mapping by local port. Returns true if found.
+    pub fn remove_by_local_port(&mut self, port: u16) -> bool {
+        let before = self.mappings.len();
+        self.mappings.retain(|m| m.local_port != port);
+        self.mappings.len() < before
+    }
+
+    /// Total number of mappings.
+    pub fn count(&self) -> usize {
+        self.mappings.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1642,5 +1767,72 @@ mod tests {
         let stats = TunnelBandwidthStats::new();
         assert_eq!(stats.inbound("missing"), 0);
         assert_eq!(stats.outbound("missing"), 0);
+    }
+
+    // ── TunnelPortMapping ─────────────────────────────────────────
+
+    #[test]
+    fn port_mapping_basic() {
+        let mapping = TunnelPortMapping::new(3000, 443, PortProtocol::Https)
+            .with_label("web");
+        assert_eq!(mapping.local_port, 3000);
+        assert_eq!(mapping.remote_port, 443);
+        assert_eq!(mapping.label.as_deref(), Some("web"));
+        assert!(!mapping.is_identity());
+    }
+
+    #[test]
+    fn port_mapping_identity() {
+        let mapping = TunnelPortMapping::new(8080, 8080, PortProtocol::Http);
+        assert!(mapping.is_identity());
+    }
+
+    #[test]
+    fn port_mapping_url() {
+        let mapping = TunnelPortMapping::new(3000, 443, PortProtocol::Https);
+        assert_eq!(mapping.url("example.com"), "https://example.com:443");
+    }
+
+    #[test]
+    fn port_mapping_display() {
+        let mapping = TunnelPortMapping::new(3000, 443, PortProtocol::Https)
+            .with_label("web");
+        let display = format!("{}", mapping);
+        assert!(display.contains("web"));
+        assert!(display.contains("3000"));
+        assert!(display.contains("443"));
+    }
+
+    // ── TunnelPortRouter ──────────────────────────────────────────
+
+    #[test]
+    fn port_router_resolve() {
+        let mut router = TunnelPortRouter::new();
+        router.add_mapping(TunnelPortMapping::new(3000, 443, PortProtocol::Https));
+        router.add_mapping(TunnelPortMapping::new(5000, 80, PortProtocol::Http));
+        assert_eq!(router.resolve_local(3000), Some(443));
+        assert_eq!(router.resolve_local(9999), None);
+        assert_eq!(router.resolve_remote(80), Some(5000));
+        assert_eq!(router.count(), 2);
+    }
+
+    #[test]
+    fn port_router_by_protocol() {
+        let mut router = TunnelPortRouter::new();
+        router.add_mapping(TunnelPortMapping::new(3000, 443, PortProtocol::Https));
+        router.add_mapping(TunnelPortMapping::new(5000, 80, PortProtocol::Http));
+        router.add_mapping(TunnelPortMapping::new(2222, 22, PortProtocol::Tcp));
+        assert_eq!(router.by_protocol(PortProtocol::Https).len(), 1);
+        assert_eq!(router.by_protocol(PortProtocol::Http).len(), 1);
+    }
+
+    #[test]
+    fn port_router_remove() {
+        let mut router = TunnelPortRouter::new();
+        router.add_mapping(TunnelPortMapping::new(3000, 443, PortProtocol::Https));
+        assert!(router.has_local_port(3000));
+        assert!(router.remove_by_local_port(3000));
+        assert!(!router.has_local_port(3000));
+        assert_eq!(router.count(), 0);
     }
 }

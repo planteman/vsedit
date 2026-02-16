@@ -1021,6 +1021,132 @@ pub fn selections_adjacent(a: &SelectionRange, b: &SelectionRange) -> bool {
         || (b.end_line == a.start_line && b.end_col == a.start_col)
 }
 
+// ---------------------------------------------------------------------------
+// SelectionSorter – utilities for ordering multi-cursor selections
+// ---------------------------------------------------------------------------
+
+/// Sort selection ranges by their start position (line, then column).
+pub fn sort_selections(ranges: &mut [SelectionRange]) {
+    ranges.sort_by(|a, b| {
+        a.start_line
+            .cmp(&b.start_line)
+            .then(a.start_col.cmp(&b.start_col))
+    });
+}
+
+/// Remove duplicate selections (by position, ignoring parent chains).
+pub fn dedup_selections(ranges: &mut Vec<SelectionRange>) {
+    ranges.sort_by(|a, b| {
+        a.start_line
+            .cmp(&b.start_line)
+            .then(a.start_col.cmp(&b.start_col))
+            .then(a.end_line.cmp(&b.end_line))
+            .then(a.end_col.cmp(&b.end_col))
+    });
+    ranges.dedup_by(|a, b| {
+        a.start_line == b.start_line
+            && a.start_col == b.start_col
+            && a.end_line == b.end_line
+            && a.end_col == b.end_col
+    });
+}
+
+/// Merge overlapping or adjacent selections into the smallest set of
+/// non-overlapping ranges. Parent chains are discarded.
+pub fn merge_overlapping_selections(ranges: &[SelectionRange]) -> Vec<SelectionRange> {
+    if ranges.is_empty() {
+        return Vec::new();
+    }
+    let mut sorted: Vec<SelectionRange> = ranges.to_vec();
+    sort_selections(&mut sorted);
+    // Strip parents for merging
+    for r in &mut sorted {
+        r.parent = None;
+    }
+    let mut merged: Vec<SelectionRange> = vec![sorted[0].clone()];
+    for r in &sorted[1..] {
+        let last = merged.last_mut().unwrap();
+        let last_end = (last.end_line, last.end_col);
+        let r_start = (r.start_line, r.start_col);
+        if r_start <= last_end {
+            // overlapping or adjacent – extend
+            if (r.end_line, r.end_col) > last_end {
+                last.end_line = r.end_line;
+                last.end_col = r.end_col;
+            }
+        } else {
+            merged.push(r.clone());
+        }
+    }
+    merged
+}
+
+/// Return the total number of characters selected across lines, given line contents.
+/// Supports multi-line ranges.
+pub fn selection_text_char_count(range: &SelectionRange, lines: &[&str]) -> usize {
+    if range.start_line == range.end_line {
+        let idx = range.start_line.saturating_sub(1) as usize;
+        if idx < lines.len() {
+            let s = range.start_col.saturating_sub(1) as usize;
+            let e = range.end_col.saturating_sub(1) as usize;
+            return e.saturating_sub(s);
+        }
+        return 0;
+    }
+    let mut count = 0usize;
+    for ln in range.start_line..=range.end_line {
+        let idx = ln.saturating_sub(1) as usize;
+        if idx >= lines.len() {
+            continue;
+        }
+        let line = lines[idx];
+        if ln == range.start_line {
+            let s = range.start_col.saturating_sub(1) as usize;
+            count += line.len().saturating_sub(s);
+        } else if ln == range.end_line {
+            let e = range.end_col.saturating_sub(1) as usize;
+            count += e.min(line.len());
+        } else {
+            count += line.len();
+        }
+    }
+    count
+}
+
+/// Extract the selected text from line contents.
+pub fn extract_selected_text(range: &SelectionRange, lines: &[&str]) -> String {
+    if range.start_line == range.end_line {
+        let idx = range.start_line.saturating_sub(1) as usize;
+        if idx >= lines.len() {
+            return String::new();
+        }
+        let line = lines[idx];
+        let s = (range.start_col.saturating_sub(1) as usize).min(line.len());
+        let e = (range.end_col.saturating_sub(1) as usize).min(line.len());
+        return line[s..e].to_string();
+    }
+    let mut result = String::new();
+    for ln in range.start_line..=range.end_line {
+        let idx = ln.saturating_sub(1) as usize;
+        if idx >= lines.len() {
+            continue;
+        }
+        let line = lines[idx];
+        if ln == range.start_line {
+            let s = (range.start_col.saturating_sub(1) as usize).min(line.len());
+            result.push_str(&line[s..]);
+        } else if ln == range.end_line {
+            result.push('\n');
+            let e = (range.end_col.saturating_sub(1) as usize).min(line.len());
+            result.push_str(&line[..e]);
+        } else {
+            result.push('\n');
+            result.push_str(line);
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1771,5 +1897,88 @@ mod tests {
         let a = SelectionRange::new(1, 1, 1, 5);
         let b = SelectionRange::new(1, 7, 1, 10);
         assert!(!selections_adjacent(&a, &b));
+    }
+
+    #[test]
+    fn sort_selections_by_position() {
+        let mut sels = vec![
+            SelectionRange::new(3, 1, 3, 5),
+            SelectionRange::new(1, 1, 1, 5),
+            SelectionRange::new(2, 5, 2, 10),
+        ];
+        sort_selections(&mut sels);
+        assert_eq!(sels[0].start_line, 1);
+        assert_eq!(sels[1].start_line, 2);
+        assert_eq!(sels[2].start_line, 3);
+    }
+
+    #[test]
+    fn dedup_selections_removes_duplicates() {
+        let mut sels = vec![
+            SelectionRange::new(1, 1, 1, 5),
+            SelectionRange::new(1, 1, 1, 5),
+            SelectionRange::new(2, 1, 2, 5),
+        ];
+        dedup_selections(&mut sels);
+        assert_eq!(sels.len(), 2);
+    }
+
+    #[test]
+    fn merge_overlapping_selections_merges() {
+        let sels = vec![
+            SelectionRange::new(1, 1, 1, 10),
+            SelectionRange::new(1, 5, 1, 15),
+        ];
+        let merged = merge_overlapping_selections(&sels);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].start_col, 1);
+        assert_eq!(merged[0].end_col, 15);
+    }
+
+    #[test]
+    fn merge_overlapping_selections_keeps_disjoint() {
+        let sels = vec![
+            SelectionRange::new(1, 1, 1, 5),
+            SelectionRange::new(2, 1, 2, 5),
+        ];
+        let merged = merge_overlapping_selections(&sels);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn text_char_count_single_line() {
+        let range = SelectionRange::new(1, 2, 1, 6);
+        let lines = vec!["hello world"];
+        assert_eq!(selection_text_char_count(&range, &lines), 4);
+    }
+
+    #[test]
+    fn text_char_count_multi_line() {
+        let range = SelectionRange::new(1, 3, 3, 4);
+        let lines = vec!["abcde", "fghij", "klmno"];
+        // line 1: from col 3 onwards = "cde" (3 chars)
+        // line 2: entire = "fghij" (5 chars)
+        // line 3: up to col 4 = "klm" (3 chars)
+        assert_eq!(selection_text_char_count(&range, &lines), 11);
+    }
+
+    #[test]
+    fn extract_selected_text_single_line() {
+        let range = SelectionRange::new(1, 1, 1, 6);
+        let lines = vec!["hello world"];
+        assert_eq!(extract_selected_text(&range, &lines), "hello");
+    }
+
+    #[test]
+    fn extract_selected_text_multi_line() {
+        let range = SelectionRange::new(1, 4, 2, 4);
+        let lines = vec!["abcdef", "ghijkl"];
+        assert_eq!(extract_selected_text(&range, &lines), "def\nghi");
+    }
+
+    #[test]
+    fn merge_empty_returns_empty() {
+        let merged = merge_overlapping_selections(&[]);
+        assert!(merged.is_empty());
     }
 }

@@ -892,6 +892,193 @@ impl CompletionTelemetry {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CompletionDebouncer – rate-limits completion requests
+// ---------------------------------------------------------------------------
+
+/// Controls the rate at which inline completion requests are dispatched.
+/// Only allows a request through if enough time has elapsed since the last one.
+#[derive(Debug, Clone)]
+pub struct CompletionDebouncer {
+    delay_ms: u64,
+    last_request_ms: Option<u64>,
+    suppressed_count: u64,
+}
+
+impl CompletionDebouncer {
+    /// Create a new debouncer with the given minimum delay between requests.
+    pub fn new(delay_ms: u64) -> Self {
+        Self {
+            delay_ms,
+            last_request_ms: None,
+            suppressed_count: 0,
+        }
+    }
+
+    /// Try to dispatch a request at `now_ms`. Returns `true` if allowed.
+    pub fn try_request(&mut self, now_ms: u64) -> bool {
+        if let Some(last) = self.last_request_ms {
+            if now_ms.saturating_sub(last) < self.delay_ms {
+                self.suppressed_count += 1;
+                return false;
+            }
+        }
+        self.last_request_ms = Some(now_ms);
+        true
+    }
+
+    /// Number of requests that were suppressed.
+    pub fn suppressed_count(&self) -> u64 {
+        self.suppressed_count
+    }
+
+    /// Reset the debouncer state.
+    pub fn reset(&mut self) {
+        self.last_request_ms = None;
+        self.suppressed_count = 0;
+    }
+
+    /// The configured delay in milliseconds.
+    pub fn delay_ms(&self) -> u64 {
+        self.delay_ms
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CompletionDiff – shows what text a completion would insert/replace
+// ---------------------------------------------------------------------------
+
+/// Describes the textual difference a completion would produce.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletionDiff {
+    /// Text that would be removed from the document.
+    pub removed: String,
+    /// Text that would be inserted into the document.
+    pub inserted: String,
+}
+
+impl CompletionDiff {
+    /// Compute the diff between the current line content and the completion.
+    pub fn compute(current_line: &str, col: usize, item: &InlineCompletionItem) -> Self {
+        let prefix = if col <= current_line.len() {
+            &current_line[..col]
+        } else {
+            current_line
+        };
+        let suffix = if col <= current_line.len() {
+            &current_line[col..]
+        } else {
+            ""
+        };
+        let removed = suffix.to_string();
+        let inserted = item.insert_text.clone();
+        Self { removed, inserted }
+
+    }
+
+    /// Whether this completion is a pure insertion (nothing removed).
+    pub fn is_pure_insert(&self) -> bool {
+        self.removed.is_empty()
+    }
+
+    /// Net change in character count.
+    pub fn net_change(&self) -> i64 {
+        self.inserted.len() as i64 - self.removed.len() as i64
+    }
+
+    /// Build the resulting line after applying this diff.
+    pub fn apply_to(&self, current_line: &str, col: usize) -> String {
+        let prefix = if col <= current_line.len() {
+            &current_line[..col]
+        } else {
+            current_line
+        };
+        format!("{}{}", prefix, self.inserted)
+    }
+}
+
+impl fmt::Display for CompletionDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CompletionDiff(-{:?} +{:?})", self.removed, self.inserted)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CompletionFilter – filter completions by criteria
+// ---------------------------------------------------------------------------
+
+/// Filters inline completion items by various criteria.
+#[derive(Debug, Clone)]
+pub struct CompletionFilter {
+    min_length: Option<usize>,
+    max_length: Option<usize>,
+    prefix: Option<String>,
+}
+
+impl CompletionFilter {
+    pub fn new() -> Self {
+        Self {
+            min_length: None,
+            max_length: None,
+            prefix: None,
+        }
+    }
+
+    /// Only include completions with at least this many characters.
+    pub fn min_length(mut self, len: usize) -> Self {
+        self.min_length = Some(len);
+        self
+    }
+
+    /// Only include completions with at most this many characters.
+    pub fn max_length(mut self, len: usize) -> Self {
+        self.max_length = Some(len);
+        self
+    }
+
+    /// Only include completions whose insert text starts with the given prefix.
+    pub fn prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.prefix = Some(prefix.into());
+        self
+    }
+
+    /// Apply the filter, returning only matching items.
+    pub fn apply<'a>(&self, items: &'a [InlineCompletionItem]) -> Vec<&'a InlineCompletionItem> {
+        items
+            .iter()
+            .filter(|item| {
+                if let Some(min) = self.min_length {
+                    if item.insert_text.len() < min {
+                        return false;
+                    }
+                }
+                if let Some(max) = self.max_length {
+                    if item.insert_text.len() > max {
+                        return false;
+                    }
+                }
+                if let Some(ref pfx) = self.prefix {
+                    if !item.insert_text.starts_with(pfx.as_str()) {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect()
+    }
+
+    /// Count how many items pass the filter.
+    pub fn count_matching(&self, items: &[InlineCompletionItem]) -> usize {
+        self.apply(items).len()
+    }
+}
+
+impl Default for CompletionFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1653,5 +1840,121 @@ mod tests {
         tel.clear();
         assert_eq!(tel.event_count(), 0);
         assert!(tel.accept_rate().is_none());
+    }
+
+    #[test]
+    fn debouncer_allows_first_request() {
+        let mut db = CompletionDebouncer::new(100);
+        assert!(db.try_request(0));
+        assert_eq!(db.suppressed_count(), 0);
+    }
+
+    #[test]
+    fn debouncer_suppresses_rapid_requests() {
+        let mut db = CompletionDebouncer::new(100);
+        assert!(db.try_request(0));
+        assert!(!db.try_request(50));
+        assert!(!db.try_request(99));
+        assert_eq!(db.suppressed_count(), 2);
+        assert!(db.try_request(100));
+        assert_eq!(db.suppressed_count(), 2);
+    }
+
+    #[test]
+    fn debouncer_reset() {
+        let mut db = CompletionDebouncer::new(100);
+        assert!(db.try_request(0));
+        assert!(!db.try_request(10));
+        db.reset();
+        assert!(db.try_request(10));
+        assert_eq!(db.suppressed_count(), 0);
+        assert_eq!(db.delay_ms(), 100);
+    }
+
+    #[test]
+    fn completion_diff_pure_insert() {
+        let item = InlineCompletionItem {
+            insert_text: "hello()".into(),
+            range_start_line: 0,
+            range_start_col: 5,
+            range_end_line: 0,
+            range_end_col: 5,
+            filter_text: None,
+            command: None,
+        };
+        let diff = CompletionDiff::compute("fn he", 5, &item);
+        assert!(diff.is_pure_insert());
+        assert_eq!(diff.net_change(), 7);
+        let result = diff.apply_to("fn he", 5);
+        assert_eq!(result, "fn hehello()");
+    }
+
+    #[test]
+    fn completion_diff_with_replacement() {
+        let item = InlineCompletionItem {
+            insert_text: "world".into(),
+            range_start_line: 0,
+            range_start_col: 3,
+            range_end_line: 0,
+            range_end_col: 6,
+            filter_text: None,
+            command: None,
+        };
+        let diff = CompletionDiff::compute("fn foo()", 3, &item);
+        assert!(!diff.is_pure_insert());
+        assert_eq!(diff.removed, "foo()");
+        let display = format!("{diff}");
+        assert!(display.contains("CompletionDiff"));
+    }
+
+    #[test]
+    fn completion_filter_by_length() {
+        let items = vec![
+            InlineCompletionItem {
+                insert_text: "ab".into(),
+                range_start_line: 0, range_start_col: 0,
+                range_end_line: 0, range_end_col: 0,
+                filter_text: None, command: None,
+            },
+            InlineCompletionItem {
+                insert_text: "abcdef".into(),
+                range_start_line: 0, range_start_col: 0,
+                range_end_line: 0, range_end_col: 0,
+                filter_text: None, command: None,
+            },
+            InlineCompletionItem {
+                insert_text: "abcdefghij".into(),
+                range_start_line: 0, range_start_col: 0,
+                range_end_line: 0, range_end_col: 0,
+                filter_text: None, command: None,
+            },
+        ];
+        let filter = CompletionFilter::new().min_length(3).max_length(8);
+        let matched = filter.apply(&items);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].insert_text, "abcdef");
+        assert_eq!(filter.count_matching(&items), 1);
+    }
+
+    #[test]
+    fn completion_filter_by_prefix() {
+        let items = vec![
+            InlineCompletionItem {
+                insert_text: "fn main".into(),
+                range_start_line: 0, range_start_col: 0,
+                range_end_line: 0, range_end_col: 0,
+                filter_text: None, command: None,
+            },
+            InlineCompletionItem {
+                insert_text: "let x".into(),
+                range_start_line: 0, range_start_col: 0,
+                range_end_line: 0, range_end_col: 0,
+                filter_text: None, command: None,
+            },
+        ];
+        let filter = CompletionFilter::new().prefix("fn");
+        let matched = filter.apply(&items);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].insert_text, "fn main");
     }
 }

@@ -938,6 +938,126 @@ impl TestHistory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TestTreeWalker – depth-first iterator over a test item tree
+// ---------------------------------------------------------------------------
+
+/// Depth-first iterator over all nodes in a `TestItem` tree.
+pub struct TestTreeWalker<'a> {
+    stack: Vec<(usize, &'a TestItem)>,
+}
+
+impl<'a> TestTreeWalker<'a> {
+    /// Create a walker from a slice of root items.
+    pub fn new(roots: &'a [TestItem]) -> Self {
+        let stack: Vec<(usize, &'a TestItem)> = roots.iter().rev().map(|i| (0, i)).collect();
+        Self { stack }
+    }
+}
+
+impl<'a> Iterator for TestTreeWalker<'a> {
+    type Item = (usize, &'a TestItem);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (depth, item) = self.stack.pop()?;
+        // push children in reverse so the first child is visited next
+        for child in item.children.iter().rev() {
+            self.stack.push((depth + 1, child));
+        }
+        Some((depth, item))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TestItemBuilder – ergonomic builder for TestItem
+// ---------------------------------------------------------------------------
+
+/// Builder for constructing `TestItem` instances.
+pub struct TestItemBuilder {
+    id: String,
+    label: String,
+    uri: Option<String>,
+    line: Option<u32>,
+    state: TestState,
+    children: Vec<TestItem>,
+    duration_ms: Option<f64>,
+    message: Option<String>,
+}
+
+impl TestItemBuilder {
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            uri: None,
+            line: None,
+            state: TestState::Queued,
+            children: Vec::new(),
+            duration_ms: None,
+            message: None,
+        }
+    }
+
+    pub fn state(mut self, state: TestState) -> Self {
+        self.state = state;
+        self
+    }
+
+    pub fn uri(mut self, uri: impl Into<String>) -> Self {
+        self.uri = Some(uri.into());
+        self
+    }
+
+    pub fn line(mut self, line: u32) -> Self {
+        self.line = Some(line);
+        self
+    }
+
+    pub fn duration_ms(mut self, ms: f64) -> Self {
+        self.duration_ms = Some(ms);
+        self
+    }
+
+    pub fn message(mut self, msg: impl Into<String>) -> Self {
+        self.message = Some(msg.into());
+        self
+    }
+
+    pub fn child(mut self, child: TestItem) -> Self {
+        self.children.push(child);
+        self
+    }
+
+    pub fn build(self) -> TestItem {
+        TestItem {
+            id: self.id,
+            label: self.label,
+            uri: self.uri,
+            line: self.line,
+            state: self.state,
+            children: self.children,
+            duration_ms: self.duration_ms,
+            message: self.message,
+        }
+    }
+}
+
+/// Collect all items grouped by their state from a test item tree.
+pub fn group_by_state(items: &[TestItem]) -> std::collections::HashMap<&'static str, Vec<&TestItem>> {
+    let mut map: std::collections::HashMap<&'static str, Vec<&TestItem>> = std::collections::HashMap::new();
+    for (_, item) in TestTreeWalker::new(items) {
+        if item.children.is_empty() {
+            map.entry(state_label(item.state)).or_default().push(item);
+        }
+    }
+    map
+}
+
+/// Compute the depth of the deepest node in a test item tree.
+pub fn max_depth(items: &[TestItem]) -> usize {
+    TestTreeWalker::new(items).map(|(d, _)| d).max().unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1688,5 +1808,82 @@ mod tests {
 
         let worst = history.worst_run().unwrap();
         assert_eq!(worst.run_id, "bad");
+    }
+
+    #[test]
+    fn test_tree_walker_visits_all() {
+        let child1 = test_item("c1", TestState::Passed);
+        let child2 = test_item("c2", TestState::Failed);
+        let mut parent = test_item("p1", TestState::Running);
+        parent.children = vec![child1, child2];
+        let items = vec![parent, test_item("t2", TestState::Skipped)];
+        let visited: Vec<&str> = TestTreeWalker::new(&items).map(|(_, i)| i.id.as_str()).collect();
+        assert_eq!(visited, vec!["p1", "c1", "c2", "t2"]);
+    }
+
+    #[test]
+    fn test_tree_walker_depths() {
+        let grandchild = test_item("gc", TestState::Passed);
+        let mut child = test_item("c", TestState::Passed);
+        child.children = vec![grandchild];
+        let mut root = test_item("r", TestState::Passed);
+        root.children = vec![child];
+        let depths: Vec<usize> = TestTreeWalker::new(&[root]).map(|(d, _)| d).collect();
+        assert_eq!(depths, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn test_item_builder() {
+        let item = TestItemBuilder::new("t1", "Test One")
+            .state(TestState::Passed)
+            .duration_ms(42.0)
+            .uri("file:///test.rs".to_string())
+            .line(10)
+            .message("ok")
+            .build();
+        assert_eq!(item.id, "t1");
+        assert_eq!(item.label, "Test One");
+        assert_eq!(item.state, TestState::Passed);
+        assert_eq!(item.duration_ms, Some(42.0));
+        assert_eq!(item.uri.as_deref(), Some("file:///test.rs"));
+        assert_eq!(item.line, Some(10));
+        assert_eq!(item.message.as_deref(), Some("ok"));
+    }
+
+    #[test]
+    fn test_item_builder_with_children() {
+        let child = TestItemBuilder::new("c1", "child").state(TestState::Failed).build();
+        let parent = TestItemBuilder::new("p1", "parent")
+            .state(TestState::Running)
+            .child(child)
+            .build();
+        assert!(parent.has_children());
+        assert_eq!(parent.child_count(), 1);
+    }
+
+    #[test]
+    fn test_group_by_state() {
+        let items = vec![
+            test_item("t1", TestState::Passed),
+            test_item("t2", TestState::Passed),
+            test_item("t3", TestState::Failed),
+            test_item("t4", TestState::Skipped),
+        ];
+        let groups = group_by_state(&items);
+        assert_eq!(groups.get("Passed").map(|v| v.len()), Some(2));
+        assert_eq!(groups.get("Failed").map(|v| v.len()), Some(1));
+        assert_eq!(groups.get("Skipped").map(|v| v.len()), Some(1));
+        assert!(groups.get("Errored").is_none());
+    }
+
+    #[test]
+    fn test_max_depth() {
+        let gc = test_item("gc", TestState::Passed);
+        let mut c = test_item("c", TestState::Passed);
+        c.children = vec![gc];
+        let mut r = test_item("r", TestState::Passed);
+        r.children = vec![c];
+        assert_eq!(max_depth(&[r]), 2);
+        assert_eq!(max_depth(&[test_item("solo", TestState::Passed)]), 0);
     }
 }

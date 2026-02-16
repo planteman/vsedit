@@ -160,6 +160,37 @@ impl RecentWorkspaces {
         self.persist();
     }
 
+    /// Number of recent workspace entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether there are no recent entries.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Remove a specific workspace by path.
+    pub fn remove_by_path(&mut self, path: &str) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|e| e.path != path);
+        if self.entries.len() < before {
+            self.persist();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return entries matching a label substring (case-insensitive).
+    pub fn search(&self, query: &str) -> Vec<&RecentWorkspace> {
+        let lower = query.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|e| e.label.to_lowercase().contains(&lower))
+            .collect()
+    }
+
     fn persist(&self) {
         let state = RecentState {
             recents: self.entries.clone(),
@@ -433,6 +464,46 @@ impl Workspace {
         self.folders.first().map(|f| PathBuf::from(f.uri.fs_path()))
     }
 
+    /// Number of folders in the workspace.
+    pub fn folder_count(&self) -> usize {
+        self.folders.len()
+    }
+
+    /// Whether the workspace has no folders.
+    pub fn is_empty(&self) -> bool {
+        self.folders.is_empty()
+    }
+
+    /// Get a folder by its index.
+    pub fn get_folder_by_index(&self, index: usize) -> Option<&WorkspaceFolder> {
+        self.folders.get(index)
+    }
+
+    /// Get a folder by its display name.
+    pub fn get_folder_by_name(&self, name: &str) -> Option<&WorkspaceFolder> {
+        self.folders.iter().find(|f| f.name == name)
+    }
+
+    /// Return all folder names.
+    pub fn folder_names(&self) -> Vec<&str> {
+        self.folders.iter().map(|f| f.name.as_str()).collect()
+    }
+
+    /// Return all folder URIs.
+    pub fn folder_uris(&self) -> Vec<&VsUri> {
+        self.folders.iter().map(|f| &f.uri).collect()
+    }
+
+    /// Mark the workspace as untrusted.
+    pub fn distrust_workspace(&mut self) {
+        self.trust = WorkspaceTrust::Untrusted;
+    }
+
+    /// Set workspace-level configuration.
+    pub fn set_configuration(&mut self, config: serde_json::Value) {
+        self.configuration = config;
+    }
+
     // -- Events ------------------------------------------------------------
 
     /// Subscribe to folder change events.
@@ -470,6 +541,176 @@ fn ensure_trailing_slash(path: &str) -> String {
         path.to_string()
     } else {
         format!("{path}/")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WorkspaceFolder helpers
+// ---------------------------------------------------------------------------
+
+impl WorkspaceFolder {
+    /// Create a new workspace folder from components.
+    pub fn new(uri: VsUri, name: impl Into<String>, index: usize) -> Self {
+        Self {
+            uri,
+            name: name.into(),
+            index,
+        }
+    }
+
+    /// Whether this folder's URI points to a `file://` scheme.
+    pub fn is_local(&self) -> bool {
+        self.uri.is_file()
+    }
+
+    /// Return the filesystem path of this folder (only meaningful for `file://`).
+    pub fn fs_path(&self) -> PathBuf {
+        PathBuf::from(self.uri.fs_path())
+    }
+
+    /// Check whether a given path is inside this folder (path-prefix match).
+    pub fn contains_path(&self, path: &Path) -> bool {
+        let folder = ensure_trailing_slash(&self.uri.path);
+        let candidate = ensure_trailing_slash(&path.to_string_lossy());
+        candidate.starts_with(&folder)
+    }
+
+    /// Return the folder name uppercased – handy for display headers.
+    pub fn display_name(&self) -> String {
+        self.name.clone()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WorkspaceType helpers
+// ---------------------------------------------------------------------------
+
+impl WorkspaceType {
+    /// Whether this workspace type has at least one folder.
+    pub fn has_folders(&self) -> bool {
+        !matches!(self, WorkspaceType::Empty)
+    }
+
+    /// Whether this is a multi-root workspace.
+    pub fn is_multi_root(&self) -> bool {
+        matches!(self, WorkspaceType::MultiRoot(_))
+    }
+
+    /// Whether this is a single-folder workspace.
+    pub fn is_single_folder(&self) -> bool {
+        matches!(self, WorkspaceType::SingleFolder(_))
+    }
+
+    /// Return the associated path, if any.
+    pub fn path(&self) -> Option<&Path> {
+        match self {
+            WorkspaceType::Empty => None,
+            WorkspaceType::SingleFolder(p) | WorkspaceType::MultiRoot(p) => Some(p),
+        }
+    }
+
+    /// A short human-readable label for the workspace type.
+    pub fn label(&self) -> &'static str {
+        match self {
+            WorkspaceType::Empty => "Empty Workspace",
+            WorkspaceType::SingleFolder(_) => "Folder",
+            WorkspaceType::MultiRoot(_) => "Workspace",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WorkspaceTrust helpers
+// ---------------------------------------------------------------------------
+
+impl WorkspaceTrust {
+    /// Whether trust has been explicitly decided (trusted or untrusted).
+    pub fn is_decided(&self) -> bool {
+        *self != WorkspaceTrust::Unknown
+    }
+
+    /// Whether the workspace is explicitly untrusted.
+    pub fn is_untrusted(&self) -> bool {
+        *self == WorkspaceTrust::Untrusted
+    }
+
+    /// Merge two trust levels – the more restrictive one wins.
+    ///
+    /// Order: Untrusted < Unknown < Trusted
+    pub fn merge(self, other: WorkspaceTrust) -> WorkspaceTrust {
+        match (self, other) {
+            (WorkspaceTrust::Untrusted, _) | (_, WorkspaceTrust::Untrusted) => {
+                WorkspaceTrust::Untrusted
+            }
+            (WorkspaceTrust::Unknown, _) | (_, WorkspaceTrust::Unknown) => {
+                WorkspaceTrust::Unknown
+            }
+            _ => WorkspaceTrust::Trusted,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WorkspaceFile helpers
+// ---------------------------------------------------------------------------
+
+impl WorkspaceFile {
+    /// Create a minimal workspace file with only folder entries.
+    pub fn with_folders(folders: Vec<FolderEntry>) -> Self {
+        Self {
+            folders,
+            settings: serde_json::Value::Null,
+            extensions: serde_json::Value::Null,
+            launch: serde_json::Value::Null,
+        }
+    }
+
+    /// Number of folder entries.
+    pub fn folder_count(&self) -> usize {
+        self.folders.len()
+    }
+
+    /// Whether there are any workspace-level settings.
+    pub fn has_settings(&self) -> bool {
+        !self.settings.is_null()
+            && self.settings != serde_json::Value::Object(serde_json::Map::new())
+    }
+
+    /// Collect all folder paths as a `Vec<&str>`.
+    pub fn folder_paths(&self) -> Vec<&str> {
+        self.folders.iter().map(|f| f.path.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FolderEntry helpers
+// ---------------------------------------------------------------------------
+
+impl FolderEntry {
+    /// Create a folder entry with just a path.
+    pub fn from_path(path: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            name: None,
+        }
+    }
+
+    /// Create a folder entry with a path and display name.
+    pub fn with_name(path: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            name: Some(name.into()),
+        }
+    }
+
+    /// Return the effective display name (explicit name or last path segment).
+    pub fn display_name(&self) -> &str {
+        self.name.as_deref().unwrap_or_else(|| {
+            self.path
+                .rsplit('/')
+                .find(|s| !s.is_empty())
+                .unwrap_or(&self.path)
+        })
     }
 }
 
@@ -553,6 +794,51 @@ impl WorkspaceFileIndex {
             .filter(|f| !workspace_exclude_pattern(patterns, f))
             .map(String::as_str)
             .collect()
+    }
+
+    /// Return all unique file extensions present in the index.
+    pub fn extensions(&self) -> Vec<String> {
+        let mut exts: Vec<String> = self
+            .files
+            .iter()
+            .filter_map(|f| {
+                f.rsplit('.')
+                    .next()
+                    .filter(|e| !e.contains('/') && !e.is_empty())
+                    .map(String::from)
+            })
+            .collect();
+        exts.sort();
+        exts.dedup();
+        exts
+    }
+
+    /// Return files whose basename (last path segment) contains `query`
+    /// (case-insensitive).
+    pub fn search_by_name(&self, query: &str) -> Vec<&str> {
+        let lower = query.to_lowercase();
+        self.files
+            .iter()
+            .filter(|f| {
+                let basename = f.rsplit('/').next().unwrap_or(f);
+                basename.to_lowercase().contains(&lower)
+            })
+            .map(String::as_str)
+            .collect()
+    }
+
+    /// Group files by their parent directory (first path segment before `/`).
+    pub fn group_by_directory(&self) -> std::collections::HashMap<String, Vec<&str>> {
+        let mut map: std::collections::HashMap<String, Vec<&str>> =
+            std::collections::HashMap::new();
+        for file in &self.files {
+            let dir = match file.rfind('/') {
+                Some(pos) => &file[..pos],
+                None => ".",
+            };
+            map.entry(dir.to_string()).or_default().push(file.as_str());
+        }
+        map
     }
 }
 
@@ -737,6 +1023,25 @@ impl WorkspaceSearchIndex {
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
+
+    /// Return all indexed entries.
+    pub fn entries(&self) -> &[WorkspaceSearchEntry] {
+        &self.entries
+    }
+
+    /// Search by both name and content snippet.
+    pub fn search(&self, query: &str) -> Vec<&WorkspaceSearchEntry> {
+        let lower = query.to_lowercase();
+        self.entries
+            .iter()
+            .filter(|e| {
+                e.name.to_lowercase().contains(&lower)
+                    || e.content_snippet
+                        .as_ref()
+                        .map_or(false, |s| s.to_lowercase().contains(&lower))
+            })
+            .collect()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -852,6 +1157,26 @@ impl WorkspaceSnapshot {
             file_count_delta: other.file_count as i64 - self.file_count as i64,
             trust_changed: self.trust != other.trust,
         }
+    }
+
+    /// Add a tag to the snapshot.
+    pub fn add_tag(&mut self, tag: impl Into<String>) {
+        self.tags.push(tag.into());
+    }
+
+    /// Check if the snapshot has a specific tag.
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    /// Number of folders in this snapshot.
+    pub fn folder_count(&self) -> usize {
+        self.folder_paths.len()
+    }
+
+    /// Whether this snapshot represents an empty workspace.
+    pub fn is_empty(&self) -> bool {
+        self.folder_paths.is_empty()
     }
 }
 
@@ -1693,5 +2018,354 @@ mod tests {
         assert!(tags.remove("rust"));
         assert!(!tags.contains("rust"));
         assert_eq!(tags.len(), 1);
+    }
+
+    // -- New impl-block tests --
+
+    #[test]
+    fn workspace_folder_is_local() {
+        let f = WorkspaceFolder::new(VsUri::file("/home/user/project"), "project", 0);
+        assert!(f.is_local());
+
+        let f2 = WorkspaceFolder::new(
+            VsUri::from_components("untitled", "", "/tmp/file", "", ""),
+            "tmp",
+            0,
+        );
+        assert!(!f2.is_local());
+    }
+
+    #[test]
+    fn workspace_folder_contains_path() {
+        let f = WorkspaceFolder::new(VsUri::file("/home/user/project"), "project", 0);
+        assert!(f.contains_path(Path::new("/home/user/project/src/main.rs")));
+        assert!(!f.contains_path(Path::new("/home/other/file.rs")));
+    }
+
+    #[test]
+    fn workspace_folder_fs_path() {
+        let f = WorkspaceFolder::new(VsUri::file("/home/user/project"), "project", 0);
+        assert_eq!(f.fs_path(), PathBuf::from("/home/user/project"));
+    }
+
+    #[test]
+    fn workspace_folder_display_name() {
+        let f = WorkspaceFolder::new(VsUri::file("/home/user/project"), "My Project", 0);
+        assert_eq!(f.display_name(), "My Project");
+    }
+
+    #[test]
+    fn workspace_type_predicates() {
+        assert!(!WorkspaceType::Empty.has_folders());
+        assert!(WorkspaceType::SingleFolder(PathBuf::from("/tmp")).has_folders());
+        assert!(WorkspaceType::MultiRoot(PathBuf::from("/tmp")).has_folders());
+
+        assert!(!WorkspaceType::Empty.is_multi_root());
+        assert!(!WorkspaceType::SingleFolder(PathBuf::from("/tmp")).is_multi_root());
+        assert!(WorkspaceType::MultiRoot(PathBuf::from("/tmp")).is_multi_root());
+
+        assert!(WorkspaceType::SingleFolder(PathBuf::from("/tmp")).is_single_folder());
+        assert!(!WorkspaceType::MultiRoot(PathBuf::from("/tmp")).is_single_folder());
+    }
+
+    #[test]
+    fn workspace_type_path() {
+        assert!(WorkspaceType::Empty.path().is_none());
+        assert_eq!(
+            WorkspaceType::SingleFolder(PathBuf::from("/a")).path(),
+            Some(Path::new("/a"))
+        );
+        assert_eq!(
+            WorkspaceType::MultiRoot(PathBuf::from("/b")).path(),
+            Some(Path::new("/b"))
+        );
+    }
+
+    #[test]
+    fn workspace_type_label() {
+        assert_eq!(WorkspaceType::Empty.label(), "Empty Workspace");
+        assert_eq!(
+            WorkspaceType::SingleFolder(PathBuf::from("/a")).label(),
+            "Folder"
+        );
+        assert_eq!(
+            WorkspaceType::MultiRoot(PathBuf::from("/a")).label(),
+            "Workspace"
+        );
+    }
+
+    #[test]
+    fn workspace_trust_is_decided() {
+        assert!(!WorkspaceTrust::Unknown.is_decided());
+        assert!(WorkspaceTrust::Trusted.is_decided());
+        assert!(WorkspaceTrust::Untrusted.is_decided());
+    }
+
+    #[test]
+    fn workspace_trust_is_untrusted() {
+        assert!(WorkspaceTrust::Untrusted.is_untrusted());
+        assert!(!WorkspaceTrust::Trusted.is_untrusted());
+        assert!(!WorkspaceTrust::Unknown.is_untrusted());
+    }
+
+    #[test]
+    fn workspace_trust_merge() {
+        // Untrusted always wins
+        assert_eq!(
+            WorkspaceTrust::Trusted.merge(WorkspaceTrust::Untrusted),
+            WorkspaceTrust::Untrusted
+        );
+        assert_eq!(
+            WorkspaceTrust::Untrusted.merge(WorkspaceTrust::Trusted),
+            WorkspaceTrust::Untrusted
+        );
+        // Unknown beats Trusted
+        assert_eq!(
+            WorkspaceTrust::Trusted.merge(WorkspaceTrust::Unknown),
+            WorkspaceTrust::Unknown
+        );
+        // Both trusted
+        assert_eq!(
+            WorkspaceTrust::Trusted.merge(WorkspaceTrust::Trusted),
+            WorkspaceTrust::Trusted
+        );
+    }
+
+    #[test]
+    fn workspace_file_with_folders() {
+        let wf = WorkspaceFile::with_folders(vec![
+            FolderEntry::from_path("/a"),
+            FolderEntry::from_path("/b"),
+        ]);
+        assert_eq!(wf.folder_count(), 2);
+        assert!(!wf.has_settings());
+        assert_eq!(wf.folder_paths(), vec!["/a", "/b"]);
+    }
+
+    #[test]
+    fn workspace_file_has_settings() {
+        let mut wf = WorkspaceFile::with_folders(vec![]);
+        assert!(!wf.has_settings());
+        wf.settings = serde_json::json!({});
+        assert!(!wf.has_settings()); // empty object
+        wf.settings = serde_json::json!({"a": 1});
+        assert!(wf.has_settings());
+    }
+
+    #[test]
+    fn folder_entry_from_path() {
+        let e = FolderEntry::from_path("/home/user/src");
+        assert_eq!(e.path, "/home/user/src");
+        assert!(e.name.is_none());
+    }
+
+    #[test]
+    fn folder_entry_with_name() {
+        let e = FolderEntry::with_name("/home/user/src", "Source");
+        assert_eq!(e.path, "/home/user/src");
+        assert_eq!(e.name.as_deref(), Some("Source"));
+    }
+
+    #[test]
+    fn folder_entry_display_name() {
+        let e1 = FolderEntry::from_path("/home/user/src");
+        assert_eq!(e1.display_name(), "src");
+
+        let e2 = FolderEntry::with_name("/home/user/src", "Source");
+        assert_eq!(e2.display_name(), "Source");
+    }
+
+    #[test]
+    fn workspace_folder_count_and_is_empty() {
+        let ws = Workspace::empty();
+        assert!(ws.is_empty());
+        assert_eq!(ws.folder_count(), 0);
+
+        let ws2 = Workspace::single_folder(VsUri::file("/a"));
+        assert!(!ws2.is_empty());
+        assert_eq!(ws2.folder_count(), 1);
+    }
+
+    #[test]
+    fn workspace_get_folder_by_index() {
+        let mut ws = Workspace::empty();
+        ws.add_folder(VsUri::file("/a"), Some("Alpha".into()));
+        ws.add_folder(VsUri::file("/b"), Some("Beta".into()));
+
+        assert_eq!(ws.get_folder_by_index(0).unwrap().name, "Alpha");
+        assert_eq!(ws.get_folder_by_index(1).unwrap().name, "Beta");
+        assert!(ws.get_folder_by_index(2).is_none());
+    }
+
+    #[test]
+    fn workspace_get_folder_by_name() {
+        let mut ws = Workspace::empty();
+        ws.add_folder(VsUri::file("/a"), Some("Alpha".into()));
+        ws.add_folder(VsUri::file("/b"), Some("Beta".into()));
+
+        assert!(ws.get_folder_by_name("Alpha").is_some());
+        assert!(ws.get_folder_by_name("Gamma").is_none());
+    }
+
+    #[test]
+    fn workspace_folder_names_and_uris() {
+        let mut ws = Workspace::empty();
+        ws.add_folder(VsUri::file("/a"), Some("A".into()));
+        ws.add_folder(VsUri::file("/b"), Some("B".into()));
+
+        assert_eq!(ws.folder_names(), vec!["A", "B"]);
+        assert_eq!(ws.folder_uris().len(), 2);
+    }
+
+    #[test]
+    fn workspace_distrust() {
+        let mut ws = Workspace::empty();
+        ws.distrust_workspace();
+        assert_eq!(ws.trust(), WorkspaceTrust::Untrusted);
+        assert!(ws.trust().is_untrusted());
+    }
+
+    #[test]
+    fn workspace_set_configuration() {
+        let mut ws = Workspace::empty();
+        ws.set_configuration(serde_json::json!({"editor.fontSize": 16}));
+        assert_eq!(ws.configuration()["editor.fontSize"], 16);
+    }
+
+    #[test]
+    fn file_index_extensions() {
+        let mut idx = WorkspaceFileIndex::new("/project");
+        idx.add_file("main.rs");
+        idx.add_file("lib.rs");
+        idx.add_file("README.md");
+        idx.add_file("Cargo.toml");
+        let exts = idx.extensions();
+        assert_eq!(exts, vec!["md", "rs", "toml"]);
+    }
+
+    #[test]
+    fn file_index_search_by_name() {
+        let mut idx = WorkspaceFileIndex::new("/project");
+        idx.add_file("src/main.rs");
+        idx.add_file("src/lib.rs");
+        idx.add_file("tests/main_test.rs");
+        let results = idx.search_by_name("main");
+        assert_eq!(results.len(), 2);
+        assert!(results.contains(&"src/main.rs"));
+        assert!(results.contains(&"tests/main_test.rs"));
+    }
+
+    #[test]
+    fn file_index_group_by_directory() {
+        let mut idx = WorkspaceFileIndex::new("/project");
+        idx.add_file("src/main.rs");
+        idx.add_file("src/lib.rs");
+        idx.add_file("tests/test1.rs");
+        idx.add_file("README.md");
+        let groups = idx.group_by_directory();
+        assert_eq!(groups.get("src").unwrap().len(), 2);
+        assert_eq!(groups.get("tests").unwrap().len(), 1);
+        assert_eq!(groups.get(".").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn search_index_combined_search() {
+        let mut idx = WorkspaceSearchIndex::new();
+        idx.add("/src/app.rs", Some("fn run_app() {}"));
+        idx.add("/src/config.rs", Some("fn load_config() {}"));
+        idx.add("/README.md", Some("This is an app readme"));
+
+        // Matches name "app"
+        let results = idx.search("app");
+        assert_eq!(results.len(), 2); // app.rs by name, README by content
+        assert!(results.iter().any(|e| e.path == "/src/app.rs"));
+        assert!(results.iter().any(|e| e.path == "/README.md"));
+    }
+
+    #[test]
+    fn search_index_entries() {
+        let mut idx = WorkspaceSearchIndex::new();
+        idx.add("/a.rs", None);
+        idx.add("/b.rs", None);
+        assert_eq!(idx.entries().len(), 2);
+        assert_eq!(idx.entries()[0].path, "/a.rs");
+    }
+
+    #[test]
+    fn workspace_snapshot_tags() {
+        let mut snap = WorkspaceSnapshot {
+            folder_paths: vec!["/a".into()],
+            trust: WorkspaceTrust::Trusted,
+            file_count: 5,
+            tags: vec![],
+            timestamp_ms: 1000,
+        };
+        assert!(!snap.has_tag("release"));
+        snap.add_tag("release");
+        assert!(snap.has_tag("release"));
+        assert_eq!(snap.folder_count(), 1);
+        assert!(!snap.is_empty());
+    }
+
+    #[test]
+    fn workspace_snapshot_empty() {
+        let snap = WorkspaceSnapshot {
+            folder_paths: vec![],
+            trust: WorkspaceTrust::Unknown,
+            file_count: 0,
+            tags: vec![],
+            timestamp_ms: 0,
+        };
+        assert!(snap.is_empty());
+        assert_eq!(snap.folder_count(), 0);
+    }
+
+    #[test]
+    fn recent_workspaces_remove_by_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let state_path = dir.path().join("recents.json");
+        let mut store = RecentWorkspaces::new(state_path);
+        store.add_recent(RecentWorkspace {
+            path: "/a".into(),
+            label: "A".into(),
+            last_opened: 100,
+        });
+        store.add_recent(RecentWorkspace {
+            path: "/b".into(),
+            label: "B".into(),
+            last_opened: 200,
+        });
+        assert!(store.remove_by_path("/a"));
+        assert_eq!(store.len(), 1);
+        assert!(!store.remove_by_path("/nonexistent"));
+    }
+
+    #[test]
+    fn recent_workspaces_search() {
+        let dir = tempfile::tempdir().unwrap();
+        let state_path = dir.path().join("recents.json");
+        let mut store = RecentWorkspaces::new(state_path);
+        store.add_recent(RecentWorkspace {
+            path: "/a".into(),
+            label: "My Project".into(),
+            last_opened: 100,
+        });
+        store.add_recent(RecentWorkspace {
+            path: "/b".into(),
+            label: "Other Work".into(),
+            last_opened: 200,
+        });
+        let results = store.search("project");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].label, "My Project");
+    }
+
+    #[test]
+    fn recent_workspaces_len_is_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let state_path = dir.path().join("recents.json");
+        let store = RecentWorkspaces::new(state_path);
+        assert!(store.is_empty());
+        assert_eq!(store.len(), 0);
     }
 }

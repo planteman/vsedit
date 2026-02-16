@@ -959,6 +959,122 @@ impl Default for ActivityGroupManager {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ActivityBar — additional methods
+// ---------------------------------------------------------------------------
+
+impl ActivityBar {
+    /// Returns the index of the item with the given id, or `None`.
+    pub fn index_of(&self, id: &str) -> Option<usize> {
+        self.items.iter().position(|i| i.id == id)
+    }
+
+    /// Swaps the positions of two items by their ids.
+    /// Returns `true` if both items were found and swapped.
+    pub fn swap_items(&mut self, id_a: &str, id_b: &str) -> bool {
+        let pos_a = self.items.iter().position(|i| i.id == id_a);
+        let pos_b = self.items.iter().position(|i| i.id == id_b);
+        match (pos_a, pos_b) {
+            (Some(a), Some(b)) => {
+                self.items.swap(a, b);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if the activity bar is currently hidden.
+    pub fn is_hidden(&self) -> bool {
+        self.position == ActivityBarPosition::Hidden
+    }
+
+    /// Returns a count of visible items.
+    pub fn visible_count(&self) -> usize {
+        self.items.iter().filter(|i| i.visible).count()
+    }
+
+    /// Returns a count of hidden items.
+    pub fn hidden_count(&self) -> usize {
+        self.items.iter().filter(|i| !i.visible).count()
+    }
+
+    /// Returns a count of items with badges.
+    pub fn badge_count(&self) -> usize {
+        self.items.iter().filter(|i| i.badge.is_some()).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivityBarItem — additional methods
+// ---------------------------------------------------------------------------
+
+impl ActivityBarItem {
+    /// Clears the badge on this item.
+    pub fn clear_badge(&mut self) {
+        self.badge = None;
+    }
+
+    /// Returns `true` if this item is both visible and active.
+    pub fn is_visible_and_active(&self) -> bool {
+        self.visible && self.active
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivityItemGroup — additional methods
+// ---------------------------------------------------------------------------
+
+impl ActivityItemGroup {
+    /// Returns items as a slice.
+    pub fn items(&self) -> &[String] {
+        &self.item_ids
+    }
+
+    /// Reverses the order of items in this group.
+    pub fn reverse(&mut self) {
+        self.item_ids.reverse();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivityGroupManager — additional methods
+// ---------------------------------------------------------------------------
+
+impl ActivityGroupManager {
+    /// Removes a group by label. Returns `true` if found and removed.
+    pub fn remove_group(&mut self, label: &str) -> bool {
+        let before = self.groups.len();
+        self.groups.retain(|g| g.label != label);
+        self.groups.len() < before
+    }
+
+    /// Returns `true` if any group contains the item id.
+    pub fn contains_item(&self, id: &str) -> bool {
+        self.groups.iter().any(|g| g.contains(id))
+    }
+
+    /// Returns all collapsed groups.
+    pub fn collapsed_groups(&self) -> Vec<&ActivityItemGroup> {
+        self.groups.iter().filter(|g| g.collapsed).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivityBadgeCounter — additional methods
+// ---------------------------------------------------------------------------
+
+impl ActivityBadgeCounter {
+    /// Returns `true` if any counter is non-zero.
+    pub fn has_any(&self) -> bool {
+        self.counts.values().any(|&v| v > 0)
+    }
+
+    /// Number of items with non-zero counts.
+    pub fn active_count(&self) -> usize {
+        self.counts.values().filter(|&&v| v > 0).count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1652,5 +1768,119 @@ mod tests {
         g.collapsed = true;
         mgr.add_group(g);
         assert!(mgr.flattened_order().is_empty());
+    }
+
+    // -- ActivityBar additional methods -------------------------------------
+
+    #[test]
+    fn activity_bar_index_of() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(make_item("a", 0));
+        bar.add_item(make_item("b", 1));
+        assert_eq!(bar.index_of("a"), Some(0));
+        assert_eq!(bar.index_of("b"), Some(1));
+        assert_eq!(bar.index_of("z"), None);
+    }
+
+    #[test]
+    fn activity_bar_swap_items() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(make_item("a", 0));
+        bar.add_item(make_item("b", 1));
+        bar.add_item(make_item("c", 2));
+        assert!(bar.swap_items("a", "c"));
+        assert_eq!(bar.items[0].id, "c");
+        assert_eq!(bar.items[2].id, "a");
+        assert!(!bar.swap_items("a", "nonexistent"));
+    }
+
+    #[test]
+    fn activity_bar_is_hidden() {
+        let mut bar = ActivityBar::new();
+        assert!(!bar.is_hidden());
+        bar.set_position(ActivityBarPosition::Hidden);
+        assert!(bar.is_hidden());
+    }
+
+    #[test]
+    fn activity_bar_visible_hidden_badge_counts() {
+        let mut bar = ActivityBar::new();
+        bar.add_item(make_item("a", 0));
+        let mut hidden = make_item("b", 1);
+        hidden.visible = false;
+        bar.add_item(hidden);
+        bar.set_badge("a", Some("3".to_string()));
+        assert_eq!(bar.visible_count(), 1);
+        assert_eq!(bar.hidden_count(), 1);
+        assert_eq!(bar.badge_count(), 1);
+    }
+
+    // -- ActivityBarItem additional methods ---------------------------------
+
+    #[test]
+    fn activity_bar_item_clear_badge_and_visible_active() {
+        let mut item = make_item("x", 0);
+        item.badge = Some("5".to_string());
+        item.clear_badge();
+        assert!(item.badge.is_none());
+        assert!(!item.is_visible_and_active());
+        item.active = true;
+        assert!(item.is_visible_and_active());
+        item.visible = false;
+        assert!(!item.is_visible_and_active());
+    }
+
+    // -- ActivityItemGroup additional methods -------------------------------
+
+    #[test]
+    fn activity_item_group_items_and_reverse() {
+        let mut g = ActivityItemGroup::new("Test");
+        g.add_item("a");
+        g.add_item("b");
+        g.add_item("c");
+        assert_eq!(g.items(), &["a", "b", "c"]);
+        g.reverse();
+        assert_eq!(g.items(), &["c", "b", "a"]);
+    }
+
+    // -- ActivityGroupManager additional methods ----------------------------
+
+    #[test]
+    fn group_manager_remove_and_contains() {
+        let mut mgr = ActivityGroupManager::new();
+        let mut g = ActivityItemGroup::new("Primary");
+        g.add_item("explorer");
+        mgr.add_group(g);
+        assert!(mgr.contains_item("explorer"));
+        assert!(!mgr.contains_item("search"));
+        assert!(mgr.remove_group("Primary"));
+        assert!(!mgr.remove_group("Primary"));
+        assert_eq!(mgr.group_count(), 0);
+    }
+
+    #[test]
+    fn group_manager_collapsed_groups() {
+        let mut mgr = ActivityGroupManager::new();
+        let g1 = ActivityItemGroup::new("Open");
+        let mut g2 = ActivityItemGroup::new("Closed");
+        g2.collapsed = true;
+        mgr.add_group(g1);
+        mgr.add_group(g2);
+        let collapsed = mgr.collapsed_groups();
+        assert_eq!(collapsed.len(), 1);
+        assert_eq!(collapsed[0].label, "Closed");
+    }
+
+    // -- ActivityBadgeCounter additional methods ----------------------------
+
+    #[test]
+    fn badge_counter_has_any_and_active_count() {
+        let mut bc = ActivityBadgeCounter::new();
+        assert!(!bc.has_any());
+        assert_eq!(bc.active_count(), 0);
+        bc.set("a", 5);
+        bc.set("b", 0);
+        assert!(bc.has_any());
+        assert_eq!(bc.active_count(), 1);
     }
 }

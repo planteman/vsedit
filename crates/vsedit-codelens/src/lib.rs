@@ -971,6 +971,96 @@ pub fn any_has_data(lenses: &[CodeLens]) -> bool {
     lenses.iter().any(|l| !l.data.is_empty())
 }
 
+// ---------------------------------------------------------------------------
+// CodeLens analysis utilities
+// ---------------------------------------------------------------------------
+
+/// Count the number of resolved lenses (those with a command attached).
+pub fn resolved_count(lenses: &[CodeLens]) -> usize {
+    lenses.iter().filter(|l| l.is_resolved()).count()
+}
+
+/// Count the number of unresolved lenses.
+pub fn unresolved_count(lenses: &[CodeLens]) -> usize {
+    lenses.iter().filter(|l| !l.is_resolved()).count()
+}
+
+/// Group lenses by their start line, returning a mapping from line number
+/// to the lenses on that line.
+pub fn group_by_line(lenses: &[CodeLens]) -> std::collections::HashMap<u32, Vec<&CodeLens>> {
+    let mut map: std::collections::HashMap<u32, Vec<&CodeLens>> = std::collections::HashMap::new();
+    for lens in lenses {
+        map.entry(lens.start_line).or_default().push(lens);
+    }
+    map
+}
+
+/// Return all unique start lines that have at least one code lens.
+pub fn lens_lines(lenses: &[CodeLens]) -> Vec<u32> {
+    let mut lines: Vec<u32> = lenses.iter().map(|l| l.start_line).collect();
+    lines.sort_unstable();
+    lines.dedup();
+    lines
+}
+
+/// Merge two lens sets, deduplicating by (start_line, start_col, end_line, end_col).
+pub fn merge_lenses(a: &[CodeLens], b: &[CodeLens]) -> Vec<CodeLens> {
+    let mut result: Vec<CodeLens> = a.to_vec();
+    for lens in b {
+        let dup = result.iter().any(|existing| {
+            existing.start_line == lens.start_line
+                && existing.start_col == lens.start_col
+                && existing.end_line == lens.end_line
+                && existing.end_col == lens.end_col
+        });
+        if !dup {
+            result.push(lens.clone());
+        }
+    }
+    result
+}
+
+/// Return the total line span covered by all lenses (max end_line - min start_line).
+pub fn total_span(lenses: &[CodeLens]) -> u32 {
+    if lenses.is_empty() {
+        return 0;
+    }
+    let min_start = lenses.iter().map(|l| l.start_line).min().unwrap();
+    let max_end = lenses.iter().map(|l| l.end_line).max().unwrap();
+    max_end.saturating_sub(min_start)
+}
+
+/// Filter lenses to only those whose command_id matches a given pattern.
+pub fn filter_by_command<'a>(lenses: &'a [CodeLens], command_id: &str) -> Vec<&'a CodeLens> {
+    lenses
+        .iter()
+        .filter(|l| {
+            l.command
+                .as_ref()
+                .map(|c| c.command_id == command_id)
+                .unwrap_or(false)
+        })
+        .collect()
+}
+
+/// Format a code lens as a display string using a given style.
+pub fn format_lens(lens: &CodeLens, style: &CodeLensStyle) -> String {
+    if let Some(cmd) = &lens.command {
+        format!("{}{}{}", style.prefix, cmd.title, style.suffix)
+    } else {
+        format!("{}(unresolved){}", style.prefix, style.suffix)
+    }
+}
+
+/// Format all lenses on a single line into a combined display string.
+pub fn format_line_lenses(lenses: &[&CodeLens], style: &CodeLensStyle) -> String {
+    lenses
+        .iter()
+        .map(|l| format_lens(l, style))
+        .collect::<Vec<_>>()
+        .join(&style.separator)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1795,5 +1885,84 @@ mod tests {
     fn any_has_data_false() {
         let lenses = vec![CodeLens::new(1, 0, 1, 5)];
         assert!(!any_has_data(&lenses));
+    }
+
+    // -- resolved_count / unresolved_count -------------------------------------
+
+    #[test]
+    fn resolved_count_basic() {
+        let mut lens = CodeLens::new(1, 0, 1, 10);
+        lens.command = Some(Command { title: "Run".into(), command_id: "test.run".into(), tooltip: String::new(), arguments: vec![] });
+        let lenses = vec![lens, CodeLens::new(2, 0, 2, 10)];
+        assert_eq!(resolved_count(&lenses), 1);
+        assert_eq!(unresolved_count(&lenses), 1);
+    }
+
+    // -- group_by_line ---------------------------------------------------------
+
+    #[test]
+    fn group_by_line_groups() {
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 5),
+            CodeLens::new(1, 6, 1, 10),
+            CodeLens::new(3, 0, 3, 5),
+        ];
+        let groups = group_by_line(&lenses);
+        assert_eq!(groups[&1].len(), 2);
+        assert_eq!(groups[&3].len(), 1);
+    }
+
+    // -- lens_lines ------------------------------------------------------------
+
+    #[test]
+    fn lens_lines_unique() {
+        let lenses = vec![
+            CodeLens::new(5, 0, 5, 10),
+            CodeLens::new(1, 0, 1, 5),
+            CodeLens::new(5, 2, 5, 8),
+        ];
+        let lines = lens_lines(&lenses);
+        assert_eq!(lines, vec![1, 5]);
+    }
+
+    // -- merge_lenses ----------------------------------------------------------
+
+    #[test]
+    fn merge_lenses_deduplicates() {
+        let a = vec![CodeLens::new(1, 0, 1, 5)];
+        let b = vec![CodeLens::new(1, 0, 1, 5), CodeLens::new(2, 0, 2, 5)];
+        let merged = merge_lenses(&a, &b);
+        assert_eq!(merged.len(), 2);
+    }
+
+    // -- total_span ------------------------------------------------------------
+
+    #[test]
+    fn total_span_computed() {
+        let lenses = vec![CodeLens::new(3, 0, 5, 0), CodeLens::new(10, 0, 15, 0)];
+        assert_eq!(total_span(&lenses), 12); // 15 - 3
+    }
+
+    #[test]
+    fn total_span_empty() {
+        let lenses: Vec<CodeLens> = vec![];
+        assert_eq!(total_span(&lenses), 0);
+    }
+
+    // -- format_lens -----------------------------------------------------------
+
+    #[test]
+    fn format_lens_resolved() {
+        let mut lens = CodeLens::new(1, 0, 1, 10);
+        lens.command = Some(Command { title: "5 references".into(), command_id: "show".into(), tooltip: String::new(), arguments: vec![] });
+        let style = CodeLensStyle { prefix: "[ ".into(), suffix: " ]".into(), separator: " | ".into() };
+        assert_eq!(format_lens(&lens, &style), "[ 5 references ]");
+    }
+
+    #[test]
+    fn format_lens_unresolved() {
+        let lens = CodeLens::new(1, 0, 1, 10);
+        let style = CodeLensStyle { prefix: "".into(), suffix: "".into(), separator: " | ".into() };
+        assert_eq!(format_lens(&lens, &style), "(unresolved)");
     }
 }

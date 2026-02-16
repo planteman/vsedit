@@ -1100,6 +1100,138 @@ impl fmt::Display for MergeSessionSummary {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MergeConflict — word-level diff helpers
+// ---------------------------------------------------------------------------
+
+impl MergeConflict {
+    /// Returns the number of words that differ between the current and incoming
+    /// text. Useful for sizing up a conflict at a glance.
+    pub fn word_diff_count(&self) -> usize {
+        let cur_words: Vec<&str> = self.current_text.split_whitespace().collect();
+        let inc_words: Vec<&str> = self.incoming_text.split_whitespace().collect();
+        let max_len = cur_words.len().max(inc_words.len());
+        let mut diffs = 0;
+        for i in 0..max_len {
+            if cur_words.get(i) != inc_words.get(i) {
+                diffs += 1;
+            }
+        }
+        diffs
+    }
+
+    /// True when the conflict only involves whitespace changes.
+    pub fn is_whitespace_only(&self) -> bool {
+        let cur_stripped: String =
+            self.current_text.chars().filter(|c| !c.is_whitespace()).collect();
+        let inc_stripped: String =
+            self.incoming_text.chars().filter(|c| !c.is_whitespace()).collect();
+        cur_stripped == inc_stripped && self.current_text != self.incoming_text
+    }
+
+    /// Reset a previously resolved conflict back to unresolved.
+    pub fn unresolve(&mut self) {
+        self.resolved = false;
+        self.resolution = None;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MergeEditorWidget — batch & search operations
+// ---------------------------------------------------------------------------
+
+impl MergeEditorWidget {
+    /// Resolve all remaining conflicts with the given resolution strategy.
+    pub fn resolve_all(&mut self, resolution: MergeResolution) {
+        for i in 0..self.conflicts.len() {
+            if !self.conflicts[i].resolved {
+                self.resolve_conflict(i, resolution.clone());
+            }
+        }
+    }
+
+    /// Reset every conflict back to unresolved.
+    pub fn unresolve_all(&mut self) {
+        for c in &mut self.conflicts {
+            c.unresolve();
+        }
+    }
+
+    /// Find the first conflict whose current or incoming text contains `needle`.
+    pub fn find_conflict_containing(&self, needle: &str) -> Option<usize> {
+        self.conflicts.iter().position(|c| {
+            c.current_text.contains(needle) || c.incoming_text.contains(needle)
+        })
+    }
+
+    /// Collect indices of conflicts that are whitespace-only changes.
+    pub fn whitespace_only_indices(&self) -> Vec<usize> {
+        self.conflicts
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| c.is_whitespace_only())
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Auto-resolve whitespace-only conflicts by accepting the incoming side.
+    pub fn auto_resolve_whitespace(&mut self) -> usize {
+        let mut count = 0;
+        for c in &mut self.conflicts {
+            if !c.resolved && c.is_whitespace_only() {
+                c.resolution = Some(c.incoming_text.clone());
+                c.resolved = true;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Returns the largest conflict measured by `word_diff_count`.
+    pub fn largest_conflict_index(&self) -> Option<usize> {
+        self.conflicts
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, c)| c.word_diff_count())
+            .map(|(i, _)| i)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MergeSession — bulk operations
+// ---------------------------------------------------------------------------
+
+impl MergeSession {
+    /// Return paths of all files matching a given status.
+    pub fn files_with_status(&self, status: MergeFileStatus) -> Vec<&str> {
+        self.files
+            .iter()
+            .filter(|f| f.status == status)
+            .map(|f| f.path.as_str())
+            .collect()
+    }
+
+    /// Find a file entry by path, returning its index.
+    pub fn find_file(&self, path: &str) -> Option<usize> {
+        self.files.iter().position(|f| f.path == path)
+    }
+
+    /// Jump to a file by path, returning `true` if found.
+    pub fn jump_to_file(&mut self, path: &str) -> bool {
+        if let Some(idx) = self.find_file(path) {
+            self.current_file = idx;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Total number of unresolved conflicts across all files.
+    pub fn total_unresolved_conflicts(&self) -> usize {
+        self.files.iter().map(|f| f.editor.unresolved_count()).sum()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1738,5 +1870,239 @@ d
         assert_eq!(summary.total_conflicts, 1);
         assert_eq!(summary.resolved_conflicts, 1);
         assert!((summary.conflict_resolution_ratio() - 1.0).abs() < f64::EPSILON);
+    }
+
+    // ---- New functionality tests ----
+
+    #[test]
+    fn word_diff_count_identical() {
+        let c = MergeConflictBuilder::new()
+            .region(0, 2)
+            .current_text("hello world")
+            .incoming_text("hello world")
+            .build()
+            .unwrap();
+        assert_eq!(c.word_diff_count(), 0);
+    }
+
+    #[test]
+    fn word_diff_count_different() {
+        let c = MergeConflictBuilder::new()
+            .region(0, 2)
+            .current_text("the quick fox")
+            .incoming_text("the slow bear")
+            .build()
+            .unwrap();
+        assert_eq!(c.word_diff_count(), 2);
+    }
+
+    #[test]
+    fn is_whitespace_only_true() {
+        let c = MergeConflictBuilder::new()
+            .region(0, 2)
+            .current_text("hello  world")
+            .incoming_text("hello world")
+            .build()
+            .unwrap();
+        assert!(c.is_whitespace_only());
+    }
+
+    #[test]
+    fn is_whitespace_only_false_when_identical() {
+        let c = MergeConflictBuilder::new()
+            .region(0, 2)
+            .current_text("hello")
+            .incoming_text("hello")
+            .build()
+            .unwrap();
+        // identical texts are not "whitespace-only changes"
+        assert!(!c.is_whitespace_only());
+    }
+
+    #[test]
+    fn unresolve_resets_conflict() {
+        let mut c = MergeConflictBuilder::new()
+            .region(0, 2)
+            .current_text("a")
+            .incoming_text("b")
+            .build()
+            .unwrap();
+        c.resolved = true;
+        c.resolution = Some("a".into());
+        c.unresolve();
+        assert!(!c.resolved);
+        assert!(c.resolution.is_none());
+    }
+
+    #[test]
+    fn resolve_all_accepts_incoming() {
+        let mut w = MergeEditorWidget::new();
+        for i in 0..3 {
+            w.add_conflict(
+                MergeConflictBuilder::new()
+                    .region(i, i + 1)
+                    .current_text("a")
+                    .incoming_text("b")
+                    .build()
+                    .unwrap(),
+            );
+        }
+        w.resolve_all(MergeResolution::AcceptIncoming);
+        assert!(w.all_resolved());
+        assert_eq!(w.get_merged_result(), vec!["b", "b", "b"]);
+    }
+
+    #[test]
+    fn unresolve_all_clears_resolutions() {
+        let mut w = MergeEditorWidget::new();
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(0, 2)
+                .current_text("a")
+                .incoming_text("b")
+                .build()
+                .unwrap(),
+        );
+        w.resolve_conflict(0, MergeResolution::AcceptCurrent);
+        assert!(w.all_resolved());
+        w.unresolve_all();
+        assert_eq!(w.unresolved_count(), 1);
+        assert!(!w.all_resolved());
+    }
+
+    #[test]
+    fn find_conflict_containing_text() {
+        let mut w = MergeEditorWidget::new();
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(0, 1)
+                .current_text("fn main()")
+                .incoming_text("fn start()")
+                .build()
+                .unwrap(),
+        );
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(1, 2)
+                .current_text("let x = 1")
+                .incoming_text("let y = 2")
+                .build()
+                .unwrap(),
+        );
+        assert_eq!(w.find_conflict_containing("main"), Some(0));
+        assert_eq!(w.find_conflict_containing("let y"), Some(1));
+        assert_eq!(w.find_conflict_containing("nonexistent"), None);
+    }
+
+    #[test]
+    fn whitespace_only_indices_and_auto_resolve() {
+        let mut w = MergeEditorWidget::new();
+        // whitespace-only conflict
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(0, 1)
+                .current_text("a  b")
+                .incoming_text("a b")
+                .build()
+                .unwrap(),
+        );
+        // real conflict
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(1, 2)
+                .current_text("foo")
+                .incoming_text("bar")
+                .build()
+                .unwrap(),
+        );
+        assert_eq!(w.whitespace_only_indices(), vec![0]);
+        let resolved = w.auto_resolve_whitespace();
+        assert_eq!(resolved, 1);
+        assert!(w.conflicts[0].resolved);
+        assert!(!w.conflicts[1].resolved);
+    }
+
+    #[test]
+    fn largest_conflict_index_picks_biggest() {
+        let mut w = MergeEditorWidget::new();
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(0, 1)
+                .current_text("a")
+                .incoming_text("b")
+                .build()
+                .unwrap(),
+        );
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(1, 2)
+                .current_text("the quick brown fox")
+                .incoming_text("a slow red dog")
+                .build()
+                .unwrap(),
+        );
+        assert_eq!(w.largest_conflict_index(), Some(1));
+    }
+
+    #[test]
+    fn session_files_with_status() {
+        let mut session = MergeSession::new();
+        session.add_file("a.rs");
+        session.add_file("b.rs");
+        session.add_file("c.rs");
+        session.files[0].status = MergeFileStatus::Resolved;
+        session.files[2].status = MergeFileStatus::Resolved;
+        let resolved = session.files_with_status(MergeFileStatus::Resolved);
+        assert_eq!(resolved, vec!["a.rs", "c.rs"]);
+        let pending = session.files_with_status(MergeFileStatus::Pending);
+        assert_eq!(pending, vec!["b.rs"]);
+    }
+
+    #[test]
+    fn session_find_and_jump_to_file() {
+        let mut session = MergeSession::new();
+        session.add_file("alpha.rs");
+        session.add_file("beta.rs");
+        session.add_file("gamma.rs");
+        assert_eq!(session.find_file("beta.rs"), Some(1));
+        assert_eq!(session.find_file("missing.rs"), None);
+        assert!(session.jump_to_file("gamma.rs"));
+        assert_eq!(session.current_file, 2);
+        assert!(!session.jump_to_file("nope.rs"));
+        assert_eq!(session.current_file, 2); // unchanged
+    }
+
+    #[test]
+    fn session_total_unresolved_conflicts() {
+        let mut session = MergeSession::new();
+        session.add_file("a.rs");
+        session.add_file("b.rs");
+        session.files[0].editor.add_conflict(
+            MergeConflictBuilder::new()
+                .region(0, 2)
+                .current_text("x")
+                .incoming_text("y")
+                .build()
+                .unwrap(),
+        );
+        session.files[1].editor.add_conflict(
+            MergeConflictBuilder::new()
+                .region(0, 1)
+                .current_text("p")
+                .incoming_text("q")
+                .build()
+                .unwrap(),
+        );
+        session.files[1].editor.add_conflict(
+            MergeConflictBuilder::new()
+                .region(1, 3)
+                .current_text("r")
+                .incoming_text("s")
+                .build()
+                .unwrap(),
+        );
+        assert_eq!(session.total_unresolved_conflicts(), 3);
+        session.files[0].editor.resolve_conflict(0, MergeResolution::AcceptCurrent);
+        assert_eq!(session.total_unresolved_conflicts(), 2);
     }
 }

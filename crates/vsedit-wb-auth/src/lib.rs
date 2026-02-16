@@ -1127,6 +1127,57 @@ impl AuthFlowTracker {
         self.flows.retain(|_, s| !s.is_terminal());
     }
 }
+
+// ---------------------------------------------------------------------------
+// Session scope operations
+// ---------------------------------------------------------------------------
+
+impl AuthenticationSession {
+    pub fn scopes_display(&self) -> String { self.scopes.join(", ") }
+
+    pub fn missing_scopes(&self, required: &[&str]) -> Vec<String> {
+        required.iter().filter(|s| !self.has_scope(s)).map(|s| s.to_string()).collect()
+    }
+
+    pub fn has_any_scope(&self, scopes: &[&str]) -> bool {
+        scopes.iter().any(|s| self.has_scope(s))
+    }
+}
+
+impl AuthenticationService {
+    pub fn providers_with_sessions(&self) -> Vec<String> {
+        let mut ids: Vec<String> = self.sessions.iter().map(|s| s.provider_id.clone()).collect();
+        ids.sort(); ids.dedup(); ids
+    }
+
+    pub fn total_unique_scopes(&self) -> usize {
+        let mut scopes: Vec<&str> = self.sessions.iter().flat_map(|s| s.scopes.iter().map(String::as_str)).collect();
+        scopes.sort(); scopes.dedup(); scopes.len()
+    }
+
+    pub fn sessions_with_scope(&self, scope: &str) -> Vec<&AuthenticationSession> {
+        self.sessions.iter().filter(|s| s.has_scope(scope)).collect()
+    }
+
+    pub fn clear_provider_sessions(&mut self, provider_id: &str) -> usize {
+        let before = self.sessions.len();
+        self.sessions.retain(|s| s.provider_id != provider_id);
+        before - self.sessions.len()
+    }
+
+    pub fn summary(&self) -> String {
+        format!("{} provider(s), {} session(s)", self.providers.len(), self.sessions.len())
+    }
+}
+
+pub fn active_providers(providers: &[AuthProvider]) -> Vec<&AuthProvider> {
+    providers.iter().filter(|p| p.status == AuthProviderStatus::Active).collect()
+}
+
+pub fn multi_account_providers(providers: &[AuthProvider]) -> Vec<&AuthProvider> {
+    providers.iter().filter(|p| p.supports_multiple_accounts).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1765,5 +1816,78 @@ mod tests {
         tracker.clear_completed();
         assert_eq!(tracker.len(), 1);
         assert!(tracker.get_state("b").unwrap().is_in_progress());
+    }
+
+    #[test]
+    fn session_scopes_display() {
+        let session = AuthenticationSession { id: "s1".into(), provider_id: "github".into(), account_label: "user".into(), scopes: vec!["read".into(), "write".into()] };
+        assert_eq!(session.scopes_display(), "read, write");
+    }
+
+    #[test]
+    fn session_missing_scopes() {
+        let session = AuthenticationSession { id: "s1".into(), provider_id: "github".into(), account_label: "user".into(), scopes: vec!["read".into(), "write".into()] };
+        assert_eq!(session.missing_scopes(&["read", "admin"]), vec!["admin"]);
+    }
+
+    #[test]
+    fn session_has_any_scope() {
+        let session = AuthenticationSession { id: "s1".into(), provider_id: "github".into(), account_label: "user".into(), scopes: vec!["read".into()] };
+        assert!(session.has_any_scope(&["write", "read"]));
+        assert!(!session.has_any_scope(&["write", "admin"]));
+    }
+
+    #[test]
+    fn providers_with_sessions_lists() {
+        let mut svc = AuthenticationService::new();
+        svc.register_provider(github_provider());
+        svc.register_provider(azure_provider());
+        svc.create_session("github", vec!["read".into()]);
+        svc.create_session("azure", vec!["email".into()]);
+        let ids = svc.providers_with_sessions();
+        assert_eq!(ids, vec!["azure", "github"]);
+    }
+
+    #[test]
+    fn total_unique_scopes_counts() {
+        let mut svc = AuthenticationService::new();
+        svc.register_provider(github_provider());
+        svc.create_session("github", vec!["read".into(), "write".into()]);
+        svc.create_session("github", vec!["read".into(), "admin".into()]);
+        assert_eq!(svc.total_unique_scopes(), 3);
+    }
+
+    #[test]
+    fn clear_provider_sessions_removes() {
+        let mut svc = AuthenticationService::new();
+        svc.register_provider(github_provider());
+        svc.create_session("github", vec!["read".into()]);
+        svc.create_session("github", vec!["write".into()]);
+        assert_eq!(svc.clear_provider_sessions("github"), 2);
+        assert_eq!(svc.session_count(), 0);
+    }
+
+    #[test]
+    fn service_summary_format() {
+        let mut svc = AuthenticationService::new();
+        svc.register_provider(github_provider());
+        svc.create_session("github", vec!["read".into()]);
+        assert!(svc.summary().contains("1 provider(s)"));
+    }
+
+    #[test]
+    fn active_providers_filters() {
+        let providers = vec![github_provider(), azure_provider()];
+        let active = active_providers(&providers);
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].id, "azure");
+    }
+
+    #[test]
+    fn multi_account_providers_filters() {
+        let providers = vec![github_provider(), azure_provider()];
+        let multi = multi_account_providers(&providers);
+        assert_eq!(multi.len(), 1);
+        assert_eq!(multi[0].id, "azure");
     }
 }

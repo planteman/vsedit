@@ -994,6 +994,130 @@ pub fn split_highlighted_line(line: &HighlightedLine, at_char: usize) -> (Highli
     (HighlightedLine { segments: left }, HighlightedLine { segments: right })
 }
 
+// ---------------------------------------------------------------------------
+// ColorStats – aggregate colour statistics for highlighted output
+// ---------------------------------------------------------------------------
+
+/// Statistics about colour usage across a set of highlighted lines.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ColorStats {
+    /// Total number of segments analysed.
+    pub total_segments: usize,
+    /// Total character count across all segments.
+    pub total_chars: usize,
+    /// Number of unique foreground colours.
+    pub unique_colors: usize,
+    /// The (r,g,b) that covers the most characters.
+    pub dominant_color: Option<(u8, u8, u8)>,
+    /// Characters covered by the dominant colour.
+    pub dominant_chars: usize,
+}
+
+/// Compute [`ColorStats`] for a slice of highlighted lines.
+pub fn compute_color_stats(lines: &[HighlightedLine]) -> ColorStats {
+    let mut freq: std::collections::HashMap<(u8, u8, u8), usize> =
+        std::collections::HashMap::new();
+    let mut total_segments = 0usize;
+    let mut total_chars = 0usize;
+    for line in lines {
+        for seg in line.segments() {
+            total_segments += 1;
+            let chars = seg.text.chars().count();
+            total_chars += chars;
+            *freq.entry(seg.fg).or_insert(0) += chars;
+        }
+    }
+    let (dominant_color, dominant_chars) = freq
+        .iter()
+        .max_by_key(|&(_, &count)| count)
+        .map(|(&c, &n)| (Some(c), n))
+        .unwrap_or((None, 0));
+    ColorStats {
+        total_segments,
+        total_chars,
+        unique_colors: freq.len(),
+        dominant_color,
+        dominant_chars,
+    }
+}
+
+/// Return only lines that contain at least one non-whitespace segment.
+pub fn non_blank_lines(lines: &[HighlightedLine]) -> Vec<&HighlightedLine> {
+    lines
+        .iter()
+        .filter(|l| l.segments().iter().any(|s| !s.is_whitespace()))
+        .collect()
+}
+
+/// Concatenate the plain text of all lines separated by newlines.
+pub fn lines_to_plain_text(lines: &[HighlightedLine]) -> String {
+    lines
+        .iter()
+        .map(|l| l.plain_text())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Search highlighted lines for segments whose text contains `needle` (case-sensitive).
+/// Returns `(line_index, segment_index)` pairs.
+pub fn search_segments(lines: &[HighlightedLine], needle: &str) -> Vec<(usize, usize)> {
+    let mut hits = Vec::new();
+    for (li, line) in lines.iter().enumerate() {
+        for (si, seg) in line.segments().iter().enumerate() {
+            if seg.text.contains(needle) {
+                hits.push((li, si));
+            }
+        }
+    }
+    hits
+}
+
+/// Re-colour every segment in a line to the given foreground colour.
+pub fn recolor_line(line: &HighlightedLine, fg: (u8, u8, u8)) -> HighlightedLine {
+    HighlightedLine {
+        segments: line
+            .segments()
+            .iter()
+            .map(|s| HighlightedSegment::new(fg, s.text.clone()))
+            .collect(),
+    }
+}
+
+/// Trim leading whitespace-only segments from a highlighted line.
+pub fn trim_leading_whitespace(line: &HighlightedLine) -> HighlightedLine {
+    let segs = line.segments();
+    let skip = segs.iter().take_while(|s| s.is_whitespace()).count();
+    HighlightedLine {
+        segments: segs[skip..].to_vec(),
+    }
+}
+
+/// Trim trailing whitespace-only segments from a highlighted line.
+pub fn trim_trailing_whitespace(line: &HighlightedLine) -> HighlightedLine {
+    let segs = line.segments();
+    let mut end = segs.len();
+    while end > 0 && segs[end - 1].is_whitespace() {
+        end -= 1;
+    }
+    HighlightedLine {
+        segments: segs[..end].to_vec(),
+    }
+}
+
+/// Map a function over every segment text, preserving colours.
+pub fn map_segment_text<F>(line: &HighlightedLine, f: F) -> HighlightedLine
+where
+    F: Fn(&str) -> String,
+{
+    HighlightedLine {
+        segments: line
+            .segments()
+            .iter()
+            .map(|s| HighlightedSegment::new(s.fg, f(&s.text)))
+            .collect(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1769,5 +1893,111 @@ mod tests {
         let (left, right) = split_highlighted_line(&line, 2);
         assert_eq!(left.plain_text(), "ab");
         assert_eq!(right.plain_text(), "cdef");
+    }
+
+    #[test]
+    fn color_stats_empty() {
+        let stats = compute_color_stats(&[]);
+        assert_eq!(stats.total_segments, 0);
+        assert_eq!(stats.total_chars, 0);
+        assert_eq!(stats.unique_colors, 0);
+        assert!(stats.dominant_color.is_none());
+    }
+
+    #[test]
+    fn color_stats_single_line() {
+        let line = HighlightedLine {
+            segments: vec![
+                HighlightedSegment::new((255, 0, 0), "red"),
+                HighlightedSegment::new((0, 255, 0), "green!"),
+            ],
+        };
+        let stats = compute_color_stats(&[line]);
+        assert_eq!(stats.total_segments, 2);
+        assert_eq!(stats.total_chars, 9);
+        assert_eq!(stats.unique_colors, 2);
+        assert_eq!(stats.dominant_color, Some((0, 255, 0)));
+        assert_eq!(stats.dominant_chars, 6);
+    }
+
+    #[test]
+    fn non_blank_lines_filters() {
+        let blank = HighlightedLine { segments: vec![HighlightedSegment::new((0, 0, 0), "   ")] };
+        let code = HighlightedLine {
+            segments: vec![HighlightedSegment::new((0, 0, 0), "fn main()")],
+        };
+        let lines = [blank, code];
+        let result = non_blank_lines(&lines);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].plain_text(), "fn main()");
+    }
+
+    #[test]
+    fn lines_to_plain_text_joins() {
+        let a = HighlightedLine { segments: vec![HighlightedSegment::new((0, 0, 0), "hello")] };
+        let b = HighlightedLine { segments: vec![HighlightedSegment::new((0, 0, 0), "world")] };
+        assert_eq!(lines_to_plain_text(&[a, b]), "hello\nworld");
+    }
+
+    #[test]
+    fn search_segments_finds_matches() {
+        let line = HighlightedLine {
+            segments: vec![
+                HighlightedSegment::new((0, 0, 0), "fn main()"),
+                HighlightedSegment::new((0, 0, 0), " { }"),
+            ],
+        };
+        let hits = search_segments(&[line], "main");
+        assert_eq!(hits, vec![(0, 0)]);
+    }
+
+    #[test]
+    fn recolor_line_changes_all_fg() {
+        let line = HighlightedLine {
+            segments: vec![
+                HighlightedSegment::new((1, 2, 3), "a"),
+                HighlightedSegment::new((4, 5, 6), "b"),
+            ],
+        };
+        let recolored = recolor_line(&line, (255, 255, 255));
+        for seg in recolored.segments() {
+            assert_eq!(seg.fg, (255, 255, 255));
+        }
+    }
+
+    #[test]
+    fn trim_leading_whitespace_works() {
+        let line = HighlightedLine {
+            segments: vec![
+                HighlightedSegment::new((0, 0, 0), "  "),
+                HighlightedSegment::new((0, 0, 0), "\t"),
+                HighlightedSegment::new((1, 1, 1), "code"),
+            ],
+        };
+        let trimmed = trim_leading_whitespace(&line);
+        assert_eq!(trimmed.segment_count(), 1);
+        assert_eq!(trimmed.plain_text(), "code");
+    }
+
+    #[test]
+    fn trim_trailing_whitespace_works() {
+        let line = HighlightedLine {
+            segments: vec![
+                HighlightedSegment::new((1, 1, 1), "code"),
+                HighlightedSegment::new((0, 0, 0), "  "),
+            ],
+        };
+        let trimmed = trim_trailing_whitespace(&line);
+        assert_eq!(trimmed.segment_count(), 1);
+        assert_eq!(trimmed.plain_text(), "code");
+    }
+
+    #[test]
+    fn map_segment_text_uppercases() {
+        let line = HighlightedLine {
+            segments: vec![HighlightedSegment::new((0, 0, 0), "hello")],
+        };
+        let mapped = map_segment_text(&line, |s| s.to_uppercase());
+        assert_eq!(mapped.plain_text(), "HELLO");
     }
 }

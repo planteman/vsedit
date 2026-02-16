@@ -401,6 +401,100 @@ impl EditorOptions {
     pub fn toggle_sticky_scroll_enabled(&mut self) {
         self.sticky_scroll_enabled = !self.sticky_scroll_enabled;
     }
+
+    /// Compute the effective line height; when `line_height` is 0 the font size
+    /// scaled by a default factor (1.35) is used.
+    pub fn effective_line_height(&self) -> u32 {
+        if self.line_height > 0 {
+            self.line_height
+        } else {
+            // 1.35× font_size, rounded
+            ((self.font_size as f64) * 1.35).round() as u32
+        }
+    }
+
+    /// Compute the effective cursor width; 0 means "use the cursor style default".
+    pub fn effective_cursor_width(&self) -> u32 {
+        if self.cursor_width > 0 {
+            return self.cursor_width;
+        }
+        match self.cursor_style {
+            CursorStyle::Line => 2,
+            CursorStyle::LineThin => 1,
+            _ => 0,
+        }
+    }
+
+    /// Resolve the diff word-wrap setting: if `Inherit`, fall back to the
+    /// editor-level `word_wrap`.
+    pub fn resolved_diff_word_wrap(&self) -> WordWrap {
+        if self.diff_word_wrap == WordWrap::Inherit {
+            self.word_wrap
+        } else {
+            self.diff_word_wrap
+        }
+    }
+
+    /// Build a compact indentation description string, e.g. "Spaces: 4" or "Tabs".
+    pub fn indentation_label(&self) -> String {
+        if self.insert_spaces {
+            format!("Spaces: {}", self.tab_size)
+        } else {
+            "Tabs".to_string()
+        }
+    }
+
+    /// Returns `true` when any automatic formatting feature is enabled.
+    pub fn has_auto_format(&self) -> bool {
+        self.format_on_paste || self.format_on_type || self.format_on_save
+    }
+
+    /// Count how many boolean "feature" flags are enabled.
+    pub fn enabled_feature_count(&self) -> usize {
+        let flags: &[bool] = &[
+            self.insert_spaces,
+            self.detect_indentation,
+            self.trim_auto_whitespace,
+            self.minimap_enabled,
+            self.scroll_beyond_last_line,
+            self.smooth_scrolling,
+            self.render_control_characters,
+            self.format_on_paste,
+            self.format_on_type,
+            self.format_on_save,
+            self.suggest_on_trigger_characters,
+            self.quick_suggestions,
+            self.bracket_pair_colorization,
+            self.guides_indentation,
+            self.guides_bracket_pairs,
+            self.folding_enabled,
+            self.links,
+            self.sticky_scroll_enabled,
+        ];
+        flags.iter().filter(|&&v| v).count()
+    }
+
+    /// Clamp numeric fields to sane ranges in-place, returning the number of
+    /// fields that were adjusted.
+    pub fn clamp_values(&mut self) -> usize {
+        let mut adjusted = 0usize;
+        macro_rules! clamp {
+            ($field:ident, $min:expr, $max:expr) => {
+                let clamped = self.$field.clamp($min, $max);
+                if clamped != self.$field {
+                    self.$field = clamped;
+                    adjusted += 1;
+                }
+            };
+        }
+        clamp!(tab_size, 1, 16);
+        clamp!(word_wrap_column, 1, 10_000);
+        clamp!(cursor_width, 0, 10);
+        clamp!(font_size, 1, 200);
+        clamp!(line_height, 0, 200);
+        clamp!(sticky_scroll_max_line_count, 0, 50);
+        adjusted
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -716,6 +810,48 @@ impl EditorConfigOverride {
             filename == self.pattern
         }
     }
+
+    /// Returns `true` when at least one field is set to a non-`None` value.
+    pub fn has_overrides(&self) -> bool {
+        self.tab_size.is_some()
+            || self.insert_spaces.is_some()
+            || self.word_wrap.is_some()
+            || self.rulers.is_some()
+            || self.trim_trailing_whitespace.is_some()
+            || self.insert_final_newline.is_some()
+    }
+
+    /// Count how many fields are overridden (non-`None`).
+    pub fn override_count(&self) -> usize {
+        [
+            self.tab_size.is_some(),
+            self.insert_spaces.is_some(),
+            self.word_wrap.is_some(),
+            self.rulers.is_some(),
+            self.trim_trailing_whitespace.is_some(),
+            self.insert_final_newline.is_some(),
+        ]
+        .iter()
+        .filter(|&&v| v)
+        .count()
+    }
+
+    /// Apply this override onto a mutable `EditorOptions`, touching only
+    /// the fields that are `Some`.
+    pub fn apply_to(&self, opts: &mut EditorOptions) {
+        if let Some(ts) = self.tab_size {
+            opts.tab_size = ts;
+        }
+        if let Some(is) = self.insert_spaces {
+            opts.insert_spaces = is;
+        }
+        if let Some(ww) = self.word_wrap {
+            opts.word_wrap = ww;
+        }
+        if let Some(ref r) = self.rulers {
+            opts.rulers = r.clone();
+        }
+    }
 }
 
 /// Registry of per-file-type overrides.
@@ -749,6 +885,36 @@ impl OverrideRegistry {
 
     pub fn is_empty(&self) -> bool {
         self.overrides.is_empty()
+    }
+
+    /// Remove all overrides whose pattern equals the given pattern.
+    /// Returns how many were removed.
+    pub fn remove_by_pattern(&mut self, pattern: &str) -> usize {
+        let before = self.overrides.len();
+        self.overrides.retain(|o| o.pattern != pattern);
+        before - self.overrides.len()
+    }
+
+    /// Apply the *first* matching override to the given options.
+    /// Returns `true` if an override was applied.
+    pub fn apply_first(&self, filename: &str, opts: &mut EditorOptions) -> bool {
+        if let Some(ov) = self.find(filename) {
+            ov.apply_to(opts);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// List all unique patterns registered.
+    pub fn patterns(&self) -> Vec<&str> {
+        let mut seen = Vec::new();
+        for o in &self.overrides {
+            if !seen.contains(&o.pattern.as_str()) {
+                seen.push(o.pattern.as_str());
+            }
+        }
+        seen
     }
 }
 
@@ -821,6 +987,25 @@ impl WordWrap {
     }
 }
 
+impl WordWrap {
+    /// Parse from a string (case-insensitive).
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().as_str() {
+            "off" => Some(Self::Off),
+            "on" => Some(Self::On),
+            "wordwrapcolumn" | "word-wrap-column" => Some(Self::WordWrapColumn),
+            "bounded" => Some(Self::Bounded),
+            "inherit" => Some(Self::Inherit),
+            _ => None,
+        }
+    }
+
+    /// Returns `true` if wrapping uses a column limit.
+    pub fn uses_column(&self) -> bool {
+        matches!(self, WordWrap::WordWrapColumn | WordWrap::Bounded)
+    }
+}
+
 impl fmt::Display for WordWrap {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -851,6 +1036,44 @@ impl LineNumbersType {
     /// Returns true if line numbers are shown.
     pub fn is_visible(&self) -> bool {
         !matches!(self, LineNumbersType::Off)
+    }
+}
+
+impl LineNumbersType {
+    /// Parse from a string (case-insensitive).
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().as_str() {
+            "off" => Some(Self::Off),
+            "on" => Some(Self::On),
+            "relative" => Some(Self::Relative),
+            "interval" => Some(Self::Interval),
+            _ => None,
+        }
+    }
+
+    /// Compute the displayed line number given the cursor line and the actual line.
+    /// Both `cursor_line` and `line` are 1-based.
+    pub fn render_line_number(&self, cursor_line: u32, line: u32, interval: u32) -> Option<u32> {
+        match self {
+            LineNumbersType::Off => None,
+            LineNumbersType::On => Some(line),
+            LineNumbersType::Relative => {
+                if line == cursor_line {
+                    Some(line)
+                } else {
+                    Some(line.abs_diff(cursor_line))
+                }
+            }
+            LineNumbersType::Interval => {
+                if line == cursor_line || interval == 0 {
+                    Some(line)
+                } else if line % interval == 0 {
+                    Some(line)
+                } else {
+                    None
+                }
+            }
+        }
     }
 }
 
@@ -1704,6 +1927,230 @@ mod tests {
         assert!(errors.len() >= 2);
         assert!(errors.iter().any(|e| e.contains("tab_size")));
         assert!(errors.iter().any(|e| e.contains("font_size")));
+    }
+
+    // -----------------------------------------------------------------------
+    // New functionality tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn word_wrap_from_name() {
+        assert_eq!(WordWrap::from_name("off"), Some(WordWrap::Off));
+        assert_eq!(WordWrap::from_name("ON"), Some(WordWrap::On));
+        assert_eq!(WordWrap::from_name("bounded"), Some(WordWrap::Bounded));
+        assert_eq!(WordWrap::from_name("wordwrapcolumn"), Some(WordWrap::WordWrapColumn));
+        assert_eq!(WordWrap::from_name("word-wrap-column"), Some(WordWrap::WordWrapColumn));
+        assert_eq!(WordWrap::from_name("inherit"), Some(WordWrap::Inherit));
+        assert_eq!(WordWrap::from_name("nope"), None);
+    }
+
+    #[test]
+    fn word_wrap_uses_column() {
+        assert!(WordWrap::WordWrapColumn.uses_column());
+        assert!(WordWrap::Bounded.uses_column());
+        assert!(!WordWrap::Off.uses_column());
+        assert!(!WordWrap::On.uses_column());
+        assert!(!WordWrap::Inherit.uses_column());
+    }
+
+    #[test]
+    fn line_numbers_from_name() {
+        assert_eq!(LineNumbersType::from_name("off"), Some(LineNumbersType::Off));
+        assert_eq!(LineNumbersType::from_name("ON"), Some(LineNumbersType::On));
+        assert_eq!(LineNumbersType::from_name("Relative"), Some(LineNumbersType::Relative));
+        assert_eq!(LineNumbersType::from_name("interval"), Some(LineNumbersType::Interval));
+        assert_eq!(LineNumbersType::from_name("bogus"), None);
+    }
+
+    #[test]
+    fn line_numbers_render_off() {
+        assert_eq!(LineNumbersType::Off.render_line_number(5, 1, 10), None);
+    }
+
+    #[test]
+    fn line_numbers_render_on() {
+        assert_eq!(LineNumbersType::On.render_line_number(5, 3, 10), Some(3));
+    }
+
+    #[test]
+    fn line_numbers_render_relative() {
+        // At cursor line → absolute number
+        assert_eq!(LineNumbersType::Relative.render_line_number(5, 5, 0), Some(5));
+        // Away from cursor → distance
+        assert_eq!(LineNumbersType::Relative.render_line_number(5, 8, 0), Some(3));
+        assert_eq!(LineNumbersType::Relative.render_line_number(5, 2, 0), Some(3));
+    }
+
+    #[test]
+    fn line_numbers_render_interval() {
+        // Cursor line always shown
+        assert_eq!(LineNumbersType::Interval.render_line_number(7, 7, 5), Some(7));
+        // Multiples of interval shown
+        assert_eq!(LineNumbersType::Interval.render_line_number(7, 10, 5), Some(10));
+        // Non-multiples hidden
+        assert_eq!(LineNumbersType::Interval.render_line_number(7, 3, 5), None);
+    }
+
+    #[test]
+    fn effective_line_height_explicit() {
+        let mut opts = EditorOptions::default();
+        opts.line_height = 22;
+        assert_eq!(opts.effective_line_height(), 22);
+    }
+
+    #[test]
+    fn effective_line_height_auto() {
+        let opts = EditorOptions::default(); // font_size 14, line_height 0
+        // 14 * 1.35 = 18.9 → rounds to 19
+        assert_eq!(opts.effective_line_height(), 19);
+    }
+
+    #[test]
+    fn effective_cursor_width_defaults() {
+        let mut opts = EditorOptions::default();
+        opts.cursor_width = 0;
+        opts.cursor_style = CursorStyle::Line;
+        assert_eq!(opts.effective_cursor_width(), 2);
+        opts.cursor_style = CursorStyle::LineThin;
+        assert_eq!(opts.effective_cursor_width(), 1);
+        opts.cursor_style = CursorStyle::Block;
+        assert_eq!(opts.effective_cursor_width(), 0);
+    }
+
+    #[test]
+    fn effective_cursor_width_explicit() {
+        let mut opts = EditorOptions::default();
+        opts.cursor_width = 5;
+        assert_eq!(opts.effective_cursor_width(), 5);
+    }
+
+    #[test]
+    fn resolved_diff_word_wrap_inherit() {
+        let mut opts = EditorOptions::default();
+        opts.word_wrap = WordWrap::On;
+        opts.diff_word_wrap = WordWrap::Inherit;
+        assert_eq!(opts.resolved_diff_word_wrap(), WordWrap::On);
+    }
+
+    #[test]
+    fn resolved_diff_word_wrap_explicit() {
+        let mut opts = EditorOptions::default();
+        opts.word_wrap = WordWrap::Off;
+        opts.diff_word_wrap = WordWrap::Bounded;
+        assert_eq!(opts.resolved_diff_word_wrap(), WordWrap::Bounded);
+    }
+
+    #[test]
+    fn indentation_label_spaces() {
+        let opts = EditorOptions::default();
+        assert_eq!(opts.indentation_label(), "Spaces: 4");
+    }
+
+    #[test]
+    fn indentation_label_tabs() {
+        let mut opts = EditorOptions::default();
+        opts.insert_spaces = false;
+        assert_eq!(opts.indentation_label(), "Tabs");
+    }
+
+    #[test]
+    fn has_auto_format_none() {
+        let opts = EditorOptions::default();
+        assert!(!opts.has_auto_format());
+    }
+
+    #[test]
+    fn has_auto_format_some() {
+        let mut opts = EditorOptions::default();
+        opts.format_on_save = true;
+        assert!(opts.has_auto_format());
+    }
+
+    #[test]
+    fn enabled_feature_count_default() {
+        let opts = EditorOptions::default();
+        // The default has many booleans enabled; just verify count > 0
+        assert!(opts.enabled_feature_count() > 5);
+    }
+
+    #[test]
+    fn clamp_values_no_change() {
+        let mut opts = EditorOptions::default();
+        assert_eq!(opts.clamp_values(), 0);
+    }
+
+    #[test]
+    fn clamp_values_adjusts() {
+        let mut opts = EditorOptions::default();
+        opts.tab_size = 0;
+        opts.font_size = 999;
+        opts.word_wrap_column = 0;
+        let adjusted = opts.clamp_values();
+        assert_eq!(adjusted, 3);
+        assert_eq!(opts.tab_size, 1);
+        assert_eq!(opts.font_size, 200);
+        assert_eq!(opts.word_wrap_column, 1);
+    }
+
+    #[test]
+    fn override_has_overrides_empty() {
+        let ov = EditorConfigOverride::new("*.rs");
+        assert!(!ov.has_overrides());
+        assert_eq!(ov.override_count(), 0);
+    }
+
+    #[test]
+    fn override_has_overrides_some() {
+        let ov = EditorConfigOverride::new("*.rs")
+            .with_tab_size(2)
+            .with_insert_spaces(true);
+        assert!(ov.has_overrides());
+        assert_eq!(ov.override_count(), 2);
+    }
+
+    #[test]
+    fn override_apply_to() {
+        let ov = EditorConfigOverride::new("*.py")
+            .with_tab_size(2)
+            .with_insert_spaces(true)
+            .with_word_wrap(WordWrap::On)
+            .with_rulers(vec![79]);
+        let mut opts = EditorOptions::default();
+        ov.apply_to(&mut opts);
+        assert_eq!(opts.tab_size, 2);
+        assert!(opts.insert_spaces);
+        assert_eq!(opts.word_wrap, WordWrap::On);
+        assert_eq!(opts.rulers, vec![79]);
+    }
+
+    #[test]
+    fn registry_remove_by_pattern() {
+        let mut reg = OverrideRegistry::new();
+        reg.add(EditorConfigOverride::new("*.rs").with_tab_size(4));
+        reg.add(EditorConfigOverride::new("*.rs").with_insert_spaces(true));
+        reg.add(EditorConfigOverride::new("*.py").with_tab_size(2));
+        assert_eq!(reg.remove_by_pattern("*.rs"), 2);
+        assert_eq!(reg.len(), 1);
+    }
+
+    #[test]
+    fn registry_apply_first() {
+        let mut reg = OverrideRegistry::new();
+        reg.add(EditorConfigOverride::new("*.rs").with_tab_size(2));
+        let mut opts = EditorOptions::default();
+        assert!(reg.apply_first("main.rs", &mut opts));
+        assert_eq!(opts.tab_size, 2);
+        assert!(!reg.apply_first("main.js", &mut opts));
+    }
+
+    #[test]
+    fn registry_patterns() {
+        let mut reg = OverrideRegistry::new();
+        reg.add(EditorConfigOverride::new("*.rs"));
+        reg.add(EditorConfigOverride::new("*.rs"));
+        reg.add(EditorConfigOverride::new("*.py"));
+        let pats = reg.patterns();
+        assert_eq!(pats, vec!["*.rs", "*.py"]);
     }
 
 }

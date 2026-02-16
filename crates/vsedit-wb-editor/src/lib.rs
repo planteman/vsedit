@@ -1101,6 +1101,180 @@ impl fmt::Display for EditorGroupStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// EditorGroupLayout utilities
+// ---------------------------------------------------------------------------
+
+impl EditorGroupLayout {
+    /// Returns the number of visible splits for this layout given a group count.
+    /// Horizontal and Vertical show all groups linearly; Grid arranges in rows.
+    pub fn split_count(&self, group_count: usize) -> (usize, usize) {
+        match self {
+            EditorGroupLayout::Horizontal => (group_count, 1),
+            EditorGroupLayout::Vertical => (1, group_count),
+            EditorGroupLayout::Grid => {
+                if group_count == 0 {
+                    return (0, 0);
+                }
+                let cols = (group_count as f64).sqrt().ceil() as usize;
+                let rows = (group_count + cols - 1) / cols;
+                (cols, rows)
+            }
+        }
+    }
+
+    /// Returns the next layout in a cycle: Horizontal → Vertical → Grid → Horizontal.
+    pub fn cycle_next(self) -> Self {
+        match self {
+            EditorGroupLayout::Horizontal => EditorGroupLayout::Vertical,
+            EditorGroupLayout::Vertical => EditorGroupLayout::Grid,
+            EditorGroupLayout::Grid => EditorGroupLayout::Horizontal,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorTabInfo utilities
+// ---------------------------------------------------------------------------
+
+impl EditorTabInfo {
+    /// Returns the file extension from the URI, if any.
+    pub fn extension(&self) -> Option<&str> {
+        let filename = self.uri.rsplit(['/', '\\']).next().unwrap_or(&self.uri);
+        match filename.rsplit_once('.') {
+            Some((stem, ext)) if !stem.is_empty() && !ext.is_empty() => Some(ext),
+            _ => None,
+        }
+    }
+
+    /// Returns the filename portion of the URI (last path component).
+    pub fn filename(&self) -> &str {
+        self.uri.rsplit(['/', '\\']).next().unwrap_or(&self.uri)
+    }
+
+    /// Returns true if this tab is in a "clean" state (not dirty, not preview).
+    pub fn is_stable(&self) -> bool {
+        !self.dirty && !self.preview
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorGroup – close_all and retain operations
+// ---------------------------------------------------------------------------
+
+impl EditorGroup {
+    /// Closes all tabs in this group, returning the removed tabs.
+    pub fn close_all(&mut self) -> Vec<EditorTabInfo> {
+        self.active_editor = None;
+        std::mem::take(&mut self.editors)
+    }
+
+    /// Closes all tabs except those that match the predicate.
+    /// Returns the removed tabs. Active editor is reset if its tab was removed.
+    pub fn close_others<F>(&mut self, keep: F) -> Vec<EditorTabInfo>
+    where
+        F: Fn(&EditorTabInfo) -> bool,
+    {
+        let mut removed = Vec::new();
+        let mut kept = Vec::new();
+        for tab in self.editors.drain(..) {
+            if keep(&tab) {
+                kept.push(tab);
+            } else {
+                removed.push(tab);
+            }
+        }
+        self.editors = kept;
+        if self.editors.is_empty() {
+            self.active_editor = None;
+        } else if let Some(active) = self.active_editor {
+            if active >= self.editors.len() {
+                self.active_editor = Some(self.editors.len() - 1);
+            }
+        }
+        removed
+    }
+
+    /// Returns the index of the tab with the given URI, if present.
+    pub fn find_tab_index(&self, uri: &str) -> Option<usize> {
+        self.editors.iter().position(|e| e.uri == uri)
+    }
+
+    /// Activates the next tab (wrapping around). Returns the new active index.
+    pub fn activate_next(&mut self) -> Option<usize> {
+        if self.editors.is_empty() {
+            return None;
+        }
+        let next = match self.active_editor {
+            Some(i) => (i + 1) % self.editors.len(),
+            None => 0,
+        };
+        self.active_editor = Some(next);
+        Some(next)
+    }
+
+    /// Activates the previous tab (wrapping around). Returns the new active index.
+    pub fn activate_prev(&mut self) -> Option<usize> {
+        if self.editors.is_empty() {
+            return None;
+        }
+        let prev = match self.active_editor {
+            Some(0) => self.editors.len() - 1,
+            Some(i) => i - 1,
+            None => self.editors.len() - 1,
+        };
+        self.active_editor = Some(prev);
+        Some(prev)
+    }
+
+    /// Returns the URIs of all pinned tabs.
+    pub fn pinned_uris(&self) -> Vec<&str> {
+        self.editors.iter().filter(|e| e.pinned).map(|e| e.uri.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorGroupService – batch operations
+// ---------------------------------------------------------------------------
+
+impl EditorGroupService {
+    /// Closes all tabs across all groups that are not dirty.
+    /// Returns the total number of tabs closed.
+    pub fn close_all_saved(&mut self) -> usize {
+        let mut closed = 0;
+        for group in &mut self.groups {
+            let before = group.editors.len();
+            group.editors.retain(|t| t.dirty);
+            closed += before - group.editors.len();
+            if group.editors.is_empty() {
+                group.active_editor = None;
+            } else if let Some(active) = group.active_editor {
+                if active >= group.editors.len() {
+                    group.active_editor = Some(group.editors.len() - 1);
+                }
+            }
+        }
+        closed
+    }
+
+    /// Returns a summary of all groups as a vector of `TabSummary` paired with group id.
+    pub fn group_summaries(&self) -> Vec<(u64, TabSummary)> {
+        self.groups
+            .iter()
+            .map(|g| (g.id, TabSummary::from_tabs(&g.editors)))
+            .collect()
+    }
+
+    /// Finds all groups containing a tab with the given URI.
+    pub fn find_groups_with_uri(&self, uri: &str) -> Vec<u64> {
+        self.groups
+            .iter()
+            .filter(|g| g.editors.iter().any(|e| e.uri == uri))
+            .map(|g| g.id)
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

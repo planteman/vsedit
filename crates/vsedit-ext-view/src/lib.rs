@@ -177,6 +177,31 @@ impl std::fmt::Display for ViewError {
 
 impl std::error::Error for ViewError {}
 
+impl ViewError {
+    /// Returns `true` if this is a `PanelNotFound` error.
+    pub fn is_not_found(&self) -> bool {
+        matches!(self, ViewError::PanelNotFound(_))
+    }
+
+    /// Returns `true` if this is an `InvalidInput` error.
+    pub fn is_invalid_input(&self) -> bool {
+        matches!(self, ViewError::InvalidInput(_))
+    }
+
+    /// Returns `true` if this is a `PanelLimitExceeded` error.
+    pub fn is_limit_exceeded(&self) -> bool {
+        matches!(self, ViewError::PanelLimitExceeded { .. })
+    }
+
+    /// If this is a `PanelNotFound` error, returns the missing panel id.
+    pub fn panel_id(&self) -> Option<&str> {
+        match self {
+            ViewError::PanelNotFound(id) => Some(id),
+            _ => None,
+        }
+    }
+}
+
 // ── Display impls ──
 
 impl std::fmt::Display for ViewColumn {
@@ -217,6 +242,33 @@ impl WebviewPanel {
     /// Clears the HTML content of the panel.
     pub fn clear_html(&mut self) {
         self.html.clear();
+    }
+
+    /// Renames the panel, returning the old title.
+    pub fn rename(&mut self, new_title: impl Into<String>) -> String {
+        std::mem::replace(&mut self.title, new_title.into())
+    }
+
+    /// Returns `true` if the panel's title or view_type contains `query`
+    /// (case-insensitive).
+    pub fn matches_filter(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.title.to_lowercase().contains(&q) || self.view_type.to_lowercase().contains(&q)
+    }
+
+    /// Returns `true` if this panel has the given `view_type`.
+    pub fn is_type(&self, vt: &str) -> bool {
+        self.view_type == vt
+    }
+
+    /// Sets visibility and returns the previous value.
+    pub fn set_visibility(&mut self, visible: bool) -> bool {
+        std::mem::replace(&mut self.is_visible, visible)
+    }
+
+    /// Returns a short one-line summary: `"id: title (type)"`.
+    pub fn summary(&self) -> String {
+        format!("{}: {} ({})", self.id, self.title, self.view_type)
     }
 
     /// Wraps the current HTML in a basic document skeleton if it does not
@@ -260,6 +312,38 @@ impl ViewColumn {
     /// Returns `true` for the symbolic (non-numeric) columns.
     pub fn is_symbolic(self) -> bool {
         matches!(self, ViewColumn::Active | ViewColumn::Beside)
+    }
+
+    /// Returns `true` for the numeric (non-symbolic) columns.
+    pub fn is_numeric(self) -> bool {
+        !self.is_symbolic()
+    }
+
+    /// Returns all numeric column variants.
+    pub fn all_numeric() -> [ViewColumn; 3] {
+        [ViewColumn::One, ViewColumn::Two, ViewColumn::Three]
+    }
+
+    /// Advances to the next numeric column, wrapping from Three back to One.
+    /// Symbolic columns resolve to `One`.
+    pub fn next_column(self) -> ViewColumn {
+        match self {
+            ViewColumn::One => ViewColumn::Two,
+            ViewColumn::Two => ViewColumn::Three,
+            ViewColumn::Three => ViewColumn::One,
+            ViewColumn::Active | ViewColumn::Beside => ViewColumn::One,
+        }
+    }
+
+    /// Moves to the previous numeric column, wrapping from One to Three.
+    /// Symbolic columns resolve to `One`.
+    pub fn prev_column(self) -> ViewColumn {
+        match self {
+            ViewColumn::One => ViewColumn::Three,
+            ViewColumn::Two => ViewColumn::One,
+            ViewColumn::Three => ViewColumn::Two,
+            ViewColumn::Active | ViewColumn::Beside => ViewColumn::One,
+        }
     }
 }
 
@@ -534,6 +618,38 @@ impl ExtensionListItem {
             self.name, self.publisher, self.version, self.id,
         )
     }
+
+    /// Returns the qualified name in `publisher.name` form.
+    pub fn qualified_name(&self) -> String {
+        format!("{}.{}", self.publisher, self.name)
+    }
+
+    /// Returns `true` if `query` appears in the name, publisher, description,
+    /// or id (case-insensitive).
+    pub fn matches_query(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.name.to_lowercase().contains(&q)
+            || self.publisher.to_lowercase().contains(&q)
+            || self.description.to_lowercase().contains(&q)
+            || self.id.to_lowercase().contains(&q)
+    }
+
+    /// Toggles the enabled flag and returns the new value.
+    pub fn toggle_enabled(&mut self) -> bool {
+        self.is_enabled = !self.is_enabled;
+        self.is_enabled
+    }
+
+    /// Returns a human-readable status label.
+    pub fn status_label(&self) -> &'static str {
+        if !self.is_installed {
+            "Not Installed"
+        } else if self.is_enabled {
+            "Enabled"
+        } else {
+            "Disabled"
+        }
+    }
 }
 
 /// Detail view data for a single extension.
@@ -594,6 +710,37 @@ impl ExtensionDetailView {
             "{}\nPublisher: {}\nVersion: {}\nStatus: {status}\nID: {}\nDependencies: {deps}\n\n{}",
             self.name, self.publisher, self.version, self.id, self.description,
         )
+    }
+
+    /// Returns `true` if this extension has any dependencies.
+    pub fn has_dependencies(&self) -> bool {
+        !self.dependencies.is_empty()
+    }
+
+    /// Returns the number of dependencies.
+    pub fn dependency_count(&self) -> usize {
+        self.dependencies.len()
+    }
+
+    /// Returns a human-readable status label.
+    pub fn status_label(&self) -> &'static str {
+        if !self.is_installed {
+            "Not Installed"
+        } else if self.is_enabled {
+            "Enabled"
+        } else {
+            "Disabled"
+        }
+    }
+
+    /// Returns `true` if `query` appears in the name, publisher, description,
+    /// or id (case-insensitive).
+    pub fn matches_query(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.name.to_lowercase().contains(&q)
+            || self.publisher.to_lowercase().contains(&q)
+            || self.description.to_lowercase().contains(&q)
+            || self.id.to_lowercase().contains(&q)
     }
 }
 
@@ -696,6 +843,40 @@ impl ExtensionsViewState {
     /// Count items in the current tab.
     pub fn item_count(&self) -> usize {
         self.active_items().len()
+    }
+
+    /// Clears the search query and switches back to the Installed tab.
+    pub fn clear_search(&mut self) {
+        self.search_query.clear();
+        self.search_results.clear();
+        self.switch_tab(ExtensionsTab::Installed);
+    }
+
+    /// Returns `true` if the search query is non-empty.
+    pub fn has_search(&self) -> bool {
+        !self.search_query.is_empty()
+    }
+
+    /// Count of enabled installed extensions.
+    pub fn enabled_count(&self) -> usize {
+        self.installed_items.iter().filter(|i| i.is_enabled).count()
+    }
+
+    /// Count of disabled installed extensions.
+    pub fn disabled_count(&self) -> usize {
+        self.installed_items
+            .iter()
+            .filter(|i| i.is_installed && !i.is_enabled)
+            .count()
+    }
+
+    /// Finds an extension by its id across all lists.
+    pub fn find_by_id(&self, id: &str) -> Option<&ExtensionListItem> {
+        self.installed_items
+            .iter()
+            .chain(self.recommended_items.iter())
+            .chain(self.search_results.iter())
+            .find(|item| item.id == id)
     }
 
     /// Render tab bar.
@@ -875,6 +1056,38 @@ impl Default for ExtensionBrowserView {
     }
 }
 
+impl ExtensionBrowserView {
+    /// Returns the currently selected extension, if any.
+    pub fn selected_extension(&self) -> Option<&ExtensionInfo> {
+        self.active_list().get(self.selected)
+    }
+
+    /// Clears the search query and results, switching back to Installed tab.
+    pub fn clear_search(&mut self) {
+        self.search_query.clear();
+        self.search_results.clear();
+        self.active_tab = ExtensionTab::Installed;
+        self.selected = 0;
+    }
+
+    /// Number of installed extensions.
+    pub fn installed_count(&self) -> usize {
+        self.installed.len()
+    }
+
+    /// Number of search results.
+    pub fn search_count(&self) -> usize {
+        self.search_results.len()
+    }
+
+    /// Removes an installed extension by id, returning `true` if found.
+    pub fn remove_installed(&mut self, id: &str) -> bool {
+        let before = self.installed.len();
+        self.installed.retain(|e| e.id != id);
+        self.installed.len() < before
+    }
+}
+
 // ---------------------------------------------------------------------------
 // ViewRegistry – typed panel management
 // ---------------------------------------------------------------------------
@@ -925,6 +1138,32 @@ impl ViewRegistry {
 
     pub fn visible_panels(&self) -> Vec<&WebviewPanel> {
         self.panels.iter().filter(|p| p.is_visible).collect()
+    }
+
+    /// Removes all panels from the registry, returning the count removed.
+    pub fn clear(&mut self) -> usize {
+        let n = self.panels.len();
+        self.panels.clear();
+        n
+    }
+
+    /// Returns the ids of all registered panels.
+    pub fn ids(&self) -> Vec<&str> {
+        self.panels.iter().map(|p| p.id.as_str()).collect()
+    }
+
+    /// Finds panels whose title contains `query` (case-insensitive).
+    pub fn find_by_title(&self, query: &str) -> Vec<&WebviewPanel> {
+        let q = query.to_lowercase();
+        self.panels
+            .iter()
+            .filter(|p| p.title.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    /// Retains only panels matching the predicate.
+    pub fn retain(&mut self, f: impl Fn(&WebviewPanel) -> bool) {
+        self.panels.retain(|p| f(p));
     }
 }
 
@@ -1050,6 +1289,44 @@ impl ViewLayoutManager {
     /// Check if a panel is visible (in any column).
     pub fn is_panel_visible(&self, panel_id: &str) -> bool {
         self.column_panels.iter().any(|col| col.iter().any(|id| id == panel_id))
+    }
+
+    /// Total number of panels (visible + hidden).
+    pub fn total_count(&self) -> usize {
+        self.visible_count() + self.hidden_count()
+    }
+
+    /// Returns the 0-based column index a panel resides in, or `None`.
+    pub fn find_panel_column(&self, panel_id: &str) -> Option<usize> {
+        self.column_panels
+            .iter()
+            .position(|col| col.iter().any(|id| id == panel_id))
+    }
+
+    /// Swaps two panels across their respective columns.  Returns `true` if
+    /// both panels were found and swapped.
+    pub fn swap_panels(&mut self, a: &str, b: &str) -> bool {
+        let col_a = self.find_panel_column(a);
+        let col_b = self.find_panel_column(b);
+        match (col_a, col_b) {
+            (Some(ca), Some(cb)) => {
+                if let Some(pos_a) = self.column_panels[ca].iter().position(|id| id == a) {
+                    if let Some(pos_b) = self.column_panels[cb].iter().position(|id| id == b) {
+                        // Swap the ids in-place.  For same-column swaps this
+                        // works because we have distinct positions.
+                        if ca == cb {
+                            self.column_panels[ca].swap(pos_a, pos_b);
+                        } else {
+                            self.column_panels[ca][pos_a] = b.to_string();
+                            self.column_panels[cb][pos_b] = a.to_string();
+                        }
+                        return true;
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
     }
 }
 
@@ -1709,5 +1986,244 @@ mod tests {
         layout.show("p1", 1);
         assert!(layout.is_panel_visible("p1"));
         assert_eq!(layout.panels_in_column(1), &["p1".to_string()]);
+    }
+
+    // ── New deep tests ──
+
+    #[test]
+    fn view_column_numeric_helpers() {
+        assert!(ViewColumn::One.is_numeric());
+        assert!(!ViewColumn::Active.is_numeric());
+        let all = ViewColumn::all_numeric();
+        assert_eq!(all.len(), 3);
+        assert_eq!(all[0], ViewColumn::One);
+    }
+
+    #[test]
+    fn view_column_next_prev() {
+        assert_eq!(ViewColumn::One.next_column(), ViewColumn::Two);
+        assert_eq!(ViewColumn::Two.next_column(), ViewColumn::Three);
+        assert_eq!(ViewColumn::Three.next_column(), ViewColumn::One);
+        assert_eq!(ViewColumn::Active.next_column(), ViewColumn::One);
+
+        assert_eq!(ViewColumn::One.prev_column(), ViewColumn::Three);
+        assert_eq!(ViewColumn::Two.prev_column(), ViewColumn::One);
+        assert_eq!(ViewColumn::Three.prev_column(), ViewColumn::Two);
+        assert_eq!(ViewColumn::Beside.prev_column(), ViewColumn::One);
+    }
+
+    #[test]
+    fn webview_panel_rename_and_filter() {
+        let mut p = make_panel("p1", "markdown", ViewColumn::One);
+        p.title = "My Notes".into();
+
+        let old = p.rename("Updated Title");
+        assert_eq!(old, "My Notes");
+        assert_eq!(p.title, "Updated Title");
+
+        assert!(p.matches_filter("updated"));
+        assert!(p.matches_filter("MARKDOWN"));
+        assert!(!p.matches_filter("html"));
+    }
+
+    #[test]
+    fn webview_panel_is_type_and_summary() {
+        let p = make_panel("p1", "terminal", ViewColumn::Two);
+        assert!(p.is_type("terminal"));
+        assert!(!p.is_type("markdown"));
+        assert_eq!(p.summary(), "p1: p1 (terminal)");
+    }
+
+    #[test]
+    fn webview_panel_set_visibility() {
+        let mut p = make_panel("p1", "md", ViewColumn::One);
+        assert!(p.is_visible);
+        let was = p.set_visibility(false);
+        assert!(was);
+        assert!(!p.is_visible);
+        let was2 = p.set_visibility(true);
+        assert!(!was2);
+        assert!(p.is_visible);
+    }
+
+    #[test]
+    fn view_error_predicates() {
+        let nf = ViewError::PanelNotFound("p42".into());
+        assert!(nf.is_not_found());
+        assert!(!nf.is_invalid_input());
+        assert!(!nf.is_limit_exceeded());
+        assert_eq!(nf.panel_id(), Some("p42"));
+
+        let inv = ViewError::InvalidInput("bad".into());
+        assert!(inv.is_invalid_input());
+        assert!(inv.panel_id().is_none());
+
+        let lim = ViewError::PanelLimitExceeded { limit: 10 };
+        assert!(lim.is_limit_exceeded());
+    }
+
+    #[test]
+    fn extension_list_item_qualified_name_and_query() {
+        let item = ExtensionListItem {
+            id: "pub.rust".into(),
+            name: "Rust Analyzer".into(),
+            publisher: "matklad".into(),
+            version: "0.3.0".into(),
+            icon: None,
+            is_enabled: true,
+            is_installed: true,
+            description: "Language server".into(),
+        };
+        assert_eq!(item.qualified_name(), "matklad.Rust Analyzer");
+        assert!(item.matches_query("rust"));
+        assert!(item.matches_query("MATKLAD"));
+        assert!(item.matches_query("language"));
+        assert!(!item.matches_query("python"));
+    }
+
+    #[test]
+    fn extension_list_item_toggle_and_status() {
+        let mut item = ExtensionListItem {
+            id: "x".into(),
+            name: "X".into(),
+            publisher: "p".into(),
+            version: "1.0.0".into(),
+            icon: None,
+            is_enabled: true,
+            is_installed: true,
+            description: String::new(),
+        };
+        assert_eq!(item.status_label(), "Enabled");
+        let now = item.toggle_enabled();
+        assert!(!now);
+        assert_eq!(item.status_label(), "Disabled");
+
+        item.is_installed = false;
+        assert_eq!(item.status_label(), "Not Installed");
+    }
+
+    #[test]
+    fn extension_detail_dependencies_and_status() {
+        let mut detail = ExtensionDetailView {
+            id: "a".into(),
+            name: "A".into(),
+            publisher: "p".into(),
+            version: "1.0.0".into(),
+            description: "desc".into(),
+            is_installed: true,
+            is_enabled: false,
+            dependencies: vec!["dep1".into(), "dep2".into()],
+        };
+        assert!(detail.has_dependencies());
+        assert_eq!(detail.dependency_count(), 2);
+        assert_eq!(detail.status_label(), "Disabled");
+        assert!(detail.matches_query("desc"));
+
+        detail.dependencies.clear();
+        assert!(!detail.has_dependencies());
+        assert_eq!(detail.dependency_count(), 0);
+    }
+
+    #[test]
+    fn extensions_view_state_clear_and_find() {
+        let mut state = ExtensionsViewState::new();
+        let exts = vec![
+            make_installed_ext("pub.ext1", "Ext 1", "pub", "1.0.0", true),
+            make_installed_ext("pub.ext2", "Ext 2", "pub", "2.0.0", false),
+        ];
+        state.load_installed(&exts);
+        state.set_search_query("hello");
+        assert!(state.has_search());
+
+        state.clear_search();
+        assert!(!state.has_search());
+        assert_eq!(state.active_tab, ExtensionsTab::Installed);
+        assert!(state.search_results.is_empty());
+
+        assert_eq!(state.enabled_count(), 1);
+        assert_eq!(state.disabled_count(), 1);
+        assert!(state.find_by_id("pub.ext1").is_some());
+        assert!(state.find_by_id("nonexistent").is_none());
+    }
+
+    #[test]
+    fn view_registry_clear_ids_find_retain() {
+        let mut reg = ViewRegistry::new();
+        reg.register(make_panel("p1", "md", ViewColumn::One));
+        reg.register(make_panel("p2", "terminal", ViewColumn::Two));
+        reg.register(make_panel("p3", "md", ViewColumn::One));
+
+        let ids = reg.ids();
+        assert_eq!(ids.len(), 3);
+        assert!(ids.contains(&"p1"));
+
+        // Duplicate register is a no-op
+        reg.register(make_panel("p1", "md", ViewColumn::One));
+        assert_eq!(reg.len(), 3);
+
+        assert_eq!(reg.find_by_title("p2").len(), 1);
+
+        reg.retain(|p| p.view_type == "md");
+        assert_eq!(reg.len(), 2);
+
+        let cleared = reg.clear();
+        assert_eq!(cleared, 2);
+        assert!(reg.is_empty());
+    }
+
+    #[test]
+    fn view_layout_total_and_find_column() {
+        let mut layout = ViewLayoutManager::new(3);
+        layout.assign("p1", 0);
+        layout.assign("p2", 2);
+        layout.hide("p3");
+        assert_eq!(layout.total_count(), 3);
+        assert_eq!(layout.find_panel_column("p1"), Some(0));
+        assert_eq!(layout.find_panel_column("p2"), Some(2));
+        assert_eq!(layout.find_panel_column("p3"), None);
+        assert_eq!(layout.find_panel_column("missing"), None);
+    }
+
+    #[test]
+    fn view_layout_swap_panels() {
+        let mut layout = ViewLayoutManager::new(3);
+        layout.assign("p1", 0);
+        layout.assign("p2", 2);
+        assert!(layout.swap_panels("p1", "p2"));
+        assert_eq!(layout.find_panel_column("p1"), Some(2));
+        assert_eq!(layout.find_panel_column("p2"), Some(0));
+
+        // swap with unknown panel returns false
+        assert!(!layout.swap_panels("p1", "unknown"));
+    }
+
+    #[test]
+    fn browser_view_selected_and_clear() {
+        let mut view = ExtensionBrowserView::new();
+        assert!(view.selected_extension().is_none());
+
+        view.add_installed(make_ext_info("A", true, true));
+        view.add_installed(make_ext_info("B", true, false));
+        assert_eq!(view.installed_count(), 2);
+        assert_eq!(view.selected_extension().unwrap().name, "A");
+
+        view.set_search_results(vec![make_ext_info("S1", false, false)]);
+        assert_eq!(view.search_count(), 1);
+
+        view.clear_search();
+        assert_eq!(view.active_tab, ExtensionTab::Installed);
+        assert!(view.search_query.is_empty());
+        assert_eq!(view.search_count(), 0);
+    }
+
+    #[test]
+    fn browser_view_remove_installed() {
+        let mut view = ExtensionBrowserView::new();
+        view.add_installed(make_ext_info("Keep", true, true));
+        view.add_installed(make_ext_info("Remove", true, true));
+        assert_eq!(view.installed_count(), 2);
+        assert!(view.remove_installed("pub.remove"));
+        assert_eq!(view.installed_count(), 1);
+        assert!(!view.remove_installed("pub.remove")); // already gone
     }
 }

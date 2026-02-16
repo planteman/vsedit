@@ -246,6 +246,18 @@ impl LogEntry {
     }
 }
 
+impl LogEntry {
+    /// Check whether this entry is at or above the given level.
+    pub fn matches_level(&self, min: LogLevel) -> bool {
+        self.level >= min
+    }
+
+    /// Check whether the message contains the given substring.
+    pub fn contains(&self, pattern: &str) -> bool {
+        self.message.contains(pattern)
+    }
+}
+
 impl fmt::Display for LogEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.format())
@@ -342,6 +354,62 @@ impl LogOutputChannel {
     pub fn hide(&mut self) {
         self.channel.hide();
     }
+
+    /// Return lines whose formatted log level is at or above `min`.
+    pub fn filter_by_level(&self, min: LogLevel) -> Vec<&str> {
+        let tags: Vec<&str> = [LogLevel::Trace, LogLevel::Debug, LogLevel::Info, LogLevel::Warn, LogLevel::Error]
+            .iter()
+            .filter(|&&l| l >= min)
+            .map(|l| match l {
+                LogLevel::Trace => "TRACE",
+                LogLevel::Debug => "DEBUG",
+                LogLevel::Info => "INFO",
+                LogLevel::Warn => "WARN",
+                LogLevel::Error => "ERROR",
+            })
+            .collect();
+        self.channel
+            .lines
+            .iter()
+            .filter(|line| tags.iter().any(|tag| line.contains(tag)))
+            .map(|s| s.as_str())
+            .collect()
+    }
+
+    /// Parse stored lines back into `LogEntry` values.
+    /// Lines that do not match the expected `[ts LEVEL] message` format are skipped.
+    pub fn entries(&self) -> Vec<LogEntry> {
+        let mut result = Vec::new();
+        for line in &self.channel.lines {
+            if let Some(entry) = Self::parse_log_line(line) {
+                result.push(entry);
+            }
+        }
+        result
+    }
+
+    /// Try to parse a single formatted log line into a `LogEntry`.
+    fn parse_log_line(line: &str) -> Option<LogEntry> {
+        let rest = line.strip_prefix('[')?;
+        let bracket_end = rest.find(']')?;
+        let header = &rest[..bracket_end];
+        let message = rest[bracket_end + 1..].trim_start().to_string();
+
+        let mut parts = header.splitn(2, ' ');
+        let ts_str = parts.next()?;
+        let level_str = parts.next()?;
+
+        let ts: u64 = ts_str.parse().ok()?;
+        let level = match level_str {
+            "TRACE" => LogLevel::Trace,
+            "DEBUG" => LogLevel::Debug,
+            "INFO" => LogLevel::Info,
+            "WARN" => LogLevel::Warn,
+            "ERROR" => LogLevel::Error,
+            _ => return None,
+        };
+        Some(LogEntry::new(level, message, ts))
+    }
 }
 
 impl fmt::Display for LogOutputChannel {
@@ -417,6 +485,19 @@ impl OutputChannel {
             self.lines.push(line.to_string());
         }
     }
+
+    /// Return a sub-slice of lines by start (inclusive) and end (exclusive) indices.
+    /// Out-of-range indices are clamped silently.
+    pub fn line_range(&self, start: usize, end: usize) -> Vec<&str> {
+        let s = start.min(self.lines.len());
+        let e = end.min(self.lines.len());
+        self.lines[s..e].iter().map(|l| l.as_str()).collect()
+    }
+
+    /// Return the last line, if any.
+    pub fn last_line(&self) -> Option<&str> {
+        self.lines.last().map(|s| s.as_str())
+    }
 }
 
 impl OutputService {
@@ -449,6 +530,17 @@ impl OutputService {
     /// Get channel names as a list.
     pub fn channel_names(&self) -> Vec<&str> {
         self.channels.iter().map(|ch| ch.name.as_str()).collect()
+    }
+
+    /// Get or create a channel by name. Returns the channel's id.
+    /// If a channel with the given name already exists, its id is returned
+    /// without creating a duplicate.
+    pub fn get_or_create_channel(&mut self, name: &str) -> String {
+        if let Some(ch) = self.channels.iter().find(|c| c.name == name) {
+            return ch.id.clone();
+        }
+        let idx = self.create_channel(name);
+        self.channels[idx].id.clone()
     }
 }
 
@@ -918,7 +1010,7 @@ pub fn channels_matching_pattern<'a>(
     service: &'a OutputService,
     pattern: &str,
 ) -> Vec<&'a OutputChannel> {
-    let lower = pattern.to_lowercase();
+    let _lower = pattern.to_lowercase();
     service
         .search_all_channels(pattern)
         .into_iter()
@@ -982,6 +1074,95 @@ pub fn extract_log_level_lines(channel: &OutputChannel, level_tag: &str) -> Vec<
         .filter(|l| l.contains(level_tag))
         .map(|l| l.to_string())
         .collect()
+}
+
+// ---------------------------------------------------------------------------
+// OutputChannelSnapshot — frozen point-in-time capture of channel state
+// ---------------------------------------------------------------------------
+
+/// A frozen, cloneable snapshot of an `OutputChannel` at a point in time.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputChannelSnapshot {
+    pub channel_id: String,
+    pub channel_name: String,
+    pub lines: Vec<String>,
+    pub visible: bool,
+}
+
+impl OutputChannelSnapshot {
+    /// Capture the current state of a channel.
+    pub fn capture(channel: &OutputChannel) -> Self {
+        Self {
+            channel_id: channel.id.clone(),
+            channel_name: channel.name.clone(),
+            lines: channel.lines.clone(),
+            visible: channel.visible,
+        }
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.lines.len()
+    }
+
+    pub fn get_content(&self) -> String {
+        self.lines.join("\n")
+    }
+}
+
+impl fmt::Display for OutputChannelSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Snapshot({}, {} lines)",
+            self.channel_name,
+            self.lines.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputDiff — diff between two snapshots
+// ---------------------------------------------------------------------------
+
+/// The kind of change detected between two snapshots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffKind {
+    /// Lines were added at the end (contains the new lines).
+    Appended(Vec<String>),
+    /// Lines were removed from the end (contains count removed).
+    Truncated(usize),
+    /// Content changed in a way that is not a simple append or truncation.
+    Changed,
+    /// No differences.
+    Unchanged,
+}
+
+/// Computes a simple diff between two `OutputChannelSnapshot` values
+/// that belong to the same channel.
+pub struct OutputDiff;
+
+impl OutputDiff {
+    /// Compare `before` and `after` snapshots, returning a `DiffKind`.
+    pub fn diff(before: &OutputChannelSnapshot, after: &OutputChannelSnapshot) -> DiffKind {
+        if before.lines == after.lines {
+            return DiffKind::Unchanged;
+        }
+        // Check pure append: after starts with all of before's lines.
+        if after.lines.len() > before.lines.len()
+            && after.lines[..before.lines.len()] == before.lines[..]
+        {
+            let new_lines = after.lines[before.lines.len()..].to_vec();
+            return DiffKind::Appended(new_lines);
+        }
+        // Check pure truncation: before starts with all of after's lines.
+        if before.lines.len() > after.lines.len()
+            && before.lines[..after.lines.len()] == after.lines[..]
+        {
+            let removed = before.lines.len() - after.lines.len();
+            return DiffKind::Truncated(removed);
+        }
+        DiffKind::Changed
+    }
 }
 
 #[cfg(test)]
@@ -1752,5 +1933,127 @@ mod tests {
         let errors = extract_log_level_lines(&ch, "[ERROR]");
         assert_eq!(errors.len(), 2);
         assert!(errors[0].contains("something broke"));
+    }
+
+    // -- New functionality tests --
+
+    #[test]
+    fn log_entry_matches_level_and_contains() {
+        let entry = LogEntry::new(LogLevel::Warn, "disk almost full", 500);
+        assert!(entry.matches_level(LogLevel::Info));
+        assert!(entry.matches_level(LogLevel::Warn));
+        assert!(!entry.matches_level(LogLevel::Error));
+        assert!(entry.contains("almost"));
+        assert!(!entry.contains("memory"));
+    }
+
+    #[test]
+    fn channel_line_range_and_last_line() {
+        let mut ch = OutputChannel::new("ch1", "Log");
+        ch.append_lines(&["a", "b", "c", "d", "e"]);
+        assert_eq!(ch.line_range(1, 4), vec!["b", "c", "d"]);
+        assert_eq!(ch.line_range(3, 100), vec!["d", "e"]);
+        assert!(ch.line_range(10, 20).is_empty());
+        assert_eq!(ch.last_line(), Some("e"));
+
+        let empty = OutputChannel::new("ch2", "Empty");
+        assert_eq!(empty.last_line(), None);
+    }
+
+    #[test]
+    fn service_get_or_create_channel_idempotent() {
+        let mut svc = OutputService::new();
+        let id1 = svc.get_or_create_channel("Build");
+        let id2 = svc.get_or_create_channel("Build");
+        assert_eq!(id1, id2);
+        assert_eq!(svc.channel_count(), 1);
+        let id3 = svc.get_or_create_channel("Tests");
+        assert_ne!(id1, id3);
+        assert_eq!(svc.channel_count(), 2);
+    }
+
+    #[test]
+    fn log_channel_filter_by_level() {
+        let mut log_ch = LogOutputChannel::new("log1", "Server");
+        log_ch.set_log_level(LogLevel::Trace);
+        log_ch.trace("t");
+        log_ch.debug("d");
+        log_ch.info("i");
+        log_ch.warn("w");
+        log_ch.error("e");
+        assert_eq!(log_ch.line_count(), 5);
+
+        let warn_and_above = log_ch.filter_by_level(LogLevel::Warn);
+        assert_eq!(warn_and_above.len(), 2);
+        assert!(warn_and_above[0].contains("WARN"));
+        assert!(warn_and_above[1].contains("ERROR"));
+    }
+
+    #[test]
+    fn log_channel_entries_roundtrip() {
+        let mut log_ch = LogOutputChannel::new("log1", "Build");
+        log_ch.info("compiling");
+        log_ch.warn("deprecated");
+        log_ch.error("failed");
+
+        let entries = log_ch.entries();
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].level, LogLevel::Info);
+        assert_eq!(entries[0].message, "compiling");
+        assert_eq!(entries[0].timestamp_ms, 1);
+        assert_eq!(entries[1].level, LogLevel::Warn);
+        assert_eq!(entries[2].level, LogLevel::Error);
+        assert_eq!(entries[2].timestamp_ms, 3);
+    }
+
+    #[test]
+    fn snapshot_capture_and_display() {
+        let mut ch = OutputChannel::new("ch1", "Build");
+        ch.append_line("line 1");
+        ch.append_line("line 2");
+        ch.show();
+        let snap = OutputChannelSnapshot::capture(&ch);
+        assert_eq!(snap.channel_id, "ch1");
+        assert_eq!(snap.line_count(), 2);
+        assert!(snap.visible);
+        assert_eq!(snap.get_content(), "line 1\nline 2");
+        assert!(snap.to_string().contains("Snapshot"));
+
+        // Modifying the channel after capture doesn't affect the snapshot.
+        ch.append_line("line 3");
+        assert_eq!(snap.line_count(), 2);
+    }
+
+    #[test]
+    fn output_diff_detects_changes() {
+        let mut ch = OutputChannel::new("ch1", "Log");
+        ch.append_lines(&["a", "b"]);
+        let snap1 = OutputChannelSnapshot::capture(&ch);
+
+        // Unchanged
+        let snap_same = OutputChannelSnapshot::capture(&ch);
+        assert_eq!(OutputDiff::diff(&snap1, &snap_same), DiffKind::Unchanged);
+
+        // Appended
+        ch.append_line("c");
+        ch.append_line("d");
+        let snap2 = OutputChannelSnapshot::capture(&ch);
+        match OutputDiff::diff(&snap1, &snap2) {
+            DiffKind::Appended(new) => {
+                assert_eq!(new, vec!["c", "d"]);
+            }
+            other => panic!("expected Appended, got {:?}", other),
+        }
+
+        // Truncated
+        match OutputDiff::diff(&snap2, &snap1) {
+            DiffKind::Truncated(n) => assert_eq!(n, 2),
+            other => panic!("expected Truncated, got {:?}", other),
+        }
+
+        // Changed (replace content entirely)
+        ch.replace(vec!["x".into(), "y".into()]);
+        let snap3 = OutputChannelSnapshot::capture(&ch);
+        assert_eq!(OutputDiff::diff(&snap1, &snap3), DiffKind::Changed);
     }
 }

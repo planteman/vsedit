@@ -958,6 +958,114 @@ pub fn cursor_line_span(cursors: &[CursorState]) -> u32 {
 // Tests
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// Cursor deduplication and bounding box utilities
+// ---------------------------------------------------------------------------
+
+/// Remove duplicate cursors (same position), keeping the first occurrence.
+pub fn deduplicate_cursors(cursors: &[CursorState]) -> Vec<CursorState> {
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::new();
+    for c in cursors {
+        let key = (
+            c.selection.anchor.line,
+            c.selection.anchor.column,
+            c.selection.active.line,
+            c.selection.active.column,
+        );
+        if seen.insert(key) {
+            result.push(c.clone());
+        }
+    }
+    result
+}
+
+/// Compute the bounding box (top-left, bottom-right) of all cursor positions.
+/// Returns `None` if the slice is empty.
+pub fn cursor_bounding_box(cursors: &[CursorState]) -> Option<(Position, Position)> {
+    if cursors.is_empty() {
+        return None;
+    }
+    let mut min_line = u32::MAX;
+    let mut min_col = u32::MAX;
+    let mut max_line = 0u32;
+    let mut max_col = 0u32;
+    for c in cursors {
+        let pos = c.position();
+        min_line = min_line.min(pos.line);
+        min_col = min_col.min(pos.column);
+        max_line = max_line.max(pos.line);
+        max_col = max_col.max(pos.column);
+    }
+    Some((Position::new(min_line, min_col), Position::new(max_line, max_col)))
+}
+
+/// Return the cursor closest to the end of the document.
+pub fn last_cursor(cursors: &[CursorState]) -> Option<&CursorState> {
+    cursors
+        .iter()
+        .max_by_key(|c| (c.position().line, c.position().column))
+}
+
+/// Return the cursor closest to the start of the document.
+pub fn first_cursor(cursors: &[CursorState]) -> Option<&CursorState> {
+    cursors
+        .iter()
+        .min_by_key(|c| (c.position().line, c.position().column))
+}
+
+/// Check if any cursor has a non-empty selection.
+pub fn any_has_selection(cursors: &[CursorState]) -> bool {
+    cursors.iter().any(|c| c.is_selection())
+}
+
+/// Count how many cursors have active selections.
+pub fn selection_count(cursors: &[CursorState]) -> usize {
+    cursors.iter().filter(|c| c.is_selection()).count()
+}
+
+/// Return cursors on a specific line.
+pub fn cursors_on_line(cursors: &[CursorState], line: u32) -> Vec<&CursorState> {
+    cursors
+        .iter()
+        .filter(|c| c.position().line == line)
+        .collect()
+}
+
+/// Reverse the order of cursors in a mutable slice.
+pub fn reverse_cursors(cursors: &mut [CursorState]) {
+    cursors.reverse();
+}
+
+/// Collapse all selections to their active position (no selection, just caret).
+pub fn collapse_selections(cursors: &[CursorState]) -> Vec<CursorState> {
+    cursors
+        .iter()
+        .map(|c| CursorState::from_position(c.position()))
+        .collect()
+}
+
+impl CursorState {
+    /// Create a cursor with a selection from anchor to active positions.
+    pub fn with_selection(anchor: Position, active: Position) -> Self {
+        Self {
+            selection: Selection::from_positions(anchor, active),
+        }
+    }
+
+    /// Return the anchor position of the selection.
+    pub fn anchor(&self) -> Position {
+        self.selection.anchor
+    }
+
+    /// Return a collapsed version of this cursor (selection removed).
+    pub fn collapsed(&self) -> Self {
+        CursorState::from_position(self.position())
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1763,4 +1871,92 @@ mod tests {
         let cursors: Vec<CursorState> = vec![];
         assert_eq!(cursor_line_span(&cursors), 0);
     }
+
+    #[test]
+    fn deduplicate_cursors_removes_dupes() {
+        let cursors = vec![cursor_at(1, 1), cursor_at(2, 3), cursor_at(1, 1), cursor_at(2, 3)];
+        let deduped = deduplicate_cursors(&cursors);
+        assert_eq!(deduped.len(), 2);
+    }
+
+    #[test]
+    fn deduplicate_cursors_preserves_unique() {
+        let cursors = vec![cursor_at(1, 1), cursor_at(2, 2), cursor_at(3, 3)];
+        let deduped = deduplicate_cursors(&cursors);
+        assert_eq!(deduped.len(), 3);
+    }
+
+    #[test]
+    fn cursor_bounding_box_computes() {
+        let cursors = vec![cursor_at(3, 5), cursor_at(1, 2), cursor_at(7, 10)];
+        let (min, max) = cursor_bounding_box(&cursors).unwrap();
+        assert_eq!(min.line, 1);
+        assert_eq!(min.column, 2);
+        assert_eq!(max.line, 7);
+        assert_eq!(max.column, 10);
+    }
+
+    #[test]
+    fn cursor_bounding_box_empty() {
+        let cursors: Vec<CursorState> = vec![];
+        assert!(cursor_bounding_box(&cursors).is_none());
+    }
+
+    #[test]
+    fn first_and_last_cursor() {
+        let cursors = vec![cursor_at(5, 3), cursor_at(1, 1), cursor_at(10, 8)];
+        let first = first_cursor(&cursors).unwrap();
+        assert_eq!(first.position().line, 1);
+        let last = last_cursor(&cursors).unwrap();
+        assert_eq!(last.position().line, 10);
+    }
+
+    #[test]
+    fn any_has_selection_true() {
+        let cursors = vec![
+            cursor_at(1, 1),
+            CursorState::with_selection(Position::new(2, 1), Position::new(2, 5)),
+        ];
+        assert!(any_has_selection(&cursors));
+        assert_eq!(selection_count(&cursors), 1);
+    }
+
+    #[test]
+    fn any_has_selection_false() {
+        let cursors = vec![cursor_at(1, 1), cursor_at(2, 2)];
+        assert!(!any_has_selection(&cursors));
+        assert_eq!(selection_count(&cursors), 0);
+    }
+
+    #[test]
+    fn cursors_on_line_filters() {
+        let cursors = vec![cursor_at(1, 1), cursor_at(2, 3), cursor_at(1, 5)];
+        let on_1 = cursors_on_line(&cursors, 1);
+        assert_eq!(on_1.len(), 2);
+        let on_3 = cursors_on_line(&cursors, 3);
+        assert!(on_3.is_empty());
+    }
+
+    #[test]
+    fn collapse_selections_removes_selections() {
+        let cursors = vec![
+            CursorState::with_selection(Position::new(1, 1), Position::new(1, 5)),
+            CursorState::with_selection(Position::new(2, 1), Position::new(3, 10)),
+        ];
+        let collapsed = collapse_selections(&cursors);
+        assert!(!collapsed[0].is_selection());
+        assert!(!collapsed[1].is_selection());
+        assert_eq!(collapsed[0].position(), Position::new(1, 5));
+    }
+
+    #[test]
+    fn cursor_state_anchor_and_collapsed() {
+        let c = CursorState::with_selection(Position::new(1, 1), Position::new(1, 10));
+        assert_eq!(c.anchor(), Position::new(1, 1));
+        assert!(c.is_selection());
+        let col = c.collapsed();
+        assert!(!col.is_selection());
+        assert_eq!(col.position(), Position::new(1, 10));
+    }
+
 }

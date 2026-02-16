@@ -952,6 +952,122 @@ impl IpcMessageBatch {
         chs.dedup();
         chs
     }
+
+    /// Filter messages by channel name.
+    pub fn messages_for_channel(&self, channel: &str) -> Vec<&IpcMessage> {
+        self.messages.iter().filter(|m| m.channel == channel).collect()
+    }
+
+    /// Total number of distinct channels in this batch.
+    pub fn channel_count(&self) -> usize {
+        self.channels().len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IpcMessageFilter — filter messages by criteria
+// ---------------------------------------------------------------------------
+
+/// Criteria for filtering IPC messages.
+#[derive(Debug, Clone, Default)]
+pub struct IpcMessageFilter {
+    channel_prefix: Option<String>,
+    min_payload_size: Option<usize>,
+    max_payload_size: Option<usize>,
+    id_range: Option<(u64, u64)>,
+}
+
+impl IpcMessageFilter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Only match messages whose channel starts with the given prefix.
+    pub fn channel_prefix(mut self, prefix: impl Into<String>) -> Self {
+        self.channel_prefix = Some(prefix.into());
+        self
+    }
+
+    /// Only match messages with payload at least this many bytes.
+    pub fn min_payload(mut self, min: usize) -> Self {
+        self.min_payload_size = Some(min);
+        self
+    }
+
+    /// Only match messages with payload at most this many bytes.
+    pub fn max_payload(mut self, max: usize) -> Self {
+        self.max_payload_size = Some(max);
+        self
+    }
+
+    /// Only match messages with id in [lo, hi] inclusive.
+    pub fn id_range(mut self, lo: u64, hi: u64) -> Self {
+        self.id_range = Some((lo, hi));
+        self
+    }
+
+    /// Test whether a message matches all configured criteria.
+    pub fn matches(&self, msg: &IpcMessage) -> bool {
+        if let Some(ref prefix) = self.channel_prefix {
+            if !msg.channel.starts_with(prefix.as_str()) {
+                return false;
+            }
+        }
+        if let Some(min) = self.min_payload_size {
+            if msg.payload.len() < min {
+                return false;
+            }
+        }
+        if let Some(max) = self.max_payload_size {
+            if msg.payload.len() > max {
+                return false;
+            }
+        }
+        if let Some((lo, hi)) = self.id_range {
+            if msg.id < lo || msg.id > hi {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Filter a slice of messages, returning only those that match.
+    pub fn apply<'a>(&self, msgs: &'a [IpcMessage]) -> Vec<&'a IpcMessage> {
+        msgs.iter().filter(|m| self.matches(m)).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IpcConnectionPool — additional methods
+// ---------------------------------------------------------------------------
+
+impl IpcConnectionPool {
+    /// Return all connection IDs.
+    pub fn connection_ids(&self) -> Vec<&str> {
+        self.connections.iter().map(|c| c.id.as_str()).collect()
+    }
+
+    /// Total messages sent across all connections.
+    pub fn total_sent(&self) -> u64 {
+        self.connections.iter().map(|c| c.messages_sent).sum()
+    }
+
+    /// Total messages received across all connections.
+    pub fn total_received(&self) -> u64 {
+        self.connections.iter().map(|c| c.messages_received).sum()
+    }
+
+    /// Return the connection with the most total messages.
+    pub fn busiest_connection(&self) -> Option<&IpcConnection> {
+        self.connections.iter().max_by_key(|c| c.total_messages())
+    }
+
+    /// Disconnect all connections.
+    pub fn disconnect_all(&mut self) {
+        for conn in &mut self.connections {
+            conn.connected = false;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1649,5 +1765,91 @@ mod tests {
         batch.add(IpcMessageBuilder::new().id(3).channel("a").build()).unwrap();
         let chs = batch.channels();
         assert_eq!(chs, vec!["a", "b"]);
+    }
+
+    // -- IpcMessageFilter tests -----------------------------------------------
+
+    #[test]
+    fn filter_by_channel_prefix() {
+        let msgs = vec![
+            IpcMessageBuilder::new().id(1).channel("textDocument/completion").build(),
+            IpcMessageBuilder::new().id(2).channel("textDocument/hover").build(),
+            IpcMessageBuilder::new().id(3).channel("workspace/symbol").build(),
+        ];
+        let filter = IpcMessageFilter::new().channel_prefix("textDocument/");
+        let matched = filter.apply(&msgs);
+        assert_eq!(matched.len(), 2);
+        assert_eq!(matched[0].id, 1);
+        assert_eq!(matched[1].id, 2);
+    }
+
+    #[test]
+    fn filter_by_payload_size() {
+        let msgs = vec![
+            IpcMessageBuilder::new().id(1).channel("a").payload(vec![1, 2, 3]).build(),
+            IpcMessageBuilder::new().id(2).channel("a").payload(vec![1]).build(),
+            IpcMessageBuilder::new().id(3).channel("a").payload(vec![1, 2, 3, 4, 5]).build(),
+        ];
+        let filter = IpcMessageFilter::new().min_payload(2).max_payload(4);
+        let matched = filter.apply(&msgs);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].id, 1);
+    }
+
+    #[test]
+    fn filter_by_id_range() {
+        let msgs = vec![
+            IpcMessageBuilder::new().id(5).channel("a").build(),
+            IpcMessageBuilder::new().id(10).channel("a").build(),
+            IpcMessageBuilder::new().id(15).channel("a").build(),
+        ];
+        let filter = IpcMessageFilter::new().id_range(6, 12);
+        let matched = filter.apply(&msgs);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].id, 10);
+    }
+
+    #[test]
+    fn filter_empty_criteria_matches_all() {
+        let msgs = vec![
+            IpcMessageBuilder::new().id(1).channel("x").build(),
+            IpcMessageBuilder::new().id(2).channel("y").build(),
+        ];
+        let filter = IpcMessageFilter::new();
+        assert_eq!(filter.apply(&msgs).len(), 2);
+    }
+
+    #[test]
+    fn batch_messages_for_channel() {
+        let mut batch = IpcMessageBatch::new(10);
+        batch.add(IpcMessageBuilder::new().id(1).channel("a").build()).unwrap();
+        batch.add(IpcMessageBuilder::new().id(2).channel("b").build()).unwrap();
+        batch.add(IpcMessageBuilder::new().id(3).channel("a").build()).unwrap();
+        let a_msgs = batch.messages_for_channel("a");
+        assert_eq!(a_msgs.len(), 2);
+        assert_eq!(batch.channel_count(), 2);
+    }
+
+    #[test]
+    fn connection_pool_stats() {
+        let mut pool = IpcConnectionPool::new(10);
+        pool.add(IpcConnection::new("c1", "ch1")).unwrap();
+        pool.add(IpcConnection::new("c2", "ch2")).unwrap();
+        pool.record_send("c1").unwrap();
+        pool.record_send("c1").unwrap();
+        pool.record_receive("c2").unwrap();
+        assert_eq!(pool.total_sent(), 2);
+        assert_eq!(pool.total_received(), 1);
+        let busiest = pool.busiest_connection().unwrap();
+        assert_eq!(busiest.id, "c1");
+    }
+
+    #[test]
+    fn connection_pool_disconnect_all() {
+        let mut pool = IpcConnectionPool::new(10);
+        pool.add(IpcConnection::new("c1", "ch1")).unwrap();
+        pool.add(IpcConnection::new("c2", "ch2")).unwrap();
+        pool.disconnect_all();
+        assert_eq!(pool.active_connections().len(), 0);
     }
 }

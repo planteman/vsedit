@@ -1058,6 +1058,112 @@ impl ResourceLabel {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LabelFormat – additional methods
+// ---------------------------------------------------------------------------
+
+impl LabelFormat {
+    /// Create a new `LabelFormat` from a pattern string.
+    pub fn new(pattern: impl Into<String>) -> Self {
+        Self { pattern: pattern.into() }
+    }
+
+    /// Return the set of known placeholder names present in this pattern.
+    pub fn used_placeholders(&self) -> Vec<&'static str> {
+        let known: &[&str] = &["${filename}", "${dirname}", "${extname}"];
+        known.iter().copied().filter(|p| self.pattern.contains(p)).collect()
+    }
+
+    /// Return `true` if the pattern references the given placeholder token.
+    pub fn uses(&self, placeholder: &str) -> bool {
+        self.pattern.contains(placeholder)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LabelDetail – ordering & conversion
+// ---------------------------------------------------------------------------
+
+impl LabelDetail {
+    /// Return an integer verbosity rank (0 = least verbose, 3 = most verbose).
+    pub fn verbosity(self) -> u8 {
+        match self {
+            LabelDetail::Short => 0,
+            LabelDetail::Medium => 1,
+            LabelDetail::Long => 2,
+            LabelDetail::Full => 3,
+        }
+    }
+
+    /// Parse a detail level from a string (case-insensitive).
+    pub fn from_str_loose(s: &str) -> Option<Self> {
+        match s.to_ascii_lowercase().as_str() {
+            "short" => Some(LabelDetail::Short),
+            "medium" | "med" => Some(LabelDetail::Medium),
+            "long" => Some(LabelDetail::Long),
+            "full" => Some(LabelDetail::Full),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LabelSegment – additional helpers
+// ---------------------------------------------------------------------------
+
+impl LabelSegment {
+    /// Create a plain (non-highlighted) segment.
+    pub fn plain(text: impl Into<String>) -> Self {
+        Self { text: text.into(), highlighted: false }
+    }
+
+    /// Create a highlighted segment.
+    pub fn highlight(text: impl Into<String>) -> Self {
+        Self { text: text.into(), highlighted: true }
+    }
+
+    /// Return the number of characters in this segment.
+    pub fn char_count(&self) -> usize {
+        self.text.chars().count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ResourceLabel – batch & path utilities
+// ---------------------------------------------------------------------------
+
+impl ResourceLabel {
+    /// Return the path depth (number of `/`-separated segments).
+    pub fn depth(&self) -> usize {
+        path_depth(&self.path)
+    }
+
+    /// Return `true` if this label's path starts with the given prefix.
+    pub fn is_under(&self, prefix: &str) -> bool {
+        self.path.starts_with(prefix)
+    }
+
+    /// Strip a common prefix from the path, returning the relative remainder.
+    pub fn relative_path(&self, prefix: &str) -> &str {
+        strip_prefix(&self.path, prefix)
+    }
+
+    /// Produce a `LabelHighlight` by fuzzy-matching the name against `query`.
+    pub fn highlight_name(&self, query: &str) -> LabelHighlight {
+        LabelHighlight::from_query(&self.name, query)
+    }
+}
+
+/// Filter resource labels whose path starts with the given prefix.
+pub fn filter_labels_under<'a>(labels: &'a [ResourceLabel], prefix: &str) -> Vec<&'a ResourceLabel> {
+    labels.iter().filter(|l| l.is_under(prefix)).collect()
+}
+
+/// Join an iterator of labels into a single comma-separated string of names.
+pub fn join_label_names(labels: &[ResourceLabel], separator: &str) -> String {
+    labels.iter().map(|l| l.name.as_str()).collect::<Vec<_>>().join(separator)
+}
+
 /// Normalize a path by collapsing consecutive separators and removing trailing slashes.
 pub fn normalize_path_separators(path: &str) -> String {
     let mut result = String::with_capacity(path.len());
@@ -1754,5 +1860,97 @@ mod tests {
         assert_eq!(normalize_path_separators("/a/b/c"), "/a/b/c");
         assert_eq!(normalize_path_separators("/"), "/");
         assert_eq!(normalize_path_separators(""), "");
+    }
+
+    // -- LabelFormat additional methods ------------------------------------
+
+    #[test]
+    fn label_format_new_and_used_placeholders() {
+        let fmt = LabelFormat::new("${filename} in ${dirname}");
+        assert_eq!(fmt.used_placeholders(), vec!["${filename}", "${dirname}"]);
+        assert!(fmt.uses("${filename}"));
+        assert!(!fmt.uses("${extname}"));
+    }
+
+    // -- LabelDetail verbosity & parsing -----------------------------------
+
+    #[test]
+    fn label_detail_verbosity_ordering() {
+        assert!(LabelDetail::Short.verbosity() < LabelDetail::Medium.verbosity());
+        assert!(LabelDetail::Medium.verbosity() < LabelDetail::Long.verbosity());
+        assert!(LabelDetail::Long.verbosity() < LabelDetail::Full.verbosity());
+    }
+
+    #[test]
+    fn label_detail_from_str_loose() {
+        assert_eq!(LabelDetail::from_str_loose("short"), Some(LabelDetail::Short));
+        assert_eq!(LabelDetail::from_str_loose("MED"), Some(LabelDetail::Medium));
+        assert_eq!(LabelDetail::from_str_loose("FULL"), Some(LabelDetail::Full));
+        assert_eq!(LabelDetail::from_str_loose("bogus"), None);
+    }
+
+    // -- LabelSegment constructors & char_count ----------------------------
+
+    #[test]
+    fn label_segment_constructors_and_char_count() {
+        let p = LabelSegment::plain("hello");
+        assert!(!p.highlighted);
+        assert_eq!(p.char_count(), 5);
+
+        let h = LabelSegment::highlight("wörld");
+        assert!(h.highlighted);
+        assert_eq!(h.char_count(), 5);
+    }
+
+    // -- ResourceLabel depth, is_under, relative_path ----------------------
+
+    #[test]
+    fn resource_label_depth_and_under() {
+        let label = ResourceLabel {
+            name: "main.rs".into(),
+            path: "/home/user/src/main.rs".into(),
+            description: None,
+            icon: None,
+        };
+        assert_eq!(label.depth(), 4);
+        assert!(label.is_under("/home/user/"));
+        assert!(!label.is_under("/tmp/"));
+        assert_eq!(label.relative_path("/home/user/"), "src/main.rs");
+    }
+
+    #[test]
+    fn resource_label_highlight_name() {
+        let label = ResourceLabel {
+            name: "Cargo.toml".into(),
+            path: "/project/Cargo.toml".into(),
+            description: None,
+            icon: None,
+        };
+        let hl = label.highlight_name("carg");
+        assert!(hl.has_match());
+        assert_eq!(hl.highlighted_text(), "Carg");
+    }
+
+    // -- filter_labels_under & join_label_names ----------------------------
+
+    #[test]
+    fn filter_labels_under_prefix() {
+        let labels = vec![
+            ResourceLabel { name: "a.rs".into(), path: "/src/a.rs".into(), description: None, icon: None },
+            ResourceLabel { name: "b.rs".into(), path: "/lib/b.rs".into(), description: None, icon: None },
+            ResourceLabel { name: "c.rs".into(), path: "/src/sub/c.rs".into(), description: None, icon: None },
+        ];
+        let under_src = filter_labels_under(&labels, "/src/");
+        assert_eq!(under_src.len(), 2);
+    }
+
+    #[test]
+    fn join_label_names_produces_csv() {
+        let labels = vec![
+            ResourceLabel { name: "a.rs".into(), path: "/a.rs".into(), description: None, icon: None },
+            ResourceLabel { name: "b.rs".into(), path: "/b.rs".into(), description: None, icon: None },
+        ];
+        assert_eq!(join_label_names(&labels, ", "), "a.rs, b.rs");
+        assert_eq!(join_label_names(&[], "; "), "");
     }
 }

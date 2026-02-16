@@ -1051,6 +1051,134 @@ impl fmt::Display for WidgetTree {
     }
 }
 
+// ---------------------------------------------------------------------------
+// WidgetTree — additional methods
+// ---------------------------------------------------------------------------
+
+impl WidgetTree {
+    /// Return the path from root to the given node (inclusive).
+    pub fn path_to_root(&self, id: &str) -> Vec<&str> {
+        let mut path = Vec::new();
+        let mut current = id.to_string();
+        loop {
+            match self.nodes.get(&current) {
+                Some(node) => {
+                    path.push(node.id.as_str());
+                    match &node.parent {
+                        Some(p) => current = p.clone(),
+                        None => break,
+                    }
+                }
+                None => break,
+            }
+        }
+        path.reverse();
+        path
+    }
+
+    /// Return all leaf nodes (nodes with no children).
+    pub fn leaves(&self) -> Vec<&str> {
+        self.nodes
+            .values()
+            .filter(|n| n.children.is_empty())
+            .map(|n| n.id.as_str())
+            .collect()
+    }
+
+    /// Return the sibling IDs of a given node (excluding itself).
+    pub fn siblings(&self, id: &str) -> Vec<&str> {
+        let parent_id = match self.nodes.get(id) {
+            Some(node) => node.parent.as_deref(),
+            None => return Vec::new(),
+        };
+        match parent_id {
+            Some(pid) => match self.nodes.get(pid) {
+                Some(parent) => parent
+                    .children
+                    .iter()
+                    .filter(|c| c.as_str() != id)
+                    .map(|c| c.as_str())
+                    .collect(),
+                None => Vec::new(),
+            },
+            None => self
+                .root_ids
+                .iter()
+                .filter(|r| r.as_str() != id)
+                .map(|r| r.as_str())
+                .collect(),
+        }
+    }
+
+    /// Remove a node and all its descendants. Returns the count of removed nodes.
+    pub fn remove_subtree(&mut self, id: &str) -> usize {
+        let descendants: Vec<String> = self
+            .descendants(id)
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let mut removed = 0;
+        for desc in &descendants {
+            if self.nodes.remove(desc).is_some() {
+                removed += 1;
+            }
+        }
+        // Remove the node itself
+        if self.nodes.remove(id).is_some() {
+            removed += 1;
+        }
+        // Remove from parent's children
+        for node in self.nodes.values_mut() {
+            node.children.retain(|c| c != id);
+        }
+        self.root_ids.retain(|r| r != id);
+        removed
+    }
+
+    /// Toggle visibility of a node.
+    pub fn toggle_visibility(&mut self, id: &str) -> Option<bool> {
+        self.nodes.get_mut(id).map(|n| {
+            n.visible = !n.visible;
+            n.visible
+        })
+    }
+
+    /// Count only the visible nodes.
+    pub fn visible_count(&self) -> usize {
+        self.nodes.values().filter(|n| n.visible).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WidgetId — type-safe widget identifier
+// ---------------------------------------------------------------------------
+
+/// A strongly-typed widget identifier for compile-time safety.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct WidgetId(String);
+
+impl WidgetId {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self(id.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for WidgetId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<&str> for WidgetId {
+    fn from(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1649,5 +1777,82 @@ mod tests {
         tree.add_root(WidgetNode::new("b").with_z_order(2));
         tree.send_to_back("b");
         assert_eq!(tree.z_sorted().first(), Some(&"b"));
+    }
+
+    // -- WidgetTree extended tests --------------------------------------------
+
+    #[test]
+    fn widget_tree_path_to_root() {
+        let mut tree = WidgetTree::new();
+        tree.add_root(WidgetNode::new("root"));
+        tree.add_child("root", WidgetNode::new("mid"));
+        tree.add_child("mid", WidgetNode::new("leaf"));
+        let path = tree.path_to_root("leaf");
+        assert_eq!(path, vec!["root", "mid", "leaf"]);
+    }
+
+    #[test]
+    fn widget_tree_leaves() {
+        let mut tree = WidgetTree::new();
+        tree.add_root(WidgetNode::new("root"));
+        tree.add_child("root", WidgetNode::new("child1"));
+        tree.add_child("root", WidgetNode::new("child2"));
+        tree.add_child("child1", WidgetNode::new("grandchild"));
+        let mut leaves = tree.leaves();
+        leaves.sort();
+        assert_eq!(leaves, vec!["child2", "grandchild"]);
+    }
+
+    #[test]
+    fn widget_tree_siblings() {
+        let mut tree = WidgetTree::new();
+        tree.add_root(WidgetNode::new("root"));
+        tree.add_child("root", WidgetNode::new("a"));
+        tree.add_child("root", WidgetNode::new("b"));
+        tree.add_child("root", WidgetNode::new("c"));
+        let mut sibs = tree.siblings("b");
+        sibs.sort();
+        assert_eq!(sibs, vec!["a", "c"]);
+    }
+
+    #[test]
+    fn widget_tree_remove_subtree() {
+        let mut tree = WidgetTree::new();
+        tree.add_root(WidgetNode::new("root"));
+        tree.add_child("root", WidgetNode::new("child"));
+        tree.add_child("child", WidgetNode::new("grandchild"));
+        let removed = tree.remove_subtree("child");
+        assert_eq!(removed, 2);
+        assert_eq!(tree.node_count(), 1);
+    }
+
+    #[test]
+    fn widget_tree_toggle_visibility() {
+        let mut tree = WidgetTree::new();
+        tree.add_root(WidgetNode::new("w1"));
+        assert_eq!(tree.visible_count(), 1);
+        tree.toggle_visibility("w1");
+        assert_eq!(tree.visible_count(), 0);
+        tree.toggle_visibility("w1");
+        assert_eq!(tree.visible_count(), 1);
+    }
+
+    #[test]
+    fn widget_id_display_and_from() {
+        let id = WidgetId::new("my-widget");
+        assert_eq!(id.as_str(), "my-widget");
+        assert_eq!(format!("{id}"), "my-widget");
+        let id2: WidgetId = "other".into();
+        assert_ne!(id, id2);
+    }
+
+    #[test]
+    fn widget_tree_root_siblings() {
+        let mut tree = WidgetTree::new();
+        tree.add_root(WidgetNode::new("r1"));
+        tree.add_root(WidgetNode::new("r2"));
+        tree.add_root(WidgetNode::new("r3"));
+        let sibs = tree.siblings("r2");
+        assert_eq!(sibs.len(), 2);
     }
 }

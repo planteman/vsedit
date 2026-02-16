@@ -1018,6 +1018,141 @@ impl Gradient {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ColorHarmony – generate harmonious color sets
+// ---------------------------------------------------------------------------
+
+/// Generator for color harmony patterns based on color theory.
+pub struct ColorHarmony;
+
+impl ColorHarmony {
+    /// Generate an analogous color set: the base color plus two neighbors
+    /// rotated by ±30° on the hue wheel.
+    pub fn analogous(base: &Color) -> [Color; 3] {
+        let hsl = rgb_to_hsl(base);
+        let h1 = (hsl.h + 330.0) % 360.0;
+        let h2 = (hsl.h + 30.0) % 360.0;
+        [
+            hsl_to_rgb(&HslColor { h: h1, s: hsl.s, l: hsl.l, a: hsl.a }),
+            *base,
+            hsl_to_rgb(&HslColor { h: h2, s: hsl.s, l: hsl.l, a: hsl.a }),
+        ]
+    }
+
+    /// Generate a split-complementary set: the base plus two colors
+    /// at ±150° from the base hue.
+    pub fn split_complementary(base: &Color) -> [Color; 3] {
+        let hsl = rgb_to_hsl(base);
+        let h1 = (hsl.h + 150.0) % 360.0;
+        let h2 = (hsl.h + 210.0) % 360.0;
+        [
+            *base,
+            hsl_to_rgb(&HslColor { h: h1, s: hsl.s, l: hsl.l, a: hsl.a }),
+            hsl_to_rgb(&HslColor { h: h2, s: hsl.s, l: hsl.l, a: hsl.a }),
+        ]
+    }
+
+    /// Generate a tetradic (rectangle) harmony: four colors evenly spaced
+    /// at 0°, 60°, 180°, and 240° offsets.
+    pub fn tetradic(base: &Color) -> [Color; 4] {
+        let hsl = rgb_to_hsl(base);
+        [
+            *base,
+            hsl_to_rgb(&HslColor { h: (hsl.h + 60.0) % 360.0, s: hsl.s, l: hsl.l, a: hsl.a }),
+            hsl_to_rgb(&HslColor { h: (hsl.h + 180.0) % 360.0, s: hsl.s, l: hsl.l, a: hsl.a }),
+            hsl_to_rgb(&HslColor { h: (hsl.h + 240.0) % 360.0, s: hsl.s, l: hsl.l, a: hsl.a }),
+        ]
+    }
+
+    /// Generate `n` evenly spaced hues (monochromatic lightness steps are not
+    /// altered; only the hue rotates).
+    pub fn n_hue_spread(base: &Color, n: usize) -> Vec<Color> {
+        if n == 0 {
+            return Vec::new();
+        }
+        let hsl = rgb_to_hsl(base);
+        let step = 360.0 / n as f64;
+        (0..n)
+            .map(|i| {
+                let h = (hsl.h + step * i as f64) % 360.0;
+                hsl_to_rgb(&HslColor { h, s: hsl.s, l: hsl.l, a: hsl.a })
+            })
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorMixer – mix and tint operations
+// ---------------------------------------------------------------------------
+
+/// Utility for mixing colors.
+pub struct ColorMixer;
+
+impl ColorMixer {
+    /// Average a list of colors component-wise (including alpha).
+    pub fn average(colors: &[Color]) -> Option<Color> {
+        if colors.is_empty() {
+            return None;
+        }
+        let n = colors.len() as f64;
+        let r = colors.iter().map(|c| c.r).sum::<f64>() / n;
+        let g = colors.iter().map(|c| c.g).sum::<f64>() / n;
+        let b = colors.iter().map(|c| c.b).sum::<f64>() / n;
+        let a = colors.iter().map(|c| c.a).sum::<f64>() / n;
+        Some(Color::new(r, g, b, a))
+    }
+
+    /// Lighten a color by mixing it with white by the given factor (0..1).
+    pub fn tint(color: &Color, factor: f64) -> Color {
+        blend(color, &Color::white(), factor.clamp(0.0, 1.0))
+    }
+
+    /// Darken a color by mixing it with black by the given factor (0..1).
+    pub fn shade(color: &Color, factor: f64) -> Color {
+        blend(color, &Color::black(), factor.clamp(0.0, 1.0))
+    }
+
+    /// Generate a tint/shade scale with `steps` entries from full shade
+    /// to full tint through the original color.
+    pub fn tint_shade_scale(color: &Color, steps: usize) -> Vec<Color> {
+        if steps == 0 {
+            return Vec::new();
+        }
+        if steps == 1 {
+            return vec![*color];
+        }
+        let mid = steps / 2;
+        (0..steps)
+            .map(|i| {
+                if i < mid {
+                    let factor = 1.0 - (i as f64 / mid as f64);
+                    Self::shade(color, factor)
+                } else if i == mid {
+                    *color
+                } else {
+                    let factor = (i - mid) as f64 / (steps - 1 - mid) as f64;
+                    Self::tint(color, factor)
+                }
+            })
+            .collect()
+    }
+}
+
+/// Invert a color (1 - each component, alpha unchanged).
+pub fn invert_color(c: &Color) -> Color {
+    Color::new(1.0 - c.r, 1.0 - c.g, 1.0 - c.b, c.a)
+}
+
+/// Convert a Color to CSS `hwb()` string.
+pub fn color_to_hwb_string(c: &Color) -> String {
+    let hsl = rgb_to_hsl(c);
+    let min_rgb = c.r.min(c.g).min(c.b);
+    let max_rgb = c.r.max(c.g).max(c.b);
+    let whiteness = min_rgb * 100.0;
+    let blackness = (1.0 - max_rgb) * 100.0;
+    format!("hwb({:.0} {:.0}% {:.0}%)", hsl.h, whiteness, blackness)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1689,5 +1824,62 @@ mod tests {
         assert!((mid.g - 0.5).abs() < 0.01);
         let start = grad.interpolate_at(0.0);
         assert!((start.r - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_analogous_harmony() {
+        let base = Color::red();
+        let [left, center, right] = ColorHarmony::analogous(&base);
+        assert!((center.r - base.r).abs() < f64::EPSILON);
+        assert!((center.g - base.g).abs() < f64::EPSILON);
+        // left and right should differ from base
+        let hsl_left = rgb_to_hsl(&left);
+        let hsl_right = rgb_to_hsl(&right);
+        assert!((hsl_left.h - hsl_right.h).abs() > 1.0);
+    }
+
+    #[test]
+    fn test_split_complementary() {
+        let base = Color::new(0.0, 0.0, 1.0, 1.0); // blue
+        let [b, sc1, sc2] = ColorHarmony::split_complementary(&base);
+        assert!((b.b - 1.0).abs() < f64::EPSILON);
+        // the split-complementary colors should not be blue
+        assert!(sc1.b < 0.9 || sc1.r > 0.1 || sc1.g > 0.1);
+        assert!(sc2.b < 0.9 || sc2.r > 0.1 || sc2.g > 0.1);
+    }
+
+    #[test]
+    fn test_tetradic_has_four_colors() {
+        let colors = ColorHarmony::tetradic(&Color::red());
+        assert_eq!(colors.len(), 4);
+        // first should be the base
+        assert!((colors[0].r - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_color_mixer_average() {
+        let avg = ColorMixer::average(&[Color::black(), Color::white()]).unwrap();
+        assert!((avg.r - 0.5).abs() < f64::EPSILON);
+        assert!((avg.g - 0.5).abs() < f64::EPSILON);
+        assert!((avg.b - 0.5).abs() < f64::EPSILON);
+        assert!(ColorMixer::average(&[]).is_none());
+    }
+
+    #[test]
+    fn test_tint_shade_scale() {
+        let scale = ColorMixer::tint_shade_scale(&Color::red(), 5);
+        assert_eq!(scale.len(), 5);
+        // darkest at start, lightest at end
+        assert!(scale[0].r <= scale[4].r);
+        assert!(scale[0].g <= scale[4].g);
+    }
+
+    #[test]
+    fn test_invert_color() {
+        let inv = invert_color(&Color::new(0.2, 0.3, 0.4, 0.9));
+        assert!((inv.r - 0.8).abs() < f64::EPSILON);
+        assert!((inv.g - 0.7).abs() < f64::EPSILON);
+        assert!((inv.b - 0.6).abs() < f64::EPSILON);
+        assert!((inv.a - 0.9).abs() < f64::EPSILON);
     }
 }

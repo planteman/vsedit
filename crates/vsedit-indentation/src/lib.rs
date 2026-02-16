@@ -1143,6 +1143,85 @@ pub fn indent_levels(text: &str, style: IndentStyle) -> Vec<u32> {
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Block indentation helpers
+// ---------------------------------------------------------------------------
+
+/// Apply a relative indent adjustment to a range of lines (0-indexed, inclusive).
+/// Positive `delta` indents; negative dedents (clamping at 0).
+pub fn adjust_indent_range(
+    text: &str,
+    start_line: usize,
+    end_line: usize,
+    delta: i32,
+    style: IndentStyle,
+) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut result = Vec::with_capacity(lines.len());
+    for (i, &line) in lines.iter().enumerate() {
+        if i >= start_line && i <= end_line && !line.trim().is_empty() {
+            let current = get_line_indent_level(line, style);
+            let new_level = if delta >= 0 {
+                current + delta as u32
+            } else {
+                current.saturating_sub((-delta) as u32)
+            };
+            let trimmed = line.trim_start();
+            result.push(format!("{}{}", style.indent_string_n(new_level), trimmed));
+        } else {
+            result.push(line.to_string());
+        }
+    }
+    result.join("\n")
+}
+
+/// Detect whether text uses consistent indentation (no mixing of tabs and spaces).
+pub fn is_consistent(text: &str) -> bool {
+    let stats = analyse_indentation(text);
+    !stats.mixed
+}
+
+/// Count the number of indent transitions (level changes) in the text.
+pub fn count_indent_transitions(text: &str, style: IndentStyle) -> usize {
+    let levels = indent_levels(text, style);
+    levels.windows(2).filter(|w| w[0] != w[1]).count()
+}
+
+/// Return the average indentation level across non-blank lines.
+pub fn average_indent_level(text: &str, style: IndentStyle) -> f64 {
+    let levels: Vec<u32> = text.lines()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| get_line_indent_level(l, style))
+        .collect();
+    if levels.is_empty() {
+        return 0.0;
+    }
+    levels.iter().sum::<u32>() as f64 / levels.len() as f64
+}
+
+/// Extract a block of text at a specific indent level (contiguous lines at
+/// that level or deeper, starting from the first match).
+pub fn extract_block(text: &str, target_level: u32, style: IndentStyle) -> Option<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut start = None;
+    let mut end = None;
+    for (i, &line) in lines.iter().enumerate() {
+        let level = if line.trim().is_empty() { target_level } else { get_line_indent_level(line, style) };
+        if level >= target_level && start.is_some() {
+            end = Some(i);
+        } else if level >= target_level && start.is_none() {
+            start = Some(i);
+            end = Some(i);
+        } else if start.is_some() {
+            break;
+        }
+    }
+    match (start, end) {
+        (Some(s), Some(e)) => Some(lines[s..=e].join("\n")),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1671,5 +1750,55 @@ mod tests {
         let text = "a\n    b\n        c\n\n    d";
         let levels = indent_levels(text, IndentStyle::Spaces(4));
         assert_eq!(levels, vec![0, 1, 2, 0, 1]);
+    }
+
+    // -- adjust_indent_range tests ------------------------------------------
+
+    #[test]
+    fn adjust_indent_range_increases_indent() {
+        let text = "fn main() {\nlet x = 1;\nlet y = 2;\n}";
+        let result = adjust_indent_range(text, 1, 2, 1, IndentStyle::Spaces(4));
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines[0], "fn main() {");
+        assert_eq!(lines[1], "    let x = 1;");
+        assert_eq!(lines[2], "    let y = 2;");
+        assert_eq!(lines[3], "}");
+    }
+
+    #[test]
+    fn adjust_indent_range_decreases_indent() {
+        let text = "fn main() {\n        let x = 1;\n        let y = 2;\n}";
+        let result = adjust_indent_range(text, 1, 2, -1, IndentStyle::Spaces(4));
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines[1], "    let x = 1;");
+        assert_eq!(lines[2], "    let y = 2;");
+    }
+
+    #[test]
+    fn is_consistent_detects_clean_indentation() {
+        assert!(is_consistent("    a\n    b\n        c"));
+        assert!(is_consistent("\ta\n\t\tb"));
+        assert!(!is_consistent("\ta\n    b"));
+    }
+
+    #[test]
+    fn count_indent_transitions_counts_changes() {
+        let text = "a\n    b\n    c\n        d\na";
+        let transitions = count_indent_transitions(text, IndentStyle::Spaces(4));
+        assert_eq!(transitions, 3); // 0→1, 1→2, 2→0
+    }
+
+    #[test]
+    fn average_indent_level_computes_mean() {
+        let text = "a\n    b\n        c";
+        let avg = average_indent_level(text, IndentStyle::Spaces(4));
+        assert!((avg - 1.0).abs() < 0.01); // (0 + 1 + 2) / 3 = 1.0
+    }
+
+    #[test]
+    fn extract_block_finds_indented_block() {
+        let text = "top\n    inner1\n    inner2\nbottom";
+        let block = extract_block(text, 1, IndentStyle::Spaces(4));
+        assert_eq!(block, Some("    inner1\n    inner2".to_string()));
     }
 }

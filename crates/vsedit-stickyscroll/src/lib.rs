@@ -1079,6 +1079,73 @@ impl fmt::Display for StickyScrollCache {
         )
     }
 }
+
+// ---------------------------------------------------------------------------
+// Sticky-scroll analysis utilities
+// ---------------------------------------------------------------------------
+
+/// Compute the total number of visible (non-collapsed) lines across all
+/// sticky scroll lines.
+pub fn visible_count(lines: &[StickyScrollLine]) -> usize {
+    lines.iter().filter(|l| !l.collapsed).count()
+}
+
+/// Return the maximum nesting level present in the given lines.
+pub fn max_nesting(lines: &[StickyScrollLine]) -> u32 {
+    lines.iter().map(|l| l.nesting_level).max().unwrap_or(0)
+}
+
+/// Flatten a nested set of sticky scroll lines into a single string,
+/// indenting each line by its nesting level (2 spaces per level).
+pub fn flatten_to_string(lines: &[StickyScrollLine]) -> String {
+    let mut buf = String::new();
+    for (i, line) in lines.iter().enumerate() {
+        if i > 0 {
+            buf.push('\n');
+        }
+        for _ in 0..line.nesting_level {
+            buf.push_str("  ");
+        }
+        buf.push_str(&line.text);
+    }
+    buf
+}
+
+/// Build a breadcrumb-style path from the current sticky scroll context.
+/// E.g. `"class Foo > fn bar > if cond"`.
+pub fn breadcrumb_path(lines: &[StickyScrollLine], separator: &str) -> String {
+    lines
+        .iter()
+        .filter(|l| !l.collapsed)
+        .map(|l| l.text.trim().to_string())
+        .collect::<Vec<_>>()
+        .join(separator)
+}
+
+/// Group sticky scroll lines by nesting level.
+pub fn group_by_nesting(lines: &[StickyScrollLine]) -> std::collections::HashMap<u32, Vec<&StickyScrollLine>> {
+    let mut map: std::collections::HashMap<u32, Vec<&StickyScrollLine>> = std::collections::HashMap::new();
+    for line in lines {
+        map.entry(line.nesting_level).or_default().push(line);
+    }
+    map
+}
+
+/// Create a StickyScrollLine from raw parts (convenience constructor).
+pub fn make_line(line_number: u32, text: &str, nesting_level: u32) -> StickyScrollLine {
+    StickyScrollLine {
+        line_number,
+        text: text.to_string(),
+        nesting_level,
+        collapsed: false,
+    }
+}
+
+/// Filter out lines whose nesting level exceeds a maximum.
+pub fn filter_by_max_nesting(lines: &[StickyScrollLine], max: u32) -> Vec<&StickyScrollLine> {
+    lines.iter().filter(|l| l.nesting_level <= max).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1791,5 +1858,70 @@ mod tests {
         assert_eq!(cache.len(), 2);
         cache.put(2, vec![]);
         assert_eq!(cache.len(), 2); // one was evicted
+    }
+
+    // -- visible_count ---------------------------------------------------------
+
+    #[test]
+    fn visible_count_all() {
+        let lines = vec![make_line(1, "fn main", 0), make_line(2, "if x", 1)];
+        assert_eq!(visible_count(&lines), 2);
+    }
+
+    #[test]
+    fn visible_count_with_collapsed() {
+        let mut lines = vec![make_line(1, "fn main", 0), make_line(2, "if x", 1)];
+        lines[1].collapsed = true;
+        assert_eq!(visible_count(&lines), 1);
+    }
+
+    // -- max_nesting -----------------------------------------------------------
+
+    #[test]
+    fn max_nesting_basic() {
+        let lines = vec![make_line(1, "a", 0), make_line(2, "b", 3), make_line(3, "c", 2)];
+        assert_eq!(max_nesting(&lines), 3);
+    }
+
+    #[test]
+    fn max_nesting_empty() {
+        let lines: Vec<StickyScrollLine> = vec![];
+        assert_eq!(max_nesting(&lines), 0);
+    }
+
+    // -- flatten_to_string -----------------------------------------------------
+
+    #[test]
+    fn flatten_to_string_indents() {
+        let lines = vec![make_line(1, "fn main", 0), make_line(2, "if x", 1)];
+        let flat = flatten_to_string(&lines);
+        assert_eq!(flat, "fn main\n  if x");
+    }
+
+    // -- breadcrumb_path -------------------------------------------------------
+
+    #[test]
+    fn breadcrumb_path_basic() {
+        let lines = vec![make_line(1, "class Foo", 0), make_line(2, "fn bar", 1)];
+        assert_eq!(breadcrumb_path(&lines, " > "), "class Foo > fn bar");
+    }
+
+    // -- group_by_nesting ------------------------------------------------------
+
+    #[test]
+    fn group_by_nesting_groups() {
+        let lines = vec![make_line(1, "a", 0), make_line(2, "b", 1), make_line(3, "c", 0)];
+        let groups = group_by_nesting(&lines);
+        assert_eq!(groups[&0].len(), 2);
+        assert_eq!(groups[&1].len(), 1);
+    }
+
+    // -- filter_by_max_nesting -------------------------------------------------
+
+    #[test]
+    fn filter_by_max_nesting_filters() {
+        let lines = vec![make_line(1, "a", 0), make_line(2, "b", 2), make_line(3, "c", 1)];
+        let filtered = filter_by_max_nesting(&lines, 1);
+        assert_eq!(filtered.len(), 2);
     }
 }

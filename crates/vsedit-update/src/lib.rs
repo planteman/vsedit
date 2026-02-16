@@ -1061,6 +1061,213 @@ impl VersionParts {
     pub fn is_newer_than(&self, other: &Self) -> bool {
         other.is_older_than(self)
     }
+
+    /// Check if this version satisfies a simple constraint string.
+    ///
+    /// Supported operators: `=`, `>`, `<`, `>=`, `<=`, `^` (compatible), `~` (patch-level).
+    /// - `^1.2.3` matches `>=1.2.3` and `<2.0.0` (same major).
+    /// - `~1.2.3` matches `>=1.2.3` and `<1.3.0` (same major.minor).
+    pub fn satisfies(&self, constraint: &str) -> bool {
+        let constraint = constraint.trim();
+        if constraint.is_empty() {
+            return false;
+        }
+
+        if let Some(rest) = constraint.strip_prefix(">=") {
+            return VersionParts::parse(rest.trim())
+                .map_or(false, |target| !self.is_older_than(&target));
+        }
+        if let Some(rest) = constraint.strip_prefix("<=") {
+            return VersionParts::parse(rest.trim())
+                .map_or(false, |target| !self.is_newer_than(&target));
+        }
+        if let Some(rest) = constraint.strip_prefix('>') {
+            return VersionParts::parse(rest.trim())
+                .map_or(false, |target| self.is_newer_than(&target));
+        }
+        if let Some(rest) = constraint.strip_prefix('<') {
+            return VersionParts::parse(rest.trim())
+                .map_or(false, |target| self.is_older_than(&target));
+        }
+        if let Some(rest) = constraint.strip_prefix('^') {
+            return VersionParts::parse(rest.trim()).map_or(false, |target| {
+                !self.is_older_than(&target) && self.major == target.major
+            });
+        }
+        if let Some(rest) = constraint.strip_prefix('~') {
+            return VersionParts::parse(rest.trim()).map_or(false, |target| {
+                !self.is_older_than(&target)
+                    && self.major == target.major
+                    && self.minor == target.minor
+            });
+        }
+        if let Some(rest) = constraint.strip_prefix('=') {
+            return VersionParts::parse(rest.trim()).map_or(false, |target| self == &target);
+        }
+        // bare version treated as exact match
+        VersionParts::parse(constraint).map_or(false, |target| self == &target)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VersionRange – inclusive version range with filtering
+// ---------------------------------------------------------------------------
+
+/// An inclusive version range `[min, max]` for filtering and containment checks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VersionRange {
+    pub min: VersionParts,
+    pub max: VersionParts,
+}
+
+impl VersionRange {
+    /// Create a new inclusive version range.  
+    /// Returns `None` if `min > max`.
+    pub fn new(min: VersionParts, max: VersionParts) -> Option<Self> {
+        if min.is_newer_than(&max) {
+            return None;
+        }
+        Some(Self { min, max })
+    }
+
+    /// Returns `true` if `version` falls within `[min, max]`.
+    pub fn contains(&self, version: &VersionParts) -> bool {
+        !version.is_older_than(&self.min) && !version.is_newer_than(&self.max)
+    }
+
+    /// Filter a slice of versions, returning only those within the range.
+    pub fn filter<'a>(&self, versions: &'a [VersionParts]) -> Vec<&'a VersionParts> {
+        versions.iter().filter(|v| self.contains(v)).collect()
+    }
+
+    /// Return the span of major versions covered by this range.
+    pub fn major_span(&self) -> u32 {
+        self.max.major.saturating_sub(self.min.major) + 1
+    }
+}
+
+impl fmt::Display for VersionRange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}, {}]", self.min, self.max)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UpdateChannel – parsing and priority
+// ---------------------------------------------------------------------------
+
+impl UpdateChannel {
+    /// Parse a channel name (case-insensitive).
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().as_str() {
+            "stable" => Some(Self::Stable),
+            "insider" | "insiders" => Some(Self::Insider),
+            "exploration" | "explore" => Some(Self::Exploration),
+            _ => None,
+        }
+    }
+
+    /// Return a numeric stability priority (lower = more stable).
+    pub fn stability_priority(&self) -> u8 {
+        match self {
+            Self::Stable => 0,
+            Self::Insider => 1,
+            Self::Exploration => 2,
+        }
+    }
+
+    /// Returns `true` if `self` is at least as stable as `other`.
+    pub fn is_at_least_as_stable_as(&self, other: &Self) -> bool {
+        self.stability_priority() <= other.stability_priority()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UpdateState – valid transitions
+// ---------------------------------------------------------------------------
+
+impl UpdateState {
+    /// The set of states that are valid successors of this state.
+    pub fn valid_transitions(&self) -> Vec<UpdateState> {
+        match self {
+            UpdateState::Idle => vec![UpdateState::CheckingForUpdates],
+            UpdateState::CheckingForUpdates => vec![
+                UpdateState::UpdateAvailable,
+                UpdateState::Idle,
+                UpdateState::Error(String::new()),
+            ],
+            UpdateState::UpdateAvailable => vec![
+                UpdateState::Downloading,
+                UpdateState::Idle,
+                UpdateState::Error(String::new()),
+            ],
+            UpdateState::Downloading => vec![
+                UpdateState::Ready,
+                UpdateState::Error(String::new()),
+            ],
+            UpdateState::Ready => vec![UpdateState::Idle],
+            UpdateState::Error(_) => vec![UpdateState::Idle],
+        }
+    }
+
+    /// Check whether transitioning from `self` to `target` is valid.
+    /// Error states match any `Error(_)` variant regardless of message.
+    pub fn can_transition_to(&self, target: &UpdateState) -> bool {
+        self.valid_transitions().iter().any(|valid| {
+            std::mem::discriminant(valid) == std::mem::discriminant(target)
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UpdateInfo – parsed version helper
+// ---------------------------------------------------------------------------
+
+impl UpdateInfo {
+    /// Parse the version string into `VersionParts`.
+    pub fn parsed_version(&self) -> Option<VersionParts> {
+        VersionParts::parse(&self.version)
+    }
+
+    /// Return `true` if this update has release notes.
+    pub fn has_release_notes(&self) -> bool {
+        self.release_notes.as_ref().map_or(false, |n| !n.is_empty())
+    }
+
+    /// Return `true` if a download URL is present.
+    pub fn has_download_url(&self) -> bool {
+        self.url.is_some()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UpdateService – validated transitions
+// ---------------------------------------------------------------------------
+
+impl UpdateService {
+    /// Attempt a validated state transition. Returns an error if the
+    /// transition is not allowed by the state machine rules.
+    pub fn transition_to(&mut self, target: UpdateState) -> Result<(), UpdateError> {
+        if !self.state.can_transition_to(&target) {
+            return Err(UpdateError::InvalidStateTransition {
+                from: self.state.clone(),
+                to: target,
+            });
+        }
+        self.state = target;
+        Ok(())
+    }
+
+    /// Return the latest version from history, if any.
+    pub fn latest_in_history(&self) -> Option<&UpdateInfo> {
+        self.update_history
+            .iter()
+            .filter_map(|info| {
+                VersionParts::parse(&info.version).map(|parts| (info, parts))
+            })
+            .max_by(|(_, a), (_, b)| a.cmp(b))
+            .map(|(info, _)| info)
+    }
 }
 
 #[cfg(test)]
@@ -1753,5 +1960,247 @@ mod tests {
         let v2 = VersionParts::from_parts(2, 0, 0);
         assert!(v2.is_newer_than(&v1));
         assert!(!v1.is_newer_than(&v2));
+    }
+
+    // -- VersionParts::satisfies constraint tests ----------------------------
+
+    #[test]
+    fn satisfies_exact_match() {
+        let v = VersionParts::from_parts(1, 2, 3);
+        assert!(v.satisfies("1.2.3"));
+        assert!(v.satisfies("=1.2.3"));
+        assert!(!v.satisfies("1.2.4"));
+        assert!(!v.satisfies("=1.2.4"));
+    }
+
+    #[test]
+    fn satisfies_greater_less() {
+        let v = VersionParts::from_parts(1, 5, 0);
+        assert!(v.satisfies(">1.0.0"));
+        assert!(!v.satisfies(">1.5.0"));
+        assert!(v.satisfies(">=1.5.0"));
+        assert!(v.satisfies("<2.0.0"));
+        assert!(!v.satisfies("<1.5.0"));
+        assert!(v.satisfies("<=1.5.0"));
+    }
+
+    #[test]
+    fn satisfies_caret() {
+        let v13 = VersionParts::from_parts(1, 9, 0);
+        assert!(v13.satisfies("^1.2.3"));
+        let v20 = VersionParts::from_parts(2, 0, 0);
+        assert!(!v20.satisfies("^1.2.3"));
+        let v_old = VersionParts::from_parts(1, 0, 0);
+        assert!(!v_old.satisfies("^1.2.3"));
+    }
+
+    #[test]
+    fn satisfies_tilde() {
+        let v = VersionParts::from_parts(1, 2, 9);
+        assert!(v.satisfies("~1.2.3"));
+        let v_next_minor = VersionParts::from_parts(1, 3, 0);
+        assert!(!v_next_minor.satisfies("~1.2.3"));
+    }
+
+    #[test]
+    fn satisfies_empty_and_invalid() {
+        let v = VersionParts::from_parts(1, 0, 0);
+        assert!(!v.satisfies(""));
+        assert!(!v.satisfies(">not_a_version"));
+    }
+
+    // -- VersionRange tests -------------------------------------------------
+
+    #[test]
+    fn version_range_creation() {
+        let min = VersionParts::from_parts(1, 0, 0);
+        let max = VersionParts::from_parts(2, 0, 0);
+        let range = VersionRange::new(min.clone(), max.clone()).unwrap();
+        assert_eq!(range.min, min);
+        assert_eq!(range.max, max);
+    }
+
+    #[test]
+    fn version_range_rejects_inverted() {
+        let high = VersionParts::from_parts(3, 0, 0);
+        let low = VersionParts::from_parts(1, 0, 0);
+        assert!(VersionRange::new(high, low).is_none());
+    }
+
+    #[test]
+    fn version_range_contains() {
+        let range = VersionRange::new(
+            VersionParts::from_parts(1, 0, 0),
+            VersionParts::from_parts(2, 0, 0),
+        )
+        .unwrap();
+        assert!(range.contains(&VersionParts::from_parts(1, 5, 0)));
+        assert!(range.contains(&VersionParts::from_parts(1, 0, 0))); // inclusive min
+        assert!(range.contains(&VersionParts::from_parts(2, 0, 0))); // inclusive max
+        assert!(!range.contains(&VersionParts::from_parts(0, 9, 0)));
+        assert!(!range.contains(&VersionParts::from_parts(2, 0, 1)));
+    }
+
+    #[test]
+    fn version_range_filter() {
+        let range = VersionRange::new(
+            VersionParts::from_parts(1, 0, 0),
+            VersionParts::from_parts(1, 5, 0),
+        )
+        .unwrap();
+        let versions = vec![
+            VersionParts::from_parts(0, 9, 0),
+            VersionParts::from_parts(1, 0, 0),
+            VersionParts::from_parts(1, 3, 0),
+            VersionParts::from_parts(1, 5, 0),
+            VersionParts::from_parts(2, 0, 0),
+        ];
+        let filtered = range.filter(&versions);
+        assert_eq!(filtered.len(), 3);
+        assert_eq!(*filtered[0], VersionParts::from_parts(1, 0, 0));
+        assert_eq!(*filtered[2], VersionParts::from_parts(1, 5, 0));
+    }
+
+    #[test]
+    fn version_range_major_span() {
+        let range = VersionRange::new(
+            VersionParts::from_parts(1, 0, 0),
+            VersionParts::from_parts(3, 0, 0),
+        )
+        .unwrap();
+        assert_eq!(range.major_span(), 3);
+    }
+
+    #[test]
+    fn version_range_display() {
+        let range = VersionRange::new(
+            VersionParts::from_parts(1, 0, 0),
+            VersionParts::from_parts(2, 0, 0),
+        )
+        .unwrap();
+        assert_eq!(range.to_string(), "[1.0.0, 2.0.0]");
+    }
+
+    // -- UpdateChannel::from_name and priority tests -------------------------
+
+    #[test]
+    fn update_channel_from_name() {
+        assert_eq!(UpdateChannel::from_name("stable"), Some(UpdateChannel::Stable));
+        assert_eq!(UpdateChannel::from_name("INSIDER"), Some(UpdateChannel::Insider));
+        assert_eq!(UpdateChannel::from_name("Insiders"), Some(UpdateChannel::Insider));
+        assert_eq!(UpdateChannel::from_name("exploration"), Some(UpdateChannel::Exploration));
+        assert_eq!(UpdateChannel::from_name("explore"), Some(UpdateChannel::Exploration));
+        assert_eq!(UpdateChannel::from_name("unknown"), None);
+    }
+
+    #[test]
+    fn update_channel_stability_ordering() {
+        assert!(UpdateChannel::Stable.stability_priority() < UpdateChannel::Insider.stability_priority());
+        assert!(UpdateChannel::Insider.stability_priority() < UpdateChannel::Exploration.stability_priority());
+        assert!(UpdateChannel::Stable.is_at_least_as_stable_as(&UpdateChannel::Insider));
+        assert!(!UpdateChannel::Exploration.is_at_least_as_stable_as(&UpdateChannel::Stable));
+        assert!(UpdateChannel::Insider.is_at_least_as_stable_as(&UpdateChannel::Insider));
+    }
+
+    // -- UpdateState transition tests ----------------------------------------
+
+    #[test]
+    fn state_valid_transitions() {
+        assert!(UpdateState::Idle.can_transition_to(&UpdateState::CheckingForUpdates));
+        assert!(!UpdateState::Idle.can_transition_to(&UpdateState::Ready));
+        assert!(UpdateState::CheckingForUpdates.can_transition_to(&UpdateState::UpdateAvailable));
+        assert!(UpdateState::CheckingForUpdates.can_transition_to(&UpdateState::Idle));
+        assert!(UpdateState::CheckingForUpdates.can_transition_to(&UpdateState::Error("x".into())));
+        assert!(UpdateState::Downloading.can_transition_to(&UpdateState::Ready));
+        assert!(!UpdateState::Downloading.can_transition_to(&UpdateState::Idle));
+        assert!(UpdateState::Ready.can_transition_to(&UpdateState::Idle));
+        assert!(!UpdateState::Ready.can_transition_to(&UpdateState::Downloading));
+        assert!(UpdateState::Error("e".into()).can_transition_to(&UpdateState::Idle));
+    }
+
+    // -- UpdateInfo helper tests --------------------------------------------
+
+    #[test]
+    fn update_info_parsed_version() {
+        let info = UpdateInfo {
+            version: "3.2.1".into(),
+            product_version: "3.2.1".into(),
+            url: None,
+            release_notes: None,
+        };
+        let parts = info.parsed_version().unwrap();
+        assert_eq!(parts, VersionParts::from_parts(3, 2, 1));
+    }
+
+    #[test]
+    fn update_info_has_release_notes_and_url() {
+        let info = UpdateInfo {
+            version: "1.0.0".into(),
+            product_version: "1.0.0".into(),
+            url: Some("https://example.com".into()),
+            release_notes: Some("notes".into()),
+        };
+        assert!(info.has_release_notes());
+        assert!(info.has_download_url());
+
+        let empty_notes = UpdateInfo {
+            version: "1.0.0".into(),
+            product_version: "1.0.0".into(),
+            url: None,
+            release_notes: Some("".into()),
+        };
+        assert!(!empty_notes.has_release_notes());
+        assert!(!empty_notes.has_download_url());
+    }
+
+    // -- UpdateService::transition_to tests ---------------------------------
+
+    #[test]
+    fn service_transition_to_valid() {
+        let mut svc = UpdateService::new("1.0.0");
+        assert!(svc.transition_to(UpdateState::CheckingForUpdates).is_ok());
+        assert_eq!(*svc.get_state(), UpdateState::CheckingForUpdates);
+        assert!(svc.transition_to(UpdateState::UpdateAvailable).is_ok());
+    }
+
+    #[test]
+    fn service_transition_to_invalid() {
+        let mut svc = UpdateService::new("1.0.0");
+        let result = svc.transition_to(UpdateState::Ready);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            UpdateError::InvalidStateTransition { .. }
+        ));
+        assert_eq!(*svc.get_state(), UpdateState::Idle);
+    }
+
+    // -- UpdateService::latest_in_history tests -----------------------------
+
+    #[test]
+    fn service_latest_in_history() {
+        let mut svc = UpdateService::new("1.0.0");
+        assert!(svc.latest_in_history().is_none());
+
+        svc.push_history(UpdateInfo {
+            version: "1.1.0".into(),
+            product_version: "1.1.0".into(),
+            url: None,
+            release_notes: None,
+        });
+        svc.push_history(UpdateInfo {
+            version: "1.3.0".into(),
+            product_version: "1.3.0".into(),
+            url: None,
+            release_notes: None,
+        });
+        svc.push_history(UpdateInfo {
+            version: "1.2.0".into(),
+            product_version: "1.2.0".into(),
+            url: None,
+            release_notes: None,
+        });
+        let latest = svc.latest_in_history().unwrap();
+        assert_eq!(latest.version, "1.3.0");
     }
 }

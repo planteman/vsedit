@@ -1015,6 +1015,118 @@ pub fn policy_summary(svc: &PolicyService) -> String {
     format!("{total} policies ({bools} boolean)")
 }
 
+// ---------------------------------------------------------------------------
+// Policy diffing and export utilities
+// ---------------------------------------------------------------------------
+
+/// Return the names of policies that changed between two services (added, removed, or modified).
+pub fn changed_policy_names(a: &PolicyService, b: &PolicyService) -> Vec<String> {
+    let a_names: HashSet<String> = a.list_policies().into_iter().collect();
+    let b_names: HashSet<String> = b.list_policies().into_iter().collect();
+    let all_names: HashSet<&String> = a_names.iter().chain(b_names.iter()).collect();
+    let mut diffs = Vec::new();
+    for name in all_names {
+        let a_val = a.get_policy(name).map(|p| &p.value);
+        let b_val = b.get_policy(name).map(|p| &p.value);
+        if a_val != b_val {
+            diffs.push(name.clone());
+        }
+    }
+    diffs.sort();
+    diffs
+}
+
+/// Export all policies as a list of `"name=value"` strings, sorted by name.
+pub fn export_policies(svc: &PolicyService) -> Vec<String> {
+    let mut pairs: Vec<String> = svc
+        .list_policies()
+        .into_iter()
+        .filter_map(|name| {
+            svc.get_policy(&name)
+                .map(|p| format!("{}={}", name, p.value))
+        })
+        .collect();
+    pairs.sort();
+    pairs
+}
+
+/// Return policies grouped by their value type name.
+pub fn group_policies_by_type(svc: &PolicyService) -> HashMap<&'static str, Vec<String>> {
+    let mut groups: HashMap<&'static str, Vec<String>> = HashMap::new();
+    for name in svc.list_policies() {
+        if let Some(policy) = svc.get_policy(&name) {
+            let label = match &policy.value {
+                PolicyValue::Bool(_) => "bool",
+                PolicyValue::String(_) => "string",
+                PolicyValue::Number(_) => "number",
+                PolicyValue::StringList(_) => "string_list",
+            };
+            groups.entry(label).or_default().push(name);
+        }
+    }
+    groups
+}
+
+/// Return true if all boolean policies are set to `true`.
+pub fn all_features_enabled(svc: &PolicyService) -> bool {
+    svc.list_policies()
+        .iter()
+        .filter_map(|n| svc.get_bool(n))
+        .all(|v| v)
+}
+
+/// Return the names of number policies whose values exceed a threshold.
+pub fn number_policies_above(svc: &PolicyService, threshold: i64) -> Vec<String> {
+    svc.list_policies()
+        .into_iter()
+        .filter(|n| svc.get_number(n).map_or(false, |v| v > threshold))
+        .collect()
+}
+
+/// Count the total number of items across all StringList policies.
+pub fn total_string_list_items(svc: &PolicyService) -> usize {
+    svc.list_policies()
+        .iter()
+        .filter_map(|n| svc.get_string_list(n))
+        .map(|list| list.len())
+        .sum()
+}
+
+/// Find policy names that violate naming conventions (lowercase, dots, hyphens only).
+pub fn find_invalid_policy_names(svc: &PolicyService) -> Vec<String> {
+    svc.list_policies()
+        .into_iter()
+        .filter(|name| {
+            !name
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c == '.' || c == '-')
+        })
+        .collect()
+}
+
+impl PolicyService {
+    /// Return true if the service contains a policy with the given name.
+    pub fn contains_policy(&self, name: &str) -> bool {
+        self.get_policy(name).is_some()
+    }
+
+    /// Return the names of all boolean policies.
+    pub fn bool_policy_names(&self) -> Vec<String> {
+        self.list_policies()
+            .into_iter()
+            .filter(|n| self.get_bool(n).is_some())
+            .collect()
+    }
+
+    /// Return the names of all string-valued policies.
+    pub fn str_policy_names(&self) -> Vec<String> {
+        self.list_policies()
+            .into_iter()
+            .filter(|n| self.get_string(n).is_some())
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1763,5 +1875,105 @@ mod tests {
     fn test_enabled_feature_names_empty() {
         let svc = PolicyService::new();
         assert!(enabled_feature_names(&svc).is_empty());
+    }
+
+    #[test]
+    fn changed_policy_names_detects_differences() {
+        let mut a = PolicyService::new();
+        let mut b = PolicyService::new();
+        a.set_policy("shared", PolicyValue::Bool(true), None);
+        a.set_policy("only_a", PolicyValue::Number(1), None);
+        b.set_policy("shared", PolicyValue::Bool(false), None);
+        b.set_policy("only_b", PolicyValue::String("x".into()), None);
+        let diffs = changed_policy_names(&a, &b);
+        assert_eq!(diffs.len(), 3);
+        assert!(diffs.contains(&"shared".to_string()));
+        assert!(diffs.contains(&"only_a".to_string()));
+        assert!(diffs.contains(&"only_b".to_string()));
+    }
+
+    #[test]
+    fn changed_policy_names_empty_when_equal() {
+        let mut a = PolicyService::new();
+        let mut b = PolicyService::new();
+        a.set_policy("x", PolicyValue::Bool(true), None);
+        b.set_policy("x", PolicyValue::Bool(true), None);
+        let diffs = changed_policy_names(&a, &b);
+        assert!(diffs.is_empty());
+    }
+
+    #[test]
+    fn export_policies_format() {
+        let mut svc = PolicyService::new();
+        svc.set_policy("b.flag", PolicyValue::Bool(true), None);
+        svc.set_policy("a.name", PolicyValue::String("val".into()), None);
+        let exported = export_policies(&svc);
+        assert_eq!(exported[0], "a.name=val");
+        assert_eq!(exported[1], "b.flag=true");
+    }
+
+    #[test]
+    fn group_policies_by_type_groups() {
+        let mut svc = PolicyService::new();
+        svc.set_policy("flag1", PolicyValue::Bool(true), None);
+        svc.set_policy("flag2", PolicyValue::Bool(false), None);
+        svc.set_policy("name", PolicyValue::String("x".into()), None);
+        let groups = group_policies_by_type(&svc);
+        assert_eq!(groups["bool"].len(), 2);
+        assert_eq!(groups["string"].len(), 1);
+    }
+
+    #[test]
+    fn all_features_enabled_checks() {
+        let mut svc = PolicyService::new();
+        svc.set_policy("a", PolicyValue::Bool(true), None);
+        svc.set_policy("b", PolicyValue::Bool(true), None);
+        assert!(all_features_enabled(&svc));
+        svc.set_policy("c", PolicyValue::Bool(false), None);
+        assert!(!all_features_enabled(&svc));
+    }
+
+    #[test]
+    fn number_policies_above_threshold() {
+        let mut svc = PolicyService::new();
+        svc.set_policy("low", PolicyValue::Number(5), None);
+        svc.set_policy("high", PolicyValue::Number(100), None);
+        svc.set_policy("mid", PolicyValue::Number(50), None);
+        let above = number_policies_above(&svc, 10);
+        assert_eq!(above.len(), 2);
+    }
+
+    #[test]
+    fn total_string_list_items_sums() {
+        let mut svc = PolicyService::new();
+        svc.set_policy("list1", PolicyValue::StringList(vec!["a".into(), "b".into()]), None);
+        svc.set_policy("list2", PolicyValue::StringList(vec!["c".into()]), None);
+        svc.set_policy("flag", PolicyValue::Bool(true), None);
+        assert_eq!(total_string_list_items(&svc), 3);
+    }
+
+    #[test]
+    fn find_invalid_policy_names_catches() {
+        let mut svc = PolicyService::new();
+        svc.set_policy("valid.name", PolicyValue::Bool(true), None);
+        svc.set_policy("INVALID", PolicyValue::Bool(true), None);
+        svc.set_policy("also-valid", PolicyValue::Bool(true), None);
+        let invalid = find_invalid_policy_names(&svc);
+        assert_eq!(invalid.len(), 1);
+        assert_eq!(invalid[0], "INVALID");
+    }
+
+    #[test]
+    fn policy_service_contains_and_names() {
+        let mut svc = PolicyService::new();
+        svc.set_policy("flag", PolicyValue::Bool(true), None);
+        svc.set_policy("name", PolicyValue::String("x".into()), None);
+        assert!(svc.contains_policy("flag"));
+        assert!(!svc.contains_policy("nonexistent"));
+        let bools = svc.bool_policy_names();
+        assert_eq!(bools.len(), 1);
+        assert!(bools.contains(&"flag".to_string()));
+        let strings = svc.str_policy_names();
+        assert_eq!(strings.len(), 1);
     }
 }

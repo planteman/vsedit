@@ -1050,6 +1050,134 @@ impl fmt::Display for RollingChecksum {
         write!(f, "RollingChecksum(window={}, fed={}, value={:#010x})", self.window_size, self.count, self.value())
     }
 }
+
+// ---------------------------------------------------------------------------
+// Hex validation and utilities
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if `s` is a valid lowercase hex string (even length, chars 0-9 a-f).
+pub fn is_valid_hex(s: &str) -> bool {
+    s.len() % 2 == 0 && !s.is_empty() && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// Normalize a hex string to lowercase.
+pub fn hex_normalize(s: &str) -> String {
+    s.to_ascii_lowercase()
+}
+
+/// Returns `true` if two hex strings are equal ignoring case.
+pub fn hex_eq(a: &str, b: &str) -> bool {
+    a.eq_ignore_ascii_case(b)
+}
+
+// ---------------------------------------------------------------------------
+// Batch checksum operations
+// ---------------------------------------------------------------------------
+
+/// Compute checksums for multiple byte slices, returning `(index, checksum)` pairs.
+pub fn batch_checksums(items: &[&[u8]], kind: ChecksumKind) -> Vec<(usize, String)> {
+    items
+        .iter()
+        .enumerate()
+        .map(|(i, data)| (i, compute_checksum(data, kind)))
+        .collect()
+}
+
+/// Verify a batch of `(data, expected_checksum)` pairs. Returns indices of failures.
+pub fn batch_verify(items: &[(&[u8], &str)], kind: ChecksumKind) -> Vec<usize> {
+    items
+        .iter()
+        .enumerate()
+        .filter(|(_, (data, expected))| !verify_checksum(data, expected, kind))
+        .map(|(i, _)| i)
+        .collect()
+}
+
+/// Compute a checksum over a string slice (convenience wrapper).
+pub fn checksum_str(s: &str, kind: ChecksumKind) -> String {
+    compute_checksum(s.as_bytes(), kind)
+}
+
+// ---------------------------------------------------------------------------
+// ChecksumManifest – extended helpers
+// ---------------------------------------------------------------------------
+
+impl ChecksumManifest {
+    /// Return all entries whose path starts with the given prefix.
+    pub fn entries_with_prefix(&self, prefix: &str) -> Vec<&ManifestEntry> {
+        self.entries
+            .values()
+            .filter(|e| e.path.starts_with(prefix))
+            .collect()
+    }
+
+    /// Return the total size in bytes across all entries.
+    pub fn total_size(&self) -> u64 {
+        self.entries.values().map(|e| e.size).sum()
+    }
+
+    /// Return distinct algorithms used in the manifest.
+    pub fn algorithms(&self) -> Vec<String> {
+        let mut algos: Vec<String> = self
+            .entries
+            .values()
+            .map(|e| e.algorithm.clone())
+            .collect();
+        algos.sort();
+        algos.dedup();
+        algos
+    }
+
+    /// Return the entry with the largest file size, if any.
+    pub fn largest_entry(&self) -> Option<&ManifestEntry> {
+        self.entries.values().max_by_key(|e| e.size)
+    }
+
+    /// Return the entry with the smallest file size, if any.
+    pub fn smallest_entry(&self) -> Option<&ManifestEntry> {
+        self.entries.values().min_by_key(|e| e.size)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RollingChecksum – comparison helpers
+// ---------------------------------------------------------------------------
+
+impl RollingChecksum {
+    /// Returns true if two rolling checksums have the same value.
+    pub fn matches(&self, other: &RollingChecksum) -> bool {
+        self.value() == other.value()
+    }
+
+    /// Returns the window size.
+    pub fn window_size(&self) -> usize {
+        self.window_size
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChecksumResult helpers
+// ---------------------------------------------------------------------------
+
+impl ChecksumResult {
+    /// Returns the hex string length of the checksum.
+    pub fn hex_len(&self) -> usize {
+        self.hex_digest.len()
+    }
+
+    /// Returns true if this result's checksum matches the given expected value (case-insensitive).
+    pub fn matches(&self, expected: &str) -> bool {
+        self.hex_digest.eq_ignore_ascii_case(expected)
+    }
+}
+
+impl fmt::Display for ChecksumResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", algorithm_name(self.kind), self.hex_digest)
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1761,4 +1889,113 @@ mod tests {
         let s = format!("{rc1}");
         assert!(s.contains("window=8"));
     }
+
+    #[test]
+    fn is_valid_hex_accepts_valid() {
+        assert!(is_valid_hex("0123456789abcdef"));
+        assert!(is_valid_hex("aa"));
+        assert!(!is_valid_hex(""));
+        assert!(!is_valid_hex("a"));
+        assert!(!is_valid_hex("AABB"));
+        assert!(!is_valid_hex("zz"));
+    }
+
+    #[test]
+    fn hex_normalize_lowercases() {
+        assert_eq!(hex_normalize("AABB"), "aabb");
+        assert_eq!(hex_normalize("aabb"), "aabb");
+    }
+
+    #[test]
+    fn hex_eq_case_insensitive() {
+        assert!(hex_eq("aabb", "AABB"));
+        assert!(hex_eq("aabb", "aabb"));
+        assert!(!hex_eq("aabb", "ccdd"));
+    }
+
+    #[test]
+    fn batch_checksums_produces_correct_count() {
+        let items: Vec<&[u8]> = vec![b"alpha", b"beta", b"gamma"];
+        let results = batch_checksums(&items, ChecksumKind::Fnv64);
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].0, 0);
+        assert_eq!(results[2].0, 2);
+        assert_ne!(results[0].1, results[1].1);
+    }
+
+    #[test]
+    fn batch_verify_catches_failures() {
+        let c1 = compute_checksum(b"hello", ChecksumKind::Fnv64);
+        let items: Vec<(&[u8], &str)> = vec![
+            (b"hello", c1.as_str()),
+            (b"world", "0000000000000000"),
+        ];
+        let failures = batch_verify(&items, ChecksumKind::Fnv64);
+        assert_eq!(failures, vec![1]);
+    }
+
+    #[test]
+    fn checksum_str_matches_bytes() {
+        let from_str = checksum_str("test", ChecksumKind::Sha256);
+        let from_bytes = compute_checksum(b"test", ChecksumKind::Sha256);
+        assert_eq!(from_str, from_bytes);
+    }
+
+    #[test]
+    fn manifest_entries_with_prefix() {
+        let mut m = ChecksumManifest::new();
+        m.add_entry("src/main.rs", "SHA-256", "aabb", 100);
+        m.add_entry("src/lib.rs", "SHA-256", "ccdd", 200);
+        m.add_entry("tests/test.rs", "SHA-256", "eeff", 50);
+        let src = m.entries_with_prefix("src/");
+        assert_eq!(src.len(), 2);
+    }
+
+    #[test]
+    fn manifest_total_size() {
+        let mut m = ChecksumManifest::new();
+        m.add_entry("a.txt", "SHA-256", "aa", 100);
+        m.add_entry("b.txt", "SHA-256", "bb", 250);
+        assert_eq!(m.total_size(), 350);
+    }
+
+    #[test]
+    fn manifest_largest_smallest() {
+        let mut m = ChecksumManifest::new();
+        m.add_entry("small.txt", "SHA-256", "aa", 10);
+        m.add_entry("big.txt", "SHA-256", "bb", 1000);
+        assert_eq!(m.largest_entry().unwrap().size, 1000);
+        assert_eq!(m.smallest_entry().unwrap().size, 10);
+    }
+
+    #[test]
+    fn manifest_algorithms_dedup() {
+        let mut m = ChecksumManifest::new();
+        m.add_entry("a.txt", "SHA-256", "aa", 10);
+        m.add_entry("b.txt", "MD5", "bb", 20);
+        m.add_entry("c.txt", "SHA-256", "cc", 30);
+        let algos = m.algorithms();
+        assert_eq!(algos, vec!["MD5", "SHA-256"]);
+    }
+
+    #[test]
+    fn rolling_checksum_matches_helper() {
+        let mut rc1 = RollingChecksum::new(4);
+        let mut rc2 = RollingChecksum::new(4);
+        rc1.push_bytes(b"abcd");
+        rc2.push_bytes(b"abcd");
+        assert!(rc1.matches(&rc2));
+        rc2.push_bytes(b"e");
+        assert!(!rc1.matches(&rc2));
+    }
+
+    #[test]
+    fn checksum_result_display_and_matches() {
+        let result = compute_checksum_result(b"hello", ChecksumKind::Sha256);
+        assert!(result.hex_len() > 0);
+        assert!(result.matches(&result.hex_digest));
+        let display = format!("{result}");
+        assert!(display.starts_with("SHA-256:"));
+    }
+
 }

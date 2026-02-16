@@ -1042,6 +1042,72 @@ pub fn partition_forwards(forwards: &[PortForward]) -> (Vec<PortForward>, Vec<Po
     (auto, manual)
 }
 
+// ---------------------------------------------------------------------------
+// Remote-features analysis utilities
+// ---------------------------------------------------------------------------
+
+/// Return the set of features that are currently enabled.
+pub fn enabled_features(svc: &RemoteFeaturesService) -> Vec<RemoteFeature> {
+    let all = [
+        RemoteFeature::FileSystem,
+        RemoteFeature::Terminal,
+        RemoteFeature::Debugging,
+        RemoteFeature::Extensions,
+        RemoteFeature::PortForwarding,
+    ];
+    all.iter()
+        .filter(|f| svc.is_enabled(f))
+        .cloned()
+        .collect()
+}
+
+/// Count ports by protocol.
+pub fn count_by_protocol(ports: &[PortForward]) -> (usize, usize, usize) {
+    let http = ports.iter().filter(|p| p.protocol == PortProtocol::Http).count();
+    let https = ports.iter().filter(|p| p.protocol == PortProtocol::Https).count();
+    let tcp = ports.iter().filter(|p| p.protocol == PortProtocol::Tcp).count();
+    (http, https, tcp)
+}
+
+/// Check whether a given local port is already in use by any forwarded port.
+pub fn is_port_in_use(ports: &[PortForward], local_port: u16) -> bool {
+    ports.iter().any(|p| p.local_port == local_port)
+}
+
+/// Find an available local port starting from `start` that is not already
+/// forwarded. Returns `None` if no port below 65535 is available.
+pub fn find_available_port(ports: &[PortForward], start: u16) -> Option<u16> {
+    (start..=u16::MAX).find(|&p| !is_port_in_use(ports, p))
+}
+
+/// Summarise the remote features service state.
+pub fn summarise_service(svc: &RemoteFeaturesService) -> RemoteServiceSummary {
+    let ports = svc.get_forwarded_ports();
+    let (http, https, tcp) = count_by_protocol(ports);
+    let auto_forward_count = ports.iter().filter(|p| p.auto_forward).count();
+    RemoteServiceSummary {
+        features_enabled: enabled_features(svc).len(),
+        total_ports: ports.len(),
+        http_ports: http,
+        https_ports: https,
+        tcp_ports: tcp,
+        auto_forward_count,
+    }
+}
+
+/// Return the distinct set of remote port numbers that are being forwarded.
+pub fn remote_port_set(ports: &[PortForward]) -> Vec<u16> {
+    let mut set: Vec<u16> = ports.iter().map(|p| p.remote_port).collect();
+    set.sort_unstable();
+    set.dedup();
+    set
+}
+
+/// Check whether all features in `required` are enabled.
+pub fn all_features_enabled(svc: &RemoteFeaturesService, required: &[RemoteFeature]) -> bool {
+    required.iter().all(|f| svc.is_enabled(f))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1794,5 +1860,85 @@ mod tests {
         assert_eq!(auto.len(), 2);
         assert_eq!(manual.len(), 1);
         assert_eq!(manual[0].local_port, 3000);
+    }
+
+    // -- enabled_features ------------------------------------------------------
+
+    #[test]
+    fn enabled_features_empty() {
+        let svc = RemoteFeaturesService::new();
+        assert!(enabled_features(&svc).is_empty());
+    }
+
+    #[test]
+    fn enabled_features_some() {
+        let mut svc = RemoteFeaturesService::new();
+        svc.enable_feature(RemoteFeature::Terminal);
+        svc.enable_feature(RemoteFeature::Debugging);
+        let feats = enabled_features(&svc);
+        assert_eq!(feats.len(), 2);
+    }
+
+    // -- count_by_protocol -----------------------------------------------------
+
+    #[test]
+    fn count_by_protocol_basic() {
+        let ports = vec![
+            PortForwardBuilder::new(80, 80).protocol(PortProtocol::Http).build(),
+            PortForwardBuilder::new(443, 443).protocol(PortProtocol::Https).build(),
+            PortForwardBuilder::new(3000, 3000).protocol(PortProtocol::Http).build(),
+        ];
+        let (http, https, tcp) = count_by_protocol(&ports);
+        assert_eq!(http, 2);
+        assert_eq!(https, 1);
+        assert_eq!(tcp, 0);
+    }
+
+    // -- is_port_in_use --------------------------------------------------------
+
+    #[test]
+    fn is_port_in_use_true() {
+        let ports = vec![PortForwardBuilder::new(8080, 80).build()];
+        assert!(is_port_in_use(&ports, 8080));
+    }
+
+    #[test]
+    fn is_port_in_use_false() {
+        let ports = vec![PortForwardBuilder::new(8080, 80).build()];
+        assert!(!is_port_in_use(&ports, 9090));
+    }
+
+    // -- find_available_port ---------------------------------------------------
+
+    #[test]
+    fn find_available_port_skips_used() {
+        let ports = vec![
+            PortForwardBuilder::new(3000, 3000).build(),
+            PortForwardBuilder::new(3001, 3001).build(),
+        ];
+        assert_eq!(find_available_port(&ports, 3000), Some(3002));
+    }
+
+    // -- all_features_enabled --------------------------------------------------
+
+    #[test]
+    fn all_features_enabled_checks() {
+        let mut svc = RemoteFeaturesService::new();
+        svc.enable_feature(RemoteFeature::Terminal);
+        assert!(all_features_enabled(&svc, &[RemoteFeature::Terminal]));
+        assert!(!all_features_enabled(&svc, &[RemoteFeature::Terminal, RemoteFeature::Debugging]));
+    }
+
+    // -- remote_port_set -------------------------------------------------------
+
+    #[test]
+    fn remote_port_set_deduplicates() {
+        let ports = vec![
+            PortForwardBuilder::new(8080, 80).build(),
+            PortForwardBuilder::new(8081, 80).build(),
+            PortForwardBuilder::new(443, 443).build(),
+        ];
+        let set = remote_port_set(&ports);
+        assert_eq!(set, vec![80, 443]);
     }
 }

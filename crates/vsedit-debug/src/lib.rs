@@ -1021,6 +1021,124 @@ pub fn find_frame_by_function(
 }
 
 // ---------------------------------------------------------------------------
+// DebugSession — additional methods
+// ---------------------------------------------------------------------------
+
+impl DebugSession {
+    /// Returns `true` if the session is active (running or paused).
+    pub fn is_active(&self) -> bool {
+        self.state.is_active()
+    }
+
+    /// Returns `true` if the session has ended.
+    pub fn is_finished(&self) -> bool {
+        self.state.is_finished()
+    }
+
+    /// Returns the elapsed time since launch, given the current timestamp.
+    pub fn elapsed_ms(&self, current_time_ms: u64) -> u64 {
+        if self.start_time_ms == 0 {
+            return 0;
+        }
+        current_time_ms.saturating_sub(self.start_time_ms)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BreakpointManager — additional methods
+// ---------------------------------------------------------------------------
+
+impl BreakpointManager {
+    /// Returns all files that have at least one breakpoint.
+    pub fn files(&self) -> Vec<&str> {
+        self.breakpoints
+            .iter()
+            .filter(|(_, lines)| !lines.is_empty())
+            .map(|(file, _)| file.as_str())
+            .collect()
+    }
+
+    /// Adds a breakpoint at the given file and line (no-op if already exists).
+    /// Returns `true` if the breakpoint was newly added.
+    pub fn add(&mut self, file: &str, line: u32) -> bool {
+        let lines = self.breakpoints.entry(file.to_string()).or_default();
+        if lines.contains(&line) {
+            false
+        } else {
+            lines.push(line);
+            lines.sort_unstable();
+            true
+        }
+    }
+
+    /// Removes a breakpoint at the given file and line.
+    /// Returns `true` if the breakpoint existed and was removed.
+    pub fn remove(&mut self, file: &str, line: u32) -> bool {
+        if let Some(lines) = self.breakpoints.get_mut(file) {
+            if let Some(pos) = lines.iter().position(|&l| l == line) {
+                lines.remove(pos);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Returns a summary of breakpoints per file.
+    pub fn summary(&self) -> Vec<(&str, usize)> {
+        let mut result: Vec<(&str, usize)> = self
+            .breakpoints
+            .iter()
+            .filter(|(_, lines)| !lines.is_empty())
+            .map(|(file, lines)| (file.as_str(), lines.len()))
+            .collect();
+        result.sort_by_key(|(file, _)| file.to_string());
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WatchStore — additional methods
+// ---------------------------------------------------------------------------
+
+impl WatchStore {
+    /// Returns `true` if any expression has an error.
+    pub fn has_errors(&self) -> bool {
+        self.expressions.iter().any(|w| w.error.is_some())
+    }
+
+    /// Returns expressions that have errors.
+    pub fn errored_expressions(&self) -> Vec<&WatchExpression> {
+        self.expressions.iter().filter(|w| w.error.is_some()).collect()
+    }
+
+    /// Removes all expressions.
+    pub fn clear(&mut self) {
+        self.expressions.clear();
+    }
+
+    /// Returns a reference to an expression by id.
+    pub fn get(&self, id: u64) -> Option<&WatchExpression> {
+        self.expressions.iter().find(|w| w.id == id)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DebugSessionState — additional methods
+// ---------------------------------------------------------------------------
+
+impl DebugSessionState {
+    /// Returns `true` if the session can be initialized from this state.
+    pub fn can_initialize(&self) -> bool {
+        matches!(self, Self::NotStarted)
+    }
+
+    /// Returns `true` if stepping is allowed in this state.
+    pub fn can_step(&self) -> bool {
+        matches!(self, Self::Paused)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1652,5 +1770,95 @@ mod tests {
         assert!(summary.contains("x: i32 = 42"));
         assert!(summary.contains("name = hello"));
         assert_eq!(summary.lines().count(), 2);
+    }
+
+    // -- DebugSession additional methods -------------------------------------
+
+    #[test]
+    fn session_is_active_and_finished() {
+        let mut s = DebugSession::new("s1", "app", "lldb");
+        assert!(!s.is_active());
+        assert!(!s.is_finished());
+        s.initialize().unwrap();
+        s.launch(100).unwrap();
+        assert!(s.is_active());
+        s.pause().unwrap();
+        assert!(s.is_active());
+        s.terminate().unwrap();
+        assert!(s.is_finished());
+        assert!(!s.is_active());
+    }
+
+    #[test]
+    fn session_elapsed_ms() {
+        let mut s = DebugSession::new("s2", "app", "lldb");
+        assert_eq!(s.elapsed_ms(5000), 0);
+        s.initialize().unwrap();
+        s.launch(1000).unwrap();
+        assert_eq!(s.elapsed_ms(3500), 2500);
+    }
+
+    // -- BreakpointManager additional methods --------------------------------
+
+    #[test]
+    fn breakpoint_manager_add_and_remove() {
+        let mut mgr = BreakpointManager::new();
+        assert!(mgr.add("main.rs", 10));
+        assert!(!mgr.add("main.rs", 10)); // duplicate
+        assert!(mgr.has_breakpoint("main.rs", 10));
+        assert!(mgr.remove("main.rs", 10));
+        assert!(!mgr.remove("main.rs", 10)); // already removed
+        assert!(!mgr.has_breakpoint("main.rs", 10));
+    }
+
+    #[test]
+    fn breakpoint_manager_files_and_summary() {
+        let mut mgr = BreakpointManager::new();
+        mgr.add("a.rs", 1);
+        mgr.add("a.rs", 5);
+        mgr.add("b.rs", 10);
+        let files = mgr.files();
+        assert!(files.contains(&"a.rs"));
+        assert!(files.contains(&"b.rs"));
+        let summary = mgr.summary();
+        assert_eq!(summary.len(), 2);
+    }
+
+    // -- WatchStore additional methods ---------------------------------------
+
+    #[test]
+    fn watch_store_has_errors() {
+        let mut store = WatchStore::new();
+        let id = store.add("x");
+        assert!(!store.has_errors());
+        store.get_mut(id).unwrap().set_error("undefined");
+        assert!(store.has_errors());
+        assert_eq!(store.errored_expressions().len(), 1);
+    }
+
+    #[test]
+    fn watch_store_get_and_clear() {
+        let mut store = WatchStore::new();
+        let id = store.add("y");
+        assert!(store.get(id).is_some());
+        assert!(store.get(999).is_none());
+        store.clear();
+        assert!(store.is_empty());
+    }
+
+    // -- DebugSessionState additional methods --------------------------------
+
+    #[test]
+    fn session_state_can_initialize() {
+        assert!(DebugSessionState::NotStarted.can_initialize());
+        assert!(!DebugSessionState::Running.can_initialize());
+        assert!(!DebugSessionState::Terminated.can_initialize());
+    }
+
+    #[test]
+    fn session_state_can_step() {
+        assert!(DebugSessionState::Paused.can_step());
+        assert!(!DebugSessionState::Running.can_step());
+        assert!(!DebugSessionState::NotStarted.can_step());
     }
 }

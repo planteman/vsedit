@@ -1111,6 +1111,244 @@ impl Default for EditorController {
 }
 
 // ---------------------------------------------------------------------------
+// EditorAction — utility methods
+// ---------------------------------------------------------------------------
+
+impl EditorAction {
+    /// Returns `true` if this action modifies the text buffer.
+    pub fn is_mutating(&self) -> bool {
+        matches!(
+            self,
+            EditorAction::InsertText(_)
+                | EditorAction::DeleteLeft
+                | EditorAction::DeleteRight
+                | EditorAction::DeleteWordLeft
+                | EditorAction::DeleteWordRight
+                | EditorAction::DeleteLine
+                | EditorAction::NewLine
+                | EditorAction::IndentLine
+                | EditorAction::OutdentLine
+                | EditorAction::MoveLineUp
+                | EditorAction::MoveLineDown
+                | EditorAction::ToggleLineComment
+                | EditorAction::InsertLineBelow
+                | EditorAction::InsertLineAbove
+                | EditorAction::Cut
+                | EditorAction::Paste(_)
+                | EditorAction::Replace(_, _)
+                | EditorAction::ReplaceAll(_, _)
+                | EditorAction::Undo
+                | EditorAction::Redo
+        )
+    }
+
+    /// Returns `true` if this action only moves the cursor without selecting.
+    pub fn is_cursor_movement(&self) -> bool {
+        matches!(
+            self,
+            EditorAction::MoveCursorLeft
+                | EditorAction::MoveCursorRight
+                | EditorAction::MoveCursorUp
+                | EditorAction::MoveCursorDown
+                | EditorAction::MoveCursorWordLeft
+                | EditorAction::MoveCursorWordRight
+                | EditorAction::MoveCursorLineStart
+                | EditorAction::MoveCursorLineEnd
+                | EditorAction::MoveCursorDocumentStart
+                | EditorAction::MoveCursorDocumentEnd
+                | EditorAction::PageUp(_)
+                | EditorAction::PageDown(_)
+                | EditorAction::GoToLine(_)
+                | EditorAction::JumpToMatchingBracket
+        )
+    }
+
+    /// Returns `true` if this action extends the selection.
+    pub fn is_selection(&self) -> bool {
+        matches!(
+            self,
+            EditorAction::SelectLeft
+                | EditorAction::SelectRight
+                | EditorAction::SelectUp
+                | EditorAction::SelectDown
+                | EditorAction::SelectAll
+                | EditorAction::SelectLine
+                | EditorAction::AddSelectionToNextFindMatch
+                | EditorAction::SelectAllOccurrences
+        )
+    }
+
+    /// Returns a short human-readable name for the action.
+    pub fn name(&self) -> &'static str {
+        match self {
+            EditorAction::MoveCursorLeft => "MoveCursorLeft",
+            EditorAction::MoveCursorRight => "MoveCursorRight",
+            EditorAction::MoveCursorUp => "MoveCursorUp",
+            EditorAction::MoveCursorDown => "MoveCursorDown",
+            EditorAction::MoveCursorWordLeft => "MoveCursorWordLeft",
+            EditorAction::MoveCursorWordRight => "MoveCursorWordRight",
+            EditorAction::MoveCursorLineStart => "MoveCursorLineStart",
+            EditorAction::MoveCursorLineEnd => "MoveCursorLineEnd",
+            EditorAction::MoveCursorDocumentStart => "MoveCursorDocumentStart",
+            EditorAction::MoveCursorDocumentEnd => "MoveCursorDocumentEnd",
+            EditorAction::SelectLeft => "SelectLeft",
+            EditorAction::SelectRight => "SelectRight",
+            EditorAction::SelectUp => "SelectUp",
+            EditorAction::SelectDown => "SelectDown",
+            EditorAction::SelectAll => "SelectAll",
+            EditorAction::InsertText(_) => "InsertText",
+            EditorAction::DeleteLeft => "DeleteLeft",
+            EditorAction::DeleteRight => "DeleteRight",
+            EditorAction::DeleteWordLeft => "DeleteWordLeft",
+            EditorAction::DeleteWordRight => "DeleteWordRight",
+            EditorAction::DeleteLine => "DeleteLine",
+            EditorAction::NewLine => "NewLine",
+            EditorAction::IndentLine => "IndentLine",
+            EditorAction::OutdentLine => "OutdentLine",
+            EditorAction::MoveLineUp => "MoveLineUp",
+            EditorAction::MoveLineDown => "MoveLineDown",
+            EditorAction::ToggleLineComment => "ToggleLineComment",
+            EditorAction::SelectLine => "SelectLine",
+            EditorAction::InsertLineBelow => "InsertLineBelow",
+            EditorAction::InsertLineAbove => "InsertLineAbove",
+            EditorAction::AddCursorAbove => "AddCursorAbove",
+            EditorAction::AddCursorBelow => "AddCursorBelow",
+            EditorAction::AddSelectionToNextFindMatch => "AddSelectionToNextFindMatch",
+            EditorAction::SelectAllOccurrences => "SelectAllOccurrences",
+            EditorAction::CursorUndo => "CursorUndo",
+            EditorAction::RemoveSecondaryCursors => "RemoveSecondaryCursors",
+            EditorAction::PageUp(_) => "PageUp",
+            EditorAction::PageDown(_) => "PageDown",
+            EditorAction::JumpToMatchingBracket => "JumpToMatchingBracket",
+            EditorAction::GoToLine(_) => "GoToLine",
+            EditorAction::Copy => "Copy",
+            EditorAction::Cut => "Cut",
+            EditorAction::Paste(_) => "Paste",
+            EditorAction::Find(_) => "Find",
+            EditorAction::FindNext => "FindNext",
+            EditorAction::FindPrevious => "FindPrevious",
+            EditorAction::Replace(_, _) => "Replace",
+            EditorAction::ReplaceAll(_, _) => "ReplaceAll",
+            EditorAction::Undo => "Undo",
+            EditorAction::Redo => "Redo",
+            EditorAction::ToggleAutoClose => "ToggleAutoClose",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorController — query / inspection helpers
+// ---------------------------------------------------------------------------
+
+impl EditorController {
+    /// Execute a sequence of actions in order.
+    pub fn execute_actions(&mut self, actions: &[EditorAction]) {
+        for action in actions {
+            self.execute_action(action.clone());
+        }
+    }
+
+    /// Return the full text content of the model.
+    pub fn text(&self) -> String {
+        self.model.get_value()
+    }
+
+    /// Return the number of lines in the document.
+    pub fn line_count(&self) -> u32 {
+        self.model.get_line_count()
+    }
+
+    /// Return the content of a specific line (1-based).
+    pub fn line_content(&self, line: u32) -> &str {
+        self.model.get_line_content(line)
+    }
+
+    /// Return the current primary cursor position.
+    pub fn cursor_position(&self) -> Position {
+        self.cursors.get_primary().position()
+    }
+
+    /// Return the current primary selection as a `Range`.
+    pub fn selection_range(&self) -> Range {
+        self.cursors.get_primary().selection.as_range()
+    }
+
+    /// Return the text currently selected by the primary cursor, or an empty
+    /// string if no selection exists.
+    pub fn selected_text(&self) -> String {
+        let range = self.selection_range();
+        if range.is_empty() {
+            String::new()
+        } else {
+            self.model.get_value_in_range(range)
+        }
+    }
+
+    /// Returns `true` when the primary cursor has a non-empty selection.
+    pub fn has_selection(&self) -> bool {
+        !self.selection_range().is_empty()
+    }
+
+    /// Returns `true` when there is more than one cursor active.
+    pub fn has_multiple_cursors(&self) -> bool {
+        self.cursors.has_multiple_cursors()
+    }
+
+    /// Return the number of active cursors.
+    pub fn cursor_count(&self) -> usize {
+        self.cursors.cursor_count()
+    }
+
+    /// Returns `true` when the document is empty.
+    pub fn is_empty(&self) -> bool {
+        self.model.is_empty()
+    }
+
+    /// Returns the number of words in the document.
+    pub fn word_count(&self) -> usize {
+        self.model.get_word_count()
+    }
+
+    /// Returns the number of characters in the document.
+    pub fn char_count(&self) -> usize {
+        self.model.get_char_count()
+    }
+
+    /// Returns true if the cursor is on the first line.
+    pub fn cursor_at_first_line(&self) -> bool {
+        self.cursor_position().line == 1
+    }
+
+    /// Returns true if the cursor is on the last line.
+    pub fn cursor_at_last_line(&self) -> bool {
+        self.cursor_position().line == self.line_count()
+    }
+
+    /// Returns true if the cursor is at the very start of the document.
+    pub fn cursor_at_document_start(&self) -> bool {
+        let pos = self.cursor_position();
+        pos.line == 1 && pos.column == 1
+    }
+
+    /// Returns true if the cursor is at the very end of the document.
+    pub fn cursor_at_document_end(&self) -> bool {
+        let pos = self.cursor_position();
+        let last_line = self.line_count();
+        pos.line == last_line && pos.column == self.model.get_line_max_column(last_line)
+    }
+
+    /// Returns the content of the line the primary cursor is on.
+    pub fn current_line_content(&self) -> &str {
+        self.model.get_line_content(self.cursor_position().line)
+    }
+
+    /// Returns the length of the line the primary cursor is on.
+    pub fn current_line_length(&self) -> u32 {
+        self.model.get_line_length(self.cursor_position().line)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -1703,5 +1941,221 @@ mod tests {
         c.cursors.set_state(0, CursorState::from_position(Position::new(1, 3)));
         c.execute_action(EditorAction::DeleteLeft);
         assert_eq!(c.model.get_value(), "ac");
+    }
+
+    // -----------------------------------------------------------------------
+    // EditorAction predicate / utility tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn action_is_mutating_insert() {
+        assert!(EditorAction::InsertText("x".into()).is_mutating());
+        assert!(EditorAction::DeleteLeft.is_mutating());
+        assert!(EditorAction::NewLine.is_mutating());
+        assert!(EditorAction::Cut.is_mutating());
+        assert!(EditorAction::Paste("t".into()).is_mutating());
+        assert!(EditorAction::Replace("a".into(), "b".into()).is_mutating());
+        assert!(EditorAction::Undo.is_mutating());
+        assert!(EditorAction::Redo.is_mutating());
+    }
+
+    #[test]
+    fn action_is_not_mutating_movement() {
+        assert!(!EditorAction::MoveCursorLeft.is_mutating());
+        assert!(!EditorAction::MoveCursorRight.is_mutating());
+        assert!(!EditorAction::SelectAll.is_mutating());
+        assert!(!EditorAction::Copy.is_mutating());
+        assert!(!EditorAction::Find("x".into()).is_mutating());
+        assert!(!EditorAction::GoToLine(1).is_mutating());
+    }
+
+    #[test]
+    fn action_is_cursor_movement() {
+        assert!(EditorAction::MoveCursorLeft.is_cursor_movement());
+        assert!(EditorAction::MoveCursorDocumentEnd.is_cursor_movement());
+        assert!(EditorAction::PageUp(10).is_cursor_movement());
+        assert!(EditorAction::GoToLine(5).is_cursor_movement());
+        assert!(EditorAction::JumpToMatchingBracket.is_cursor_movement());
+        assert!(!EditorAction::SelectAll.is_cursor_movement());
+        assert!(!EditorAction::InsertText("a".into()).is_cursor_movement());
+    }
+
+    #[test]
+    fn action_is_selection() {
+        assert!(EditorAction::SelectLeft.is_selection());
+        assert!(EditorAction::SelectRight.is_selection());
+        assert!(EditorAction::SelectUp.is_selection());
+        assert!(EditorAction::SelectDown.is_selection());
+        assert!(EditorAction::SelectAll.is_selection());
+        assert!(EditorAction::SelectLine.is_selection());
+        assert!(!EditorAction::MoveCursorLeft.is_selection());
+        assert!(!EditorAction::InsertText("a".into()).is_selection());
+    }
+
+    #[test]
+    fn action_name_returns_string() {
+        assert_eq!(EditorAction::MoveCursorLeft.name(), "MoveCursorLeft");
+        assert_eq!(EditorAction::InsertText("x".into()).name(), "InsertText");
+        assert_eq!(EditorAction::DeleteLine.name(), "DeleteLine");
+        assert_eq!(EditorAction::Paste("p".into()).name(), "Paste");
+        assert_eq!(EditorAction::Undo.name(), "Undo");
+        assert_eq!(EditorAction::ToggleAutoClose.name(), "ToggleAutoClose");
+    }
+
+    #[test]
+    fn action_categories_are_mutually_exclusive() {
+        // Movement actions should not be selections or mutations
+        let movements = [
+            EditorAction::MoveCursorLeft,
+            EditorAction::MoveCursorRight,
+            EditorAction::MoveCursorUp,
+            EditorAction::MoveCursorDown,
+        ];
+        for a in &movements {
+            assert!(a.is_cursor_movement());
+            assert!(!a.is_selection());
+            assert!(!a.is_mutating());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // EditorController query / inspection tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn controller_text_returns_content() {
+        let c = ctrl("hello world");
+        assert_eq!(c.text(), "hello world");
+    }
+
+    #[test]
+    fn controller_line_count() {
+        let c = ctrl("a\nb\nc");
+        assert_eq!(c.line_count(), 3);
+    }
+
+    #[test]
+    fn controller_line_content() {
+        let c = ctrl("alpha\nbeta\ngamma");
+        assert_eq!(c.line_content(1), "alpha");
+        assert_eq!(c.line_content(2), "beta");
+        assert_eq!(c.line_content(3), "gamma");
+    }
+
+    #[test]
+    fn controller_cursor_position_after_new() {
+        let c = ctrl("hello");
+        assert_eq!(c.cursor_position(), Position::new(1, 1));
+    }
+
+    #[test]
+    fn controller_selected_text_empty_when_no_selection() {
+        let c = ctrl("hello");
+        assert_eq!(c.selected_text(), "");
+        assert!(!c.has_selection());
+    }
+
+    #[test]
+    fn controller_selected_text_with_selection() {
+        let mut c = ctrl("hello world");
+        c.cursors.set_state(
+            0,
+            CursorState {
+                selection: Selection::from_positions(
+                    Position::new(1, 1),
+                    Position::new(1, 6),
+                ),
+            },
+        );
+        assert_eq!(c.selected_text(), "hello");
+        assert!(c.has_selection());
+    }
+
+    #[test]
+    fn controller_is_empty() {
+        assert!(ctrl("").is_empty());
+        assert!(!ctrl("x").is_empty());
+    }
+
+    #[test]
+    fn controller_word_count() {
+        let c = ctrl("hello beautiful world");
+        assert_eq!(c.word_count(), 3);
+    }
+
+    #[test]
+    fn controller_char_count() {
+        let c = ctrl("abc");
+        assert_eq!(c.char_count(), 3);
+    }
+
+    #[test]
+    fn controller_cursor_at_document_start() {
+        let c = ctrl("hello");
+        assert!(c.cursor_at_document_start());
+        assert!(c.cursor_at_first_line());
+    }
+
+    #[test]
+    fn controller_cursor_at_document_end() {
+        let mut c = ctrl("hello");
+        c.execute_action(EditorAction::MoveCursorDocumentEnd);
+        assert!(c.cursor_at_document_end());
+        assert!(c.cursor_at_last_line());
+    }
+
+    #[test]
+    fn controller_cursor_at_first_last_line_multiline() {
+        let mut c = ctrl("a\nb\nc");
+        assert!(c.cursor_at_first_line());
+        assert!(!c.cursor_at_last_line());
+        c.execute_action(EditorAction::GoToLine(3));
+        assert!(!c.cursor_at_first_line());
+        assert!(c.cursor_at_last_line());
+    }
+
+    #[test]
+    fn controller_current_line_content() {
+        let mut c = ctrl("hello\nworld");
+        assert_eq!(c.current_line_content(), "hello");
+        c.execute_action(EditorAction::MoveCursorDown);
+        assert_eq!(c.current_line_content(), "world");
+    }
+
+    #[test]
+    fn controller_current_line_length() {
+        let c = ctrl("hello");
+        assert_eq!(c.current_line_length(), 5);
+    }
+
+    #[test]
+    fn controller_has_multiple_cursors() {
+        let mut c = ctrl("hello\nworld");
+        assert!(!c.has_multiple_cursors());
+        assert_eq!(c.cursor_count(), 1);
+        c.cursors.add_cursor(Position::new(2, 1));
+        assert!(c.has_multiple_cursors());
+        assert_eq!(c.cursor_count(), 2);
+    }
+
+    #[test]
+    fn controller_execute_actions_batch() {
+        let mut c = ctrl("");
+        c.execute_actions(&[
+            EditorAction::InsertText("hello".into()),
+            EditorAction::NewLine,
+            EditorAction::InsertText("world".into()),
+        ]);
+        assert_eq!(c.text(), "hello\nworld");
+        assert_eq!(c.line_count(), 2);
+    }
+
+    #[test]
+    fn controller_selection_range_after_select_all() {
+        let mut c = ctrl("ab\ncd");
+        c.execute_action(EditorAction::SelectAll);
+        let range = c.selection_range();
+        assert_eq!(range.start, Position::new(1, 1));
+        assert_eq!(range.end, Position::new(2, 3));
     }
 }

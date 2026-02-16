@@ -1011,6 +1011,83 @@ impl StateService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// StateService — query and bulk operations
+// ---------------------------------------------------------------------------
+
+impl StateService {
+    /// Return all entries whose value contains the given substring.
+    pub fn search_values(&self, query: &str) -> Vec<(&str, &str)> {
+        self.state
+            .values()
+            .filter(|s| s.value.contains(query))
+            .map(|s| (s.key.as_str(), s.value.as_str()))
+            .collect()
+    }
+
+    /// Return the total byte size of all stored values.
+    pub fn total_value_bytes(&self) -> usize {
+        self.state.values().map(|s| s.value.len()).sum()
+    }
+
+    /// Return all keys sorted alphabetically.
+    pub fn sorted_keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.state.keys().map(|k| k.as_str()).collect();
+        keys.sort_unstable();
+        keys
+    }
+
+    /// Retain only entries matching a predicate on (key, value).
+    pub fn retain<F: Fn(&str, &str) -> bool>(&mut self, f: F) -> usize {
+        let before = self.state.len();
+        self.state.retain(|k, v| f(k, &v.value));
+        before - self.state.len()
+    }
+
+    /// Copy all entries from one scope to another, overwriting on key collision.
+    pub fn copy_scope(&mut self, from: StateScope, to: StateScope) -> usize {
+        let entries: Vec<(String, String)> = self.state
+            .values()
+            .filter(|s| s.scope == from)
+            .map(|s| (s.key.clone(), s.value.clone()))
+            .collect();
+        let count = entries.len();
+        for (key, value) in entries {
+            self.set(key, value, to);
+        }
+        count
+    }
+}
+
+/// Export all entries of a `StateService` as a sorted key=value string.
+pub fn export_state(svc: &StateService) -> String {
+    let mut entries: Vec<(&str, &str)> = svc.state
+        .values()
+        .map(|s| (s.key.as_str(), s.value.as_str()))
+        .collect();
+    entries.sort_by_key(|(k, _)| *k);
+    entries.iter()
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Import state entries from a key=value string (one per line).
+pub fn import_state(svc: &mut StateService, text: &str, scope: StateScope) -> usize {
+    let mut count = 0;
+    for line in text.lines() {
+        if let Some(eq_pos) = line.find('=') {
+            let key = &line[..eq_pos];
+            let value = &line[eq_pos + 1..];
+            if !key.trim().is_empty() {
+                svc.set(key, value, scope);
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1676,5 +1753,74 @@ mod tests {
         assert_eq!(format!("{}", d2), "- k = v");
         let d3 = StateDiff::Changed { key: "k".into(), old_value: "a".into(), new_value: "b".into() };
         assert_eq!(format!("{}", d3), "~ k : a -> b");
+    }
+
+    // -- New tests ----------------------------------------------------------
+
+    #[test]
+    fn search_values_finds_matches() {
+        let mut svc = StateService::new();
+        svc.set("theme", "dark-mode", StateScope::Global);
+        svc.set("font", "monospace", StateScope::Global);
+        svc.set("editor.mode", "dark", StateScope::Workspace);
+
+        let results = svc.search_values("dark");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn total_value_bytes_sums_correctly() {
+        let mut svc = StateService::new();
+        svc.set("a", "hello", StateScope::Global);     // 5 bytes
+        svc.set("b", "world!!", StateScope::Global);    // 7 bytes
+        assert_eq!(svc.total_value_bytes(), 12);
+    }
+
+    #[test]
+    fn sorted_keys_returns_alphabetical() {
+        let mut svc = StateService::new();
+        svc.set("z", "1", StateScope::Global);
+        svc.set("a", "2", StateScope::Global);
+        svc.set("m", "3", StateScope::Global);
+        assert_eq!(svc.sorted_keys(), vec!["a", "m", "z"]);
+    }
+
+    #[test]
+    fn retain_removes_non_matching() {
+        let mut svc = StateService::new();
+        svc.set("keep.a", "1", StateScope::Global);
+        svc.set("keep.b", "2", StateScope::Global);
+        svc.set("remove.c", "3", StateScope::Global);
+        let removed = svc.retain(|k, _| k.starts_with("keep"));
+        assert_eq!(removed, 1);
+        assert_eq!(svc.key_count(), 2);
+    }
+
+    #[test]
+    fn copy_scope_copies_entries() {
+        let mut svc = StateService::new();
+        svc.set("a", "1", StateScope::Global);
+        svc.set("b", "2", StateScope::Global);
+        svc.set("c", "3", StateScope::Workspace);
+        let copied = svc.copy_scope(StateScope::Global, StateScope::Window);
+        assert_eq!(copied, 2);
+        assert_eq!(svc.get_scope("a"), Some(StateScope::Window));
+    }
+
+    #[test]
+    fn export_import_round_trip() {
+        let mut svc = StateService::new();
+        svc.set("alpha", "one", StateScope::Global);
+        svc.set("beta", "two", StateScope::Global);
+        let exported = export_state(&svc);
+        assert!(exported.contains("alpha=one"));
+        assert!(exported.contains("beta=two"));
+
+        let mut svc2 = StateService::new();
+        let imported = import_state(&mut svc2, &exported, StateScope::Workspace);
+        assert_eq!(imported, 2);
+        assert_eq!(svc2.get("alpha"), Some("one"));
+        assert_eq!(svc2.get("beta"), Some("two"));
+        assert_eq!(svc2.get_scope("alpha"), Some(StateScope::Workspace));
     }
 }

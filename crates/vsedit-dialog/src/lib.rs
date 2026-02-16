@@ -1170,6 +1170,81 @@ pub fn history_kind_counts(history: &DialogHistory) -> HashMap<String, usize> {
 
 use std::collections::HashMap;
 
+// ---------------------------------------------------------------------------
+// DialogOptions helpers
+// ---------------------------------------------------------------------------
+
+/// Return `true` if the dialog has at least one primary button.
+pub fn has_primary_button(options: &DialogOptions) -> bool {
+    options.buttons.iter().any(|b| b.is_primary)
+}
+
+/// Return the number of buttons in a dialog.
+pub fn dialog_button_count(options: &DialogOptions) -> usize {
+    options.buttons.len()
+}
+
+/// Return `true` if this is a destructive dialog (Warning or Error kind).
+pub fn is_destructive_dialog(options: &DialogOptions) -> bool {
+    matches!(options.kind, DialogKind::Warning | DialogKind::Error)
+}
+
+/// Collect all button return values from dialog options.
+pub fn dialog_return_values(options: &DialogOptions) -> Vec<&str> {
+    options.buttons.iter().map(|b| b.returns_value.as_str()).collect()
+}
+
+/// Create a simple dialog with a single "OK" button.
+pub fn simple_ok_dialog(title: impl Into<String>, message: impl Into<String>) -> DialogOptions {
+    DialogOptions {
+        title: title.into(),
+        message: message.into(),
+        kind: DialogKind::Info,
+        buttons: vec![DialogButton::primary("OK", "ok")],
+        detail: None,
+    }
+}
+
+/// Create a save/discard/cancel dialog for unsaved changes.
+pub fn save_discard_cancel(title: impl Into<String>, message: impl Into<String>) -> DialogOptions {
+    DialogOptions {
+        title: title.into(),
+        message: message.into(),
+        kind: DialogKind::Confirm,
+        buttons: vec![
+            DialogButton::primary("Save", "save"),
+            DialogButton::new("Don't Save", "discard"),
+            DialogButton::new("Cancel", "cancel"),
+        ],
+        detail: None,
+    }
+}
+
+/// Return `true` if the dialog result indicates the user chose "ok".
+pub fn is_ok_result(result: &DialogResult) -> bool {
+    result.is_value("ok")
+}
+
+/// Return `true` if the dialog result indicates the user chose "cancel".
+pub fn is_cancel_result(result: &DialogResult) -> bool {
+    result.cancelled || result.is_value("cancel")
+}
+
+/// Count the total number of dialogs that were cancelled in a history.
+pub fn cancelled_dialog_count(history: &DialogHistory) -> usize {
+    history.entries().iter().filter(|e| e.result.cancelled).count()
+}
+
+/// Return the most recent dialog entry from a history, if any.
+pub fn most_recent_dialog(history: &DialogHistory) -> Option<&DialogHistoryEntry> {
+    history.entries().last()
+}
+
+/// Filter dialog history to only entries of a given kind.
+pub fn history_filter_by_kind(history: &DialogHistory, kind: DialogKind) -> Vec<&DialogHistoryEntry> {
+    history.entries().iter().filter(|e| e.kind == kind).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1774,5 +1849,116 @@ mod tests {
         let counts = history_kind_counts(&history);
         assert_eq!(counts.get("Info"), Some(&2));
         assert_eq!(counts.get("Error"), Some(&1));
+    }
+
+    #[test]
+    fn has_primary_button_true() {
+        let opts = DialogOptions::ok_cancel("Title", "Msg");
+        assert!(has_primary_button(&opts));
+    }
+
+    #[test]
+    fn has_primary_button_false() {
+        let opts = DialogOptions {
+            title: "T".into(),
+            message: "M".into(),
+            kind: DialogKind::Info,
+            buttons: vec![DialogButton::new("A", "a")],
+            detail: None,
+        };
+        assert!(!has_primary_button(&opts));
+    }
+
+    #[test]
+    fn dialog_button_count_works() {
+        let opts = DialogOptions::yes_no_cancel("T", "M");
+        assert_eq!(dialog_button_count(&opts), 3);
+    }
+
+    #[test]
+    fn is_destructive_dialog_checks_kind() {
+        let warn = DialogOptions {
+            title: "T".into(),
+            message: "M".into(),
+            kind: DialogKind::Warning,
+            buttons: vec![],
+            detail: None,
+        };
+        assert!(is_destructive_dialog(&warn));
+        let info = DialogOptions {
+            title: "T".into(),
+            message: "M".into(),
+            kind: DialogKind::Info,
+            buttons: vec![],
+            detail: None,
+        };
+        assert!(!is_destructive_dialog(&info));
+    }
+
+    #[test]
+    fn dialog_return_values_collected() {
+        let opts = DialogOptions::ok_cancel("T", "M");
+        let vals = dialog_return_values(&opts);
+        assert!(vals.contains(&"ok"));
+        assert!(vals.contains(&"cancel"));
+    }
+
+    #[test]
+    fn simple_ok_dialog_has_one_button() {
+        let opts = simple_ok_dialog("Hello", "World");
+        assert_eq!(opts.buttons.len(), 1);
+        assert!(opts.buttons[0].is_primary);
+        assert_eq!(opts.buttons[0].returns_value, "ok");
+    }
+
+    #[test]
+    fn save_discard_cancel_three_buttons() {
+        let opts = save_discard_cancel("Save?", "Unsaved changes");
+        assert_eq!(opts.buttons.len(), 3);
+        assert_eq!(opts.buttons[0].returns_value, "save");
+        assert_eq!(opts.buttons[1].returns_value, "discard");
+        assert_eq!(opts.buttons[2].returns_value, "cancel");
+    }
+
+    #[test]
+    fn is_ok_result_checks() {
+        assert!(is_ok_result(&DialogResult::selected("ok")));
+        assert!(!is_ok_result(&DialogResult::selected("cancel")));
+        assert!(!is_ok_result(&DialogResult::cancelled()));
+    }
+
+    #[test]
+    fn is_cancel_result_checks() {
+        assert!(is_cancel_result(&DialogResult::cancelled()));
+        assert!(is_cancel_result(&DialogResult::selected("cancel")));
+        assert!(!is_cancel_result(&DialogResult::selected("ok")));
+    }
+
+    #[test]
+    fn cancelled_dialog_count_works() {
+        let mut h = DialogHistory::new();
+        h.record("a", DialogKind::Info, DialogResult::cancelled());
+        h.record("b", DialogKind::Info, DialogResult::selected("ok"));
+        h.record("c", DialogKind::Error, DialogResult::cancelled());
+        assert_eq!(cancelled_dialog_count(&h), 2);
+    }
+
+    #[test]
+    fn most_recent_dialog_returns_last() {
+        let mut h = DialogHistory::new();
+        h.record("first", DialogKind::Info, DialogResult::cancelled());
+        h.record("second", DialogKind::Error, DialogResult::selected("ok"));
+        let recent = most_recent_dialog(&h).unwrap();
+        assert_eq!(recent.dialog_id, "second");
+    }
+
+    #[test]
+    fn history_filter_by_kind_filters() {
+        let mut h = DialogHistory::new();
+        h.record("a", DialogKind::Info, DialogResult::cancelled());
+        h.record("b", DialogKind::Error, DialogResult::cancelled());
+        h.record("c", DialogKind::Info, DialogResult::selected("ok"));
+        let infos = history_filter_by_kind(&h, DialogKind::Info);
+        assert_eq!(infos.len(), 2);
     }
 }

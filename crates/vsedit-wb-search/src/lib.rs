@@ -1030,6 +1030,138 @@ impl fmt::Display for SearchFilter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SearchMatch utilities
+// ---------------------------------------------------------------------------
+
+impl SearchMatch {
+    /// Create a new search match.
+    pub fn new(uri: impl Into<String>, line: u32, column: u32, length: u32, preview: impl Into<String>) -> Self {
+        Self {
+            uri: uri.into(),
+            line,
+            column,
+            length,
+            preview: preview.into(),
+        }
+    }
+
+    /// Returns the end column (column + length).
+    pub fn end_column(&self) -> u32 {
+        self.column + self.length
+    }
+
+    /// Returns true if this match overlaps with another on the same line.
+    pub fn overlaps(&self, other: &SearchMatch) -> bool {
+        self.uri == other.uri
+            && self.line == other.line
+            && self.column < other.end_column()
+            && other.column < self.end_column()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchResult utilities
+// ---------------------------------------------------------------------------
+
+impl SearchResult {
+    /// Total number of matches.
+    pub fn match_count(&self) -> usize {
+        self.matches.len()
+    }
+
+    /// Return the set of unique file URIs that have matches.
+    pub fn unique_files(&self) -> Vec<String> {
+        let mut seen = Vec::new();
+        for m in &self.matches {
+            if !seen.contains(&m.uri) {
+                seen.push(m.uri.clone());
+            }
+        }
+        seen
+    }
+
+    /// Return only matches for a specific file URI.
+    pub fn matches_in_file(&self, uri: &str) -> Vec<&SearchMatch> {
+        self.matches.iter().filter(|m| m.uri == uri).collect()
+    }
+
+    /// Compute per-file match counts.
+    pub fn file_match_counts(&self) -> Vec<(String, usize)> {
+        let mut counts: Vec<(String, usize)> = Vec::new();
+        for m in &self.matches {
+            if let Some(entry) = counts.iter_mut().find(|(u, _)| *u == m.uri) {
+                entry.1 += 1;
+            } else {
+                counts.push((m.uri.clone(), 1));
+            }
+        }
+        counts
+    }
+}
+
+impl fmt::Display for SearchResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let files = self.unique_files().len();
+        write!(
+            f,
+            "{} matches in {} files{}",
+            self.matches.len(),
+            files,
+            if self.is_complete { "" } else { " (truncated)" }
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SymbolEntry utilities
+// ---------------------------------------------------------------------------
+
+impl SymbolEntry {
+    /// Create a new symbol entry.
+    pub fn new(name: impl Into<String>, kind: SymbolKind, line: u32, column: u32) -> Self {
+        Self {
+            name: name.into(),
+            kind,
+            line,
+            column,
+            container_name: None,
+        }
+    }
+
+    /// Set container name (builder pattern).
+    pub fn with_container(mut self, container: impl Into<String>) -> Self {
+        self.container_name = Some(container.into());
+        self
+    }
+
+    /// Returns a fully-qualified name: `container.name` or just `name`.
+    pub fn qualified_name(&self) -> String {
+        match &self.container_name {
+            Some(c) => format!("{}.{}", c, self.name),
+            None => self.name.clone(),
+        }
+    }
+}
+
+/// Filter symbols by kind.
+pub fn filter_symbols(symbols: &[SymbolEntry], kind: SymbolKind) -> Vec<&SymbolEntry> {
+    symbols.iter().filter(|s| s.kind == kind).collect()
+}
+
+/// Group symbols by kind.
+pub fn group_symbols_by_kind(symbols: &[SymbolEntry]) -> Vec<(SymbolKind, Vec<&SymbolEntry>)> {
+    let mut groups: Vec<(SymbolKind, Vec<&SymbolEntry>)> = Vec::new();
+    for sym in symbols {
+        if let Some(entry) = groups.iter_mut().find(|(k, _)| *k == sym.kind) {
+            entry.1.push(sym);
+        } else {
+            groups.push((sym.kind, vec![sym]));
+        }
+    }
+    groups
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1663,5 +1795,82 @@ mod submod;
         assert!(!filter.matches_path("target/debug/main.rs"));
         assert!(!filter.matches_path("src/main.py"));
         assert!(format!("{filter}").contains("include=1"));
+    }
+
+    #[test]
+    fn test_search_match_end_column_and_overlap() {
+        let a = SearchMatch::new("file.rs", 10, 5, 3, "foo");
+        assert_eq!(a.end_column(), 8);
+        let b = SearchMatch::new("file.rs", 10, 7, 4, "obar");
+        assert!(a.overlaps(&b));
+        let c = SearchMatch::new("file.rs", 10, 8, 2, "ba");
+        assert!(!a.overlaps(&c));
+        let d = SearchMatch::new("other.rs", 10, 5, 3, "foo");
+        assert!(!a.overlaps(&d));
+    }
+
+    #[test]
+    fn test_search_result_unique_files_and_counts() {
+        let result = SearchResult {
+            matches: vec![
+                SearchMatch::new("a.rs", 1, 0, 3, "foo"),
+                SearchMatch::new("a.rs", 5, 0, 3, "foo"),
+                SearchMatch::new("b.rs", 2, 0, 3, "foo"),
+            ],
+            is_complete: true,
+        };
+        assert_eq!(result.match_count(), 3);
+        assert_eq!(result.unique_files(), vec!["a.rs", "b.rs"]);
+        let counts = result.file_match_counts();
+        assert_eq!(counts.iter().find(|(u, _)| u == "a.rs").unwrap().1, 2);
+        assert_eq!(result.matches_in_file("b.rs").len(), 1);
+    }
+
+    #[test]
+    fn test_search_result_display() {
+        let result = SearchResult {
+            matches: vec![
+                SearchMatch::new("a.rs", 1, 0, 3, "foo"),
+            ],
+            is_complete: false,
+        };
+        let s = format!("{}", result);
+        assert!(s.contains("1 matches"));
+        assert!(s.contains("truncated"));
+    }
+
+    #[test]
+    fn test_symbol_entry_builder_and_qualified() {
+        let sym = SymbolEntry::new("process", SymbolKind::Function, 10, 4)
+            .with_container("MyStruct");
+        assert_eq!(sym.qualified_name(), "MyStruct.process");
+        let sym2 = SymbolEntry::new("main", SymbolKind::Function, 1, 0);
+        assert_eq!(sym2.qualified_name(), "main");
+    }
+
+    #[test]
+    fn test_filter_symbols_by_kind() {
+        let syms = vec![
+            SymbolEntry::new("foo", SymbolKind::Function, 1, 0),
+            SymbolEntry::new("Bar", SymbolKind::Struct, 5, 0),
+            SymbolEntry::new("baz", SymbolKind::Function, 10, 0),
+        ];
+        let fns = filter_symbols(&syms, SymbolKind::Function);
+        assert_eq!(fns.len(), 2);
+        let structs = filter_symbols(&syms, SymbolKind::Struct);
+        assert_eq!(structs.len(), 1);
+    }
+
+    #[test]
+    fn test_group_symbols_by_kind() {
+        let syms = vec![
+            SymbolEntry::new("a", SymbolKind::Function, 1, 0),
+            SymbolEntry::new("B", SymbolKind::Struct, 5, 0),
+            SymbolEntry::new("c", SymbolKind::Function, 10, 0),
+        ];
+        let groups = group_symbols_by_kind(&syms);
+        assert_eq!(groups.len(), 2);
+        let fn_group = groups.iter().find(|(k, _)| *k == SymbolKind::Function).unwrap();
+        assert_eq!(fn_group.1.len(), 2);
     }
 }

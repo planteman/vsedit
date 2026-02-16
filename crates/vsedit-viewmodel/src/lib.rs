@@ -2,7 +2,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use vsedit_editor_config::WordWrap;
-use vsedit_editor_types::{ITextModel, Position};
+use vsedit_editor_types::{ITextModel, Position, Range};
 use vsedit_text_model::TextModel;
 
 /// A single display line after word wrapping.
@@ -936,6 +936,253 @@ impl<'a> Iterator for ViewLineIterator<'a> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ViewLine – content analysis helpers
+// ---------------------------------------------------------------------------
+
+impl ViewLine {
+    /// Return the leading whitespace count (spaces and tabs).
+    pub fn leading_whitespace(&self) -> u32 {
+        self.content
+            .bytes()
+            .take_while(|&b| b == b' ' || b == b'\t')
+            .count() as u32
+    }
+
+    /// Return the trimmed (leading + trailing whitespace removed) content.
+    pub fn trimmed_content(&self) -> &str {
+        self.content.trim()
+    }
+
+    /// Return `true` if the view line consists entirely of whitespace.
+    pub fn is_whitespace_only(&self) -> bool {
+        self.content.bytes().all(|b| b == b' ' || b == b'\t')
+    }
+
+    /// Return the model range covered by this view line as a `Range`.
+    pub fn model_range(&self) -> Range {
+        Range::new(
+            self.model_line,
+            self.model_start_column,
+            self.model_line,
+            self.model_end_column(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewLineRange – iteration helpers
+// ---------------------------------------------------------------------------
+
+impl ViewLineRange {
+    /// Iterate over all 1-based line indices in the range.
+    pub fn iter(&self) -> impl Iterator<Item = u32> {
+        let start = self.start;
+        let end = if self.is_empty() {
+            self.start // produce empty iterator
+        } else {
+            self.end + 1
+        };
+        start..end
+    }
+
+    /// Clamp the range to `[1, max_line]`.
+    pub fn clamp(&self, max_line: u32) -> ViewLineRange {
+        if self.is_empty() || max_line == 0 {
+            return ViewLineRange::new(1, 0); // empty
+        }
+        ViewLineRange::new(self.start.max(1).min(max_line), self.end.min(max_line))
+    }
+
+    /// Expand the range by `amount` lines on each side, staying within `[1, max_line]`.
+    pub fn expand(&self, amount: u32, max_line: u32) -> ViewLineRange {
+        if self.is_empty() {
+            return self.clone();
+        }
+        let new_start = self.start.saturating_sub(amount).max(1);
+        let new_end = self.end.saturating_add(amount).min(max_line);
+        ViewLineRange::new(new_start, new_end)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewModel – content search & range queries
+// ---------------------------------------------------------------------------
+
+impl ViewModel {
+    /// Return the model `Range` that a given 1-based view line covers.
+    pub fn view_line_model_range(&self, view_line: u32) -> Range {
+        self.get_view_line(view_line).model_range()
+    }
+
+    /// Collect all view lines whose content contains `needle` (case-sensitive).
+    /// Returns 1-based view line indices.
+    pub fn find_lines_containing(&self, needle: &str) -> Vec<u32> {
+        if needle.is_empty() {
+            return Vec::new();
+        }
+        (1..=self.get_view_line_count())
+            .filter(|&i| self.get_view_line_content(i).contains(needle))
+            .collect()
+    }
+
+    /// Collect all view lines whose trimmed content matches `text` exactly.
+    /// Returns 1-based view line indices.
+    pub fn find_exact_trimmed(&self, text: &str) -> Vec<u32> {
+        (1..=self.get_view_line_count())
+            .filter(|&i| self.get_view_line(i).trimmed_content() == text)
+            .collect()
+    }
+
+    /// Return all view lines that are blank (empty or whitespace-only).
+    /// Returns 1-based view line indices.
+    pub fn blank_lines(&self) -> Vec<u32> {
+        (1..=self.get_view_line_count())
+            .filter(|&i| {
+                let vl = self.get_view_line(i);
+                vl.is_empty() || vl.is_whitespace_only()
+            })
+            .collect()
+    }
+
+    /// Compute the indentation level (leading whitespace chars) for each view line.
+    /// Returns a `Vec` indexed by 0-based view line index.
+    pub fn indentation_map(&self) -> Vec<u32> {
+        (1..=self.get_view_line_count())
+            .map(|i| self.get_view_line(i).leading_whitespace())
+            .collect()
+    }
+
+    /// Return the maximum column used across all view lines (the "virtual width").
+    pub fn max_column(&self) -> u32 {
+        self.view_lines
+            .iter()
+            .map(|vl| vl.content.len() as u32)
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// Return the total character count across all view lines.
+    pub fn total_character_count(&self) -> usize {
+        self.view_lines.iter().map(|vl| vl.content.len()).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewportState – cursor movement helpers
+// ---------------------------------------------------------------------------
+
+impl ViewportState {
+    /// Move cursor up by `n` lines, scrolling if needed. Returns the new cursor line.
+    pub fn move_cursor_up(&mut self, n: u32, total_view_lines: u32) -> u32 {
+        self.cursor_view_line = self.cursor_view_line.saturating_sub(n).max(1);
+        self.ensure_visible(total_view_lines);
+        self.cursor_view_line
+    }
+
+    /// Move cursor down by `n` lines, scrolling if needed. Returns the new cursor line.
+    pub fn move_cursor_down(&mut self, n: u32, total_view_lines: u32) -> u32 {
+        self.cursor_view_line = self
+            .cursor_view_line
+            .saturating_add(n)
+            .min(total_view_lines);
+        self.ensure_visible(total_view_lines);
+        self.cursor_view_line
+    }
+
+    /// Page down: move cursor by viewport height and scroll accordingly.
+    pub fn page_down(&mut self, total_view_lines: u32) {
+        self.move_cursor_down(self.viewport_height, total_view_lines);
+    }
+
+    /// Page up: move cursor by viewport height and scroll accordingly.
+    pub fn page_up(&mut self, total_view_lines: u32) {
+        self.move_cursor_up(self.viewport_height, total_view_lines);
+    }
+
+    /// Move cursor to the very first line.
+    pub fn go_to_top(&mut self, total_view_lines: u32) {
+        self.cursor_view_line = 1;
+        self.ensure_visible(total_view_lines);
+    }
+
+    /// Move cursor to the very last line.
+    pub fn go_to_bottom(&mut self, total_view_lines: u32) {
+        self.cursor_view_line = total_view_lines.max(1);
+        self.ensure_visible(total_view_lines);
+    }
+
+    /// Return the 0-based "progress" through the document as a fraction `[0.0, 1.0]`.
+    pub fn scroll_fraction(&self, total_view_lines: u32) -> f64 {
+        if total_view_lines <= self.viewport_height {
+            return 0.0;
+        }
+        let max_scroll = total_view_lines - self.viewport_height;
+        (self.scroll_position - 1) as f64 / max_scroll as f64
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Viewport – range & position helpers
+// ---------------------------------------------------------------------------
+
+impl Viewport {
+    /// Clamp this viewport so it does not exceed `total_view_lines`.
+    pub fn clamp(&self, total_view_lines: u32) -> Viewport {
+        let first = self.first_view_line.max(1).min(total_view_lines.max(1));
+        let max_count = total_view_lines.saturating_sub(first - 1);
+        Viewport::new(first, self.visible_line_count.min(max_count))
+    }
+
+    /// Return the midpoint view line of this viewport.
+    pub fn center_line(&self) -> u32 {
+        self.first_view_line + self.visible_line_count / 2
+    }
+
+    /// Convert this viewport to a `ViewLineRange`.
+    pub fn to_range(&self) -> ViewLineRange {
+        ViewLineRange::new(self.first_view_line, self.last_view_line())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LineHeightTracker – reset & resize
+// ---------------------------------------------------------------------------
+
+impl LineHeightTracker {
+    /// Reset all custom heights back to the default.
+    pub fn reset(&mut self) {
+        self.heights.clear();
+    }
+
+    /// Return the default line height.
+    pub fn default_height(&self) -> u32 {
+        self.default_height
+    }
+
+    /// Number of lines that have explicit height entries.
+    pub fn explicit_count(&self) -> usize {
+        self.heights.len()
+    }
+
+    /// Find the line index with the maximum height (0-based). Returns `None` if empty.
+    pub fn tallest_line(&self, line_count: usize) -> Option<usize> {
+        if line_count == 0 {
+            return None;
+        }
+        let mut max_h = 0u32;
+        let mut max_idx = 0usize;
+        for i in 0..line_count {
+            let h = self.get_height(i);
+            if h >= max_h {
+                max_h = h;
+                max_idx = i;
+            }
+        }
+        Some(max_idx)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1731,5 +1978,274 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].1.content, "bbb");
         assert_eq!(items[1].1.content, "ccc");
+    }
+
+    // ---- ViewLine content analysis tests ----
+
+    #[test]
+    fn view_line_leading_whitespace() {
+        let vl = ViewLine {
+            content: "   hello".to_string(),
+            model_line: 1,
+            model_start_column: 1,
+            is_wrapped: false,
+        };
+        assert_eq!(vl.leading_whitespace(), 3);
+
+        let vl2 = ViewLine {
+            content: "hello".to_string(),
+            model_line: 1,
+            model_start_column: 1,
+            is_wrapped: false,
+        };
+        assert_eq!(vl2.leading_whitespace(), 0);
+    }
+
+    #[test]
+    fn view_line_trimmed_content() {
+        let vl = ViewLine {
+            content: "  hello  ".to_string(),
+            model_line: 1,
+            model_start_column: 1,
+            is_wrapped: false,
+        };
+        assert_eq!(vl.trimmed_content(), "hello");
+    }
+
+    #[test]
+    fn view_line_is_whitespace_only() {
+        let blank = ViewLine {
+            content: "   \t  ".to_string(),
+            model_line: 1,
+            model_start_column: 1,
+            is_wrapped: false,
+        };
+        assert!(blank.is_whitespace_only());
+
+        let not_blank = ViewLine {
+            content: "  x  ".to_string(),
+            model_line: 1,
+            model_start_column: 1,
+            is_wrapped: false,
+        };
+        assert!(!not_blank.is_whitespace_only());
+    }
+
+    #[test]
+    fn view_line_model_range_check() {
+        let vl = ViewLine {
+            content: "hello".to_string(),
+            model_line: 3,
+            model_start_column: 5,
+            is_wrapped: true,
+        };
+        let r = vl.model_range();
+        assert_eq!(r.start.line, 3);
+        assert_eq!(r.start.column, 5);
+        assert_eq!(r.end.line, 3);
+        assert_eq!(r.end.column, 10); // 5 + 5
+    }
+
+    // ---- ViewLineRange iteration & clamping tests ----
+
+    #[test]
+    fn view_line_range_iter() {
+        let r = ViewLineRange::new(3, 6);
+        let items: Vec<u32> = r.iter().collect();
+        assert_eq!(items, vec![3, 4, 5, 6]);
+
+        let empty = ViewLineRange::new(5, 3);
+        let items2: Vec<u32> = empty.iter().collect();
+        assert!(items2.is_empty());
+    }
+
+    #[test]
+    fn view_line_range_clamp_and_expand() {
+        let r = ViewLineRange::new(1, 100);
+        let clamped = r.clamp(50);
+        assert_eq!(clamped.start, 1);
+        assert_eq!(clamped.end, 50);
+
+        let r2 = ViewLineRange::new(5, 10);
+        let expanded = r2.expand(3, 20);
+        assert_eq!(expanded.start, 2);
+        assert_eq!(expanded.end, 13);
+
+        // Expanding at boundaries
+        let r3 = ViewLineRange::new(1, 5);
+        let expanded2 = r3.expand(5, 8);
+        assert_eq!(expanded2.start, 1);
+        assert_eq!(expanded2.end, 8);
+    }
+
+    // ---- ViewModel content query tests ----
+
+    #[test]
+    fn vm_find_lines_containing() {
+        let model = make_model("hello world\nfoo bar\nhello again");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let found = vm.find_lines_containing("hello");
+        assert_eq!(found, vec![1, 3]);
+        assert!(vm.find_lines_containing("").is_empty());
+        assert!(vm.find_lines_containing("zzz").is_empty());
+    }
+
+    #[test]
+    fn vm_find_exact_trimmed() {
+        let model = make_model("  foo  \nbar\n  foo  ");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let found = vm.find_exact_trimmed("foo");
+        assert_eq!(found, vec![1, 3]);
+    }
+
+    #[test]
+    fn vm_blank_lines() {
+        let model = make_model("hello\n   \nworld\n\t\t");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let blanks = vm.blank_lines();
+        assert_eq!(blanks, vec![2, 4]);
+    }
+
+    #[test]
+    fn vm_indentation_map() {
+        let model = make_model("hello\n  world\n    foo");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let indent = vm.indentation_map();
+        assert_eq!(indent, vec![0, 2, 4]);
+    }
+
+    #[test]
+    fn vm_max_column_and_total_chars() {
+        let model = make_model("short\na longer line\nhi");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        assert_eq!(vm.max_column(), 13); // "a longer line"
+        assert_eq!(vm.total_character_count(), 5 + 13 + 2);
+    }
+
+    #[test]
+    fn vm_view_line_model_range() {
+        let model = make_model("hello world");
+        let vm = ViewModel::new(model, 6, WordWrap::On);
+        let r = vm.view_line_model_range(2);
+        assert_eq!(r.start.line, 1);
+        assert_eq!(r.start.column, 7);
+        assert_eq!(r.end.line, 1);
+        assert_eq!(r.end.column, 12); // "world" = 5 chars, 7+5=12
+    }
+
+    // ---- ViewportState cursor movement tests ----
+
+    #[test]
+    fn viewport_state_move_cursor_up_down() {
+        let mut state = ViewportState::new(5);
+        state.cursor_view_line = 10;
+        state.scroll_to(8, 20);
+
+        state.move_cursor_up(3, 20);
+        assert_eq!(state.cursor_view_line, 7);
+
+        state.move_cursor_down(10, 20);
+        assert_eq!(state.cursor_view_line, 17);
+
+        // Clamp to 1
+        state.move_cursor_up(100, 20);
+        assert_eq!(state.cursor_view_line, 1);
+        assert_eq!(state.scroll_position, 1);
+    }
+
+    #[test]
+    fn viewport_state_page_up_down() {
+        let mut state = ViewportState::new(5);
+        state.cursor_view_line = 1;
+
+        state.page_down(20);
+        assert_eq!(state.cursor_view_line, 6);
+
+        state.page_up(20);
+        assert_eq!(state.cursor_view_line, 1);
+    }
+
+    #[test]
+    fn viewport_state_go_to_top_bottom() {
+        let mut state = ViewportState::new(5);
+        state.cursor_view_line = 10;
+        state.scroll_to(8, 50);
+
+        state.go_to_bottom(50);
+        assert_eq!(state.cursor_view_line, 50);
+
+        state.go_to_top(50);
+        assert_eq!(state.cursor_view_line, 1);
+        assert_eq!(state.scroll_position, 1);
+    }
+
+    #[test]
+    fn viewport_state_scroll_fraction() {
+        let state = ViewportState::new(10);
+        // Document fits in viewport → 0.0
+        assert!((state.scroll_fraction(10) - 0.0).abs() < f64::EPSILON);
+        assert!((state.scroll_fraction(5) - 0.0).abs() < f64::EPSILON);
+
+        let mut state2 = ViewportState::new(10);
+        // total=20, max_scroll=10, scroll_position=1 → 0.0
+        assert!((state2.scroll_fraction(20) - 0.0).abs() < f64::EPSILON);
+        // scroll to end
+        state2.scroll_to(11, 20);
+        assert!((state2.scroll_fraction(20) - 1.0).abs() < f64::EPSILON);
+    }
+
+    // ---- Viewport helper tests ----
+
+    #[test]
+    fn viewport_clamp() {
+        let vp = Viewport::new(8, 10);
+        let clamped = vp.clamp(12);
+        assert_eq!(clamped.first_view_line, 8);
+        assert_eq!(clamped.visible_line_count, 5); // only 5 lines left
+
+        let vp2 = Viewport::new(20, 10);
+        let clamped2 = vp2.clamp(5);
+        assert_eq!(clamped2.first_view_line, 5);
+        assert_eq!(clamped2.visible_line_count, 1);
+    }
+
+    #[test]
+    fn viewport_center_line_and_to_range() {
+        let vp = Viewport::new(5, 10);
+        assert_eq!(vp.center_line(), 10); // 5 + 10/2
+
+        let range = vp.to_range();
+        assert_eq!(range.start, 5);
+        assert_eq!(range.end, 14); // last_view_line
+    }
+
+    // ---- LineHeightTracker extended tests ----
+
+    #[test]
+    fn line_height_tracker_reset_and_accessors() {
+        let mut tracker = LineHeightTracker::new(18);
+        assert_eq!(tracker.default_height(), 18);
+        assert_eq!(tracker.explicit_count(), 0);
+
+        tracker.set_height(0, 30);
+        tracker.set_height(5, 40);
+        assert_eq!(tracker.explicit_count(), 6); // 0..=5 allocated
+
+        tracker.reset();
+        assert_eq!(tracker.explicit_count(), 0);
+        assert_eq!(tracker.get_height(0), 18); // back to default
+    }
+
+    #[test]
+    fn line_height_tracker_tallest_line() {
+        let mut tracker = LineHeightTracker::new(20);
+        tracker.set_height(2, 50);
+        tracker.set_height(4, 30);
+        assert_eq!(tracker.tallest_line(5), Some(2));
+        assert_eq!(tracker.tallest_line(0), None);
+
+        // All default → last line wins (>=)
+        let tracker2 = LineHeightTracker::new(20);
+        assert_eq!(tracker2.tallest_line(3), Some(2));
     }
 }

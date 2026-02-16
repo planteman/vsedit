@@ -1036,6 +1036,120 @@ pub fn validate_branch_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// ScmHistory — additional methods
+// ---------------------------------------------------------------------------
+
+impl ScmHistory {
+    /// Filter history to items within a time range `[from, to]`.
+    pub fn in_time_range(&self, from: u64, to: u64) -> Vec<&ScmHistoryItem> {
+        self.items
+            .iter()
+            .filter(|i| i.timestamp >= from && i.timestamp <= to)
+            .collect()
+    }
+
+    /// Returns all unique authors in the history.
+    pub fn authors(&self) -> Vec<&str> {
+        let mut seen = std::collections::HashSet::new();
+        let mut result = Vec::new();
+        for item in &self.items {
+            if seen.insert(item.author.as_str()) {
+                result.push(item.author.as_str());
+            }
+        }
+        result.sort();
+        result
+    }
+
+    /// Returns the oldest item.
+    pub fn oldest(&self) -> Option<&ScmHistoryItem> {
+        self.items.iter().min_by_key(|i| i.timestamp)
+    }
+
+    /// Returns items as a slice.
+    pub fn items(&self) -> &[ScmHistoryItem] {
+        &self.items
+    }
+
+    /// Clears all history items.
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SourceControl — additional methods
+// ---------------------------------------------------------------------------
+
+impl SourceControl {
+    /// Returns all resources across all groups as a flat list.
+    pub fn all_resources(&self) -> Vec<&ScmResource> {
+        self.groups
+            .iter()
+            .flat_map(|g| &g.resources)
+            .collect()
+    }
+
+    /// Finds a group by id.
+    pub fn get_group(&self, group_id: &str) -> Option<&SourceControlGroup> {
+        self.groups.iter().find(|g| g.id == group_id)
+    }
+
+    /// Returns group ids.
+    pub fn group_ids(&self) -> Vec<&str> {
+        self.groups.iter().map(|g| g.id.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DiffStats — additional methods
+// ---------------------------------------------------------------------------
+
+impl DiffStats {
+    /// Merge two DiffStats instances.
+    pub fn merge(&self, other: &DiffStats) -> DiffStats {
+        DiffStats {
+            additions: self.additions + other.additions,
+            deletions: self.deletions + other.deletions,
+            files_changed: self.files_changed + other.files_changed,
+        }
+    }
+
+    /// Returns the ratio of additions to total changes, or 0.0 if no changes.
+    pub fn addition_ratio(&self) -> f64 {
+        let total = self.total_changes();
+        if total == 0 {
+            0.0
+        } else {
+            self.additions as f64 / total as f64
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommitMessageValidator — additional methods
+// ---------------------------------------------------------------------------
+
+impl CommitMessageValidator {
+    /// Set the maximum subject line length.
+    pub fn with_max_subject(mut self, max: usize) -> Self {
+        self.max_subject_length = max;
+        self
+    }
+
+    /// Set the maximum body line length.
+    pub fn with_max_body_line(mut self, max: usize) -> Self {
+        self.max_body_line_length = max;
+        self
+    }
+
+    /// Returns `true` if the message has no validation warnings.
+    pub fn is_valid(&self, message: &str) -> bool {
+        self.validate(message).is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1652,5 +1766,100 @@ mod tests {
         assert!(validate_branch_name("a b").is_err());
         assert!(validate_branch_name("foo/").is_err());
         assert!(validate_branch_name("ref@{1}").is_err());
+    }
+
+    // -- ScmHistory additional methods --------------------------------------
+
+    #[test]
+    fn history_in_time_range() {
+        let mut h = ScmHistory::new();
+        h.push(ScmHistoryItem::new("a", "m", "A", 100, "f.rs"));
+        h.push(ScmHistoryItem::new("b", "m", "B", 200, "f.rs"));
+        h.push(ScmHistoryItem::new("c", "m", "C", 300, "f.rs"));
+        let range = h.in_time_range(150, 250);
+        assert_eq!(range.len(), 1);
+        assert_eq!(range[0].id, "b");
+    }
+
+    #[test]
+    fn history_authors() {
+        let mut h = ScmHistory::new();
+        h.push(ScmHistoryItem::new("a", "m", "Alice", 100, "f.rs"));
+        h.push(ScmHistoryItem::new("b", "m", "Bob", 200, "f.rs"));
+        h.push(ScmHistoryItem::new("c", "m", "Alice", 300, "f.rs"));
+        let authors = h.authors();
+        assert_eq!(authors, vec!["Alice", "Bob"]);
+    }
+
+    #[test]
+    fn history_oldest_and_clear() {
+        let mut h = ScmHistory::new();
+        h.push(ScmHistoryItem::new("a", "m", "A", 300, "f.rs"));
+        h.push(ScmHistoryItem::new("b", "m", "A", 100, "f.rs"));
+        assert_eq!(h.oldest().unwrap().id, "b");
+        h.clear();
+        assert!(h.is_empty());
+    }
+
+    // -- SourceControl additional methods -----------------------------------
+
+    #[test]
+    fn source_control_all_resources_and_groups() {
+        let mut bridge = ScmBridge::new();
+        bridge.register_provider("git", "Git", None);
+        bridge.create_group("git", "changes", "Changes");
+        bridge.create_group("git", "staged", "Staged");
+        bridge.handle_message(&ScmMessage::UpdateResources {
+            provider_id: "git".into(),
+            group_id: "changes".into(),
+            resources: vec![ScmResource::plain("file:///a.rs")],
+        });
+        let p = bridge.get_provider("git").unwrap();
+        assert_eq!(p.all_resources().len(), 1);
+        assert!(p.get_group("changes").is_some());
+        assert!(p.get_group("nonexistent").is_none());
+        let ids = p.group_ids();
+        assert!(ids.contains(&"changes"));
+        assert!(ids.contains(&"staged"));
+    }
+
+    // -- DiffStats additional methods ---------------------------------------
+
+    #[test]
+    fn diff_stats_merge_and_ratio() {
+        let a = DiffStats::new(10, 5, 1);
+        let b = DiffStats::new(3, 2, 1);
+        let merged = a.merge(&b);
+        assert_eq!(merged.additions, 13);
+        assert_eq!(merged.deletions, 7);
+        assert_eq!(merged.files_changed, 2);
+        let ratio = a.addition_ratio();
+        assert!((ratio - 10.0 / 15.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn diff_stats_addition_ratio_empty() {
+        let empty = DiffStats::new(0, 0, 0);
+        assert!((empty.addition_ratio() - 0.0).abs() < f64::EPSILON);
+    }
+
+    // -- CommitMessageValidator additional methods --------------------------
+
+    #[test]
+    fn commit_message_validator_is_valid() {
+        let v = CommitMessageValidator::new();
+        assert!(v.is_valid("Fix a bug\n\nDetails here"));
+        assert!(!v.is_valid("Fix a bug."));
+    }
+
+    #[test]
+    fn commit_message_validator_custom_limits() {
+        let v = CommitMessageValidator::new()
+            .with_max_subject(10)
+            .with_max_body_line(20);
+        let warnings = v.validate("Short\n\nOk body");
+        assert!(warnings.is_empty());
+        let warnings = v.validate("This subject is way too long for the limit");
+        assert!(!warnings.is_empty());
     }
 }

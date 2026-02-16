@@ -975,6 +975,133 @@ impl Default for PaneFocusChain {
     }
 }
 
+// ---------------------------------------------------------------------------
+// PaneVisibilityPolicy – rules for automatic show/hide
+// ---------------------------------------------------------------------------
+
+/// Controls automatic visibility toggling of panes based on conditions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VisibilityRule {
+    /// Always visible.
+    AlwaysVisible,
+    /// Visible only when a file with the given extension is open.
+    OnFileExtension(String),
+    /// Visible only when the pane has content.
+    WhenNotEmpty,
+    /// Follow another pane's visibility.
+    FollowPane(String),
+}
+
+/// Manages visibility policies for panes.
+#[derive(Debug, Clone)]
+pub struct PaneVisibilityPolicy {
+    rules: HashMap<String, VisibilityRule>,
+}
+
+impl PaneVisibilityPolicy {
+    pub fn new() -> Self {
+        Self {
+            rules: HashMap::new(),
+        }
+    }
+
+    /// Set a visibility rule for a pane.
+    pub fn set_rule(&mut self, pane_id: impl Into<String>, rule: VisibilityRule) {
+        self.rules.insert(pane_id.into(), rule);
+    }
+
+    /// Remove the rule for a pane.
+    pub fn remove_rule(&mut self, pane_id: &str) {
+        self.rules.remove(pane_id);
+    }
+
+    /// Get the rule for a pane, if any.
+    pub fn rule_for(&self, pane_id: &str) -> Option<&VisibilityRule> {
+        self.rules.get(pane_id)
+    }
+
+    /// Evaluate which panes should be visible given the current open file extension.
+    pub fn evaluate_visibility(&self, open_extension: Option<&str>) -> HashMap<String, bool> {
+        let mut result = HashMap::new();
+        for (id, rule) in &self.rules {
+            let visible = match rule {
+                VisibilityRule::AlwaysVisible => true,
+                VisibilityRule::OnFileExtension(ext) => {
+                    open_extension.map_or(false, |oe| oe == ext.as_str())
+                }
+                VisibilityRule::WhenNotEmpty => true, // caller must check content
+                VisibilityRule::FollowPane(other_id) => {
+                    // Follow the resolved visibility of the other pane, default true.
+                    result.get(other_id).copied().unwrap_or(true)
+                }
+            };
+            result.insert(id.clone(), visible);
+        }
+        result
+    }
+
+    /// Number of registered rules.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+}
+
+impl Default for PaneVisibilityPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PaneStats – aggregated pane service statistics
+// ---------------------------------------------------------------------------
+
+/// Summary statistics about panes in a service.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PaneStats {
+    pub total: usize,
+    pub visible: usize,
+    pub hidden: usize,
+    pub maximized: usize,
+    pub by_location: HashMap<PaneLocation, usize>,
+}
+
+impl PaneStats {
+    /// Compute statistics from a [`PaneService`].
+    pub fn from_service(service: &PaneService) -> Self {
+        let total = service.pane_count();
+        let visible = service.panes.iter().filter(|p| p.visible).count();
+        let hidden = total - visible;
+        let maximized = service.panes.iter().filter(|p| p.maximized).count();
+        let by_location = count_by_location(&service.panes);
+        Self {
+            total,
+            visible,
+            hidden,
+            maximized,
+            by_location,
+        }
+    }
+
+    /// Fraction of panes that are visible.
+    pub fn visibility_ratio(&self) -> f64 {
+        if self.total == 0 {
+            return 0.0;
+        }
+        self.visible as f64 / self.total as f64
+    }
+}
+
+impl fmt::Display for PaneStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "PaneStats(total={}, visible={}, hidden={}, maximized={})",
+            self.total, self.visible, self.hidden, self.maximized,
+        )
+    }
+}
+
 /// Swaps the titles and visible status of two panes in the service.
 pub fn pane_swap(service: &mut PaneService, id_a: &str, id_b: &str) -> Result<(), String> {
     let idx_a = service
@@ -1655,5 +1782,79 @@ mod tests {
         assert_eq!(chain.current(), None);
         assert_eq!(chain.focus_next(), None);
         assert_eq!(chain.focus_prev(), None);
+    }
+
+    #[test]
+    fn visibility_policy_always_visible() {
+        let mut policy = PaneVisibilityPolicy::new();
+        policy.set_rule("explorer", VisibilityRule::AlwaysVisible);
+        let vis = policy.evaluate_visibility(None);
+        assert_eq!(*vis.get("explorer").unwrap(), true);
+    }
+
+    #[test]
+    fn visibility_policy_on_file_extension() {
+        let mut policy = PaneVisibilityPolicy::new();
+        policy.set_rule("rust-panel", VisibilityRule::OnFileExtension("rs".into()));
+        policy.set_rule("js-panel", VisibilityRule::OnFileExtension("js".into()));
+
+        let vis = policy.evaluate_visibility(Some("rs"));
+        assert_eq!(*vis.get("rust-panel").unwrap(), true);
+        assert_eq!(*vis.get("js-panel").unwrap(), false);
+
+        let vis2 = policy.evaluate_visibility(None);
+        assert_eq!(*vis2.get("rust-panel").unwrap(), false);
+    }
+
+    #[test]
+    fn visibility_policy_remove_and_count() {
+        let mut policy = PaneVisibilityPolicy::new();
+        policy.set_rule("a", VisibilityRule::AlwaysVisible);
+        policy.set_rule("b", VisibilityRule::WhenNotEmpty);
+        assert_eq!(policy.rule_count(), 2);
+        policy.remove_rule("a");
+        assert_eq!(policy.rule_count(), 1);
+        assert!(policy.rule_for("a").is_none());
+        assert!(policy.rule_for("b").is_some());
+    }
+
+    #[test]
+    fn pane_stats_from_service() {
+        let mut svc = PaneService::new();
+        svc.add_pane(
+            PaneBuilder::new("a").title("A").location(PaneLocation::Sidebar).visible(true).build(),
+        );
+        svc.add_pane(
+            PaneBuilder::new("b").title("B").location(PaneLocation::Panel).visible(false).build(),
+        );
+        svc.add_pane(
+            PaneBuilder::new("c").title("C").location(PaneLocation::Sidebar).visible(true).maximized(true).build(),
+        );
+        let stats = PaneStats::from_service(&svc);
+        assert_eq!(stats.total, 3);
+        assert_eq!(stats.visible, 2);
+        assert_eq!(stats.hidden, 1);
+        assert_eq!(stats.maximized, 1);
+        assert_eq!(*stats.by_location.get(&PaneLocation::Sidebar).unwrap(), 2);
+        assert_eq!(*stats.by_location.get(&PaneLocation::Panel).unwrap(), 1);
+        assert!((stats.visibility_ratio() - 2.0 / 3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn pane_stats_display() {
+        let svc = PaneService::new();
+        let stats = PaneStats::from_service(&svc);
+        let display = format!("{stats}");
+        assert!(display.contains("PaneStats"));
+        assert_eq!(stats.visibility_ratio(), 0.0);
+    }
+
+    #[test]
+    fn visibility_policy_follow_pane() {
+        let mut policy = PaneVisibilityPolicy::new();
+        policy.set_rule("main", VisibilityRule::AlwaysVisible);
+        policy.set_rule("follower", VisibilityRule::FollowPane("main".into()));
+        let vis = policy.evaluate_visibility(None);
+        assert_eq!(*vis.get("follower").unwrap(), true);
     }
 }

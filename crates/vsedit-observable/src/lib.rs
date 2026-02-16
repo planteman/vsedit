@@ -443,6 +443,238 @@ impl fmt::Display for ObservableStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ObservableValue – utility helpers & predicates
+// ---------------------------------------------------------------------------
+
+impl<T: Clone + PartialEq + Send + Sync + 'static> ObservableValue<T> {
+    /// Replace the value only if `predicate` returns `true` for the current value.
+    /// Returns `true` if the replacement occurred.
+    pub fn set_if(&self, predicate: impl FnOnce(&T) -> bool, new_value: T) -> bool {
+        let should_set = {
+            let v = self.value.lock().unwrap();
+            predicate(&v)
+        };
+        if should_set {
+            self.set(new_value);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Take the current value and replace it with `replacement`, returning the old value.
+    /// Always fires the change event if old != replacement.
+    pub fn take(&self, replacement: T) -> T {
+        self.swap(replacement)
+    }
+
+    /// Return a snapshot tuple of `(value, listener_handle)` where the listener
+    /// records every change into the returned `Arc<Mutex<Vec<T>>>`.
+    pub fn spy(&self) -> (T, Arc<Mutex<Vec<T>>>, DisposableHandle) {
+        let log = Arc::new(Mutex::new(Vec::<T>::new()));
+        let log2 = log.clone();
+        let current = self.get();
+        let handle = self.on_change(move |val| {
+            log2.lock().unwrap().push(val.clone());
+        });
+        (current, log, handle)
+    }
+}
+
+impl<T: Clone + PartialEq + Send + Sync + Default + 'static> ObservableValue<T> {
+    /// Reset the value to `T::default()`, firing the change event if it differs.
+    pub fn reset(&self) {
+        self.set(T::default());
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ObservableList – utility helpers
+// ---------------------------------------------------------------------------
+
+impl<T: Clone + Send + Sync + 'static> ObservableList<T> {
+    /// Create an observable list from an existing vector.
+    pub fn from_vec(items: Vec<T>) -> Self {
+        Self {
+            items: Arc::new(Mutex::new(items)),
+            on_change: Emitter::new(),
+        }
+    }
+
+    /// Return the first item, if any.
+    pub fn first(&self) -> Option<T> {
+        self.items.lock().unwrap().first().cloned()
+    }
+
+    /// Return the last item, if any.
+    pub fn last(&self) -> Option<T> {
+        self.items.lock().unwrap().last().cloned()
+    }
+
+    /// Apply a mapping function to every item in the list and return the results.
+    pub fn map_items<R>(&self, f: impl Fn(&T) -> R) -> Vec<R> {
+        self.items.lock().unwrap().iter().map(f).collect()
+    }
+
+    /// Extend the list with items from an iterator. Fires a single change event.
+    pub fn extend(&self, iter: impl IntoIterator<Item = T>) {
+        let snapshot = {
+            let mut items = self.items.lock().unwrap();
+            items.extend(iter);
+            items.clone()
+        };
+        self.on_change.fire(&snapshot);
+    }
+
+    /// Remove and return the last item. Fires change event if an item was removed.
+    pub fn pop(&self) -> Option<T> {
+        let (popped, snapshot) = {
+            let mut items = self.items.lock().unwrap();
+            let popped = items.pop();
+            (popped, items.clone())
+        };
+        if popped.is_some() {
+            self.on_change.fire(&snapshot);
+        }
+        popped
+    }
+}
+
+impl<T: Clone + PartialEq + Send + Sync + 'static> ObservableList<T> {
+    /// Return the index of the first item equal to `value`, or `None`.
+    pub fn index_of(&self, value: &T) -> Option<usize> {
+        self.items.lock().unwrap().iter().position(|x| x == value)
+    }
+
+    /// Return `true` if the list contains the given value.
+    pub fn contains(&self, value: &T) -> bool {
+        self.items.lock().unwrap().contains(value)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ObservableMap – utility helpers
+// ---------------------------------------------------------------------------
+
+impl<K: Clone + Eq + std::hash::Hash + Send + Sync + 'static, V: Clone + Send + Sync + 'static>
+    ObservableMap<K, V>
+{
+    /// Return all values (without keys).
+    pub fn values(&self) -> Vec<V> {
+        self.entries.lock().unwrap().values().cloned().collect()
+    }
+
+    /// Return all entries as a vector of `(key, value)` pairs.
+    pub fn to_vec(&self) -> Vec<(K, V)> {
+        self.entries
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+
+    /// Get or insert a default value for the given key. Returns the value.
+    pub fn get_or_insert(&self, key: K, default: V) -> V {
+        {
+            let map = self.entries.lock().unwrap();
+            if let Some(v) = map.get(&key) {
+                return v.clone();
+            }
+        }
+        self.insert(key.clone(), default);
+        self.entries.lock().unwrap().get(&key).unwrap().clone()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ObservableStats – additional analytics
+// ---------------------------------------------------------------------------
+
+impl ObservableStats {
+    /// Return the number of successful operations.
+    pub fn successes(&self) -> u64 {
+        self.successful_operations
+    }
+
+    /// Return the number of failed operations.
+    pub fn failures(&self) -> u64 {
+        self.failed_operations
+    }
+
+    /// Return `true` if no failures have been recorded.
+    pub fn is_all_success(&self) -> bool {
+        self.failed_operations == 0
+    }
+
+    /// Return total elapsed time in nanoseconds.
+    pub fn total_time_ns(&self) -> u64 {
+        self.total_time_ns
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ObservableHistory – additional utilities
+// ---------------------------------------------------------------------------
+
+impl<T: Clone> ObservableHistory<T> {
+    /// Return the first recorded value, if any.
+    pub fn first(&self) -> Option<&T> {
+        self.entries.first().map(|e| &e.value)
+    }
+
+    /// Return a Vec of all recorded values (without sequence metadata).
+    pub fn values(&self) -> Vec<&T> {
+        self.entries.iter().map(|e| &e.value).collect()
+    }
+
+    /// Return the current next-sequence counter.
+    pub fn next_sequence(&self) -> u64 {
+        self.next_sequence
+    }
+}
+
+impl<T: Clone + PartialEq> ObservableHistory<T> {
+    /// Return `true` if the given value was ever recorded.
+    pub fn contains(&self, value: &T) -> bool {
+        self.entries.iter().any(|e| e.value == *value)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ObservableDebouncer – additional utilities
+// ---------------------------------------------------------------------------
+
+impl<T: Clone + PartialEq> ObservableDebouncer<T> {
+    /// Create a debouncer with an initial committed value.
+    pub fn with_initial(value: T) -> Self {
+        Self {
+            pending: None,
+            committed: Some(value),
+            change_count: 0,
+        }
+    }
+
+    /// Stage and immediately commit. Returns `true` if the value changed.
+    pub fn set(&mut self, value: T) -> bool {
+        self.stage(value);
+        self.commit()
+    }
+
+    /// Return `true` if a value has been committed at least once.
+    pub fn has_committed(&self) -> bool {
+        self.committed.is_some()
+    }
+
+    /// Reset the debouncer to its initial empty state.
+    pub fn reset(&mut self) {
+        self.pending = None;
+        self.committed = None;
+        self.change_count = 0;
+    }
+}
+
 /// Validation utilities for observable.
 #[derive(Debug, Clone)]
 pub struct ObservableValidator {
@@ -1705,5 +1937,236 @@ mod tests {
         assert!(!d.has_pending());
         assert!(!d.commit());
         assert_eq!(d.committed(), None);
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for added functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn observable_value_set_if_true() {
+        let obs = ObservableValue::new(10);
+        let changed = obs.set_if(|v| *v < 20, 15);
+        assert!(changed);
+        assert_eq!(obs.get(), 15);
+    }
+
+    #[test]
+    fn observable_value_set_if_false() {
+        let obs = ObservableValue::new(10);
+        let changed = obs.set_if(|v| *v > 20, 15);
+        assert!(!changed);
+        assert_eq!(obs.get(), 10);
+    }
+
+    #[test]
+    fn observable_value_take() {
+        let obs = ObservableValue::new(42);
+        let old = obs.take(99);
+        assert_eq!(old, 42);
+        assert_eq!(obs.get(), 99);
+    }
+
+    #[test]
+    fn observable_value_spy() {
+        let obs = ObservableValue::new(0);
+        let (current, log, _handle) = obs.spy();
+        assert_eq!(current, 0);
+        obs.set(1);
+        obs.set(2);
+        obs.set(3);
+        assert_eq!(*log.lock().unwrap(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn observable_value_reset_to_default() {
+        let obs = ObservableValue::new(42_i32);
+        obs.reset();
+        assert_eq!(obs.get(), 0);
+    }
+
+    #[test]
+    fn observable_list_from_vec() {
+        let list = ObservableList::from_vec(vec![1, 2, 3]);
+        assert_eq!(list.len(), 3);
+        assert_eq!(list.to_vec(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn observable_list_first_last() {
+        let list = ObservableList::from_vec(vec![10, 20, 30]);
+        assert_eq!(list.first(), Some(10));
+        assert_eq!(list.last(), Some(30));
+
+        let empty: ObservableList<i32> = ObservableList::new();
+        assert_eq!(empty.first(), None);
+        assert_eq!(empty.last(), None);
+    }
+
+    #[test]
+    fn observable_list_map_items() {
+        let list = ObservableList::from_vec(vec![1, 2, 3]);
+        let doubled = list.map_items(|x| x * 2);
+        assert_eq!(doubled, vec![2, 4, 6]);
+    }
+
+    #[test]
+    fn observable_list_extend() {
+        let list = ObservableList::from_vec(vec![1]);
+        let fired = Arc::new(Mutex::new(0_u32));
+        let f = fired.clone();
+        let _handle = list.on_change(move |_| {
+            *f.lock().unwrap() += 1;
+        });
+        list.extend(vec![2, 3, 4]);
+        assert_eq!(list.to_vec(), vec![1, 2, 3, 4]);
+        assert_eq!(*fired.lock().unwrap(), 1); // single event
+    }
+
+    #[test]
+    fn observable_list_pop() {
+        let list = ObservableList::from_vec(vec![1, 2, 3]);
+        assert_eq!(list.pop(), Some(3));
+        assert_eq!(list.len(), 2);
+
+        let empty: ObservableList<i32> = ObservableList::new();
+        assert_eq!(empty.pop(), None);
+    }
+
+    #[test]
+    fn observable_list_index_of_and_contains() {
+        let list = ObservableList::from_vec(vec![10, 20, 30]);
+        assert_eq!(list.index_of(&20), Some(1));
+        assert_eq!(list.index_of(&99), None);
+        assert!(list.contains(&10));
+        assert!(!list.contains(&99));
+    }
+
+    #[test]
+    fn observable_map_values_and_to_vec() {
+        let map: ObservableMap<String, i32> = ObservableMap::new();
+        map.insert("a".to_string(), 1);
+        map.insert("b".to_string(), 2);
+        let mut values = map.values();
+        values.sort();
+        assert_eq!(values, vec![1, 2]);
+
+        let mut entries = map.to_vec();
+        entries.sort_by_key(|(k, _)| k.clone());
+        assert_eq!(
+            entries,
+            vec![("a".to_string(), 1), ("b".to_string(), 2)]
+        );
+    }
+
+    #[test]
+    fn observable_map_get_or_insert() {
+        let map: ObservableMap<String, i32> = ObservableMap::new();
+        let v = map.get_or_insert("key".to_string(), 42);
+        assert_eq!(v, 42);
+        // Existing key should not overwrite.
+        let v2 = map.get_or_insert("key".to_string(), 99);
+        assert_eq!(v2, 42);
+    }
+
+    #[test]
+    fn observable_stats_successes_failures_helpers() {
+        let mut stats = ObservableStats::new();
+        stats.record_success(10);
+        stats.record_success(20);
+        stats.record_failure(30);
+        assert_eq!(stats.successes(), 2);
+        assert_eq!(stats.failures(), 1);
+        assert!(!stats.is_all_success());
+        assert!(stats.total_time_ns() > 0);
+
+        let mut clean = ObservableStats::new();
+        clean.record_success(5);
+        assert!(clean.is_all_success());
+    }
+
+    #[test]
+    fn history_first_and_values() {
+        let mut h: ObservableHistory<&str> = ObservableHistory::new();
+        assert_eq!(h.first(), None);
+        h.record("a");
+        h.record("b");
+        h.record("c");
+        assert_eq!(h.first(), Some(&"a"));
+        assert_eq!(h.values(), vec![&"a", &"b", &"c"]);
+    }
+
+    #[test]
+    fn history_next_sequence() {
+        let mut h: ObservableHistory<i32> = ObservableHistory::new();
+        assert_eq!(h.next_sequence(), 0);
+        h.record(1);
+        assert_eq!(h.next_sequence(), 1);
+        h.record(2);
+        assert_eq!(h.next_sequence(), 2);
+    }
+
+    #[test]
+    fn history_contains() {
+        let mut h: ObservableHistory<i32> = ObservableHistory::new();
+        h.record(10);
+        h.record(20);
+        assert!(h.contains(&10));
+        assert!(!h.contains(&99));
+    }
+
+    #[test]
+    fn debouncer_with_initial() {
+        let d = ObservableDebouncer::with_initial(42);
+        assert_eq!(d.committed(), Some(&42));
+        assert!(d.has_committed());
+        assert_eq!(d.change_count(), 0);
+    }
+
+    #[test]
+    fn debouncer_set_shorthand() {
+        let mut d: ObservableDebouncer<i32> = ObservableDebouncer::new();
+        assert!(d.set(10));
+        assert_eq!(d.committed(), Some(&10));
+        assert!(!d.set(10)); // same value
+        assert_eq!(d.change_count(), 1);
+        assert!(d.set(20));
+        assert_eq!(d.change_count(), 2);
+    }
+
+    #[test]
+    fn debouncer_reset() {
+        let mut d: ObservableDebouncer<i32> = ObservableDebouncer::new();
+        d.set(42);
+        d.stage(99);
+        d.reset();
+        assert!(!d.has_committed());
+        assert!(!d.has_pending());
+        assert_eq!(d.change_count(), 0);
+    }
+
+    #[test]
+    fn observable_value_set_if_fires_event() {
+        let obs = ObservableValue::new(5);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _handle = obs.on_change(move |val| {
+            r.lock().unwrap().push(*val);
+        });
+        obs.set_if(|v| *v == 5, 10);
+        obs.set_if(|v| *v == 999, 20); // predicate false, no fire
+        assert_eq!(*received.lock().unwrap(), vec![10]);
+    }
+
+    #[test]
+    fn observable_list_pop_fires_event() {
+        let list = ObservableList::from_vec(vec![1, 2, 3]);
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let r = received.clone();
+        let _handle = list.on_change(move |snapshot| {
+            r.lock().unwrap().push(snapshot.clone());
+        });
+        list.pop();
+        assert_eq!(received.lock().unwrap()[0], vec![1, 2]);
     }
 }

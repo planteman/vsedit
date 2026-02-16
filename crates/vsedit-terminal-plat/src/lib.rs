@@ -1064,6 +1064,102 @@ impl TerminalCommandHistory {
 }
 
 // ---------------------------------------------------------------------------
+// TerminalDimensions — helper for terminal size calculations
+// ---------------------------------------------------------------------------
+
+/// Represents the dimensions of a terminal in both cells and pixels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TerminalDimensions {
+    pub cols: u16,
+    pub rows: u16,
+    pub pixel_width: u32,
+    pub pixel_height: u32,
+}
+
+impl TerminalDimensions {
+    /// Create dimensions from cell counts and cell size in pixels.
+    pub fn from_cells(cols: u16, rows: u16, cell_width: u16, cell_height: u16) -> Self {
+        Self {
+            cols,
+            rows,
+            pixel_width: cols as u32 * cell_width as u32,
+            pixel_height: rows as u32 * cell_height as u32,
+        }
+    }
+
+    /// Create dimensions from a target pixel area and cell size.
+    pub fn from_pixels(pixel_width: u32, pixel_height: u32, cell_width: u16, cell_height: u16) -> Self {
+        let cols = if cell_width > 0 { (pixel_width / cell_width as u32) as u16 } else { 1 };
+        let rows = if cell_height > 0 { (pixel_height / cell_height as u32) as u16 } else { 1 };
+        Self { cols, rows, pixel_width, pixel_height }
+    }
+
+    /// Return the total number of character cells.
+    pub fn total_cells(&self) -> u32 {
+        self.cols as u32 * self.rows as u32
+    }
+
+    /// Return the aspect ratio (width / height) in cells.
+    pub fn aspect_ratio(&self) -> f64 {
+        if self.rows == 0 {
+            return 0.0;
+        }
+        self.cols as f64 / self.rows as f64
+    }
+
+    /// Clamp the dimensions to min/max column and row bounds.
+    pub fn clamp(self, min_cols: u16, max_cols: u16, min_rows: u16, max_rows: u16) -> Self {
+        Self {
+            cols: self.cols.clamp(min_cols, max_cols),
+            rows: self.rows.clamp(min_rows, max_rows),
+            pixel_width: self.pixel_width,
+            pixel_height: self.pixel_height,
+        }
+    }
+
+    /// Return true if either dimension is zero.
+    pub fn is_zero(&self) -> bool {
+        self.cols == 0 || self.rows == 0
+    }
+}
+
+impl fmt::Display for TerminalDimensions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}x{} ({}x{}px)", self.cols, self.rows, self.pixel_width, self.pixel_height)
+    }
+}
+
+impl Default for TerminalFontConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TerminalEnvironment {
+    /// Return the number of variables from the shell environment.
+    pub fn shell_env_count(&self) -> usize {
+        self.shell_env.len()
+    }
+
+    /// Return the number of variables from the editor environment.
+    pub fn editor_env_count(&self) -> usize {
+        self.editor_env.len()
+    }
+
+    /// Return total unique variable count across both environments.
+    pub fn total_count(&self) -> usize {
+        self.keys().len()
+    }
+
+    /// Remove a variable from both environments. Returns true if found in either.
+    pub fn remove(&mut self, key: &str) -> bool {
+        let a = self.shell_env.remove(key).is_some();
+        let b = self.editor_env.remove(key).is_some();
+        a || b
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1775,5 +1871,84 @@ mod tests {
         hist.record("ls", 1000);
         assert!(hist.contains_command("ls"));
         assert!(!hist.contains_command("cd"));
+    }
+
+    // -- TerminalDimensions tests -------------------------------------------
+
+    #[test]
+    fn dimensions_from_cells() {
+        let d = TerminalDimensions::from_cells(80, 24, 8, 16);
+        assert_eq!(d.cols, 80);
+        assert_eq!(d.rows, 24);
+        assert_eq!(d.pixel_width, 640);
+        assert_eq!(d.pixel_height, 384);
+        assert_eq!(d.total_cells(), 1920);
+    }
+
+    #[test]
+    fn dimensions_from_pixels() {
+        let d = TerminalDimensions::from_pixels(640, 384, 8, 16);
+        assert_eq!(d.cols, 80);
+        assert_eq!(d.rows, 24);
+    }
+
+    #[test]
+    fn dimensions_aspect_ratio() {
+        let d = TerminalDimensions::from_cells(80, 24, 8, 16);
+        let ratio = d.aspect_ratio();
+        assert!((ratio - 80.0 / 24.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn dimensions_clamp() {
+        let d = TerminalDimensions::from_cells(200, 5, 8, 16);
+        let clamped = d.clamp(10, 120, 10, 50);
+        assert_eq!(clamped.cols, 120);
+        assert_eq!(clamped.rows, 10);
+    }
+
+    #[test]
+    fn dimensions_is_zero() {
+        let d = TerminalDimensions::from_cells(0, 24, 8, 16);
+        assert!(d.is_zero());
+        let d2 = TerminalDimensions::from_cells(80, 24, 8, 16);
+        assert!(!d2.is_zero());
+    }
+
+    #[test]
+    fn dimensions_display() {
+        let d = TerminalDimensions::from_cells(80, 24, 8, 16);
+        let s = format!("{}", d);
+        assert!(s.contains("80x24"));
+    }
+
+    // -- TerminalEnvironment extended tests ----------------------------------
+
+    #[test]
+    fn env_shell_and_editor_counts() {
+        let shell: HashMap<String, String> = [("PATH".into(), "/usr/bin".into())].into();
+        let editor: HashMap<String, String> = [("TERM".into(), "xterm".into()), ("EDITOR".into(), "vi".into())].into();
+        let env = TerminalEnvironment::new(shell, editor);
+        assert_eq!(env.shell_env_count(), 1);
+        assert_eq!(env.editor_env_count(), 2);
+        assert_eq!(env.total_count(), 3);
+    }
+
+    #[test]
+    fn env_remove_variable() {
+        let shell: HashMap<String, String> = [("PATH".into(), "/usr/bin".into())].into();
+        let editor: HashMap<String, String> = [("PATH".into(), "/editor/bin".into())].into();
+        let mut env = TerminalEnvironment::new(shell, editor);
+        assert!(env.remove("PATH"));
+        assert_eq!(env.shell_env_count(), 0);
+        assert_eq!(env.editor_env_count(), 0);
+    }
+
+    #[test]
+    fn font_config_default() {
+        let f = TerminalFontConfig::default();
+        assert_eq!(f.family, "monospace");
+        assert!((f.size - 14.0).abs() < 0.1);
+        assert_eq!(f.weight, 400);
     }
 }

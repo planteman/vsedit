@@ -952,6 +952,125 @@ pub fn resolve_scope_stack<'a>(stack: &ScopeStack, selectors: &[&'a ScopeSelecto
     best
 }
 
+// ---------------------------------------------------------------------------
+// ColoredSpan — additional methods
+// ---------------------------------------------------------------------------
+
+impl ColoredSpan {
+    /// Returns a new span with bold style enabled.
+    pub fn bold(mut self) -> Self {
+        self.bold = true;
+        self
+    }
+
+    /// Returns a new span with italic style enabled.
+    pub fn italic(mut self) -> Self {
+        self.italic = true;
+        self
+    }
+
+    /// Returns a new span with underline style enabled.
+    pub fn underline(mut self) -> Self {
+        self.underline = true;
+        self
+    }
+
+    /// Returns a new span with the given background color.
+    pub fn with_bg(text: &str, r: u8, g: u8, b: u8) -> Self {
+        Self {
+            text: text.to_string(),
+            fg: (255, 255, 255),
+            bg: (r, g, b),
+            bold: false,
+            italic: false,
+            underline: false,
+        }
+    }
+
+    /// Returns `true` if this span's text is empty.
+    pub fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+
+    /// Returns a new span with all style properties removed (plain styling).
+    pub fn strip_style(&self) -> Self {
+        Self {
+            text: self.text.clone(),
+            fg: (255, 255, 255),
+            bg: (0, 0, 0),
+            bold: false,
+            italic: false,
+            underline: false,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HighlightedLine — additional methods
+// ---------------------------------------------------------------------------
+
+impl HighlightedLine {
+    /// Returns `true` if any span in this line has styling.
+    pub fn has_styled_spans(&self) -> bool {
+        self.spans.iter().any(|s| s.is_styled())
+    }
+
+    /// Returns the number of spans in this line.
+    pub fn span_count(&self) -> usize {
+        self.spans.len()
+    }
+
+    /// Returns the plain text of this line with all styling removed.
+    pub fn plain_text(&self) -> String {
+        self.text()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScopeStack — additional methods
+// ---------------------------------------------------------------------------
+
+impl ScopeStack {
+    /// Returns a new scope stack with the given scope appended.
+    pub fn with_scope(&self, scope: impl Into<String>) -> Self {
+        let mut new = self.clone();
+        new.push(scope);
+        new
+    }
+
+    /// Returns `true` if the stack has exactly the given depth.
+    pub fn has_depth(&self, depth: usize) -> bool {
+        self.scopes.len() == depth
+    }
+
+    /// Returns the scope at the given index from the bottom, if it exists.
+    pub fn at(&self, index: usize) -> Option<&str> {
+        self.scopes.get(index).map(|s| s.as_str())
+    }
+
+    /// Returns the common prefix scope count between this stack and another.
+    pub fn common_prefix_depth(&self, other: &ScopeStack) -> usize {
+        self.scopes
+            .iter()
+            .zip(other.scopes.iter())
+            .take_while(|(a, b)| a == b)
+            .count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HighlightCache — additional methods
+// ---------------------------------------------------------------------------
+
+impl HighlightCache {
+    /// Returns all cached line numbers.
+    pub fn cached_lines(&self) -> Vec<usize> {
+        let mut lines: Vec<usize> = self.lines.keys().copied().collect();
+        lines.sort_unstable();
+        lines
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1652,5 +1771,95 @@ mod tests {
         let selectors: Vec<&ScopeSelector> = vec![&sel1, &sel2];
         let best = resolve_scope_stack(&stack, &selectors);
         assert_eq!(best.unwrap().pattern, "entity.name.function");
+    }
+
+    // -- ColoredSpan additional methods ------------------------------------
+
+    #[test]
+    fn colored_span_builder_methods() {
+        let span = ColoredSpan::plain("hello").bold().italic().underline();
+        assert!(span.bold);
+        assert!(span.italic);
+        assert!(span.underline);
+        assert!(span.is_styled());
+    }
+
+    #[test]
+    fn colored_span_with_bg() {
+        let span = ColoredSpan::with_bg("test", 10, 20, 30);
+        assert_eq!(span.bg, (10, 20, 30));
+        assert!(span.is_styled());
+    }
+
+    #[test]
+    fn colored_span_is_empty_and_strip_style() {
+        let empty = ColoredSpan::plain("");
+        assert!(empty.is_empty());
+        let styled = ColoredSpan::with_fg("text", 255, 0, 0).bold();
+        let stripped = styled.strip_style();
+        assert!(!stripped.is_styled());
+        assert_eq!(stripped.text, "text");
+    }
+
+    // -- HighlightedLine additional methods --------------------------------
+
+    #[test]
+    fn highlighted_line_has_styled_spans() {
+        let spans = vec![
+            ColoredSpan::plain("fn "),
+            ColoredSpan::with_fg("main", 100, 200, 50),
+        ];
+        let line = HighlightedLine::new(0, spans);
+        assert!(line.has_styled_spans());
+        assert_eq!(line.span_count(), 2);
+    }
+
+    #[test]
+    fn highlighted_line_all_plain_not_styled() {
+        let spans = vec![ColoredSpan::plain("hello world")];
+        let line = HighlightedLine::new(0, spans);
+        assert!(!line.has_styled_spans());
+        assert_eq!(line.plain_text(), "hello world");
+    }
+
+    // -- ScopeStack additional methods ------------------------------------
+
+    #[test]
+    fn scope_stack_with_scope() {
+        let stack = ScopeStack::from_str("source.rust");
+        let extended = stack.with_scope("meta.function");
+        assert_eq!(extended.depth(), 2);
+        assert_eq!(extended.top(), Some("meta.function"));
+    }
+
+    #[test]
+    fn scope_stack_has_depth_and_at() {
+        let stack = ScopeStack::from_str("source.rust meta.function");
+        assert!(stack.has_depth(2));
+        assert!(!stack.has_depth(3));
+        assert_eq!(stack.at(0), Some("source.rust"));
+        assert_eq!(stack.at(1), Some("meta.function"));
+        assert_eq!(stack.at(2), None);
+    }
+
+    #[test]
+    fn scope_stack_common_prefix_depth() {
+        let a = ScopeStack::from_str("source.rust meta.function entity.name");
+        let b = ScopeStack::from_str("source.rust meta.function variable.other");
+        assert_eq!(a.common_prefix_depth(&b), 2);
+        let c = ScopeStack::from_str("source.python");
+        assert_eq!(a.common_prefix_depth(&c), 0);
+    }
+
+    // -- HighlightCache additional methods ---------------------------------
+
+    #[test]
+    fn cache_cached_lines() {
+        let mut cache = HighlightCache::new();
+        cache.set(5, vec![ColoredSpan::plain("a")]);
+        cache.set(2, vec![ColoredSpan::plain("b")]);
+        cache.set(8, vec![ColoredSpan::plain("c")]);
+        let lines = cache.cached_lines();
+        assert_eq!(lines, vec![2, 5, 8]);
     }
 }

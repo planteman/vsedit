@@ -974,6 +974,120 @@ pub fn rects_overlap(a: &Rect, b: &Rect) -> bool {
     a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
 }
 
+/// Compute the intersection rectangle of two Rects, or None if they do not overlap.
+pub fn rect_intersection(a: &Rect, b: &Rect) -> Option<Rect> {
+    let x1 = a.x.max(b.x);
+    let y1 = a.y.max(b.y);
+    let x2 = (a.x + a.width).min(b.x + b.width);
+    let y2 = (a.y + a.height).min(b.y + b.height);
+    if x2 > x1 && y2 > y1 {
+        Some(Rect::new(x1, y1, x2 - x1, y2 - y1))
+    } else {
+        None
+    }
+}
+
+/// Compute the bounding box that contains all provided Rects.
+pub fn bounding_box(rects: &[Rect]) -> Option<Rect> {
+    if rects.is_empty() {
+        return None;
+    }
+    let mut min_x = u16::MAX;
+    let mut min_y = u16::MAX;
+    let mut max_x: u16 = 0;
+    let mut max_y: u16 = 0;
+    for r in rects {
+        min_x = min_x.min(r.x);
+        min_y = min_y.min(r.y);
+        max_x = max_x.max(r.x + r.width);
+        max_y = max_y.max(r.y + r.height);
+    }
+    Some(Rect::new(min_x, min_y, max_x - min_x, max_y - min_y))
+}
+
+/// Inset a rectangle by a given margin on all sides.
+/// Returns a zero-size rect if the margin is too large.
+pub fn rect_inset(r: &Rect, margin: u16) -> Rect {
+    let double = margin * 2;
+    if r.width <= double || r.height <= double {
+        return Rect::new(r.x + r.width / 2, r.y + r.height / 2, 0, 0);
+    }
+    Rect::new(r.x + margin, r.y + margin, r.width - double, r.height - double)
+}
+
+/// Return true if `inner` is fully contained within `outer`.
+pub fn rect_contains(outer: &Rect, inner: &Rect) -> bool {
+    inner.x >= outer.x
+        && inner.y >= outer.y
+        && inner.x + inner.width <= outer.x + outer.width
+        && inner.y + inner.height <= outer.y + outer.height
+}
+
+impl Part {
+    /// Return true if this part is considered a "chrome" element (not the editor).
+    pub fn is_chrome(&self) -> bool {
+        !matches!(self, Part::Editor)
+    }
+
+    /// Return a string label for this part.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Part::Titlebar => "Title Bar",
+            Part::Menubar => "Menu Bar",
+            Part::Sidebar => "Side Bar",
+            Part::Editor => "Editor",
+            Part::Panel => "Panel",
+            Part::StatusBar => "Status Bar",
+            Part::ActivityBar => "Activity Bar",
+            Part::AuxiliaryBar => "Auxiliary Bar",
+        }
+    }
+}
+
+impl LayoutResult {
+    /// Return all non-None rectangles as a vector.
+    pub fn all_rects(&self) -> Vec<Rect> {
+        let mut rects = Vec::new();
+        if let Some(r) = self.menubar {
+            rects.push(r);
+        }
+        if let Some(r) = self.activity_bar {
+            rects.push(r);
+        }
+        if let Some(r) = self.sidebar {
+            rects.push(r);
+        }
+        rects.push(self.editor);
+        if let Some(r) = self.panel {
+            rects.push(r);
+        }
+        rects.push(self.statusbar);
+        rects
+    }
+
+    /// Return the total area in cells covered by all visible parts.
+    pub fn total_area(&self) -> u32 {
+        self.all_rects().iter().map(|r| rect_area(r)).sum()
+    }
+}
+
+impl LayoutSplit {
+    /// Return the ratio assigned to pane at `index`, or None if out of bounds.
+    pub fn ratio_at(&self, index: usize) -> Option<f32> {
+        self.ratios.get(index).copied()
+    }
+
+    /// Return the total ratio sum (should be ~1.0 for a well-formed split).
+    pub fn ratio_sum(&self) -> f32 {
+        self.ratios.iter().sum()
+    }
+
+    /// Return true if the split has only a single pane.
+    pub fn is_single_pane(&self) -> bool {
+        self.ratios.len() <= 1
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1775,5 +1889,116 @@ mod tests {
         let a = rect(0, 0, 10, 10);
         let b = rect(10, 0, 10, 10);
         assert!(!rects_overlap(&a, &b));
+    }
+
+    #[test]
+    fn rect_intersection_overlapping() {
+        let a = rect(0, 0, 10, 10);
+        let b = rect(5, 5, 10, 10);
+        let inter = rect_intersection(&a, &b).unwrap();
+        assert_eq!(inter, rect(5, 5, 5, 5));
+    }
+
+    #[test]
+    fn rect_intersection_none() {
+        let a = rect(0, 0, 10, 10);
+        let b = rect(20, 20, 10, 10);
+        assert!(rect_intersection(&a, &b).is_none());
+    }
+
+    #[test]
+    fn bounding_box_multiple() {
+        let rects = vec![rect(5, 5, 10, 10), rect(0, 0, 3, 3), rect(10, 10, 5, 5)];
+        let bb = bounding_box(&rects).unwrap();
+        assert_eq!(bb, rect(0, 0, 15, 15));
+    }
+
+    #[test]
+    fn bounding_box_empty() {
+        let rects: Vec<Rect> = vec![];
+        assert!(bounding_box(&rects).is_none());
+    }
+
+    #[test]
+    fn rect_inset_shrinks() {
+        let r = rect(10, 10, 20, 20);
+        let inset = rect_inset(&r, 3);
+        assert_eq!(inset, rect(13, 13, 14, 14));
+    }
+
+    #[test]
+    fn rect_inset_too_large() {
+        let r = rect(10, 10, 4, 4);
+        let inset = rect_inset(&r, 3);
+        assert_eq!(inset.width, 0);
+        assert_eq!(inset.height, 0);
+    }
+
+    #[test]
+    fn rect_contains_inside() {
+        let outer = rect(0, 0, 20, 20);
+        let inner = rect(5, 5, 10, 10);
+        assert!(rect_contains(&outer, &inner));
+    }
+
+    #[test]
+    fn rect_contains_outside() {
+        let outer = rect(0, 0, 10, 10);
+        let inner = rect(5, 5, 10, 10);
+        assert!(!rect_contains(&outer, &inner));
+    }
+
+    #[test]
+    fn part_is_chrome() {
+        assert!(Part::Menubar.is_chrome());
+        assert!(Part::StatusBar.is_chrome());
+        assert!(!Part::Editor.is_chrome());
+    }
+
+    #[test]
+    fn part_label() {
+        assert_eq!(Part::Editor.label(), "Editor");
+        assert_eq!(Part::Sidebar.label(), "Side Bar");
+    }
+
+    #[test]
+    fn layout_result_all_rects() {
+        let layout = WorkbenchLayout::new();
+        let result = layout.compute(rect(0, 0, 120, 50));
+        let rects = result.all_rects();
+        assert!(rects.len() >= 4); // menubar, actbar, sidebar, editor, panel, statusbar
+    }
+
+    #[test]
+    fn layout_result_total_area() {
+        let layout = WorkbenchLayout::new();
+        let result = layout.compute(rect(0, 0, 120, 50));
+        assert!(result.total_area() > 0);
+    }
+
+    #[test]
+    fn split_add_remove_pane() {
+        let mut split = LayoutSplit::new(SplitDirection::Horizontal, 2);
+        assert_eq!(split.pane_count(), 2);
+        split.add_pane();
+        assert_eq!(split.pane_count(), 3);
+        assert!(split.remove_pane(2));
+        assert_eq!(split.pane_count(), 2);
+    }
+
+    #[test]
+    fn split_single_pane_minimum() {
+        let mut split = LayoutSplit::new(SplitDirection::Vertical, 1);
+        assert!(split.is_single_pane());
+        assert!(!split.remove_pane(0)); // can't remove the last one
+        assert_eq!(split.pane_count(), 1);
+    }
+
+    #[test]
+    fn split_ratio_at_and_sum() {
+        let split = LayoutSplit::new(SplitDirection::Horizontal, 3);
+        assert!(split.ratio_at(0).is_some());
+        assert!(split.ratio_at(5).is_none());
+        assert!((split.ratio_sum() - 1.0).abs() < 0.01);
     }
 }

@@ -968,6 +968,141 @@ impl ReferencesModel {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ReferenceDiff — compare two reference models
+// ---------------------------------------------------------------------------
+
+/// Result of diffing two `ReferencesModel` instances.
+#[derive(Debug, Clone)]
+pub struct ReferenceDiff {
+    /// References present in `new` but not in `old`.
+    pub added: Vec<Location>,
+    /// References present in `old` but not in `new`.
+    pub removed: Vec<Location>,
+    /// Number of references shared between both models.
+    pub unchanged_count: usize,
+}
+
+impl ReferenceDiff {
+    /// Compute the diff between an old and new model based on location equality.
+    pub fn diff(old: &ReferencesModel, new: &ReferencesModel) -> Self {
+        let old_locs: Vec<&Location> = old.references.iter().map(|r| &r.location).collect();
+        let new_locs: Vec<&Location> = new.references.iter().map(|r| &r.location).collect();
+
+        let added: Vec<Location> = new_locs
+            .iter()
+            .filter(|loc| !old_locs.contains(loc))
+            .map(|loc| (*loc).clone())
+            .collect();
+
+        let removed: Vec<Location> = old_locs
+            .iter()
+            .filter(|loc| !new_locs.contains(loc))
+            .map(|loc| (*loc).clone())
+            .collect();
+
+        let unchanged_count = new_locs
+            .iter()
+            .filter(|loc| old_locs.contains(loc))
+            .count();
+
+        Self {
+            added,
+            removed,
+            unchanged_count,
+        }
+    }
+
+    /// Whether the two models are identical (no additions or removals).
+    pub fn is_identical(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty()
+    }
+
+    /// Total number of changes (added + removed).
+    pub fn change_count(&self) -> usize {
+        self.added.len() + self.removed.len()
+    }
+}
+
+impl fmt::Display for ReferenceDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ReferenceDiff(+{} -{} ={} )",
+            self.added.len(),
+            self.removed.len(),
+            self.unchanged_count,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ReferenceNavigator — stateful navigation through references
+// ---------------------------------------------------------------------------
+
+/// Enables sequential navigation through references in a model.
+pub struct ReferenceNavigator<'a> {
+    refs: Vec<&'a ReferenceItem>,
+    index: Option<usize>,
+}
+
+impl<'a> ReferenceNavigator<'a> {
+    /// Create a navigator from a model's references.
+    pub fn new(model: &'a ReferencesModel) -> Self {
+        Self {
+            refs: model.references.iter().collect(),
+            index: None,
+        }
+    }
+
+    /// Move to the next reference. Wraps around.
+    pub fn next(&mut self) -> Option<&'a ReferenceItem> {
+        if self.refs.is_empty() {
+            return None;
+        }
+        let next = match self.index {
+            Some(i) => (i + 1) % self.refs.len(),
+            None => 0,
+        };
+        self.index = Some(next);
+        Some(self.refs[next])
+    }
+
+    /// Move to the previous reference. Wraps around.
+    pub fn previous(&mut self) -> Option<&'a ReferenceItem> {
+        if self.refs.is_empty() {
+            return None;
+        }
+        let prev = match self.index {
+            Some(0) => self.refs.len() - 1,
+            Some(i) => i - 1,
+            None => self.refs.len() - 1,
+        };
+        self.index = Some(prev);
+        Some(self.refs[prev])
+    }
+
+    /// Current reference, if any.
+    pub fn current(&self) -> Option<&'a ReferenceItem> {
+        self.index.map(|i| self.refs[i])
+    }
+
+    /// Current index (1-based display), or None if not started.
+    pub fn position(&self) -> Option<(usize, usize)> {
+        self.index.map(|i| (i + 1, self.refs.len()))
+    }
+
+    /// Total number of navigable references.
+    pub fn len(&self) -> usize {
+        self.refs.len()
+    }
+
+    /// Whether there are no references to navigate.
+    pub fn is_empty(&self) -> bool {
+        self.refs.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1649,5 +1784,93 @@ mod tests {
         assert_eq!(groups.len(), 2); // Read and Write
         let read_group = groups.iter().find(|(k, _)| *k == ReferenceKind::Read).unwrap();
         assert_eq!(read_group.1.len(), 2);
+    }
+
+    // -- ReferenceDiff tests ---------------------------------------------------
+
+    #[test]
+    fn diff_identical_models() {
+        let base = Location::new("main.rs", 1, 0, 1, 5);
+        let mut m1 = ReferencesModel::new("foo", base.clone());
+        m1.add_reference(ref_item("a.rs", 10, 5));
+        m1.add_reference(ref_item("b.rs", 20, 0));
+
+        let mut m2 = ReferencesModel::new("foo", base);
+        m2.add_reference(ref_item("a.rs", 10, 5));
+        m2.add_reference(ref_item("b.rs", 20, 0));
+
+        let diff = ReferenceDiff::diff(&m1, &m2);
+        assert!(diff.is_identical());
+        assert_eq!(diff.change_count(), 0);
+        assert_eq!(diff.unchanged_count, 2);
+    }
+
+    #[test]
+    fn diff_detects_added_and_removed() {
+        let base = Location::new("main.rs", 1, 0, 1, 5);
+        let mut old = ReferencesModel::new("foo", base.clone());
+        old.add_reference(ref_item("a.rs", 10, 5));
+
+        let mut new = ReferencesModel::new("foo", base);
+        new.add_reference(ref_item("b.rs", 20, 0));
+
+        let diff = ReferenceDiff::diff(&old, &new);
+        assert_eq!(diff.added.len(), 1);
+        assert_eq!(diff.removed.len(), 1);
+        assert_eq!(diff.added[0].uri, "b.rs");
+        assert_eq!(diff.removed[0].uri, "a.rs");
+    }
+
+    #[test]
+    fn diff_display() {
+        let base = Location::new("main.rs", 1, 0, 1, 5);
+        let old = ReferencesModel::new("foo", base.clone());
+        let mut new = ReferencesModel::new("foo", base);
+        new.add_reference(ref_item("c.rs", 1, 0));
+        let diff = ReferenceDiff::diff(&old, &new);
+        let display = format!("{diff}");
+        assert!(display.contains("+1"));
+    }
+
+    // -- ReferenceNavigator tests ---------------------------------------------
+
+    #[test]
+    fn navigator_next_wraps() {
+        let base = Location::new("main.rs", 1, 0, 1, 5);
+        let mut model = ReferencesModel::new("foo", base);
+        model.add_reference(ref_item("a.rs", 1, 0));
+        model.add_reference(ref_item("b.rs", 2, 0));
+
+        let mut nav = ReferenceNavigator::new(&model);
+        assert!(nav.current().is_none());
+        let first = nav.next().unwrap();
+        assert_eq!(first.location.uri, "a.rs");
+        let second = nav.next().unwrap();
+        assert_eq!(second.location.uri, "b.rs");
+        let wrapped = nav.next().unwrap();
+        assert_eq!(wrapped.location.uri, "a.rs");
+    }
+
+    #[test]
+    fn navigator_previous_wraps() {
+        let base = Location::new("main.rs", 1, 0, 1, 5);
+        let mut model = ReferencesModel::new("foo", base);
+        model.add_reference(ref_item("a.rs", 1, 0));
+        model.add_reference(ref_item("b.rs", 2, 0));
+
+        let mut nav = ReferenceNavigator::new(&model);
+        let last = nav.previous().unwrap();
+        assert_eq!(last.location.uri, "b.rs");
+        assert_eq!(nav.position(), Some((2, 2)));
+    }
+
+    #[test]
+    fn navigator_empty_model() {
+        let base = Location::new("main.rs", 1, 0, 1, 5);
+        let model = ReferencesModel::new("foo", base);
+        let mut nav = ReferenceNavigator::new(&model);
+        assert!(nav.is_empty());
+        assert!(nav.next().is_none());
+        assert!(nav.previous().is_none());
     }
 }

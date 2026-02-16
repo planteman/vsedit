@@ -1066,6 +1066,88 @@ impl StatusBarBridge {
     }
 }
 
+// ---------------------------------------------------------------------------
+// StatusBarBridge — batch and rendering helpers
+// ---------------------------------------------------------------------------
+
+impl StatusBarBridge {
+    /// Create multiple items at once. Returns the number of items actually created
+    /// (skipping duplicates).
+    pub fn create_items(&mut self, specs: &[(&str, StatusBarAlignment, i32)]) -> usize {
+        let mut created = 0;
+        for &(id, alignment, priority) in specs {
+            if !self.items.iter().any(|i| i.id == id) {
+                self.create_item(id, alignment, priority);
+                created += 1;
+            }
+        }
+        created
+    }
+
+    /// Render a simple text representation of the status bar layout.
+    /// Returns `"[left items] | [right items]"` with items separated by spaces.
+    pub fn render_text(&self) -> String {
+        let mut left: Vec<&StatusBarItem> = self.items.iter()
+            .filter(|i| i.is_visible && i.alignment == StatusBarAlignment::Left)
+            .collect();
+        left.sort_by(|a, b| b.priority.cmp(&a.priority));
+
+        let mut right: Vec<&StatusBarItem> = self.items.iter()
+            .filter(|i| i.is_visible && i.alignment == StatusBarAlignment::Right)
+            .collect();
+        right.sort_by(|a, b| b.priority.cmp(&a.priority));
+
+        let left_text: Vec<&str> = left.iter().map(|i| i.display_text()).collect();
+        let right_text: Vec<&str> = right.iter().map(|i| i.display_text()).collect();
+        format!("{} | {}", left_text.join("  "), right_text.join("  "))
+    }
+
+    /// Find an item by its command string.
+    pub fn find_by_command(&self, command: &str) -> Vec<&StatusBarItem> {
+        self.items.iter()
+            .filter(|i| i.command.as_deref() == Some(command))
+            .collect()
+    }
+
+    /// Return a JSON array of all visible items (for serialization to frontend).
+    pub fn to_json(&self) -> serde_json::Value {
+        let items: Vec<serde_json::Value> = self.visible_items()
+            .iter()
+            .map(|i| serde_json::json!({
+                "id": i.id,
+                "text": i.display_text(),
+                "alignment": format!("{}", i.alignment),
+                "priority": i.priority,
+            }))
+            .collect();
+        serde_json::Value::Array(items)
+    }
+
+    /// Update the priority of an item. Returns Ok(()) on success or an error
+    /// if the item doesn't exist.
+    pub fn set_priority(&mut self, id: &str, priority: i32) -> Result<(), StatusBarError> {
+        let item = self.items.iter_mut()
+            .find(|i| i.id == id)
+            .ok_or_else(|| StatusBarError::ItemNotFound(id.to_string()))?;
+        item.priority = priority;
+        Ok(())
+    }
+
+    /// Count items that have non-empty text set.
+    pub fn items_with_text_count(&self) -> usize {
+        self.items.iter().filter(|i| !i.text.is_empty()).count()
+    }
+}
+
+/// Render a compact one-line summary of a set of status bar items.
+pub fn render_summary(items: &[StatusBarItem]) -> String {
+    let visible = items.iter().filter(|i| i.is_visible).count();
+    let total = items.len();
+    let left = items.iter().filter(|i| i.alignment == StatusBarAlignment::Left).count();
+    let right = items.iter().filter(|i| i.alignment == StatusBarAlignment::Right).count();
+    format!("{}/{} visible, {} left, {} right", visible, total, left, right)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1666,5 +1748,84 @@ mod tests {
 
         mgr.toggle_group("test", &mut bridge);
         assert!(bridge.get_item("x").unwrap().is_visible);
+    }
+
+    // -- New tests ----------------------------------------------------------
+
+    #[test]
+    fn create_items_batch() {
+        let mut bridge = StatusBarBridge::new();
+        let specs = vec![
+            ("a", StatusBarAlignment::Left, 10),
+            ("b", StatusBarAlignment::Right, 5),
+            ("a", StatusBarAlignment::Left, 20), // duplicate
+        ];
+        let created = bridge.create_items(&specs);
+        assert_eq!(created, 2);
+        assert_eq!(bridge.item_count(), 2);
+    }
+
+    #[test]
+    fn render_text_layout() {
+        let mut bridge = StatusBarBridge::new();
+        bridge.create_item("branch", StatusBarAlignment::Left, 10);
+        bridge.create_item("line", StatusBarAlignment::Right, 5);
+        bridge.show_item("branch");
+        bridge.show_item("line");
+        let _ = bridge.update_item("branch", Some("main"), None, None);
+        let _ = bridge.update_item("line", Some("Ln 42"), None, None);
+
+        let text = bridge.render_text();
+        assert!(text.contains("main"));
+        assert!(text.contains("Ln 42"));
+        assert!(text.contains("|"));
+    }
+
+    #[test]
+    fn find_by_command_returns_matches() {
+        let mut bridge = StatusBarBridge::new();
+        bridge.create_item("a", StatusBarAlignment::Left, 1);
+        bridge.create_item("b", StatusBarAlignment::Left, 2);
+        let _ = bridge.update_item("a", None, None, Some("editor.action.format"));
+        let _ = bridge.update_item("b", None, None, Some("editor.action.format"));
+
+        let found = bridge.find_by_command("editor.action.format");
+        assert_eq!(found.len(), 2);
+        assert!(bridge.find_by_command("nonexistent").is_empty());
+    }
+
+    #[test]
+    fn to_json_returns_array() {
+        let mut bridge = StatusBarBridge::new();
+        bridge.create_item("git", StatusBarAlignment::Left, 10);
+        bridge.show_item("git");
+        let _ = bridge.update_item("git", Some("main"), None, None);
+
+        let json = bridge.to_json();
+        let arr = json.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["id"], "git");
+        assert_eq!(arr[0]["text"], "main");
+    }
+
+    #[test]
+    fn set_priority_updates_item() {
+        let mut bridge = StatusBarBridge::new();
+        bridge.create_item("x", StatusBarAlignment::Left, 1);
+        assert!(bridge.set_priority("x", 100).is_ok());
+        assert_eq!(bridge.get_item("x").unwrap().priority, 100);
+        assert!(bridge.set_priority("missing", 1).is_err());
+    }
+
+    #[test]
+    fn render_summary_output() {
+        let items = vec![
+            StatusBarItemBuilder::new().id("a").visible(true).alignment(StatusBarAlignment::Left).build().unwrap(),
+            StatusBarItemBuilder::new().id("b").visible(false).alignment(StatusBarAlignment::Right).build().unwrap(),
+        ];
+        let s = render_summary(&items);
+        assert!(s.contains("1/2 visible"));
+        assert!(s.contains("1 left"));
+        assert!(s.contains("1 right"));
     }
 }

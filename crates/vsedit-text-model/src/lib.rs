@@ -912,6 +912,238 @@ impl TextModel {
 }
 
 // ---------------------------------------------------------------------------
+// Encoding — helpers
+// ---------------------------------------------------------------------------
+
+impl Encoding {
+    /// Return the IANA charset label for the encoding.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Encoding::UTF8 => "utf-8",
+            Encoding::UTF8BOM => "utf-8-bom",
+            Encoding::UTF16LE => "utf-16le",
+            Encoding::UTF16BE => "utf-16be",
+            Encoding::Latin1 => "iso-8859-1",
+            Encoding::ShiftJIS => "shift_jis",
+            Encoding::GBK => "gbk",
+        }
+    }
+
+    /// Parse an IANA label back to an `Encoding`, case-insensitive.
+    pub fn from_label(label: &str) -> Option<Self> {
+        match label.to_ascii_lowercase().as_str() {
+            "utf-8" | "utf8" => Some(Encoding::UTF8),
+            "utf-8-bom" | "utf8bom" => Some(Encoding::UTF8BOM),
+            "utf-16le" | "utf16le" => Some(Encoding::UTF16LE),
+            "utf-16be" | "utf16be" => Some(Encoding::UTF16BE),
+            "iso-8859-1" | "latin1" => Some(Encoding::Latin1),
+            "shift_jis" | "shiftjis" => Some(Encoding::ShiftJIS),
+            "gbk" => Some(Encoding::GBK),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileEncoding — helpers
+// ---------------------------------------------------------------------------
+
+impl FileEncoding {
+    /// Return the BOM bytes for this encoding (empty for encodings without a BOM).
+    pub fn bom_bytes(&self) -> &'static [u8] {
+        match self {
+            Self::Utf8 | Self::Latin1 => &[],
+            Self::Utf8Bom => &[0xEF, 0xBB, 0xBF],
+            Self::Utf16Le => &[0xFF, 0xFE],
+            Self::Utf16Be => &[0xFE, 0xFF],
+        }
+    }
+
+    /// Return a human-readable label.
+    pub fn display_label(&self) -> &'static str {
+        match self {
+            Self::Utf8 => "UTF-8",
+            Self::Utf8Bom => "UTF-8 with BOM",
+            Self::Utf16Le => "UTF-16 LE",
+            Self::Utf16Be => "UTF-16 BE",
+            Self::Latin1 => "ISO 8859-1",
+        }
+    }
+
+    /// Convert to the full `Encoding` enum.
+    pub fn to_encoding(&self) -> Encoding {
+        match self {
+            Self::Utf8 => Encoding::UTF8,
+            Self::Utf8Bom => Encoding::UTF8BOM,
+            Self::Utf16Le => Encoding::UTF16LE,
+            Self::Utf16Be => Encoding::UTF16BE,
+            Self::Latin1 => Encoding::Latin1,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LineEnding — helpers
+// ---------------------------------------------------------------------------
+
+/// Count individual LF and CRLF occurrences in `text`.
+pub fn count_line_endings(text: &str) -> (u32, u32) {
+    let mut lf = 0u32;
+    let mut crlf = 0u32;
+    let bytes = text.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+    while i < len {
+        if bytes[i] == b'\r' && i + 1 < len && bytes[i + 1] == b'\n' {
+            crlf += 1;
+            i += 2;
+        } else if bytes[i] == b'\n' {
+            lf += 1;
+            i += 1;
+        } else {
+            i += 1;
+        }
+    }
+    (lf, crlf)
+}
+
+impl LineEnding {
+    /// Detect the predominant line ending and return the corresponding
+    /// `LineEnding`. Mixed or no-newline text defaults to LF.
+    pub fn detect(text: &str) -> Self {
+        match detect_line_ending(text) {
+            DetectedLineEnding::CRLF => LineEnding::CRLF,
+            _ => LineEnding::LF,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContentChange — helpers
+// ---------------------------------------------------------------------------
+
+impl ContentChange {
+    /// True when the change only inserts text (empty range).
+    pub fn is_insert(&self) -> bool {
+        self.range_length == 0 && !self.text.is_empty()
+    }
+
+    /// True when the change only deletes text (empty replacement).
+    pub fn is_delete(&self) -> bool {
+        self.range_length > 0 && self.text.is_empty()
+    }
+
+    /// True when the change replaces existing text with different text.
+    pub fn is_replace(&self) -> bool {
+        self.range_length > 0 && !self.text.is_empty()
+    }
+
+    /// Net byte-length delta produced by this change.
+    pub fn delta(&self) -> isize {
+        self.text.len() as isize - self.range_length as isize
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditOperation — helpers
+// ---------------------------------------------------------------------------
+
+impl EditOperation {
+    /// True when the edit produces no visible change.
+    pub fn is_noop(&self) -> bool {
+        self.text_inserted == self.text_replaced
+    }
+
+    /// Produce the inverse operation that undoes this edit.
+    pub fn inverse(&self) -> Self {
+        EditOperation {
+            range_after: self.range_before,
+            text_inserted: self.text_replaced.clone(),
+            text_replaced: self.text_inserted.clone(),
+            range_before: self.range_after,
+            force_move_markers: self.force_move_markers,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ModelSnapshot — helpers
+// ---------------------------------------------------------------------------
+
+impl ModelSnapshot {
+    /// Number of lines in the snapshot.
+    pub fn line_count(&self) -> u32 {
+        if self.text.is_empty() {
+            return 1;
+        }
+        self.text.split('\n').count() as u32
+    }
+
+    /// Return the content of the given 1-based line without the trailing newline.
+    pub fn get_line_content(&self, line_number: u32) -> Option<&str> {
+        self.text
+            .split('\n')
+            .nth((line_number - 1) as usize)
+            .map(|l| l.strip_suffix('\r').unwrap_or(l))
+    }
+
+    /// Simple whitespace-delimited word count.
+    pub fn word_count(&self) -> usize {
+        self.text.split_whitespace().count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TextModel — additional queries
+// ---------------------------------------------------------------------------
+
+impl TextModel {
+    /// Count whitespace-delimited words in the document.
+    pub fn get_word_count(&self) -> usize {
+        let text = self.get_value();
+        text.split_whitespace().count()
+    }
+
+    /// Count Unicode scalar values (characters) in the document.
+    pub fn get_char_count(&self) -> usize {
+        self.rope.len_chars()
+    }
+
+    /// Replace all non-overlapping occurrences of `search` with `replacement`.
+    /// Returns the number of replacements made.
+    pub fn replace_all(&mut self, search: &str, replacement: &str) -> usize {
+        if search.is_empty() {
+            return 0;
+        }
+        let matches = self.find_matches(search, false, true);
+        let count = matches.len();
+        // Apply in reverse so earlier ranges stay valid.
+        for range in matches.into_iter().rev() {
+            self.apply_edit(range, replacement);
+        }
+        count
+    }
+
+    /// Return true if the document text is empty.
+    pub fn is_empty(&self) -> bool {
+        self.rope.len_bytes() == 0
+    }
+
+    /// Return the first line's content.
+    pub fn first_line(&self) -> &str {
+        self.cache_line(1);
+        unsafe { (*self.line_cache.get()).1.as_str() }
+    }
+
+    /// Return the last line's content.
+    pub fn last_line(&self) -> &str {
+        let lc = self.get_line_count();
+        self.cache_line(lc);
+        unsafe { (*self.line_cache.get()).1.as_str() }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // ITextModel implementation
 // ---------------------------------------------------------------------------
 
@@ -1737,5 +1969,230 @@ mod tests {
     fn model_new_defaults_to_utf8_file_encoding() {
         let model = TextModel::new("hello");
         assert_eq!(model.get_file_encoding(), FileEncoding::Utf8);
+    }
+
+    // -- New functionality tests --------------------------------------------
+
+    #[test]
+    fn encoding_label_roundtrip() {
+        let encodings = [
+            Encoding::UTF8,
+            Encoding::UTF8BOM,
+            Encoding::UTF16LE,
+            Encoding::UTF16BE,
+            Encoding::Latin1,
+            Encoding::ShiftJIS,
+            Encoding::GBK,
+        ];
+        for enc in &encodings {
+            let label = enc.label();
+            let parsed = Encoding::from_label(label);
+            assert_eq!(parsed, Some(*enc), "roundtrip failed for {:?}", enc);
+        }
+    }
+
+    #[test]
+    fn encoding_from_label_case_insensitive() {
+        assert_eq!(Encoding::from_label("UTF-8"), Some(Encoding::UTF8));
+        assert_eq!(Encoding::from_label("Utf-16LE"), Some(Encoding::UTF16LE));
+        assert_eq!(Encoding::from_label("unknown"), None);
+    }
+
+    #[test]
+    fn file_encoding_bom_bytes() {
+        assert!(FileEncoding::Utf8.bom_bytes().is_empty());
+        assert_eq!(FileEncoding::Utf8Bom.bom_bytes(), &[0xEF, 0xBB, 0xBF]);
+        assert_eq!(FileEncoding::Utf16Le.bom_bytes(), &[0xFF, 0xFE]);
+        assert_eq!(FileEncoding::Utf16Be.bom_bytes(), &[0xFE, 0xFF]);
+        assert!(FileEncoding::Latin1.bom_bytes().is_empty());
+    }
+
+    #[test]
+    fn file_encoding_display_label() {
+        assert_eq!(FileEncoding::Utf8.display_label(), "UTF-8");
+        assert_eq!(FileEncoding::Utf8Bom.display_label(), "UTF-8 with BOM");
+        assert_eq!(FileEncoding::Latin1.display_label(), "ISO 8859-1");
+    }
+
+    #[test]
+    fn file_encoding_to_encoding() {
+        assert_eq!(FileEncoding::Utf8.to_encoding(), Encoding::UTF8);
+        assert_eq!(FileEncoding::Utf8Bom.to_encoding(), Encoding::UTF8BOM);
+        assert_eq!(FileEncoding::Utf16Le.to_encoding(), Encoding::UTF16LE);
+        assert_eq!(FileEncoding::Utf16Be.to_encoding(), Encoding::UTF16BE);
+        assert_eq!(FileEncoding::Latin1.to_encoding(), Encoding::Latin1);
+    }
+
+    #[test]
+    fn count_line_endings_basic() {
+        assert_eq!(count_line_endings("a\nb\nc\n"), (3, 0));
+        assert_eq!(count_line_endings("a\r\nb\r\n"), (0, 2));
+        assert_eq!(count_line_endings("a\nb\r\n"), (1, 1));
+        assert_eq!(count_line_endings("no newlines"), (0, 0));
+    }
+
+    #[test]
+    fn line_ending_detect_helper() {
+        assert_eq!(LineEnding::detect("a\r\nb\r\n"), LineEnding::CRLF);
+        assert_eq!(LineEnding::detect("a\nb\n"), LineEnding::LF);
+        assert_eq!(LineEnding::detect("no newlines"), LineEnding::LF);
+    }
+
+    #[test]
+    fn content_change_classification() {
+        let insert = ContentChange {
+            range: Range::new(1, 1, 1, 1),
+            text: "hello".into(),
+            range_offset: 0,
+            range_length: 0,
+        };
+        assert!(insert.is_insert());
+        assert!(!insert.is_delete());
+        assert!(!insert.is_replace());
+        assert_eq!(insert.delta(), 5);
+
+        let delete = ContentChange {
+            range: Range::new(1, 1, 1, 6),
+            text: String::new(),
+            range_offset: 0,
+            range_length: 5,
+        };
+        assert!(!delete.is_insert());
+        assert!(delete.is_delete());
+        assert!(!delete.is_replace());
+        assert_eq!(delete.delta(), -5);
+
+        let replace = ContentChange {
+            range: Range::new(1, 1, 1, 4),
+            text: "ab".into(),
+            range_offset: 0,
+            range_length: 3,
+        };
+        assert!(!replace.is_insert());
+        assert!(!replace.is_delete());
+        assert!(replace.is_replace());
+        assert_eq!(replace.delta(), -1);
+    }
+
+    #[test]
+    fn edit_operation_is_noop() {
+        let noop = EditOperation {
+            range_after: Range::new(1, 1, 1, 4),
+            text_inserted: "abc".into(),
+            text_replaced: "abc".into(),
+            range_before: Range::new(1, 1, 1, 4),
+            force_move_markers: false,
+        };
+        assert!(noop.is_noop());
+
+        let real = EditOperation {
+            range_after: Range::new(1, 1, 1, 4),
+            text_inserted: "xyz".into(),
+            text_replaced: "abc".into(),
+            range_before: Range::new(1, 1, 1, 4),
+            force_move_markers: false,
+        };
+        assert!(!real.is_noop());
+    }
+
+    #[test]
+    fn edit_operation_inverse() {
+        let op = EditOperation {
+            range_after: Range::new(1, 1, 1, 6),
+            text_inserted: "hello".into(),
+            text_replaced: "hi".into(),
+            range_before: Range::new(1, 1, 1, 3),
+            force_move_markers: false,
+        };
+        let inv = op.inverse();
+        assert_eq!(inv.text_inserted, "hi");
+        assert_eq!(inv.text_replaced, "hello");
+        assert_eq!(inv.range_before, op.range_after);
+        assert_eq!(inv.range_after, op.range_before);
+    }
+
+    #[test]
+    fn snapshot_line_count_and_content() {
+        let model = TextModel::new("hello\nworld\nfoo");
+        let snap = model.create_snapshot();
+        assert_eq!(snap.line_count(), 3);
+        assert_eq!(snap.get_line_content(1), Some("hello"));
+        assert_eq!(snap.get_line_content(2), Some("world"));
+        assert_eq!(snap.get_line_content(3), Some("foo"));
+        assert_eq!(snap.get_line_content(4), None);
+    }
+
+    #[test]
+    fn snapshot_word_count() {
+        let model = TextModel::new("hello world\nfoo bar baz");
+        let snap = model.create_snapshot();
+        assert_eq!(snap.word_count(), 5);
+    }
+
+    #[test]
+    fn model_word_count() {
+        let model = TextModel::new("the quick brown fox");
+        assert_eq!(model.get_word_count(), 4);
+    }
+
+    #[test]
+    fn model_char_count() {
+        let model = TextModel::new("hello");
+        assert_eq!(model.get_char_count(), 5);
+    }
+
+    #[test]
+    fn model_replace_all() {
+        let mut model = TextModel::new("foo bar foo baz foo");
+        let count = model.replace_all("foo", "qux");
+        assert_eq!(count, 3);
+        assert_eq!(model.get_value(), "qux bar qux baz qux");
+    }
+
+    #[test]
+    fn model_replace_all_no_match() {
+        let mut model = TextModel::new("hello world");
+        let count = model.replace_all("xyz", "abc");
+        assert_eq!(count, 0);
+        assert_eq!(model.get_value(), "hello world");
+    }
+
+    #[test]
+    fn model_replace_all_empty_search() {
+        let mut model = TextModel::new("hello");
+        let count = model.replace_all("", "x");
+        assert_eq!(count, 0);
+        assert_eq!(model.get_value(), "hello");
+    }
+
+    #[test]
+    fn model_is_empty() {
+        let model = TextModel::new("");
+        assert!(model.is_empty());
+        let model = TextModel::new("a");
+        assert!(!model.is_empty());
+    }
+
+    #[test]
+    fn model_first_and_last_line() {
+        let model = TextModel::new("first\nmiddle\nlast");
+        assert_eq!(model.first_line(), "first");
+        assert_eq!(model.last_line(), "last");
+    }
+
+    #[test]
+    fn model_first_last_single_line() {
+        let model = TextModel::new("only");
+        assert_eq!(model.first_line(), "only");
+        assert_eq!(model.last_line(), "only");
+    }
+
+    #[test]
+    fn snapshot_empty_document() {
+        let model = TextModel::new("");
+        let snap = model.create_snapshot();
+        assert_eq!(snap.line_count(), 1);
+        assert_eq!(snap.word_count(), 0);
+        assert_eq!(snap.get_line_content(1), Some(""));
     }
 }

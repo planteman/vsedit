@@ -1026,6 +1026,134 @@ pub fn iterate_while<T>(mut value: T, pred: impl Fn(&T) -> bool, f: impl Fn(T) -
     value
 }
 
+// ---------------------------------------------------------------------------
+// window — sliding window over a slice
+// ---------------------------------------------------------------------------
+
+/// Return all contiguous windows of size `n` from a slice.
+pub fn windows<T>(items: &[T], n: usize) -> Vec<&[T]> {
+    if n == 0 || n > items.len() {
+        return Vec::new();
+    }
+    items.windows(n).collect()
+}
+
+// ---------------------------------------------------------------------------
+// intersperse — place a separator between elements
+// ---------------------------------------------------------------------------
+
+/// Insert `sep` between every two consecutive elements.
+pub fn intersperse<T: Clone>(items: impl IntoIterator<Item = T>, sep: T) -> Vec<T> {
+    let mut result = Vec::new();
+    let mut first = true;
+    for item in items {
+        if !first {
+            result.push(sep.clone());
+        }
+        result.push(item);
+        first = false;
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// chunk — split into fixed-size groups
+// ---------------------------------------------------------------------------
+
+/// Split a `Vec` into chunks of at most `size` elements.
+pub fn chunk<T>(items: Vec<T>, size: usize) -> Vec<Vec<T>> {
+    if size == 0 {
+        return Vec::new();
+    }
+    let mut result = Vec::new();
+    let mut current = Vec::with_capacity(size);
+    for item in items {
+        current.push(item);
+        if current.len() == size {
+            result.push(std::mem::take(&mut current));
+            current = Vec::with_capacity(size);
+        }
+    }
+    if !current.is_empty() {
+        result.push(current);
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// transpose — Option<Result> ↔ Result<Option>
+// ---------------------------------------------------------------------------
+
+/// Convert `Option<Result<T, E>>` into `Result<Option<T>, E>`.
+pub fn transpose_option_result<T, E>(opt: Option<Result<T, E>>) -> Result<Option<T>, E> {
+    match opt {
+        Some(Ok(v)) => Ok(Some(v)),
+        Some(Err(e)) => Err(e),
+        None => Ok(None),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// zip_longest — zip two iterators, padding with None
+// ---------------------------------------------------------------------------
+
+/// Zip two iterators, continuing until both are exhausted.
+/// Shorter iterator pads with `None`.
+pub fn zip_longest<A, B>(
+    a: impl IntoIterator<Item = A>,
+    b: impl IntoIterator<Item = B>,
+) -> Vec<(Option<A>, Option<B>)> {
+    let mut a_iter = a.into_iter();
+    let mut b_iter = b.into_iter();
+    let mut result = Vec::new();
+    loop {
+        match (a_iter.next(), b_iter.next()) {
+            (None, None) => break,
+            (av, bv) => result.push((av, bv)),
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// fold_while — fold with early termination
+// ---------------------------------------------------------------------------
+
+/// Fold over items while the predicate returns true for the accumulator.
+/// Stops as soon as the predicate fails after an accumulation step.
+pub fn fold_while<T, A>(
+    items: impl IntoIterator<Item = T>,
+    init: A,
+    pred: impl Fn(&A) -> bool,
+    f: impl Fn(A, T) -> A,
+) -> A {
+    let mut acc = init;
+    for item in items {
+        acc = f(acc, item);
+        if !pred(&acc) {
+            break;
+        }
+    }
+    acc
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline additional methods
+// ---------------------------------------------------------------------------
+
+impl<T: Clone + 'static> Pipeline<T> {
+    /// Execute the pipeline but also return each intermediate result.
+    pub fn execute_trace(&self, value: T) -> Vec<T> {
+        let mut trace = vec![value.clone()];
+        let mut current = value;
+        for step in &self.steps {
+            current = step(current);
+            trace.push(current.clone());
+        }
+        trace
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1665,5 +1793,69 @@ mod tests {
     fn test_iterate_while() {
         let result = iterate_while(1, |x| *x < 100, |x| x * 2);
         assert_eq!(result, 128); // 1 → 2 → 4 → 8 → 16 → 32 → 64 → 128
+    }
+
+    #[test]
+    fn test_windows() {
+        let data = vec![1, 2, 3, 4, 5];
+        let w = windows(&data, 3);
+        assert_eq!(w.len(), 3);
+        assert_eq!(w[0], &[1, 2, 3]);
+        assert_eq!(w[2], &[3, 4, 5]);
+        assert!(windows(&data, 0).is_empty());
+        assert!(windows(&data, 6).is_empty());
+    }
+
+    #[test]
+    fn test_intersperse() {
+        let result = intersperse(vec![1, 2, 3], 0);
+        assert_eq!(result, vec![1, 0, 2, 0, 3]);
+        let single = intersperse(vec![42], 0);
+        assert_eq!(single, vec![42]);
+        let empty: Vec<i32> = intersperse(Vec::new(), 0);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn test_chunk() {
+        let result = chunk(vec![1, 2, 3, 4, 5], 2);
+        assert_eq!(result, vec![vec![1, 2], vec![3, 4], vec![5]]);
+        let exact = chunk(vec![1, 2, 3, 4], 2);
+        assert_eq!(exact, vec![vec![1, 2], vec![3, 4]]);
+        assert!(chunk(vec![1, 2], 0).is_empty());
+    }
+
+    #[test]
+    fn test_transpose_option_result() {
+        let some_ok: Option<Result<i32, &str>> = Some(Ok(42));
+        assert_eq!(transpose_option_result(some_ok), Ok(Some(42)));
+        let some_err: Option<Result<i32, &str>> = Some(Err("fail"));
+        assert_eq!(transpose_option_result(some_err), Err("fail"));
+        let none: Option<Result<i32, &str>> = None;
+        assert_eq!(transpose_option_result(none), Ok(None));
+    }
+
+    #[test]
+    fn test_zip_longest() {
+        let result = zip_longest(vec![1, 2, 3], vec!["a", "b"]);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], (Some(1), Some("a")));
+        assert_eq!(result[2], (Some(3), None));
+    }
+
+    #[test]
+    fn test_fold_while() {
+        // Sum until accumulator exceeds 10
+        let result = fold_while(vec![3, 3, 3, 3, 3], 0, |acc| *acc <= 10, |a, b| a + b);
+        assert_eq!(result, 12); // 0+3=3, 3+3=6, 6+3=9, 9+3=12 > 10 → stop
+    }
+
+    #[test]
+    fn test_pipeline_execute_trace() {
+        let p = Pipeline::new()
+            .then(|x: i32| x + 1)
+            .then(|x: i32| x * 2);
+        let trace = p.execute_trace(5);
+        assert_eq!(trace, vec![5, 6, 12]);
     }
 }

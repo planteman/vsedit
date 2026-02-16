@@ -1095,6 +1095,109 @@ pub fn most_recent_record(acc: &ErrorAccumulator) -> Option<&ErrorRecord> {
     acc.records().last()
 }
 
+
+// ---------------------------------------------------------------------------
+// Error classification and filtering utilities
+// ---------------------------------------------------------------------------
+
+/// Return true if the error variant represents a permissions/access issue.
+pub fn is_access_error(error: &VsError) -> bool {
+    matches!(error, VsError::PermissionDenied(_) | VsError::ReadOnly(_))
+}
+
+/// Return true if the error is retryable (not a permanent logic error).
+pub fn is_retryable(error: &VsError) -> bool {
+    matches!(error, VsError::Io(_) | VsError::Other(_))
+}
+
+/// Wrap a string message into a `VsError::User` variant.
+pub fn user_error(msg: impl Into<String>) -> VsError {
+    VsError::User(msg.into())
+}
+
+/// Wrap a string into a `VsError::IllegalArgument` variant.
+pub fn illegal_argument(msg: impl Into<String>) -> VsError {
+    VsError::IllegalArgument(msg.into())
+}
+
+/// Wrap a string into a `VsError::IllegalState` variant.
+pub fn illegal_state(msg: impl Into<String>) -> VsError {
+    VsError::IllegalState(msg.into())
+}
+
+/// Filter error records by minimum severity level.
+pub fn filter_by_severity(acc: &ErrorAccumulator, min: ErrorSeverity) -> Vec<&ErrorRecord> {
+    let min_ord = severity_ordinal(min);
+    acc.records()
+        .iter()
+        .filter(|r| severity_ordinal(r.severity()) >= min_ord)
+        .collect()
+}
+
+/// Return a numeric ordinal for severity comparison.
+fn severity_ordinal(s: ErrorSeverity) -> u8 {
+    match s {
+        ErrorSeverity::Info => 0,
+        ErrorSeverity::Warning => 1,
+        ErrorSeverity::Error => 2,
+    }
+}
+
+/// Partition accumulator records into errors and non-errors.
+pub fn partition_by_severity(acc: &ErrorAccumulator) -> (Vec<&ErrorRecord>, Vec<&ErrorRecord>) {
+    let errors: Vec<&ErrorRecord> = acc
+        .records()
+        .iter()
+        .filter(|r| matches!(r.severity(), ErrorSeverity::Error))
+        .collect();
+    let non_errors: Vec<&ErrorRecord> = acc
+        .records()
+        .iter()
+        .filter(|r| !matches!(r.severity(), ErrorSeverity::Error))
+        .collect();
+    (errors, non_errors)
+}
+
+/// Produce a formatted report of all errors in an accumulator.
+pub fn error_report(acc: &ErrorAccumulator) -> String {
+    if acc.is_empty() {
+        return "No errors recorded.".to_string();
+    }
+    let mut report = format!("{} error(s) recorded:\n", acc.len());
+    for (i, rec) in acc.records().iter().enumerate() {
+        report.push_str(&format!("  {}. {}\n", i + 1, rec));
+    }
+    report
+}
+
+/// Extract all unique error codes from an accumulator.
+pub fn unique_error_codes(acc: &ErrorAccumulator) -> Vec<&'static str> {
+    let mut codes: Vec<&'static str> = acc.records().iter().map(|r| r.error.code()).collect();
+    codes.sort();
+    codes.dedup();
+    codes
+}
+
+/// Returns true if the error is a "not found" variant.
+pub fn is_not_found(error: &VsError) -> bool {
+    matches!(error, VsError::NotFound(_))
+}
+
+/// Returns true if the error is a "not implemented" variant.
+pub fn is_not_implemented(error: &VsError) -> bool {
+    matches!(error, VsError::NotImplemented(_))
+}
+
+/// Chain two errors: if `primary` is a cancellation, return `fallback` instead.
+pub fn or_on_cancel(primary: VsError, fallback: VsError) -> VsError {
+    if is_cancelled(&primary) {
+        fallback
+    } else {
+        primary
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1764,4 +1867,94 @@ mod tests {
         let rec = most_recent_record(&acc).unwrap();
         assert_eq!(error_inner_message(&rec.error), Some("second"));
     }
+
+    #[test]
+    fn is_access_error_checks() {
+        assert!(is_access_error(&VsError::PermissionDenied("denied".into())));
+        assert!(is_access_error(&VsError::ReadOnly("file".into())));
+        assert!(!is_access_error(&VsError::NotFound("missing".into())));
+        assert!(!is_access_error(&VsError::Cancelled));
+    }
+
+    #[test]
+    fn is_retryable_checks() {
+        let io_err = VsError::Io(std::io::Error::new(std::io::ErrorKind::TimedOut, "timeout"));
+        assert!(is_retryable(&io_err));
+        assert!(!is_retryable(&VsError::Cancelled));
+        assert!(!is_retryable(&VsError::NotFound("x".into())));
+    }
+
+    #[test]
+    fn convenience_constructors() {
+        let u = user_error("oops");
+        assert_eq!(u.to_string(), "oops");
+        let ia = illegal_argument("bad arg");
+        assert_eq!(ia.to_string(), "Illegal argument: bad arg");
+        let is = illegal_state("bad state");
+        assert_eq!(is.to_string(), "Illegal state: bad state");
+    }
+
+    #[test]
+    fn filter_by_severity_filters() {
+        let mut acc = ErrorAccumulator::new();
+        acc.push_record(ErrorRecord::new(VsError::User("info".into())).with_severity(ErrorSeverity::Info));
+        acc.push_record(ErrorRecord::new(VsError::User("warn".into())).with_severity(ErrorSeverity::Warning));
+        acc.push_record(ErrorRecord::new(VsError::User("err".into())).with_severity(ErrorSeverity::Error));
+        let warnings_up = filter_by_severity(&acc, ErrorSeverity::Warning);
+        assert_eq!(warnings_up.len(), 2);
+        let errors_only = filter_by_severity(&acc, ErrorSeverity::Error);
+        assert_eq!(errors_only.len(), 1);
+    }
+
+    #[test]
+    fn partition_by_severity_splits() {
+        let mut acc = ErrorAccumulator::new();
+        acc.push_record(ErrorRecord::new(VsError::User("err".into())).with_severity(ErrorSeverity::Error));
+        acc.push_record(ErrorRecord::new(VsError::User("info".into())).with_severity(ErrorSeverity::Info));
+        let (errors, non_errors) = partition_by_severity(&acc);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(non_errors.len(), 1);
+    }
+
+    #[test]
+    fn error_report_format() {
+        let acc = ErrorAccumulator::new();
+        assert_eq!(error_report(&acc), "No errors recorded.");
+        let mut acc2 = ErrorAccumulator::new();
+        acc2.push(VsError::NotFound("a".into()));
+        acc2.push(VsError::User("b".into()));
+        let report = error_report(&acc2);
+        assert!(report.contains("2 error(s)"));
+    }
+
+    #[test]
+    fn unique_error_codes_deduplicates() {
+        let mut acc = ErrorAccumulator::new();
+        acc.push(VsError::NotFound("a".into()));
+        acc.push(VsError::NotFound("b".into()));
+        acc.push(VsError::User("c".into()));
+        let codes = unique_error_codes(&acc);
+        assert_eq!(codes.len(), 2);
+    }
+
+    #[test]
+    fn is_not_found_and_not_implemented() {
+        assert!(is_not_found(&VsError::NotFound("x".into())));
+        assert!(!is_not_found(&VsError::Cancelled));
+        assert!(is_not_implemented(&VsError::NotImplemented("x".into())));
+        assert!(!is_not_implemented(&VsError::Cancelled));
+    }
+
+    #[test]
+    fn or_on_cancel_replaces() {
+        let primary = VsError::Cancelled;
+        let fallback = VsError::User("fallback".into());
+        let result = or_on_cancel(primary, fallback);
+        assert_eq!(result.to_string(), "fallback");
+        let primary2 = VsError::NotFound("x".into());
+        let fallback2 = VsError::User("y".into());
+        let result2 = or_on_cancel(primary2, fallback2);
+        assert_eq!(result2.to_string(), "Not found: x");
+    }
+
 }
