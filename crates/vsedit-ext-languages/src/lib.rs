@@ -3,6 +3,7 @@
 //! RPC bridge between the extension host and the main thread for languages.
 
 use std::collections::HashMap;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
@@ -759,6 +760,278 @@ impl LanguageStatusRegistry {
     }
 }
 
+// ── Display impls ──
+
+impl fmt::Display for LanguageFeatureKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            LanguageFeatureKind::Completion => "Completion",
+            LanguageFeatureKind::Hover => "Hover",
+            LanguageFeatureKind::Definition => "Definition",
+            LanguageFeatureKind::Diagnostics => "Diagnostics",
+            LanguageFeatureKind::CodeActions => "Code Actions",
+            LanguageFeatureKind::CodeLens => "Code Lens",
+            LanguageFeatureKind::Formatting => "Formatting",
+            LanguageFeatureKind::SignatureHelp => "Signature Help",
+            LanguageFeatureKind::Rename => "Rename",
+            LanguageFeatureKind::DocumentSymbol => "Document Symbol",
+        };
+        write!(f, "{}", label)
+    }
+}
+
+impl fmt::Display for ProviderPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            ProviderPriority::Default => "default",
+            ProviderPriority::High => "high",
+            ProviderPriority::Exclusive => "exclusive",
+        };
+        write!(f, "{}", label)
+    }
+}
+
+impl fmt::Display for LanguageStatusSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            LanguageStatusSeverity::Information => "info",
+            LanguageStatusSeverity::Warning => "warning",
+            LanguageStatusSeverity::Error => "error",
+        };
+        write!(f, "{}", label)
+    }
+}
+
+impl fmt::Display for LanguageSelector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let lang = self.language.as_deref().unwrap_or("*");
+        let scheme = self.scheme.as_deref().unwrap_or("*");
+        let pat = self.pattern.as_deref().unwrap_or("*");
+        write!(f, "{}:{}:{}", lang, scheme, pat)
+    }
+}
+
+impl fmt::Display for LanguageStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {} ({})", self.severity, self.display_text(), self.language_id)
+    }
+}
+
+// ── From impls ──
+
+impl From<&str> for LanguageSelector {
+    fn from(language: &str) -> Self {
+        LanguageSelector {
+            language: Some(language.to_string()),
+            scheme: None,
+            pattern: None,
+        }
+    }
+}
+
+impl From<ProviderPriority> for u32 {
+    fn from(p: ProviderPriority) -> u32 {
+        p.weight()
+    }
+}
+
+// ── SelectorMatcher ──
+
+/// Evaluates whether a [`LanguageSelector`] matches a document described by
+/// its language, scheme, and file path. Wraps the matching logic with document
+/// metadata so it can be reused across multiple selectors without repeating
+/// the document fields.
+#[derive(Debug, Clone)]
+pub struct SelectorMatcher {
+    pub language: String,
+    pub scheme: String,
+    pub path: String,
+}
+
+impl SelectorMatcher {
+    pub fn new(language: impl Into<String>, scheme: impl Into<String>, path: impl Into<String>) -> Self {
+        Self {
+            language: language.into(),
+            scheme: scheme.into(),
+            path: path.into(),
+        }
+    }
+
+    /// Returns `true` if the given selector matches this document.
+    pub fn matches(&self, selector: &LanguageSelector) -> bool {
+        selector_matches(selector, &self.language, &self.scheme, &self.path)
+    }
+
+    /// Returns the specificity score for the given selector against this document.
+    pub fn score(&self, selector: &LanguageSelector) -> u32 {
+        selector_score(selector, &self.language, &self.scheme, &self.path)
+    }
+
+    /// Filters a slice of selectors, returning only those that match.
+    pub fn filter_matching<'a>(&self, selectors: &'a [LanguageSelector]) -> Vec<&'a LanguageSelector> {
+        selectors.iter().filter(|s| self.matches(s)).collect()
+    }
+
+    /// Returns the best-matching selector from a slice, or `None` if none match.
+    pub fn best_match<'a>(&self, selectors: &'a [LanguageSelector]) -> Option<&'a LanguageSelector> {
+        selectors
+            .iter()
+            .filter(|s| self.matches(s))
+            .max_by_key(|s| self.score(s))
+    }
+}
+
+// ── FeatureMatrix ──
+
+/// Tracks which [`LanguageFeatureKind`]s are available for which languages,
+/// providing summary queries across the entire matrix.
+#[derive(Debug, Clone, Default)]
+pub struct FeatureMatrix {
+    entries: HashMap<String, Vec<LanguageFeatureKind>>,
+}
+
+impl FeatureMatrix {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Build a `FeatureMatrix` from a `LanguageBridge` by inspecting all
+    /// registered providers.
+    pub fn from_bridge(bridge: &LanguageBridge) -> Self {
+        let mut matrix = Self::new();
+        for (id, reg) in &bridge.providers {
+            if let (Some(lang), Some(&kind)) =
+                (&reg.selector.language, bridge.feature_kinds.get(id.as_str()))
+            {
+                matrix.add(lang, kind);
+            }
+        }
+        matrix
+    }
+
+    /// Record that `language` supports `feature`.
+    pub fn add(&mut self, language: &str, feature: LanguageFeatureKind) {
+        let features = self.entries.entry(language.to_string()).or_default();
+        if !features.contains(&feature) {
+            features.push(feature);
+        }
+    }
+
+    /// Returns the set of features available for a language.
+    pub fn features_for(&self, language: &str) -> &[LanguageFeatureKind] {
+        self.entries.get(language).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+
+    /// Returns all languages that have at least one feature registered.
+    pub fn languages(&self) -> Vec<&str> {
+        let mut langs: Vec<&str> = self.entries.keys().map(|s| s.as_str()).collect();
+        langs.sort();
+        langs
+    }
+
+    /// Number of distinct (language, feature) pairs.
+    pub fn total_entries(&self) -> usize {
+        self.entries.values().map(|v| v.len()).sum()
+    }
+
+    /// Returns languages that support every feature in `required`.
+    pub fn languages_with_all(&self, required: &[LanguageFeatureKind]) -> Vec<&str> {
+        self.entries
+            .iter()
+            .filter(|(_, features)| required.iter().all(|r| features.contains(r)))
+            .map(|(lang, _)| lang.as_str())
+            .collect()
+    }
+
+    /// Returns languages that support at least one feature in `any`.
+    pub fn languages_with_any(&self, any: &[LanguageFeatureKind]) -> Vec<&str> {
+        self.entries
+            .iter()
+            .filter(|(_, features)| any.iter().any(|r| features.contains(r)))
+            .map(|(lang, _)| lang.as_str())
+            .collect()
+    }
+
+    /// Returns a human-readable summary of the matrix.
+    pub fn summary(&self) -> String {
+        let mut out = String::new();
+        let mut langs = self.languages();
+        langs.sort();
+        for lang in langs {
+            let features = self.features_for(lang);
+            let names: Vec<String> = features.iter().map(|f| f.to_string()).collect();
+            out.push_str(&format!("{}: {}\n", lang, names.join(", ")));
+        }
+        out
+    }
+}
+
+// ── ProviderChain ──
+
+/// Entry in a [`ProviderChain`], pairing a registration with a priority.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PrioritizedProvider {
+    pub registration: ProviderRegistration,
+    pub priority: ProviderPriority,
+}
+
+/// Chains multiple providers in priority order for a single feature.
+///
+/// When resolving which provider(s) to invoke, an `Exclusive` provider
+/// suppresses all others. Otherwise providers are returned in descending
+/// priority order (High before Default), with ties broken by insertion order.
+#[derive(Debug, Clone, Default)]
+pub struct ProviderChain {
+    providers: Vec<PrioritizedProvider>,
+}
+
+impl ProviderChain {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a provider with the given priority.
+    pub fn add(&mut self, registration: ProviderRegistration, priority: ProviderPriority) {
+        self.providers.push(PrioritizedProvider { registration, priority });
+    }
+
+    /// Number of providers in the chain.
+    pub fn len(&self) -> usize {
+        self.providers.len()
+    }
+
+    /// Returns `true` if the chain contains no providers.
+    pub fn is_empty(&self) -> bool {
+        self.providers.is_empty()
+    }
+
+    /// Resolve the chain: if any provider is `Exclusive`, return only that one
+    /// (the first exclusive provider wins). Otherwise return all providers
+    /// sorted by descending priority weight.
+    pub fn resolve(&self) -> Vec<&PrioritizedProvider> {
+        // Check for an exclusive provider first.
+        if let Some(exclusive) = self.providers.iter().find(|p| p.priority == ProviderPriority::Exclusive) {
+            return vec![exclusive];
+        }
+        let mut sorted: Vec<&PrioritizedProvider> = self.providers.iter().collect();
+        sorted.sort_by(|a, b| b.priority.weight().cmp(&a.priority.weight()));
+        sorted
+    }
+
+    /// Convenience: resolve and return only the top provider, if any.
+    pub fn top(&self) -> Option<&PrioritizedProvider> {
+        self.resolve().into_iter().next()
+    }
+
+    /// Returns all provider IDs in resolved order.
+    pub fn resolved_ids(&self) -> Vec<&str> {
+        self.resolve()
+            .iter()
+            .map(|p| p.registration.provider_id.as_str())
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1422,5 +1695,188 @@ mod tests {
         assert!(reg.remove_status("typescript"));
         assert!(!reg.remove_status("typescript"));
         assert_eq!(reg.count(), 1);
+    }
+
+    // ── SelectorMatcher tests ──
+
+    #[test]
+    fn selector_matcher_matches_and_scores() {
+        let matcher = SelectorMatcher::new("rust", "file", "/src/main.rs");
+        let sel_match = LanguageSelectorBuilder::new().language("rust").scheme("file").build();
+        let sel_miss = LanguageSelectorBuilder::new().language("python").build();
+
+        assert!(matcher.matches(&sel_match));
+        assert!(!matcher.matches(&sel_miss));
+        assert!(matcher.score(&sel_match) > 0);
+        assert_eq!(matcher.score(&sel_miss), 0);
+    }
+
+    #[test]
+    fn selector_matcher_filter_and_best() {
+        let matcher = SelectorMatcher::new("rust", "file", "/src/lib.rs");
+        let selectors = vec![
+            LanguageSelectorBuilder::new().build(),                              // wildcard
+            LanguageSelectorBuilder::new().language("rust").build(),             // lang only
+            LanguageSelectorBuilder::new().language("rust").scheme("file").pattern("**/*.rs").build(), // full
+            LanguageSelectorBuilder::new().language("python").build(),           // no match
+        ];
+        let matching = matcher.filter_matching(&selectors);
+        assert_eq!(matching.len(), 3);
+
+        let best = matcher.best_match(&selectors).unwrap();
+        assert_eq!(best.language.as_deref(), Some("rust"));
+        assert_eq!(best.scheme.as_deref(), Some("file"));
+        assert_eq!(best.pattern.as_deref(), Some("**/*.rs"));
+    }
+
+    // ── FeatureMatrix tests ──
+
+    #[test]
+    fn feature_matrix_add_and_query() {
+        let mut matrix = FeatureMatrix::new();
+        matrix.add("rust", LanguageFeatureKind::Completion);
+        matrix.add("rust", LanguageFeatureKind::Hover);
+        matrix.add("rust", LanguageFeatureKind::Completion); // duplicate, ignored
+        matrix.add("python", LanguageFeatureKind::Formatting);
+
+        assert_eq!(matrix.features_for("rust").len(), 2);
+        assert_eq!(matrix.features_for("python").len(), 1);
+        assert_eq!(matrix.features_for("go").len(), 0);
+        assert_eq!(matrix.total_entries(), 3);
+        assert_eq!(matrix.languages(), vec!["python", "rust"]);
+    }
+
+    #[test]
+    fn feature_matrix_languages_with_all_and_any() {
+        let mut matrix = FeatureMatrix::new();
+        matrix.add("rust", LanguageFeatureKind::Completion);
+        matrix.add("rust", LanguageFeatureKind::Hover);
+        matrix.add("rust", LanguageFeatureKind::Formatting);
+        matrix.add("python", LanguageFeatureKind::Completion);
+        matrix.add("go", LanguageFeatureKind::Hover);
+
+        let with_both = matrix.languages_with_all(&[
+            LanguageFeatureKind::Completion,
+            LanguageFeatureKind::Hover,
+        ]);
+        assert_eq!(with_both, vec!["rust"]);
+
+        let mut with_any = matrix.languages_with_any(&[LanguageFeatureKind::Formatting]);
+        with_any.sort();
+        assert_eq!(with_any, vec!["rust"]);
+    }
+
+    #[test]
+    fn feature_matrix_from_bridge() {
+        let mut bridge = LanguageBridge::new();
+        bridge.handle(LanguageMessage::RegisterCompletionProvider {
+            registration: ProviderRegistration {
+                provider_id: "c1".into(),
+                selector: selector("rust"),
+            },
+        });
+        bridge.handle(LanguageMessage::RegisterHoverProvider {
+            registration: ProviderRegistration {
+                provider_id: "h1".into(),
+                selector: selector("rust"),
+            },
+        });
+        bridge.handle(LanguageMessage::RegisterFormatter {
+            registration: ProviderRegistration {
+                provider_id: "f1".into(),
+                selector: selector("go"),
+            },
+        });
+        let matrix = FeatureMatrix::from_bridge(&bridge);
+        assert_eq!(matrix.features_for("rust").len(), 2);
+        assert_eq!(matrix.features_for("go").len(), 1);
+
+        let summary = matrix.summary();
+        assert!(summary.contains("rust:"));
+        assert!(summary.contains("go:"));
+    }
+
+    // ── ProviderChain tests ──
+
+    #[test]
+    fn provider_chain_resolve_by_priority() {
+        let mut chain = ProviderChain::new();
+        assert!(chain.is_empty());
+
+        chain.add(
+            ProviderRegistration { provider_id: "default-1".into(), selector: selector("rust") },
+            ProviderPriority::Default,
+        );
+        chain.add(
+            ProviderRegistration { provider_id: "high-1".into(), selector: selector("rust") },
+            ProviderPriority::High,
+        );
+        chain.add(
+            ProviderRegistration { provider_id: "default-2".into(), selector: selector("rust") },
+            ProviderPriority::Default,
+        );
+        assert_eq!(chain.len(), 3);
+
+        let ids = chain.resolved_ids();
+        assert_eq!(ids[0], "high-1");
+        // The two default providers follow
+        assert!(ids.contains(&"default-1"));
+        assert!(ids.contains(&"default-2"));
+    }
+
+    #[test]
+    fn provider_chain_exclusive_suppresses_others() {
+        let mut chain = ProviderChain::new();
+        chain.add(
+            ProviderRegistration { provider_id: "default-1".into(), selector: selector("rust") },
+            ProviderPriority::Default,
+        );
+        chain.add(
+            ProviderRegistration { provider_id: "excl-1".into(), selector: selector("rust") },
+            ProviderPriority::Exclusive,
+        );
+        chain.add(
+            ProviderRegistration { provider_id: "high-1".into(), selector: selector("rust") },
+            ProviderPriority::High,
+        );
+
+        let resolved = chain.resolve();
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].registration.provider_id, "excl-1");
+        assert_eq!(chain.top().unwrap().registration.provider_id, "excl-1");
+    }
+
+    // ── Display / From impl tests ──
+
+    #[test]
+    fn display_impls_produce_output() {
+        assert_eq!(LanguageFeatureKind::Completion.to_string(), "Completion");
+        assert_eq!(LanguageFeatureKind::SignatureHelp.to_string(), "Signature Help");
+        assert_eq!(ProviderPriority::High.to_string(), "high");
+        assert_eq!(LanguageStatusSeverity::Error.to_string(), "error");
+
+        let sel = LanguageSelectorBuilder::new().language("rust").scheme("file").build();
+        assert_eq!(sel.to_string(), "rust:file:*");
+
+        let status = LanguageStatus::new("rust", "RA").with_detail("ready");
+        let display = status.to_string();
+        assert!(display.contains("RA (ready)"));
+        assert!(display.contains("rust"));
+    }
+
+    #[test]
+    fn from_str_for_selector() {
+        let sel: LanguageSelector = "typescript".into();
+        assert_eq!(sel.language.as_deref(), Some("typescript"));
+        assert!(sel.scheme.is_none());
+        assert!(sel.pattern.is_none());
+    }
+
+    #[test]
+    fn from_priority_to_u32() {
+        let w: u32 = ProviderPriority::Exclusive.into();
+        assert_eq!(w, 2);
+        let w2: u32 = ProviderPriority::Default.into();
+        assert_eq!(w2, 0);
     }
 }

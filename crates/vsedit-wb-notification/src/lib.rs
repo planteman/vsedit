@@ -835,6 +835,158 @@ pub fn max_priority(notifs: &[WorkbenchNotification]) -> Option<NotificationPrio
     notifs.iter().map(|n| n.priority).max()
 }
 
+// ---------------------------------------------------------------------------
+// NotificationFilterRule – rule-based filtering
+// ---------------------------------------------------------------------------
+
+/// A single filter rule for notifications.
+#[derive(Debug, Clone)]
+pub struct NotificationFilterRule {
+    pub source_pattern: Option<String>,
+    pub min_priority: Option<NotificationPriority>,
+    pub message_pattern: Option<String>,
+}
+
+/// Filters notifications by a set of rules (all rules must match).
+pub struct NotificationRuleFilter {
+    rules: Vec<NotificationFilterRule>,
+}
+
+impl NotificationRuleFilter {
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    pub fn add_rule(&mut self, rule: NotificationFilterRule) {
+        self.rules.push(rule);
+    }
+
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+
+    /// Returns true if the notification matches ALL rules.
+    pub fn matches(&self, notif: &WorkbenchNotification) -> bool {
+        self.rules.iter().all(|rule| {
+            let source_ok = match &rule.source_pattern {
+                Some(pat) => notif.source.as_ref()
+                    .map_or(false, |s| s.label.contains(pat.as_str())),
+                None => true,
+            };
+            let priority_ok = match rule.min_priority {
+                Some(min) => notif.priority >= min,
+                None => true,
+            };
+            let message_ok = match &rule.message_pattern {
+                Some(pat) => notif.message.contains(pat.as_str()),
+                None => true,
+            };
+            source_ok && priority_ok && message_ok
+        })
+    }
+
+    /// Filter a slice of notifications, returning those that match.
+    pub fn apply<'a>(&self, notifs: &'a [WorkbenchNotification]) -> Vec<&'a WorkbenchNotification> {
+        notifs.iter().filter(|n| self.matches(n)).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationBatch – group related notifications
+// ---------------------------------------------------------------------------
+
+/// Groups related notifications into a batch for bulk operations.
+pub struct NotificationBatch {
+    items: Vec<WorkbenchNotification>,
+    label: String,
+}
+
+impl NotificationBatch {
+    pub fn new(label: impl Into<String>) -> Self {
+        Self { items: Vec::new(), label: label.into() }
+    }
+
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn add(&mut self, notif: WorkbenchNotification) {
+        self.items.push(notif);
+    }
+
+    pub fn drain(&mut self) -> Vec<WorkbenchNotification> {
+        std::mem::take(&mut self.items)
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn priorities(&self) -> Vec<NotificationPriority> {
+        self.items.iter().map(|n| n.priority).collect()
+    }
+}
+
+impl fmt::Display for NotificationBatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Batch '{}' ({} notification(s))", self.label, self.items.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationHistory – searchable history ring
+// ---------------------------------------------------------------------------
+
+/// Keeps a bounded history of notifications for later querying.
+pub struct NotificationHistory {
+    entries: Vec<WorkbenchNotification>,
+    capacity: usize,
+}
+
+impl NotificationHistory {
+    pub fn new(capacity: usize) -> Self {
+        Self { entries: Vec::with_capacity(capacity), capacity }
+    }
+
+    pub fn push(&mut self, notif: WorkbenchNotification) {
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push(notif);
+    }
+
+    /// Search history for notifications whose message contains `query`.
+    pub fn search(&self, query: &str) -> Vec<&WorkbenchNotification> {
+        self.entries.iter().filter(|n| n.message.contains(query)).collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return the most recent `n` notifications (newest last).
+    pub fn recent(&self, n: usize) -> &[WorkbenchNotification] {
+        let start = self.entries.len().saturating_sub(n);
+        &self.entries[start..]
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1452,5 +1604,97 @@ mod tests {
         ];
         assert_eq!(max_priority(&notifs), Some(NotificationPriority::Urgent));
         assert_eq!(max_priority(&[]), None);
+    }
+
+    fn make_test_notif(id: u64, msg: &str, priority: NotificationPriority, source_label: Option<&str>) -> WorkbenchNotification {
+        WorkbenchNotification {
+            id,
+            message: msg.to_string(),
+            priority,
+            source: source_label.map(|s| NotificationSource { label: s.to_string(), id: format!("src-{}", id) }),
+            actions: vec![],
+            progress: None,
+            closeable: true,
+            closed: false,
+        }
+    }
+
+    #[test]
+    fn test_notification_rule_filter_by_priority() {
+        let mut filter = NotificationRuleFilter::new();
+        filter.add_rule(NotificationFilterRule {
+            source_pattern: None,
+            min_priority: Some(NotificationPriority::Urgent),
+            message_pattern: None,
+        });
+        let notifs = vec![
+            make_test_notif(1, "low", NotificationPriority::Silent, None),
+            make_test_notif(2, "urg", NotificationPriority::Urgent, None),
+        ];
+        let matched = filter.apply(&notifs);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].message, "urg");
+    }
+
+    #[test]
+    fn test_notification_rule_filter_by_message() {
+        let mut filter = NotificationRuleFilter::new();
+        filter.add_rule(NotificationFilterRule {
+            source_pattern: None,
+            min_priority: None,
+            message_pattern: Some("deploy".to_string()),
+        });
+        let n1 = make_test_notif(1, "deploy started", NotificationPriority::Default, None);
+        let n2 = make_test_notif(2, "build ok", NotificationPriority::Default, None);
+        assert!(filter.matches(&n1));
+        assert!(!filter.matches(&n2));
+    }
+
+    #[test]
+    fn test_notification_batch_drain() {
+        let mut batch = NotificationBatch::new("build");
+        assert!(batch.is_empty());
+        batch.add(make_test_notif(1, "a", NotificationPriority::Default, None));
+        batch.add(make_test_notif(2, "b", NotificationPriority::Urgent, None));
+        assert_eq!(batch.len(), 2);
+        assert_eq!(format!("{}", batch), "Batch 'build' (2 notification(s))");
+        let drained = batch.drain();
+        assert_eq!(drained.len(), 2);
+        assert!(batch.is_empty());
+    }
+
+    #[test]
+    fn test_notification_history_push_and_search() {
+        let mut history = NotificationHistory::new(3);
+        history.push(make_test_notif(1, "error in main.rs", NotificationPriority::Urgent, None));
+        history.push(make_test_notif(2, "warning in lib.rs", NotificationPriority::Default, None));
+        history.push(make_test_notif(3, "error in utils.rs", NotificationPriority::Urgent, None));
+        let results = history.search("error");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_notification_history_capacity() {
+        let mut history = NotificationHistory::new(2);
+        history.push(make_test_notif(1, "a", NotificationPriority::Default, None));
+        history.push(make_test_notif(2, "b", NotificationPriority::Default, None));
+        history.push(make_test_notif(3, "c", NotificationPriority::Default, None));
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.recent(5).len(), 2);
+        assert_eq!(history.recent(1)[0].message, "c");
+    }
+
+    #[test]
+    fn test_notification_history_recent() {
+        let mut history = NotificationHistory::new(10);
+        for i in 0..5 {
+            history.push(make_test_notif(i, &format!("msg-{}", i), NotificationPriority::Default, None));
+        }
+        let recent = history.recent(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].message, "msg-3");
+        assert_eq!(recent[1].message, "msg-4");
+        history.clear();
+        assert!(history.is_empty());
     }
 }

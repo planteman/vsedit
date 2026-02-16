@@ -827,6 +827,430 @@ pub fn ansi_cursor_move(row: u32, col: u32) -> String {
     format!("\x1b[{};{}H", row, col)
 }
 
+// ---------------------------------------------------------------------------
+// TerminalHistory
+// ---------------------------------------------------------------------------
+
+/// Stores command history for a terminal instance with search, dedup, and max entries.
+#[derive(Debug, Clone)]
+pub struct TerminalHistory {
+    entries: Vec<String>,
+    max_entries: usize,
+    cursor: usize,
+}
+
+impl TerminalHistory {
+    /// Create a new history with the given maximum number of entries.
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries: max_entries.max(1),
+            cursor: 0,
+        }
+    }
+
+    /// Push a command into history. Duplicates of the most recent entry are ignored.
+    /// When the history exceeds `max_entries`, the oldest entry is removed.
+    pub fn push(&mut self, command: impl Into<String>) {
+        let cmd = command.into();
+        if cmd.is_empty() {
+            return;
+        }
+        // Deduplicate against the last entry.
+        if self.entries.last().map(|s| s.as_str()) == Some(cmd.as_str()) {
+            return;
+        }
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(cmd);
+        self.cursor = self.entries.len();
+    }
+
+    /// Return the number of entries in the history.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return true if the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return all entries as a slice.
+    pub fn entries(&self) -> &[String] {
+        &self.entries
+    }
+
+    /// Clear all history entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.cursor = 0;
+    }
+
+    /// Navigate backwards (older) and return the entry, if any.
+    pub fn prev(&mut self) -> Option<&str> {
+        if self.cursor > 0 {
+            self.cursor -= 1;
+            Some(&self.entries[self.cursor])
+        } else {
+            None
+        }
+    }
+
+    /// Navigate forwards (newer) and return the entry, if any.
+    pub fn next(&mut self) -> Option<&str> {
+        if self.cursor < self.entries.len().saturating_sub(1) {
+            self.cursor += 1;
+            Some(&self.entries[self.cursor])
+        } else {
+            self.cursor = self.entries.len();
+            None
+        }
+    }
+
+    /// Search history for entries containing `query` (case-insensitive), most recent first.
+    pub fn search(&self, query: &str) -> Vec<&str> {
+        let q = query.to_lowercase();
+        self.entries
+            .iter()
+            .rev()
+            .filter(|e| e.to_lowercase().contains(&q))
+            .map(|e| e.as_str())
+            .collect()
+    }
+
+    /// Remove all entries matching `command` exactly.
+    pub fn remove_all(&mut self, command: &str) {
+        self.entries.retain(|e| e != command);
+        self.cursor = self.entries.len();
+    }
+}
+
+impl Default for TerminalHistory {
+    fn default() -> Self {
+        Self::new(1000)
+    }
+}
+
+impl fmt::Display for TerminalHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TerminalHistory({}/{})", self.entries.len(), self.max_entries)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalProfileConfig
+// ---------------------------------------------------------------------------
+
+/// A saved terminal configuration describing shell, working directory, environment, and dimensions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TerminalProfileConfig {
+    pub name: String,
+    pub shell_type: TerminalShellType,
+    pub cwd: Option<String>,
+    pub env: HashMap<String, String>,
+    pub dimensions: TerminalDimensions,
+}
+
+impl TerminalProfileConfig {
+    pub fn new(name: impl Into<String>, shell_type: TerminalShellType) -> Self {
+        Self {
+            name: name.into(),
+            shell_type,
+            cwd: None,
+            env: HashMap::new(),
+            dimensions: TerminalDimensions::standard(),
+        }
+    }
+
+    pub fn with_cwd(mut self, cwd: impl Into<String>) -> Self {
+        self.cwd = Some(cwd.into());
+        self
+    }
+
+    pub fn with_env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.env.insert(key.into(), value.into());
+        self
+    }
+
+    pub fn with_dimensions(mut self, dims: TerminalDimensions) -> Self {
+        self.dimensions = dims;
+        self
+    }
+}
+
+impl fmt::Display for TerminalProfileConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Profile({}, shell={}, dims={})",
+            self.name, self.shell_type, self.dimensions
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalProfileManager
+// ---------------------------------------------------------------------------
+
+/// Manages named terminal profiles with create/get/list/delete/set_default.
+#[derive(Debug, Clone)]
+pub struct TerminalProfileManager {
+    profiles: HashMap<String, TerminalProfileConfig>,
+    default_name: Option<String>,
+}
+
+impl TerminalProfileManager {
+    pub fn new() -> Self {
+        Self {
+            profiles: HashMap::new(),
+            default_name: None,
+        }
+    }
+
+    /// Add or replace a profile. If this is the first profile, it becomes the default.
+    pub fn create(&mut self, profile: TerminalProfileConfig) {
+        let is_first = self.profiles.is_empty();
+        let name = profile.name.clone();
+        self.profiles.insert(name.clone(), profile);
+        if is_first {
+            self.default_name = Some(name);
+        }
+    }
+
+    /// Get a profile by name.
+    pub fn get(&self, name: &str) -> Option<&TerminalProfileConfig> {
+        self.profiles.get(name)
+    }
+
+    /// List all profile names, sorted alphabetically.
+    pub fn list(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self.profiles.keys().map(|s| s.as_str()).collect();
+        names.sort();
+        names
+    }
+
+    /// Delete a profile by name. Returns true if it existed.
+    pub fn delete(&mut self, name: &str) -> bool {
+        let removed = self.profiles.remove(name).is_some();
+        if removed && self.default_name.as_deref() == Some(name) {
+            self.default_name = self.profiles.keys().next().cloned();
+        }
+        removed
+    }
+
+    /// Set the default profile by name. Returns false if the name doesn't exist.
+    pub fn set_default(&mut self, name: &str) -> bool {
+        if self.profiles.contains_key(name) {
+            self.default_name = Some(name.to_string());
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return the default profile, if any.
+    pub fn default_profile(&self) -> Option<&TerminalProfileConfig> {
+        self.default_name.as_deref().and_then(|n| self.profiles.get(n))
+    }
+
+    /// Return the number of profiles.
+    pub fn len(&self) -> usize {
+        self.profiles.len()
+    }
+
+    /// Return true if there are no profiles.
+    pub fn is_empty(&self) -> bool {
+        self.profiles.is_empty()
+    }
+}
+
+impl Default for TerminalProfileManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AnsiColor / AnsiColorParser
+// ---------------------------------------------------------------------------
+
+/// A parsed ANSI SGR color.
+#[derive(Debug, Clone, PartialEq)]
+pub enum AnsiColor {
+    /// Standard color index 0–7 (e.g. 30–37 for foreground).
+    Standard(u8),
+    /// Bright color index 0–7 (e.g. 90–97 for foreground).
+    Bright(u8),
+    /// 256-color palette index.
+    Palette(u8),
+    /// 24-bit true-color RGB.
+    Rgb(u8, u8, u8),
+    /// Reset / default color.
+    Reset,
+}
+
+impl fmt::Display for AnsiColor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Standard(c) => write!(f, "standard({c})"),
+            Self::Bright(c) => write!(f, "bright({c})"),
+            Self::Palette(c) => write!(f, "palette({c})"),
+            Self::Rgb(r, g, b) => write!(f, "rgb({r},{g},{b})"),
+            Self::Reset => write!(f, "reset"),
+        }
+    }
+}
+
+/// Result of parsing an ANSI color escape sequence.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AnsiColorInfo {
+    pub foreground: Option<AnsiColor>,
+    pub background: Option<AnsiColor>,
+    pub bold: bool,
+    pub underline: bool,
+}
+
+/// Parses basic ANSI SGR (Select Graphic Rendition) escape sequences.
+pub struct AnsiColorParser;
+
+impl AnsiColorParser {
+    /// Parse a single SGR parameter sequence (the numbers between `\x1b[` and `m`).
+    /// Returns extracted color information.
+    pub fn parse_sgr(params: &str) -> AnsiColorInfo {
+        let mut info = AnsiColorInfo {
+            foreground: None,
+            background: None,
+            bold: false,
+            underline: false,
+        };
+        let codes: Vec<u8> = params
+            .split(';')
+            .filter_map(|s| s.parse::<u8>().ok())
+            .collect();
+
+        let mut i = 0;
+        while i < codes.len() {
+            match codes[i] {
+                0 => {
+                    info.foreground = Some(AnsiColor::Reset);
+                    info.background = Some(AnsiColor::Reset);
+                    info.bold = false;
+                    info.underline = false;
+                }
+                1 => info.bold = true,
+                4 => info.underline = true,
+                // Standard foreground 30–37
+                c @ 30..=37 => info.foreground = Some(AnsiColor::Standard(c - 30)),
+                // Standard background 40–47
+                c @ 40..=47 => info.background = Some(AnsiColor::Standard(c - 40)),
+                // Bright foreground 90–97
+                c @ 90..=97 => info.foreground = Some(AnsiColor::Bright(c - 90)),
+                // Bright background 100–107
+                c @ 100..=107 => info.background = Some(AnsiColor::Bright(c - 100)),
+                // Extended foreground: 38;5;n or 38;2;r;g;b
+                38 if i + 1 < codes.len() => {
+                    if codes[i + 1] == 5 && i + 2 < codes.len() {
+                        info.foreground = Some(AnsiColor::Palette(codes[i + 2]));
+                        i += 2;
+                    } else if codes[i + 1] == 2 && i + 4 < codes.len() {
+                        info.foreground =
+                            Some(AnsiColor::Rgb(codes[i + 2], codes[i + 3], codes[i + 4]));
+                        i += 4;
+                    }
+                }
+                // Extended background: 48;5;n or 48;2;r;g;b
+                48 if i + 1 < codes.len() => {
+                    if codes[i + 1] == 5 && i + 2 < codes.len() {
+                        info.background = Some(AnsiColor::Palette(codes[i + 2]));
+                        i += 2;
+                    } else if codes[i + 1] == 2 && i + 4 < codes.len() {
+                        info.background =
+                            Some(AnsiColor::Rgb(codes[i + 2], codes[i + 3], codes[i + 4]));
+                        i += 4;
+                    }
+                }
+                39 => info.foreground = Some(AnsiColor::Reset),
+                49 => info.background = Some(AnsiColor::Reset),
+                _ => {}
+            }
+            i += 1;
+        }
+        info
+    }
+
+    /// Extract all SGR sequences from an input string and return the color info for each.
+    pub fn extract_colors(input: &str) -> Vec<AnsiColorInfo> {
+        let mut results = Vec::new();
+        let bytes = input.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] == b'\x1b' && i + 1 < bytes.len() && bytes[i + 1] == b'[' {
+                // Find the closing 'm'
+                let start = i + 2;
+                let mut end = start;
+                while end < bytes.len() && bytes[end] != b'm' {
+                    end += 1;
+                }
+                if end < bytes.len() {
+                    let params = &input[start..end];
+                    results.push(Self::parse_sgr(params));
+                    i = end + 1;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+        results
+    }
+
+    /// Strip all ANSI escape sequences from a string, returning only visible text.
+    pub fn strip_ansi(input: &str) -> String {
+        let mut out = String::with_capacity(input.len());
+        let bytes = input.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] == b'\x1b' && i + 1 < bytes.len() && bytes[i + 1] == b'[' {
+                let start = i + 2;
+                let mut end = start;
+                while end < bytes.len() && !(bytes[end] as char).is_ascii_alphabetic() {
+                    end += 1;
+                }
+                // skip past the final letter
+                i = if end < bytes.len() { end + 1 } else { end };
+            } else {
+                out.push(bytes[i] as char);
+                i += 1;
+            }
+        }
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// From impls
+// ---------------------------------------------------------------------------
+
+impl From<&str> for TerminalShellType {
+    fn from(s: &str) -> Self {
+        Self::from_path(s)
+    }
+}
+
+impl From<TerminalProfileConfig> for TerminalInstance {
+    fn from(profile: TerminalProfileConfig) -> Self {
+        Self {
+            id: 0,
+            title: profile.name,
+            shell_type: profile.shell_type,
+            dimensions: profile.dimensions,
+            active: false,
+            group: "default".into(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1415,5 +1839,198 @@ mod tests {
     fn test_ansi_cursor_move() {
         let seq = ansi_cursor_move(5, 10);
         assert_eq!(seq, "\x1b[5;10H");
+    }
+
+    // -- TerminalHistory tests --
+
+    #[test]
+    fn test_terminal_history_push_and_dedup() {
+        let mut h = TerminalHistory::new(5);
+        h.push("ls");
+        h.push("pwd");
+        h.push("pwd"); // duplicate – should be ignored
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.entries(), &["ls", "pwd"]);
+        // empty commands ignored
+        h.push("");
+        assert_eq!(h.len(), 2);
+    }
+
+    #[test]
+    fn test_terminal_history_max_entries() {
+        let mut h = TerminalHistory::new(3);
+        h.push("a");
+        h.push("b");
+        h.push("c");
+        h.push("d"); // should evict "a"
+        assert_eq!(h.len(), 3);
+        assert_eq!(h.entries(), &["b", "c", "d"]);
+    }
+
+    #[test]
+    fn test_terminal_history_navigation() {
+        let mut h = TerminalHistory::new(10);
+        h.push("first");
+        h.push("second");
+        h.push("third");
+        // Navigate backwards
+        assert_eq!(h.prev(), Some("third"));
+        assert_eq!(h.prev(), Some("second"));
+        assert_eq!(h.prev(), Some("first"));
+        assert_eq!(h.prev(), None); // at beginning
+        // Navigate forwards
+        assert_eq!(h.next(), Some("second"));
+        assert_eq!(h.next(), Some("third"));
+        assert_eq!(h.next(), None); // past end
+    }
+
+    #[test]
+    fn test_terminal_history_search() {
+        let mut h = TerminalHistory::new(10);
+        h.push("git status");
+        h.push("cargo build");
+        h.push("git log --oneline");
+        h.push("cargo test");
+        let results = h.search("git");
+        assert_eq!(results, vec!["git log --oneline", "git status"]);
+        // Case-insensitive
+        let results = h.search("CARGO");
+        assert_eq!(results, vec!["cargo test", "cargo build"]);
+        assert!(h.search("nonexistent").is_empty());
+    }
+
+    #[test]
+    fn test_terminal_history_remove_and_clear() {
+        let mut h = TerminalHistory::new(10);
+        h.push("keep");
+        h.push("remove");
+        h.push("keep2");
+        h.remove_all("remove");
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.entries(), &["keep", "keep2"]);
+        h.clear();
+        assert!(h.is_empty());
+        assert_eq!(h.to_string(), "TerminalHistory(0/10)");
+    }
+
+    // -- TerminalProfileConfig + Manager tests --
+
+    #[test]
+    fn test_profile_config_builder_and_display() {
+        let p = TerminalProfileConfig::new("dev", TerminalShellType::Zsh)
+            .with_cwd("/home/user/project")
+            .with_env("EDITOR", "vim")
+            .with_dimensions(TerminalDimensions::wide());
+        assert_eq!(p.name, "dev");
+        assert_eq!(p.shell_type, TerminalShellType::Zsh);
+        assert_eq!(p.cwd.as_deref(), Some("/home/user/project"));
+        assert_eq!(p.env.get("EDITOR").map(|s| s.as_str()), Some("vim"));
+        assert_eq!(p.dimensions, TerminalDimensions::wide());
+        let display = format!("{p}");
+        assert!(display.contains("dev"));
+        assert!(display.contains("zsh"));
+    }
+
+    #[test]
+    fn test_profile_manager_create_get_list_delete() {
+        let mut mgr = TerminalProfileManager::new();
+        assert!(mgr.is_empty());
+
+        let p1 = TerminalProfileConfig::new("bash-dev", TerminalShellType::Bash);
+        let p2 = TerminalProfileConfig::new("zsh-prod", TerminalShellType::Zsh);
+        mgr.create(p1);
+        mgr.create(p2);
+        assert_eq!(mgr.len(), 2);
+
+        assert!(mgr.get("bash-dev").is_some());
+        assert_eq!(mgr.get("bash-dev").unwrap().shell_type, TerminalShellType::Bash);
+        assert!(mgr.get("nonexistent").is_none());
+
+        let names = mgr.list();
+        assert_eq!(names, vec!["bash-dev", "zsh-prod"]);
+
+        // First profile is the default
+        assert_eq!(mgr.default_profile().unwrap().name, "bash-dev");
+
+        // Delete the default
+        assert!(mgr.delete("bash-dev"));
+        assert!(!mgr.delete("bash-dev")); // already gone
+        assert_eq!(mgr.len(), 1);
+        // Default should have shifted
+        assert!(mgr.default_profile().is_some());
+    }
+
+    #[test]
+    fn test_profile_manager_set_default() {
+        let mut mgr = TerminalProfileManager::new();
+        mgr.create(TerminalProfileConfig::new("a", TerminalShellType::Bash));
+        mgr.create(TerminalProfileConfig::new("b", TerminalShellType::Zsh));
+        assert!(mgr.set_default("b"));
+        assert_eq!(mgr.default_profile().unwrap().name, "b");
+        assert!(!mgr.set_default("nonexistent"));
+    }
+
+    // -- AnsiColorParser tests --
+
+    #[test]
+    fn test_ansi_color_parser_standard_colors() {
+        let info = AnsiColorParser::parse_sgr("1;31;42");
+        assert!(info.bold);
+        assert_eq!(info.foreground, Some(AnsiColor::Standard(1))); // red
+        assert_eq!(info.background, Some(AnsiColor::Standard(2))); // green
+    }
+
+    #[test]
+    fn test_ansi_color_parser_256_and_rgb() {
+        // 256-color foreground
+        let info = AnsiColorParser::parse_sgr("38;5;208");
+        assert_eq!(info.foreground, Some(AnsiColor::Palette(208)));
+        // RGB background
+        let info = AnsiColorParser::parse_sgr("48;2;100;150;200");
+        assert_eq!(info.background, Some(AnsiColor::Rgb(100, 150, 200)));
+    }
+
+    #[test]
+    fn test_ansi_color_parser_extract_and_strip() {
+        let input = "\x1b[1;32mHello\x1b[0m World";
+        let colors = AnsiColorParser::extract_colors(input);
+        assert_eq!(colors.len(), 2);
+        assert!(colors[0].bold);
+        assert_eq!(colors[0].foreground, Some(AnsiColor::Standard(2)));
+        // reset
+        assert_eq!(colors[1].foreground, Some(AnsiColor::Reset));
+
+        let stripped = AnsiColorParser::strip_ansi(input);
+        assert_eq!(stripped, "Hello World");
+    }
+
+    // -- From impls tests --
+
+    #[test]
+    fn test_shell_type_from_str() {
+        let s: TerminalShellType = "bash".into();
+        assert_eq!(s, TerminalShellType::Bash);
+        let s: TerminalShellType = "zsh".into();
+        assert_eq!(s, TerminalShellType::Zsh);
+    }
+
+    #[test]
+    fn test_terminal_instance_from_profile_config() {
+        let profile = TerminalProfileConfig::new("my-profile", TerminalShellType::Fish)
+            .with_dimensions(TerminalDimensions::wide());
+        let inst: TerminalInstance = profile.into();
+        assert_eq!(inst.title, "my-profile");
+        assert_eq!(inst.shell_type, TerminalShellType::Fish);
+        assert_eq!(inst.dimensions, TerminalDimensions::wide());
+        assert_eq!(inst.group, "default");
+    }
+
+    #[test]
+    fn test_ansi_color_display() {
+        assert_eq!(AnsiColor::Standard(1).to_string(), "standard(1)");
+        assert_eq!(AnsiColor::Bright(3).to_string(), "bright(3)");
+        assert_eq!(AnsiColor::Palette(42).to_string(), "palette(42)");
+        assert_eq!(AnsiColor::Rgb(10, 20, 30).to_string(), "rgb(10,20,30)");
+        assert_eq!(AnsiColor::Reset.to_string(), "reset");
     }
 }

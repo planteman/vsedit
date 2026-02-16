@@ -700,6 +700,201 @@ pub fn input_chord_builder(chord_str: &str) -> Result<Vec<KeyCodeChord>, String>
     Ok(chords)
 }
 
+
+
+// ---------------------------------------------------------------------------
+// InputSequence
+// ---------------------------------------------------------------------------
+
+/// An ordered sequence of key inputs, useful for multi-key chord matching.
+#[derive(Debug, Clone, Default)]
+pub struct InputSequence {
+    keys: Vec<KeyInput>,
+}
+
+impl InputSequence {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, key: KeyInput) {
+        self.keys.push(key);
+    }
+
+    pub fn len(&self) -> usize {
+        self.keys.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.keys.is_empty()
+    }
+
+    /// Check if `prefix` matches the start of this sequence.
+    pub fn matches_prefix(&self, prefix: &[KeyInput]) -> bool {
+        if prefix.len() > self.keys.len() {
+            return false;
+        }
+        self.keys[..prefix.len()] == *prefix
+    }
+
+    /// Build a human-readable chord string like "ctrl+a ctrl+b".
+    pub fn to_chord_string(&self) -> String {
+        self.keys
+            .iter()
+            .map(|k| {
+                let mut parts = Vec::new();
+                if k.ctrl { parts.push("ctrl"); }
+                if k.shift { parts.push("shift"); }
+                if k.alt { parts.push("alt"); }
+                if k.meta { parts.push("meta"); }
+                parts.push(match k.key_code {
+                    KeyCode::KeyA => "a", KeyCode::KeyB => "b", KeyCode::KeyC => "c",
+                    KeyCode::KeyD => "d", KeyCode::KeyE => "e", KeyCode::KeyF => "f",
+                    KeyCode::KeyG => "g", KeyCode::KeyH => "h", KeyCode::KeyI => "i",
+                    KeyCode::KeyJ => "j", KeyCode::KeyK => "k", KeyCode::KeyL => "l",
+                    KeyCode::KeyM => "m", KeyCode::KeyN => "n", KeyCode::KeyO => "o",
+                    KeyCode::KeyP => "p", KeyCode::KeyQ => "q", KeyCode::KeyR => "r",
+                    KeyCode::KeyS => "s", KeyCode::KeyT => "t", KeyCode::KeyU => "u",
+                    KeyCode::KeyV => "v", KeyCode::KeyW => "w", KeyCode::KeyX => "x",
+                    KeyCode::KeyY => "y", KeyCode::KeyZ => "z",
+                    KeyCode::Enter => "enter", KeyCode::Tab => "tab",
+                    KeyCode::Escape => "escape", KeyCode::Space => "space",
+                    _ => "?",
+                });
+                parts.join("+")
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InputHistory
+// ---------------------------------------------------------------------------
+
+/// A history buffer of recent key inputs.
+#[derive(Debug, Clone, Default)]
+pub struct InputHistory {
+    entries: Vec<KeyInput>,
+}
+
+impl InputHistory {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, key: KeyInput) {
+        self.entries.push(key);
+    }
+
+    pub fn last(&self) -> Option<&KeyInput> {
+        self.entries.last()
+    }
+
+    /// Return the `n` most recent inputs (oldest first).
+    pub fn recent(&self, n: usize) -> &[KeyInput] {
+        let start = self.entries.len().saturating_sub(n);
+        &self.entries[start..]
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeyGestureRecognizer
+// ---------------------------------------------------------------------------
+
+/// Recognizes multi-key gesture patterns from a stream of keyboard inputs.
+/// Unlike `GestureRecognizer` (which handles mouse clicks), this matches
+/// sequential key press patterns.
+#[derive(Debug, Clone)]
+pub struct KeyGestureRecognizer {
+    patterns: Vec<(String, Vec<KeyInput>)>,
+    buffer: Vec<KeyInput>,
+}
+
+impl KeyGestureRecognizer {
+    pub fn new() -> Self {
+        Self { patterns: Vec::new(), buffer: Vec::new() }
+    }
+
+    pub fn add_pattern(&mut self, name: impl Into<String>, keys: Vec<KeyInput>) {
+        self.patterns.push((name.into(), keys));
+    }
+
+    /// Feed a key and check if any pattern matches.
+    pub fn recognize(&mut self, key: KeyInput) -> Option<String> {
+        self.buffer.push(key);
+        for (name, pattern) in &self.patterns {
+            if self.buffer.len() >= pattern.len() {
+                let start = self.buffer.len() - pattern.len();
+                if &self.buffer[start..] == pattern.as_slice() {
+                    let matched = name.clone();
+                    self.buffer.clear();
+                    return Some(matched);
+                }
+            }
+        }
+        if self.buffer.len() > 32 {
+            self.buffer.drain(..16);
+        }
+        None
+    }
+
+    pub fn reset(&mut self) {
+        self.buffer.clear();
+    }
+}
+
+impl Default for KeyGestureRecognizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeyPressCounter
+// ---------------------------------------------------------------------------
+
+/// Tracks how many times each key code has been pressed.
+#[derive(Debug, Clone, Default)]
+pub struct KeyPressCounter {
+    counts: std::collections::HashMap<KeyCode, u64>,
+}
+
+impl KeyPressCounter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record(&mut self, key: KeyCode) {
+        *self.counts.entry(key).or_insert(0) += 1;
+    }
+
+    /// Return the `n` most frequently pressed keys, sorted descending.
+    pub fn top_keys(&self, n: usize) -> Vec<(KeyCode, u64)> {
+        let mut entries: Vec<_> = self.counts.iter().map(|(&k, &v)| (k, v)).collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.truncate(n);
+        entries
+    }
+
+    pub fn total(&self) -> u64 {
+        self.counts.values().sum()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1481,4 +1676,80 @@ mod tests {
         assert!(chords[0].ctrl);
         assert_eq!(chords[0].key_code, KeyCode::Digit1);
     }
+
+    // --- new tests ---
+
+    fn make_simple_key(code: KeyCode) -> KeyInput {
+        KeyInput { key_code: code, ctrl: false, shift: false, alt: false, meta: false }
+    }
+
+    fn make_simple_ctrl_key(code: KeyCode) -> KeyInput {
+        KeyInput { key_code: code, ctrl: true, shift: false, alt: false, meta: false }
+    }
+
+    #[test]
+    fn input_sequence_push_and_chord_string() {
+        let mut seq = InputSequence::new();
+        seq.push(make_simple_ctrl_key(KeyCode::KeyA));
+        seq.push(make_simple_key(KeyCode::KeyB));
+        assert_eq!(seq.len(), 2);
+        let s = seq.to_chord_string();
+        assert!(s.contains("ctrl+a"));
+        assert!(s.contains("b"));
+    }
+
+    #[test]
+    fn input_sequence_matches_prefix() {
+        let mut seq = InputSequence::new();
+        seq.push(make_simple_key(KeyCode::KeyA));
+        seq.push(make_simple_key(KeyCode::KeyB));
+        seq.push(make_simple_key(KeyCode::KeyC));
+        assert!(seq.matches_prefix(&[make_simple_key(KeyCode::KeyA), make_simple_key(KeyCode::KeyB)]));
+        assert!(!seq.matches_prefix(&[make_simple_key(KeyCode::KeyB)]));
+    }
+
+    #[test]
+    fn input_history_recent() {
+        let mut hist = InputHistory::new();
+        hist.push(make_simple_key(KeyCode::KeyA));
+        hist.push(make_simple_key(KeyCode::KeyB));
+        hist.push(make_simple_key(KeyCode::KeyC));
+        assert_eq!(hist.len(), 3);
+        let recent = hist.recent(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].key_code, KeyCode::KeyB);
+        assert_eq!(hist.last().unwrap().key_code, KeyCode::KeyC);
+        hist.clear();
+        assert!(hist.is_empty());
+    }
+
+    #[test]
+    fn key_gesture_recognizer_match() {
+        let mut gr = KeyGestureRecognizer::new();
+        gr.add_pattern("save", vec![make_simple_ctrl_key(KeyCode::KeyS)]);
+        assert!(gr.recognize(make_simple_key(KeyCode::KeyA)).is_none());
+        assert_eq!(gr.recognize(make_simple_ctrl_key(KeyCode::KeyS)).unwrap(), "save");
+    }
+
+    #[test]
+    fn key_gesture_recognizer_multi_key() {
+        let mut gr = KeyGestureRecognizer::new();
+        gr.add_pattern("quit", vec![make_simple_key(KeyCode::KeyQ), make_simple_key(KeyCode::KeyQ)]);
+        assert!(gr.recognize(make_simple_key(KeyCode::KeyQ)).is_none());
+        assert_eq!(gr.recognize(make_simple_key(KeyCode::KeyQ)).unwrap(), "quit");
+    }
+
+    #[test]
+    fn key_press_counter_top_keys() {
+        let mut stats = KeyPressCounter::new();
+        for _ in 0..5 { stats.record(KeyCode::KeyA); }
+        for _ in 0..3 { stats.record(KeyCode::KeyB); }
+        stats.record(KeyCode::KeyC);
+        assert_eq!(stats.total(), 9);
+        let top = stats.top_keys(2);
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0].0, KeyCode::KeyA);
+        assert_eq!(top[0].1, 5);
+    }
+
 }

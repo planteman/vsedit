@@ -897,6 +897,112 @@ pub fn platform_exe_extension(platform: Platform) -> &'static str {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// PlatformPaths
+// ---------------------------------------------------------------------------
+
+/// Standard platform-specific directories for configuration, data, and cache.
+#[derive(Debug, Clone)]
+pub struct PlatformPaths {
+    platform: Platform,
+}
+
+impl PlatformPaths {
+    pub fn new(platform: Platform) -> Self {
+        Self { platform }
+    }
+
+    pub fn for_current() -> Self {
+        Self::new(Platform::current())
+    }
+
+    pub fn home_dir(&self) -> Option<PathBuf> {
+        env::var("HOME").ok().map(PathBuf::from).or_else(|| {
+            env::var("USERPROFILE").ok().map(PathBuf::from)
+        })
+    }
+
+    pub fn config_dir(&self) -> Option<PathBuf> {
+        match self.platform {
+            Platform::MacOS => self.home_dir().map(|h| h.join("Library/Application Support/vsedit")),
+            Platform::Windows => env::var("APPDATA").ok().map(|a| PathBuf::from(a).join("vsedit")),
+            _ => env::var("XDG_CONFIG_HOME")
+                .ok()
+                .map(PathBuf::from)
+                .or_else(|| self.home_dir().map(|h| h.join(".config")))
+                .map(|d| d.join("vsedit")),
+        }
+    }
+
+    pub fn data_dir(&self) -> Option<PathBuf> {
+        match self.platform {
+            Platform::MacOS => self.home_dir().map(|h| h.join("Library/Application Support/vsedit/data")),
+            Platform::Windows => env::var("LOCALAPPDATA").ok().map(|a| PathBuf::from(a).join("vsedit/data")),
+            _ => env::var("XDG_DATA_HOME")
+                .ok()
+                .map(PathBuf::from)
+                .or_else(|| self.home_dir().map(|h| h.join(".local/share")))
+                .map(|d| d.join("vsedit")),
+        }
+    }
+
+    pub fn cache_dir(&self) -> Option<PathBuf> {
+        match self.platform {
+            Platform::MacOS => self.home_dir().map(|h| h.join("Library/Caches/vsedit")),
+            Platform::Windows => env::var("LOCALAPPDATA").ok().map(|a| PathBuf::from(a).join("vsedit/cache")),
+            _ => env::var("XDG_CACHE_HOME")
+                .ok()
+                .map(PathBuf::from)
+                .or_else(|| self.home_dir().map(|h| h.join(".cache")))
+                .map(|d| d.join("vsedit")),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ShellInfo
+// ---------------------------------------------------------------------------
+
+/// Information about the user's default shell.
+#[derive(Debug, Clone)]
+pub struct ShellInfo {
+    pub shell_path: String,
+    pub name: String,
+    pub is_posix: bool,
+}
+
+impl ShellInfo {
+    pub fn detect() -> Self {
+        let shell_path = env::var("SHELL")
+            .unwrap_or_else(|_| env::var("COMSPEC").unwrap_or_else(|_| "sh".to_string()));
+        let name = shell_path
+            .rsplit('/')
+            .next()
+            .unwrap_or(&shell_path)
+            .rsplit('\\')
+            .next()
+            .unwrap_or(&shell_path)
+            .to_string();
+        let is_posix = matches!(
+            name.as_str(),
+            "sh" | "bash" | "zsh" | "fish" | "dash" | "ksh" | "ash"
+        );
+        Self { shell_path, name, is_posix }
+    }
+
+    pub fn new(path: impl Into<String>, name: impl Into<String>, is_posix: bool) -> Self {
+        Self { shell_path: path.into(), name: name.into(), is_posix }
+    }
+}
+
+impl fmt::Display for ShellInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let posix_label = if self.is_posix { "POSIX" } else { "non-POSIX" };
+        write!(f, "{} ({posix_label})", self.name)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1479,4 +1585,56 @@ mod tests {
         assert_eq!(platform_exe_extension(Platform::Windows), ".exe");
         assert_eq!(platform_exe_extension(Platform::Linux), "");
     }
+
+    // --- new tests ---
+
+    #[test]
+    fn capabilities_minimal_vs_all() {
+        let minimal = PlatformCapabilities::minimal(Platform::Linux);
+        assert!(!minimal.true_color);
+        assert!(!minimal.mouse);
+        let all = PlatformCapabilities::all_enabled(Platform::Linux);
+        assert!(all.true_color);
+        assert!(all.mouse);
+        assert!(all.unicode);
+    }
+
+    #[test]
+    fn capabilities_display_format() {
+        let caps = PlatformCapabilities::all_enabled(Platform::Linux);
+        let s = format!("{caps}");
+        assert!(s.contains("Linux"));
+        assert!(s.contains("5/5"));
+    }
+
+    #[test]
+    fn capabilities_detect_runs() {
+        let caps = PlatformCapabilities::detect();
+        let s = format!("{caps}");
+        assert!(s.contains("caps:"));
+    }
+
+    #[test]
+    fn platform_paths_config_dir() {
+        let paths = PlatformPaths::for_current();
+        let cfg = paths.config_dir();
+        assert!(cfg.is_some() || Platform::current() == Platform::Unknown);
+    }
+
+    #[test]
+    fn shell_info_detect() {
+        let info = ShellInfo::detect();
+        assert!(!info.name.is_empty());
+        let s = format!("{info}");
+        assert!(s.contains(&info.name));
+    }
+
+    #[test]
+    fn shell_info_posix_check() {
+        let bash = ShellInfo::new("/bin/bash", "bash", true);
+        assert!(bash.is_posix);
+        let cmd = ShellInfo::new("C:\\Windows\\cmd.exe", "cmd.exe", false);
+        assert!(!cmd.is_posix);
+    }
+
 }

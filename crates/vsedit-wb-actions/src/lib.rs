@@ -827,6 +827,104 @@ pub fn actions_with_keybindings(actions: &[Action]) -> Vec<&Action> {
     actions.iter().filter(|a| a.keybinding.is_some()).collect()
 }
 
+// ---------------------------------------------------------------------------
+// ActionExecutionResult
+// ---------------------------------------------------------------------------
+
+/// Result of executing an action.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionExecutionResult {
+    Success,
+    Failure(String),
+    Cancelled,
+    NotFound(String),
+}
+
+impl ActionExecutionResult {
+    pub fn is_success(&self) -> bool {
+        matches!(self, Self::Success)
+    }
+
+    pub fn is_failure(&self) -> bool {
+        matches!(self, Self::Failure(_))
+    }
+}
+
+impl fmt::Display for ActionExecutionResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Success => write!(f, "success"),
+            Self::Failure(msg) => write!(f, "failed: {msg}"),
+            Self::Cancelled => write!(f, "cancelled"),
+            Self::NotFound(id) => write!(f, "action '{id}' not found"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActionHistory
+// ---------------------------------------------------------------------------
+
+/// An entry in the action history.
+#[derive(Debug, Clone)]
+pub struct ActionHistoryEntry {
+    pub action_id: String,
+    pub result: ActionExecutionResult,
+}
+
+/// Tracks recently executed actions.
+#[derive(Debug, Clone)]
+pub struct ActionHistory {
+    entries: Vec<ActionHistoryEntry>,
+    max_size: usize,
+}
+
+impl ActionHistory {
+    pub fn new(max_size: usize) -> Self {
+        Self { entries: Vec::new(), max_size }
+    }
+
+    pub fn push(&mut self, action_id: impl Into<String>, result: ActionExecutionResult) {
+        if self.entries.len() >= self.max_size {
+            self.entries.remove(0);
+        }
+        self.entries.push(ActionHistoryEntry {
+            action_id: action_id.into(),
+            result,
+        });
+    }
+
+    pub fn last(&self) -> Option<&ActionHistoryEntry> {
+        self.entries.last()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &ActionHistoryEntry> {
+        self.entries.iter()
+    }
+
+    pub fn success_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.result.is_success()).count()
+    }
+}
+
+impl fmt::Display for ActionHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ActionHistory({} entries, {} successes)", self.len(), self.success_count())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1437,5 +1535,71 @@ mod tests {
         let with_kb = actions_with_keybindings(&actions);
         assert_eq!(with_kb.len(), 1);
         assert_eq!(with_kb[0].id, "a");
+    }
+
+    #[test]
+    fn test_action_registry_operations() {
+        let mut reg = ActionRegistry::new();
+        assert_eq!(reg.action_count(), 0);
+        reg.register(make_action("open", ActionCategory::File));
+        reg.register(make_action("save", ActionCategory::File));
+        reg.register(make_action("cut", ActionCategory::Edit));
+        assert_eq!(reg.action_count(), 3);
+        assert!(reg.get_action("open").is_some());
+        assert_eq!(reg.get_by_category(ActionCategory::File).len(), 2);
+        assert!(reg.unregister("cut"));
+        assert_eq!(reg.action_count(), 2);
+        assert!(!reg.unregister("missing"));
+    }
+
+    #[test]
+    fn test_action_registry_find_by_keybinding() {
+        let mut reg = ActionRegistry::new();
+        let mut action = make_action("save", ActionCategory::File);
+        action.keybinding = Some("ctrl+s".into());
+        reg.register(action);
+        assert!(reg.get_by_keybinding("ctrl+s").is_some());
+        assert!(reg.get_by_keybinding("ctrl+x").is_none());
+    }
+
+    #[test]
+    fn test_action_registry_has_action() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("x", ActionCategory::File));
+        assert!(reg.has_action("x"));
+        assert!(!reg.has_action("y"));
+    }
+
+    #[test]
+    fn test_action_execution_result_display() {
+        assert_eq!(format!("{}", ActionExecutionResult::Success), "success");
+        assert!(ActionExecutionResult::Success.is_success());
+        assert!(ActionExecutionResult::Failure("err".into()).is_failure());
+        assert_eq!(format!("{}", ActionExecutionResult::NotFound("x".into())), "action 'x' not found");
+    }
+
+    #[test]
+    fn test_action_history_operations() {
+        let mut hist = ActionHistory::new(3);
+        assert!(hist.is_empty());
+        hist.push("open", ActionExecutionResult::Success);
+        hist.push("save", ActionExecutionResult::Success);
+        hist.push("cut", ActionExecutionResult::Failure("err".into()));
+        assert_eq!(hist.len(), 3);
+        assert_eq!(hist.success_count(), 2);
+        assert_eq!(hist.last().unwrap().action_id, "cut");
+        // Overflow causes oldest to be removed
+        hist.push("paste", ActionExecutionResult::Success);
+        assert_eq!(hist.len(), 3);
+        assert!(format!("{hist}").contains("3 entries"));
+    }
+
+    #[test]
+    fn test_action_history_clear() {
+        let mut hist = ActionHistory::new(10);
+        hist.push("a", ActionExecutionResult::Success);
+        hist.push("b", ActionExecutionResult::Cancelled);
+        hist.clear();
+        assert!(hist.is_empty());
     }
 }

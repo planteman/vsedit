@@ -802,6 +802,298 @@ pub fn editor_word_at_position(line: &str, column_1based: u32) -> Option<(String
     Some((word, (start + 1) as u32, (end + 1) as u32))
 }
 
+
+// ---------------------------------------------------------------------------
+// EditorWidgetConfig - builder-pattern configuration
+// ---------------------------------------------------------------------------
+
+/// Configuration for an editor widget instance.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EditorWidgetConfig {
+    pub show_line_numbers: bool,
+    pub show_minimap: bool,
+    pub tab_size: u8,
+    pub word_wrap: bool,
+    pub readonly: bool,
+}
+
+impl Default for EditorWidgetConfig {
+    fn default() -> Self {
+        Self {
+            show_line_numbers: true,
+            show_minimap: true,
+            tab_size: 4,
+            word_wrap: false,
+            readonly: false,
+        }
+    }
+}
+
+impl EditorWidgetConfig {
+    /// Create a new config with default values.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set whether to show line numbers.
+    pub fn with_line_numbers(mut self, show: bool) -> Self {
+        self.show_line_numbers = show;
+        self
+    }
+
+    /// Set whether to show the minimap.
+    pub fn with_minimap(mut self, show: bool) -> Self {
+        self.show_minimap = show;
+        self
+    }
+
+    /// Set the tab size (clamped to 1..=8).
+    pub fn with_tab_size(mut self, size: u8) -> Self {
+        self.tab_size = size.clamp(1, 8);
+        self
+    }
+
+    /// Set whether to enable word wrap.
+    pub fn with_word_wrap(mut self, wrap: bool) -> Self {
+        self.word_wrap = wrap;
+        self
+    }
+
+    /// Set whether the editor is read-only.
+    pub fn with_readonly(mut self, readonly: bool) -> Self {
+        self.readonly = readonly;
+        self
+    }
+
+    /// Returns true if this config uses default values.
+    pub fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
+impl std::fmt::Display for EditorWidgetConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Config(lines={}, minimap={}, tab={}, wrap={}, ro={})",
+            self.show_line_numbers, self.show_minimap, self.tab_size, self.word_wrap, self.readonly
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WidgetSelection - a single selection range in the editor
+// ---------------------------------------------------------------------------
+
+/// A selection range within the editor represented by anchor and active positions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WidgetSelection {
+    pub anchor_line: u32,
+    pub anchor_col: u32,
+    pub active_line: u32,
+    pub active_col: u32,
+}
+
+impl WidgetSelection {
+    /// Create a new selection.
+    pub fn new(anchor_line: u32, anchor_col: u32, active_line: u32, active_col: u32) -> Self {
+        Self { anchor_line, anchor_col, active_line, active_col }
+    }
+
+    /// Create a cursor (empty selection) at the given position.
+    pub fn cursor(line: u32, col: u32) -> Self {
+        Self::new(line, col, line, col)
+    }
+
+    /// Returns true if the selection is empty (cursor only).
+    pub fn is_empty(&self) -> bool {
+        self.anchor_line == self.active_line && self.anchor_col == self.active_col
+    }
+
+    /// The number of lines spanned by this selection.
+    pub fn line_span(&self) -> u32 {
+        let min_line = self.anchor_line.min(self.active_line);
+        let max_line = self.anchor_line.max(self.active_line);
+        max_line - min_line + 1
+    }
+
+    /// Returns true if the given position is within the selection range.
+    pub fn contains_position(&self, line: u32, col: u32) -> bool {
+        let (start_line, start_col, end_line, end_col) = self.ordered();
+        if line < start_line || line > end_line {
+            return false;
+        }
+        if line == start_line && col < start_col {
+            return false;
+        }
+        if line == end_line && col > end_col {
+            return false;
+        }
+        true
+    }
+
+    /// Returns true if this selection overlaps with another.
+    pub fn overlaps(&self, other: &WidgetSelection) -> bool {
+        let (s1l, s1c, e1l, e1c) = self.ordered();
+        let (s2l, s2c, e2l, e2c) = other.ordered();
+        if (e1l, e1c) < (s2l, s2c) || (e2l, e2c) < (s1l, s1c) {
+            return false;
+        }
+        true
+    }
+
+    fn ordered(&self) -> (u32, u32, u32, u32) {
+        if (self.anchor_line, self.anchor_col) <= (self.active_line, self.active_col) {
+            (self.anchor_line, self.anchor_col, self.active_line, self.active_col)
+        } else {
+            (self.active_line, self.active_col, self.anchor_line, self.anchor_col)
+        }
+    }
+}
+
+impl std::fmt::Display for WidgetSelection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_empty() {
+            write!(f, "Cursor({}:{})", self.anchor_line, self.anchor_col)
+        } else {
+            write!(
+                f,
+                "Sel({}:{}-{}:{})",
+                self.anchor_line, self.anchor_col, self.active_line, self.active_col
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WidgetSelectionSet - manages multiple selections
+// ---------------------------------------------------------------------------
+
+/// Manages a set of selections in the editor.
+#[derive(Debug, Clone, Default)]
+pub struct WidgetSelectionSet {
+    selections: Vec<WidgetSelection>,
+}
+
+impl WidgetSelectionSet {
+    /// Create an empty selection set.
+    pub fn new() -> Self {
+        Self { selections: Vec::new() }
+    }
+
+    /// Add a selection.
+    pub fn add(&mut self, sel: WidgetSelection) {
+        self.selections.push(sel);
+    }
+
+    /// Remove the selection at the given index.
+    pub fn remove(&mut self, index: usize) -> Option<WidgetSelection> {
+        if index < self.selections.len() {
+            Some(self.selections.remove(index))
+        } else {
+            None
+        }
+    }
+
+    /// Merge overlapping selections in place.
+    pub fn merge_overlapping(&mut self) {
+        if self.selections.len() < 2 {
+            return;
+        }
+        self.selections.sort_by(|a, b| {
+            let ao = a.ordered();
+            let bo = b.ordered();
+            (ao.0, ao.1).cmp(&(bo.0, bo.1))
+        });
+        let mut merged: Vec<WidgetSelection> = vec![self.selections[0].clone()];
+        for sel in &self.selections[1..] {
+            let last = merged.last().unwrap();
+            if last.overlaps(sel) {
+                let lo = last.ordered();
+                let so = sel.ordered();
+                let start_line = lo.0.min(so.0);
+                let start_col = if lo.0 == so.0 { lo.1.min(so.1) } else if lo.0 < so.0 { lo.1 } else { so.1 };
+                let end_line = lo.2.max(so.2);
+                let end_col = if lo.2 == so.2 { lo.3.max(so.3) } else if lo.2 > so.2 { lo.3 } else { so.3 };
+                *merged.last_mut().unwrap() = WidgetSelection::new(start_line, start_col, end_line, end_col);
+            } else {
+                merged.push(sel.clone());
+            }
+        }
+        self.selections = merged;
+    }
+
+    /// Iterate over selections.
+    pub fn iter(&self) -> std::slice::Iter<'_, WidgetSelection> {
+        self.selections.iter()
+    }
+
+    /// Number of selections.
+    pub fn len(&self) -> usize {
+        self.selections.len()
+    }
+
+    /// Returns true if there are no selections.
+    pub fn is_empty(&self) -> bool {
+        self.selections.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorStats - tracks editor activity
+// ---------------------------------------------------------------------------
+
+/// Tracks editor usage statistics.
+#[derive(Debug, Clone, Default)]
+pub struct EditorStats {
+    pub keystrokes: u64,
+    pub edits: u64,
+    pub selections_changed: u64,
+}
+
+impl EditorStats {
+    /// Create new empty stats.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a keystroke.
+    pub fn record_keystroke(&mut self) {
+        self.keystrokes += 1;
+    }
+
+    /// Record an edit operation.
+    pub fn record_edit(&mut self) {
+        self.edits += 1;
+    }
+
+    /// Record a selection change.
+    pub fn record_selection_change(&mut self) {
+        self.selections_changed += 1;
+    }
+
+    /// Total number of recorded actions.
+    pub fn total_actions(&self) -> u64 {
+        self.keystrokes + self.edits + self.selections_changed
+    }
+
+    /// Reset all counters.
+    pub fn reset(&mut self) {
+        self.keystrokes = 0;
+        self.edits = 0;
+        self.selections_changed = 0;
+    }
+}
+
+impl std::fmt::Display for EditorStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Stats(keys={}, edits={}, sel_changes={})",
+            self.keystrokes, self.edits, self.selections_changed
+        )
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1482,5 +1774,79 @@ mod tests {
     fn word_at_position_numeric_word() {
         let result = editor_word_at_position("val = 12345;", 8);
         assert_eq!(result, Some(("12345".to_string(), 7, 11)));
+    }
+
+    #[test]
+    fn editor_widget_config_builder() {
+        let cfg = EditorWidgetConfig::new()
+            .with_line_numbers(false)
+            .with_minimap(false)
+            .with_tab_size(2)
+            .with_word_wrap(true)
+            .with_readonly(true);
+        assert!(!cfg.show_line_numbers);
+        assert!(!cfg.show_minimap);
+        assert_eq!(cfg.tab_size, 2);
+        assert!(cfg.word_wrap);
+        assert!(cfg.readonly);
+        assert!(!cfg.is_default());
+    }
+
+    #[test]
+    fn editor_widget_config_tab_size_clamped() {
+        let cfg = EditorWidgetConfig::new().with_tab_size(0);
+        assert_eq!(cfg.tab_size, 1);
+        let cfg2 = EditorWidgetConfig::new().with_tab_size(20);
+        assert_eq!(cfg2.tab_size, 8);
+    }
+
+    #[test]
+    fn widget_selection_empty_and_contains() {
+        let cursor = WidgetSelection::cursor(5, 10);
+        assert!(cursor.is_empty());
+        assert_eq!(cursor.line_span(), 1);
+        assert!(cursor.contains_position(5, 10));
+        assert!(!cursor.contains_position(5, 11));
+
+        let sel = WidgetSelection::new(2, 1, 4, 5);
+        assert!(!sel.is_empty());
+        assert_eq!(sel.line_span(), 3);
+        assert!(sel.contains_position(3, 3));
+        assert!(!sel.contains_position(1, 1));
+    }
+
+    #[test]
+    fn widget_selection_overlaps() {
+        let a = WidgetSelection::new(1, 1, 3, 5);
+        let b = WidgetSelection::new(3, 3, 5, 1);
+        assert!(a.overlaps(&b));
+
+        let c = WidgetSelection::new(4, 1, 6, 1);
+        assert!(!a.overlaps(&c));
+    }
+
+    #[test]
+    fn widget_selection_set_merge() {
+        let mut set = WidgetSelectionSet::new();
+        set.add(WidgetSelection::new(1, 1, 3, 5));
+        set.add(WidgetSelection::new(3, 3, 5, 1));
+        set.add(WidgetSelection::new(10, 1, 12, 1));
+        assert_eq!(set.len(), 3);
+        set.merge_overlapping();
+        assert_eq!(set.len(), 2);
+    }
+
+    #[test]
+    fn editor_stats_tracking() {
+        let mut stats = EditorStats::new();
+        stats.record_keystroke();
+        stats.record_keystroke();
+        stats.record_edit();
+        stats.record_selection_change();
+        assert_eq!(stats.total_actions(), 4);
+        let display = format!("{stats}");
+        assert!(display.contains("keys=2"));
+        stats.reset();
+        assert_eq!(stats.total_actions(), 0);
     }
 }

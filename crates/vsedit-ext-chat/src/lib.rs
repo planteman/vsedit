@@ -851,6 +851,299 @@ impl ChatConversation {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ChatHistory – multi-conversation store
+// ---------------------------------------------------------------------------
+
+/// Stores multiple [`ChatConversation`]s and provides lookup, search, and
+/// aggregate operations.
+#[derive(Debug, Clone, Default)]
+pub struct ChatHistory {
+    conversations: Vec<ChatConversation>,
+}
+
+impl ChatHistory {
+    /// Creates a new empty history.
+    pub fn new() -> Self {
+        Self {
+            conversations: Vec::new(),
+        }
+    }
+
+    /// Adds a conversation to the history.
+    pub fn add_conversation(&mut self, conv: ChatConversation) {
+        self.conversations.push(conv);
+    }
+
+    /// Returns a reference to the conversation with the given id, if present.
+    pub fn get_conversation(&self, id: &str) -> Option<&ChatConversation> {
+        self.conversations.iter().find(|c| c.id == id)
+    }
+
+    /// Returns a mutable reference to the conversation with the given id.
+    pub fn get_conversation_mut(&mut self, id: &str) -> Option<&mut ChatConversation> {
+        self.conversations.iter_mut().find(|c| c.id == id)
+    }
+
+    /// Lists all conversation ids.
+    pub fn list_conversations(&self) -> Vec<&str> {
+        self.conversations.iter().map(|c| c.id.as_str()).collect()
+    }
+
+    /// Removes the conversation with the given id. Returns `true` if found.
+    pub fn delete_conversation(&mut self, id: &str) -> bool {
+        let before = self.conversations.len();
+        self.conversations.retain(|c| c.id != id);
+        self.conversations.len() < before
+    }
+
+    /// Returns the total number of messages across all conversations.
+    pub fn total_messages(&self) -> usize {
+        self.conversations.iter().map(|c| c.message_count()).sum()
+    }
+
+    /// Returns the number of stored conversations.
+    pub fn conversation_count(&self) -> usize {
+        self.conversations.len()
+    }
+
+    /// Searches all conversations for messages whose text content contains
+    /// `query` (case-insensitive). Returns `(conversation_id, message_index)`
+    /// pairs for each match.
+    pub fn search_messages(&self, query: &str) -> Vec<(&str, usize)> {
+        let query_lower = query.to_lowercase();
+        let mut results = Vec::new();
+        for conv in &self.conversations {
+            for (i, msg) in conv.messages.iter().enumerate() {
+                let matches = msg.parts.iter().any(|p| {
+                    p.text_content().to_lowercase().contains(&query_lower)
+                });
+                if matches {
+                    results.push((conv.id.as_str(), i));
+                }
+            }
+        }
+        results
+    }
+
+    /// Computes aggregate [`ChatStatistics`] over all conversations.
+    pub fn statistics(&self) -> ChatStatistics {
+        ChatStatistics::from_history(self)
+    }
+}
+
+impl fmt::Display for ChatHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ChatHistory({} conversation{}, {} message{})",
+            self.conversations.len(),
+            if self.conversations.len() == 1 { "" } else { "s" },
+            self.total_messages(),
+            if self.total_messages() == 1 { "" } else { "s" },
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatStatistics – aggregate metrics
+// ---------------------------------------------------------------------------
+
+/// Aggregate statistics computed over a [`ChatHistory`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChatStatistics {
+    /// Total number of conversations.
+    pub total_conversations: usize,
+    /// Total number of messages across all conversations.
+    pub total_messages: usize,
+    /// Number of messages grouped by role.
+    pub messages_per_role: Vec<(String, usize)>,
+    /// Average character length of message content (0 when no messages).
+    pub avg_message_length: usize,
+    /// Rough token estimate (total chars / 4).
+    pub total_token_estimate: usize,
+}
+
+impl ChatStatistics {
+    /// Compute statistics from a [`ChatHistory`].
+    pub fn from_history(history: &ChatHistory) -> Self {
+        let total_conversations = history.conversation_count();
+
+        let mut role_counts: Vec<(String, usize)> = Vec::new();
+        let mut total_chars: usize = 0;
+        let mut total_messages: usize = 0;
+
+        for conv in &history.conversations {
+            for msg in &conv.messages {
+                total_messages += 1;
+                let msg_chars: usize = msg.parts.iter().map(|p| p.char_count()).sum();
+                total_chars += msg_chars;
+
+                if let Some(entry) = role_counts.iter_mut().find(|(r, _)| r == &msg.role) {
+                    entry.1 += 1;
+                } else {
+                    role_counts.push((msg.role.clone(), 1));
+                }
+            }
+        }
+
+        role_counts.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let avg_message_length = if total_messages == 0 {
+            0
+        } else {
+            total_chars / total_messages
+        };
+
+        Self {
+            total_conversations,
+            total_messages,
+            messages_per_role: role_counts,
+            avg_message_length,
+            total_token_estimate: total_chars / 4,
+        }
+    }
+
+    /// Look up the message count for a specific role.
+    pub fn count_for_role(&self, role: &str) -> usize {
+        self.messages_per_role
+            .iter()
+            .find(|(r, _)| r == role)
+            .map(|(_, c)| *c)
+            .unwrap_or(0)
+    }
+}
+
+impl fmt::Display for ChatStatistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ChatStatistics(convs={}, msgs={}, avg_len={}, tokens≈{})",
+            self.total_conversations,
+            self.total_messages,
+            self.avg_message_length,
+            self.total_token_estimate,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatMessageFormatter – message display formatting
+// ---------------------------------------------------------------------------
+
+/// Configurable formatter for rendering [`ChatConversationMessage`]s as
+/// human-readable strings.
+#[derive(Debug, Clone)]
+pub struct ChatMessageFormatter {
+    /// Maximum characters before the message body is truncated.
+    max_body_chars: usize,
+    /// Whether to prepend the role label.
+    show_role: bool,
+    /// Whether to prepend the timestamp.
+    show_timestamp: bool,
+}
+
+impl ChatMessageFormatter {
+    /// Creates a formatter with sensible defaults.
+    pub fn new() -> Self {
+        Self {
+            max_body_chars: 200,
+            show_role: true,
+            show_timestamp: false,
+        }
+    }
+
+    /// Set maximum body characters before truncation.
+    pub fn max_body_chars(mut self, n: usize) -> Self {
+        self.max_body_chars = n;
+        self
+    }
+
+    /// Enable or disable the role prefix.
+    pub fn show_role(mut self, v: bool) -> Self {
+        self.show_role = v;
+        self
+    }
+
+    /// Enable or disable the timestamp prefix.
+    pub fn show_timestamp(mut self, v: bool) -> Self {
+        self.show_timestamp = v;
+        self
+    }
+
+    /// Format a single [`ChatConversationMessage`] into a display string.
+    pub fn format_message(&self, msg: &ChatConversationMessage) -> String {
+        let mut out = String::new();
+
+        if self.show_timestamp {
+            out.push_str(&format!("[{}ms] ", msg.timestamp_ms));
+        }
+
+        if self.show_role {
+            out.push_str(&msg.role);
+            out.push_str(": ");
+        }
+
+        let body = chat_format_response(&msg.parts);
+        if body.chars().count() > self.max_body_chars {
+            let truncated: String = body.chars().take(self.max_body_chars.saturating_sub(1)).collect();
+            out.push_str(&truncated);
+            out.push('…');
+        } else {
+            out.push_str(&body);
+        }
+
+        out
+    }
+
+    /// Format all messages of a [`ChatConversation`].
+    pub fn format_conversation(&self, conv: &ChatConversation) -> String {
+        conv.messages
+            .iter()
+            .map(|m| self.format_message(m))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+impl Default for ChatMessageFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for ChatMessageFormatter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ChatMessageFormatter(max_body={}, role={}, ts={})",
+            self.max_body_chars, self.show_role, self.show_timestamp,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// From impls
+// ---------------------------------------------------------------------------
+
+impl From<&str> for ChatMessagePart {
+    fn from(s: &str) -> Self {
+        Self::Text(s.to_string())
+    }
+}
+
+impl From<String> for ChatMessagePart {
+    fn from(s: String) -> Self {
+        Self::Text(s)
+    }
+}
+
+impl From<ChatError> for String {
+    fn from(e: ChatError) -> Self {
+        e.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1409,5 +1702,181 @@ mod tests {
         // add assistant with 12 chars => total 20 chars => 5 tokens
         conv.add_assistant_message(vec![ChatMessagePart::Text("123456789012".into())]);
         assert_eq!(conv.total_tokens_estimate(), 5);
+    }
+
+    // -----------------------------------------------------------------------
+    // ChatHistory tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn chat_history_add_get_delete() {
+        let mut history = ChatHistory::new();
+        assert_eq!(history.conversation_count(), 0);
+        assert_eq!(history.total_messages(), 0);
+
+        let mut c1 = ChatConversation::new("c1");
+        c1.add_user_message("hello");
+        c1.add_assistant_message(vec![ChatMessagePart::Text("hi".into())]);
+        history.add_conversation(c1);
+
+        let mut c2 = ChatConversation::new("c2");
+        c2.add_user_message("bye");
+        history.add_conversation(c2);
+
+        assert_eq!(history.conversation_count(), 2);
+        assert_eq!(history.total_messages(), 3);
+        assert_eq!(history.list_conversations(), vec!["c1", "c2"]);
+
+        assert!(history.get_conversation("c1").is_some());
+        assert_eq!(history.get_conversation("c1").unwrap().message_count(), 2);
+        assert!(history.get_conversation("missing").is_none());
+
+        assert!(history.delete_conversation("c1"));
+        assert_eq!(history.conversation_count(), 1);
+        assert!(!history.delete_conversation("c1")); // already removed
+    }
+
+    #[test]
+    fn chat_history_search_messages() {
+        let mut history = ChatHistory::new();
+        let mut c1 = ChatConversation::new("c1");
+        c1.add_user_message("How do I write a Rust function?");
+        c1.add_assistant_message(vec![ChatMessagePart::Text("Use fn keyword".into())]);
+        history.add_conversation(c1);
+
+        let mut c2 = ChatConversation::new("c2");
+        c2.add_user_message("What is Python?");
+        history.add_conversation(c2);
+
+        let results = history.search_messages("rust");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], ("c1", 0));
+
+        let results = history.search_messages("fn");
+        // matches "fn keyword" in c1 assistant message
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0], ("c1", 1));
+
+        let results = history.search_messages("nonexistent");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn chat_history_display() {
+        let mut history = ChatHistory::new();
+        assert_eq!(format!("{history}"), "ChatHistory(0 conversations, 0 messages)");
+
+        let mut c = ChatConversation::new("c1");
+        c.add_user_message("hi");
+        history.add_conversation(c);
+        assert_eq!(format!("{history}"), "ChatHistory(1 conversation, 1 message)");
+    }
+
+    // -----------------------------------------------------------------------
+    // ChatStatistics tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn chat_statistics_from_history() {
+        let mut history = ChatHistory::new();
+
+        let mut c1 = ChatConversation::new("c1");
+        c1.add_user_message("abcd");        // 4 chars
+        c1.add_assistant_message(vec![ChatMessagePart::Text("efghijkl".into())]); // 8 chars
+        history.add_conversation(c1);
+
+        let mut c2 = ChatConversation::new("c2");
+        c2.add_user_message("mnop");        // 4 chars
+        history.add_conversation(c2);
+
+        let stats = history.statistics();
+        assert_eq!(stats.total_conversations, 2);
+        assert_eq!(stats.total_messages, 3);
+        // total chars = 4 + 8 + 4 = 16, avg = 16/3 = 5
+        assert_eq!(stats.avg_message_length, 5);
+        // token estimate = 16/4 = 4
+        assert_eq!(stats.total_token_estimate, 4);
+        assert_eq!(stats.count_for_role("user"), 2);
+        assert_eq!(stats.count_for_role("assistant"), 1);
+        assert_eq!(stats.count_for_role("system"), 0);
+    }
+
+    #[test]
+    fn chat_statistics_empty() {
+        let history = ChatHistory::new();
+        let stats = history.statistics();
+        assert_eq!(stats.total_conversations, 0);
+        assert_eq!(stats.total_messages, 0);
+        assert_eq!(stats.avg_message_length, 0);
+        assert_eq!(stats.total_token_estimate, 0);
+        assert!(stats.messages_per_role.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // ChatMessageFormatter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn chat_message_formatter_truncates_long_body() {
+        let formatter = ChatMessageFormatter::new().max_body_chars(10).show_role(false);
+        let msg = ChatConversationMessage {
+            role: "user".into(),
+            parts: vec![ChatMessagePart::Text("This is a very long message that should be truncated".into())],
+            timestamp_ms: 0,
+        };
+        let out = formatter.format_message(&msg);
+        assert_eq!(out.chars().count(), 10);
+        assert!(out.ends_with('…'));
+    }
+
+    #[test]
+    fn chat_message_formatter_with_role_and_timestamp() {
+        let formatter = ChatMessageFormatter::new()
+            .max_body_chars(500)
+            .show_role(true)
+            .show_timestamp(true);
+        let msg = ChatConversationMessage {
+            role: "assistant".into(),
+            parts: vec![ChatMessagePart::Text("Hello".into())],
+            timestamp_ms: 42,
+        };
+        let out = formatter.format_message(&msg);
+        assert!(out.starts_with("[42ms] assistant: Hello"));
+    }
+
+    #[test]
+    fn chat_message_formatter_format_conversation() {
+        let formatter = ChatMessageFormatter::new().max_body_chars(500).show_role(true).show_timestamp(false);
+        let mut conv = ChatConversation::new("c1");
+        conv.add_user_message("Hi");
+        conv.add_assistant_message(vec![ChatMessagePart::Text("Hello!".into())]);
+
+        let out = formatter.format_conversation(&conv);
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0], "user: Hi");
+        assert_eq!(lines[1], "assistant: Hello!");
+    }
+
+    // -----------------------------------------------------------------------
+    // From impl tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn chat_message_part_from_str_and_string() {
+        let part: ChatMessagePart = "hello".into();
+        assert!(part.is_text());
+        assert_eq!(part.text_content(), "hello");
+
+        let part: ChatMessagePart = String::from("world").into();
+        assert!(part.is_text());
+        assert_eq!(part.text_content(), "world");
+    }
+
+    #[test]
+    fn chat_error_into_string() {
+        let err = ChatError::ValidationError("bad".into());
+        let s: String = err.into();
+        assert_eq!(s, "validation error: bad");
     }
 }

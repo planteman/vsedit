@@ -981,6 +981,182 @@ impl ColorBlindMode {
 }
 
 // ---------------------------------------------------------------------------
+// AccessibilityAudit
+// ---------------------------------------------------------------------------
+
+/// Severity of an audit issue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuditSeverity {
+    Pass,
+    Warning,
+    Error,
+}
+
+impl fmt::Display for AuditSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pass => write!(f, "pass"),
+            Self::Warning => write!(f, "warning"),
+            Self::Error => write!(f, "error"),
+        }
+    }
+}
+
+/// A single issue found during an accessibility audit.
+#[derive(Debug, Clone)]
+pub struct AuditIssue {
+    pub severity: AuditSeverity,
+    pub message: String,
+    pub widget_id: String,
+}
+
+impl fmt::Display for AuditIssue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}: {}", self.severity, self.widget_id, self.message)
+    }
+}
+
+/// Result of an accessibility audit.
+#[derive(Debug, Clone, Default)]
+pub struct AuditResult {
+    pub issues: Vec<AuditIssue>,
+}
+
+impl AuditResult {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn pass_count(&self) -> usize {
+        self.issues.iter().filter(|i| i.severity == AuditSeverity::Pass).count()
+    }
+
+    pub fn warning_count(&self) -> usize {
+        self.issues.iter().filter(|i| i.severity == AuditSeverity::Warning).count()
+    }
+
+    pub fn error_count(&self) -> usize {
+        self.issues.iter().filter(|i| i.severity == AuditSeverity::Error).count()
+    }
+
+    pub fn has_errors(&self) -> bool {
+        self.error_count() > 0
+    }
+
+    pub fn is_clean(&self) -> bool {
+        self.error_count() == 0 && self.warning_count() == 0
+    }
+
+    pub fn total(&self) -> usize {
+        self.issues.len()
+    }
+}
+
+impl fmt::Display for AuditResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "AuditResult(pass={}, warn={}, error={})",
+            self.pass_count(), self.warning_count(), self.error_count()
+        )
+    }
+}
+
+/// Audits a set of widgets for accessibility compliance.
+#[derive(Debug)]
+pub struct AccessibilityAudit {
+    labels: HashMap<String, String>,
+    keyboard_accessible: HashMap<String, bool>,
+}
+
+impl AccessibilityAudit {
+    pub fn new() -> Self {
+        Self {
+            labels: HashMap::new(),
+            keyboard_accessible: HashMap::new(),
+        }
+    }
+
+    /// Register a widget with its label and keyboard accessibility.
+    pub fn register_widget(&mut self, id: impl Into<String>, label: Option<String>, kb_accessible: bool) {
+        let id = id.into();
+        if let Some(label) = label {
+            self.labels.insert(id.clone(), label);
+        }
+        self.keyboard_accessible.insert(id, kb_accessible);
+    }
+
+    /// Run the audit and return results.
+    pub fn run(&self) -> AuditResult {
+        let mut result = AuditResult::new();
+        for (id, kb) in &self.keyboard_accessible {
+            if !self.labels.contains_key(id) {
+                result.issues.push(AuditIssue {
+                    severity: AuditSeverity::Error,
+                    message: "missing accessibility label".into(),
+                    widget_id: id.clone(),
+                });
+            } else {
+                result.issues.push(AuditIssue {
+                    severity: AuditSeverity::Pass,
+                    message: "has label".into(),
+                    widget_id: id.clone(),
+                });
+            }
+            if !kb {
+                result.issues.push(AuditIssue {
+                    severity: AuditSeverity::Warning,
+                    message: "not keyboard accessible".into(),
+                    widget_id: id.clone(),
+                });
+            }
+        }
+        result
+    }
+}
+
+impl Default for AccessibilityAudit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContrastChecker
+// ---------------------------------------------------------------------------
+
+/// Checks color contrast ratios per WCAG guidelines.
+#[derive(Debug)]
+pub struct ContrastChecker;
+
+impl ContrastChecker {
+    /// Compute the contrast ratio between two relative luminances.
+    /// Luminance values should be in 0.0..=1.0 range.
+    pub fn check_ratio(lum1: f64, lum2: f64) -> f64 {
+        let (lighter, darker) = if lum1 > lum2 { (lum1, lum2) } else { (lum2, lum1) };
+        (lighter + 0.05) / (darker + 0.05)
+    }
+
+    /// Returns the WCAG level for a given contrast ratio.
+    pub fn wcag_level(ratio: f64) -> &'static str {
+        if ratio >= 7.0 {
+            "AAA"
+        } else if ratio >= 4.5 {
+            "AA"
+        } else if ratio >= 3.0 {
+            "AA-large"
+        } else {
+            "fail"
+        }
+    }
+
+    /// Check contrast between two luminances and return the WCAG level.
+    pub fn evaluate(lum1: f64, lum2: f64) -> &'static str {
+        Self::wcag_level(Self::check_ratio(lum1, lum2))
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1451,5 +1627,59 @@ mod tests {
         assert_eq!(modes.len(), 4);
         assert!(ColorBlindMode::Protanopia.description().contains("Red"));
         assert!(ColorBlindMode::None.description().contains("Normal"));
+    }
+
+    #[test]
+    fn test_accessibility_audit_clean() {
+        let mut audit = AccessibilityAudit::new();
+        audit.register_widget("btn1", Some("Save".into()), true);
+        audit.register_widget("btn2", Some("Cancel".into()), true);
+        let result = audit.run();
+        assert!(!result.has_errors());
+        assert_eq!(result.pass_count(), 2);
+        assert!(result.is_clean());
+        assert!(format!("{result}").contains("pass=2"));
+    }
+
+    #[test]
+    fn test_accessibility_audit_missing_label() {
+        let mut audit = AccessibilityAudit::new();
+        audit.register_widget("btn1", None, true);
+        let result = audit.run();
+        assert!(result.has_errors());
+        assert_eq!(result.error_count(), 1);
+        assert!(!result.is_clean());
+        let issue_str = format!("{}", result.issues[0]);
+        assert!(issue_str.contains("missing accessibility label"));
+    }
+
+    #[test]
+    fn test_accessibility_audit_no_keyboard() {
+        let mut audit = AccessibilityAudit::new();
+        audit.register_widget("icon", Some("Logo".into()), false);
+        let result = audit.run();
+        assert_eq!(result.warning_count(), 1);
+        assert!(!result.has_errors());
+    }
+
+    #[test]
+    fn test_contrast_checker_ratio() {
+        let ratio = ContrastChecker::check_ratio(1.0, 0.0);
+        assert!((ratio - 21.0).abs() < 0.1);
+        assert_eq!(ContrastChecker::wcag_level(ratio), "AAA");
+    }
+
+    #[test]
+    fn test_contrast_checker_levels() {
+        assert_eq!(ContrastChecker::wcag_level(8.0), "AAA");
+        assert_eq!(ContrastChecker::wcag_level(5.0), "AA");
+        assert_eq!(ContrastChecker::wcag_level(3.5), "AA-large");
+        assert_eq!(ContrastChecker::wcag_level(2.0), "fail");
+    }
+
+    #[test]
+    fn test_contrast_checker_evaluate() {
+        assert_eq!(ContrastChecker::evaluate(1.0, 0.0), "AAA");
+        assert_eq!(ContrastChecker::evaluate(0.5, 0.5), "fail");
     }
 }

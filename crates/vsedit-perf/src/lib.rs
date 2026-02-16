@@ -865,6 +865,350 @@ impl Default for MemoryTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Performance budget
+// ---------------------------------------------------------------------------
+
+/// A named budget violation produced by [`PerfBudget::check`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct BudgetViolation {
+    pub operation: String,
+    pub budget_ms: f64,
+    pub actual_ms: f64,
+}
+
+impl BudgetViolation {
+    /// How far the actual duration exceeded the budget, as a ratio (e.g. 1.5 = 50 % over).
+    pub fn overshoot_ratio(&self) -> f64 {
+        if self.budget_ms == 0.0 {
+            return f64::INFINITY;
+        }
+        self.actual_ms / self.budget_ms
+    }
+}
+
+impl fmt::Display for BudgetViolation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: {:.2}ms (budget {:.2}ms, {:.1}x over)",
+            self.operation,
+            self.actual_ms,
+            self.budget_ms,
+            self.overshoot_ratio(),
+        )
+    }
+}
+
+/// Defines maximum allowed durations for named operations and checks recorded
+/// entries against those limits.
+#[derive(Debug, Clone)]
+pub struct PerfBudget {
+    limits: Vec<(String, f64)>,
+}
+
+impl PerfBudget {
+    pub fn new() -> Self {
+        Self { limits: Vec::new() }
+    }
+
+    /// Register a budget: the p95 duration for `operation` must not exceed `max_ms`.
+    pub fn set(&mut self, operation: impl Into<String>, max_ms: f64) {
+        let op = operation.into();
+        if let Some(entry) = self.limits.iter_mut().find(|(n, _)| *n == op) {
+            entry.1 = max_ms;
+        } else {
+            self.limits.push((op, max_ms));
+        }
+    }
+
+    /// Check all budgets against a [`PerfService`], returning any violations.
+    pub fn check(&self, svc: &PerfService) -> Vec<BudgetViolation> {
+        let mut violations = Vec::new();
+        for (op, max_ms) in &self.limits {
+            if let Some(p95) = svc.percentile_duration(op, 95.0) {
+                if p95 > *max_ms {
+                    violations.push(BudgetViolation {
+                        operation: op.clone(),
+                        budget_ms: *max_ms,
+                        actual_ms: p95,
+                    });
+                }
+            }
+        }
+        violations
+    }
+
+    /// Returns the number of registered budgets.
+    pub fn len(&self) -> usize {
+        self.limits.len()
+    }
+
+    /// Returns `true` if no budgets have been registered.
+    pub fn is_empty(&self) -> bool {
+        self.limits.is_empty()
+    }
+}
+
+impl Default for PerfBudget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Performance comparison
+// ---------------------------------------------------------------------------
+
+/// Result of comparing two [`PerfStats`] snapshots (baseline vs current).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PerfComparison {
+    pub operation: String,
+    pub baseline: PerfStats,
+    pub current: PerfStats,
+}
+
+impl PerfComparison {
+    pub fn new(operation: impl Into<String>, baseline: PerfStats, current: PerfStats) -> Self {
+        Self {
+            operation: operation.into(),
+            baseline,
+            current,
+        }
+    }
+
+    /// Ratio of current mean to baseline mean.  Values < 1.0 indicate a speedup.
+    pub fn mean_ratio(&self) -> f64 {
+        if self.baseline.mean == 0.0 {
+            return f64::INFINITY;
+        }
+        self.current.mean / self.baseline.mean
+    }
+
+    /// Ratio of current p95 to baseline p95.
+    pub fn p95_ratio(&self) -> f64 {
+        if self.baseline.p95 == 0.0 {
+            return f64::INFINITY;
+        }
+        self.current.p95 / self.baseline.p95
+    }
+
+    /// `true` when the current mean is lower than baseline (faster).
+    pub fn improved(&self) -> bool {
+        self.current.mean < self.baseline.mean
+    }
+
+    /// `true` when the current mean is higher than baseline (slower).
+    pub fn regressed(&self) -> bool {
+        self.current.mean > self.baseline.mean
+    }
+}
+
+impl fmt::Display for PerfComparison {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let direction = if self.improved() {
+            "improved"
+        } else if self.regressed() {
+            "regressed"
+        } else {
+            "unchanged"
+        };
+        write!(
+            f,
+            "{}: mean {:.2}ms -> {:.2}ms ({}, ratio {:.2}x)",
+            self.operation,
+            self.baseline.mean,
+            self.current.mean,
+            direction,
+            self.mean_ratio(),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Histogram
+// ---------------------------------------------------------------------------
+
+/// A histogram that accumulates durations into configurable buckets.
+#[derive(Debug, Clone)]
+pub struct PerfHistogram {
+    /// Upper-bound (inclusive) of each bucket, in milliseconds.  Must be sorted.
+    boundaries: Vec<f64>,
+    /// One count per bucket, plus an overflow bucket at the end.
+    counts: Vec<u64>,
+    total_count: u64,
+}
+
+impl PerfHistogram {
+    /// Create a histogram with the given bucket boundaries (in ms).
+    /// Boundaries are sorted automatically; an implicit +Inf overflow bucket
+    /// is always appended.
+    pub fn new(mut boundaries: Vec<f64>) -> Self {
+        boundaries.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        boundaries.dedup();
+        let bucket_count = boundaries.len() + 1; // +1 for overflow
+        Self {
+            boundaries,
+            counts: vec![0; bucket_count],
+            total_count: 0,
+        }
+    }
+
+    /// Record a duration value (ms) into the appropriate bucket.
+    pub fn record(&mut self, value_ms: f64) {
+        self.total_count += 1;
+        for (i, &bound) in self.boundaries.iter().enumerate() {
+            if value_ms <= bound {
+                self.counts[i] += 1;
+                return;
+            }
+        }
+        // Falls into overflow bucket.
+        *self.counts.last_mut().unwrap() += 1;
+    }
+
+    /// Total number of recorded values.
+    pub fn total(&self) -> u64 {
+        self.total_count
+    }
+
+    /// Returns `(upper_bound, count)` pairs.  The last entry has `f64::INFINITY`
+    /// as its upper bound (the overflow bucket).
+    pub fn buckets(&self) -> Vec<(f64, u64)> {
+        let mut out: Vec<(f64, u64)> = self
+            .boundaries
+            .iter()
+            .zip(self.counts.iter())
+            .map(|(&b, &c)| (b, c))
+            .collect();
+        out.push((f64::INFINITY, *self.counts.last().unwrap_or(&0)));
+        out
+    }
+
+    /// Fraction of values that fell at or below the given boundary.
+    pub fn cumulative_fraction(&self, boundary_ms: f64) -> f64 {
+        if self.total_count == 0 {
+            return 0.0;
+        }
+        let mut cum = 0u64;
+        for (i, &b) in self.boundaries.iter().enumerate() {
+            cum += self.counts[i];
+            if (b - boundary_ms).abs() < f64::EPSILON || b > boundary_ms {
+                break;
+            }
+        }
+        cum as f64 / self.total_count as f64
+    }
+
+    /// Reset all bucket counts.
+    pub fn clear(&mut self) {
+        for c in &mut self.counts {
+            *c = 0;
+        }
+        self.total_count = 0;
+    }
+}
+
+impl fmt::Display for PerfHistogram {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (bound, count) in self.buckets() {
+            if bound.is_infinite() {
+                writeln!(f, "  +Inf: {count}")?;
+            } else {
+                writeln!(f, "  <={bound:.1}ms: {count}")?;
+            }
+        }
+        write!(f, "  total: {}", self.total_count)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Performance report
+// ---------------------------------------------------------------------------
+
+/// A generated summary report from a [`PerfService`].
+#[derive(Debug, Clone)]
+pub struct PerfReport {
+    pub slowest: Vec<PerfEntry>,
+    pub budget_violations: Vec<BudgetViolation>,
+    pub stats_by_name: Vec<(String, PerfStats)>,
+    pub total_entries: usize,
+}
+
+impl PerfReport {
+    /// Build a report from a service, checking against an optional budget.
+    pub fn generate(svc: &PerfService, budget: Option<&PerfBudget>, top_n: usize) -> Self {
+        let slowest: Vec<PerfEntry> = svc.get_slowest(top_n).into_iter().cloned().collect();
+
+        let budget_violations = budget.map(|b| b.check(svc)).unwrap_or_default();
+
+        // Collect unique operation names.
+        let mut names: Vec<String> = svc
+            .get_entries()
+            .iter()
+            .map(|e| e.name.clone())
+            .collect();
+        names.sort();
+        names.dedup();
+
+        let stats_by_name: Vec<(String, PerfStats)> = names
+            .into_iter()
+            .filter_map(|n| svc.get_stats(&n).map(|s| (n, s)))
+            .collect();
+
+        Self {
+            slowest,
+            budget_violations,
+            stats_by_name,
+            total_entries: svc.entry_count(),
+        }
+    }
+
+    /// `true` if any budget was violated.
+    pub fn has_violations(&self) -> bool {
+        !self.budget_violations.is_empty()
+    }
+}
+
+impl fmt::Display for PerfReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "=== Performance Report ({} entries) ===", self.total_entries)?;
+
+        if !self.slowest.is_empty() {
+            writeln!(f, "\nSlowest operations:")?;
+            for e in &self.slowest {
+                writeln!(f, "  {} — {:.2}ms", e.name, e.duration_ms)?;
+            }
+        }
+
+        if !self.budget_violations.is_empty() {
+            writeln!(f, "\nBudget violations:")?;
+            for v in &self.budget_violations {
+                writeln!(f, "  {v}")?;
+            }
+        }
+
+        if !self.stats_by_name.is_empty() {
+            writeln!(f, "\nPer-operation stats:")?;
+            for (name, st) in &self.stats_by_name {
+                writeln!(
+                    f,
+                    "  {name}: n={} min={:.2} mean={:.2} p95={:.2} max={:.2}",
+                    st.count, st.min, st.mean, st.p95, st.max,
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl From<&PerfService> for PerfReport {
+    fn from(svc: &PerfService) -> Self {
+        Self::generate(svc, None, 5)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1417,5 +1761,170 @@ mod tests {
         tracker.clear();
         assert_eq!(tracker.sample_count(), 0);
         assert!(tracker.latest().is_none());
+    }
+
+    // --- PerfBudget tests ---
+
+    #[test]
+    fn perf_budget_no_violations_when_within_limits() {
+        let mut svc = PerfService::new();
+        svc.add_entry("render", 10.0);
+        svc.add_entry("render", 12.0);
+        svc.add_entry("render", 11.0);
+
+        let mut budget = PerfBudget::new();
+        budget.set("render", 50.0);
+        assert_eq!(budget.len(), 1);
+        assert!(!budget.is_empty());
+
+        let violations = budget.check(&svc);
+        assert!(violations.is_empty());
+    }
+
+    #[test]
+    fn perf_budget_detects_violation() {
+        let mut svc = PerfService::new();
+        for _ in 0..20 {
+            svc.add_entry("slow_op", 200.0);
+        }
+
+        let mut budget = PerfBudget::new();
+        budget.set("slow_op", 100.0);
+
+        let violations = budget.check(&svc);
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].operation, "slow_op");
+        assert!((violations[0].budget_ms - 100.0).abs() < f64::EPSILON);
+        assert!(violations[0].actual_ms > 100.0);
+        assert!(violations[0].overshoot_ratio() > 1.0);
+
+        let display = format!("{}", violations[0]);
+        assert!(display.contains("slow_op"));
+        assert!(display.contains("over"));
+    }
+
+    #[test]
+    fn perf_budget_update_existing_limit() {
+        let mut budget = PerfBudget::new();
+        budget.set("op", 50.0);
+        budget.set("op", 100.0);
+        assert_eq!(budget.len(), 1);
+
+        let mut svc = PerfService::new();
+        svc.add_entry("op", 75.0);
+        // 75 < 100 so no violation after update
+        assert!(budget.check(&svc).is_empty());
+    }
+
+    // --- PerfComparison tests ---
+
+    #[test]
+    fn perf_comparison_detects_improvement_and_regression() {
+        let baseline = PerfStats {
+            count: 10,
+            min: 5.0,
+            max: 50.0,
+            mean: 20.0,
+            p50: 18.0,
+            p95: 45.0,
+            total_ms: 200.0,
+        };
+        let faster = PerfStats {
+            count: 10,
+            min: 3.0,
+            max: 30.0,
+            mean: 10.0,
+            p50: 9.0,
+            p95: 25.0,
+            total_ms: 100.0,
+        };
+        let slower = PerfStats {
+            count: 10,
+            min: 10.0,
+            max: 80.0,
+            mean: 40.0,
+            p50: 35.0,
+            p95: 70.0,
+            total_ms: 400.0,
+        };
+
+        let cmp_fast = PerfComparison::new("render", baseline.clone(), faster);
+        assert!(cmp_fast.improved());
+        assert!(!cmp_fast.regressed());
+        assert!(cmp_fast.mean_ratio() < 1.0);
+        assert!(cmp_fast.p95_ratio() < 1.0);
+
+        let cmp_slow = PerfComparison::new("render", baseline, slower);
+        assert!(cmp_slow.regressed());
+        assert!(!cmp_slow.improved());
+        assert!(cmp_slow.mean_ratio() > 1.0);
+
+        let display = format!("{cmp_slow}");
+        assert!(display.contains("regressed"));
+        assert!(display.contains("render"));
+    }
+
+    // --- PerfHistogram tests ---
+
+    #[test]
+    fn perf_histogram_distributes_values() {
+        let mut hist = PerfHistogram::new(vec![10.0, 50.0, 100.0]);
+        hist.record(5.0); // bucket <=10
+        hist.record(9.0); // bucket <=10
+        hist.record(25.0); // bucket <=50
+        hist.record(75.0); // bucket <=100
+        hist.record(200.0); // overflow
+
+        assert_eq!(hist.total(), 5);
+
+        let buckets = hist.buckets();
+        assert_eq!(buckets.len(), 4); // 3 boundaries + overflow
+        assert_eq!(buckets[0], (10.0, 2));
+        assert_eq!(buckets[1], (50.0, 1));
+        assert_eq!(buckets[2], (100.0, 1));
+        assert!(buckets[3].0.is_infinite());
+        assert_eq!(buckets[3].1, 1);
+
+        let frac = hist.cumulative_fraction(50.0);
+        assert!((frac - 0.6).abs() < f64::EPSILON); // 3/5
+
+        hist.clear();
+        assert_eq!(hist.total(), 0);
+
+        let display = format!("{hist}");
+        assert!(display.contains("total: 0"));
+    }
+
+    // --- PerfReport tests ---
+
+    #[test]
+    fn perf_report_generation_and_display() {
+        let mut svc = PerfService::new();
+        svc.add_entry("compile", 120.0);
+        svc.add_entry("compile", 130.0);
+        svc.add_entry("lint", 20.0);
+        svc.add_entry("lint", 25.0);
+
+        let mut budget = PerfBudget::new();
+        budget.set("compile", 50.0); // will violate
+        budget.set("lint", 100.0); // ok
+
+        let report = PerfReport::generate(&svc, Some(&budget), 3);
+        assert_eq!(report.total_entries, 4);
+        assert!(report.has_violations());
+        assert_eq!(report.budget_violations.len(), 1);
+        assert_eq!(report.budget_violations[0].operation, "compile");
+        assert_eq!(report.stats_by_name.len(), 2);
+        assert!(!report.slowest.is_empty());
+
+        let display = format!("{report}");
+        assert!(display.contains("Performance Report"));
+        assert!(display.contains("compile"));
+        assert!(display.contains("Budget violations"));
+
+        // From impl
+        let report2 = PerfReport::from(&svc);
+        assert_eq!(report2.total_entries, 4);
+        assert!(!report2.has_violations()); // no budget passed
     }
 }

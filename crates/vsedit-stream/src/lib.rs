@@ -871,6 +871,248 @@ pub fn collect_all_items<S: ReadableStream>(stream: &mut S) -> Vec<S::Item> {
     stream.collect_all()
 }
 
+// ---------------------------------------------------------------------------
+// SkipStream adapter
+// ---------------------------------------------------------------------------
+
+/// A stream that skips the first `n` items, then yields the rest.
+pub struct SkipStream<S> {
+    inner: S,
+    remaining_skip: usize,
+}
+
+impl<S> SkipStream<S> {
+    pub fn new(inner: S, n: usize) -> Self {
+        Self {
+            inner,
+            remaining_skip: n,
+        }
+    }
+}
+
+impl<S: ReadableStream> ReadableStream for SkipStream<S>
+where
+    Self: Send,
+{
+    type Item = S::Item;
+
+    fn read(&mut self) -> Option<S::Item> {
+        while self.remaining_skip > 0 {
+            if self.inner.read().is_none() {
+                self.remaining_skip = 0;
+                return None;
+            }
+            self.remaining_skip -= 1;
+        }
+        self.inner.read()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InspectStream adapter
+// ---------------------------------------------------------------------------
+
+/// A stream adapter that calls a side-effect closure on each item before
+/// yielding it, without modifying the item. Useful for logging/debugging.
+pub struct InspectStream<S, F> {
+    inner: S,
+    inspector: F,
+}
+
+impl<S, F> InspectStream<S, F> {
+    pub fn new(inner: S, inspector: F) -> Self {
+        Self { inner, inspector }
+    }
+}
+
+impl<S, F> ReadableStream for InspectStream<S, F>
+where
+    S: ReadableStream,
+    F: FnMut(&S::Item),
+    Self: Send,
+{
+    type Item = S::Item;
+
+    fn read(&mut self) -> Option<S::Item> {
+        self.inner.read().map(|item| {
+            (self.inspector)(&item);
+            item
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FlatMapStream adapter
+// ---------------------------------------------------------------------------
+
+/// A stream adapter that maps each item to a Vec and flattens the results.
+pub struct FlatMapStream<S, F, T> {
+    inner: S,
+    mapper: F,
+    buffer: std::collections::VecDeque<T>,
+}
+
+impl<S, F, T> FlatMapStream<S, F, T> {
+    pub fn new(inner: S, mapper: F) -> Self {
+        Self {
+            inner,
+            mapper,
+            buffer: std::collections::VecDeque::new(),
+        }
+    }
+}
+
+impl<S, F, T> ReadableStream for FlatMapStream<S, F, T>
+where
+    S: ReadableStream,
+    F: FnMut(S::Item) -> Vec<T>,
+    Self: Send,
+{
+    type Item = T;
+
+    fn read(&mut self) -> Option<T> {
+        loop {
+            if let Some(item) = self.buffer.pop_front() {
+                return Some(item);
+            }
+            match self.inner.read() {
+                Some(item) => {
+                    self.buffer = (self.mapper)(item).into();
+                }
+                None => return None,
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ZipStream adapter
+// ---------------------------------------------------------------------------
+
+/// A stream that yields paired items from two streams. Stops when either
+/// stream is exhausted.
+pub struct ZipStream<S1, S2> {
+    first: S1,
+    second: S2,
+}
+
+impl<S1, S2> ZipStream<S1, S2> {
+    pub fn new(first: S1, second: S2) -> Self {
+        Self { first, second }
+    }
+}
+
+impl<S1, S2> ReadableStream for ZipStream<S1, S2>
+where
+    S1: ReadableStream,
+    S2: ReadableStream,
+    Self: Send,
+{
+    type Item = (S1::Item, S2::Item);
+
+    fn read(&mut self) -> Option<(S1::Item, S2::Item)> {
+        let a = self.first.read()?;
+        let b = self.second.read()?;
+        Some((a, b))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EnumerateStream adapter
+// ---------------------------------------------------------------------------
+
+/// A stream that yields `(index, item)` pairs, counting from zero.
+pub struct EnumerateStream<S> {
+    inner: S,
+    index: usize,
+}
+
+impl<S> EnumerateStream<S> {
+    pub fn new(inner: S) -> Self {
+        Self { inner, index: 0 }
+    }
+}
+
+impl<S: ReadableStream> ReadableStream for EnumerateStream<S>
+where
+    Self: Send,
+{
+    type Item = (usize, S::Item);
+
+    fn read(&mut self) -> Option<(usize, S::Item)> {
+        self.inner.read().map(|item| {
+            let idx = self.index;
+            self.index += 1;
+            (idx, item)
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PeekableStream adapter
+// ---------------------------------------------------------------------------
+
+/// A stream wrapper that allows peeking at the next item without consuming it.
+pub struct PeekableStream<S: ReadableStream> {
+    inner: S,
+    peeked: Option<Option<S::Item>>,
+}
+
+impl<S: ReadableStream> PeekableStream<S> {
+    pub fn new(inner: S) -> Self {
+        Self {
+            inner,
+            peeked: None,
+        }
+    }
+
+    /// Peek at the next item without consuming it. Returns `None` if the
+    /// stream is exhausted. Subsequent calls return the same reference until
+    /// `read()` is called.
+    pub fn peek(&mut self) -> Option<&S::Item> {
+        if self.peeked.is_none() {
+            self.peeked = Some(self.inner.read());
+        }
+        self.peeked.as_ref().and_then(|o| o.as_ref())
+    }
+}
+
+impl<S: ReadableStream> ReadableStream for PeekableStream<S>
+where
+    Self: Send,
+{
+    type Item = S::Item;
+
+    fn read(&mut self) -> Option<S::Item> {
+        match self.peeked.take() {
+            Some(item) => item,
+            None => self.inner.read(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display impls for adapters
+// ---------------------------------------------------------------------------
+
+impl<S> fmt::Display for TakeStream<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TakeStream(remaining={})", self.remaining)
+    }
+}
+
+impl<S> fmt::Display for SkipStream<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SkipStream(remaining_skip={})", self.remaining_skip)
+    }
+}
+
+impl<S> fmt::Display for EnumerateStream<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EnumerateStream(index={})", self.index)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1401,5 +1643,103 @@ mod tests {
         let mut stream = StringStream::from_strings(vec!["x".into(), "y".into()]);
         let items = collect_all_items(&mut stream);
         assert_eq!(items, vec!["x", "y"]);
+    }
+
+    // -- SkipStream --------------------------------------------------------
+
+    #[test]
+    fn skip_stream_skips_first_n() {
+        let inner = StringStream::from_strings(vec![
+            "a".into(), "b".into(), "c".into(), "d".into(),
+        ]);
+        let mut skipped = SkipStream::new(inner, 2);
+        assert_eq!(skipped.read(), Some("c".to_string()));
+        assert_eq!(skipped.read(), Some("d".to_string()));
+        assert!(skipped.read().is_none());
+    }
+
+    #[test]
+    fn skip_stream_skip_more_than_available() {
+        let inner = StringStream::from_strings(vec!["a".into()]);
+        let mut skipped = SkipStream::new(inner, 5);
+        assert!(skipped.read().is_none());
+    }
+
+    #[test]
+    fn skip_stream_skip_zero() {
+        let inner = StringStream::from_strings(vec!["a".into(), "b".into()]);
+        let mut skipped = SkipStream::new(inner, 0);
+        assert_eq!(skipped.collect_all(), vec!["a", "b"]);
+    }
+
+    // -- InspectStream -----------------------------------------------------
+
+    #[test]
+    fn inspect_stream_observes_without_modifying() {
+        let inner = StringStream::from_strings(vec!["x".into(), "y".into()]);
+        // InspectStream should yield items unchanged; the inspector is a no-op here.
+        let mut inspected = InspectStream::new(inner, |_item: &String| {});
+        assert_eq!(inspected.read(), Some("x".to_string()));
+        assert_eq!(inspected.read(), Some("y".to_string()));
+        assert!(inspected.read().is_none());
+    }
+
+    // -- ZipStream ---------------------------------------------------------
+
+    #[test]
+    fn zip_stream_pairs_items() {
+        let s1 = StringStream::from_strings(vec!["a".into(), "b".into(), "c".into()]);
+        let s2 = StringStream::from_strings(vec!["1".into(), "2".into()]);
+        let mut zipped = ZipStream::new(s1, s2);
+        assert_eq!(
+            zipped.read(),
+            Some(("a".to_string(), "1".to_string()))
+        );
+        assert_eq!(
+            zipped.read(),
+            Some(("b".to_string(), "2".to_string()))
+        );
+        // s2 exhausted, so zip stops
+        assert!(zipped.read().is_none());
+    }
+
+    // -- EnumerateStream ---------------------------------------------------
+
+    #[test]
+    fn enumerate_stream_adds_indices() {
+        let inner = StringStream::from_strings(vec!["x".into(), "y".into(), "z".into()]);
+        let mut enumerated = EnumerateStream::new(inner);
+        assert_eq!(enumerated.read(), Some((0, "x".to_string())));
+        assert_eq!(enumerated.read(), Some((1, "y".to_string())));
+        assert_eq!(enumerated.read(), Some((2, "z".to_string())));
+        assert!(enumerated.read().is_none());
+    }
+
+    // -- PeekableStream ----------------------------------------------------
+
+    #[test]
+    fn peekable_stream_peek_does_not_consume() {
+        let inner = StringStream::from_strings(vec!["a".into(), "b".into()]);
+        let mut peekable = PeekableStream::new(inner);
+        assert_eq!(peekable.peek(), Some(&"a".to_string()));
+        assert_eq!(peekable.peek(), Some(&"a".to_string())); // idempotent
+        assert_eq!(peekable.read(), Some("a".to_string()));
+        assert_eq!(peekable.read(), Some("b".to_string()));
+        assert!(peekable.peek().is_none());
+        assert!(peekable.read().is_none());
+    }
+
+    // -- Display impls -----------------------------------------------------
+
+    #[test]
+    fn adapter_display_impls() {
+        let take = TakeStream::new(StringStream::from_strings(vec![]), 5);
+        assert_eq!(take.to_string(), "TakeStream(remaining=5)");
+
+        let skip = SkipStream::new(StringStream::from_strings(vec![]), 3);
+        assert_eq!(skip.to_string(), "SkipStream(remaining_skip=3)");
+
+        let en = EnumerateStream::new(StringStream::from_strings(vec![]));
+        assert_eq!(en.to_string(), "EnumerateStream(index=0)");
     }
 }

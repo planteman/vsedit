@@ -9,6 +9,7 @@ pub mod client;
 pub mod manager;
 pub mod transport;
 
+use std::collections::HashMap;
 use std::fmt;
 pub use client::{LspClient, LspServerConfig};
 pub use manager::LspManager;
@@ -848,6 +849,394 @@ pub fn lsp_initialize_params(
     })
 }
 
+// ---------------------------------------------------------------------------
+// Diagnostic index (file-keyed)
+// ---------------------------------------------------------------------------
+
+/// A file-keyed index of diagnostics for fast lookup by URI.
+///
+/// Unlike [`DiagnosticCollection`] which stores a flat list,
+/// `DiagnosticIndex` maintains a `HashMap` keyed by file URI for O(1)
+/// per-file access.
+#[derive(Debug, Clone, Default)]
+pub struct DiagnosticIndex {
+    index: HashMap<String, Vec<DiagnosticEntry>>,
+}
+
+impl DiagnosticIndex {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Insert diagnostics for a file, replacing any previous entries.
+    pub fn set_file(&mut self, uri: impl Into<String>, diags: Vec<DiagnosticEntry>) {
+        let uri = uri.into();
+        if diags.is_empty() {
+            self.index.remove(&uri);
+        } else {
+            self.index.insert(uri, diags);
+        }
+    }
+
+    /// Get diagnostics for a single file.
+    pub fn get_for_file(&self, uri: &str) -> &[DiagnosticEntry] {
+        self.index.get(uri).map(|v| v.as_slice()).unwrap_or(&[])
+    }
+
+    /// Number of files that have at least one diagnostic.
+    pub fn file_count(&self) -> usize {
+        self.index.len()
+    }
+
+    /// Total number of diagnostics across all files.
+    pub fn total_count(&self) -> usize {
+        self.index.values().map(|v| v.len()).sum()
+    }
+
+    /// Return URIs of files that have at least one error-severity diagnostic.
+    pub fn files_with_errors(&self) -> Vec<&str> {
+        self.index
+            .iter()
+            .filter(|(_, diags)| diags.iter().any(|d| d.severity == Severity::Error))
+            .map(|(uri, _)| uri.as_str())
+            .collect()
+    }
+
+    /// Remove all diagnostics for a file.
+    pub fn clear_file(&mut self, uri: &str) {
+        self.index.remove(uri);
+    }
+
+    /// Remove all diagnostics.
+    pub fn clear_all(&mut self) {
+        self.index.clear();
+    }
+
+    /// Return all file URIs that have diagnostics, sorted.
+    pub fn file_uris(&self) -> Vec<&str> {
+        let mut uris: Vec<&str> = self.index.keys().map(|s| s.as_str()).collect();
+        uris.sort_unstable();
+        uris
+    }
+
+    /// Count diagnostics of a given severity across all files.
+    pub fn count_by_severity(&self, sev: Severity) -> usize {
+        self.index
+            .values()
+            .flat_map(|v| v.iter())
+            .filter(|d| d.severity == sev)
+            .count()
+    }
+}
+
+impl From<DiagnosticCollection> for DiagnosticIndex {
+    fn from(collection: DiagnosticCollection) -> Self {
+        let mut idx = DiagnosticIndex::new();
+        for entry in collection.all() {
+            idx.index
+                .entry(entry.uri.clone())
+                .or_default()
+                .push(entry.clone());
+        }
+        idx
+    }
+}
+
+impl fmt::Display for DiagnosticIndex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} diagnostic(s) across {} file(s)",
+            self.total_count(),
+            self.file_count()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Completion item entry
+// ---------------------------------------------------------------------------
+
+/// The kind of a completion item, mirroring common LSP completion kinds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CompletionKind {
+    Text,
+    Method,
+    Function,
+    Constructor,
+    Field,
+    Variable,
+    Class,
+    Interface,
+    Module,
+    Property,
+    Keyword,
+    Snippet,
+    File,
+    Constant,
+    Enum,
+    EnumMember,
+    Struct,
+    TypeParameter,
+    Other,
+}
+
+impl CompletionKind {
+    /// Convert from an `lsp_types::CompletionItemKind`.
+    pub fn from_lsp(kind: lsp_types::CompletionItemKind) -> Self {
+        match kind {
+            lsp_types::CompletionItemKind::TEXT => Self::Text,
+            lsp_types::CompletionItemKind::METHOD => Self::Method,
+            lsp_types::CompletionItemKind::FUNCTION => Self::Function,
+            lsp_types::CompletionItemKind::CONSTRUCTOR => Self::Constructor,
+            lsp_types::CompletionItemKind::FIELD => Self::Field,
+            lsp_types::CompletionItemKind::VARIABLE => Self::Variable,
+            lsp_types::CompletionItemKind::CLASS => Self::Class,
+            lsp_types::CompletionItemKind::INTERFACE => Self::Interface,
+            lsp_types::CompletionItemKind::MODULE => Self::Module,
+            lsp_types::CompletionItemKind::PROPERTY => Self::Property,
+            lsp_types::CompletionItemKind::KEYWORD => Self::Keyword,
+            lsp_types::CompletionItemKind::SNIPPET => Self::Snippet,
+            lsp_types::CompletionItemKind::FILE => Self::File,
+            lsp_types::CompletionItemKind::CONSTANT => Self::Constant,
+            lsp_types::CompletionItemKind::ENUM => Self::Enum,
+            lsp_types::CompletionItemKind::ENUM_MEMBER => Self::EnumMember,
+            lsp_types::CompletionItemKind::STRUCT => Self::Struct,
+            lsp_types::CompletionItemKind::TYPE_PARAMETER => Self::TypeParameter,
+            _ => Self::Other,
+        }
+    }
+
+    /// Short symbol for display in menus.
+    pub fn symbol(self) -> char {
+        match self {
+            Self::Text => 'T',
+            Self::Method | Self::Function => 'f',
+            Self::Constructor => 'C',
+            Self::Field | Self::Property => 'p',
+            Self::Variable => 'v',
+            Self::Class | Self::Struct | Self::Interface => 'S',
+            Self::Module => 'M',
+            Self::Keyword => 'K',
+            Self::Snippet => 's',
+            Self::File => 'F',
+            Self::Constant => 'c',
+            Self::Enum | Self::EnumMember => 'E',
+            Self::TypeParameter => 't',
+            Self::Other => '?',
+        }
+    }
+}
+
+impl fmt::Display for CompletionKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Text => "text",
+            Self::Method => "method",
+            Self::Function => "function",
+            Self::Constructor => "constructor",
+            Self::Field => "field",
+            Self::Variable => "variable",
+            Self::Class => "class",
+            Self::Interface => "interface",
+            Self::Module => "module",
+            Self::Property => "property",
+            Self::Keyword => "keyword",
+            Self::Snippet => "snippet",
+            Self::File => "file",
+            Self::Constant => "constant",
+            Self::Enum => "enum",
+            Self::EnumMember => "enum member",
+            Self::Struct => "struct",
+            Self::TypeParameter => "type parameter",
+            Self::Other => "other",
+        })
+    }
+}
+
+/// A simplified completion item for display in the editor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletionItemEntry {
+    pub label: String,
+    pub kind: CompletionKind,
+    pub detail: Option<String>,
+    pub sort_text: Option<String>,
+    pub insert_text: Option<String>,
+}
+
+impl CompletionItemEntry {
+    pub fn new(label: impl Into<String>, kind: CompletionKind) -> Self {
+        Self {
+            label: label.into(),
+            kind,
+            detail: None,
+            sort_text: None,
+            insert_text: None,
+        }
+    }
+
+    /// The text to actually insert; falls back to `label`.
+    pub fn text_to_insert(&self) -> &str {
+        self.insert_text.as_deref().unwrap_or(&self.label)
+    }
+
+    /// The key used for sorting; falls back to `label`.
+    pub fn sort_key(&self) -> &str {
+        self.sort_text.as_deref().unwrap_or(&self.label)
+    }
+
+    /// Case-insensitive prefix match against a typed prefix.
+    pub fn matches_prefix(&self, prefix: &str) -> bool {
+        let prefix_lower = prefix.to_lowercase();
+        self.label.to_lowercase().starts_with(&prefix_lower)
+            || self
+                .insert_text
+                .as_deref()
+                .map(|t| t.to_lowercase().starts_with(&prefix_lower))
+                .unwrap_or(false)
+    }
+
+    /// Fuzzy match: every character of `query` appears in order in the label.
+    pub fn matches_fuzzy(&self, query: &str) -> bool {
+        let mut label_chars = self.label.chars().flat_map(|c| c.to_lowercase());
+        for qc in query.chars().flat_map(|c| c.to_lowercase()) {
+            if !label_chars.any(|lc| lc == qc) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl From<&lsp_types::CompletionItem> for CompletionItemEntry {
+    fn from(item: &lsp_types::CompletionItem) -> Self {
+        Self {
+            label: item.label.clone(),
+            kind: item
+                .kind
+                .map(CompletionKind::from_lsp)
+                .unwrap_or(CompletionKind::Text),
+            detail: item.detail.clone(),
+            sort_text: item.sort_text.clone(),
+            insert_text: item.insert_text.clone(),
+        }
+    }
+}
+
+impl fmt::Display for CompletionItemEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}", self.kind.symbol(), self.label)?;
+        if let Some(ref detail) = self.detail {
+            write!(f, " — {detail}")?;
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Completion list
+// ---------------------------------------------------------------------------
+
+/// A list of completion items, possibly incomplete (more results available).
+#[derive(Debug, Clone, Default)]
+pub struct CompletionList {
+    pub items: Vec<CompletionItemEntry>,
+    pub is_incomplete: bool,
+}
+
+impl CompletionList {
+    pub fn new(items: Vec<CompletionItemEntry>, is_incomplete: bool) -> Self {
+        Self {
+            items,
+            is_incomplete,
+        }
+    }
+
+    /// Filter items by a typed prefix (case-insensitive).
+    pub fn filter_prefix(&self, prefix: &str) -> CompletionList {
+        CompletionList {
+            items: self
+                .items
+                .iter()
+                .filter(|i| i.matches_prefix(prefix))
+                .cloned()
+                .collect(),
+            is_incomplete: self.is_incomplete,
+        }
+    }
+
+    /// Filter items by fuzzy match.
+    pub fn filter_fuzzy(&self, query: &str) -> CompletionList {
+        CompletionList {
+            items: self
+                .items
+                .iter()
+                .filter(|i| i.matches_fuzzy(query))
+                .cloned()
+                .collect(),
+            is_incomplete: self.is_incomplete,
+        }
+    }
+
+    /// Return a new list sorted by sort key.
+    pub fn sorted(&self) -> CompletionList {
+        let mut items = self.items.clone();
+        items.sort_by(|a, b| a.sort_key().cmp(b.sort_key()));
+        CompletionList {
+            items,
+            is_incomplete: self.is_incomplete,
+        }
+    }
+
+    /// Number of items.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// True if there are no items.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Filter items by completion kind.
+    pub fn filter_kind(&self, kind: CompletionKind) -> CompletionList {
+        CompletionList {
+            items: self
+                .items
+                .iter()
+                .filter(|i| i.kind == kind)
+                .cloned()
+                .collect(),
+            is_incomplete: self.is_incomplete,
+        }
+    }
+}
+
+impl From<lsp_types::CompletionResponse> for CompletionList {
+    fn from(resp: lsp_types::CompletionResponse) -> Self {
+        match resp {
+            lsp_types::CompletionResponse::Array(items) => CompletionList {
+                items: items.iter().map(CompletionItemEntry::from).collect(),
+                is_incomplete: false,
+            },
+            lsp_types::CompletionResponse::List(list) => CompletionList {
+                items: list.items.iter().map(CompletionItemEntry::from).collect(),
+                is_incomplete: list.is_incomplete,
+            },
+        }
+    }
+}
+
+impl fmt::Display for CompletionList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} item(s)", self.items.len())?;
+        if self.is_incomplete {
+            f.write_str(" (incomplete)")?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1402,5 +1791,232 @@ mod tests {
     #[test]
     fn initialize_params_relative_path_fails() {
         assert!(lsp_initialize_params("relative/path", "c", "0").is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // DiagnosticIndex tests
+    // -----------------------------------------------------------------------
+
+    fn make_diag(uri: &str, sev: Severity, msg: &str) -> DiagnosticEntry {
+        DiagnosticEntry {
+            uri: uri.to_string(),
+            range: DocRange::new(DocPosition::new(0, 0), DocPosition::new(0, 1)),
+            severity: sev,
+            message: msg.to_string(),
+            source: None,
+            code: None,
+        }
+    }
+
+    #[test]
+    fn diagnostic_index_set_get_clear() {
+        let mut idx = DiagnosticIndex::new();
+        assert_eq!(idx.file_count(), 0);
+        assert_eq!(idx.total_count(), 0);
+
+        let d1 = make_diag("file:///a.rs", Severity::Error, "err");
+        let d2 = make_diag("file:///a.rs", Severity::Warning, "warn");
+        let d3 = make_diag("file:///b.rs", Severity::Hint, "hint");
+
+        idx.set_file("file:///a.rs", vec![d1.clone(), d2.clone()]);
+        idx.set_file("file:///b.rs", vec![d3.clone()]);
+
+        assert_eq!(idx.file_count(), 2);
+        assert_eq!(idx.total_count(), 3);
+        assert_eq!(idx.get_for_file("file:///a.rs").len(), 2);
+        assert_eq!(idx.get_for_file("file:///c.rs").len(), 0);
+
+        let errors = idx.files_with_errors();
+        assert_eq!(errors.len(), 1);
+        assert!(errors.contains(&"file:///a.rs"));
+
+        idx.clear_file("file:///a.rs");
+        assert_eq!(idx.file_count(), 1);
+        assert_eq!(idx.total_count(), 1);
+
+        idx.clear_all();
+        assert!(idx.file_count() == 0);
+    }
+
+    #[test]
+    fn diagnostic_index_from_collection() {
+        let mut coll = DiagnosticCollection::new();
+        let d1 = make_diag("file:///x.rs", Severity::Error, "e1");
+        let d2 = make_diag("file:///y.rs", Severity::Warning, "w1");
+        coll.set_for_uri("file:///x.rs", vec![d1]);
+        coll.set_for_uri("file:///y.rs", vec![d2]);
+
+        let idx = DiagnosticIndex::from(coll);
+        assert_eq!(idx.file_count(), 2);
+        assert_eq!(idx.total_count(), 2);
+        assert_eq!(idx.count_by_severity(Severity::Error), 1);
+    }
+
+    #[test]
+    fn diagnostic_index_display() {
+        let mut idx = DiagnosticIndex::new();
+        idx.set_file(
+            "file:///a.rs",
+            vec![make_diag("file:///a.rs", Severity::Error, "e")],
+        );
+        let display = format!("{idx}");
+        assert!(display.contains("1 diagnostic(s)"));
+        assert!(display.contains("1 file(s)"));
+    }
+
+    #[test]
+    fn diagnostic_index_set_empty_removes() {
+        let mut idx = DiagnosticIndex::new();
+        idx.set_file(
+            "file:///a.rs",
+            vec![make_diag("file:///a.rs", Severity::Info, "i")],
+        );
+        assert_eq!(idx.file_count(), 1);
+        idx.set_file("file:///a.rs", vec![]);
+        assert_eq!(idx.file_count(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // CompletionItemEntry tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn completion_item_entry_matching() {
+        let item = CompletionItemEntry {
+            label: "HashMap".to_string(),
+            kind: CompletionKind::Struct,
+            detail: Some("std::collections".to_string()),
+            sort_text: None,
+            insert_text: None,
+        };
+
+        assert!(item.matches_prefix("Hash"));
+        assert!(item.matches_prefix("hash"));
+        assert!(!item.matches_prefix("Vec"));
+
+        assert!(item.matches_fuzzy("HM"));
+        assert!(item.matches_fuzzy("hm"));
+        assert!(item.matches_fuzzy("hashmap"));
+        assert!(!item.matches_fuzzy("xyz"));
+
+        assert_eq!(item.text_to_insert(), "HashMap");
+        assert_eq!(item.sort_key(), "HashMap");
+    }
+
+    #[test]
+    fn completion_item_entry_with_insert_text() {
+        let item = CompletionItemEntry {
+            label: "println!".to_string(),
+            kind: CompletionKind::Snippet,
+            detail: None,
+            sort_text: Some("0001".to_string()),
+            insert_text: Some("println!(\"{}\", )".to_string()),
+        };
+
+        assert_eq!(item.text_to_insert(), "println!(\"{}\", )");
+        assert_eq!(item.sort_key(), "0001");
+        // prefix match also checks insert_text
+        assert!(item.matches_prefix("println"));
+    }
+
+    #[test]
+    fn completion_item_from_lsp() {
+        let lsp_item = lsp_types::CompletionItem {
+            label: "my_func".to_string(),
+            kind: Some(lsp_types::CompletionItemKind::FUNCTION),
+            detail: Some("fn()".to_string()),
+            sort_text: None,
+            insert_text: Some("my_func()".to_string()),
+            ..Default::default()
+        };
+        let entry = CompletionItemEntry::from(&lsp_item);
+        assert_eq!(entry.label, "my_func");
+        assert_eq!(entry.kind, CompletionKind::Function);
+        assert_eq!(entry.detail.as_deref(), Some("fn()"));
+        assert_eq!(entry.insert_text.as_deref(), Some("my_func()"));
+    }
+
+    #[test]
+    fn completion_item_display() {
+        let item = CompletionItemEntry::new("foo", CompletionKind::Function);
+        assert_eq!(format!("{item}"), "[f] foo");
+
+        let mut item2 = CompletionItemEntry::new("bar", CompletionKind::Variable);
+        item2.detail = Some("i32".to_string());
+        assert_eq!(format!("{item2}"), "[v] bar — i32");
+    }
+
+    // -----------------------------------------------------------------------
+    // CompletionList tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn completion_list_filter_and_sort() {
+        let items = vec![
+            CompletionItemEntry::new("zebra", CompletionKind::Variable),
+            CompletionItemEntry::new("apple", CompletionKind::Function),
+            CompletionItemEntry::new("apricot", CompletionKind::Function),
+            CompletionItemEntry::new("banana", CompletionKind::Keyword),
+        ];
+        let list = CompletionList::new(items, true);
+
+        assert_eq!(list.len(), 4);
+        assert!(list.is_incomplete);
+
+        let filtered = list.filter_prefix("ap");
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.items.iter().all(|i| i.label.starts_with("ap")));
+
+        let sorted = list.sorted();
+        assert_eq!(sorted.items[0].label, "apple");
+        assert_eq!(sorted.items[3].label, "zebra");
+
+        let funcs = list.filter_kind(CompletionKind::Function);
+        assert_eq!(funcs.len(), 2);
+
+        let fuzzy = list.filter_fuzzy("zb");
+        assert_eq!(fuzzy.len(), 1);
+        assert_eq!(fuzzy.items[0].label, "zebra");
+    }
+
+    #[test]
+    fn completion_list_display() {
+        let list = CompletionList::new(vec![], false);
+        assert_eq!(format!("{list}"), "0 item(s)");
+
+        let list2 = CompletionList::new(
+            vec![CompletionItemEntry::new("x", CompletionKind::Text)],
+            true,
+        );
+        assert_eq!(format!("{list2}"), "1 item(s) (incomplete)");
+    }
+
+    #[test]
+    fn completion_list_from_lsp_array() {
+        let lsp_items = vec![
+            lsp_types::CompletionItem {
+                label: "a".to_string(),
+                kind: Some(lsp_types::CompletionItemKind::KEYWORD),
+                ..Default::default()
+            },
+            lsp_types::CompletionItem {
+                label: "b".to_string(),
+                ..Default::default()
+            },
+        ];
+        let resp = lsp_types::CompletionResponse::Array(lsp_items);
+        let list = CompletionList::from(resp);
+        assert_eq!(list.len(), 2);
+        assert!(!list.is_incomplete);
+        assert_eq!(list.items[0].kind, CompletionKind::Keyword);
+        assert_eq!(list.items[1].kind, CompletionKind::Text);
+    }
+
+    #[test]
+    fn completion_kind_display_and_symbol() {
+        assert_eq!(CompletionKind::Function.symbol(), 'f');
+        assert_eq!(CompletionKind::Variable.symbol(), 'v');
+        assert_eq!(format!("{}", CompletionKind::Struct), "struct");
+        assert_eq!(format!("{}", CompletionKind::EnumMember), "enum member");
     }
 }

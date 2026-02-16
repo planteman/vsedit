@@ -704,6 +704,257 @@ impl QueryParams {
 }
 
 // ---------------------------------------------------------------------------
+// UriBuilder — fluent builder for constructing URIs piece by piece
+// ---------------------------------------------------------------------------
+
+/// Fluent builder for constructing [`VsUri`] instances.
+///
+/// ```
+/// # use vsedit_uri::UriBuilder;
+/// let uri = UriBuilder::new()
+///     .scheme("https")
+///     .authority("example.com")
+///     .path("/api/v1")
+///     .query("page=1")
+///     .fragment("top")
+///     .build();
+/// assert_eq!(uri.scheme, "https");
+/// ```
+#[derive(Debug, Default, Clone)]
+pub struct UriBuilder {
+    scheme: String,
+    authority: String,
+    path: String,
+    query: String,
+    fragment: String,
+}
+
+impl UriBuilder {
+    /// Create a new empty builder.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Start from an existing URI.
+    pub fn from_uri(uri: &VsUri) -> Self {
+        Self {
+            scheme: uri.scheme.clone(),
+            authority: uri.authority.clone(),
+            path: uri.path.clone(),
+            query: uri.query.clone(),
+            fragment: uri.fragment.clone(),
+        }
+    }
+
+    /// Set the scheme (e.g. `"https"`, `"file"`).
+    pub fn scheme(mut self, scheme: &str) -> Self {
+        self.scheme = scheme.to_string();
+        self
+    }
+
+    /// Set the authority (e.g. `"example.com:8080"`).
+    pub fn authority(mut self, authority: &str) -> Self {
+        self.authority = authority.to_string();
+        self
+    }
+
+    /// Set the path (e.g. `"/api/v1/users"`).
+    pub fn path(mut self, path: &str) -> Self {
+        self.path = vsedit_path::to_forward_slashes(path);
+        self
+    }
+
+    /// Set the raw query string (without leading `?`).
+    pub fn query(mut self, query: &str) -> Self {
+        self.query = query.to_string();
+        self
+    }
+
+    /// Set the query from a [`QueryParams`] instance.
+    pub fn query_params(mut self, params: &QueryParams) -> Self {
+        self.query = params.to_query_string();
+        self
+    }
+
+    /// Set the fragment (without leading `#`).
+    pub fn fragment(mut self, fragment: &str) -> Self {
+        self.fragment = fragment.to_string();
+        self
+    }
+
+    /// Build the final [`VsUri`].
+    pub fn build(self) -> VsUri {
+        VsUri {
+            scheme: self.scheme,
+            authority: self.authority,
+            path: self.path,
+            query: self.query,
+            fragment: self.fragment,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UriMatcher — glob-style pattern matching for URIs
+// ---------------------------------------------------------------------------
+
+/// Matches URIs against patterns with glob-style wildcards.
+///
+/// Supported wildcards:
+/// - `*` matches any characters within a single path segment
+/// - `**` matches any characters across multiple path segments
+/// - Wildcards can appear in scheme, authority, or path
+///
+/// ```
+/// # use vsedit_uri::{UriMatcher, VsUri};
+/// let m = UriMatcher::new("https://example.com/api/**");
+/// assert!(m.matches(&VsUri::parse("https://example.com/api/v1/users")));
+/// ```
+#[derive(Debug, Clone)]
+pub struct UriMatcher {
+    scheme_pattern: String,
+    authority_pattern: String,
+    path_pattern: String,
+}
+
+impl UriMatcher {
+    /// Create a new matcher from a pattern string.
+    ///
+    /// The pattern is parsed as `scheme://authority/path` where any component
+    /// may contain `*` or `**` wildcards.
+    pub fn new(pattern: &str) -> Self {
+        let parsed = VsUri::parse(pattern);
+        Self {
+            scheme_pattern: parsed.scheme,
+            authority_pattern: parsed.authority,
+            path_pattern: parsed.path,
+        }
+    }
+
+    /// Test whether a URI matches this pattern.
+    pub fn matches(&self, uri: &VsUri) -> bool {
+        glob_match(&self.scheme_pattern, &uri.scheme)
+            && glob_match(&self.authority_pattern, &uri.authority)
+            && glob_match_path(&self.path_pattern, &uri.path)
+    }
+}
+
+/// Simple glob match for non-path components (`*` matches any chars).
+fn glob_match(pattern: &str, value: &str) -> bool {
+    if pattern == "*" {
+        return true;
+    }
+    pattern == value
+}
+
+/// Glob match for path components with `*` and `**` support.
+fn glob_match_path(pattern: &str, path: &str) -> bool {
+    let pat_segs: Vec<&str> = pattern.split('/').collect();
+    let path_segs: Vec<&str> = path.split('/').collect();
+    glob_match_segments(&pat_segs, &path_segs)
+}
+
+fn glob_match_segments(pat: &[&str], path: &[&str]) -> bool {
+    let mut pi = 0;
+    let mut si = 0;
+    let mut star_pi = None;
+    let mut star_si = None;
+
+    while si < path.len() {
+        if pi < pat.len() && pat[pi] == "**" {
+            star_pi = Some(pi);
+            star_si = Some(si);
+            pi += 1;
+        } else if pi < pat.len() && segment_matches(pat[pi], path[si]) {
+            pi += 1;
+            si += 1;
+        } else if let (Some(sp), Some(ss)) = (star_pi, star_si) {
+            pi = sp + 1;
+            let new_ss = ss + 1;
+            star_si = Some(new_ss);
+            si = new_ss;
+        } else {
+            return false;
+        }
+    }
+
+    while pi < pat.len() && pat[pi] == "**" {
+        pi += 1;
+    }
+
+    pi == pat.len()
+}
+
+/// Match a single path segment against a pattern segment (`*` = any segment).
+fn segment_matches(pattern: &str, segment: &str) -> bool {
+    if pattern == "*" {
+        return true;
+    }
+    pattern == segment
+}
+
+// ---------------------------------------------------------------------------
+// resolve_relative — free function wrapper
+// ---------------------------------------------------------------------------
+
+/// Resolve a relative URI reference against a base URI.
+///
+/// This is a convenience wrapper around [`VsUri::resolve`].
+///
+/// ```
+/// # use vsedit_uri::{VsUri, resolve_relative};
+/// let base = VsUri::parse("https://example.com/a/b/c");
+/// let resolved = resolve_relative(&base, "../d");
+/// assert_eq!(resolved.path, "/a/d");
+/// ```
+pub fn resolve_relative(base: &VsUri, relative: &str) -> VsUri {
+    base.resolve(relative)
+}
+
+// ---------------------------------------------------------------------------
+// From / Into conversions
+// ---------------------------------------------------------------------------
+
+impl From<&str> for VsUri {
+    fn from(s: &str) -> Self {
+        VsUri::parse(s)
+    }
+}
+
+impl From<String> for VsUri {
+    fn from(s: String) -> Self {
+        VsUri::parse(&s)
+    }
+}
+
+impl From<VsUri> for String {
+    fn from(uri: VsUri) -> Self {
+        uri.to_uri_string()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display for QueryParams
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for QueryParams {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.to_query_string())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Iterator support for QueryParams
+// ---------------------------------------------------------------------------
+
+impl QueryParams {
+    /// Iterate over key-value pairs.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.params.iter().map(|(k, v)| (k.as_str(), v.as_str()))
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Data URI encoding/decoding
 // ---------------------------------------------------------------------------
 
@@ -1419,5 +1670,127 @@ mod tests {
         assert_eq!(normalize_path("/a/b/../c"), "/a/c");
         assert_eq!(normalize_path("/a/./b"), "/a/b");
         assert_eq!(normalize_path("/a/b/../../c"), "/c");
+    }
+
+    // ---- UriBuilder tests ----
+
+    #[test]
+    fn uri_builder_full() {
+        let uri = UriBuilder::new()
+            .scheme("https")
+            .authority("example.com:8080")
+            .path("/api/v1/users")
+            .query("page=1&limit=10")
+            .fragment("top")
+            .build();
+        assert_eq!(uri.scheme, "https");
+        assert_eq!(uri.authority, "example.com:8080");
+        assert_eq!(uri.path, "/api/v1/users");
+        assert_eq!(uri.query, "page=1&limit=10");
+        assert_eq!(uri.fragment, "top");
+        assert_eq!(
+            uri.to_string(),
+            "https://example.com:8080/api/v1/users?page=1&limit=10#top"
+        );
+    }
+
+    #[test]
+    fn uri_builder_file_shorthand() {
+        let uri = UriBuilder::new().scheme("file").path("/home/user/file.rs").build();
+        assert_eq!(uri.scheme, "file");
+        assert_eq!(uri.path, "/home/user/file.rs");
+        assert!(uri.authority.is_empty());
+    }
+
+    #[test]
+    fn uri_builder_with_query_params() {
+        let mut params = QueryParams::parse("");
+        params.set("search", "rust uri");
+        params.set("page", "3");
+        let uri = UriBuilder::new()
+            .scheme("https")
+            .authority("example.com")
+            .path("/search")
+            .query_params(&params)
+            .build();
+        assert!(uri.query.contains("search="));
+        assert!(uri.query.contains("page=3"));
+    }
+
+    // ---- UriMatcher tests ----
+
+    #[test]
+    fn uri_matcher_exact() {
+        let m = UriMatcher::new("https://example.com/api/v1/users");
+        assert!(m.matches(&VsUri::parse("https://example.com/api/v1/users")));
+        assert!(!m.matches(&VsUri::parse("https://example.com/api/v1/posts")));
+    }
+
+    #[test]
+    fn uri_matcher_glob_star() {
+        let m = UriMatcher::new("https://example.com/api/**");
+        assert!(m.matches(&VsUri::parse("https://example.com/api/v1/users")));
+        assert!(m.matches(&VsUri::parse("https://example.com/api/v2/posts/123")));
+        assert!(!m.matches(&VsUri::parse("https://example.com/other")));
+    }
+
+    #[test]
+    fn uri_matcher_wildcard_scheme() {
+        let m = UriMatcher::new("*://example.com/path");
+        assert!(m.matches(&VsUri::parse("https://example.com/path")));
+        assert!(m.matches(&VsUri::parse("http://example.com/path")));
+        assert!(!m.matches(&VsUri::parse("https://other.com/path")));
+    }
+
+    #[test]
+    fn uri_matcher_single_star_segment() {
+        let m = UriMatcher::new("file:///home/*/projects");
+        assert!(m.matches(&VsUri::parse("file:///home/alice/projects")));
+        assert!(m.matches(&VsUri::parse("file:///home/bob/projects")));
+        assert!(!m.matches(&VsUri::parse("file:///home/alice/bob/projects")));
+    }
+
+    // ---- resolve_relative free function ----
+
+    #[test]
+    fn resolve_relative_fn_basic() {
+        let base = VsUri::parse("https://example.com/a/b/c");
+        let resolved = resolve_relative(&base, "../d?q=1#frag");
+        assert_eq!(resolved.path, "/a/d");
+        assert_eq!(resolved.query, "q=1");
+        assert_eq!(resolved.fragment, "frag");
+    }
+
+    // ---- From / Display impls ----
+
+    #[test]
+    fn from_string_for_vsuri() {
+        let uri: VsUri = "https://example.com/path".into();
+        assert_eq!(uri.scheme, "https");
+        assert_eq!(uri.authority, "example.com");
+    }
+
+    #[test]
+    fn from_vsuri_for_string() {
+        let uri = VsUri::parse("https://example.com/path");
+        let s: String = uri.into();
+        assert!(s.starts_with("https://example.com"));
+    }
+
+    #[test]
+    fn query_params_display() {
+        let params = QueryParams::parse("a=1&b=2");
+        let s = params.to_string();
+        assert!(s.contains("a=1"));
+        assert!(s.contains("b=2"));
+    }
+
+    #[test]
+    fn query_params_iter() {
+        let params = QueryParams::parse("x=1&y=2&z=3");
+        let collected: Vec<_> = params.iter().collect();
+        assert_eq!(collected.len(), 3);
+        assert_eq!(collected[0], ("x", "1"));
+        assert_eq!(collected[2], ("z", "3"));
     }
 }

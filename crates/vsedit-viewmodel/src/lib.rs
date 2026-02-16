@@ -733,6 +733,209 @@ impl ViewModelStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ViewLineRange — a range of 1-based view lines
+// ---------------------------------------------------------------------------
+
+/// A range of 1-based view line indices (inclusive on both ends).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewLineRange {
+    /// First view line (1-based, inclusive).
+    pub start: u32,
+    /// Last view line (1-based, inclusive).
+    pub end: u32,
+}
+
+impl ViewLineRange {
+    pub fn new(start: u32, end: u32) -> Self {
+        Self { start, end }
+    }
+
+    /// Returns `true` if `view_line` is within this range.
+    pub fn contains(&self, view_line: u32) -> bool {
+        !self.is_empty() && view_line >= self.start && view_line <= self.end
+    }
+
+    /// Number of view lines in the range.
+    pub fn len(&self) -> u32 {
+        if self.end >= self.start {
+            self.end - self.start + 1
+        } else {
+            0
+        }
+    }
+
+    /// Returns `true` if the range contains no lines.
+    pub fn is_empty(&self) -> bool {
+        self.end < self.start
+    }
+
+    /// Compute the intersection with another range, or `None` if disjoint.
+    pub fn intersect(&self, other: &ViewLineRange) -> Option<ViewLineRange> {
+        let start = self.start.max(other.start);
+        let end = self.end.min(other.end);
+        if start <= end {
+            Some(ViewLineRange::new(start, end))
+        } else {
+            None
+        }
+    }
+
+    /// Compute the smallest range that covers both ranges.
+    pub fn union(&self, other: &ViewLineRange) -> ViewLineRange {
+        ViewLineRange::new(self.start.min(other.start), self.end.max(other.end))
+    }
+}
+
+impl fmt::Display for ViewLineRange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}..{}]", self.start, self.end)
+    }
+}
+
+impl From<(u32, u32)> for ViewLineRange {
+    fn from((start, end): (u32, u32)) -> Self {
+        Self::new(start, end)
+    }
+}
+
+impl From<&VisibleRange> for ViewLineRange {
+    fn from(vr: &VisibleRange) -> Self {
+        Self::new(vr.first_line, vr.last_line)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewportState — tracks scroll position, cursor, and visible range
+// ---------------------------------------------------------------------------
+
+/// Mutable state for a viewport: scroll position, visible height, and cursor line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewportState {
+    /// 1-based first visible view line.
+    pub scroll_position: u32,
+    /// Number of lines visible in the viewport.
+    pub viewport_height: u32,
+    /// 1-based view line where the cursor currently sits.
+    pub cursor_view_line: u32,
+}
+
+impl ViewportState {
+    pub fn new(viewport_height: u32) -> Self {
+        Self {
+            scroll_position: 1,
+            viewport_height,
+            cursor_view_line: 1,
+        }
+    }
+
+    /// Scroll so that `target` is the first visible line, clamped to valid bounds.
+    pub fn scroll_to(&mut self, target: u32, total_view_lines: u32) {
+        let max_first = total_view_lines.saturating_sub(self.viewport_height) + 1;
+        self.scroll_position = target.clamp(1, max_first);
+    }
+
+    /// Adjust scroll position so that `cursor_view_line` is visible.
+    pub fn ensure_visible(&mut self, total_view_lines: u32) {
+        if self.cursor_view_line < self.scroll_position {
+            self.scroll_to(self.cursor_view_line, total_view_lines);
+        } else if self.cursor_view_line
+            > self.scroll_position + self.viewport_height.saturating_sub(1)
+        {
+            let new_first = self.cursor_view_line.saturating_sub(self.viewport_height - 1);
+            self.scroll_to(new_first, total_view_lines);
+        }
+    }
+
+    /// Returns `true` if `view_line` is currently visible.
+    pub fn is_line_visible(&self, view_line: u32) -> bool {
+        view_line >= self.scroll_position
+            && view_line <= self.scroll_position + self.viewport_height.saturating_sub(1)
+    }
+
+    /// Return the currently visible range as a `ViewLineRange`.
+    pub fn visible_range(&self, total_view_lines: u32) -> ViewLineRange {
+        let end = (self.scroll_position + self.viewport_height - 1).min(total_view_lines);
+        ViewLineRange::new(self.scroll_position, end)
+    }
+}
+
+impl fmt::Display for ViewportState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ViewportState(scroll={}, height={}, cursor={})",
+            self.scroll_position, self.viewport_height, self.cursor_view_line
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewLineIterator — iterate over view lines with optional filtering
+// ---------------------------------------------------------------------------
+
+/// An iterator over `(1-based index, &ViewLine)` pairs with optional filters.
+pub struct ViewLineIterator<'a> {
+    view_lines: &'a [ViewLine],
+    pos: usize,
+    wrapped_only: bool,
+    model_line_min: Option<u32>,
+    model_line_max: Option<u32>,
+}
+
+impl<'a> ViewLineIterator<'a> {
+    pub fn new(vm: &'a ViewModel) -> Self {
+        Self {
+            view_lines: &vm.view_lines,
+            pos: 0,
+            wrapped_only: false,
+            model_line_min: None,
+            model_line_max: None,
+        }
+    }
+
+    /// Only yield wrapped continuation lines.
+    pub fn wrapped_only(mut self) -> Self {
+        self.wrapped_only = true;
+        self
+    }
+
+    /// Only yield lines from model lines in `[min_model, max_model]` (inclusive).
+    pub fn model_line_range(mut self, min_model: u32, max_model: u32) -> Self {
+        self.model_line_min = Some(min_model);
+        self.model_line_max = Some(max_model);
+        self
+    }
+}
+
+impl<'a> Iterator for ViewLineIterator<'a> {
+    type Item = (u32, &'a ViewLine);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.pos < self.view_lines.len() {
+            let idx = self.pos;
+            self.pos += 1;
+            let vl = &self.view_lines[idx];
+
+            if self.wrapped_only && !vl.is_wrapped {
+                continue;
+            }
+            if let Some(min) = self.model_line_min {
+                if vl.model_line < min {
+                    continue;
+                }
+            }
+            if let Some(max) = self.model_line_max {
+                if vl.model_line > max {
+                    continue;
+                }
+            }
+            return Some(((idx as u32) + 1, vl));
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1399,5 +1602,134 @@ mod tests {
         assert!(s.contains("100 model lines"));
         assert!(s.contains("120 view lines"));
         assert!(s.contains("20 wrapped"));
+    }
+
+    // ---- ViewLineRange tests ----
+
+    #[test]
+    fn view_line_range_contains_and_len() {
+        let r = ViewLineRange::new(3, 7);
+        assert_eq!(r.len(), 5);
+        assert!(!r.is_empty());
+        assert!(r.contains(3));
+        assert!(r.contains(7));
+        assert!(!r.contains(2));
+        assert!(!r.contains(8));
+    }
+
+    #[test]
+    fn view_line_range_empty() {
+        let r = ViewLineRange::new(5, 3);
+        assert!(r.is_empty());
+        assert_eq!(r.len(), 0);
+        assert!(!r.contains(4));
+    }
+
+    #[test]
+    fn view_line_range_intersect() {
+        let a = ViewLineRange::new(1, 5);
+        let b = ViewLineRange::new(3, 8);
+        let inter = a.intersect(&b).unwrap();
+        assert_eq!(inter.start, 3);
+        assert_eq!(inter.end, 5);
+
+        let c = ViewLineRange::new(6, 10);
+        assert!(a.intersect(&c).is_none());
+    }
+
+    #[test]
+    fn view_line_range_union() {
+        let a = ViewLineRange::new(2, 5);
+        let b = ViewLineRange::new(4, 9);
+        let u = a.union(&b);
+        assert_eq!(u.start, 2);
+        assert_eq!(u.end, 9);
+    }
+
+    #[test]
+    fn view_line_range_display_and_from() {
+        let r = ViewLineRange::new(1, 10);
+        assert_eq!(format!("{r}"), "[1..10]");
+        let r2: ViewLineRange = (3u32, 7u32).into();
+        assert_eq!(r2.start, 3);
+        assert_eq!(r2.end, 7);
+    }
+
+    // ---- ViewportState tests ----
+
+    #[test]
+    fn viewport_state_scroll_to() {
+        let mut state = ViewportState::new(20);
+        assert_eq!(state.scroll_position, 1);
+        state.scroll_to(5, 100);
+        assert_eq!(state.scroll_position, 5);
+        // Clamp to valid max
+        state.scroll_to(200, 100);
+        assert_eq!(state.scroll_position, 81); // 100 - 20 + 1
+    }
+
+    #[test]
+    fn viewport_state_ensure_visible() {
+        let mut state = ViewportState::new(10);
+        state.cursor_view_line = 15;
+        state.ensure_visible(100);
+        // cursor at 15, viewport=10 → scroll_position should be 6..15
+        assert_eq!(state.scroll_position, 6);
+
+        // Already visible
+        state.cursor_view_line = 10;
+        state.ensure_visible(100);
+        assert_eq!(state.scroll_position, 6);
+    }
+
+    #[test]
+    fn viewport_state_is_line_visible() {
+        let mut state = ViewportState::new(5);
+        state.scroll_to(3, 20);
+        assert!(state.is_line_visible(3));
+        assert!(state.is_line_visible(7));
+        assert!(!state.is_line_visible(2));
+        assert!(!state.is_line_visible(8));
+    }
+
+    #[test]
+    fn viewport_state_visible_range() {
+        let mut state = ViewportState::new(5);
+        state.scroll_to(3, 10);
+        let r = state.visible_range(10);
+        assert_eq!(r.start, 3);
+        assert_eq!(r.end, 7);
+    }
+
+    // ---- ViewLineIterator tests ----
+
+    #[test]
+    fn view_line_iterator_all() {
+        let model = make_model("hello world\nfoo");
+        let vm = ViewModel::new(model, 6, WordWrap::On);
+        let items: Vec<_> = ViewLineIterator::new(&vm).collect();
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].0, 1);
+        assert_eq!(items[2].1.content, "foo");
+    }
+
+    #[test]
+    fn view_line_iterator_wrapped_only() {
+        let model = make_model("hello world\nfoo");
+        let vm = ViewModel::new(model, 6, WordWrap::On);
+        let items: Vec<_> = ViewLineIterator::new(&vm).wrapped_only().collect();
+        assert_eq!(items.len(), 1);
+        assert!(items[0].1.is_wrapped);
+        assert_eq!(items[0].0, 2);
+    }
+
+    #[test]
+    fn view_line_iterator_model_range() {
+        let model = make_model("aaa\nbbb\nccc\nddd");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let items: Vec<_> = ViewLineIterator::new(&vm).model_line_range(2, 3).collect();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].1.content, "bbb");
+        assert_eq!(items[1].1.content, "ccc");
     }
 }

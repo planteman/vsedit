@@ -874,6 +874,162 @@ impl Default for FileQuickPick {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SearchHistory
+// ---------------------------------------------------------------------------
+
+/// Tracks recent search queries.
+#[derive(Debug, Clone)]
+pub struct SearchHistory {
+    entries: Vec<String>,
+    max_size: usize,
+}
+
+impl SearchHistory {
+    pub fn new(max_size: usize) -> Self {
+        Self { entries: Vec::new(), max_size }
+    }
+
+    pub fn push(&mut self, query: impl Into<String>) {
+        let query = query.into();
+        self.entries.retain(|e| e != &query);
+        if self.entries.len() >= self.max_size {
+            self.entries.remove(0);
+        }
+        self.entries.push(query);
+    }
+
+    pub fn last(&self) -> Option<&str> {
+        self.entries.last().map(|s| s.as_str())
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn contains(&self, query: &str) -> bool {
+        self.entries.iter().any(|e| e == query)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        self.entries.iter().map(|s| s.as_str())
+    }
+
+    pub fn recent(&self, n: usize) -> Vec<&str> {
+        self.entries.iter().rev().take(n).map(|s| s.as_str()).collect()
+    }
+}
+
+impl fmt::Display for SearchHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SearchHistory({} entries)", self.entries.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchStats
+// ---------------------------------------------------------------------------
+
+/// Tracks aggregate search statistics.
+#[derive(Debug, Clone, Default)]
+pub struct SearchStats {
+    pub total_searches: u64,
+    pub total_matches: u64,
+}
+
+impl SearchStats {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record(&mut self, match_count: u64) {
+        self.total_searches += 1;
+        self.total_matches += match_count;
+    }
+
+    pub fn average_matches(&self) -> f64 {
+        if self.total_searches == 0 {
+            0.0
+        } else {
+            self.total_matches as f64 / self.total_searches as f64
+        }
+    }
+}
+
+impl fmt::Display for SearchStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SearchStats(searches={}, matches={}, avg={:.1})",
+            self.total_searches, self.total_matches, self.average_matches()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchFilter
+// ---------------------------------------------------------------------------
+
+/// A filter combining include/exclude patterns for file paths.
+#[derive(Debug, Clone)]
+pub struct SearchFilter {
+    pub include: Vec<String>,
+    pub exclude: Vec<String>,
+}
+
+impl SearchFilter {
+    pub fn new() -> Self {
+        Self { include: Vec::new(), exclude: Vec::new() }
+    }
+
+    pub fn with_include(mut self, pattern: impl Into<String>) -> Self {
+        self.include.push(pattern.into());
+        self
+    }
+
+    pub fn with_exclude(mut self, pattern: impl Into<String>) -> Self {
+        self.exclude.push(pattern.into());
+        self
+    }
+
+    /// Checks if a path matches the filter rules.
+    /// If include patterns exist, the path must match at least one.
+    /// If exclude patterns exist, the path must not match any.
+    pub fn matches_path(&self, path: &str) -> bool {
+        if !self.exclude.is_empty() {
+            for pat in &self.exclude {
+                if path.contains(pat.as_str()) {
+                    return false;
+                }
+            }
+        }
+        if self.include.is_empty() {
+            return true;
+        }
+        self.include.iter().any(|pat| path.contains(pat.as_str()))
+    }
+}
+
+impl Default for SearchFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for SearchFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SearchFilter(include={}, exclude={})", self.include.len(), self.exclude.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1445,5 +1601,67 @@ mod submod;
         let total: usize = results.iter().map(|r| r.matches.len()).sum();
         assert_eq!(total, 2);
         fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn test_search_history_push_dedup() {
+        let mut hist = SearchHistory::new(5);
+        hist.push("hello");
+        hist.push("world");
+        hist.push("hello"); // moves to end
+        assert_eq!(hist.len(), 2);
+        assert_eq!(hist.last(), Some("hello"));
+        assert!(hist.contains("world"));
+        assert!(format!("{hist}").contains("2 entries"));
+    }
+
+    #[test]
+    fn test_search_history_overflow() {
+        let mut hist = SearchHistory::new(2);
+        hist.push("a");
+        hist.push("b");
+        hist.push("c");
+        assert_eq!(hist.len(), 2);
+        assert!(!hist.contains("a"));
+        assert!(hist.contains("b"));
+        assert!(hist.contains("c"));
+    }
+
+    #[test]
+    fn test_search_history_recent() {
+        let mut hist = SearchHistory::new(10);
+        hist.push("a");
+        hist.push("b");
+        hist.push("c");
+        let recent = hist.recent(2);
+        assert_eq!(recent, vec!["c", "b"]);
+    }
+
+    #[test]
+    fn test_search_stats() {
+        let mut stats = SearchStats::new();
+        stats.record(10);
+        stats.record(20);
+        assert_eq!(stats.total_searches, 2);
+        assert_eq!(stats.total_matches, 30);
+        assert!((stats.average_matches() - 15.0).abs() < f64::EPSILON);
+        assert!(format!("{stats}").contains("avg=15.0"));
+    }
+
+    #[test]
+    fn test_search_stats_empty() {
+        let stats = SearchStats::new();
+        assert!((stats.average_matches() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_search_filter_matches() {
+        let filter = SearchFilter::new()
+            .with_include(".rs")
+            .with_exclude("target");
+        assert!(filter.matches_path("src/main.rs"));
+        assert!(!filter.matches_path("target/debug/main.rs"));
+        assert!(!filter.matches_path("src/main.py"));
+        assert!(format!("{filter}").contains("include=1"));
     }
 }

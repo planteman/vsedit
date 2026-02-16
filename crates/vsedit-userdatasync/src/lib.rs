@@ -720,6 +720,317 @@ impl SyncLog {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ResourceVersion
+// ---------------------------------------------------------------------------
+
+/// Versioning metadata for a single sync resource.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceVersion {
+    pub resource: SyncResource,
+    pub version: u64,
+    pub hash: String,
+    pub timestamp: u64,
+}
+
+impl ResourceVersion {
+    pub fn new(resource: SyncResource, version: u64, hash: impl Into<String>, timestamp: u64) -> Self {
+        Self {
+            resource,
+            version,
+            hash: hash.into(),
+            timestamp,
+        }
+    }
+
+    /// Returns `true` when both version number and content hash match.
+    pub fn matches(&self, other: &ResourceVersion) -> bool {
+        self.version == other.version && self.hash == other.hash
+    }
+
+    /// Returns `true` if `self` is strictly newer than `other` by version number.
+    pub fn is_newer_than(&self, other: &ResourceVersion) -> bool {
+        self.version > other.version
+    }
+
+    /// Returns `true` if the content hash differs from `other` regardless of version.
+    pub fn content_differs(&self, other: &ResourceVersion) -> bool {
+        self.hash != other.hash
+    }
+}
+
+impl fmt::Display for ResourceVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}@v{} ({})", self.resource, self.version, &self.hash)
+    }
+}
+
+impl From<(SyncResource, u64, &str, u64)> for ResourceVersion {
+    fn from((resource, version, hash, timestamp): (SyncResource, u64, &str, u64)) -> Self {
+        Self::new(resource, version, hash, timestamp)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SyncPlan
+// ---------------------------------------------------------------------------
+
+/// The direction of a planned resource transfer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncDirection {
+    Upload,
+    Download,
+}
+
+impl fmt::Display for SyncDirection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SyncDirection::Upload => write!(f, "Upload"),
+            SyncDirection::Download => write!(f, "Download"),
+        }
+    }
+}
+
+/// A single item within a [`SyncPlan`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct SyncPlanItem {
+    pub resource: SyncResource,
+    pub direction: SyncDirection,
+    pub estimated_bytes: u64,
+    pub has_conflict: bool,
+}
+
+/// A planned sync operation describing what will be transferred.
+#[derive(Debug, Clone)]
+pub struct SyncPlan {
+    items: Vec<SyncPlanItem>,
+    conflict_strategy: ConflictStrategy,
+}
+
+impl SyncPlan {
+    pub fn new(conflict_strategy: ConflictStrategy) -> Self {
+        Self {
+            items: Vec::new(),
+            conflict_strategy,
+        }
+    }
+
+    pub fn add_item(&mut self, item: SyncPlanItem) {
+        self.items.push(item);
+    }
+
+    pub fn items(&self) -> &[SyncPlanItem] {
+        &self.items
+    }
+
+    /// Total estimated transfer size in bytes.
+    pub fn estimated_total_bytes(&self) -> u64 {
+        self.items.iter().map(|i| i.estimated_bytes).sum()
+    }
+
+    /// Number of items that have a conflict.
+    pub fn conflict_count(&self) -> usize {
+        self.items.iter().filter(|i| i.has_conflict).count()
+    }
+
+    /// Returns `true` if the plan contains any conflicts.
+    pub fn has_conflicts(&self) -> bool {
+        self.conflict_count() > 0
+    }
+
+    /// The strategy that will be used for conflicts in this plan.
+    pub fn conflict_strategy(&self) -> ConflictStrategy {
+        self.conflict_strategy
+    }
+
+    /// Returns `true` when the plan has no items.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Number of items in the plan.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Build a plan by comparing local and remote [`ResourceVersion`] lists.
+    pub fn from_versions(
+        local: &[ResourceVersion],
+        remote: &[ResourceVersion],
+        conflict_strategy: ConflictStrategy,
+    ) -> Self {
+        let mut plan = SyncPlan::new(conflict_strategy);
+
+        let remote_map: HashMap<&SyncResource, &ResourceVersion> =
+            remote.iter().map(|r| (&r.resource, r)).collect();
+
+        for lv in local {
+            if let Some(rv) = remote_map.get(&lv.resource) {
+                if lv.content_differs(rv) {
+                    let (direction, has_conflict) = if lv.is_newer_than(rv) {
+                        (SyncDirection::Upload, false)
+                    } else if rv.is_newer_than(lv) {
+                        (SyncDirection::Download, false)
+                    } else {
+                        // Same version number but different hashes — conflict.
+                        (SyncDirection::Upload, true)
+                    };
+                    plan.add_item(SyncPlanItem {
+                        resource: lv.resource.clone(),
+                        direction,
+                        estimated_bytes: 0,
+                        has_conflict,
+                    });
+                }
+            } else {
+                // Exists locally but not remotely — upload.
+                plan.add_item(SyncPlanItem {
+                    resource: lv.resource.clone(),
+                    direction: SyncDirection::Upload,
+                    estimated_bytes: 0,
+                    has_conflict: false,
+                });
+            }
+        }
+
+        let local_map: HashMap<&SyncResource, &ResourceVersion> =
+            local.iter().map(|r| (&r.resource, r)).collect();
+        for rv in remote {
+            if !local_map.contains_key(&rv.resource) {
+                plan.add_item(SyncPlanItem {
+                    resource: rv.resource.clone(),
+                    direction: SyncDirection::Download,
+                    estimated_bytes: 0,
+                    has_conflict: false,
+                });
+            }
+        }
+
+        plan
+    }
+}
+
+impl fmt::Display for SyncPlan {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SyncPlan({} items, {} conflicts, ~{} bytes)",
+            self.len(),
+            self.conflict_count(),
+            self.estimated_total_bytes()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SyncHistory
+// ---------------------------------------------------------------------------
+
+/// Outcome of a completed sync operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncOutcome {
+    Success,
+    PartialSuccess,
+    Failed,
+}
+
+impl fmt::Display for SyncOutcome {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SyncOutcome::Success => write!(f, "Success"),
+            SyncOutcome::PartialSuccess => write!(f, "Partial Success"),
+            SyncOutcome::Failed => write!(f, "Failed"),
+        }
+    }
+}
+
+/// Record of a single completed sync operation.
+#[derive(Debug, Clone)]
+pub struct SyncHistoryEntry {
+    pub timestamp: u64,
+    pub resources: Vec<SyncResource>,
+    pub outcome: SyncOutcome,
+    pub duration_ms: u64,
+    pub bytes_transferred: u64,
+    pub error_message: Option<String>,
+}
+
+impl fmt::Display for SyncHistoryEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[t={}] {} ({} resources, {}ms, {} bytes)",
+            self.timestamp,
+            self.outcome,
+            self.resources.len(),
+            self.duration_ms,
+            self.bytes_transferred,
+        )
+    }
+}
+
+/// Stores a bounded history of past sync operations.
+pub struct SyncHistory {
+    entries: Vec<SyncHistoryEntry>,
+    max_entries: usize,
+}
+
+impl SyncHistory {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+        }
+    }
+
+    /// Record a completed sync operation.
+    pub fn record(&mut self, entry: SyncHistoryEntry) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(entry);
+    }
+
+    pub fn entries(&self) -> &[SyncHistoryEntry] {
+        &self.entries
+    }
+
+    pub fn last_entry(&self) -> Option<&SyncHistoryEntry> {
+        self.entries.last()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Average duration of all recorded syncs in milliseconds.
+    pub fn average_duration_ms(&self) -> u64 {
+        if self.entries.is_empty() {
+            return 0;
+        }
+        let total: u64 = self.entries.iter().map(|e| e.duration_ms).sum();
+        total / self.entries.len() as u64
+    }
+
+    /// Total bytes transferred across all recorded syncs.
+    pub fn total_bytes_transferred(&self) -> u64 {
+        self.entries.iter().map(|e| e.bytes_transferred).sum()
+    }
+
+    /// Number of entries with a given outcome.
+    pub fn count_by_outcome(&self, outcome: SyncOutcome) -> usize {
+        self.entries.iter().filter(|e| e.outcome == outcome).count()
+    }
+
+    /// Return entries that involved a particular resource.
+    pub fn entries_for_resource(&self, resource: &SyncResource) -> Vec<&SyncHistoryEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.resources.contains(resource))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1410,5 +1721,262 @@ mod tests {
     fn userdatasync_is_ascii_printable() {
         assert!(UserdatasyncValidator::is_ascii_printable("Hello World 123"));
         assert!(!UserdatasyncValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // ResourceVersion tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn resource_version_matches_identical() {
+        let a = ResourceVersion::new(SyncResource::Settings, 1, "abc123", 1000);
+        let b = ResourceVersion::new(SyncResource::Settings, 1, "abc123", 2000);
+        assert!(a.matches(&b));
+    }
+
+    #[test]
+    fn resource_version_differs_by_hash() {
+        let a = ResourceVersion::new(SyncResource::Settings, 1, "abc123", 1000);
+        let b = ResourceVersion::new(SyncResource::Settings, 1, "def456", 1000);
+        assert!(!a.matches(&b));
+        assert!(a.content_differs(&b));
+    }
+
+    #[test]
+    fn resource_version_is_newer_than() {
+        let a = ResourceVersion::new(SyncResource::Keybindings, 3, "h1", 100);
+        let b = ResourceVersion::new(SyncResource::Keybindings, 1, "h2", 200);
+        assert!(a.is_newer_than(&b));
+        assert!(!b.is_newer_than(&a));
+    }
+
+    #[test]
+    fn resource_version_display() {
+        let v = ResourceVersion::new(SyncResource::Snippets, 5, "deadbeef", 0);
+        let s = format!("{v}");
+        assert!(s.contains("Snippets"));
+        assert!(s.contains("v5"));
+        assert!(s.contains("deadbeef"));
+    }
+
+    #[test]
+    fn resource_version_from_tuple() {
+        let v: ResourceVersion = (SyncResource::Extensions, 2, "hash", 99).into();
+        assert_eq!(v.resource, SyncResource::Extensions);
+        assert_eq!(v.version, 2);
+        assert_eq!(v.hash, "hash");
+        assert_eq!(v.timestamp, 99);
+    }
+
+    // -----------------------------------------------------------------------
+    // SyncPlan tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn sync_plan_empty() {
+        let plan = SyncPlan::new(ConflictStrategy::UseLocal);
+        assert!(plan.is_empty());
+        assert_eq!(plan.len(), 0);
+        assert_eq!(plan.estimated_total_bytes(), 0);
+        assert!(!plan.has_conflicts());
+    }
+
+    #[test]
+    fn sync_plan_add_items_and_totals() {
+        let mut plan = SyncPlan::new(ConflictStrategy::UseRemote);
+        plan.add_item(SyncPlanItem {
+            resource: SyncResource::Settings,
+            direction: SyncDirection::Upload,
+            estimated_bytes: 1024,
+            has_conflict: false,
+        });
+        plan.add_item(SyncPlanItem {
+            resource: SyncResource::Keybindings,
+            direction: SyncDirection::Download,
+            estimated_bytes: 512,
+            has_conflict: true,
+        });
+        assert_eq!(plan.len(), 2);
+        assert_eq!(plan.estimated_total_bytes(), 1536);
+        assert_eq!(plan.conflict_count(), 1);
+        assert!(plan.has_conflicts());
+        assert_eq!(plan.conflict_strategy(), ConflictStrategy::UseRemote);
+    }
+
+    #[test]
+    fn sync_plan_from_versions_upload_newer_local() {
+        let local = vec![ResourceVersion::new(SyncResource::Settings, 3, "aaa", 100)];
+        let remote = vec![ResourceVersion::new(SyncResource::Settings, 1, "bbb", 50)];
+        let plan = SyncPlan::from_versions(&local, &remote, ConflictStrategy::UseLocal);
+        assert_eq!(plan.len(), 1);
+        assert_eq!(plan.items()[0].direction, SyncDirection::Upload);
+        assert!(!plan.items()[0].has_conflict);
+    }
+
+    #[test]
+    fn sync_plan_from_versions_download_newer_remote() {
+        let local = vec![ResourceVersion::new(SyncResource::Snippets, 1, "old", 10)];
+        let remote = vec![ResourceVersion::new(SyncResource::Snippets, 5, "new", 90)];
+        let plan = SyncPlan::from_versions(&local, &remote, ConflictStrategy::Merge);
+        assert_eq!(plan.len(), 1);
+        assert_eq!(plan.items()[0].direction, SyncDirection::Download);
+    }
+
+    #[test]
+    fn sync_plan_from_versions_conflict_same_version_different_hash() {
+        let local = vec![ResourceVersion::new(SyncResource::Extensions, 2, "hashA", 50)];
+        let remote = vec![ResourceVersion::new(SyncResource::Extensions, 2, "hashB", 60)];
+        let plan = SyncPlan::from_versions(&local, &remote, ConflictStrategy::UseLocal);
+        assert_eq!(plan.len(), 1);
+        assert!(plan.items()[0].has_conflict);
+    }
+
+    #[test]
+    fn sync_plan_from_versions_local_only_and_remote_only() {
+        let local = vec![ResourceVersion::new(SyncResource::Settings, 1, "h1", 10)];
+        let remote = vec![ResourceVersion::new(SyncResource::Keybindings, 1, "h2", 20)];
+        let plan = SyncPlan::from_versions(&local, &remote, ConflictStrategy::UseLocal);
+        assert_eq!(plan.len(), 2);
+        let upload = plan.items().iter().find(|i| i.direction == SyncDirection::Upload).unwrap();
+        assert_eq!(upload.resource, SyncResource::Settings);
+        let download = plan.items().iter().find(|i| i.direction == SyncDirection::Download).unwrap();
+        assert_eq!(download.resource, SyncResource::Keybindings);
+    }
+
+    #[test]
+    fn sync_plan_from_versions_in_sync() {
+        let local = vec![ResourceVersion::new(SyncResource::Profiles, 4, "same", 100)];
+        let remote = vec![ResourceVersion::new(SyncResource::Profiles, 4, "same", 200)];
+        let plan = SyncPlan::from_versions(&local, &remote, ConflictStrategy::Merge);
+        assert!(plan.is_empty());
+    }
+
+    #[test]
+    fn sync_plan_display() {
+        let mut plan = SyncPlan::new(ConflictStrategy::UseLocal);
+        plan.add_item(SyncPlanItem {
+            resource: SyncResource::Settings,
+            direction: SyncDirection::Upload,
+            estimated_bytes: 256,
+            has_conflict: false,
+        });
+        let s = format!("{plan}");
+        assert!(s.contains("1 items"));
+        assert!(s.contains("0 conflicts"));
+        assert!(s.contains("256 bytes"));
+    }
+
+    // -----------------------------------------------------------------------
+    // SyncHistory tests
+    // -----------------------------------------------------------------------
+
+    fn make_history_entry(
+        ts: u64,
+        resources: Vec<SyncResource>,
+        outcome: SyncOutcome,
+        duration_ms: u64,
+        bytes: u64,
+    ) -> SyncHistoryEntry {
+        SyncHistoryEntry {
+            timestamp: ts,
+            resources,
+            outcome,
+            duration_ms,
+            bytes_transferred: bytes,
+            error_message: None,
+        }
+    }
+
+    #[test]
+    fn sync_history_empty() {
+        let history = SyncHistory::new(10);
+        assert!(history.entries().is_empty());
+        assert!(history.last_entry().is_none());
+        assert_eq!(history.average_duration_ms(), 0);
+        assert_eq!(history.total_bytes_transferred(), 0);
+    }
+
+    #[test]
+    fn sync_history_record_and_query() {
+        let mut history = SyncHistory::new(10);
+        history.record(make_history_entry(
+            100,
+            vec![SyncResource::Settings, SyncResource::Keybindings],
+            SyncOutcome::Success,
+            250,
+            4096,
+        ));
+        history.record(make_history_entry(
+            200,
+            vec![SyncResource::Settings],
+            SyncOutcome::Failed,
+            100,
+            0,
+        ));
+        assert_eq!(history.entries().len(), 2);
+        assert_eq!(history.last_entry().unwrap().timestamp, 200);
+        assert_eq!(history.average_duration_ms(), 175);
+        assert_eq!(history.total_bytes_transferred(), 4096);
+        assert_eq!(history.count_by_outcome(SyncOutcome::Success), 1);
+        assert_eq!(history.count_by_outcome(SyncOutcome::Failed), 1);
+        assert_eq!(history.count_by_outcome(SyncOutcome::PartialSuccess), 0);
+    }
+
+    #[test]
+    fn sync_history_drops_oldest() {
+        let mut history = SyncHistory::new(2);
+        history.record(make_history_entry(1, vec![SyncResource::Settings], SyncOutcome::Success, 10, 0));
+        history.record(make_history_entry(2, vec![SyncResource::Settings], SyncOutcome::Success, 20, 0));
+        history.record(make_history_entry(3, vec![SyncResource::Settings], SyncOutcome::Success, 30, 0));
+        assert_eq!(history.entries().len(), 2);
+        assert_eq!(history.entries()[0].timestamp, 2);
+    }
+
+    #[test]
+    fn sync_history_entries_for_resource() {
+        let mut history = SyncHistory::new(10);
+        history.record(make_history_entry(1, vec![SyncResource::Settings], SyncOutcome::Success, 10, 100));
+        history.record(make_history_entry(2, vec![SyncResource::Keybindings], SyncOutcome::Success, 20, 200));
+        history.record(make_history_entry(3, vec![SyncResource::Settings, SyncResource::Snippets], SyncOutcome::PartialSuccess, 30, 300));
+        let settings = history.entries_for_resource(&SyncResource::Settings);
+        assert_eq!(settings.len(), 2);
+        let keybindings = history.entries_for_resource(&SyncResource::Keybindings);
+        assert_eq!(keybindings.len(), 1);
+    }
+
+    #[test]
+    fn sync_history_clear() {
+        let mut history = SyncHistory::new(10);
+        history.record(make_history_entry(1, vec![SyncResource::Settings], SyncOutcome::Success, 10, 0));
+        history.clear();
+        assert!(history.entries().is_empty());
+    }
+
+    #[test]
+    fn sync_history_entry_display() {
+        let entry = make_history_entry(
+            42,
+            vec![SyncResource::Settings, SyncResource::Extensions],
+            SyncOutcome::PartialSuccess,
+            350,
+            8192,
+        );
+        let s = format!("{entry}");
+        assert!(s.contains("Partial Success"));
+        assert!(s.contains("2 resources"));
+        assert!(s.contains("350ms"));
+    }
+
+    #[test]
+    fn sync_direction_display() {
+        assert_eq!(SyncDirection::Upload.to_string(), "Upload");
+        assert_eq!(SyncDirection::Download.to_string(), "Download");
+    }
+
+    #[test]
+    fn sync_outcome_display() {
+        assert_eq!(SyncOutcome::Success.to_string(), "Success");
+        assert_eq!(SyncOutcome::PartialSuccess.to_string(), "Partial Success");
+        assert_eq!(SyncOutcome::Failed.to_string(), "Failed");
     }
 }

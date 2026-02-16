@@ -789,6 +789,345 @@ impl CellMetadata {
     }
 }
 
+// ── Cell Execution State Tracking ──
+
+/// The execution state of a single notebook cell.
+#[derive(Debug, Clone, PartialEq)]
+pub enum CellExecutionState {
+    Idle,
+    Running,
+    Success,
+    Error(String),
+}
+
+impl fmt::Display for CellExecutionState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Idle => write!(f, "idle"),
+            Self::Running => write!(f, "running"),
+            Self::Success => write!(f, "success"),
+            Self::Error(msg) => write!(f, "error: {msg}"),
+        }
+    }
+}
+
+impl From<bool> for CellExecutionState {
+    /// `true` maps to `Success`, `false` maps to `Error`.
+    fn from(ok: bool) -> Self {
+        if ok {
+            Self::Success
+        } else {
+            Self::Error("execution failed".into())
+        }
+    }
+}
+
+/// Tracks per-cell execution state across a notebook.
+#[derive(Debug, Clone)]
+pub struct CellExecutionTracker {
+    states: std::collections::HashMap<u32, CellExecutionState>,
+}
+
+impl CellExecutionTracker {
+    pub fn new() -> Self {
+        Self {
+            states: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Get the execution state of a cell (defaults to `Idle`).
+    pub fn state(&self, cell_index: u32) -> &CellExecutionState {
+        static IDLE: CellExecutionState = CellExecutionState::Idle;
+        self.states.get(&cell_index).unwrap_or(&IDLE)
+    }
+
+    pub fn mark_running(&mut self, cell_index: u32) {
+        self.states.insert(cell_index, CellExecutionState::Running);
+    }
+
+    pub fn mark_success(&mut self, cell_index: u32) {
+        self.states.insert(cell_index, CellExecutionState::Success);
+    }
+
+    pub fn mark_error(&mut self, cell_index: u32, msg: impl Into<String>) {
+        self.states
+            .insert(cell_index, CellExecutionState::Error(msg.into()));
+    }
+
+    /// Return indices of all cells currently running.
+    pub fn running_cells(&self) -> Vec<u32> {
+        let mut cells: Vec<u32> = self
+            .states
+            .iter()
+            .filter(|(_, s)| matches!(s, CellExecutionState::Running))
+            .map(|(&idx, _)| idx)
+            .collect();
+        cells.sort();
+        cells
+    }
+
+    /// Reset all tracked states.
+    pub fn reset_all(&mut self) {
+        self.states.clear();
+    }
+}
+
+impl Default for CellExecutionTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Notebook Outline (Table of Contents) ──
+
+/// A single heading entry extracted from a markup cell.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OutlineEntry {
+    /// Heading level (1 for `#`, 2 for `##`, etc.).
+    pub level: u8,
+    /// The heading text.
+    pub title: String,
+    /// Index of the cell containing this heading.
+    pub cell_index: u32,
+}
+
+/// Extracts a table-of-contents outline from the markup cells of a notebook.
+#[derive(Debug, Clone)]
+pub struct NotebookOutline {
+    entries: Vec<OutlineEntry>,
+}
+
+impl NotebookOutline {
+    /// Build an outline from a notebook document by scanning markup cells
+    /// for lines that start with one or more `#` characters.
+    pub fn from_document(doc: &NotebookDocument) -> Self {
+        let mut entries = Vec::new();
+        for cell in &doc.cells {
+            if cell.kind != NotebookCellKind::Markup {
+                continue;
+            }
+            for line in cell.content.lines() {
+                let trimmed = line.trim_start();
+                if !trimmed.starts_with('#') {
+                    continue;
+                }
+                let hashes = trimmed.bytes().take_while(|&b| b == b'#').count();
+                let title = trimmed[hashes..].trim().to_string();
+                if !title.is_empty() && hashes <= 6 {
+                    entries.push(OutlineEntry {
+                        level: hashes as u8,
+                        title,
+                        cell_index: cell.index,
+                    });
+                }
+            }
+        }
+        Self { entries }
+    }
+
+    /// Return all outline entries.
+    pub fn entries(&self) -> &[OutlineEntry] {
+        &self.entries
+    }
+
+    /// Return entries filtered to a maximum heading level.
+    pub fn entries_up_to_level(&self, max_level: u8) -> Vec<&OutlineEntry> {
+        self.entries.iter().filter(|e| e.level <= max_level).collect()
+    }
+}
+
+impl fmt::Display for NotebookOutline {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Outline({} entries)", self.entries.len())
+    }
+}
+
+// ── Cell Dependency Analyzer ──
+
+/// Variable definition and reference information for a single cell.
+#[derive(Debug, Clone)]
+pub struct CellVarInfo {
+    pub cell_index: u32,
+    /// Variable names defined (assigned) in this cell.
+    pub definitions: Vec<String>,
+    /// Variable names referenced (used) in this cell.
+    pub references: Vec<String>,
+}
+
+/// Analyzes code cells for variable definitions and references to suggest
+/// execution order based on data dependencies.
+#[derive(Debug, Clone)]
+pub struct CellDependencyAnalyzer {
+    cells: Vec<CellVarInfo>,
+}
+
+impl CellDependencyAnalyzer {
+    /// Analyze a notebook document. Uses simple heuristic pattern matching
+    /// for `name = ...` assignments and bare identifiers as references.
+    pub fn analyze(doc: &NotebookDocument) -> Self {
+        let mut cells = Vec::new();
+        for cell in &doc.cells {
+            if cell.kind != NotebookCellKind::Code {
+                continue;
+            }
+            let mut definitions = Vec::new();
+            let mut references = Vec::new();
+
+            for line in cell.content.lines() {
+                let trimmed = line.trim();
+                // Detect simple assignments: `name = ...`
+                if let Some(eq_pos) = trimmed.find('=') {
+                    let lhs = trimmed[..eq_pos].trim();
+                    // Only treat it as a definition if the LHS is a simple identifier
+                    if !lhs.is_empty()
+                        && lhs.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+                        && !lhs.starts_with(|c: char| c.is_ascii_digit())
+                    {
+                        if !definitions.contains(&lhs.to_string()) {
+                            definitions.push(lhs.to_string());
+                        }
+                    }
+                    // Scan the RHS for identifier references
+                    let rhs = trimmed[eq_pos + 1..].trim();
+                    Self::extract_idents(rhs, &mut references);
+                } else {
+                    Self::extract_idents(trimmed, &mut references);
+                }
+            }
+
+            // Remove self-definitions from references
+            references.retain(|r| !definitions.contains(r));
+
+            cells.push(CellVarInfo {
+                cell_index: cell.index,
+                definitions,
+                references,
+            });
+        }
+        Self { cells }
+    }
+
+    /// Extract simple identifiers from a string fragment.
+    fn extract_idents(s: &str, out: &mut Vec<String>) {
+        for token in s.split(|c: char| !c.is_ascii_alphanumeric() && c != '_') {
+            let t = token.trim();
+            if !t.is_empty()
+                && t.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+                && !t.starts_with(|c: char| c.is_ascii_digit())
+                && !out.contains(&t.to_string())
+            {
+                out.push(t.to_string());
+            }
+        }
+    }
+
+    /// Get the variable info for a cell by its index.
+    pub fn cell_info(&self, cell_index: u32) -> Option<&CellVarInfo> {
+        self.cells.iter().find(|c| c.cell_index == cell_index)
+    }
+
+    /// Return the indices of cells that define variables referenced by the
+    /// given cell (i.e. its dependencies).
+    pub fn dependencies_of(&self, cell_index: u32) -> Vec<u32> {
+        let info = match self.cell_info(cell_index) {
+            Some(i) => i,
+            None => return Vec::new(),
+        };
+        let mut deps = Vec::new();
+        for r in &info.references {
+            for other in &self.cells {
+                if other.cell_index != cell_index && other.definitions.contains(r) {
+                    if !deps.contains(&other.cell_index) {
+                        deps.push(other.cell_index);
+                    }
+                }
+            }
+        }
+        deps.sort();
+        deps
+    }
+
+    /// Suggest an execution order that respects data dependencies
+    /// (topological sort; falls back to document order on cycles).
+    pub fn suggested_order(&self) -> Vec<u32> {
+        let indices: Vec<u32> = self.cells.iter().map(|c| c.cell_index).collect();
+        let mut visited = std::collections::HashSet::new();
+        let mut order = Vec::new();
+
+        for &idx in &indices {
+            self.topo_visit(idx, &mut visited, &mut order, &indices);
+        }
+        order
+    }
+
+    fn topo_visit(
+        &self,
+        idx: u32,
+        visited: &mut std::collections::HashSet<u32>,
+        order: &mut Vec<u32>,
+        all: &[u32],
+    ) {
+        if visited.contains(&idx) {
+            return;
+        }
+        visited.insert(idx);
+        for dep in self.dependencies_of(idx) {
+            if all.contains(&dep) {
+                self.topo_visit(dep, visited, order, all);
+            }
+        }
+        order.push(idx);
+    }
+}
+
+// ── Notebook Exporter ──
+
+/// Serializes a `NotebookDocument` to a simple markdown representation.
+pub struct NotebookExporter;
+
+impl NotebookExporter {
+    /// Export a notebook document as markdown. Markup cells are emitted
+    /// verbatim; code cells are wrapped in fenced code blocks.
+    pub fn to_markdown(doc: &NotebookDocument) -> String {
+        let mut out = String::new();
+        for (i, cell) in doc.cells.iter().enumerate() {
+            if i > 0 {
+                out.push('\n');
+            }
+            match cell.kind {
+                NotebookCellKind::Markup => {
+                    out.push_str(&cell.content);
+                    out.push('\n');
+                }
+                NotebookCellKind::Code => {
+                    out.push_str("```");
+                    out.push_str(&cell.language_id);
+                    out.push('\n');
+                    out.push_str(&cell.content);
+                    out.push_str("\n```\n");
+                }
+            }
+        }
+        out
+    }
+
+    /// Export only code cells, each wrapped in a fenced code block.
+    pub fn code_cells_to_markdown(doc: &NotebookDocument) -> String {
+        let mut out = String::new();
+        for cell in doc.code_cells() {
+            if !out.is_empty() {
+                out.push('\n');
+            }
+            out.push_str("```");
+            out.push_str(&cell.language_id);
+            out.push('\n');
+            out.push_str(&cell.content);
+            out.push_str("\n```\n");
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1424,5 +1763,145 @@ mod tests {
         // Duplicate ignored
         meta.add_tag("important");
         assert_eq!(meta.tag_count(), 2);
+    }
+
+    // -- CellExecutionState & CellExecutionTracker tests --------------------
+
+    #[test]
+    fn cell_execution_state_display() {
+        assert_eq!(format!("{}", CellExecutionState::Idle), "idle");
+        assert_eq!(format!("{}", CellExecutionState::Running), "running");
+        assert_eq!(format!("{}", CellExecutionState::Success), "success");
+        assert_eq!(format!("{}", CellExecutionState::Error("oops".into())), "error: oops");
+    }
+
+    #[test]
+    fn cell_execution_tracker_lifecycle() {
+        let mut tracker = CellExecutionTracker::new();
+        assert_eq!(tracker.state(0), &CellExecutionState::Idle);
+
+        tracker.mark_running(0);
+        assert_eq!(tracker.state(0), &CellExecutionState::Running);
+        assert_eq!(tracker.running_cells(), vec![0]);
+
+        tracker.mark_success(0);
+        assert_eq!(tracker.state(0), &CellExecutionState::Success);
+        assert!(tracker.running_cells().is_empty());
+
+        tracker.mark_running(1);
+        tracker.mark_error(1, "division by zero");
+        assert!(matches!(tracker.state(1), CellExecutionState::Error(_)));
+
+        tracker.reset_all();
+        assert_eq!(tracker.state(0), &CellExecutionState::Idle);
+        assert_eq!(tracker.state(1), &CellExecutionState::Idle);
+    }
+
+    // -- NotebookOutline tests ----------------------------------------------
+
+    #[test]
+    fn notebook_outline_extracts_headings() {
+        let doc = NotebookDocumentBuilder::new()
+            .uri("file:///nb.ipynb")
+            .add_markup_cell("# Introduction\nSome text\n## Background")
+            .add_code_cell("python", "x = 1")
+            .add_markup_cell("## Methods\n### Sub-method")
+            .build()
+            .unwrap();
+        let outline = NotebookOutline::from_document(&doc);
+        let entries = outline.entries();
+        assert_eq!(entries.len(), 4);
+        assert_eq!(entries[0].title, "Introduction");
+        assert_eq!(entries[0].level, 1);
+        assert_eq!(entries[0].cell_index, 0);
+        assert_eq!(entries[1].title, "Background");
+        assert_eq!(entries[1].level, 2);
+        assert_eq!(entries[2].title, "Methods");
+        assert_eq!(entries[2].level, 2);
+        assert_eq!(entries[2].cell_index, 2);
+        assert_eq!(entries[3].title, "Sub-method");
+        assert_eq!(entries[3].level, 3);
+    }
+
+    #[test]
+    fn notebook_outline_empty_document() {
+        let doc = NotebookDocumentBuilder::new()
+            .uri("file:///nb.ipynb")
+            .add_code_cell("python", "x = 1")
+            .build()
+            .unwrap();
+        let outline = NotebookOutline::from_document(&doc);
+        assert!(outline.entries().is_empty());
+        assert_eq!(format!("{outline}"), "Outline(0 entries)");
+    }
+
+    // -- CellDependencyAnalyzer tests ---------------------------------------
+
+    #[test]
+    fn cell_dependency_analyzer_basic() {
+        let doc = NotebookDocumentBuilder::new()
+            .uri("file:///nb.ipynb")
+            .add_code_cell("python", "x = 1\ny = 2")
+            .add_code_cell("python", "z = x + y")
+            .add_code_cell("python", "w = 42")
+            .build()
+            .unwrap();
+        let analyzer = CellDependencyAnalyzer::analyze(&doc);
+
+        let info0 = analyzer.cell_info(0).unwrap();
+        assert!(info0.definitions.contains(&"x".to_string()));
+        assert!(info0.definitions.contains(&"y".to_string()));
+
+        let info1 = analyzer.cell_info(1).unwrap();
+        assert!(info1.definitions.contains(&"z".to_string()));
+        assert!(info1.references.contains(&"x".to_string()));
+        assert!(info1.references.contains(&"y".to_string()));
+
+        let deps = analyzer.dependencies_of(1);
+        assert!(deps.contains(&0));
+
+        let order = analyzer.suggested_order();
+        let pos0 = order.iter().position(|&i| i == 0).unwrap();
+        let pos1 = order.iter().position(|&i| i == 1).unwrap();
+        assert!(pos0 < pos1);
+    }
+
+    // -- NotebookExporter tests ---------------------------------------------
+
+    #[test]
+    fn notebook_exporter_markdown() {
+        let doc = NotebookDocumentBuilder::new()
+            .uri("file:///nb.ipynb")
+            .add_markup_cell("# Title\nSome description.")
+            .add_code_cell("python", "x = 42\nprint(x)")
+            .add_markup_cell("## Results")
+            .build()
+            .unwrap();
+        let md = NotebookExporter::to_markdown(&doc);
+        assert!(md.contains("# Title"));
+        assert!(md.contains("```python"));
+        assert!(md.contains("x = 42"));
+        assert!(md.contains("```"));
+        assert!(md.contains("## Results"));
+    }
+
+    #[test]
+    fn notebook_exporter_empty_document() {
+        let doc = NotebookDocumentBuilder::new()
+            .uri("file:///nb.ipynb")
+            .build()
+            .unwrap();
+        let md = NotebookExporter::to_markdown(&doc);
+        assert!(md.trim().is_empty() || md.contains("nb.ipynb"));
+    }
+
+    // -- From impls tests ---------------------------------------------------
+
+    #[test]
+    fn cell_execution_state_from_bool() {
+        let s: CellExecutionState = true.into();
+        assert_eq!(s, CellExecutionState::Success);
+        let s: CellExecutionState = false.into();
+        assert!(matches!(s, CellExecutionState::Error(_)));
     }
 }

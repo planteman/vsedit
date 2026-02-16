@@ -1,6 +1,7 @@
 //! Settings editor UI.
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fmt;
 
 /// The data type of a setting value.
@@ -867,6 +868,392 @@ impl<'a> Iterator for SettingPrefixIter<'a> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SettingValidator – configurable per-setting validation rules
+// ---------------------------------------------------------------------------
+
+/// A configurable validator that maps setting keys to validation rules.
+///
+/// Unlike `SettingValidation` which is a single constraint, `SettingValidator`
+/// owns a collection of rules keyed by setting key and applies all matching
+/// rules when validating a value.
+#[derive(Debug, Clone, Default)]
+pub struct SettingValidator {
+    rules: HashMap<String, Vec<ValidationRule>>,
+}
+
+/// A single validation rule with a human-readable description.
+#[derive(Debug, Clone)]
+pub struct ValidationRule {
+    pub description: String,
+    pub kind: ValidationRuleKind,
+}
+
+/// The kind of check performed by a [`ValidationRule`].
+#[derive(Debug, Clone)]
+pub enum ValidationRuleKind {
+    /// String length must be within [min, max].
+    StringLength { min: usize, max: usize },
+    /// Numeric value must be within [min, max].
+    NumberRange { min: f64, max: f64 },
+    /// Value must be one of the listed members.
+    EnumMembership(Vec<String>),
+    /// Value must contain the given substring pattern.
+    RegexPattern(String),
+}
+
+impl fmt::Display for ValidationRule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description)
+    }
+}
+
+impl fmt::Display for ValidationRuleKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValidationRuleKind::StringLength { min, max } => {
+                write!(f, "string length [{min}, {max}]")
+            }
+            ValidationRuleKind::NumberRange { min, max } => {
+                write!(f, "number range [{min}, {max}]")
+            }
+            ValidationRuleKind::EnumMembership(opts) => {
+                write!(f, "one of {:?}", opts)
+            }
+            ValidationRuleKind::RegexPattern(pat) => {
+                write!(f, "matches pattern '{pat}'")
+            }
+        }
+    }
+}
+
+impl SettingValidator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a validation rule for a setting key.
+    pub fn add_rule(&mut self, key: impl Into<String>, rule: ValidationRule) {
+        self.rules.entry(key.into()).or_default().push(rule);
+    }
+
+    /// Validate a value against all rules registered for `key`.
+    ///
+    /// Returns a list of human-readable error messages for each failing rule.
+    /// An empty vec means the value is valid.
+    pub fn validate(&self, key: &str, value: &str) -> Vec<String> {
+        let Some(rules) = self.rules.get(key) else {
+            return Vec::new();
+        };
+        let mut errors = Vec::new();
+        for rule in rules {
+            if let Err(msg) = rule.kind.check(value) {
+                errors.push(format!("{}: {}", rule.description, msg));
+            }
+        }
+        errors
+    }
+
+    /// Returns true if the value passes all rules for the given key.
+    pub fn is_valid(&self, key: &str, value: &str) -> bool {
+        self.validate(key, value).is_empty()
+    }
+
+    /// Returns the number of rules registered for a key.
+    pub fn rule_count(&self, key: &str) -> usize {
+        self.rules.get(key).map_or(0, |r| r.len())
+    }
+
+    /// Returns all keys that have at least one rule.
+    pub fn keys_with_rules(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.rules.keys().map(|k| k.as_str()).collect();
+        keys.sort();
+        keys
+    }
+}
+
+impl ValidationRuleKind {
+    fn check(&self, value: &str) -> Result<(), String> {
+        match self {
+            ValidationRuleKind::StringLength { min, max } => {
+                let len = value.len();
+                if len < *min || len > *max {
+                    return Err(format!("length {len} outside [{min}, {max}]"));
+                }
+            }
+            ValidationRuleKind::NumberRange { min, max } => {
+                let num: f64 = value
+                    .parse()
+                    .map_err(|_| format!("'{value}' is not a number"))?;
+                if num < *min || num > *max {
+                    return Err(format!("{num} outside [{min}, {max}]"));
+                }
+            }
+            ValidationRuleKind::EnumMembership(opts) => {
+                if !opts.iter().any(|o| o == value) {
+                    return Err(format!("'{value}' not in {:?}", opts));
+                }
+            }
+            ValidationRuleKind::RegexPattern(pat) => {
+                if !value.contains(pat.as_str()) {
+                    return Err(format!("'{value}' does not contain '{pat}'"));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingsDiff – Display impl
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for SettingsDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.only_in_a.is_empty() && self.only_in_b.is_empty() && self.changed.is_empty() {
+            return write!(f, "no differences");
+        }
+        for key in &self.only_in_a {
+            writeln!(f, "- {key}")?;
+        }
+        for key in &self.only_in_b {
+            writeln!(f, "+ {key}")?;
+        }
+        for (key, old, new) in &self.changed {
+            writeln!(f, "~ {key}: {old} -> {new}")?;
+        }
+        Ok(())
+    }
+}
+
+impl SettingsDiff {
+    /// Returns true if there are no differences.
+    pub fn is_empty(&self) -> bool {
+        self.only_in_a.is_empty() && self.only_in_b.is_empty() && self.changed.is_empty()
+    }
+
+    /// Total number of differences (added + removed + changed).
+    pub fn total(&self) -> usize {
+        self.only_in_a.len() + self.only_in_b.len() + self.changed.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingsTextExporter – key=value plain text format
+// ---------------------------------------------------------------------------
+
+/// Serializes settings to a simple `key=value` text format (one per line)
+/// and parses it back.
+pub struct SettingsTextExporter;
+
+impl SettingsTextExporter {
+    /// Serialize all settings in a registry to `key=value` lines.
+    pub fn to_text(registry: &SettingsRegistry) -> String {
+        let mut out = String::new();
+        for item in registry.all() {
+            let value = item
+                .current_value
+                .as_deref()
+                .unwrap_or(&item.default_value);
+            out.push_str(&item.key);
+            out.push('=');
+            // Escape newlines and backslashes in the value.
+            for ch in value.chars() {
+                match ch {
+                    '\\' => out.push_str("\\\\"),
+                    '\n' => out.push_str("\\n"),
+                    _ => out.push(ch),
+                }
+            }
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Parse `key=value` lines back into pairs.
+    ///
+    /// Lines starting with `#` are treated as comments and skipped.
+    /// Empty lines are skipped.
+    pub fn from_text(text: &str) -> Result<Vec<(String, String)>, SettingsError> {
+        let mut result = Vec::new();
+        for (lineno, line) in text.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+            let Some(eq_pos) = trimmed.find('=') else {
+                return Err(SettingsError::InvalidValue(format!(
+                    "line {}: missing '=' in '{trimmed}'",
+                    lineno + 1
+                )));
+            };
+            let key = trimmed[..eq_pos].trim().to_string();
+            let raw_val = &trimmed[eq_pos + 1..];
+            let val = raw_val
+                .replace("\\n", "\n")
+                .replace("\\\\", "\\");
+            result.push((key, val));
+        }
+        Ok(result)
+    }
+
+    /// Apply parsed key=value pairs to a registry, setting each value.
+    pub fn apply_to_registry(
+        registry: &mut SettingsRegistry,
+        pairs: &[(String, String)],
+    ) -> Vec<SettingsError> {
+        let mut errors = Vec::new();
+        for (key, value) in pairs {
+            if let Err(e) = registry.set(key, value.clone()) {
+                errors.push(e);
+            }
+        }
+        errors
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingSearchIndex – fast full-text search
+// ---------------------------------------------------------------------------
+
+/// A pre-built index for fast full-text search across setting keys, labels,
+/// and descriptions.
+///
+/// Tokens are lowercased words extracted from keys (split on `.`), labels,
+/// and descriptions. Searching returns indices of matching `SettingItem`s.
+#[derive(Debug, Clone)]
+pub struct SettingSearchIndex {
+    /// For each setting index, the set of lowercased tokens.
+    entries: Vec<(usize, Vec<String>)>,
+}
+
+impl SettingSearchIndex {
+    /// Build an index from a slice of settings.
+    pub fn build(settings: &[SettingItem]) -> Self {
+        let mut entries = Vec::with_capacity(settings.len());
+        for (i, item) in settings.iter().enumerate() {
+            let mut tokens = Vec::new();
+            // Tokenize key segments
+            for seg in item.key.split('.') {
+                tokens.push(seg.to_lowercase());
+            }
+            // Tokenize label words
+            for word in item.label.split_whitespace() {
+                tokens.push(word.to_lowercase());
+            }
+            // Tokenize description words
+            for word in item.description.split_whitespace() {
+                tokens.push(word.to_lowercase());
+            }
+            entries.push((i, tokens));
+        }
+        Self { entries }
+    }
+
+    /// Search for settings matching the query string.
+    ///
+    /// The query is split into words; a setting matches if every query word
+    /// is a substring of at least one of its tokens.
+    pub fn search(&self, query: &str) -> Vec<usize> {
+        let query_words: Vec<String> = query
+            .split_whitespace()
+            .map(|w| w.to_lowercase())
+            .collect();
+        if query_words.is_empty() {
+            return self.entries.iter().map(|(i, _)| *i).collect();
+        }
+        let mut results = Vec::new();
+        for (idx, tokens) in &self.entries {
+            let all_match = query_words.iter().all(|qw| {
+                tokens.iter().any(|tok| tok.contains(qw.as_str()))
+            });
+            if all_match {
+                results.push(*idx);
+            }
+        }
+        results
+    }
+
+    /// Returns the number of indexed settings.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns true if the index has no entries.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl fmt::Display for SettingSearchIndex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SettingSearchIndex({} entries)", self.entries.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// From impls
+// ---------------------------------------------------------------------------
+
+impl From<&str> for SettingsError {
+    fn from(s: &str) -> Self {
+        SettingsError::InvalidValue(s.to_string())
+    }
+}
+
+impl From<String> for SettingsError {
+    fn from(s: String) -> Self {
+        SettingsError::InvalidValue(s)
+    }
+}
+
+impl From<SettingItem> for SettingChange {
+    fn from(item: SettingItem) -> Self {
+        SettingChange {
+            key: item.key,
+            old_value: None,
+            new_value: item.current_value,
+            timestamp_ms: 0,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingsRegistry – merge support
+// ---------------------------------------------------------------------------
+
+impl SettingsRegistry {
+    /// Merge settings from `other` into this registry.
+    ///
+    /// For keys present in both, the value from `other` wins.
+    /// Keys only in `other` are added. Keys only in `self` are kept.
+    pub fn merge(&mut self, other: &SettingsRegistry) {
+        let existing: HashSet<String> = self.items.iter().map(|i| i.key.clone()).collect();
+        for other_item in other.all() {
+            if existing.contains(&other_item.key) {
+                if let Some(item) = self.items.iter_mut().find(|i| i.key == other_item.key) {
+                    item.current_value = other_item.current_value.clone();
+                }
+            } else {
+                self.items.push(other_item.clone());
+            }
+        }
+    }
+
+    /// Returns the effective value (current or default) for a key.
+    pub fn effective_value(&self, key: &str) -> Result<&str, SettingsError> {
+        let item = self.get(key)?;
+        Ok(item.current_value.as_deref().unwrap_or(&item.default_value))
+    }
+
+    /// Returns all setting keys as a sorted list.
+    pub fn keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.items.iter().map(|i| i.key.as_str()).collect();
+        keys.sort();
+        keys
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1430,5 +1817,314 @@ mod tests {
         ];
         let editor_items: Vec<_> = SettingPrefixIter::new(&items, "editor.").collect();
         assert_eq!(editor_items.len(), 2);
+    }
+
+    // --- SettingValidator tests ---
+
+    #[test]
+    fn validator_string_length_rule() {
+        let mut v = SettingValidator::new();
+        v.add_rule("editor.fontFamily", ValidationRule {
+            description: "font family length".into(),
+            kind: ValidationRuleKind::StringLength { min: 1, max: 50 },
+        });
+        assert!(v.is_valid("editor.fontFamily", "Consolas"));
+        assert!(!v.is_valid("editor.fontFamily", ""));
+        assert_eq!(v.rule_count("editor.fontFamily"), 1);
+        assert_eq!(v.rule_count("unknown.key"), 0);
+    }
+
+    #[test]
+    fn validator_number_range_rule() {
+        let mut v = SettingValidator::new();
+        v.add_rule("editor.fontSize", ValidationRule {
+            description: "font size range".into(),
+            kind: ValidationRuleKind::NumberRange { min: 8.0, max: 72.0 },
+        });
+        assert!(v.is_valid("editor.fontSize", "14"));
+        assert!(!v.is_valid("editor.fontSize", "4"));
+        assert!(!v.is_valid("editor.fontSize", "100"));
+        assert!(!v.is_valid("editor.fontSize", "abc"));
+    }
+
+    #[test]
+    fn validator_enum_membership_rule() {
+        let mut v = SettingValidator::new();
+        v.add_rule("editor.cursorStyle", ValidationRule {
+            description: "cursor style".into(),
+            kind: ValidationRuleKind::EnumMembership(vec![
+                "line".into(), "block".into(), "underline".into(),
+            ]),
+        });
+        assert!(v.is_valid("editor.cursorStyle", "block"));
+        assert!(!v.is_valid("editor.cursorStyle", "triangle"));
+    }
+
+    #[test]
+    fn validator_regex_pattern_rule() {
+        let mut v = SettingValidator::new();
+        v.add_rule("files.exclude", ValidationRule {
+            description: "must contain glob star".into(),
+            kind: ValidationRuleKind::RegexPattern("*".into()),
+        });
+        assert!(v.is_valid("files.exclude", "*.log"));
+        assert!(!v.is_valid("files.exclude", "readme"));
+    }
+
+    #[test]
+    fn validator_multiple_rules_per_key() {
+        let mut v = SettingValidator::new();
+        v.add_rule("editor.fontFamily", ValidationRule {
+            description: "min length".into(),
+            kind: ValidationRuleKind::StringLength { min: 1, max: 100 },
+        });
+        v.add_rule("editor.fontFamily", ValidationRule {
+            description: "must contain a".into(),
+            kind: ValidationRuleKind::RegexPattern("a".into()),
+        });
+        assert!(v.is_valid("editor.fontFamily", "Cascadia"));
+        // Fails second rule (no 'a')
+        let errors = v.validate("editor.fontFamily", "Consol");
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("must contain a"));
+        // Fails first rule (empty)
+        let errors = v.validate("editor.fontFamily", "");
+        assert_eq!(errors.len(), 2);
+    }
+
+    #[test]
+    fn validator_keys_with_rules() {
+        let mut v = SettingValidator::new();
+        v.add_rule("b.key", ValidationRule {
+            description: "r".into(),
+            kind: ValidationRuleKind::StringLength { min: 0, max: 10 },
+        });
+        v.add_rule("a.key", ValidationRule {
+            description: "r".into(),
+            kind: ValidationRuleKind::StringLength { min: 0, max: 10 },
+        });
+        let keys = v.keys_with_rules();
+        assert_eq!(keys, vec!["a.key", "b.key"]);
+    }
+
+    // --- SettingsDiff Display / helpers ---
+
+    #[test]
+    fn settings_diff_display_empty() {
+        let d = SettingsDiff::default();
+        assert!(d.is_empty());
+        assert_eq!(d.total(), 0);
+        assert_eq!(format!("{d}"), "no differences");
+    }
+
+    #[test]
+    fn settings_diff_display_with_changes() {
+        let d = SettingsDiff {
+            only_in_a: vec!["removed.key".into()],
+            only_in_b: vec!["added.key".into()],
+            changed: vec![("changed.key".into(), "old".into(), "new".into())],
+        };
+        assert!(!d.is_empty());
+        assert_eq!(d.total(), 3);
+        let text = format!("{d}");
+        assert!(text.contains("- removed.key"));
+        assert!(text.contains("+ added.key"));
+        assert!(text.contains("~ changed.key: old -> new"));
+    }
+
+    // --- SettingsTextExporter tests ---
+
+    #[test]
+    fn text_exporter_roundtrip() {
+        let mut reg = SettingsRegistry::new();
+        reg.add(
+            SettingItemBuilder::new("editor.fontSize", SettingType::Number)
+                .default_value("14")
+                .current_value("16")
+                .build(),
+        );
+        reg.add(
+            SettingItemBuilder::new("editor.tabSize", SettingType::Number)
+                .default_value("4")
+                .build(),
+        );
+        let text = SettingsTextExporter::to_text(&reg);
+        assert!(text.contains("editor.fontSize=16\n"));
+        assert!(text.contains("editor.tabSize=4\n"));
+
+        let pairs = SettingsTextExporter::from_text(&text).unwrap();
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0], ("editor.fontSize".into(), "16".into()));
+        assert_eq!(pairs[1], ("editor.tabSize".into(), "4".into()));
+    }
+
+    #[test]
+    fn text_exporter_comments_and_blanks() {
+        let text = "# this is a comment\n\neditor.fontSize=14\n# another\nterminal.shell=/bin/zsh\n";
+        let pairs = SettingsTextExporter::from_text(text).unwrap();
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0].0, "editor.fontSize");
+        assert_eq!(pairs[1].0, "terminal.shell");
+    }
+
+    #[test]
+    fn text_exporter_escaping() {
+        let mut reg = SettingsRegistry::new();
+        reg.add(
+            SettingItemBuilder::new("msg.greeting", SettingType::String)
+                .default_value("hello\nworld")
+                .build(),
+        );
+        let text = SettingsTextExporter::to_text(&reg);
+        assert!(text.contains("msg.greeting=hello\\nworld"));
+        let pairs = SettingsTextExporter::from_text(&text).unwrap();
+        assert_eq!(pairs[0].1, "hello\nworld");
+    }
+
+    #[test]
+    fn text_exporter_missing_equals() {
+        let result = SettingsTextExporter::from_text("no_equals_here\n");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn text_exporter_apply_to_registry() {
+        let mut reg = SettingsRegistry::new();
+        reg.add(
+            SettingItemBuilder::new("editor.fontSize", SettingType::Number)
+                .default_value("14")
+                .build(),
+        );
+        let pairs = vec![
+            ("editor.fontSize".to_string(), "20".to_string()),
+            ("missing.key".to_string(), "val".to_string()),
+        ];
+        let errors = SettingsTextExporter::apply_to_registry(&mut reg, &pairs);
+        assert_eq!(errors.len(), 1); // missing.key not found
+        assert_eq!(reg.effective_value("editor.fontSize").unwrap(), "20");
+    }
+
+    // --- SettingSearchIndex tests ---
+
+    #[test]
+    fn search_index_basic() {
+        let settings = sample_settings();
+        let index = SettingSearchIndex::build(&settings);
+        assert_eq!(index.len(), 3);
+        assert!(!index.is_empty());
+        assert_eq!(format!("{index}"), "SettingSearchIndex(3 entries)");
+    }
+
+    #[test]
+    fn search_index_finds_by_key_segment() {
+        let settings = sample_settings();
+        let index = SettingSearchIndex::build(&settings);
+        let results = index.search("editor");
+        // All three match: fontSize/tabSize have "editor" in key, autoSave has "editors" in description
+        assert_eq!(results, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn search_index_finds_by_label() {
+        let settings = sample_settings();
+        let index = SettingSearchIndex::build(&settings);
+        let results = index.search("Font");
+        assert_eq!(results, vec![0]);
+    }
+
+    #[test]
+    fn search_index_finds_by_description_word() {
+        let settings = sample_settings();
+        let index = SettingSearchIndex::build(&settings);
+        let results = index.search("pixels");
+        assert_eq!(results, vec![0]);
+    }
+
+    #[test]
+    fn search_index_multi_word_query() {
+        let settings = sample_settings();
+        let index = SettingSearchIndex::build(&settings);
+        // Must match all words
+        let results = index.search("editor font");
+        assert_eq!(results, vec![0]); // only fontSize matches both
+    }
+
+    #[test]
+    fn search_index_empty_query_returns_all() {
+        let settings = sample_settings();
+        let index = SettingSearchIndex::build(&settings);
+        let results = index.search("");
+        assert_eq!(results.len(), 3);
+    }
+
+    // --- From impls tests ---
+
+    #[test]
+    fn settings_error_from_str() {
+        let e: SettingsError = "bad value".into();
+        assert_eq!(e, SettingsError::InvalidValue("bad value".into()));
+    }
+
+    #[test]
+    fn settings_error_from_string() {
+        let e: SettingsError = String::from("oops").into();
+        assert_eq!(e, SettingsError::InvalidValue("oops".into()));
+    }
+
+    #[test]
+    fn setting_change_from_item() {
+        let item = SettingItemBuilder::new("editor.fontSize", SettingType::Number)
+            .default_value("14")
+            .current_value("16")
+            .build();
+        let change: SettingChange = item.into();
+        assert_eq!(change.key, "editor.fontSize");
+        assert_eq!(change.new_value, Some("16".into()));
+        assert!(change.old_value.is_none());
+    }
+
+    // --- Registry merge / helpers ---
+
+    #[test]
+    fn registry_merge() {
+        let mut a = SettingsRegistry::new();
+        a.add(SettingItemBuilder::new("editor.fontSize", SettingType::Number)
+            .default_value("14").build());
+        a.add(SettingItemBuilder::new("editor.tabSize", SettingType::Number)
+            .default_value("4").build());
+
+        let mut b = SettingsRegistry::new();
+        b.add(SettingItemBuilder::new("editor.fontSize", SettingType::Number)
+            .default_value("14").current_value("20").build());
+        b.add(SettingItemBuilder::new("terminal.shell", SettingType::String)
+            .default_value("/bin/bash").build());
+
+        a.merge(&b);
+        assert_eq!(a.effective_value("editor.fontSize").unwrap(), "20");
+        assert_eq!(a.effective_value("editor.tabSize").unwrap(), "4");
+        assert_eq!(a.effective_value("terminal.shell").unwrap(), "/bin/bash");
+    }
+
+    #[test]
+    fn registry_keys_sorted() {
+        let mut reg = SettingsRegistry::new();
+        reg.add(SettingItemBuilder::new("z.key", SettingType::String).default_value("").build());
+        reg.add(SettingItemBuilder::new("a.key", SettingType::String).default_value("").build());
+        reg.add(SettingItemBuilder::new("m.key", SettingType::String).default_value("").build());
+        assert_eq!(reg.keys(), vec!["a.key", "m.key", "z.key"]);
+    }
+
+    // --- ValidationRuleKind Display ---
+
+    #[test]
+    fn validation_rule_kind_display() {
+        let k = ValidationRuleKind::StringLength { min: 1, max: 50 };
+        assert_eq!(format!("{k}"), "string length [1, 50]");
+        let k = ValidationRuleKind::NumberRange { min: 0.0, max: 100.0 };
+        assert_eq!(format!("{k}"), "number range [0, 100]");
+        let k = ValidationRuleKind::EnumMembership(vec!["a".into(), "b".into()]);
+        assert!(format!("{k}").contains("one of"));
+        let k = ValidationRuleKind::RegexPattern("test".into());
+        assert!(format!("{k}").contains("test"));
     }
 }

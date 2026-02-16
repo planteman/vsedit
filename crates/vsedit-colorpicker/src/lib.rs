@@ -845,6 +845,179 @@ pub fn wcag_contrast_level(fg: &Color, bg: &Color) -> &'static str {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ColorPalette – named color collection
+// ---------------------------------------------------------------------------
+
+/// A named palette of colors.
+pub struct ColorPalette {
+    entries: Vec<(String, Color)>,
+}
+
+impl ColorPalette {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    pub fn add(&mut self, name: impl Into<String>, color: Color) {
+        let name = name.into();
+        if !self.contains(&name) {
+            self.entries.push((name, color));
+        }
+    }
+
+    pub fn remove(&mut self, name: &str) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|(n, _)| n != name);
+        self.entries.len() < before
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Color> {
+        self.entries.iter().find(|(n, _)| n == name).map(|(_, c)| c)
+    }
+
+    pub fn contains(&self, name: &str) -> bool {
+        self.entries.iter().any(|(n, _)| n == name)
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &Color)> {
+        self.entries.iter().map(|(n, c)| (n.as_str(), c))
+    }
+
+    pub fn names(&self) -> Vec<&str> {
+        self.entries.iter().map(|(n, _)| n.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorScheme – generate harmonious colors
+// ---------------------------------------------------------------------------
+
+/// Generates color harmonies from a base color.
+pub struct ColorScheme {
+    base: Color,
+}
+
+impl ColorScheme {
+    pub fn new(base: Color) -> Self {
+        Self { base }
+    }
+
+    /// Returns the complementary color (180° hue shift).
+    pub fn complementary(&self) -> Color {
+        let hsl = rgb_to_hsl(&self.base);
+        let h2 = HslColor::new((hsl.h + 180.0) % 360.0, hsl.s, hsl.l, hsl.a);
+        hsl_to_rgb(&h2)
+    }
+
+    /// Returns two analogous colors (±30° hue shift).
+    pub fn analogous(&self) -> (Color, Color) {
+        let hsl = rgb_to_hsl(&self.base);
+        let h1 = HslColor::new((hsl.h + 30.0) % 360.0, hsl.s, hsl.l, hsl.a);
+        let h2 = HslColor::new((hsl.h + 330.0) % 360.0, hsl.s, hsl.l, hsl.a);
+        (hsl_to_rgb(&h1), hsl_to_rgb(&h2))
+    }
+
+    /// Returns two triadic colors (±120° hue shift).
+    pub fn triadic(&self) -> (Color, Color) {
+        let hsl = rgb_to_hsl(&self.base);
+        let h1 = HslColor::new((hsl.h + 120.0) % 360.0, hsl.s, hsl.l, hsl.a);
+        let h2 = HslColor::new((hsl.h + 240.0) % 360.0, hsl.s, hsl.l, hsl.a);
+        (hsl_to_rgb(&h1), hsl_to_rgb(&h2))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorValidator – component bounds checking
+// ---------------------------------------------------------------------------
+
+/// Validates color component ranges.
+pub struct ColorValidator;
+
+impl ColorValidator {
+    /// Returns Ok(()) if all components are within [0.0, 1.0].
+    pub fn validate_range(color: &Color) -> Result<(), String> {
+        for (name, val) in [("r", color.r), ("g", color.g), ("b", color.b), ("a", color.a)] {
+            if !(0.0..=1.0).contains(&val) {
+                return Err(format!("{} component {} out of range [0, 1]", name, val));
+            }
+        }
+        Ok(())
+    }
+
+    /// Clamp all components to [0.0, 1.0].
+    pub fn clamp(color: &Color) -> Color {
+        Color::new(
+            color.r.clamp(0.0, 1.0),
+            color.g.clamp(0.0, 1.0),
+            color.b.clamp(0.0, 1.0),
+            color.a.clamp(0.0, 1.0),
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GradientStop / Gradient – linear gradient interpolation
+// ---------------------------------------------------------------------------
+
+/// A stop along a gradient.
+#[derive(Debug, Clone, Copy)]
+pub struct GradientStop {
+    pub position: f64,
+    pub color: Color,
+}
+
+/// A linear gradient defined by a series of stops.
+pub struct Gradient {
+    stops: Vec<GradientStop>,
+}
+
+impl Gradient {
+    pub fn new(mut stops: Vec<GradientStop>) -> Self {
+        stops.sort_by(|a, b| a.position.partial_cmp(&b.position).unwrap_or(std::cmp::Ordering::Equal));
+        Self { stops }
+    }
+
+    /// Interpolate the gradient color at position `t` in [0.0, 1.0].
+    pub fn interpolate_at(&self, t: f64) -> Color {
+        if self.stops.is_empty() {
+            return Color::new(0.0, 0.0, 0.0, 1.0);
+        }
+        let t = t.clamp(0.0, 1.0);
+        if t <= self.stops[0].position {
+            return self.stops[0].color;
+        }
+        if t >= self.stops.last().unwrap().position {
+            return self.stops.last().unwrap().color;
+        }
+        for i in 0..self.stops.len() - 1 {
+            let s0 = &self.stops[i];
+            let s1 = &self.stops[i + 1];
+            if t >= s0.position && t <= s1.position {
+                let range = s1.position - s0.position;
+                if range < f64::EPSILON {
+                    return s0.color;
+                }
+                let factor = (t - s0.position) / range;
+                return blend(&s0.color, &s1.color, factor);
+            }
+        }
+        self.stops.last().unwrap().color
+    }
+
+    pub fn stop_count(&self) -> usize {
+        self.stops.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1455,5 +1628,66 @@ mod tests {
     fn test_wcag_contrast_level() {
         assert_eq!(wcag_contrast_level(&Color::black(), &Color::white()), "AAA");
         assert_eq!(wcag_contrast_level(&Color::white(), &Color::white()), "fail");
+    }
+
+    #[test]
+    fn test_color_palette_add_get_remove() {
+        let mut pal = ColorPalette::new();
+        pal.add("red", Color::red());
+        pal.add("blue", Color::new(0.0, 0.0, 1.0, 1.0));
+        assert_eq!(pal.len(), 2);
+        assert!(pal.contains("red"));
+        assert!(pal.get("red").is_some());
+        pal.remove("red");
+        assert!(!pal.contains("red"));
+        assert_eq!(pal.len(), 1);
+    }
+
+    #[test]
+    fn test_color_palette_iter_and_names() {
+        let mut pal = ColorPalette::new();
+        pal.add("a", Color::black());
+        pal.add("b", Color::white());
+        let names = pal.names();
+        assert_eq!(names, vec!["a", "b"]);
+        assert_eq!(pal.iter().count(), 2);
+    }
+
+    #[test]
+    fn test_color_scheme_complementary() {
+        let scheme = ColorScheme::new(Color::red());
+        let comp = scheme.complementary();
+        assert!(comp.r < 0.3);
+    }
+
+    #[test]
+    fn test_color_scheme_triadic() {
+        let scheme = ColorScheme::new(Color::red());
+        let (t1, t2) = scheme.triadic();
+        assert!((t1.r - 1.0).abs() > 0.01 || t1.g.abs() > 0.01);
+        assert!((t2.r - 1.0).abs() > 0.01 || t2.g.abs() > 0.01);
+    }
+
+    #[test]
+    fn test_color_validator() {
+        assert!(ColorValidator::validate_range(&Color::red()).is_ok());
+        assert!(ColorValidator::validate_range(&Color::new(1.5, 0.0, 0.0, 1.0)).is_err());
+        let clamped = ColorValidator::clamp(&Color::new(1.5, -0.1, 0.5, 2.0));
+        assert!((clamped.r - 1.0).abs() < f64::EPSILON);
+        assert!((clamped.g - 0.0).abs() < f64::EPSILON);
+        assert!((clamped.a - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_gradient_interpolation() {
+        let grad = Gradient::new(vec![
+            GradientStop { position: 0.0, color: Color::black() },
+            GradientStop { position: 1.0, color: Color::white() },
+        ]);
+        let mid = grad.interpolate_at(0.5);
+        assert!((mid.r - 0.5).abs() < 0.01);
+        assert!((mid.g - 0.5).abs() < 0.01);
+        let start = grad.interpolate_at(0.0);
+        assert!((start.r - 0.0).abs() < f64::EPSILON);
     }
 }

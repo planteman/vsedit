@@ -924,6 +924,151 @@ pub fn merge_ruler_columns(a: &[u32], b: &[u32]) -> Vec<u32> {
     merged
 }
 
+
+// ---------------------------------------------------------------------------
+// RulerSet
+// ---------------------------------------------------------------------------
+
+/// A sorted, deduplicated collection of `RulerConfig` entries.
+#[derive(Debug, Clone, Default)]
+pub struct RulerSet {
+    rulers: Vec<RulerConfig>,
+}
+
+impl RulerSet {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a ruler. Returns an error on duplicates or invalid values.
+    pub fn add(&mut self, cfg: RulerConfig) -> Result<(), RulerError> {
+        if self.rulers.iter().any(|r| r.column == cfg.column) {
+            return Err(RulerError::DuplicateColumn(cfg.column));
+        }
+        self.rulers.push(cfg);
+        self.rulers.sort_by_key(|r| r.column);
+        Ok(())
+    }
+
+    /// Remove a ruler by column. Returns `true` if found and removed.
+    pub fn remove(&mut self, column: u32) -> bool {
+        let before = self.rulers.len();
+        self.rulers.retain(|r| r.column != column);
+        self.rulers.len() < before
+    }
+
+    pub fn contains(&self, column: u32) -> bool {
+        self.rulers.iter().any(|r| r.column == column)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &RulerConfig> {
+        self.rulers.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.rulers.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.rulers.is_empty()
+    }
+
+    pub fn columns(&self) -> Vec<u32> {
+        self.rulers.iter().map(|r| r.column).collect()
+    }
+}
+
+impl fmt::Display for RulerSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RulerSet[")?;
+        for (i, r) in self.rulers.iter().enumerate() {
+            if i > 0 { write!(f, ", ")?; }
+            write!(f, "{}", r.column)?;
+        }
+        write!(f, "]")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RulerPreset
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RulerPreset {
+    PEP8,
+    StandardRust,
+    CustomWidth(u32),
+}
+
+impl RulerPreset {
+    pub fn to_columns(&self) -> Vec<u32> {
+        match self {
+            RulerPreset::PEP8 => vec![79, 120],
+            RulerPreset::StandardRust => vec![100],
+            RulerPreset::CustomWidth(w) => vec![*w],
+        }
+    }
+}
+
+impl fmt::Display for RulerPreset {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::PEP8 => write!(f, "PEP8 (79, 120)"),
+            Self::StandardRust => write!(f, "Rust (100)"),
+            Self::CustomWidth(w) => write!(f, "Custom ({w})"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RulerOverlapChecker
+// ---------------------------------------------------------------------------
+
+/// Checks whether any ruler columns coincide with tab stops.
+pub struct RulerOverlapChecker;
+
+impl RulerOverlapChecker {
+    pub fn overlapping(ruler_columns: &[u32], tab_width: u32) -> Vec<u32> {
+        if tab_width == 0 {
+            return Vec::new();
+        }
+        ruler_columns
+            .iter()
+            .copied()
+            .filter(|&c| c > 0 && c % tab_width == 0)
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RulerVisibility
+// ---------------------------------------------------------------------------
+
+/// Computes which rulers are visible within a horizontal viewport range.
+#[derive(Debug)]
+pub struct RulerVisibility {
+    pub visible: Vec<u32>,
+}
+
+impl RulerVisibility {
+    pub fn compute(columns: &[u32], start_col: u32, end_col: u32) -> Self {
+        let visible = columns
+            .iter()
+            .copied()
+            .filter(|&c| c >= start_col && c < end_col)
+            .collect();
+        Self { visible }
+    }
+
+    pub fn count(&self) -> usize {
+        self.visible.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.visible.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1477,4 +1622,62 @@ mod tests {
         let merged = merge_ruler_columns(&[80, 40], &[120, 40]);
         assert_eq!(merged, vec![40, 80, 120]);
     }
+
+    // --- new tests ---
+
+    #[test]
+    fn ruler_set_add_remove_contains() {
+        let mut set = RulerSet::new();
+        set.add(RulerConfig::new(80, None).unwrap()).unwrap();
+        set.add(RulerConfig::new(120, None).unwrap()).unwrap();
+        assert_eq!(set.len(), 2);
+        assert!(set.contains(80));
+        assert!(!set.contains(100));
+        assert!(set.add(RulerConfig::new(80, None).unwrap()).is_err());
+        assert_eq!(set.columns(), vec![80, 120]);
+        assert!(set.remove(80));
+        assert!(!set.contains(80));
+        assert_eq!(set.len(), 1);
+    }
+
+    #[test]
+    fn ruler_set_display() {
+        let mut set = RulerSet::new();
+        set.add(RulerConfig::new(40, None).unwrap()).unwrap();
+        set.add(RulerConfig::new(80, None).unwrap()).unwrap();
+        let s = format!("{set}");
+        assert!(s.contains("40"));
+        assert!(s.contains("80"));
+    }
+
+    #[test]
+    fn ruler_preset_columns() {
+        assert_eq!(RulerPreset::PEP8.to_columns(), vec![79, 120]);
+        assert_eq!(RulerPreset::StandardRust.to_columns(), vec![100]);
+        assert_eq!(RulerPreset::CustomWidth(72).to_columns(), vec![72]);
+    }
+
+    #[test]
+    fn ruler_overlap_checker() {
+        let overlaps = RulerOverlapChecker::overlapping(&[40, 79, 80, 120], 8);
+        assert!(overlaps.contains(&40));
+        assert!(overlaps.contains(&80));
+        assert!(overlaps.contains(&120));
+        assert!(!overlaps.contains(&79));
+        assert!(RulerOverlapChecker::overlapping(&[10], 0).is_empty());
+    }
+
+    #[test]
+    fn ruler_visibility_compute() {
+        let vis = RulerVisibility::compute(&[40, 80, 120, 200], 50, 130);
+        assert_eq!(vis.visible, vec![80, 120]);
+        assert_eq!(vis.count(), 2);
+    }
+
+    #[test]
+    fn ruler_preset_display() {
+        assert!(format!("{}", RulerPreset::PEP8).contains("79"));
+        assert!(format!("{}", RulerPreset::StandardRust).contains("100"));
+    }
+
 }

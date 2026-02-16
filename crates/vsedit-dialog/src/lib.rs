@@ -986,6 +986,124 @@ pub fn text_filter() -> FileDialogFilter {
     FileDialogFilter::new("Text Files", vec!["txt".into(), "md".into(), "log".into()])
 }
 
+// ---------------------------------------------------------------------------
+// InputDialog
+// ---------------------------------------------------------------------------
+
+/// An input dialog with optional validation.
+#[derive(Debug, Clone)]
+pub struct InputDialog {
+    pub prompt: String,
+    pub placeholder: String,
+    pub max_length: usize,
+    pub value: String,
+}
+
+impl InputDialog {
+    pub fn new(prompt: impl Into<String>) -> Self {
+        Self {
+            prompt: prompt.into(),
+            placeholder: String::new(),
+            max_length: 256,
+            value: String::new(),
+        }
+    }
+
+    pub fn with_placeholder(mut self, ph: impl Into<String>) -> Self {
+        self.placeholder = ph.into();
+        self
+    }
+
+    pub fn with_max_length(mut self, max: usize) -> Self {
+        self.max_length = max;
+        self
+    }
+
+    pub fn set_value(&mut self, val: impl Into<String>) {
+        let val = val.into();
+        if val.len() <= self.max_length {
+            self.value = val;
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.value.is_empty() {
+            return Err("value cannot be empty".into());
+        }
+        if self.value.len() > self.max_length {
+            return Err(format!("value exceeds max length {}", self.max_length));
+        }
+        Ok(())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.value.is_empty()
+    }
+}
+
+impl fmt::Display for InputDialog {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "InputDialog(prompt='{}', max={})", self.prompt, self.max_length)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DialogStack
+// ---------------------------------------------------------------------------
+
+/// Manages a stack of open dialogs.
+#[derive(Debug)]
+pub struct DialogStack {
+    stack: Vec<DialogOptions>,
+}
+
+impl DialogStack {
+    pub fn new() -> Self {
+        Self { stack: Vec::new() }
+    }
+
+    pub fn push(&mut self, dialog: DialogOptions) {
+        self.stack.push(dialog);
+    }
+
+    pub fn pop(&mut self) -> Option<DialogOptions> {
+        self.stack.pop()
+    }
+
+    pub fn peek(&self) -> Option<&DialogOptions> {
+        self.stack.last()
+    }
+
+    pub fn len(&self) -> usize {
+        self.stack.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.stack.clear();
+    }
+
+    /// Returns the titles of all dialogs in the stack (bottom-to-top).
+    pub fn titles(&self) -> Vec<&str> {
+        self.stack.iter().map(|d| d.title.as_str()).collect()
+    }
+}
+
+impl Default for DialogStack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for DialogStack {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DialogStack({} dialogs)", self.stack.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1443,5 +1561,67 @@ mod tests {
         assert!(img.extensions.contains(&"png".to_string()));
         let txt = text_filter();
         assert!(txt.extensions.contains(&"txt".to_string()));
+    }
+
+    #[test]
+    fn test_dialog_theme_high_contrast() {
+        let theme = DialogTheme::high_contrast();
+        assert_eq!(theme.border_style, BorderStyle::Double);
+        assert_eq!(theme.background_color, Color::rgb(0, 0, 0));
+        let default_theme = DialogTheme::default();
+        assert_eq!(default_theme.border_style, BorderStyle::Rounded);
+    }
+
+    #[test]
+    fn test_input_dialog_validation() {
+        let mut dlg = InputDialog::new("Enter name")
+            .with_placeholder("e.g. John")
+            .with_max_length(10);
+        assert!(dlg.validate().is_err()); // empty
+        dlg.set_value("John");
+        assert!(dlg.validate().is_ok());
+        dlg.set_value("VeryLongNameExceeding");
+        assert!(dlg.is_empty() || dlg.value == "John"); // rejected due to max_length
+        assert!(format!("{dlg}").contains("Enter name"));
+    }
+
+    #[test]
+    fn test_input_dialog_max_length_enforcement() {
+        let mut dlg = InputDialog::new("test").with_max_length(3);
+        dlg.set_value("ab");
+        assert_eq!(dlg.value, "ab");
+        dlg.set_value("abcd");
+        assert_eq!(dlg.value, "ab"); // unchanged, too long
+    }
+
+    #[test]
+    fn test_dialog_stack_operations() {
+        let mut stack = DialogStack::new();
+        assert!(stack.is_empty());
+        stack.push(DialogOptions::ok_cancel("First", "Message 1"));
+        stack.push(DialogOptions::ok_cancel("Second", "Message 2"));
+        assert_eq!(stack.len(), 2);
+        assert_eq!(stack.peek().unwrap().title, "Second");
+        assert_eq!(stack.titles(), vec!["First", "Second"]);
+        let popped = stack.pop().unwrap();
+        assert_eq!(popped.title, "Second");
+        assert_eq!(stack.len(), 1);
+        assert!(format!("{stack}").contains("1 dialogs"));
+    }
+
+    #[test]
+    fn test_dialog_stack_clear() {
+        let mut stack = DialogStack::new();
+        stack.push(info_dialog("A", "a"));
+        stack.push(info_dialog("B", "b"));
+        stack.clear();
+        assert!(stack.is_empty());
+        assert!(stack.pop().is_none());
+    }
+
+    #[test]
+    fn test_dialog_stack_peek_empty() {
+        let stack = DialogStack::new();
+        assert!(stack.peek().is_none());
     }
 }

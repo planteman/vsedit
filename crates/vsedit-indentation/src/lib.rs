@@ -975,6 +975,174 @@ impl IndentStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ReindentResult — adjust indentation to a target level
+// ---------------------------------------------------------------------------
+
+/// Result of a reindentation operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReindentResult {
+    /// The reindented text.
+    pub text: String,
+    /// Number of lines whose indentation was changed.
+    pub lines_changed: usize,
+    /// The target indent level that was applied.
+    pub target_level: u32,
+}
+
+impl fmt::Display for ReindentResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ReindentResult({} lines changed, target level {})",
+            self.lines_changed, self.target_level,
+        )
+    }
+}
+
+/// Reindent all lines in `text` so that the minimum non-blank indent becomes
+/// `target_level`, preserving relative indentation between lines.
+pub fn reindent(text: &str, style: IndentStyle, target_level: u32) -> ReindentResult {
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.is_empty() {
+        return ReindentResult {
+            text: String::new(),
+            lines_changed: 0,
+            target_level,
+        };
+    }
+
+    let min_level = lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| get_line_indent_level(l, style))
+        .min()
+        .unwrap_or(0);
+
+    let mut result_lines = Vec::with_capacity(lines.len());
+    let mut changed = 0usize;
+
+    for &line in &lines {
+        if line.trim().is_empty() {
+            result_lines.push(String::new());
+            continue;
+        }
+        let current = get_line_indent_level(line, style);
+        let new_level = current - min_level + target_level;
+        let new_indent = style.indent_string_n(new_level);
+        let trimmed = line.trim_start();
+        let new_line = format!("{}{}", new_indent, trimmed);
+        if new_line != line {
+            changed += 1;
+        }
+        result_lines.push(new_line);
+    }
+
+    ReindentResult {
+        text: result_lines.join("\n"),
+        lines_changed: changed,
+        target_level,
+    }
+}
+
+impl From<ReindentResult> for String {
+    fn from(r: ReindentResult) -> Self {
+        r.text
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IndentChange — diff indentation between old and new text
+// ---------------------------------------------------------------------------
+
+/// Describes an indentation change on a single line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndentChange {
+    /// Zero-based line number.
+    pub line: usize,
+    /// Indent level in the old text.
+    pub old_level: u32,
+    /// Indent level in the new text.
+    pub new_level: u32,
+}
+
+impl IndentChange {
+    /// Returns the signed delta (new - old) as i64.
+    pub fn delta(&self) -> i64 {
+        self.new_level as i64 - self.old_level as i64
+    }
+
+    /// Returns true if indentation increased.
+    pub fn is_increase(&self) -> bool {
+        self.new_level > self.old_level
+    }
+
+    /// Returns true if indentation decreased.
+    pub fn is_decrease(&self) -> bool {
+        self.new_level < self.old_level
+    }
+}
+
+impl fmt::Display for IndentChange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let arrow = if self.new_level > self.old_level {
+            "→"
+        } else {
+            "←"
+        };
+        write!(
+            f,
+            "line {}: {} {} {}",
+            self.line, self.old_level, arrow, self.new_level,
+        )
+    }
+}
+
+/// Compare two texts and return a list of lines where indentation changed.
+///
+/// Lines are compared pairwise up to the length of the shorter text.
+/// Lines that exist only in one text are ignored.
+pub fn detect_indent_changes(
+    old_text: &str,
+    new_text: &str,
+    style: IndentStyle,
+) -> Vec<IndentChange> {
+    let old_lines: Vec<&str> = old_text.lines().collect();
+    let new_lines: Vec<&str> = new_text.lines().collect();
+    let len = old_lines.len().min(new_lines.len());
+
+    let mut changes = Vec::new();
+    for i in 0..len {
+        let old_level = get_line_indent_level(old_lines[i], style);
+        let new_level = get_line_indent_level(new_lines[i], style);
+        if old_level != new_level {
+            changes.push(IndentChange {
+                line: i,
+                old_level,
+                new_level,
+            });
+        }
+    }
+    changes
+}
+
+// ---------------------------------------------------------------------------
+// Bulk indent-level extraction
+// ---------------------------------------------------------------------------
+
+/// Return the indent level for every line in `text`.
+pub fn indent_levels(text: &str, style: IndentStyle) -> Vec<u32> {
+    text.lines()
+        .map(|line| {
+            if line.trim().is_empty() {
+                0
+            } else {
+                get_line_indent_level(line, style)
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1400,5 +1568,108 @@ mod tests {
     fn test_strip_all_indent() {
         let text = "  a\n    b\nc\n";
         assert_eq!(strip_all_indent(text), "a\nb\nc");
+    }
+
+    // -- reindent tests -----------------------------------------------------
+
+    #[test]
+    fn reindent_shifts_to_target_level() {
+        let text = "    fn inner() {\n        body();\n    }";
+        let r = reindent(text, IndentStyle::Spaces(4), 0);
+        assert_eq!(r.text, "fn inner() {\n    body();\n}");
+        assert_eq!(r.lines_changed, 3);
+        assert_eq!(r.target_level, 0);
+    }
+
+    #[test]
+    fn reindent_increases_indent() {
+        let text = "a\n    b\n        c";
+        let r = reindent(text, IndentStyle::Spaces(4), 2);
+        assert_eq!(r.text, "        a\n            b\n                c");
+        assert_eq!(r.lines_changed, 3);
+    }
+
+    #[test]
+    fn reindent_preserves_blank_lines() {
+        let text = "    a\n\n    b";
+        let r = reindent(text, IndentStyle::Spaces(4), 0);
+        assert_eq!(r.text, "a\n\nb");
+        assert_eq!(r.lines_changed, 2); // blank lines don't count
+    }
+
+    #[test]
+    fn reindent_empty_text() {
+        let r = reindent("", IndentStyle::Spaces(4), 3);
+        assert_eq!(r.text, "");
+        assert_eq!(r.lines_changed, 0);
+    }
+
+    #[test]
+    fn reindent_result_display() {
+        let r = ReindentResult {
+            text: "hello".into(),
+            lines_changed: 5,
+            target_level: 2,
+        };
+        let s = format!("{r}");
+        assert!(s.contains("5 lines changed"));
+        assert!(s.contains("target level 2"));
+    }
+
+    #[test]
+    fn reindent_result_into_string() {
+        let r = reindent("    hello", IndentStyle::Spaces(4), 0);
+        let s: String = r.into();
+        assert_eq!(s, "hello");
+    }
+
+    // -- detect_indent_changes tests ----------------------------------------
+
+    #[test]
+    fn detect_changes_identifies_modified_lines() {
+        let old = "fn main() {\n    a();\n    b();\n}";
+        let new = "fn main() {\n        a();\n    b();\n}";
+        let changes = detect_indent_changes(old, new, IndentStyle::Spaces(4));
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].line, 1);
+        assert_eq!(changes[0].old_level, 1);
+        assert_eq!(changes[0].new_level, 2);
+        assert!(changes[0].is_increase());
+        assert!(!changes[0].is_decrease());
+        assert_eq!(changes[0].delta(), 1);
+    }
+
+    #[test]
+    fn detect_changes_empty_when_identical() {
+        let text = "a\n    b\n        c";
+        let changes = detect_indent_changes(text, text, IndentStyle::Spaces(4));
+        assert!(changes.is_empty());
+    }
+
+    #[test]
+    fn detect_changes_decrease() {
+        let old = "        deep";
+        let new = "    shallow";
+        let changes = detect_indent_changes(old, new, IndentStyle::Spaces(4));
+        assert_eq!(changes.len(), 1);
+        assert!(changes[0].is_decrease());
+        assert_eq!(changes[0].delta(), -1);
+    }
+
+    #[test]
+    fn indent_change_display() {
+        let c = IndentChange { line: 3, old_level: 1, new_level: 2 };
+        let s = format!("{c}");
+        assert!(s.contains("line 3"));
+        assert!(s.contains("→"));
+    }
+
+    // -- indent_levels tests ------------------------------------------------
+
+    #[test]
+    fn indent_levels_returns_per_line_levels() {
+        let text = "a\n    b\n        c\n\n    d";
+        let levels = indent_levels(text, IndentStyle::Spaces(4));
+        assert_eq!(levels, vec![0, 1, 2, 0, 1]);
     }
 }

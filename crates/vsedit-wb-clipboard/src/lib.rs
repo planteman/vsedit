@@ -1,6 +1,8 @@
 //! System clipboard integration.
 
+use std::collections::HashMap;
 use std::fmt;
+
 /// The editing mode in which the copy was performed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceMode {
@@ -806,6 +808,323 @@ impl ClipboardEntry {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ClipboardSearch — structured history queries
+// ---------------------------------------------------------------------------
+
+/// Structured search over clipboard history with substring, regex, and mode filters.
+pub struct ClipboardSearch<'a> {
+    entries: &'a [ClipboardEntry],
+}
+
+impl<'a> ClipboardSearch<'a> {
+    /// Create a searcher over a slice of clipboard entries.
+    pub fn new(entries: &'a [ClipboardEntry]) -> Self {
+        Self { entries }
+    }
+
+    /// Build from a `ClipboardService`.
+    pub fn from_service(svc: &'a ClipboardService) -> Self {
+        Self::new(svc.get_history())
+    }
+
+    /// Return entries whose text contains `needle` (case-sensitive).
+    pub fn by_substring(&self, needle: &str) -> Vec<&'a ClipboardEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.text.contains(needle))
+            .collect()
+    }
+
+    /// Return entries whose text matches a simple glob-like pattern.
+    /// Supports `*` (any chars) and `?` (single char).
+    pub fn by_glob(&self, pattern: &str) -> Vec<&'a ClipboardEntry> {
+        self.entries
+            .iter()
+            .filter(|e| glob_match(pattern, &e.text))
+            .collect()
+    }
+
+    /// Return entries that were copied in the given source mode.
+    pub fn by_mode(&self, mode: SourceMode) -> Vec<&'a ClipboardEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.source_mode == mode)
+            .collect()
+    }
+
+    /// Return entries whose timestamp falls within `[from, to]` inclusive.
+    pub fn by_time_range(&self, from: u64, to: u64) -> Vec<&'a ClipboardEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.timestamp >= from && e.timestamp <= to)
+            .collect()
+    }
+
+    /// Combined filter: optional substring, optional mode, optional time range.
+    pub fn query(
+        &self,
+        substring: Option<&str>,
+        mode: Option<SourceMode>,
+        from_ts: Option<u64>,
+        to_ts: Option<u64>,
+    ) -> Vec<&'a ClipboardEntry> {
+        self.entries
+            .iter()
+            .filter(|e| {
+                if let Some(s) = substring {
+                    if !e.text.contains(s) {
+                        return false;
+                    }
+                }
+                if let Some(m) = mode {
+                    if e.source_mode != m {
+                        return false;
+                    }
+                }
+                if let Some(f) = from_ts {
+                    if e.timestamp < f {
+                        return false;
+                    }
+                }
+                if let Some(t) = to_ts {
+                    if e.timestamp > t {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect()
+    }
+}
+
+/// Simple glob matching supporting `*` and `?`.
+fn glob_match(pattern: &str, text: &str) -> bool {
+    let p: Vec<char> = pattern.chars().collect();
+    let t: Vec<char> = text.chars().collect();
+    glob_match_inner(&p, &t)
+}
+
+fn glob_match_inner(p: &[char], t: &[char]) -> bool {
+    match (p.first(), t.first()) {
+        (None, None) => true,
+        (Some('*'), _) => {
+            // '*' matches zero or more characters
+            glob_match_inner(&p[1..], t) || (!t.is_empty() && glob_match_inner(p, &t[1..]))
+        }
+        (Some('?'), Some(_)) => glob_match_inner(&p[1..], &t[1..]),
+        (Some(pc), Some(tc)) if pc == tc => glob_match_inner(&p[1..], &t[1..]),
+        _ => false,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardDiffResult — detailed line-based diff hunks
+// ---------------------------------------------------------------------------
+
+/// A single line in a diff output.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffLine {
+    /// Line present only in the first entry (removed).
+    Removed(String),
+    /// Line present only in the second entry (added).
+    Added(String),
+    /// Line present in both entries (context).
+    Context(String),
+}
+
+impl fmt::Display for DiffLine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiffLine::Removed(l) => write!(f, "- {l}"),
+            DiffLine::Added(l) => write!(f, "+ {l}"),
+            DiffLine::Context(l) => write!(f, "  {l}"),
+        }
+    }
+}
+
+/// Compute a detailed line-based diff between two texts, returning each line
+/// annotated as added, removed, or context.
+pub fn detailed_diff(a: &str, b: &str) -> Vec<DiffLine> {
+    let a_lines: Vec<&str> = a.lines().collect();
+    let b_lines: Vec<&str> = b.lines().collect();
+    let max_len = a_lines.len().max(b_lines.len());
+    let mut result = Vec::with_capacity(max_len);
+    for i in 0..max_len {
+        match (a_lines.get(i), b_lines.get(i)) {
+            (Some(al), Some(bl)) if al == bl => {
+                result.push(DiffLine::Context(al.to_string()));
+            }
+            (Some(al), Some(bl)) => {
+                result.push(DiffLine::Removed(al.to_string()));
+                result.push(DiffLine::Added(bl.to_string()));
+            }
+            (Some(al), None) => {
+                result.push(DiffLine::Removed(al.to_string()));
+            }
+            (None, Some(bl)) => {
+                result.push(DiffLine::Added(bl.to_string()));
+            }
+            (None, None) => {}
+        }
+    }
+    result
+}
+
+/// Format a detailed diff as a unified-style string.
+pub fn format_diff(lines: &[DiffLine]) -> String {
+    lines
+        .iter()
+        .map(|l| l.to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// Enhanced ClipboardStats — entries per mode, most recent timestamp
+// ---------------------------------------------------------------------------
+
+impl ClipboardStats {
+    /// Compute per-mode entry counts from a service.
+    pub fn entries_per_mode(svc: &ClipboardService) -> HashMap<SourceMode, usize> {
+        let mut counts = HashMap::new();
+        for entry in svc.get_history() {
+            *counts.entry(entry.source_mode).or_insert(0) += 1;
+        }
+        counts
+    }
+
+    /// Return the most recent timestamp across all entries, or `None` if empty.
+    pub fn most_recent_timestamp(svc: &ClipboardService) -> Option<u64> {
+        svc.get_history().iter().map(|e| e.timestamp).max()
+    }
+
+    /// Return the average entry length as a floating-point value.
+    pub fn avg_bytes_f64(svc: &ClipboardService) -> f64 {
+        let entries = svc.get_history();
+        if entries.is_empty() {
+            return 0.0;
+        }
+        let total: usize = entries.iter().map(|e| e.text.len()).sum();
+        total as f64 / entries.len() as f64
+    }
+}
+
+impl fmt::Display for ClipboardStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ClipboardStats(entries={}, bytes={}, avg={}, longest={}, shortest={})",
+            self.entry_count,
+            self.total_bytes,
+            self.avg_bytes,
+            self.longest_entry_bytes,
+            self.shortest_entry_bytes,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardExport — serialize / deserialize clipboard history
+// ---------------------------------------------------------------------------
+
+/// Serialize clipboard history to a simple text format and parse it back.
+///
+/// Format per entry (separated by blank lines):
+/// ```text
+/// @@@ <mode> <timestamp>
+/// <text>
+/// ```
+pub struct ClipboardExport;
+
+impl ClipboardExport {
+    /// Serialize a slice of entries to the export text format.
+    pub fn serialize(entries: &[ClipboardEntry]) -> String {
+        let mut out = String::new();
+        for (i, entry) in entries.iter().enumerate() {
+            if i > 0 {
+                out.push('\n');
+            }
+            out.push_str(&format!(
+                "@@@ {} {}\n{}",
+                entry.source_mode, entry.timestamp, entry.text
+            ));
+        }
+        out
+    }
+
+    /// Parse entries from the export text format.
+    /// Returns `None` if the format is invalid.
+    pub fn deserialize(input: &str) -> Option<Vec<ClipboardEntry>> {
+        if input.is_empty() {
+            return Some(Vec::new());
+        }
+        let mut entries = Vec::new();
+        // Split on the header marker
+        let chunks: Vec<&str> = input.split("\n@@@").collect();
+        for (i, chunk) in chunks.iter().enumerate() {
+            let chunk = if i == 0 {
+                chunk.strip_prefix("@@@").unwrap_or(chunk)
+            } else {
+                chunk
+            };
+            let chunk = chunk.trim_start();
+            // First token is mode, second is timestamp, rest is text
+            let first_newline = chunk.find('\n')?;
+            let header = &chunk[..first_newline];
+            let text = &chunk[first_newline + 1..];
+            let mut parts = header.splitn(2, ' ');
+            let mode_str = parts.next()?;
+            let ts_str = parts.next()?;
+            let mode = SourceMode::from_name(mode_str)?;
+            let timestamp: u64 = ts_str.parse().ok()?;
+            entries.push(ClipboardEntry {
+                text: text.to_string(),
+                timestamp,
+                source_mode: mode,
+            });
+        }
+        Some(entries)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// From impls
+// ---------------------------------------------------------------------------
+
+impl From<&str> for ClipboardEntry {
+    fn from(s: &str) -> Self {
+        ClipboardEntry::new(s)
+    }
+}
+
+impl From<String> for ClipboardEntry {
+    fn from(s: String) -> Self {
+        ClipboardEntry {
+            text: s,
+            timestamp: 0,
+            source_mode: SourceMode::Normal,
+        }
+    }
+}
+
+impl From<&str> for SourceMode {
+    /// Parse a mode string; defaults to `Normal` on unrecognized input.
+    fn from(s: &str) -> Self {
+        SourceMode::from_name(s).unwrap_or(SourceMode::Normal)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hash impl for SourceMode (needed for HashMap key)
+// ---------------------------------------------------------------------------
+
+impl std::hash::Hash for SourceMode {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1408,5 +1727,128 @@ mod tests {
         ];
         assert_eq!(entries.len(), 3);
         assert_eq!(entries.iter().filter(|e| e.is_multiline()).count(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests for ClipboardSearch, detailed_diff, ClipboardStats extensions,
+    // ClipboardExport, From impls, and glob matching
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn search_by_substring() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_entry("fn main() {}".into(), 1, SourceMode::Normal);
+        svc.write_entry("let x = 42;".into(), 2, SourceMode::Visual);
+        svc.write_entry("fn helper() {}".into(), 3, SourceMode::Normal);
+        let search = ClipboardSearch::from_service(&svc);
+        let results = search.by_substring("fn ");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].text, "fn main() {}");
+        assert_eq!(results[1].text, "fn helper() {}");
+    }
+
+    #[test]
+    fn search_by_glob_pattern() {
+        let entries = vec![
+            ClipboardEntry::new("hello world"),
+            ClipboardEntry::new("hello rust"),
+            ClipboardEntry::new("goodbye world"),
+        ];
+        let search = ClipboardSearch::new(&entries);
+        let results = search.by_glob("hello*");
+        assert_eq!(results.len(), 2);
+        let results2 = search.by_glob("*world");
+        assert_eq!(results2.len(), 2);
+        let results3 = search.by_glob("hello ?ust");
+        assert_eq!(results3.len(), 1);
+    }
+
+    #[test]
+    fn search_combined_query() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_entry("alpha".into(), 10, SourceMode::Normal);
+        svc.write_entry("alpha beta".into(), 20, SourceMode::Visual);
+        svc.write_entry("gamma".into(), 30, SourceMode::Normal);
+        let search = ClipboardSearch::from_service(&svc);
+        // Filter by substring + mode + time range
+        let results = search.query(
+            Some("alpha"),
+            Some(SourceMode::Normal),
+            Some(5),
+            Some(25),
+        );
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].text, "alpha");
+    }
+
+    #[test]
+    fn detailed_diff_lines() {
+        let a = "line1\nline2\nline3";
+        let b = "line1\nmodified\nline3\nline4";
+        let diff = detailed_diff(a, b);
+        assert_eq!(diff[0], DiffLine::Context("line1".into()));
+        assert_eq!(diff[1], DiffLine::Removed("line2".into()));
+        assert_eq!(diff[2], DiffLine::Added("modified".into()));
+        assert_eq!(diff[3], DiffLine::Context("line3".into()));
+        assert_eq!(diff[4], DiffLine::Added("line4".into()));
+        let formatted = format_diff(&diff);
+        assert!(formatted.contains("- line2"));
+        assert!(formatted.contains("+ modified"));
+        assert!(formatted.contains("+ line4"));
+    }
+
+    #[test]
+    fn clipboard_export_roundtrip() {
+        let entries = vec![
+            ClipboardEntry {
+                text: "hello world".into(),
+                timestamp: 100,
+                source_mode: SourceMode::Normal,
+            },
+            ClipboardEntry {
+                text: "multi\nline\ntext".into(),
+                timestamp: 200,
+                source_mode: SourceMode::Visual,
+            },
+        ];
+        let serialized = ClipboardExport::serialize(&entries);
+        let deserialized = ClipboardExport::deserialize(&serialized).unwrap();
+        assert_eq!(deserialized.len(), 2);
+        assert_eq!(deserialized[0].text, "hello world");
+        assert_eq!(deserialized[0].timestamp, 100);
+        assert_eq!(deserialized[0].source_mode, SourceMode::Normal);
+        assert_eq!(deserialized[1].text, "multi\nline\ntext");
+        assert_eq!(deserialized[1].timestamp, 200);
+        assert_eq!(deserialized[1].source_mode, SourceMode::Visual);
+    }
+
+    #[test]
+    fn clipboard_stats_per_mode_and_timestamp() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_entry("a".into(), 10, SourceMode::Normal);
+        svc.write_entry("bb".into(), 20, SourceMode::Visual);
+        svc.write_entry("ccc".into(), 30, SourceMode::Normal);
+        let per_mode = ClipboardStats::entries_per_mode(&svc);
+        assert_eq!(per_mode[&SourceMode::Normal], 2);
+        assert_eq!(per_mode[&SourceMode::Visual], 1);
+        assert_eq!(ClipboardStats::most_recent_timestamp(&svc), Some(30));
+        let avg = ClipboardStats::avg_bytes_f64(&svc);
+        assert!((avg - 2.0).abs() < 0.01);
+        let stats = ClipboardStats::from_service(&svc);
+        let display = format!("{stats}");
+        assert!(display.contains("entries=3"));
+    }
+
+    #[test]
+    fn from_impls_for_entry_and_mode() {
+        let entry: ClipboardEntry = "quick text".into();
+        assert_eq!(entry.text, "quick text");
+        assert_eq!(entry.source_mode, SourceMode::Normal);
+        let entry2: ClipboardEntry = String::from("owned").into();
+        assert_eq!(entry2.text, "owned");
+        let mode: SourceMode = "visual".into();
+        assert_eq!(mode, SourceMode::Visual);
+        let mode2: SourceMode = "unknown".into();
+        assert_eq!(mode2, SourceMode::Normal);
     }
 }

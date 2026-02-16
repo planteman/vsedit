@@ -1,5 +1,6 @@
 //! Sticky scroll widget that pins nesting-context lines at the top of the editor viewport.
 
+use std::collections::HashMap;
 use std::fmt;
 
 /// Errors produced by [`StickyScrollWidget`] operations.
@@ -852,6 +853,232 @@ pub fn filter_by_max_depth(lines: &[StickyScrollLine], max_depth: u32) -> Vec<St
         .collect()
 }
 
+
+// ---------------------------------------------------------------------------
+// StickyScrollContext - nesting context at a cursor position
+// ---------------------------------------------------------------------------
+
+/// Represents the nesting context at a given cursor position.
+#[derive(Debug, Clone, Default)]
+pub struct StickyScrollContext {
+    lines: Vec<StickyScrollLine>,
+}
+
+impl StickyScrollContext {
+    /// Create a context from the given lines (assumed to be ordered from outermost to innermost).
+    pub fn from_lines(lines: Vec<StickyScrollLine>) -> Self {
+        Self { lines }
+    }
+
+    /// Create an empty context.
+    pub fn empty() -> Self {
+        Self { lines: Vec::new() }
+    }
+
+    /// The nesting depth (number of context lines).
+    pub fn depth(&self) -> usize {
+        self.lines.len()
+    }
+
+    /// The innermost (closest) parent context line.
+    pub fn parent(&self) -> Option<&StickyScrollLine> {
+        self.lines.last()
+    }
+
+    /// All ancestor context lines from outermost to innermost.
+    pub fn ancestors(&self) -> &[StickyScrollLine] {
+        &self.lines
+    }
+
+    /// Returns true if the context is empty (at the top level).
+    pub fn is_top_level(&self) -> bool {
+        self.lines.is_empty()
+    }
+
+    /// Get the context line at a specific depth.
+    pub fn at_depth(&self, depth: usize) -> Option<&StickyScrollLine> {
+        self.lines.get(depth)
+    }
+
+    /// Get the text of the outermost ancestor.
+    pub fn outermost_text(&self) -> Option<&str> {
+        self.lines.first().map(|l| l.text.as_str())
+    }
+}
+
+impl fmt::Display for StickyScrollContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Context(depth={})", self.depth())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StickyScrollAnimator - smooth scrolling transitions
+// ---------------------------------------------------------------------------
+
+/// Animates smooth scrolling transitions for the sticky scroll widget.
+#[derive(Debug, Clone)]
+pub struct StickyScrollAnimator {
+    start_offset: f64,
+    target_offset: f64,
+    current_offset: f64,
+    duration_ms: u64,
+    elapsed_ms: u64,
+    complete: bool,
+}
+
+impl StickyScrollAnimator {
+    /// Create a new animator that transitions from `start` to `target` over `duration_ms`.
+    pub fn new(start_offset: f64, target_offset: f64, duration_ms: u64) -> Self {
+        let dur = duration_ms.max(1);
+        Self {
+            start_offset,
+            target_offset,
+            current_offset: start_offset,
+            duration_ms: dur,
+            elapsed_ms: 0,
+            complete: false,
+        }
+    }
+
+    /// Start/reset the animation.
+    pub fn start(&mut self) {
+        self.elapsed_ms = 0;
+        self.current_offset = self.start_offset;
+        self.complete = false;
+    }
+
+    /// Advance the animation by `delta_ms` milliseconds.
+    pub fn tick(&mut self, delta_ms: u64) {
+        if self.complete {
+            return;
+        }
+        self.elapsed_ms += delta_ms;
+        if self.elapsed_ms >= self.duration_ms {
+            self.current_offset = self.target_offset;
+            self.complete = true;
+        } else {
+            let t = self.elapsed_ms as f64 / self.duration_ms as f64;
+            // ease-out quadratic
+            let eased = t * (2.0 - t);
+            self.current_offset = self.start_offset + (self.target_offset - self.start_offset) * eased;
+        }
+    }
+
+    /// Returns true if the animation is complete.
+    pub fn is_complete(&self) -> bool {
+        self.complete
+    }
+
+    /// Current animated offset.
+    pub fn current_offset(&self) -> f64 {
+        self.current_offset
+    }
+
+    /// Progress as a fraction from 0.0 to 1.0.
+    pub fn progress(&self) -> f64 {
+        if self.complete {
+            1.0
+        } else {
+            (self.elapsed_ms as f64 / self.duration_ms as f64).min(1.0)
+        }
+    }
+}
+
+impl fmt::Display for StickyScrollAnimator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Animator({:.1} -> {:.1}, {:.0}%)",
+            self.start_offset,
+            self.target_offset,
+            self.progress() * 100.0
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StickyScrollCache - caches computed sticky lines per scroll position
+// ---------------------------------------------------------------------------
+
+/// Caches computed sticky scroll lines for given scroll positions.
+#[derive(Debug, Clone)]
+pub struct StickyScrollCache {
+    entries: HashMap<u32, Vec<StickyScrollLine>>,
+    hits: u64,
+    misses: u64,
+    capacity: usize,
+}
+
+impl StickyScrollCache {
+    /// Create a new cache with the given max capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: HashMap::new(),
+            hits: 0,
+            misses: 0,
+            capacity: capacity.max(1),
+        }
+    }
+
+    /// Get cached lines for a scroll position.
+    pub fn get(&mut self, scroll_top: u32) -> Option<&[StickyScrollLine]> {
+        if self.entries.contains_key(&scroll_top) {
+            self.hits += 1;
+            self.entries.get(&scroll_top).map(|v| v.as_slice())
+        } else {
+            self.misses += 1;
+            None
+        }
+    }
+
+    /// Store lines for a scroll position.
+    pub fn put(&mut self, scroll_top: u32, lines: Vec<StickyScrollLine>) {
+        if self.entries.len() >= self.capacity && !self.entries.contains_key(&scroll_top) {
+            // Evict the first key we find (simple eviction)
+            if let Some(key) = self.entries.keys().next().copied() {
+                self.entries.remove(&key);
+            }
+        }
+        self.entries.insert(scroll_top, lines);
+    }
+
+    /// Invalidate all cached entries.
+    pub fn invalidate(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Number of cached entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns true if the cache is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Cache hit rate as a fraction.
+    pub fn hit_rate(&self) -> f64 {
+        let total = self.hits + self.misses;
+        if total == 0 {
+            0.0
+        } else {
+            self.hits as f64 / total as f64
+        }
+    }
+}
+
+impl fmt::Display for StickyScrollCache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Cache({} entries, {:.1}% hit rate)",
+            self.len(),
+            self.hit_rate() * 100.0
+        )
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1493,5 +1720,76 @@ mod tests {
         ];
         let filtered = filter_by_max_depth(&lines, 1);
         assert_eq!(filtered.len(), 2);
+    }
+
+    #[test]
+    fn sticky_scroll_context_from_lines() {
+        let lines = vec![
+            StickyScrollLine::new(1, "fn main() {", 0),
+            StickyScrollLine::new(5, "  if true {", 1),
+            StickyScrollLine::new(10, "    for x in items {", 2),
+        ];
+        let ctx = StickyScrollContext::from_lines(lines);
+        assert_eq!(ctx.depth(), 3);
+        assert!(!ctx.is_top_level());
+        assert_eq!(ctx.parent().unwrap().nesting_level, 2);
+        assert_eq!(ctx.outermost_text(), Some("fn main() {"));
+        assert_eq!(ctx.at_depth(1).unwrap().line_number, 5);
+    }
+
+    #[test]
+    fn sticky_scroll_context_empty() {
+        let ctx = StickyScrollContext::empty();
+        assert!(ctx.is_top_level());
+        assert_eq!(ctx.depth(), 0);
+        assert!(ctx.parent().is_none());
+        assert!(ctx.outermost_text().is_none());
+    }
+
+    #[test]
+    fn sticky_scroll_animator_transitions() {
+        let mut anim = StickyScrollAnimator::new(0.0, 100.0, 200);
+        assert!(!anim.is_complete());
+        assert_eq!(anim.current_offset(), 0.0);
+        anim.tick(100);
+        assert!(!anim.is_complete());
+        assert!(anim.current_offset() > 0.0);
+        assert!(anim.current_offset() < 100.0);
+        anim.tick(200);
+        assert!(anim.is_complete());
+        assert!((anim.current_offset() - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn sticky_scroll_animator_restart() {
+        let mut anim = StickyScrollAnimator::new(0.0, 50.0, 100);
+        anim.tick(100);
+        assert!(anim.is_complete());
+        anim.start();
+        assert!(!anim.is_complete());
+        assert_eq!(anim.current_offset(), 0.0);
+    }
+
+    #[test]
+    fn sticky_scroll_cache_hit_miss() {
+        let mut cache = StickyScrollCache::new(10);
+        assert!(cache.is_empty());
+        cache.put(0, vec![StickyScrollLine::new(1, "fn main() {", 0)]);
+        assert_eq!(cache.len(), 1);
+        assert!(cache.get(0).is_some());
+        assert!(cache.get(99).is_none());
+        assert!(cache.hit_rate() > 0.0);
+        cache.invalidate();
+        assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn sticky_scroll_cache_eviction() {
+        let mut cache = StickyScrollCache::new(2);
+        cache.put(0, vec![]);
+        cache.put(1, vec![]);
+        assert_eq!(cache.len(), 2);
+        cache.put(2, vec![]);
+        assert_eq!(cache.len(), 2); // one was evicted
     }
 }

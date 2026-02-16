@@ -845,6 +845,211 @@ pub fn checksum_format(checksum: &str, algorithm: &str) -> String {
     format!("{algorithm}:{checksum}")
 }
 
+
+// ---------------------------------------------------------------------------
+// ChecksumManifestReport - integrity report for manifest verification
+// ---------------------------------------------------------------------------
+
+/// Report produced by verifying a checksum manifest against actual data.
+#[derive(Debug, Clone, Default)]
+pub struct ChecksumManifestReport {
+    pub passed: usize,
+    pub failed: usize,
+    pub missing: usize,
+    details: Vec<ManifestVerifyDetail>,
+}
+
+/// Detail of a single manifest verification.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ManifestVerifyDetail {
+    pub path: String,
+    pub status: ManifestVerifyStatus,
+}
+
+/// Status of a single manifest entry verification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ManifestVerifyStatus {
+    /// Checksum matched.
+    Passed,
+    /// Checksum did not match.
+    Failed { expected: String, actual: String },
+    /// Path was in manifest but not provided for verification.
+    Missing,
+}
+
+impl ChecksumManifestReport {
+    /// Create a new empty report.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a passed verification.
+    pub fn record_pass(&mut self, path: impl Into<String>) {
+        self.passed += 1;
+        self.details.push(ManifestVerifyDetail {
+            path: path.into(),
+            status: ManifestVerifyStatus::Passed,
+        });
+    }
+
+    /// Record a failed verification.
+    pub fn record_fail(&mut self, path: impl Into<String>, expected: &str, actual: &str) {
+        self.failed += 1;
+        self.details.push(ManifestVerifyDetail {
+            path: path.into(),
+            status: ManifestVerifyStatus::Failed {
+                expected: expected.to_string(),
+                actual: actual.to_string(),
+            },
+        });
+    }
+
+    /// Record a missing path.
+    pub fn record_missing(&mut self, path: impl Into<String>) {
+        self.missing += 1;
+        self.details.push(ManifestVerifyDetail {
+            path: path.into(),
+            status: ManifestVerifyStatus::Missing,
+        });
+    }
+
+    /// Returns true if all checks passed.
+    pub fn all_passed(&self) -> bool {
+        self.failed == 0 && self.missing == 0
+    }
+
+    /// Total number of entries checked.
+    pub fn total_checked(&self) -> usize {
+        self.passed + self.failed + self.missing
+    }
+
+    /// Retrieve all details.
+    pub fn details(&self) -> &[ManifestVerifyDetail] {
+        &self.details
+    }
+
+    /// Retrieve only the failed paths.
+    pub fn failed_paths(&self) -> Vec<&str> {
+        self.details
+            .iter()
+            .filter(|d| matches!(d.status, ManifestVerifyStatus::Failed { .. }))
+            .map(|d| d.path.as_str())
+            .collect()
+    }
+}
+
+impl fmt::Display for ChecksumManifestReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ManifestReport(passed={}, failed={}, missing={})",
+            self.passed, self.failed, self.missing
+        )
+    }
+}
+
+/// Verify all entries in a manifest against provided actual checksums.
+pub fn verify_manifest(
+    manifest: &ChecksumManifest,
+    actual_checksums: &HashMap<String, String>,
+) -> ChecksumManifestReport {
+    let mut report = ChecksumManifestReport::new();
+    for (path, entry) in &manifest.entries {
+        match actual_checksums.get(path) {
+            Some(actual) => {
+                if entry.checksum.eq_ignore_ascii_case(actual) {
+                    report.record_pass(path);
+                } else {
+                    report.record_fail(path, &entry.checksum, actual);
+                }
+            }
+            None => {
+                report.record_missing(path);
+            }
+        }
+    }
+    report
+}
+
+// ---------------------------------------------------------------------------
+// RollingChecksum - rolling hash for streaming data
+// ---------------------------------------------------------------------------
+
+/// A rolling hash (Adler-32 style) for streaming data.
+#[derive(Debug, Clone)]
+pub struct RollingChecksum {
+    a: u32,
+    b: u32,
+    window: Vec<u8>,
+    window_size: usize,
+    pos: usize,
+    count: u64,
+}
+
+impl RollingChecksum {
+    /// Create a new rolling checksum with the given window size.
+    pub fn new(window_size: usize) -> Self {
+        let ws = window_size.max(1);
+        Self {
+            a: 1,
+            b: 0,
+            window: vec![0u8; ws],
+            window_size: ws,
+            pos: 0,
+            count: 0,
+        }
+    }
+
+    /// Push a byte into the rolling window.
+    pub fn push(&mut self, byte: u8) {
+        let old = self.window[self.pos % self.window_size];
+        self.window[self.pos % self.window_size] = byte;
+        self.pos += 1;
+
+        if self.count >= self.window_size as u64 {
+            self.a = self.a.wrapping_add(byte as u32).wrapping_sub(old as u32);
+            self.b = self.b.wrapping_add(self.a).wrapping_sub(
+                (self.window_size as u32).wrapping_mul(old as u32).wrapping_add(1),
+            );
+        } else {
+            self.a = self.a.wrapping_add(byte as u32);
+            self.b = self.b.wrapping_add(self.a);
+        }
+        self.count += 1;
+    }
+
+    /// Push a slice of bytes.
+    pub fn push_bytes(&mut self, data: &[u8]) {
+        for &b in data {
+            self.push(b);
+        }
+    }
+
+    /// Current checksum value.
+    pub fn value(&self) -> u32 {
+        (self.b << 16) | (self.a & 0xffff)
+    }
+
+    /// Number of bytes fed.
+    pub fn bytes_fed(&self) -> u64 {
+        self.count
+    }
+
+    /// Reset the rolling checksum.
+    pub fn reset(&mut self) {
+        self.a = 1;
+        self.b = 0;
+        self.window.fill(0);
+        self.pos = 0;
+        self.count = 0;
+    }
+}
+
+impl fmt::Display for RollingChecksum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RollingChecksum(window={}, fed={}, value={:#010x})", self.window_size, self.count, self.value())
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1487,5 +1692,73 @@ mod tests {
         assert_ne!(d1, d3);
         cache.clear();
         assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn manifest_report_all_passed() {
+        let mut manifest = ChecksumManifest::new();
+        manifest.add_entry("a.txt", "sha256", "aabb", 100);
+        manifest.add_entry("b.txt", "sha256", "ccdd", 200);
+        let mut actual = HashMap::new();
+        actual.insert("a.txt".to_string(), "aabb".to_string());
+        actual.insert("b.txt".to_string(), "ccdd".to_string());
+        let report = verify_manifest(&manifest, &actual);
+        assert!(report.all_passed());
+        assert_eq!(report.passed, 2);
+        assert_eq!(report.total_checked(), 2);
+    }
+
+    #[test]
+    fn manifest_report_with_failures() {
+        let mut manifest = ChecksumManifest::new();
+        manifest.add_entry("a.txt", "sha256", "aabb", 100);
+        let mut actual = HashMap::new();
+        actual.insert("a.txt".to_string(), "xxxx".to_string());
+        let report = verify_manifest(&manifest, &actual);
+        assert!(!report.all_passed());
+        assert_eq!(report.failed, 1);
+        assert_eq!(report.failed_paths(), vec!["a.txt"]);
+    }
+
+    #[test]
+    fn manifest_report_missing_entries() {
+        let mut manifest = ChecksumManifest::new();
+        manifest.add_entry("a.txt", "sha256", "aabb", 100);
+        let actual = HashMap::new();
+        let report = verify_manifest(&manifest, &actual);
+        assert_eq!(report.missing, 1);
+        assert!(!report.all_passed());
+    }
+
+    #[test]
+    fn manifest_report_display() {
+        let mut report = ChecksumManifestReport::new();
+        report.record_pass("ok.txt");
+        report.record_fail("bad.txt", "aa", "bb");
+        let s = format!("{report}");
+        assert!(s.contains("passed=1"));
+        assert!(s.contains("failed=1"));
+    }
+
+    #[test]
+    fn rolling_checksum_deterministic() {
+        let mut rc = RollingChecksum::new(4);
+        rc.push_bytes(b"hello");
+        let v1 = rc.value();
+        rc.reset();
+        rc.push_bytes(b"hello");
+        assert_eq!(v1, rc.value());
+        assert_eq!(rc.bytes_fed(), 5);
+    }
+
+    #[test]
+    fn rolling_checksum_different_data() {
+        let mut rc1 = RollingChecksum::new(8);
+        rc1.push_bytes(b"aaaaaaaa");
+        let mut rc2 = RollingChecksum::new(8);
+        rc2.push_bytes(b"bbbbbbbb");
+        assert_ne!(rc1.value(), rc2.value());
+        let s = format!("{rc1}");
+        assert!(s.contains("window=8"));
     }
 }

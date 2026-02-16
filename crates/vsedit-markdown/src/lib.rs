@@ -1006,6 +1006,142 @@ pub fn estimated_reading_time(text: &str) -> f64 {
     word_count as f64 / 200.0
 }
 
+// ---------------------------------------------------------------------------
+// MarkdownDocument
+// ---------------------------------------------------------------------------
+
+/// A parsed Markdown document wrapping a token list.
+#[derive(Debug, Clone)]
+pub struct MarkdownDocument {
+    pub tokens: Vec<MarkdownToken>,
+}
+
+impl MarkdownDocument {
+    pub fn parse(text: &str) -> Self {
+        Self { tokens: tokenize_block(text) }
+    }
+
+    pub fn from_tokens(tokens: Vec<MarkdownToken>) -> Self {
+        Self { tokens }
+    }
+
+    /// Returns all heading tokens.
+    pub fn headings(&self) -> Vec<(u8, &str)> {
+        self.tokens.iter().filter_map(|t| match t {
+            MarkdownToken::Heading(level, text) => Some((*level, text.as_str())),
+            _ => None,
+        }).collect()
+    }
+
+    /// Returns all links as (text, url) pairs.
+    pub fn links(&self) -> Vec<(&str, &str)> {
+        self.tokens.iter().filter_map(|t| match t {
+            MarkdownToken::Link(text, url) => Some((text.as_str(), url.as_str())),
+            _ => None,
+        }).collect()
+    }
+
+    /// Returns all code blocks.
+    pub fn code_blocks(&self) -> Vec<&str> {
+        self.tokens.iter().filter_map(|t| match t {
+            MarkdownToken::CodeBlock(code, _) => Some(code.as_str()),
+            _ => None,
+        }).collect()
+    }
+
+    /// Counts words across all text-like tokens.
+    pub fn word_count(&self) -> usize {
+        self.tokens.iter().map(|t| match t {
+            MarkdownToken::Text(s) | MarkdownToken::Bold(s) | MarkdownToken::Italic(s)
+            | MarkdownToken::Heading(_, s) | MarkdownToken::ListItemMd(s) => {
+                s.split_whitespace().count()
+            }
+            _ => 0,
+        }).sum()
+    }
+
+    /// Returns a plain-text summary truncated to `max_len` characters.
+    pub fn summary(&self, max_len: usize) -> String {
+        let full = render_to_plain_text(&self.tokens);
+        if full.len() <= max_len {
+            full
+        } else {
+            let mut s = full[..max_len].to_string();
+            s.push('…');
+            s
+        }
+    }
+
+    pub fn token_count(&self) -> usize {
+        self.tokens.len()
+    }
+}
+
+impl std::fmt::Display for MarkdownDocument {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MarkdownDocument({} tokens, {} words)", self.token_count(), self.word_count())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TableOfContents
+// ---------------------------------------------------------------------------
+
+/// An entry in the table of contents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TocEntry {
+    pub level: u8,
+    pub title: String,
+}
+
+impl std::fmt::Display for TocEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let indent = "  ".repeat((self.level.saturating_sub(1)) as usize);
+        write!(f, "{indent}- {}", self.title)
+    }
+}
+
+/// Table of contents built from document headings.
+#[derive(Debug, Clone)]
+pub struct TableOfContents {
+    pub entries: Vec<TocEntry>,
+}
+
+impl TableOfContents {
+    /// Build a ToC from a list of tokens.
+    pub fn from_tokens(tokens: &[MarkdownToken]) -> Self {
+        let entries = tokens.iter().filter_map(|t| match t {
+            MarkdownToken::Heading(level, text) => Some(TocEntry {
+                level: *level,
+                title: text.clone(),
+            }),
+            _ => None,
+        }).collect();
+        Self { entries }
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn max_depth(&self) -> u8 {
+        self.entries.iter().map(|e| e.level).max().unwrap_or(0)
+    }
+}
+
+impl std::fmt::Display for TableOfContents {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for entry in &self.entries {
+            writeln!(f, "{entry}")?;
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1445,5 +1581,63 @@ mod tests {
         let text = (0..400).map(|_| "word").collect::<Vec<_>>().join(" ");
         let time = estimated_reading_time(&text);
         assert!((time - 2.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_markdown_document_parse() {
+        let doc = MarkdownDocument::parse("# Title\n\nHello **world**\n\n## Section\n\nSome text");
+        assert!(doc.token_count() > 0);
+        let headings = doc.headings();
+        assert_eq!(headings.len(), 2);
+        assert_eq!(headings[0], (1, "Title"));
+        assert_eq!(headings[1], (2, "Section"));
+        assert!(doc.word_count() > 0);
+        assert!(format!("{doc}").contains("tokens"));
+    }
+
+    #[test]
+    fn test_markdown_document_links() {
+        let doc = MarkdownDocument::parse("[Rust](https://rust-lang.org) and [More](https://example.com)");
+        let links = doc.links();
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0], ("Rust", "https://rust-lang.org"));
+    }
+
+    #[test]
+    fn test_markdown_document_summary() {
+        let doc = MarkdownDocument::parse("Hello world this is a long document with many words");
+        let summary = doc.summary(10);
+        assert!(summary.len() <= 15); // includes multi-byte ellipsis
+        assert!(summary.ends_with('…'));
+    }
+
+    #[test]
+    fn test_table_of_contents() {
+        let tokens = vec![
+            MarkdownToken::Heading(1, "Introduction".into()),
+            MarkdownToken::Text("Some text".into()),
+            MarkdownToken::Heading(2, "Details".into()),
+            MarkdownToken::Heading(2, "Examples".into()),
+        ];
+        let toc = TableOfContents::from_tokens(&tokens);
+        assert_eq!(toc.len(), 3);
+        assert_eq!(toc.max_depth(), 2);
+        let s = format!("{toc}");
+        assert!(s.contains("Introduction"));
+        assert!(s.contains("  - Details"));
+    }
+
+    #[test]
+    fn test_table_of_contents_empty() {
+        let toc = TableOfContents::from_tokens(&[]);
+        assert!(toc.is_empty());
+        assert_eq!(toc.max_depth(), 0);
+    }
+
+    #[test]
+    fn test_toc_entry_display() {
+        let entry = TocEntry { level: 3, title: "Sub-section".into() };
+        let s = format!("{entry}");
+        assert!(s.contains("    - Sub-section"));
     }
 }

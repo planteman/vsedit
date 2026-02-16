@@ -875,6 +875,184 @@ impl Default for ExtensionBrowserView {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ViewRegistry – typed panel management
+// ---------------------------------------------------------------------------
+
+/// Registry that tracks panels by id and supports type-based lookups.
+pub struct ViewRegistry {
+    panels: Vec<WebviewPanel>,
+}
+
+impl ViewRegistry {
+    pub fn new() -> Self {
+        Self { panels: Vec::new() }
+    }
+
+    pub fn register(&mut self, panel: WebviewPanel) {
+        if !self.panels.iter().any(|p| p.id == panel.id) {
+            self.panels.push(panel);
+        }
+    }
+
+    pub fn unregister(&mut self, id: &str) -> Option<WebviewPanel> {
+        if let Some(idx) = self.panels.iter().position(|p| p.id == id) {
+            Some(self.panels.remove(idx))
+        } else {
+            None
+        }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&WebviewPanel> {
+        self.panels.iter().find(|p| p.id == id)
+    }
+
+    pub fn list(&self) -> &[WebviewPanel] {
+        &self.panels
+    }
+
+    pub fn find_by_type(&self, view_type: &str) -> Vec<&WebviewPanel> {
+        self.panels.iter().filter(|p| p.view_type == view_type).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.panels.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.panels.is_empty()
+    }
+
+    pub fn visible_panels(&self) -> Vec<&WebviewPanel> {
+        self.panels.iter().filter(|p| p.is_visible).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewMessageRouter – dispatch messages to handlers
+// ---------------------------------------------------------------------------
+
+/// A handler function type for view messages.
+pub type ViewMessageHandler = Box<dyn Fn(&ViewMessage) -> Option<serde_json::Value>>;
+
+/// Routes ViewMessages to registered handler functions by message type name.
+pub struct ViewMessageRouter {
+    handlers: Vec<(String, ViewMessageHandler)>,
+}
+
+impl ViewMessageRouter {
+    pub fn new() -> Self {
+        Self { handlers: Vec::new() }
+    }
+
+    /// Register a handler for a specific message type name.
+    pub fn register_handler(&mut self, msg_type: impl Into<String>, handler: ViewMessageHandler) {
+        self.handlers.push((msg_type.into(), handler));
+    }
+
+    fn message_type_name(msg: &ViewMessage) -> &'static str {
+        match msg {
+            ViewMessage::CreateWebviewPanel { .. } => "CreateWebviewPanel",
+            ViewMessage::DisposePanel { .. } => "DisposePanel",
+            ViewMessage::RevealPanel { .. } => "RevealPanel",
+            ViewMessage::SetTitle { .. } => "SetTitle",
+            ViewMessage::SetHtml { .. } => "SetHtml",
+        }
+    }
+
+    /// Dispatch a message. Returns the response from the first matching handler.
+    pub fn dispatch(&self, msg: &ViewMessage) -> Option<serde_json::Value> {
+        let type_name = Self::message_type_name(msg);
+        for (pattern, handler) in &self.handlers {
+            if pattern == type_name {
+                return handler(msg);
+            }
+        }
+        None
+    }
+
+    pub fn handler_count(&self) -> usize {
+        self.handlers.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewLayoutManager – track panel positions
+// ---------------------------------------------------------------------------
+
+/// Tracks panel layout across columns with visibility state.
+pub struct ViewLayoutManager {
+    column_panels: Vec<Vec<String>>,
+    hidden: Vec<String>,
+}
+
+impl ViewLayoutManager {
+    /// Create a layout manager with the given number of columns.
+    pub fn new(columns: usize) -> Self {
+        Self {
+            column_panels: vec![Vec::new(); columns],
+            hidden: Vec::new(),
+        }
+    }
+
+    /// Assign a panel id to a column (0-indexed).
+    pub fn assign(&mut self, panel_id: impl Into<String>, column: usize) {
+        let id = panel_id.into();
+        self.remove_panel(&id);
+        if column < self.column_panels.len() {
+            self.column_panels[column].push(id);
+        }
+    }
+
+    /// Hide a panel (remove from column, add to hidden list).
+    pub fn hide(&mut self, panel_id: &str) {
+        for col in &mut self.column_panels {
+            col.retain(|id| id != panel_id);
+        }
+        if !self.hidden.contains(&panel_id.to_string()) {
+            self.hidden.push(panel_id.to_string());
+        }
+    }
+
+    /// Show a hidden panel, placing it in the given column.
+    pub fn show(&mut self, panel_id: &str, column: usize) {
+        self.hidden.retain(|id| id != panel_id);
+        self.assign(panel_id, column);
+    }
+
+    /// Get panels in a specific column.
+    pub fn panels_in_column(&self, column: usize) -> &[String] {
+        self.column_panels.get(column).map_or(&[], |v| v.as_slice())
+    }
+
+    /// Number of columns.
+    pub fn column_count(&self) -> usize {
+        self.column_panels.len()
+    }
+
+    /// Total visible panels.
+    pub fn visible_count(&self) -> usize {
+        self.column_panels.iter().map(|c| c.len()).sum()
+    }
+
+    /// Total hidden panels.
+    pub fn hidden_count(&self) -> usize {
+        self.hidden.len()
+    }
+
+    fn remove_panel(&mut self, id: &str) {
+        for col in &mut self.column_panels {
+            col.retain(|pid| pid != id);
+        }
+        self.hidden.retain(|pid| pid != id);
+    }
+
+    /// Check if a panel is visible (in any column).
+    pub fn is_panel_visible(&self, panel_id: &str) -> bool {
+        self.column_panels.iter().any(|col| col.iter().any(|id| id == panel_id))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1455,5 +1633,81 @@ mod tests {
     fn browser_view_default_impl() {
         let view = ExtensionBrowserView::default();
         assert_eq!(view.active_tab, ExtensionTab::Installed);
+    }
+
+    fn make_panel(id: &str, vtype: &str, col: ViewColumn) -> WebviewPanel {
+        WebviewPanel {
+            id: id.to_string(),
+            view_type: vtype.to_string(),
+            title: id.to_string(),
+            column: col,
+            html: String::new(),
+            is_visible: true,
+        }
+    }
+
+    #[test]
+    fn test_view_registry_register_and_find() {
+        let mut reg = ViewRegistry::new();
+        reg.register(make_panel("p1", "markdown", ViewColumn::One));
+        reg.register(make_panel("p2", "terminal", ViewColumn::Two));
+        assert_eq!(reg.len(), 2);
+        assert!(reg.get("p1").is_some());
+        assert_eq!(reg.find_by_type("markdown").len(), 1);
+    }
+
+    #[test]
+    fn test_view_registry_unregister() {
+        let mut reg = ViewRegistry::new();
+        reg.register(make_panel("p1", "md", ViewColumn::One));
+        let removed = reg.unregister("p1");
+        assert!(removed.is_some());
+        assert!(reg.is_empty());
+        assert!(reg.unregister("p1").is_none());
+    }
+
+    #[test]
+    fn test_view_message_router_dispatch() {
+        let mut router = ViewMessageRouter::new();
+        router.register_handler("SetTitle", Box::new(|_msg| {
+            Some(serde_json::json!({"reply": "ok"}))
+        }));
+        let msg = ViewMessage::SetTitle {
+            panel_id: "p1".into(),
+            title: "New Title".into(),
+        };
+        let resp = router.dispatch(&msg);
+        assert!(resp.is_some());
+        assert_eq!(resp.unwrap()["reply"], "ok");
+    }
+
+    #[test]
+    fn test_view_message_router_no_match() {
+        let router = ViewMessageRouter::new();
+        let msg = ViewMessage::DisposePanel { panel_id: "p1".into() };
+        assert!(router.dispatch(&msg).is_none());
+    }
+
+    #[test]
+    fn test_view_layout_manager_assign_and_hide() {
+        let mut layout = ViewLayoutManager::new(3);
+        layout.assign("p1", 0);
+        layout.assign("p2", 1);
+        assert_eq!(layout.visible_count(), 2);
+        assert!(layout.is_panel_visible("p1"));
+        layout.hide("p1");
+        assert!(!layout.is_panel_visible("p1"));
+        assert_eq!(layout.hidden_count(), 1);
+    }
+
+    #[test]
+    fn test_view_layout_manager_show() {
+        let mut layout = ViewLayoutManager::new(2);
+        layout.assign("p1", 0);
+        layout.hide("p1");
+        assert_eq!(layout.visible_count(), 0);
+        layout.show("p1", 1);
+        assert!(layout.is_panel_visible("p1"));
+        assert_eq!(layout.panels_in_column(1), &["p1".to_string()]);
     }
 }

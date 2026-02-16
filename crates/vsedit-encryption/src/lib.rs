@@ -897,6 +897,230 @@ impl EncryptionAuditLog {
     }
 }
 
+// ---------------------------------------------------------------------------
+// EncryptionConfig – builder-pattern configuration
+// ---------------------------------------------------------------------------
+
+/// Algorithm selection for the encryption service.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EncryptionAlgorithm {
+    Xor,
+    DoubleXor,
+    SubstitutionXor,
+}
+
+impl fmt::Display for EncryptionAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Xor => write!(f, "XOR"),
+            Self::DoubleXor => write!(f, "Double-XOR"),
+            Self::SubstitutionXor => write!(f, "Substitution-XOR"),
+        }
+    }
+}
+
+/// Configuration for an encryption service instance with algorithm selection.
+#[derive(Debug, Clone)]
+pub struct EncryptionServiceConfig {
+    pub algorithm: EncryptionAlgorithm,
+    pub key_rotation_interval: u64,
+    pub max_payload_size: usize,
+    pub audit_enabled: bool,
+}
+
+impl Default for EncryptionServiceConfig {
+    fn default() -> Self {
+        Self {
+            algorithm: EncryptionAlgorithm::Xor,
+            key_rotation_interval: 3600,
+            max_payload_size: 10 * 1024 * 1024,
+            audit_enabled: true,
+        }
+    }
+}
+
+impl fmt::Display for EncryptionServiceConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "EncryptionServiceConfig(algo={}, rotation={}s, max={}B, audit={})",
+            self.algorithm, self.key_rotation_interval, self.max_payload_size, self.audit_enabled
+        )
+    }
+}
+
+/// Builder for [`EncryptionServiceConfig`].
+pub struct EncryptionServiceConfigBuilder {
+    config: EncryptionServiceConfig,
+}
+
+impl EncryptionServiceConfigBuilder {
+    pub fn new() -> Self {
+        Self { config: EncryptionServiceConfig::default() }
+    }
+
+    pub fn algorithm(mut self, algo: EncryptionAlgorithm) -> Self {
+        self.config.algorithm = algo;
+        self
+    }
+
+    pub fn key_rotation_interval(mut self, secs: u64) -> Self {
+        self.config.key_rotation_interval = secs;
+        self
+    }
+
+    pub fn max_payload_size(mut self, bytes: usize) -> Self {
+        self.config.max_payload_size = bytes;
+        self
+    }
+
+    pub fn audit_enabled(mut self, enabled: bool) -> Self {
+        self.config.audit_enabled = enabled;
+        self
+    }
+
+    pub fn build(self) -> EncryptionServiceConfig {
+        self.config
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeyRing – manages multiple named keys
+// ---------------------------------------------------------------------------
+
+/// A named encryption key.
+#[derive(Debug, Clone)]
+pub struct NamedKey {
+    pub name: String,
+    pub key: Vec<u8>,
+    pub created_epoch: u64,
+}
+
+/// Manages multiple named encryption keys.
+#[derive(Debug, Clone)]
+pub struct KeyRing {
+    keys: Vec<NamedKey>,
+    active: Option<String>,
+}
+
+impl KeyRing {
+    pub fn new() -> Self {
+        Self { keys: Vec::new(), active: None }
+    }
+
+    pub fn add(&mut self, name: impl Into<String>, key: Vec<u8>) {
+        let name = name.into();
+        if !self.keys.iter().any(|k| k.name == name) {
+            if self.keys.is_empty() {
+                self.active = Some(name.clone());
+            }
+            self.keys.push(NamedKey { name, key, created_epoch: 0 });
+        }
+    }
+
+    pub fn remove(&mut self, name: &str) -> bool {
+        let len = self.keys.len();
+        self.keys.retain(|k| k.name != name);
+        if self.active.as_deref() == Some(name) {
+            self.active = self.keys.first().map(|k| k.name.clone());
+        }
+        self.keys.len() < len
+    }
+
+    pub fn get(&self, name: &str) -> Option<&[u8]> {
+        self.keys.iter().find(|k| k.name == name).map(|k| k.key.as_slice())
+    }
+
+    pub fn active_key(&self) -> Option<&[u8]> {
+        self.active.as_ref().and_then(|name| self.get(name))
+    }
+
+    pub fn set_active(&mut self, name: &str) -> bool {
+        if self.keys.iter().any(|k| k.name == name) {
+            self.active = Some(name.to_string());
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn list_names(&self) -> Vec<&str> {
+        self.keys.iter().map(|k| k.name.as_str()).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.keys.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.keys.is_empty()
+    }
+
+    pub fn rotate(&mut self, name: &str, new_key: Vec<u8>) -> bool {
+        if let Some(k) = self.keys.iter_mut().find(|k| k.name == name) {
+            k.key = new_key;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl fmt::Display for KeyRing {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "KeyRing({} keys, active={:?})",
+            self.keys.len(),
+            self.active
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EncryptionThroughputStats
+// ---------------------------------------------------------------------------
+
+/// Tracks encryption/decryption throughput statistics.
+#[derive(Debug, Clone, Default)]
+pub struct EncryptionThroughputStats {
+    pub encrypt_count: u64,
+    pub decrypt_count: u64,
+    pub bytes_encrypted: u64,
+    pub bytes_decrypted: u64,
+}
+
+impl EncryptionThroughputStats {
+    pub fn record_encrypt(&mut self, bytes: u64) {
+        self.encrypt_count += 1;
+        self.bytes_encrypted += bytes;
+    }
+
+    pub fn record_decrypt(&mut self, bytes: u64) {
+        self.decrypt_count += 1;
+        self.bytes_decrypted += bytes;
+    }
+
+    pub fn total_operations(&self) -> u64 {
+        self.encrypt_count + self.decrypt_count
+    }
+
+    pub fn total_bytes(&self) -> u64 {
+        self.bytes_encrypted + self.bytes_decrypted
+    }
+}
+
+impl fmt::Display for EncryptionThroughputStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "EncryptionThroughputStats(enc={}/{} bytes, dec={}/{} bytes)",
+            self.encrypt_count, self.bytes_encrypted,
+            self.decrypt_count, self.bytes_decrypted
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1435,5 +1659,78 @@ mod tests {
         log.log_operation("decrypt", 1001, true);
         assert_eq!(log.len(), 2);
         assert_eq!(log.filter_by_operation("encrypt").len(), 1);
+    }
+
+    #[test]
+    fn test_encryption_config_builder() {
+        let cfg = EncryptionServiceConfigBuilder::new()
+            .algorithm(EncryptionAlgorithm::DoubleXor)
+            .key_rotation_interval(7200)
+            .max_payload_size(1024)
+            .audit_enabled(false)
+            .build();
+        assert_eq!(cfg.algorithm, EncryptionAlgorithm::DoubleXor);
+        assert_eq!(cfg.key_rotation_interval, 7200);
+        assert_eq!(cfg.max_payload_size, 1024);
+        assert!(!cfg.audit_enabled);
+        assert!(format!("{cfg}").contains("Double-XOR"));
+    }
+
+    #[test]
+    fn test_encryption_config_default() {
+        let cfg = EncryptionServiceConfig::default();
+        assert_eq!(cfg.algorithm, EncryptionAlgorithm::Xor);
+        assert!(cfg.audit_enabled);
+    }
+
+    #[test]
+    fn test_keyring_operations() {
+        let mut ring = KeyRing::new();
+        assert!(ring.is_empty());
+        ring.add("primary", vec![1, 2, 3]);
+        ring.add("backup", vec![4, 5, 6]);
+        assert_eq!(ring.len(), 2);
+        assert_eq!(ring.list_names(), vec!["primary", "backup"]);
+        assert_eq!(ring.get("primary"), Some([1u8, 2, 3].as_slice()));
+        assert_eq!(ring.active_key(), Some([1u8, 2, 3].as_slice()));
+        assert!(ring.set_active("backup"));
+        assert_eq!(ring.active_key(), Some([4u8, 5, 6].as_slice()));
+        assert!(ring.remove("primary"));
+        assert_eq!(ring.len(), 1);
+        assert!(format!("{ring}").contains("1 keys"));
+    }
+
+    #[test]
+    fn test_keyring_rotate() {
+        let mut ring = KeyRing::new();
+        ring.add("k1", vec![10, 20]);
+        assert!(ring.rotate("k1", vec![30, 40]));
+        assert_eq!(ring.get("k1"), Some([30u8, 40].as_slice()));
+        assert!(!ring.rotate("missing", vec![1]));
+    }
+
+    #[test]
+    fn test_keyring_duplicate_add() {
+        let mut ring = KeyRing::new();
+        ring.add("k1", vec![1]);
+        ring.add("k1", vec![2]);
+        assert_eq!(ring.len(), 1);
+        assert_eq!(ring.get("k1"), Some([1u8].as_slice()));
+    }
+
+    #[test]
+    fn test_encryption_throughput_stats() {
+        let mut stats = EncryptionThroughputStats::default();
+        stats.record_encrypt(100);
+        stats.record_encrypt(200);
+        stats.record_decrypt(150);
+        assert_eq!(stats.encrypt_count, 2);
+        assert_eq!(stats.decrypt_count, 1);
+        assert_eq!(stats.total_operations(), 3);
+        assert_eq!(stats.total_bytes(), 450);
+        assert_eq!(stats.bytes_encrypted, 300);
+        let s = format!("{stats}");
+        assert!(s.contains("enc=2/300"));
+        assert!(s.contains("dec=1/150"));
     }
 }

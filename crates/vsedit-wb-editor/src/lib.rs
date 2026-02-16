@@ -902,6 +902,205 @@ pub fn find_duplicate_uris(tabs: &[EditorTabInfo]) -> Vec<String> {
     dupes
 }
 
+// ---------------------------------------------------------------------------
+// EditorGroupManager – manages multiple EditorGroups
+// ---------------------------------------------------------------------------
+
+/// Manages a collection of editor groups with tab-level operations.
+pub struct EditorGroupManager {
+    groups: Vec<(u64, EditorGroup)>,
+    next_id: u64,
+    active: Option<u64>,
+}
+
+impl EditorGroupManager {
+    pub fn new() -> Self {
+        Self { groups: Vec::new(), next_id: 1, active: None }
+    }
+
+    /// Create a new empty group and return its id.
+    pub fn create_group(&mut self) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        let group = EditorGroup {
+            id,
+            editors: Vec::new(),
+            active_editor: None,
+        };
+        self.groups.push((id, group));
+        if self.active.is_none() {
+            self.active = Some(id);
+        }
+        id
+    }
+
+    /// Remove a group by id, returning true if found.
+    pub fn remove_group(&mut self, id: u64) -> bool {
+        let before = self.groups.len();
+        self.groups.retain(|(gid, _)| *gid != id);
+        if self.active == Some(id) {
+            self.active = self.groups.first().map(|(gid, _)| *gid);
+        }
+        self.groups.len() < before
+    }
+
+    /// Move a tab identified by URI from one group to another.
+    pub fn move_tab(&mut self, from_group: u64, to_group: u64, uri: &str) -> Result<(), EditorError> {
+        let tab = {
+            let src = self.groups.iter_mut().find(|(id, _)| *id == from_group)
+                .ok_or(EditorError::GroupNotFound(from_group))?;
+            let idx = src.1.editors.iter().position(|t| t.uri == uri)
+                .ok_or(EditorError::TabNotFound { group_id: from_group, uri: uri.to_string() })?;
+            src.1.editors.remove(idx)
+        };
+        let dst = self.groups.iter_mut().find(|(id, _)| *id == to_group)
+            .ok_or(EditorError::GroupNotFound(to_group))?;
+        dst.1.editors.push(tab);
+        Ok(())
+    }
+
+    /// Return the id of the active group.
+    pub fn active_group(&self) -> Option<u64> {
+        self.active
+    }
+
+    /// Set the active group id.
+    pub fn set_active_group(&mut self, id: u64) {
+        if self.groups.iter().any(|(gid, _)| *gid == id) {
+            self.active = Some(id);
+        }
+    }
+
+    /// Number of groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Collect all tab URIs across every group.
+    pub fn all_tabs(&self) -> Vec<&str> {
+        self.groups.iter()
+            .flat_map(|(_, g)| g.editors.iter().map(|t| t.uri.as_str()))
+            .collect()
+    }
+
+    /// Find which group contains a tab with the given URI.
+    pub fn find_tab_across_groups(&self, uri: &str) -> Option<u64> {
+        self.groups.iter()
+            .find(|(_, g)| g.editors.iter().any(|t| t.uri == uri))
+            .map(|(id, _)| *id)
+    }
+
+    /// Get an immutable reference to a group by id.
+    pub fn get_group(&self, id: u64) -> Option<&EditorGroup> {
+        self.groups.iter().find(|(gid, _)| *gid == id).map(|(_, g)| g)
+    }
+
+    /// Get a mutable reference to a group by id.
+    pub fn get_group_mut(&mut self, id: u64) -> Option<&mut EditorGroup> {
+        self.groups.iter_mut().find(|(gid, _)| *gid == id).map(|(_, g)| g)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TabHistoryTracker – navigation history (back/forward)
+// ---------------------------------------------------------------------------
+
+/// Tracks tab navigation history with back/forward support.
+pub struct TabHistoryTracker {
+    entries: Vec<String>,
+    cursor: usize,
+}
+
+impl TabHistoryTracker {
+    pub fn new() -> Self {
+        Self { entries: Vec::new(), cursor: 0 }
+    }
+
+    /// Push a new URI, truncating any forward history.
+    pub fn push(&mut self, uri: impl Into<String>) {
+        let uri = uri.into();
+        if self.entries.last().map(|s| s.as_str()) == Some(&uri) {
+            return;
+        }
+        if !self.entries.is_empty() && self.cursor < self.entries.len() - 1 {
+            self.entries.truncate(self.cursor + 1);
+        }
+        self.entries.push(uri);
+        self.cursor = self.entries.len() - 1;
+    }
+
+    /// Move back, returning the URI if possible.
+    pub fn back(&mut self) -> Option<&str> {
+        if self.cursor > 0 {
+            self.cursor -= 1;
+            Some(&self.entries[self.cursor])
+        } else {
+            None
+        }
+    }
+
+    /// Move forward, returning the URI if possible.
+    pub fn forward(&mut self) -> Option<&str> {
+        if self.cursor + 1 < self.entries.len() {
+            self.cursor += 1;
+            Some(&self.entries[self.cursor])
+        } else {
+            None
+        }
+    }
+
+    /// Current URI in the history.
+    pub fn current(&self) -> Option<&str> {
+        self.entries.get(self.cursor).map(|s| s.as_str())
+    }
+
+    /// Total number of entries in the history.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorGroupStats – statistics with Display
+// ---------------------------------------------------------------------------
+
+/// Statistics about an editor group.
+pub struct EditorGroupStats {
+    pub open_tabs: usize,
+    pub dirty_count: usize,
+    pub pinned_count: usize,
+    pub preview_count: usize,
+    pub group_id: u64,
+}
+
+impl EditorGroupStats {
+    pub fn from_group(id: u64, group: &EditorGroup) -> Self {
+        Self {
+            group_id: id,
+            open_tabs: group.editors.len(),
+            dirty_count: group.editors.iter().filter(|t| t.dirty).count(),
+            pinned_count: group.editors.iter().filter(|t| t.pinned).count(),
+            preview_count: group.editors.iter().filter(|t| t.preview).count(),
+        }
+    }
+}
+
+impl fmt::Display for EditorGroupStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Group {} — {} tab(s), {} dirty, {} pinned, {} preview",
+            self.group_id, self.open_tabs, self.dirty_count,
+            self.pinned_count, self.preview_count,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1451,5 +1650,91 @@ mod tests {
     fn test_tab_sort_order_display() {
         assert_eq!(format!("{}", TabSortOrder::DirtyFirst), "dirty first");
         assert_eq!(format!("{}", TabSortOrder::PinnedFirst), "pinned first");
+    }
+
+    #[test]
+    fn test_editor_group_manager_create_remove() {
+        let mut mgr = EditorGroupManager::new();
+        let g1 = mgr.create_group();
+        let g2 = mgr.create_group();
+        assert_eq!(mgr.group_count(), 2);
+        assert_eq!(mgr.active_group(), Some(g1));
+        mgr.remove_group(g1);
+        assert_eq!(mgr.group_count(), 1);
+        assert_eq!(mgr.active_group(), Some(g2));
+    }
+
+    #[test]
+    fn test_editor_group_manager_move_tab() {
+        let mut mgr = EditorGroupManager::new();
+        let g1 = mgr.create_group();
+        let g2 = mgr.create_group();
+        let grp = mgr.get_group_mut(g1).unwrap();
+        grp.editors.push(EditorTabInfo {
+            uri: "main.rs".into(), label: "main.rs".into(),
+            dirty: false, pinned: false, preview: false,
+        });
+        mgr.move_tab(g1, g2, "main.rs").unwrap();
+        assert!(mgr.get_group(g1).unwrap().editors.is_empty());
+        assert_eq!(mgr.get_group(g2).unwrap().editors.len(), 1);
+    }
+
+    #[test]
+    fn test_editor_group_manager_find_tab() {
+        let mut mgr = EditorGroupManager::new();
+        let g1 = mgr.create_group();
+        let grp = mgr.get_group_mut(g1).unwrap();
+        grp.editors.push(EditorTabInfo {
+            uri: "lib.rs".into(), label: "lib.rs".into(),
+            dirty: false, pinned: false, preview: false,
+        });
+        assert_eq!(mgr.find_tab_across_groups("lib.rs"), Some(g1));
+        assert_eq!(mgr.find_tab_across_groups("nope.rs"), None);
+        assert_eq!(mgr.all_tabs(), vec!["lib.rs"]);
+    }
+
+    #[test]
+    fn test_tab_history_tracker_push_back_forward() {
+        let mut h = TabHistoryTracker::new();
+        assert!(h.is_empty());
+        h.push("a.rs");
+        h.push("b.rs");
+        h.push("c.rs");
+        assert_eq!(h.len(), 3);
+        assert_eq!(h.current(), Some("c.rs"));
+        assert_eq!(h.back(), Some("b.rs"));
+        assert_eq!(h.back(), Some("a.rs"));
+        assert_eq!(h.forward(), Some("b.rs"));
+    }
+
+    #[test]
+    fn test_tab_history_tracker_truncates_forward() {
+        let mut h = TabHistoryTracker::new();
+        h.push("a.rs");
+        h.push("b.rs");
+        h.push("c.rs");
+        h.back();
+        h.back();
+        h.push("d.rs");
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.current(), Some("d.rs"));
+        assert!(h.forward().is_none());
+    }
+
+    #[test]
+    fn test_editor_group_stats_display() {
+        let group = EditorGroup {
+            id: 42,
+            editors: vec![
+                EditorTabInfo { uri: "a.rs".into(), label: "a".into(), dirty: true, pinned: true, preview: false },
+                EditorTabInfo { uri: "b.rs".into(), label: "b".into(), dirty: false, pinned: false, preview: true },
+            ],
+            active_editor: Some(0),
+        };
+        let stats = EditorGroupStats::from_group(42, &group);
+        let display = format!("{}", stats);
+        assert!(display.contains("42"));
+        assert!(display.contains("2 tab(s)"));
+        assert!(display.contains("1 dirty"));
     }
 }

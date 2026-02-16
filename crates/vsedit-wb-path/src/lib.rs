@@ -798,6 +798,285 @@ pub fn path_join_many(base: &str, segments: &[&str]) -> String {
     result
 }
 
+// ---------------------------------------------------------------------------
+// PathComponents – structured path decomposition
+// ---------------------------------------------------------------------------
+
+/// A parsed representation of a filesystem path broken into its constituent
+/// parts: an optional drive letter, directory segments, filename stem, and
+/// file extension.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PathComponents {
+    /// Drive letter including the colon (e.g. `"C:"`), or empty on Unix.
+    pub drive: String,
+    /// The individual directory segments (excluding drive and filename).
+    pub directories: Vec<String>,
+    /// The filename without extension, if present.
+    pub stem: String,
+    /// The extension including the leading dot (e.g. `".rs"`), or empty.
+    pub extension: String,
+}
+
+impl PathComponents {
+    /// Parse `path` using the given separator convention.
+    pub fn parse(path: &str, separator: PathSeparator) -> Self {
+        let svc = PathService::new(separator);
+        let drive = svc.abs_prefix(path);
+        let without_drive = if drive.is_empty() {
+            path
+        } else {
+            &path[drive.len()..]
+        };
+
+        let parts: Vec<&str> = without_drive
+            .split(|c: char| c == '/' || c == '\\')
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        if parts.is_empty() {
+            return Self {
+                drive,
+                directories: Vec::new(),
+                stem: String::new(),
+                extension: String::new(),
+            };
+        }
+
+        let last = parts[parts.len() - 1];
+        let dirs: Vec<String> = parts[..parts.len() - 1].iter().map(|s| s.to_string()).collect();
+
+        // Determine stem and extension from the last component.
+        let (stem, ext) = match last.rfind('.') {
+            Some(0) | None => (last.to_string(), String::new()),
+            Some(i) => (last[..i].to_string(), last[i..].to_string()),
+        };
+
+        Self {
+            drive,
+            directories: dirs,
+            stem,
+            extension: ext,
+        }
+    }
+
+    /// The full filename (stem + extension).
+    pub fn filename(&self) -> String {
+        if self.extension.is_empty() {
+            self.stem.clone()
+        } else {
+            format!("{}{}", self.stem, self.extension)
+        }
+    }
+
+    /// The directory portion of the path (drive + directories joined).
+    pub fn directory(&self, separator: PathSeparator) -> String {
+        let sep = separator.as_char().to_string();
+        let dir = self.directories.join(&sep);
+        if self.drive.is_empty() {
+            dir
+        } else {
+            format!("{}{}{}", self.drive, sep, dir)
+        }
+    }
+
+    /// Reconstruct the full path.
+    pub fn to_path(&self, separator: PathSeparator) -> String {
+        let sep = separator.as_char().to_string();
+        let mut parts: Vec<&str> = Vec::new();
+        for d in &self.directories {
+            parts.push(d.as_str());
+        }
+        let filename = self.filename();
+        if !filename.is_empty() {
+            parts.push(&filename);
+        }
+        let joined = parts.join(&sep);
+        if self.drive.is_empty() {
+            joined
+        } else {
+            format!("{}{}{}", self.drive, sep, joined)
+        }
+    }
+
+    /// Returns true if this path has no meaningful components.
+    pub fn is_empty(&self) -> bool {
+        self.drive.is_empty()
+            && self.directories.is_empty()
+            && self.stem.is_empty()
+            && self.extension.is_empty()
+    }
+}
+
+impl fmt::Display for PathComponents {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "PathComponents(drive={:?}, dirs={:?}, stem={:?}, ext={:?})",
+            self.drive, self.directories, self.stem, self.extension
+        )
+    }
+}
+
+impl From<&str> for PathComponents {
+    fn from(path: &str) -> Self {
+        let sep = PathSeparator::detect(path);
+        Self::parse(path, sep)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// relative_path – compute relative path between two absolute paths
+// ---------------------------------------------------------------------------
+
+/// Compute the relative path from `from` to `to`.
+///
+/// Both paths are treated as absolute paths. The separator style is
+/// auto-detected from the `from` path.
+pub fn relative_path(from: &str, to: &str) -> String {
+    let sep = PathSeparator::detect(from);
+    let svc = PathService::new(sep);
+    svc.relative(from, to)
+}
+
+// ---------------------------------------------------------------------------
+// PathMatcher – glob-like pattern matching
+// ---------------------------------------------------------------------------
+
+/// A simple glob-style path matcher supporting `*` (any characters except
+/// separators) and `**` (any characters including separators).
+#[derive(Debug, Clone)]
+pub struct PathMatcher {
+    pattern: String,
+}
+
+impl PathMatcher {
+    /// Create a new matcher from a glob pattern string.
+    pub fn new(pattern: &str) -> Self {
+        Self {
+            pattern: pattern.to_string(),
+        }
+    }
+
+    /// Test whether `path` matches the pattern.
+    ///
+    /// Pattern rules:
+    /// - `*` matches zero or more characters within a single path segment
+    ///   (does not cross `/` or `\`).
+    /// - `**` matches zero or more complete path segments (including separators).
+    /// - All other characters are matched literally (case-sensitive).
+    pub fn matches(&self, path: &str) -> bool {
+        let pattern_parts = Self::split_pattern(&self.pattern);
+        let path_segments: Vec<&str> = path
+            .split(|c: char| c == '/' || c == '\\')
+            .filter(|s| !s.is_empty())
+            .collect();
+        Self::match_segments(&pattern_parts, &path_segments)
+    }
+
+    /// Split a pattern by path separators, preserving `**` as its own token.
+    fn split_pattern(pattern: &str) -> Vec<String> {
+        pattern
+            .split(|c: char| c == '/' || c == '\\')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    /// Recursively match pattern parts against path segments.
+    fn match_segments(pattern: &[String], path: &[&str]) -> bool {
+        if pattern.is_empty() {
+            return path.is_empty();
+        }
+
+        if pattern[0] == "**" {
+            // `**` can match zero or more segments
+            for i in 0..=path.len() {
+                if Self::match_segments(&pattern[1..], &path[i..]) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        if path.is_empty() {
+            return false;
+        }
+
+        if Self::match_wildcard(&pattern[0], path[0]) {
+            Self::match_segments(&pattern[1..], &path[1..])
+        } else {
+            false
+        }
+    }
+
+    /// Match a single pattern segment (with `*` wildcards) against a single
+    /// path segment.
+    fn match_wildcard(pattern: &str, segment: &str) -> bool {
+        let p: Vec<char> = pattern.chars().collect();
+        let s: Vec<char> = segment.chars().collect();
+        Self::match_wild(&p, &s)
+    }
+
+    fn match_wild(p: &[char], s: &[char]) -> bool {
+        if p.is_empty() {
+            return s.is_empty();
+        }
+        if p[0] == '*' {
+            // `*` matches zero or more non-separator characters
+            for i in 0..=s.len() {
+                if Self::match_wild(&p[1..], &s[i..]) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if s.is_empty() {
+            return false;
+        }
+        if p[0] == s[0] {
+            Self::match_wild(&p[1..], &s[1..])
+        } else {
+            false
+        }
+    }
+
+    /// Filter an iterator of paths, returning only those that match.
+    pub fn filter<'a>(&self, paths: &'a [&str]) -> Vec<&'a str> {
+        paths.iter().copied().filter(|p| self.matches(p)).collect()
+    }
+}
+
+impl fmt::Display for PathMatcher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PathMatcher({})", self.pattern)
+    }
+}
+
+impl From<&str> for PathMatcher {
+    fn from(pattern: &str) -> Self {
+        Self::new(pattern)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// expand_tilde – expand ~ to home directory
+// ---------------------------------------------------------------------------
+
+/// Expand a leading `~` in `path` to `home_dir`.
+///
+/// If `path` does not start with `~` it is returned unchanged. A bare `~`
+/// expands to `home_dir`; `~/rest` expands to `home_dir/rest`.
+pub fn expand_tilde(path: &str, home_dir: &str) -> String {
+    if path == "~" {
+        return home_dir.trim_end_matches('/').to_string();
+    }
+    if let Some(rest) = path.strip_prefix("~/") {
+        let home = home_dir.trim_end_matches('/');
+        return format!("{home}/{rest}");
+    }
+    path.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1407,5 +1686,149 @@ mod tests {
     fn test_path_join_many() {
         let result = path_join_many("/home", &["user", "docs", "file.txt"]);
         assert_eq!(result, "/home/user/docs/file.txt");
+    }
+
+    // -----------------------------------------------------------------------
+    // PathComponents tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn path_components_parse_unix() {
+        let pc = PathComponents::parse("/home/user/docs/readme.md", PathSeparator::Unix);
+        assert_eq!(pc.drive, "");
+        assert_eq!(pc.directories, vec!["home", "user", "docs"]);
+        assert_eq!(pc.stem, "readme");
+        assert_eq!(pc.extension, ".md");
+        assert_eq!(pc.filename(), "readme.md");
+        assert!(!pc.is_empty());
+    }
+
+    #[test]
+    fn path_components_parse_windows_drive() {
+        let pc = PathComponents::parse("C:\\Users\\admin\\file.txt", PathSeparator::Windows);
+        assert_eq!(pc.drive, "C:");
+        assert_eq!(pc.directories, vec!["Users", "admin"]);
+        assert_eq!(pc.stem, "file");
+        assert_eq!(pc.extension, ".txt");
+        assert_eq!(pc.to_path(PathSeparator::Windows), "C:\\Users\\admin\\file.txt");
+    }
+
+    #[test]
+    fn path_components_no_extension() {
+        let pc = PathComponents::parse("/usr/bin/cargo", PathSeparator::Unix);
+        assert_eq!(pc.stem, "cargo");
+        assert_eq!(pc.extension, "");
+        assert_eq!(pc.filename(), "cargo");
+    }
+
+    #[test]
+    fn path_components_hidden_file() {
+        let pc = PathComponents::parse("/home/.gitignore", PathSeparator::Unix);
+        assert_eq!(pc.stem, ".gitignore");
+        assert_eq!(pc.extension, "");
+    }
+
+    #[test]
+    fn path_components_empty_path() {
+        let pc = PathComponents::parse("", PathSeparator::Unix);
+        assert!(pc.is_empty());
+    }
+
+    #[test]
+    fn path_components_from_str() {
+        let pc = PathComponents::from("/etc/hosts");
+        assert_eq!(pc.directories, vec!["etc"]);
+        assert_eq!(pc.stem, "hosts");
+    }
+
+    #[test]
+    fn path_components_display() {
+        let pc = PathComponents::parse("/a/b.rs", PathSeparator::Unix);
+        let s = format!("{pc}");
+        assert!(s.contains("stem="));
+        assert!(s.contains(".rs"));
+    }
+
+    // -----------------------------------------------------------------------
+    // relative_path tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn relative_path_fn_sibling() {
+        assert_eq!(super::relative_path("/a/b", "/a/c"), "../c");
+    }
+
+    #[test]
+    fn relative_path_fn_nested() {
+        assert_eq!(super::relative_path("/a", "/a/b/c"), "b/c");
+    }
+
+    // -----------------------------------------------------------------------
+    // PathMatcher tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn path_matcher_exact() {
+        let m = PathMatcher::new("/home/user/file.txt");
+        assert!(m.matches("/home/user/file.txt"));
+        assert!(!m.matches("/home/user/other.txt"));
+    }
+
+    #[test]
+    fn path_matcher_single_star() {
+        let m = PathMatcher::new("/home/user/*.txt");
+        assert!(m.matches("/home/user/readme.txt"));
+        assert!(m.matches("/home/user/a.txt"));
+        assert!(!m.matches("/home/user/sub/readme.txt"));
+        assert!(!m.matches("/home/user/readme.rs"));
+    }
+
+    #[test]
+    fn path_matcher_double_star() {
+        let m = PathMatcher::new("/home/**/*.rs");
+        assert!(m.matches("/home/user/project/main.rs"));
+        assert!(m.matches("/home/lib.rs"));
+        assert!(!m.matches("/home/user/readme.txt"));
+    }
+
+    #[test]
+    fn path_matcher_filter() {
+        let m = PathMatcher::new("*.rs");
+        let paths = vec!["main.rs", "lib.rs", "readme.md", "build.rs"];
+        let result = m.filter(&paths);
+        assert_eq!(result, vec!["main.rs", "lib.rs", "build.rs"]);
+    }
+
+    #[test]
+    fn path_matcher_display_and_from() {
+        let m = PathMatcher::from("**/*.txt");
+        assert_eq!(format!("{m}"), "PathMatcher(**/*.txt)");
+    }
+
+    // -----------------------------------------------------------------------
+    // expand_tilde tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_expand_tilde_bare() {
+        assert_eq!(expand_tilde("~", "/home/user"), "/home/user");
+    }
+
+    #[test]
+    fn test_expand_tilde_subpath() {
+        assert_eq!(
+            expand_tilde("~/docs/file.txt", "/home/user"),
+            "/home/user/docs/file.txt"
+        );
+    }
+
+    #[test]
+    fn test_expand_tilde_no_tilde() {
+        assert_eq!(expand_tilde("/etc/hosts", "/home/user"), "/etc/hosts");
+    }
+
+    #[test]
+    fn test_expand_tilde_trailing_slash() {
+        assert_eq!(expand_tilde("~/a", "/home/user/"), "/home/user/a");
     }
 }

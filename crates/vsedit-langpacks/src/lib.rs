@@ -733,6 +733,372 @@ pub fn localize_with_args(pack: &LanguagePack, key: &str, args: &[&str], default
     result
 }
 
+// ---------------------------------------------------------------------------
+// LocaleChain – ordered fallback chain for translation resolution
+// ---------------------------------------------------------------------------
+
+/// An ordered list of locales to try when resolving a translation.
+///
+/// For example, a chain `["pt-BR", "pt", "en"]` means: first try Brazilian
+/// Portuguese, then generic Portuguese, then English.
+#[derive(Debug, Clone)]
+pub struct LocaleChain {
+    locales: Vec<Locale>,
+}
+
+impl LocaleChain {
+    /// Build a chain from an ordered slice of locale identifier strings.
+    pub fn new(ids: &[&str]) -> Self {
+        Self {
+            locales: ids.iter().map(|s| Locale::parse(s)).collect(),
+        }
+    }
+
+    /// Build a chain that automatically expands a locale with country into
+    /// `[locale-with-country, language-only, fallback]`.
+    pub fn from_locale_with_fallback(locale: &Locale, fallback: &str) -> Self {
+        let mut locales = vec![locale.clone()];
+        if locale.country.is_some() {
+            let lang_only = Locale {
+                language: locale.language.clone(),
+                country: None,
+            };
+            if lang_only != *locale {
+                locales.push(lang_only);
+            }
+        }
+        let fb = Locale::parse(fallback);
+        if !locales.iter().any(|l| l == &fb) {
+            locales.push(fb);
+        }
+        Self { locales }
+    }
+
+    /// Return the number of locales in the chain.
+    pub fn len(&self) -> usize {
+        self.locales.len()
+    }
+
+    /// Return `true` if the chain is empty.
+    pub fn is_empty(&self) -> bool {
+        self.locales.is_empty()
+    }
+
+    /// Iterate over the locales in priority order.
+    pub fn iter(&self) -> impl Iterator<Item = &Locale> {
+        self.locales.iter()
+    }
+
+    /// Resolve a translation key by walking the chain and looking up packs
+    /// in the provided registry.
+    pub fn resolve(&self, registry: &LanguagePackRegistry, key: &str) -> Option<String> {
+        for locale in &self.locales {
+            if let Some(pack) = registry.get_pack(locale) {
+                if let Some(val) = pack.translations.get(key) {
+                    return Some(val.clone());
+                }
+            }
+        }
+        None
+    }
+
+    /// Like [`resolve`](Self::resolve) but returns `default` when no pack
+    /// in the chain contains the key.
+    pub fn resolve_or(&self, registry: &LanguagePackRegistry, key: &str, default: &str) -> String {
+        self.resolve(registry, key)
+            .unwrap_or_else(|| default.to_string())
+    }
+}
+
+impl fmt::Display for LocaleChain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let ids: Vec<String> = self.locales.iter().map(|l| l.id()).collect();
+        write!(f, "{}", ids.join(" -> "))
+    }
+}
+
+impl From<&[&str]> for LocaleChain {
+    fn from(ids: &[&str]) -> Self {
+        Self::new(ids)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PluralRules – locale-aware plural category selection
+// ---------------------------------------------------------------------------
+
+/// Selects a [`PluralRule`] category based on a count and a locale's
+/// pluralisation rules.
+///
+/// Supports a handful of common CLDR rule families:
+/// - English-like (one / other)
+/// - French / Portuguese (0-1 → one, rest → other)
+/// - Arabic (zero, one, two, few, many, other)
+/// - Polish / Russian-style Slavic (one, few, many, other)
+#[derive(Debug, Clone)]
+pub struct PluralRules {
+    locale: Locale,
+}
+
+impl PluralRules {
+    pub fn new(locale: &Locale) -> Self {
+        Self {
+            locale: locale.clone(),
+        }
+    }
+
+    /// Select the plural category for `n`.
+    pub fn select(&self, n: u64) -> PluralRule {
+        match self.locale.language.as_str() {
+            // French / Portuguese: 0 and 1 are singular
+            "fr" | "pt" => match n {
+                0 | 1 => PluralRule::One,
+                _ => PluralRule::Other,
+            },
+            // Arabic: rich plural system
+            "ar" => match n {
+                0 => PluralRule::Zero,
+                1 => PluralRule::One,
+                2 => PluralRule::Two,
+                3..=10 => PluralRule::Few,
+                11..=99 => PluralRule::Many,
+                _ => PluralRule::Other,
+            },
+            // Polish-style Slavic
+            "pl" | "ru" | "uk" => {
+                let mod10 = n % 10;
+                let mod100 = n % 100;
+                if n == 0 {
+                    PluralRule::Zero
+                } else if n == 1 {
+                    PluralRule::One
+                } else if (2..=4).contains(&mod10) && !(12..=14).contains(&mod100) {
+                    PluralRule::Few
+                } else {
+                    PluralRule::Many
+                }
+            }
+            // Default: English-like
+            _ => PluralRule::select(n),
+        }
+    }
+
+    /// Return the locale this rule set was built for.
+    pub fn locale(&self) -> &Locale {
+        &self.locale
+    }
+}
+
+impl fmt::Display for PluralRules {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PluralRules({})", self.locale)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LocalizedFormatter – locale-aware number, date, and list formatting
+// ---------------------------------------------------------------------------
+
+/// Simple locale-sensitive formatter for numbers, dates, and lists.
+#[derive(Debug, Clone)]
+pub struct LocalizedFormatter {
+    locale: Locale,
+}
+
+impl LocalizedFormatter {
+    pub fn new(locale: &Locale) -> Self {
+        Self {
+            locale: locale.clone(),
+        }
+    }
+
+    /// Format an integer with locale-appropriate thousands separators.
+    pub fn format_integer(&self, n: i64) -> String {
+        let (sep, group_size) = self.thousands_separator();
+        let negative = n < 0;
+        let abs = if negative {
+            (n as i128).unsigned_abs() as u64
+        } else {
+            n as u64
+        };
+        let digits = abs.to_string();
+        let mut result = String::new();
+        for (i, ch) in digits.chars().rev().enumerate() {
+            if i > 0 && i % group_size == 0 {
+                result.push(sep);
+            }
+            result.push(ch);
+        }
+        let formatted: String = result.chars().rev().collect();
+        if negative {
+            format!("-{formatted}")
+        } else {
+            formatted
+        }
+    }
+
+    /// Format a decimal number with locale-appropriate decimal and thousands
+    /// separators (fixed to `precision` decimal places).
+    pub fn format_decimal(&self, value: f64, precision: usize) -> String {
+        let (thousands_sep, group_size) = self.thousands_separator();
+        let decimal_sep = self.decimal_separator();
+
+        let rounded = format!("{value:.prec$}", prec = precision);
+        let parts: Vec<&str> = rounded.splitn(2, '.').collect();
+
+        let int_part = parts[0];
+        let negative = int_part.starts_with('-');
+        let int_digits = if negative { &int_part[1..] } else { int_part };
+
+        let mut grouped = String::new();
+        for (i, ch) in int_digits.chars().rev().enumerate() {
+            if i > 0 && i % group_size == 0 {
+                grouped.push(thousands_sep);
+            }
+            grouped.push(ch);
+        }
+        let int_formatted: String = grouped.chars().rev().collect();
+
+        let mut out = String::new();
+        if negative {
+            out.push('-');
+        }
+        out.push_str(&int_formatted);
+
+        if precision > 0 {
+            out.push(decimal_sep);
+            if parts.len() > 1 {
+                out.push_str(parts[1]);
+            } else {
+                for _ in 0..precision {
+                    out.push('0');
+                }
+            }
+        }
+        out
+    }
+
+    /// Format a simple date given as `(year, month, day)` according to locale
+    /// conventions (not a full i18n date formatter).
+    pub fn format_date(&self, year: i32, month: u32, day: u32) -> String {
+        match self.locale.language.as_str() {
+            // US-style: MM/DD/YYYY
+            "en" if self.locale.country.as_deref() == Some("US") => {
+                format!("{month:02}/{day:02}/{year:04}")
+            }
+            // ISO / East-Asian: YYYY-MM-DD
+            "ja" | "ko" | "zh" => {
+                format!("{year:04}-{month:02}-{day:02}")
+            }
+            // Most of Europe & Latin America: DD/MM/YYYY
+            _ => {
+                format!("{day:02}/{month:02}/{year:04}")
+            }
+        }
+    }
+
+    /// Join a list of items with locale-appropriate separators and a
+    /// conjunction before the last element.
+    pub fn format_list(&self, items: &[&str]) -> String {
+        match items.len() {
+            0 => String::new(),
+            1 => items[0].to_string(),
+            2 => {
+                let conj = self.conjunction();
+                format!("{} {} {}", items[0], conj, items[1])
+            }
+            _ => {
+                let (sep, conj) = self.list_separators();
+                let init = items[..items.len() - 1].join(sep);
+                format!("{}{} {} {}", init, sep.trim_end(), conj, items[items.len() - 1])
+            }
+        }
+    }
+
+    // -- private helpers ----------------------------------------------------
+
+    fn thousands_separator(&self) -> (char, usize) {
+        match self.locale.language.as_str() {
+            "de" | "fr" | "pt" | "es" | "it" | "pl" | "ru" => ('.', 3),
+            "hi" => {
+                // Indian numbering uses groups of 2 after the first 3
+                // We simplify to groups of 3 for this basic formatter.
+                (',', 3)
+            }
+            _ => (',', 3),
+        }
+    }
+
+    fn decimal_separator(&self) -> char {
+        match self.locale.language.as_str() {
+            "de" | "fr" | "pt" | "es" | "it" | "pl" | "ru" => ',',
+            _ => '.',
+        }
+    }
+
+    fn conjunction(&self) -> &'static str {
+        match self.locale.language.as_str() {
+            "fr" => "et",
+            "de" => "und",
+            "es" => "y",
+            "pt" => "e",
+            "it" => "e",
+            "ja" => "と",
+            _ => "and",
+        }
+    }
+
+    fn list_separators(&self) -> (&'static str, &'static str) {
+        match self.locale.language.as_str() {
+            "fr" => (", ", "et"),
+            "de" => (", ", "und"),
+            "es" => (", ", "y"),
+            "pt" => (", ", "e"),
+            "ja" => ("、", "と"),
+            _ => (", ", "and"),
+        }
+    }
+}
+
+impl fmt::Display for LocalizedFormatter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LocalizedFormatter({})", self.locale)
+    }
+}
+
+impl From<&Locale> for LocalizedFormatter {
+    fn from(locale: &Locale) -> Self {
+        Self::new(locale)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TranslationCoverage – additional helpers
+// ---------------------------------------------------------------------------
+
+impl TranslationCoverage {
+    /// Produce a one-line summary string, e.g. `"75.0% (3/4, missing 1)"`.
+    pub fn summary(&self) -> String {
+        let pct = self.percentage();
+        if self.is_complete() {
+            format!("{pct:.1}% ({}/{})", self.translated, self.total)
+        } else {
+            format!(
+                "{pct:.1}% ({}/{}, missing {})",
+                self.translated,
+                self.total,
+                self.missing.len()
+            )
+        }
+    }
+}
+
+impl fmt::Display for TranslationCoverage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1430,5 +1796,208 @@ mod tests {
         };
         let result = localize_with_args(&pack, "greet", &["Alice", "Rust"], "fallback");
         assert_eq!(result, "Hello Alice, welcome to Rust!");
+    }
+
+    // -----------------------------------------------------------------------
+    // LocaleChain tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn locale_chain_resolve_walks_chain() {
+        let mut reg = LanguagePackRegistry::new(Locale::parse("en"));
+        reg.register(LanguagePack {
+            locale: Locale::parse("en"),
+            translations: HashMap::from([
+                ("greeting".into(), "Hello".into()),
+                ("farewell".into(), "Goodbye".into()),
+            ]),
+        });
+        reg.register(LanguagePack {
+            locale: Locale::parse("pt"),
+            translations: HashMap::from([("greeting".into(), "Olá".into())]),
+        });
+        reg.register(LanguagePack {
+            locale: Locale::parse("pt-BR"),
+            translations: HashMap::from([("greeting".into(), "Oi".into())]),
+        });
+
+        let chain = LocaleChain::new(&["pt-BR", "pt", "en"]);
+
+        // "greeting" found in pt-BR (first in chain)
+        assert_eq!(chain.resolve(&reg, "greeting"), Some("Oi".to_string()));
+        // "farewell" missing from pt-BR and pt, found in en
+        assert_eq!(chain.resolve(&reg, "farewell"), Some("Goodbye".to_string()));
+        // completely missing key
+        assert_eq!(chain.resolve(&reg, "unknown"), None);
+        assert_eq!(chain.resolve_or(&reg, "unknown", "???"), "???");
+    }
+
+    #[test]
+    fn locale_chain_from_locale_with_fallback() {
+        let locale = Locale::parse("pt-BR");
+        let chain = LocaleChain::from_locale_with_fallback(&locale, "en");
+        assert_eq!(chain.len(), 3);
+        assert_eq!(chain.to_string(), "pt-BR -> pt -> en");
+    }
+
+    #[test]
+    fn locale_chain_from_locale_no_duplicate_fallback() {
+        let locale = Locale::parse("en");
+        let chain = LocaleChain::from_locale_with_fallback(&locale, "en");
+        // "en" should appear only once
+        assert_eq!(chain.len(), 1);
+        assert_eq!(chain.to_string(), "en");
+    }
+
+    #[test]
+    fn locale_chain_display_and_from() {
+        let chain = LocaleChain::from(["fr-CA", "fr", "en"].as_slice());
+        assert_eq!(chain.to_string(), "fr-CA -> fr -> en");
+        assert!(!chain.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // PluralRules tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn plural_rules_english() {
+        let rules = PluralRules::new(&Locale::parse("en"));
+        assert_eq!(rules.select(0), PluralRule::Zero);
+        assert_eq!(rules.select(1), PluralRule::One);
+        assert_eq!(rules.select(2), PluralRule::Other);
+        assert_eq!(rules.select(42), PluralRule::Other);
+        assert_eq!(rules.to_string(), "PluralRules(en)");
+    }
+
+    #[test]
+    fn plural_rules_french() {
+        let rules = PluralRules::new(&Locale::parse("fr"));
+        // French: 0 and 1 are "one"
+        assert_eq!(rules.select(0), PluralRule::One);
+        assert_eq!(rules.select(1), PluralRule::One);
+        assert_eq!(rules.select(2), PluralRule::Other);
+    }
+
+    #[test]
+    fn plural_rules_arabic() {
+        let rules = PluralRules::new(&Locale::parse("ar"));
+        assert_eq!(rules.select(0), PluralRule::Zero);
+        assert_eq!(rules.select(1), PluralRule::One);
+        assert_eq!(rules.select(2), PluralRule::Two);
+        assert_eq!(rules.select(5), PluralRule::Few);
+        assert_eq!(rules.select(11), PluralRule::Many);
+        assert_eq!(rules.select(99), PluralRule::Many);
+        assert_eq!(rules.select(100), PluralRule::Other);
+    }
+
+    #[test]
+    fn plural_rules_polish() {
+        let rules = PluralRules::new(&Locale::parse("pl"));
+        assert_eq!(rules.select(0), PluralRule::Zero);
+        assert_eq!(rules.select(1), PluralRule::One);
+        assert_eq!(rules.select(2), PluralRule::Few);
+        assert_eq!(rules.select(4), PluralRule::Few);
+        assert_eq!(rules.select(5), PluralRule::Many);
+        assert_eq!(rules.select(12), PluralRule::Many); // 12 is in 12..=14 range
+        assert_eq!(rules.select(22), PluralRule::Few);
+    }
+
+    // -----------------------------------------------------------------------
+    // LocalizedFormatter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn formatter_format_integer_english() {
+        let fmt = LocalizedFormatter::new(&Locale::parse("en"));
+        assert_eq!(fmt.format_integer(0), "0");
+        assert_eq!(fmt.format_integer(999), "999");
+        assert_eq!(fmt.format_integer(1000), "1,000");
+        assert_eq!(fmt.format_integer(1_234_567), "1,234,567");
+        assert_eq!(fmt.format_integer(-42_000), "-42,000");
+    }
+
+    #[test]
+    fn formatter_format_integer_german() {
+        let fmt = LocalizedFormatter::new(&Locale::parse("de"));
+        assert_eq!(fmt.format_integer(1_234_567), "1.234.567");
+    }
+
+    #[test]
+    fn formatter_format_decimal() {
+        let en = LocalizedFormatter::new(&Locale::parse("en"));
+        assert_eq!(en.format_decimal(1234.5, 2), "1,234.50");
+
+        let de = LocalizedFormatter::new(&Locale::parse("de"));
+        assert_eq!(de.format_decimal(1234.5, 2), "1.234,50");
+    }
+
+    #[test]
+    fn formatter_format_date() {
+        let en_us = LocalizedFormatter::new(&Locale::parse("en-US"));
+        assert_eq!(en_us.format_date(2025, 3, 7), "03/07/2025");
+
+        let fr = LocalizedFormatter::new(&Locale::parse("fr"));
+        assert_eq!(fr.format_date(2025, 3, 7), "07/03/2025");
+
+        let ja = LocalizedFormatter::new(&Locale::parse("ja"));
+        assert_eq!(ja.format_date(2025, 3, 7), "2025-03-07");
+    }
+
+    #[test]
+    fn formatter_format_list() {
+        let en = LocalizedFormatter::new(&Locale::parse("en"));
+        assert_eq!(en.format_list(&[]), "");
+        assert_eq!(en.format_list(&["apple"]), "apple");
+        assert_eq!(en.format_list(&["apple", "banana"]), "apple and banana");
+        assert_eq!(
+            en.format_list(&["apple", "banana", "cherry"]),
+            "apple, banana, and cherry"
+        );
+
+        let fr = LocalizedFormatter::new(&Locale::parse("fr"));
+        assert_eq!(fr.format_list(&["pomme", "banane"]), "pomme et banane");
+    }
+
+    #[test]
+    fn formatter_display_and_from() {
+        let locale = Locale::parse("es");
+        let fmt = LocalizedFormatter::from(&locale);
+        assert_eq!(fmt.to_string(), "LocalizedFormatter(es)");
+    }
+
+    // -----------------------------------------------------------------------
+    // TranslationCoverage summary / Display tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn translation_coverage_summary_complete() {
+        let reference = LanguagePack {
+            locale: Locale::parse("en"),
+            translations: HashMap::from([("a".into(), "A".into())]),
+        };
+        let target = LanguagePack {
+            locale: Locale::parse("fr"),
+            translations: HashMap::from([("a".into(), "A-fr".into())]),
+        };
+        let cov = TranslationCoverage::compute(&reference, &target);
+        assert_eq!(cov.to_string(), "100.0% (1/1)");
+    }
+
+    #[test]
+    fn translation_coverage_summary_partial() {
+        let reference = LanguagePack {
+            locale: Locale::parse("en"),
+            translations: HashMap::from([
+                ("a".into(), "A".into()),
+                ("b".into(), "B".into()),
+            ]),
+        };
+        let target = LanguagePack {
+            locale: Locale::parse("de"),
+            translations: HashMap::from([("a".into(), "A-de".into())]),
+        };
+        let cov = TranslationCoverage::compute(&reference, &target);
+        assert_eq!(cov.to_string(), "50.0% (1/2, missing 1)");
     }
 }

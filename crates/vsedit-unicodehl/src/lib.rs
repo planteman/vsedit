@@ -821,6 +821,143 @@ pub fn string_codepoints(s: &str) -> Vec<(char, String)> {
     s.chars().map(|c| (c, char_codepoint(c))).collect()
 }
 
+// ---------------------------------------------------------------------------
+// ConfusableMatch / ConfusableDetector
+// ---------------------------------------------------------------------------
+
+/// A match found by the confusable detector.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConfusableMatch {
+    pub position: usize,
+    pub original_char: char,
+    pub confusable_with: char,
+    pub severity: Severity,
+}
+
+impl fmt::Display for ConfusableMatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "pos {}: U+{:04X} '{}' looks like '{}' ({})",
+            self.position,
+            self.original_char as u32,
+            self.original_char,
+            self.confusable_with,
+            self.severity,
+        )
+    }
+}
+
+/// Detects characters visually similar to ASCII in a string.
+#[derive(Debug, Clone)]
+pub struct ConfusableDetector {
+    min_severity: Severity,
+}
+
+impl ConfusableDetector {
+    pub fn new() -> Self {
+        Self { min_severity: Severity::Info }
+    }
+
+    pub fn with_min_severity(mut self, sev: Severity) -> Self {
+        self.min_severity = sev;
+        self
+    }
+
+    /// Scan `text` and return all confusable matches.
+    pub fn detect(&self, text: &str) -> Vec<ConfusableMatch> {
+        let mut matches = Vec::new();
+        for (i, ch) in text.chars().enumerate() {
+            if let Some(ascii_eq) = is_confusable(ch) {
+                let sev = if ch as u32 > 0x2000 { Severity::Error } else { Severity::Warning };
+                if sev.level() >= self.min_severity.level() {
+                    matches.push(ConfusableMatch {
+                        position: i,
+                        original_char: ch,
+                        confusable_with: ascii_eq,
+                        severity: sev,
+                    });
+                }
+            }
+        }
+        matches
+    }
+
+    /// Returns true if the text contains any confusable characters.
+    pub fn has_confusables(&self, text: &str) -> bool {
+        text.chars().any(|ch| is_confusable(ch).is_some())
+    }
+
+    /// Replaces all confusable characters with their ASCII equivalents.
+    pub fn normalize(&self, text: &str) -> String {
+        text.chars()
+            .map(|ch| is_confusable(ch).unwrap_or(ch))
+            .collect()
+    }
+}
+
+impl Default for ConfusableDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HomoglyphMap
+// ---------------------------------------------------------------------------
+
+/// A bidirectional map of homoglyph pairs (visual look-alikes).
+#[derive(Debug, Clone)]
+pub struct HomoglyphMap {
+    pairs: Vec<(char, char)>,
+}
+
+impl HomoglyphMap {
+    pub fn new() -> Self {
+        Self { pairs: Vec::new() }
+    }
+
+    pub fn add(&mut self, from: char, to: char) {
+        if !self.pairs.iter().any(|&(a, b)| a == from && b == to) {
+            self.pairs.push((from, to));
+        }
+    }
+
+    pub fn lookup(&self, ch: char) -> Option<char> {
+        self.pairs.iter().find(|&&(a, _)| a == ch).map(|&(_, b)| b)
+    }
+
+    pub fn len(&self) -> usize {
+        self.pairs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.pairs.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &(char, char)> {
+        self.pairs.iter()
+    }
+}
+
+impl From<Vec<(char, char)>> for HomoglyphMap {
+    fn from(pairs: Vec<(char, char)>) -> Self {
+        Self { pairs }
+    }
+}
+
+impl Default for HomoglyphMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for HomoglyphMap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HomoglyphMap({} pairs)", self.pairs.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1437,5 +1574,54 @@ mod tests {
         let cps = string_codepoints("AB");
         assert_eq!(cps.len(), 2);
         assert_eq!(cps[0], ('A', "U+0041".to_string()));
+    }
+
+    #[test]
+    fn test_confusable_detector_detect() {
+        let detector = ConfusableDetector::new();
+        let text = "h\u{0435}llo"; // Cyrillic е
+        let matches = detector.detect(text);
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].confusable_with, 'e');
+        assert!(format!("{}", matches[0]).contains("looks like"));
+    }
+
+    #[test]
+    fn test_confusable_detector_no_confusables() {
+        let detector = ConfusableDetector::new();
+        assert!(detector.detect("hello world").is_empty());
+        assert!(!detector.has_confusables("hello world"));
+    }
+
+    #[test]
+    fn test_confusable_detector_normalize() {
+        let detector = ConfusableDetector::new();
+        let normalized = detector.normalize("h\u{0435}llo");
+        assert_eq!(normalized, "hello");
+    }
+
+    #[test]
+    fn test_homoglyph_map_from_vec() {
+        let map = HomoglyphMap::from(vec![('а', 'a'), ('е', 'e')]);
+        assert_eq!(map.len(), 2);
+        assert_eq!(map.lookup('а'), Some('a'));
+        assert_eq!(map.lookup('z'), None);
+        assert!(!map.is_empty());
+        assert!(format!("{map}").contains("2 pairs"));
+    }
+
+    #[test]
+    fn test_homoglyph_map_add_dedup() {
+        let mut map = HomoglyphMap::new();
+        map.add('а', 'a');
+        map.add('а', 'a');
+        assert_eq!(map.len(), 1);
+    }
+
+    #[test]
+    fn test_homoglyph_map_iter() {
+        let map = HomoglyphMap::from(vec![('а', 'a'), ('е', 'e')]);
+        let collected: Vec<_> = map.iter().collect();
+        assert_eq!(collected.len(), 2);
     }
 }

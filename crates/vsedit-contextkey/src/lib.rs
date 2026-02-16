@@ -693,6 +693,446 @@ impl ContextKeyExpression {
 }
 
 // ---------------------------------------------------------------------------
+// Display for ContextKeyValue
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for ContextKeyValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Bool(b) => write!(f, "{b}"),
+            Self::String(s) => write!(f, "{s}"),
+            Self::Number(n) => write!(f, "{n}"),
+            Self::Null => write!(f, "null"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// From impls for ContextKeyValue
+// ---------------------------------------------------------------------------
+
+impl From<bool> for ContextKeyValue {
+    fn from(b: bool) -> Self {
+        Self::Bool(b)
+    }
+}
+
+impl From<f64> for ContextKeyValue {
+    fn from(n: f64) -> Self {
+        Self::Number(n)
+    }
+}
+
+impl From<String> for ContextKeyValue {
+    fn from(s: String) -> Self {
+        Self::String(s)
+    }
+}
+
+impl From<&str> for ContextKeyValue {
+    fn from(s: &str) -> Self {
+        Self::String(s.to_owned())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContextKeySnapshot
+// ---------------------------------------------------------------------------
+
+/// A frozen snapshot of all context keys at a point in time.
+///
+/// Useful for debugging, logging, or comparing context state across operations.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContextKeySnapshot {
+    entries: HashMap<String, ContextKeyValue>,
+}
+
+impl ContextKeySnapshot {
+    /// Capture the current state of a [`ContextKeyService`].
+    pub fn capture(service: &ContextKeyService) -> Self {
+        let guard = service.values.read().unwrap();
+        Self {
+            entries: guard.clone(),
+        }
+    }
+
+    /// Create a snapshot from an iterator of key-value pairs.
+    pub fn from_entries(iter: impl IntoIterator<Item = (String, ContextKeyValue)>) -> Self {
+        Self {
+            entries: iter.into_iter().collect(),
+        }
+    }
+
+    /// Number of keys in the snapshot.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the snapshot is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Look up a value in the snapshot.
+    pub fn get(&self, key: &str) -> Option<&ContextKeyValue> {
+        self.entries.get(key)
+    }
+
+    /// All key names in sorted order.
+    pub fn keys(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self.entries.keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+
+    /// Compute the difference between this snapshot and another.
+    pub fn diff(&self, other: &ContextKeySnapshot) -> ContextKeyDiff {
+        ContextKeyDiff::compute(self, other)
+    }
+}
+
+impl fmt::Display for ContextKeySnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut keys: Vec<_> = self.entries.keys().collect();
+        keys.sort();
+        writeln!(f, "ContextKeySnapshot ({} keys):", keys.len())?;
+        for key in keys {
+            let val = &self.entries[key];
+            writeln!(f, "  {key} = {val}")?;
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContextKeyDiff
+// ---------------------------------------------------------------------------
+
+/// Represents a single changed key between two snapshots.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ContextKeyChange {
+    /// Key was added (not in old, present in new).
+    Added(String, ContextKeyValue),
+    /// Key was removed (present in old, not in new).
+    Removed(String, ContextKeyValue),
+    /// Key value changed.
+    Changed(String, ContextKeyValue, ContextKeyValue),
+}
+
+/// The difference between two [`ContextKeySnapshot`]s.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContextKeyDiff {
+    pub changes: Vec<ContextKeyChange>,
+}
+
+impl ContextKeyDiff {
+    /// Compute the diff from `old` to `new`.
+    pub fn compute(old: &ContextKeySnapshot, new: &ContextKeySnapshot) -> Self {
+        let mut changes = Vec::new();
+
+        // Keys removed or changed
+        for (key, old_val) in &old.entries {
+            match new.entries.get(key) {
+                None => changes.push(ContextKeyChange::Removed(key.clone(), old_val.clone())),
+                Some(new_val) if new_val != old_val => {
+                    changes.push(ContextKeyChange::Changed(
+                        key.clone(),
+                        old_val.clone(),
+                        new_val.clone(),
+                    ));
+                }
+                _ => {}
+            }
+        }
+
+        // Keys added
+        for (key, new_val) in &new.entries {
+            if !old.entries.contains_key(key) {
+                changes.push(ContextKeyChange::Added(key.clone(), new_val.clone()));
+            }
+        }
+
+        changes.sort_by(|a, b| {
+            let ka = match a {
+                ContextKeyChange::Added(k, _)
+                | ContextKeyChange::Removed(k, _)
+                | ContextKeyChange::Changed(k, _, _) => k,
+            };
+            let kb = match b {
+                ContextKeyChange::Added(k, _)
+                | ContextKeyChange::Removed(k, _)
+                | ContextKeyChange::Changed(k, _, _) => k,
+            };
+            ka.cmp(kb)
+        });
+
+        Self { changes }
+    }
+
+    /// Whether the two snapshots are identical (no changes).
+    pub fn is_empty(&self) -> bool {
+        self.changes.is_empty()
+    }
+
+    /// Number of changes.
+    pub fn len(&self) -> usize {
+        self.changes.len()
+    }
+
+    /// Keys that were added.
+    pub fn added_keys(&self) -> Vec<&str> {
+        self.changes
+            .iter()
+            .filter_map(|c| match c {
+                ContextKeyChange::Added(k, _) => Some(k.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Keys that were removed.
+    pub fn removed_keys(&self) -> Vec<&str> {
+        self.changes
+            .iter()
+            .filter_map(|c| match c {
+                ContextKeyChange::Removed(k, _) => Some(k.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Keys whose values changed.
+    pub fn changed_keys(&self) -> Vec<&str> {
+        self.changes
+            .iter()
+            .filter_map(|c| match c {
+                ContextKeyChange::Changed(k, _, _) => Some(k.as_str()),
+                _ => None,
+            })
+            .collect()
+    }
+}
+
+impl fmt::Display for ContextKeyDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.changes.is_empty() {
+            return write!(f, "(no changes)");
+        }
+        for change in &self.changes {
+            match change {
+                ContextKeyChange::Added(k, v) => writeln!(f, "+ {k} = {v}")?,
+                ContextKeyChange::Removed(k, v) => writeln!(f, "- {k} = {v}")?,
+                ContextKeyChange::Changed(k, old, new) => {
+                    writeln!(f, "~ {k}: {old} -> {new}")?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContextKeyBatch
+// ---------------------------------------------------------------------------
+
+/// A batch of context key changes to apply atomically.
+///
+/// Collects `set` and `remove` operations and applies them in a single
+/// write-lock acquisition to avoid intermediate inconsistent states.
+#[derive(Debug, Clone, Default)]
+pub struct ContextKeyBatch {
+    ops: Vec<BatchOp>,
+}
+
+#[derive(Debug, Clone)]
+enum BatchOp {
+    Set(String, ContextKeyValue),
+    Remove(String),
+}
+
+impl ContextKeyBatch {
+    /// Create a new empty batch.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Queue a key to be set.
+    pub fn set(&mut self, key: impl Into<String>, value: ContextKeyValue) -> &mut Self {
+        self.ops.push(BatchOp::Set(key.into(), value));
+        self
+    }
+
+    /// Queue a key to be removed.
+    pub fn remove(&mut self, key: impl Into<String>) -> &mut Self {
+        self.ops.push(BatchOp::Remove(key.into()));
+        self
+    }
+
+    /// Number of queued operations.
+    pub fn len(&self) -> usize {
+        self.ops.len()
+    }
+
+    /// Whether the batch is empty.
+    pub fn is_empty(&self) -> bool {
+        self.ops.is_empty()
+    }
+
+    /// Apply all queued operations to a [`ContextKeyService`] atomically
+    /// (single write-lock acquisition).
+    pub fn apply(&self, service: &ContextKeyService) {
+        let mut guard = service.values.write().unwrap();
+        for op in &self.ops {
+            match op {
+                BatchOp::Set(key, value) => {
+                    guard.insert(key.clone(), value.clone());
+                }
+                BatchOp::Remove(key) => {
+                    guard.remove(key);
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContextKeyValidator
+// ---------------------------------------------------------------------------
+
+/// Result of validating a when-clause expression.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValidationResult {
+    /// Keys referenced in the expression that are not in the known set.
+    pub unknown_keys: Vec<String>,
+    /// Warnings about potential issues (e.g., comparing a bool key with `>`).
+    pub warnings: Vec<String>,
+}
+
+impl ValidationResult {
+    /// Whether the expression passed validation with no issues.
+    pub fn is_ok(&self) -> bool {
+        self.unknown_keys.is_empty() && self.warnings.is_empty()
+    }
+}
+
+impl fmt::Display for ValidationResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_ok() {
+            return write!(f, "validation passed");
+        }
+        if !self.unknown_keys.is_empty() {
+            writeln!(f, "unknown keys: {}", self.unknown_keys.join(", "))?;
+        }
+        for w in &self.warnings {
+            writeln!(f, "warning: {w}")?;
+        }
+        Ok(())
+    }
+}
+
+/// Validates when-clause expressions against a set of known context keys
+/// and their expected types.
+#[derive(Debug, Clone)]
+pub struct ContextKeyValidator {
+    /// Maps known key names to their expected type name ("bool", "string", "number").
+    known_keys: HashMap<String, &'static str>,
+}
+
+impl ContextKeyValidator {
+    /// Create a new validator with no known keys.
+    pub fn new() -> Self {
+        Self {
+            known_keys: HashMap::new(),
+        }
+    }
+
+    /// Register a known key with its expected type.
+    ///
+    /// `type_name` should be one of `"bool"`, `"string"`, `"number"`.
+    pub fn register(&mut self, key: impl Into<String>, type_name: &'static str) -> &mut Self {
+        self.known_keys.insert(key.into(), type_name);
+        self
+    }
+
+    /// Validate an expression, reporting unknown keys and type-mismatch warnings.
+    pub fn validate(&self, expr: &ContextKeyExpr) -> ValidationResult {
+        let mut unknown_keys = Vec::new();
+        let mut warnings = Vec::new();
+        self.validate_inner(expr, &mut unknown_keys, &mut warnings);
+        unknown_keys.sort();
+        unknown_keys.dedup();
+        ValidationResult {
+            unknown_keys,
+            warnings,
+        }
+    }
+
+    fn validate_inner(
+        &self,
+        expr: &ContextKeyExpr,
+        unknown: &mut Vec<String>,
+        warnings: &mut Vec<String>,
+    ) {
+        match expr {
+            ContextKeyExpr::True | ContextKeyExpr::False => {}
+            ContextKeyExpr::Defined(k) => {
+                self.check_known(k, unknown);
+            }
+            ContextKeyExpr::Not(inner) => {
+                self.validate_inner(inner, unknown, warnings);
+            }
+            ContextKeyExpr::Equals(k, _) | ContextKeyExpr::NotEquals(k, _) => {
+                self.check_known(k, unknown);
+            }
+            ContextKeyExpr::Regex(k, _) => {
+                self.check_known(k, unknown);
+                if let Some(&ty) = self.known_keys.get(k) {
+                    if ty != "string" {
+                        warnings.push(format!(
+                            "regex match on '{k}' which has type '{ty}', expected 'string'"
+                        ));
+                    }
+                }
+            }
+            ContextKeyExpr::In(k, s) | ContextKeyExpr::NotIn(k, s) => {
+                self.check_known(k, unknown);
+                self.check_known(s, unknown);
+            }
+            ContextKeyExpr::Greater(k, _)
+            | ContextKeyExpr::GreaterEquals(k, _)
+            | ContextKeyExpr::Less(k, _)
+            | ContextKeyExpr::LessEquals(k, _) => {
+                self.check_known(k, unknown);
+                if let Some(&ty) = self.known_keys.get(k) {
+                    if ty == "bool" {
+                        warnings.push(format!(
+                            "numeric comparison on '{k}' which has type 'bool'"
+                        ));
+                    }
+                }
+            }
+            ContextKeyExpr::And(exprs) | ContextKeyExpr::Or(exprs) => {
+                for e in exprs {
+                    self.validate_inner(e, unknown, warnings);
+                }
+            }
+        }
+    }
+
+    fn check_known(&self, key: &str, unknown: &mut Vec<String>) {
+        if !self.known_keys.contains_key(key) {
+            unknown.push(key.to_owned());
+        }
+    }
+}
+
+impl Default for ContextKeyValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1421,5 +1861,185 @@ mod tests {
     fn expression_leaf_count() {
         let expr = ContextKeyExpression::parse("a && b || c").unwrap();
         assert!(expr.leaf_count() >= 2);
+    }
+
+    // -- Display / From impls ----------------------------------------------
+
+    #[test]
+    fn context_key_value_display() {
+        assert_eq!(format!("{}", ContextKeyValue::Bool(true)), "true");
+        assert_eq!(format!("{}", ContextKeyValue::String("hi".into())), "hi");
+        assert_eq!(format!("{}", ContextKeyValue::Number(3.5)), "3.5");
+        assert_eq!(format!("{}", ContextKeyValue::Null), "null");
+    }
+
+    #[test]
+    fn context_key_value_from_impls() {
+        let v: ContextKeyValue = true.into();
+        assert_eq!(v, ContextKeyValue::Bool(true));
+
+        let v: ContextKeyValue = 42.0_f64.into();
+        assert_eq!(v, ContextKeyValue::Number(42.0));
+
+        let v: ContextKeyValue = "hello".into();
+        assert_eq!(v, ContextKeyValue::String("hello".into()));
+
+        let v: ContextKeyValue = String::from("world").into();
+        assert_eq!(v, ContextKeyValue::String("world".into()));
+    }
+
+    // -- ContextKeySnapshot ------------------------------------------------
+
+    #[test]
+    fn snapshot_capture_and_keys() {
+        let svc = ContextKeyService::new();
+        svc.set_context("beta", ContextKeyValue::Number(2.0));
+        svc.set_context("alpha", ContextKeyValue::Bool(true));
+
+        let snap = ContextKeySnapshot::capture(&svc);
+        assert_eq!(snap.len(), 2);
+        assert!(!snap.is_empty());
+        assert_eq!(snap.keys(), vec!["alpha", "beta"]);
+        assert_eq!(snap.get("alpha"), Some(&ContextKeyValue::Bool(true)));
+        assert_eq!(snap.get("missing"), None);
+    }
+
+    #[test]
+    fn snapshot_display() {
+        let snap = ContextKeySnapshot::from_entries(vec![
+            ("key".into(), ContextKeyValue::Bool(true)),
+        ]);
+        let output = format!("{snap}");
+        assert!(output.contains("1 keys"));
+        assert!(output.contains("key = true"));
+    }
+
+    // -- ContextKeyDiff ----------------------------------------------------
+
+    #[test]
+    fn diff_added_removed_changed() {
+        let old = ContextKeySnapshot::from_entries(vec![
+            ("kept".into(), ContextKeyValue::Bool(true)),
+            ("changed".into(), ContextKeyValue::Number(1.0)),
+            ("removed".into(), ContextKeyValue::String("gone".into())),
+        ]);
+        let new = ContextKeySnapshot::from_entries(vec![
+            ("kept".into(), ContextKeyValue::Bool(true)),
+            ("changed".into(), ContextKeyValue::Number(2.0)),
+            ("added".into(), ContextKeyValue::Bool(false)),
+        ]);
+
+        let diff = old.diff(&new);
+        assert_eq!(diff.len(), 3);
+        assert!(!diff.is_empty());
+        assert_eq!(diff.added_keys(), vec!["added"]);
+        assert_eq!(diff.removed_keys(), vec!["removed"]);
+        assert_eq!(diff.changed_keys(), vec!["changed"]);
+    }
+
+    #[test]
+    fn diff_identical_snapshots() {
+        let snap = ContextKeySnapshot::from_entries(vec![
+            ("a".into(), ContextKeyValue::Bool(true)),
+        ]);
+        let diff = snap.diff(&snap);
+        assert!(diff.is_empty());
+        assert_eq!(format!("{diff}"), "(no changes)");
+    }
+
+    #[test]
+    fn diff_display() {
+        let old = ContextKeySnapshot::from_entries(vec![
+            ("x".into(), ContextKeyValue::Number(1.0)),
+        ]);
+        let new = ContextKeySnapshot::from_entries(vec![
+            ("x".into(), ContextKeyValue::Number(2.0)),
+        ]);
+        let diff = old.diff(&new);
+        let output = format!("{diff}");
+        assert!(output.contains("~ x: 1 -> 2"));
+    }
+
+    // -- ContextKeyBatch ---------------------------------------------------
+
+    #[test]
+    fn batch_apply_atomic() {
+        let svc = ContextKeyService::new();
+        svc.set_context("existing", ContextKeyValue::Bool(true));
+
+        let mut batch = ContextKeyBatch::new();
+        batch
+            .set("new_key", ContextKeyValue::String("hello".into()))
+            .set("existing", ContextKeyValue::Bool(false))
+            .remove("existing");
+        assert_eq!(batch.len(), 3);
+        assert!(!batch.is_empty());
+
+        batch.apply(&svc);
+
+        assert_eq!(
+            svc.get_context("new_key"),
+            Some(ContextKeyValue::String("hello".into()))
+        );
+        // "existing" was set then removed in order
+        assert_eq!(svc.get_context("existing"), None);
+    }
+
+    // -- ContextKeyValidator -----------------------------------------------
+
+    #[test]
+    fn validator_unknown_keys() {
+        let mut validator = ContextKeyValidator::new();
+        validator.register("editorFocus", "bool");
+        validator.register("editorLangId", "string");
+
+        let expr = ContextKeyExpr::parse("editorFocus && unknownKey == foo").unwrap();
+        let result = validator.validate(&expr);
+        assert!(!result.is_ok());
+        assert!(result.unknown_keys.contains(&"unknownKey".to_string()));
+        assert!(!result.unknown_keys.contains(&"editorFocus".to_string()));
+    }
+
+    #[test]
+    fn validator_type_mismatch_warnings() {
+        let mut validator = ContextKeyValidator::new();
+        validator.register("isActive", "bool");
+        validator.register("name", "string");
+
+        // Numeric comparison on a bool key should warn
+        let expr = ContextKeyExpr::parse("isActive > 5").unwrap();
+        let result = validator.validate(&expr);
+        assert!(result.unknown_keys.is_empty());
+        assert!(!result.warnings.is_empty());
+        assert!(result.warnings[0].contains("bool"));
+
+        // Regex on a non-string key should warn
+        let expr = ContextKeyExpr::parse("isActive =~ /true/").unwrap();
+        let result = validator.validate(&expr);
+        assert!(result.warnings[0].contains("regex"));
+    }
+
+    #[test]
+    fn validator_all_known_passes() {
+        let mut validator = ContextKeyValidator::new();
+        validator.register("editorFocus", "bool");
+        validator.register("lang", "string");
+
+        let expr = ContextKeyExpr::parse("editorFocus && lang == rust").unwrap();
+        let result = validator.validate(&expr);
+        assert!(result.is_ok());
+        assert_eq!(format!("{result}"), "validation passed");
+    }
+
+    #[test]
+    fn validator_in_checks_both_keys() {
+        let mut validator = ContextKeyValidator::new();
+        validator.register("lang", "string");
+        // "supportedLangs" is not registered
+
+        let expr = ContextKeyExpr::parse("lang in supportedLangs").unwrap();
+        let result = validator.validate(&expr);
+        assert!(result.unknown_keys.contains(&"supportedLangs".to_string()));
+        assert!(!result.unknown_keys.contains(&"lang".to_string()));
     }
 }

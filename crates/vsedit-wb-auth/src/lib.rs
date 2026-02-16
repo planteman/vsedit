@@ -1,5 +1,6 @@
 //! OAuth provider integration.
 
+use std::collections::HashMap;
 use std::fmt;
 
 // ---------------------------------------------------------------------------
@@ -924,6 +925,208 @@ pub fn auth_token_refresh(
     })
 }
 
+
+// ---------------------------------------------------------------------------
+// TokenValidator - validates auth tokens
+// ---------------------------------------------------------------------------
+
+/// Validates authentication tokens.
+#[derive(Debug, Clone)]
+pub struct TokenValidator {
+    pub token: String,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub scopes: Vec<String>,
+}
+
+impl TokenValidator {
+    /// Create a new token validator.
+    pub fn new(token: impl Into<String>, issued_at: u64, expires_at: u64) -> Self {
+        Self {
+            token: token.into(),
+            issued_at,
+            expires_at,
+            scopes: Vec::new(),
+        }
+    }
+
+    /// Add scopes to this token.
+    pub fn with_scopes(mut self, scopes: Vec<String>) -> Self {
+        self.scopes = scopes;
+        self
+    }
+
+    /// Validate that the token is well-formed and not expired.
+    pub fn validate(&self, current_time: u64) -> Result<(), String> {
+        if self.token.is_empty() {
+            return Err("token is empty".to_string());
+        }
+        if self.issued_at > self.expires_at {
+            return Err("issued_at is after expires_at".to_string());
+        }
+        if self.is_expired(current_time) {
+            return Err(format!(
+                "token expired {} seconds ago",
+                current_time.saturating_sub(self.expires_at)
+            ));
+        }
+        Ok(())
+    }
+
+    /// Check if the token is expired at the given time.
+    pub fn is_expired(&self, current_time: u64) -> bool {
+        current_time >= self.expires_at
+    }
+
+    /// Remaining seconds until expiration, or 0 if already expired.
+    pub fn remaining_seconds(&self, current_time: u64) -> u64 {
+        self.expires_at.saturating_sub(current_time)
+    }
+
+    /// Duration for which this token is valid (total lifetime).
+    pub fn lifetime(&self) -> u64 {
+        self.expires_at.saturating_sub(self.issued_at)
+    }
+
+    /// Check if a specific scope is present.
+    pub fn has_scope(&self, scope: &str) -> bool {
+        self.scopes.iter().any(|s| s == scope)
+    }
+}
+
+impl fmt::Display for TokenValidator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Token(lifetime={}s, scopes={})",
+            self.lifetime(),
+            self.scopes.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AuthFlowState - state machine for authentication flows
+// ---------------------------------------------------------------------------
+
+/// Represents the state of an authentication flow.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AuthFlowState {
+    /// No authentication flow in progress.
+    Idle,
+    /// Waiting for the user to authenticate in a browser.
+    AwaitingUserAuth,
+    /// Exchanging an authorization code for tokens.
+    ExchangingCode,
+    /// Successfully authenticated.
+    Authenticated,
+    /// Authentication failed with an error message.
+    Failed(String),
+}
+
+impl AuthFlowState {
+    /// Returns true if this state is terminal (Authenticated or Failed).
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Self::Authenticated | Self::Failed(_))
+    }
+
+    /// Returns true if the flow is in progress.
+    pub fn is_in_progress(&self) -> bool {
+        matches!(self, Self::AwaitingUserAuth | Self::ExchangingCode)
+    }
+
+    /// Returns true if the flow has not started.
+    pub fn is_idle(&self) -> bool {
+        matches!(self, Self::Idle)
+    }
+
+    /// Returns true if authentication succeeded.
+    pub fn is_authenticated(&self) -> bool {
+        matches!(self, Self::Authenticated)
+    }
+
+    /// Returns the error message if the flow failed.
+    pub fn error_message(&self) -> Option<&str> {
+        match self {
+            Self::Failed(msg) => Some(msg),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for AuthFlowState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Idle => write!(f, "Idle"),
+            Self::AwaitingUserAuth => write!(f, "AwaitingUserAuth"),
+            Self::ExchangingCode => write!(f, "ExchangingCode"),
+            Self::Authenticated => write!(f, "Authenticated"),
+            Self::Failed(msg) => write!(f, "Failed({msg})"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AuthFlowTracker - tracks multiple auth flows
+// ---------------------------------------------------------------------------
+
+/// Tracks authentication flows by provider.
+#[derive(Debug, Clone, Default)]
+pub struct AuthFlowTracker {
+    flows: HashMap<String, AuthFlowState>,
+}
+
+impl AuthFlowTracker {
+    /// Create a new empty flow tracker.
+    pub fn new() -> Self {
+        Self {
+            flows: HashMap::new(),
+        }
+    }
+
+    /// Set the state of a flow for the given provider.
+    pub fn set_state(&mut self, provider_id: impl Into<String>, state: AuthFlowState) {
+        self.flows.insert(provider_id.into(), state);
+    }
+
+    /// Get the current state for a provider.
+    pub fn get_state(&self, provider_id: &str) -> Option<&AuthFlowState> {
+        self.flows.get(provider_id)
+    }
+
+    /// Returns all providers with active (in-progress) flows.
+    pub fn active_flows(&self) -> Vec<&str> {
+        self.flows
+            .iter()
+            .filter(|(_, s)| s.is_in_progress())
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+
+    /// Returns all providers that have completed authentication.
+    pub fn authenticated_providers(&self) -> Vec<&str> {
+        self.flows
+            .iter()
+            .filter(|(_, s)| s.is_authenticated())
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+
+    /// Number of tracked flows.
+    pub fn len(&self) -> usize {
+        self.flows.len()
+    }
+
+    /// Returns true if no flows are being tracked.
+    pub fn is_empty(&self) -> bool {
+        self.flows.is_empty()
+    }
+
+    /// Remove all completed (terminal) flows.
+    pub fn clear_completed(&mut self) {
+        self.flows.retain(|_, s| !s.is_terminal());
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1490,5 +1693,77 @@ mod tests {
         let checker = PermissionChecker::new();
         let session = AuthSession::new("s1", "gh", "tok");
         assert!(checker.is_allowed(&session, "anything"));
+    }
+
+    #[test]
+    fn token_validator_valid() {
+        let tv = TokenValidator::new("tok123", 1000, 2000)
+            .with_scopes(vec!["read".into(), "write".into()]);
+        assert!(tv.validate(1500).is_ok());
+        assert!(!tv.is_expired(1500));
+        assert_eq!(tv.remaining_seconds(1500), 500);
+        assert_eq!(tv.lifetime(), 1000);
+        assert!(tv.has_scope("read"));
+        assert!(!tv.has_scope("admin"));
+    }
+
+    #[test]
+    fn token_validator_expired() {
+        let tv = TokenValidator::new("tok", 100, 200);
+        assert!(tv.is_expired(300));
+        assert_eq!(tv.remaining_seconds(300), 0);
+        let err = tv.validate(300).unwrap_err();
+        assert!(err.contains("expired"));
+    }
+
+    #[test]
+    fn token_validator_empty_token() {
+        let tv = TokenValidator::new("", 100, 200);
+        let err = tv.validate(150).unwrap_err();
+        assert!(err.contains("empty"));
+    }
+
+    #[test]
+    fn auth_flow_state_transitions() {
+        let idle = AuthFlowState::Idle;
+        assert!(idle.is_idle());
+        assert!(!idle.is_terminal());
+
+        let awaiting = AuthFlowState::AwaitingUserAuth;
+        assert!(awaiting.is_in_progress());
+
+        let auth = AuthFlowState::Authenticated;
+        assert!(auth.is_terminal());
+        assert!(auth.is_authenticated());
+
+        let failed = AuthFlowState::Failed("timeout".into());
+        assert!(failed.is_terminal());
+        assert_eq!(failed.error_message(), Some("timeout"));
+        let s = format!("{failed}");
+        assert!(s.contains("timeout"));
+    }
+
+    #[test]
+    fn auth_flow_tracker_operations() {
+        let mut tracker = AuthFlowTracker::new();
+        assert!(tracker.is_empty());
+        tracker.set_state("github", AuthFlowState::AwaitingUserAuth);
+        tracker.set_state("gitlab", AuthFlowState::Authenticated);
+        assert_eq!(tracker.len(), 2);
+        assert_eq!(tracker.active_flows(), vec!["github"]);
+        assert_eq!(tracker.authenticated_providers(), vec!["gitlab"]);
+        tracker.clear_completed();
+        assert_eq!(tracker.len(), 1);
+        assert!(tracker.get_state("github").is_some());
+    }
+
+    #[test]
+    fn auth_flow_tracker_clear_completed() {
+        let mut tracker = AuthFlowTracker::new();
+        tracker.set_state("a", AuthFlowState::Failed("err".into()));
+        tracker.set_state("b", AuthFlowState::ExchangingCode);
+        tracker.clear_completed();
+        assert_eq!(tracker.len(), 1);
+        assert!(tracker.get_state("b").unwrap().is_in_progress());
     }
 }

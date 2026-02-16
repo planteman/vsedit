@@ -924,6 +924,169 @@ pub fn diff_editor_options(a: &EditorOptions, b: &EditorOptions) -> Vec<EditorOp
     changes
 }
 
+
+// ---------------------------------------------------------------------------
+// EditorConfigProfile
+// ---------------------------------------------------------------------------
+
+/// A named profile bundling a set of editor options.
+#[derive(Debug, Clone)]
+pub struct EditorConfigProfile {
+    pub name: String,
+    pub options: EditorOptions,
+    pub is_default: bool,
+}
+
+impl EditorConfigProfile {
+    pub fn new(name: impl Into<String>, options: EditorOptions) -> Self {
+        Self { name: name.into(), options, is_default: false }
+    }
+
+    pub fn with_default(mut self, is_default: bool) -> Self {
+        self.is_default = is_default;
+        self
+    }
+}
+
+impl fmt::Display for EditorConfigProfile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let tag = if self.is_default { " (default)" } else { "" };
+        write!(f, "Profile '{}'{}", self.name, tag)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProfileManager
+// ---------------------------------------------------------------------------
+
+/// Manages a collection of editor config profiles with one active profile.
+#[derive(Debug)]
+pub struct ProfileManager {
+    profiles: Vec<EditorConfigProfile>,
+    active_name: Option<String>,
+}
+
+impl ProfileManager {
+    pub fn new() -> Self {
+        Self { profiles: Vec::new(), active_name: None }
+    }
+
+    pub fn add(&mut self, profile: EditorConfigProfile) -> bool {
+        if self.profiles.iter().any(|p| p.name == profile.name) {
+            return false;
+        }
+        if profile.is_default || self.active_name.is_none() {
+            self.active_name = Some(profile.name.clone());
+        }
+        self.profiles.push(profile);
+        true
+    }
+
+    pub fn remove(&mut self, name: &str) -> bool {
+        let before = self.profiles.len();
+        self.profiles.retain(|p| p.name != name);
+        if self.active_name.as_deref() == Some(name) {
+            self.active_name = self.profiles.first().map(|p| p.name.clone());
+        }
+        self.profiles.len() < before
+    }
+
+    pub fn activate(&mut self, name: &str) -> bool {
+        if self.profiles.iter().any(|p| p.name == name) {
+            self.active_name = Some(name.to_string());
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn active(&self) -> Option<&EditorConfigProfile> {
+        self.active_name
+            .as_deref()
+            .and_then(|n| self.profiles.iter().find(|p| p.name == n))
+    }
+
+    pub fn list(&self) -> Vec<&str> {
+        self.profiles.iter().map(|p| p.name.as_str()).collect()
+    }
+
+    pub fn clone_profile(&mut self, source: &str, new_name: impl Into<String>) -> bool {
+        let new_name = new_name.into();
+        if self.profiles.iter().any(|p| p.name == new_name) {
+            return false;
+        }
+        if let Some(src) = self.profiles.iter().find(|p| p.name == source) {
+            let mut cloned = src.clone();
+            cloned.name = new_name;
+            cloned.is_default = false;
+            self.profiles.push(cloned);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Default for ProfileManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorConfigMerger
+// ---------------------------------------------------------------------------
+
+pub struct EditorConfigMerger;
+
+impl EditorConfigMerger {
+    pub fn merge(base: &EditorOptions, overrides: &EditorOptions) -> EditorOptions {
+        let def = EditorOptions::default();
+        let mut result = base.clone();
+        if overrides.tab_size != def.tab_size { result.tab_size = overrides.tab_size; }
+        if overrides.insert_spaces != def.insert_spaces { result.insert_spaces = overrides.insert_spaces; }
+        if overrides.word_wrap != def.word_wrap { result.word_wrap = overrides.word_wrap; }
+        if overrides.word_wrap_column != def.word_wrap_column { result.word_wrap_column = overrides.word_wrap_column; }
+        if overrides.font_size != def.font_size { result.font_size = overrides.font_size; }
+        if overrides.line_height != def.line_height { result.line_height = overrides.line_height; }
+        if overrides.cursor_style != def.cursor_style { result.cursor_style = overrides.cursor_style; }
+        if overrides.cursor_blinking != def.cursor_blinking { result.cursor_blinking = overrides.cursor_blinking; }
+        if overrides.line_numbers != def.line_numbers { result.line_numbers = overrides.line_numbers; }
+        if overrides.minimap_enabled != def.minimap_enabled { result.minimap_enabled = overrides.minimap_enabled; }
+        if overrides.render_whitespace != def.render_whitespace { result.render_whitespace = overrides.render_whitespace; }
+        if !overrides.rulers.is_empty() { result.rulers = overrides.rulers.clone(); }
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ConfigValidator
+// ---------------------------------------------------------------------------
+
+pub struct ConfigValidator;
+
+impl ConfigValidator {
+    pub fn validate(opts: &EditorOptions) -> Vec<String> {
+        let mut errors = Vec::new();
+        if opts.tab_size == 0 || opts.tab_size > 16 {
+            errors.push(format!("tab_size must be 1..16, got {}", opts.tab_size));
+        }
+        if opts.font_size == 0 || opts.font_size > 200 {
+            errors.push(format!("font_size must be 1..200, got {}", opts.font_size));
+        }
+        if opts.word_wrap_column == 0 || opts.word_wrap_column > 10000 {
+            errors.push(format!("word_wrap_column must be 1..10000, got {}", opts.word_wrap_column));
+        }
+        if opts.sticky_scroll_max_line_count > 50 {
+            errors.push(format!(
+                "sticky_scroll_max_line_count must be <=50, got {}",
+                opts.sticky_scroll_max_line_count,
+            ));
+        }
+        errors
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1479,4 +1642,68 @@ mod tests {
         assert!(changes.iter().any(|c| c.field == "font_size"));
         assert!(format!("{}", changes[0]).contains("->"));
     }
+
+    // --- new tests ---
+
+    #[test]
+    fn profile_manager_add_activate() {
+        let mut mgr = ProfileManager::new();
+        mgr.add(EditorConfigProfile::new("default", EditorOptions::default()).with_default(true));
+        mgr.add(EditorConfigProfile::new("minimal", EditorOptions::default()));
+        assert_eq!(mgr.list().len(), 2);
+        assert_eq!(mgr.active().unwrap().name, "default");
+        assert!(mgr.activate("minimal"));
+        assert_eq!(mgr.active().unwrap().name, "minimal");
+        assert!(!mgr.activate("nonexistent"));
+    }
+
+    #[test]
+    fn profile_manager_remove() {
+        let mut mgr = ProfileManager::new();
+        mgr.add(EditorConfigProfile::new("a", EditorOptions::default()));
+        mgr.add(EditorConfigProfile::new("b", EditorOptions::default()));
+        mgr.activate("a");
+        assert!(mgr.remove("a"));
+        assert_eq!(mgr.active().unwrap().name, "b");
+    }
+
+    #[test]
+    fn profile_manager_clone_profile() {
+        let mut mgr = ProfileManager::new();
+        mgr.add(EditorConfigProfile::new("src", EditorOptions::default()));
+        assert!(mgr.clone_profile("src", "dst"));
+        assert_eq!(mgr.list().len(), 2);
+        assert!(!mgr.clone_profile("src", "dst"));
+        assert!(!mgr.clone_profile("nope", "other"));
+    }
+
+    #[test]
+    fn config_merger_override() {
+        let base = EditorOptions::default();
+        let mut over = EditorOptions::default();
+        over.tab_size = 2;
+        over.font_size = 20;
+        let merged = EditorConfigMerger::merge(&base, &over);
+        assert_eq!(merged.tab_size, 2);
+        assert_eq!(merged.font_size, 20);
+        assert_eq!(merged.word_wrap, base.word_wrap);
+    }
+
+    #[test]
+    fn config_validator_valid() {
+        let opts = EditorOptions::default();
+        assert!(ConfigValidator::validate(&opts).is_empty());
+    }
+
+    #[test]
+    fn config_validator_invalid() {
+        let mut opts = EditorOptions::default();
+        opts.tab_size = 0;
+        opts.font_size = 999;
+        let errors = ConfigValidator::validate(&opts);
+        assert!(errors.len() >= 2);
+        assert!(errors.iter().any(|e| e.contains("tab_size")));
+        assert!(errors.iter().any(|e| e.contains("font_size")));
+    }
+
 }

@@ -796,6 +796,358 @@ impl EditorGroupLayout {
 }
 
 // ---------------------------------------------------------------------------
+// EditorHistory
+// ---------------------------------------------------------------------------
+
+/// Tracks recently visited editors with back/forward navigation.
+#[derive(Debug)]
+pub struct EditorHistory {
+    entries: Vec<VsUri>,
+    cursor: usize,
+    capacity: usize,
+}
+
+impl EditorHistory {
+    /// Create a new history with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            cursor: 0,
+            capacity: capacity.max(1),
+        }
+    }
+
+    /// Record a navigation to `uri`.
+    ///
+    /// Any forward history beyond the current cursor is discarded.
+    /// If the URI is the same as the current entry, it is not duplicated.
+    pub fn push(&mut self, uri: VsUri) {
+        if self.cursor < self.entries.len() {
+            if self.entries[self.cursor] == uri {
+                return;
+            }
+        }
+        // Discard forward history.
+        self.entries.truncate(self.cursor + if self.entries.is_empty() { 0 } else { 1 });
+        self.entries.push(uri);
+        if self.entries.len() > self.capacity {
+            self.entries.remove(0);
+        }
+        self.cursor = self.entries.len() - 1;
+    }
+
+    /// Navigate backward. Returns the URI navigated to, if any.
+    pub fn go_back(&mut self) -> Option<&VsUri> {
+        if self.cursor > 0 {
+            self.cursor -= 1;
+            Some(&self.entries[self.cursor])
+        } else {
+            None
+        }
+    }
+
+    /// Navigate forward. Returns the URI navigated to, if any.
+    pub fn go_forward(&mut self) -> Option<&VsUri> {
+        if self.cursor + 1 < self.entries.len() {
+            self.cursor += 1;
+            Some(&self.entries[self.cursor])
+        } else {
+            None
+        }
+    }
+
+    /// Return the current entry, if any.
+    pub fn current(&self) -> Option<&VsUri> {
+        self.entries.get(self.cursor)
+    }
+
+    /// Whether there is a previous entry to navigate to.
+    pub fn can_go_back(&self) -> bool {
+        self.cursor > 0
+    }
+
+    /// Whether there is a next entry to navigate to.
+    pub fn can_go_forward(&self) -> bool {
+        self.cursor + 1 < self.entries.len()
+    }
+
+    /// Return the number of entries in the history.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear the entire history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.cursor = 0;
+    }
+}
+
+impl fmt::Display for EditorHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "EditorHistory(entries={}, cursor={}, capacity={})",
+            self.entries.len(),
+            self.cursor,
+            self.capacity,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorSnapshot
+// ---------------------------------------------------------------------------
+
+/// A serialisable snapshot of the full editor state (all groups and their tabs).
+#[derive(Debug, Clone)]
+pub struct EditorSnapshot {
+    pub groups: Vec<EditorSnapshotGroup>,
+    pub active_group: usize,
+}
+
+/// One group within an [`EditorSnapshot`].
+#[derive(Debug, Clone)]
+pub struct EditorSnapshotGroup {
+    pub group_id: u32,
+    pub editors: Vec<EditorInput>,
+    pub active_index: Option<usize>,
+}
+
+impl EditorSnapshot {
+    /// Capture a snapshot from the current state of an [`EditorService`].
+    pub fn capture(svc: &EditorService) -> Self {
+        let groups = svc
+            .get_groups()
+            .iter()
+            .map(|g| EditorSnapshotGroup {
+                group_id: g.id,
+                editors: g.get_editors().to_vec(),
+                active_index: g.active_editor().map(|_| {
+                    g.get_editors()
+                        .iter()
+                        .position(|e| Some(e) == g.active_editor())
+                        .unwrap_or(0)
+                }),
+            })
+            .collect();
+        Self {
+            groups,
+            active_group: svc.active_group_index(),
+        }
+    }
+
+    /// Restore the snapshot into an [`EditorService`], replacing its state.
+    pub fn restore(&self, svc: &mut EditorService) {
+        svc.groups.clear();
+        for sg in &self.groups {
+            let mut group = EditorGroup::new(sg.group_id);
+            for editor in &sg.editors {
+                group.open(editor.clone());
+            }
+            if let Some(idx) = sg.active_index {
+                group.set_active(idx);
+            }
+            svc.groups.push(group);
+        }
+        if svc.groups.is_empty() {
+            svc.groups.push(EditorGroup::new(0));
+        }
+        svc.active_group = self.active_group.min(svc.groups.len() - 1);
+        svc.next_group_id = svc
+            .groups
+            .iter()
+            .map(|g| g.id + 1)
+            .max()
+            .unwrap_or(0);
+    }
+
+    /// Return the total number of editors across all groups in the snapshot.
+    pub fn total_editors(&self) -> usize {
+        self.groups.iter().map(|g| g.editors.len()).sum()
+    }
+}
+
+impl fmt::Display for EditorSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "EditorSnapshot(groups={}, total_editors={}, active_group={})",
+            self.groups.len(),
+            self.total_editors(),
+            self.active_group,
+        )
+    }
+}
+
+impl From<&EditorService> for EditorSnapshot {
+    fn from(svc: &EditorService) -> Self {
+        Self::capture(svc)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TabSortStrategy / TabSorter
+// ---------------------------------------------------------------------------
+
+/// Strategies for sorting editor tabs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabSortStrategy {
+    /// Sort alphabetically by display name.
+    ByName,
+    /// Sort by full file path.
+    ByPath,
+    /// Sort by file extension, then by name within the same extension.
+    ByExtension,
+    /// Sort with modified (dirty) tabs first.
+    ModifiedFirst,
+}
+
+impl fmt::Display for TabSortStrategy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ByName => write!(f, "by name"),
+            Self::ByPath => write!(f, "by path"),
+            Self::ByExtension => write!(f, "by extension"),
+            Self::ModifiedFirst => write!(f, "modified first"),
+        }
+    }
+}
+
+/// Sorts a collection of [`EditorInput`]s according to a chosen strategy.
+pub struct TabSorter;
+
+impl TabSorter {
+    /// Sort `editors` in place using the given `strategy`.
+    pub fn sort(editors: &mut [EditorInput], strategy: TabSortStrategy) {
+        match strategy {
+            TabSortStrategy::ByName => {
+                editors.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+            }
+            TabSortStrategy::ByPath => {
+                editors.sort_by(|a, b| a.uri.path.cmp(&b.uri.path));
+            }
+            TabSortStrategy::ByExtension => {
+                editors.sort_by(|a, b| {
+                    let ext_a = Self::extension(&a.name);
+                    let ext_b = Self::extension(&b.name);
+                    ext_a
+                        .cmp(&ext_b)
+                        .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+                });
+            }
+            TabSortStrategy::ModifiedFirst => {
+                editors.sort_by(|a, b| b.is_dirty.cmp(&a.is_dirty).then_with(|| a.name.cmp(&b.name)));
+            }
+        }
+    }
+
+    /// Return a sorted copy without modifying the input.
+    pub fn sorted(editors: &[EditorInput], strategy: TabSortStrategy) -> Vec<EditorInput> {
+        let mut copy = editors.to_vec();
+        Self::sort(&mut copy, strategy);
+        copy
+    }
+
+    fn extension(name: &str) -> String {
+        name.rsplit('.')
+            .next()
+            .unwrap_or("")
+            .to_lowercase()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorFilter
+// ---------------------------------------------------------------------------
+
+/// Filters editor inputs matching various criteria.
+pub struct EditorFilter;
+
+impl EditorFilter {
+    /// Return editors that have unsaved changes.
+    pub fn dirty(editors: &[EditorInput]) -> Vec<&EditorInput> {
+        editors.iter().filter(|e| e.is_dirty).collect()
+    }
+
+    /// Return editors matching a specific language identifier.
+    pub fn by_language<'a>(editors: &'a [EditorInput], lang: &str) -> Vec<&'a EditorInput> {
+        editors
+            .iter()
+            .filter(|e| e.language_id.as_deref() == Some(lang))
+            .collect()
+    }
+
+    /// Return editors whose URI path contains `pattern`.
+    pub fn by_path_contains<'a>(editors: &'a [EditorInput], pattern: &str) -> Vec<&'a EditorInput> {
+        editors
+            .iter()
+            .filter(|e| e.uri.path.contains(pattern))
+            .collect()
+    }
+
+    /// Return editors whose name matches a glob-like suffix (e.g. `".rs"`).
+    pub fn by_extension<'a>(editors: &'a [EditorInput], ext: &str) -> Vec<&'a EditorInput> {
+        let suffix = if ext.starts_with('.') {
+            ext.to_string()
+        } else {
+            format!(".{ext}")
+        };
+        editors
+            .iter()
+            .filter(|e| e.name.ends_with(&suffix))
+            .collect()
+    }
+
+    /// Return editors that are read-only.
+    pub fn readonly(editors: &[EditorInput]) -> Vec<&EditorInput> {
+        editors.iter().filter(|e| e.is_readonly).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display impls for remaining types
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for EditorInput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let dirty = if self.is_dirty { " [modified]" } else { "" };
+        let ro = if self.is_readonly { " [readonly]" } else { "" };
+        write!(f, "{}{}{}", self.name, dirty, ro)
+    }
+}
+
+impl fmt::Display for EditorGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "EditorGroup(id={}, editors={}, active={:?})",
+            self.id,
+            self.editors.len(),
+            self.active_index,
+        )
+    }
+}
+
+impl fmt::Display for EditorGroupLayout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.describe())
+    }
+}
+
+impl fmt::Display for EditorTab {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let modified = if self.is_modified { " [modified]" } else { "" };
+        write!(f, "{}{}", self.title, modified)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1426,5 +1778,130 @@ mod tests {
         assert_eq!(EditorGroupLayout::from_count(1), EditorGroupLayout::Single);
         assert_eq!(EditorGroupLayout::from_count(2), EditorGroupLayout::Horizontal);
         assert_eq!(EditorGroupLayout::from_count(5), EditorGroupLayout::Horizontal);
+    }
+
+    // -- EditorHistory ------------------------------------------------------
+
+    #[test]
+    fn history_back_forward_navigation() {
+        let mut hist = EditorHistory::new(10);
+        assert!(hist.is_empty());
+        assert!(!hist.can_go_back());
+
+        hist.push(VsUri::file("/a.rs"));
+        hist.push(VsUri::file("/b.rs"));
+        hist.push(VsUri::file("/c.rs"));
+        assert_eq!(hist.len(), 3);
+        assert_eq!(hist.current(), Some(&VsUri::file("/c.rs")));
+
+        // Go back twice.
+        assert!(hist.can_go_back());
+        assert_eq!(hist.go_back(), Some(&VsUri::file("/b.rs")));
+        assert_eq!(hist.go_back(), Some(&VsUri::file("/a.rs")));
+        assert!(!hist.can_go_back());
+        assert!(hist.go_back().is_none());
+
+        // Go forward.
+        assert!(hist.can_go_forward());
+        assert_eq!(hist.go_forward(), Some(&VsUri::file("/b.rs")));
+
+        // Push discards forward history.
+        hist.push(VsUri::file("/d.rs"));
+        assert!(!hist.can_go_forward());
+        assert_eq!(hist.current(), Some(&VsUri::file("/d.rs")));
+        assert_eq!(hist.len(), 3); // a, b, d
+    }
+
+    #[test]
+    fn history_capacity_eviction() {
+        let mut hist = EditorHistory::new(3);
+        hist.push(VsUri::file("/a.rs"));
+        hist.push(VsUri::file("/b.rs"));
+        hist.push(VsUri::file("/c.rs"));
+        hist.push(VsUri::file("/d.rs"));
+        assert_eq!(hist.len(), 3);
+        // /a.rs should have been evicted.
+        hist.go_back();
+        hist.go_back();
+        assert_eq!(hist.current(), Some(&VsUri::file("/b.rs")));
+    }
+
+    // -- EditorSnapshot -----------------------------------------------------
+
+    #[test]
+    fn snapshot_capture_and_restore() {
+        let mut svc = EditorService::new();
+        svc.open_editor(make_input("/a.rs"), None);
+        svc.open_editor(make_input("/b.rs"), None);
+        let g1 = svc.add_group();
+        svc.open_editor(make_input("/c.rs"), Some(g1));
+
+        let snap = EditorSnapshot::capture(&svc);
+        assert_eq!(snap.groups.len(), 2);
+        assert_eq!(snap.total_editors(), 3);
+
+        // Restore into a fresh service.
+        let mut svc2 = EditorService::new();
+        snap.restore(&mut svc2);
+        assert_eq!(svc2.group_count(), 2);
+        assert_eq!(svc2.total_editor_count(), 3);
+        assert_eq!(
+            svc2.get_groups()[0].get_editors()[0].uri,
+            VsUri::file("/a.rs")
+        );
+    }
+
+    // -- TabSorter ----------------------------------------------------------
+
+    #[test]
+    fn tab_sorter_by_extension_and_name() {
+        let mut editors = vec![
+            make_input("/z.py"),
+            make_input("/a.rs"),
+            make_input("/b.py"),
+            make_input("/m.rs"),
+        ];
+
+        TabSorter::sort(&mut editors, TabSortStrategy::ByExtension);
+        // .py first, then .rs; alphabetical within each extension.
+        assert_eq!(editors[0].name, "b.py");
+        assert_eq!(editors[1].name, "z.py");
+        assert_eq!(editors[2].name, "a.rs");
+        assert_eq!(editors[3].name, "m.rs");
+
+        // ByName sort.
+        TabSorter::sort(&mut editors, TabSortStrategy::ByName);
+        assert_eq!(editors[0].name, "a.rs");
+        assert_eq!(editors[1].name, "b.py");
+    }
+
+    // -- EditorFilter -------------------------------------------------------
+
+    #[test]
+    fn filter_dirty_and_by_language() {
+        let mut editors = vec![
+            make_input("/a.rs"),
+            make_input("/b.py"),
+            make_input("/c.rs"),
+        ];
+        editors[0].is_dirty = true;
+        editors[2].is_dirty = true;
+        editors[0].language_id = Some("rust".to_string());
+        editors[1].language_id = Some("python".to_string());
+        editors[2].language_id = Some("rust".to_string());
+
+        let dirty = EditorFilter::dirty(&editors);
+        assert_eq!(dirty.len(), 2);
+
+        let rust = EditorFilter::by_language(&editors, "rust");
+        assert_eq!(rust.len(), 2);
+        assert_eq!(rust[0].name, "a.rs");
+
+        let py = EditorFilter::by_extension(&editors, "py");
+        assert_eq!(py.len(), 1);
+        assert_eq!(py[0].name, "b.py");
+
+        let path_match = EditorFilter::by_path_contains(&editors, "/c");
+        assert_eq!(path_match.len(), 1);
     }
 }

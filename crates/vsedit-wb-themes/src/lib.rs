@@ -702,6 +702,422 @@ impl fmt::Display for ThemeService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ColorValidator — validate and convert hex color strings
+// ---------------------------------------------------------------------------
+
+/// Validates hex color strings and converts between formats.
+///
+/// Supports `#RGB`, `#RRGGBB`, and `#RRGGBBAA` formats.
+#[derive(Debug, Clone)]
+pub struct ColorValidator;
+
+impl ColorValidator {
+    /// Validate a hex color string.
+    ///
+    /// Accepted formats: `#RGB`, `#RRGGBB`, `#RRGGBBAA`.
+    pub fn validate(hex: &str) -> Result<(), ThemeError> {
+        if !hex.starts_with('#') {
+            return Err(ThemeError::InvalidColor(
+                format!("color must start with '#': {}", hex),
+            ));
+        }
+        let digits = &hex[1..];
+        match digits.len() {
+            3 | 6 | 8 => {}
+            _ => {
+                return Err(ThemeError::InvalidColor(
+                    format!("color must have 3, 6, or 8 hex digits after '#': {}", hex),
+                ));
+            }
+        }
+        if !digits.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(ThemeError::InvalidColor(
+                format!("color contains non-hex characters: {}", hex),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Return `true` if the string is a valid hex color.
+    pub fn is_valid(hex: &str) -> bool {
+        Self::validate(hex).is_ok()
+    }
+
+    /// Normalize a color to lowercase `#rrggbb` (discarding alpha if present).
+    ///
+    /// Short-form `#RGB` is expanded to `#RRGGBB`.
+    pub fn normalize(hex: &str) -> Result<String, ThemeError> {
+        Self::validate(hex)?;
+        let digits = &hex[1..];
+        match digits.len() {
+            3 => {
+                let chars: Vec<char> = digits.chars().collect();
+                Ok(format!(
+                    "#{0}{0}{1}{1}{2}{2}",
+                    chars[0].to_ascii_lowercase(),
+                    chars[1].to_ascii_lowercase(),
+                    chars[2].to_ascii_lowercase(),
+                ))
+            }
+            6 => Ok(format!("#{}", digits.to_ascii_lowercase())),
+            8 => Ok(format!("#{}", digits[..6].to_ascii_lowercase())),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Extract the alpha component from a `#RRGGBBAA` color (0–255).
+    ///
+    /// Returns 255 (fully opaque) for colors without an alpha channel.
+    pub fn alpha(hex: &str) -> Result<u8, ThemeError> {
+        Self::validate(hex)?;
+        let digits = &hex[1..];
+        if digits.len() == 8 {
+            u8::from_str_radix(&digits[6..8], 16)
+                .map_err(|_| ThemeError::InvalidColor(hex.to_string()))
+        } else {
+            Ok(255)
+        }
+    }
+
+    /// Convert a `#RRGGBB` color to `#RRGGBBAA` by appending an alpha value.
+    pub fn with_alpha(hex: &str, alpha: u8) -> Result<String, ThemeError> {
+        let normalized = Self::normalize(hex)?;
+        Ok(format!("{}{:02x}", normalized, alpha))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThemeDiff — detailed comparison of two themes
+// ---------------------------------------------------------------------------
+
+/// A single difference between two theme values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiffEntry {
+    Added { key: String, value: String },
+    Removed { key: String, value: String },
+    Changed { key: String, old: String, new: String },
+}
+
+impl fmt::Display for DiffEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DiffEntry::Added { key, value } => write!(f, "+ {}: {}", key, value),
+            DiffEntry::Removed { key, value } => write!(f, "- {}: {}", key, value),
+            DiffEntry::Changed { key, old, new } => {
+                write!(f, "~ {}: {} -> {}", key, old, new)
+            }
+        }
+    }
+}
+
+/// Detailed diff between two themes, covering both colors and token colors.
+#[derive(Debug, Clone)]
+pub struct ThemeDiff {
+    pub color_diffs: Vec<DiffEntry>,
+    pub token_scope_diffs: Vec<DiffEntry>,
+}
+
+impl ThemeDiff {
+    /// Compare two themes and produce a detailed diff.
+    pub fn diff(a: &ColorTheme, b: &ColorTheme) -> Self {
+        let mut color_diffs = Vec::new();
+
+        // Color map diffs
+        for (key, val_a) in &a.colors {
+            match b.colors.get(key) {
+                None => color_diffs.push(DiffEntry::Removed {
+                    key: key.clone(),
+                    value: val_a.clone(),
+                }),
+                Some(val_b) if val_b != val_a => color_diffs.push(DiffEntry::Changed {
+                    key: key.clone(),
+                    old: val_a.clone(),
+                    new: val_b.clone(),
+                }),
+                _ => {}
+            }
+        }
+        for (key, val_b) in &b.colors {
+            if !a.colors.contains_key(key) {
+                color_diffs.push(DiffEntry::Added {
+                    key: key.clone(),
+                    value: val_b.clone(),
+                });
+            }
+        }
+        color_diffs.sort_by(|x, y| {
+            let k = |e: &DiffEntry| match e {
+                DiffEntry::Added { key, .. }
+                | DiffEntry::Removed { key, .. }
+                | DiffEntry::Changed { key, .. } => key.clone(),
+            };
+            k(x).cmp(&k(y))
+        });
+
+        // Token-color scope diffs: build scope→foreground maps
+        let scope_map = |tc_list: &[TokenColor]| -> HashMap<String, String> {
+            let mut m = HashMap::new();
+            for tc in tc_list {
+                if let Some(ref fg) = tc.foreground {
+                    for s in &tc.scope {
+                        m.insert(s.clone(), fg.clone());
+                    }
+                }
+            }
+            m
+        };
+        let sa = scope_map(&a.token_colors);
+        let sb = scope_map(&b.token_colors);
+        let mut token_scope_diffs = Vec::new();
+        for (scope, fg_a) in &sa {
+            match sb.get(scope) {
+                None => token_scope_diffs.push(DiffEntry::Removed {
+                    key: scope.clone(),
+                    value: fg_a.clone(),
+                }),
+                Some(fg_b) if fg_b != fg_a => token_scope_diffs.push(DiffEntry::Changed {
+                    key: scope.clone(),
+                    old: fg_a.clone(),
+                    new: fg_b.clone(),
+                }),
+                _ => {}
+            }
+        }
+        for (scope, fg_b) in &sb {
+            if !sa.contains_key(scope) {
+                token_scope_diffs.push(DiffEntry::Added {
+                    key: scope.clone(),
+                    value: fg_b.clone(),
+                });
+            }
+        }
+        token_scope_diffs.sort_by(|x, y| {
+            let k = |e: &DiffEntry| match e {
+                DiffEntry::Added { key, .. }
+                | DiffEntry::Removed { key, .. }
+                | DiffEntry::Changed { key, .. } => key.clone(),
+            };
+            k(x).cmp(&k(y))
+        });
+
+        Self { color_diffs, token_scope_diffs }
+    }
+
+    /// Returns true when the two themes are identical.
+    pub fn is_empty(&self) -> bool {
+        self.color_diffs.is_empty() && self.token_scope_diffs.is_empty()
+    }
+
+    /// Total number of differences.
+    pub fn len(&self) -> usize {
+        self.color_diffs.len() + self.token_scope_diffs.len()
+    }
+}
+
+impl fmt::Display for ThemeDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_empty() {
+            return write!(f, "no differences");
+        }
+        if !self.color_diffs.is_empty() {
+            writeln!(f, "Colors:")?;
+            for d in &self.color_diffs {
+                writeln!(f, "  {}", d)?;
+            }
+        }
+        if !self.token_scope_diffs.is_empty() {
+            writeln!(f, "Token scopes:")?;
+            for d in &self.token_scope_diffs {
+                writeln!(f, "  {}", d)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThemeInheritance — child theme inheriting from a parent
+// ---------------------------------------------------------------------------
+
+/// Represents a child theme that inherits from a parent, overriding specific
+/// colors and token colors.
+#[derive(Debug, Clone)]
+pub struct ThemeInheritance {
+    pub parent: ColorTheme,
+    pub overrides: ColorTheme,
+}
+
+impl ThemeInheritance {
+    pub fn new(parent: ColorTheme, overrides: ColorTheme) -> Self {
+        Self { parent, overrides }
+    }
+
+    /// Resolve the inheritance into a single `ColorTheme`.
+    ///
+    /// The child's id, label, and theme_type are used. Colors and token colors
+    /// from the parent are merged with the child's overrides taking precedence.
+    pub fn resolve(&self) -> ColorTheme {
+        let colors = ThemeMerger::merge_colors(&self.parent.colors, &self.overrides.colors);
+        let token_colors =
+            ThemeMerger::merge_token_colors(&self.parent.token_colors, &self.overrides.token_colors);
+        ColorTheme {
+            id: self.overrides.id.clone(),
+            label: self.overrides.label.clone(),
+            theme_type: self.overrides.theme_type.clone(),
+            colors,
+            token_colors,
+        }
+    }
+
+    /// Return the set of color keys that the child overrides.
+    pub fn overridden_color_keys(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self
+            .overrides
+            .colors
+            .keys()
+            .filter(|k| self.parent.colors.contains_key(*k))
+            .cloned()
+            .collect();
+        keys.sort();
+        keys
+    }
+
+    /// Return the set of color keys that the child adds (not present in parent).
+    pub fn added_color_keys(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self
+            .overrides
+            .colors
+            .keys()
+            .filter(|k| !self.parent.colors.contains_key(*k))
+            .cloned()
+            .collect();
+        keys.sort();
+        keys
+    }
+}
+
+impl fmt::Display for ThemeInheritance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} (inherits from {})",
+            self.overrides.label, self.parent.label
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TokenColorMatcher — scope matching with prefix / glob patterns
+// ---------------------------------------------------------------------------
+
+/// Matches token scopes using prefix or simple glob patterns.
+///
+/// Patterns:
+/// - `"keyword"` matches exactly `"keyword"`.
+/// - `"keyword.*"` matches any scope starting with `"keyword."`.
+/// - `"*"` matches everything.
+#[derive(Debug, Clone)]
+pub struct TokenColorMatcher {
+    rules: Vec<(String, String)>, // (pattern, foreground)
+}
+
+impl TokenColorMatcher {
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    /// Add a rule mapping a pattern to a foreground color.
+    pub fn add_rule(&mut self, pattern: impl Into<String>, foreground: impl Into<String>) {
+        self.rules.push((pattern.into(), foreground.into()));
+    }
+
+    /// Build a matcher from a theme's token colors.
+    ///
+    /// Each scope in each token color entry becomes a rule.
+    pub fn from_theme(theme: &ColorTheme) -> Self {
+        let mut matcher = Self::new();
+        for tc in &theme.token_colors {
+            if let Some(ref fg) = tc.foreground {
+                for scope in &tc.scope {
+                    matcher.add_rule(scope.clone(), fg.clone());
+                }
+            }
+        }
+        matcher
+    }
+
+    /// Match a scope string against the rules.
+    ///
+    /// Returns the foreground color of the best matching rule. Exact matches
+    /// are preferred over prefix/glob matches; among the same kind, longer
+    /// patterns win.
+    pub fn match_scope(&self, scope: &str) -> Option<&str> {
+        // (is_exact, pattern_len)
+        let mut best: Option<(bool, usize, &str)> = None;
+        for (pattern, fg) in &self.rules {
+            let (matched, is_exact) = if pattern == "*" {
+                (true, false)
+            } else if let Some(prefix) = pattern.strip_suffix(".*") {
+                let m = scope == prefix || scope.starts_with(&format!("{}.", prefix));
+                (m, false)
+            } else {
+                (scope == pattern, true)
+            };
+            if matched {
+                let dominated = match best {
+                    None => true,
+                    Some((prev_exact, prev_len, _)) => {
+                        (is_exact && !prev_exact)
+                            || (is_exact == prev_exact && pattern.len() > prev_len)
+                    }
+                };
+                if dominated {
+                    best = Some((is_exact, pattern.len(), fg.as_str()));
+                }
+            }
+        }
+        best.map(|(_, _, fg)| fg)
+    }
+
+    /// Returns the number of rules.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+}
+
+impl Default for TokenColorMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for TokenColorMatcher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TokenColorMatcher({} rules)", self.rules.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// From impls
+// ---------------------------------------------------------------------------
+
+impl From<(u8, u8, u8)> for ColorValue {
+    fn from((r, g, b): (u8, u8, u8)) -> Self {
+        Self::from_rgb(r, g, b)
+    }
+}
+
+impl From<&ColorTheme> for ThemeSummary {
+    fn from(theme: &ColorTheme) -> Self {
+        Self {
+            id: theme.id.clone(),
+            label: theme.label.clone(),
+            theme_type: theme.theme_type.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1421,5 +1837,197 @@ mod tests {
         svc.set_active("dark-plus");
         let s2 = format!("{}", svc);
         assert!(s2.contains("active=Dark+"));
+    }
+
+    // ---- ColorValidator tests ----
+
+    #[test]
+    fn color_validator_valid_formats() {
+        assert!(ColorValidator::is_valid("#abc"));
+        assert!(ColorValidator::is_valid("#aabbcc"));
+        assert!(ColorValidator::is_valid("#aabbccdd"));
+        assert!(!ColorValidator::is_valid("abc"));
+        assert!(!ColorValidator::is_valid("#ab"));
+        assert!(!ColorValidator::is_valid("#abcde"));
+        assert!(!ColorValidator::is_valid("#gggggg"));
+    }
+
+    #[test]
+    fn color_validator_normalize() {
+        assert_eq!(ColorValidator::normalize("#ABC").unwrap(), "#aabbcc");
+        assert_eq!(ColorValidator::normalize("#FF0000").unwrap(), "#ff0000");
+        assert_eq!(
+            ColorValidator::normalize("#ff000080").unwrap(),
+            "#ff0000"
+        );
+        assert!(ColorValidator::normalize("bad").is_err());
+    }
+
+    #[test]
+    fn color_validator_alpha() {
+        assert_eq!(ColorValidator::alpha("#ff0000").unwrap(), 255);
+        assert_eq!(ColorValidator::alpha("#ff000080").unwrap(), 0x80);
+        assert_eq!(ColorValidator::alpha("#abc").unwrap(), 255);
+    }
+
+    #[test]
+    fn color_validator_with_alpha() {
+        let result = ColorValidator::with_alpha("#FF0000", 128).unwrap();
+        assert_eq!(result, "#ff000080");
+        let result2 = ColorValidator::with_alpha("#abc", 0).unwrap();
+        assert_eq!(result2, "#aabbcc00");
+    }
+
+    // ---- ThemeDiff tests ----
+
+    #[test]
+    fn theme_diff_identical() {
+        let t = dark_theme();
+        let diff = ThemeDiff::diff(&t, &t);
+        assert!(diff.is_empty());
+        assert_eq!(diff.len(), 0);
+        assert_eq!(format!("{}", diff), "no differences");
+    }
+
+    #[test]
+    fn theme_diff_color_changes() {
+        let a = dark_theme();
+        let mut b = a.clone();
+        b.colors.insert("editor.background".into(), "#000000".into());
+        b.colors.insert("statusBar.background".into(), "#007acc".into());
+        b.colors.remove("editor.foreground");
+        let diff = ThemeDiff::diff(&a, &b);
+        assert!(!diff.is_empty());
+        // Should have: 1 changed, 1 added, 1 removed = 3 color diffs
+        assert_eq!(diff.color_diffs.len(), 3);
+        let display = format!("{}", diff);
+        assert!(display.contains("Colors:"));
+    }
+
+    #[test]
+    fn theme_diff_token_scope_changes() {
+        let a = dark_theme();
+        let mut b = a.clone();
+        b.token_colors = vec![TokenColor {
+            scope: vec!["string".into()],
+            foreground: Some("#ce9178".into()),
+            font_style: None,
+        }];
+        let diff = ThemeDiff::diff(&a, &b);
+        // "keyword" removed, "string" added
+        assert_eq!(diff.token_scope_diffs.len(), 2);
+        let display = format!("{}", diff);
+        assert!(display.contains("Token scopes:"));
+    }
+
+    // ---- ThemeInheritance tests ----
+
+    #[test]
+    fn theme_inheritance_resolve() {
+        let parent = dark_theme();
+        let mut child_colors = HashMap::new();
+        child_colors.insert("editor.background".into(), "#000000".into());
+        child_colors.insert("statusBar.background".into(), "#007acc".into());
+        let child = ColorTheme {
+            id: "child-dark".into(),
+            label: "Child Dark".into(),
+            theme_type: ThemeType::Dark,
+            colors: child_colors,
+            token_colors: vec![],
+        };
+        let inheritance = ThemeInheritance::new(parent, child);
+        let resolved = inheritance.resolve();
+        assert_eq!(resolved.id, "child-dark");
+        assert_eq!(resolved.colors.get("editor.background").unwrap(), "#000000");
+        assert_eq!(
+            resolved.colors.get("editor.foreground").unwrap(),
+            "#d4d4d4"
+        );
+        assert_eq!(
+            resolved.colors.get("statusBar.background").unwrap(),
+            "#007acc"
+        );
+        // Parent token colors are inherited
+        assert_eq!(resolved.token_colors.len(), 1);
+        assert_eq!(resolved.token_colors[0].scope[0], "keyword");
+
+        assert_eq!(inheritance.overridden_color_keys(), vec!["editor.background"]);
+        assert_eq!(inheritance.added_color_keys(), vec!["statusBar.background"]);
+        assert_eq!(
+            format!("{}", inheritance),
+            "Child Dark (inherits from Dark+)"
+        );
+    }
+
+    // ---- TokenColorMatcher tests ----
+
+    #[test]
+    fn token_color_matcher_exact_and_prefix() {
+        let mut matcher = TokenColorMatcher::new();
+        matcher.add_rule("keyword", "#569cd6");
+        matcher.add_rule("keyword.*", "#c586c0");
+        matcher.add_rule("*", "#d4d4d4");
+
+        // Exact match
+        assert_eq!(matcher.match_scope("keyword"), Some("#569cd6"));
+        // Prefix match — "keyword.control" starts with "keyword."
+        assert_eq!(matcher.match_scope("keyword.control"), Some("#c586c0"));
+        // Wildcard fallback
+        assert_eq!(matcher.match_scope("variable"), Some("#d4d4d4"));
+        // No rules → None
+        let empty = TokenColorMatcher::new();
+        assert!(empty.match_scope("anything").is_none());
+
+        assert_eq!(matcher.rule_count(), 3);
+        assert_eq!(format!("{}", matcher), "TokenColorMatcher(3 rules)");
+    }
+
+    #[test]
+    fn token_color_matcher_from_theme() {
+        let theme = dark_theme();
+        let matcher = TokenColorMatcher::from_theme(&theme);
+        assert_eq!(matcher.match_scope("keyword"), Some("#569cd6"));
+        assert!(matcher.match_scope("string").is_none());
+    }
+
+    // ---- From impls tests ----
+
+    #[test]
+    fn color_value_from_tuple() {
+        let c: ColorValue = (255u8, 0u8, 128u8).into();
+        assert_eq!(c.red(), 255);
+        assert_eq!(c.green(), 0);
+        assert_eq!(c.blue(), 128);
+    }
+
+    #[test]
+    fn theme_summary_from_color_theme() {
+        let theme = dark_theme();
+        let summary = ThemeSummary::from(&theme);
+        assert_eq!(summary.id, "dark-plus");
+        assert_eq!(summary.label, "Dark+");
+        assert_eq!(summary.theme_type, ThemeType::Dark);
+    }
+
+    // ---- DiffEntry Display ----
+
+    #[test]
+    fn diff_entry_display() {
+        let added = DiffEntry::Added {
+            key: "k".into(),
+            value: "#fff".into(),
+        };
+        assert_eq!(format!("{}", added), "+ k: #fff");
+        let removed = DiffEntry::Removed {
+            key: "k".into(),
+            value: "#000".into(),
+        };
+        assert_eq!(format!("{}", removed), "- k: #000");
+        let changed = DiffEntry::Changed {
+            key: "k".into(),
+            old: "#000".into(),
+            new: "#fff".into(),
+        };
+        assert_eq!(format!("{}", changed), "~ k: #000 -> #fff");
     }
 }

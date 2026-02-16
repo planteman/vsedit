@@ -1,6 +1,6 @@
 //! Account/login management.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fmt;
 
 /// Information about an authenticated account.
@@ -756,6 +756,343 @@ impl<'a> IntoIterator for &'a AccountsService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ScopeSet – set operations over scope strings
+// ---------------------------------------------------------------------------
+
+/// A set of OAuth/API scopes with set-theoretic operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScopeSet {
+    inner: BTreeSet<String>,
+}
+
+impl ScopeSet {
+    /// Create an empty scope set.
+    pub fn new() -> Self {
+        Self {
+            inner: BTreeSet::new(),
+        }
+    }
+
+    /// Create a scope set from a slice of scope strings.
+    pub fn from_scopes(scopes: &[&str]) -> Self {
+        Self {
+            inner: scopes.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    /// Insert a scope. Returns `true` if the scope was newly inserted.
+    pub fn insert(&mut self, scope: impl Into<String>) -> bool {
+        self.inner.insert(scope.into())
+    }
+
+    /// Returns `true` if the set contains the given scope.
+    pub fn contains(&self, scope: &str) -> bool {
+        self.inner.contains(scope)
+    }
+
+    /// Number of scopes in the set.
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Returns `true` if the set is empty.
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    /// Returns the union of this set with `other`.
+    pub fn union(&self, other: &ScopeSet) -> ScopeSet {
+        ScopeSet {
+            inner: self.inner.union(&other.inner).cloned().collect(),
+        }
+    }
+
+    /// Returns the intersection of this set with `other`.
+    pub fn intersection(&self, other: &ScopeSet) -> ScopeSet {
+        ScopeSet {
+            inner: self.inner.intersection(&other.inner).cloned().collect(),
+        }
+    }
+
+    /// Returns scopes in `self` that are not in `other`.
+    pub fn difference(&self, other: &ScopeSet) -> ScopeSet {
+        ScopeSet {
+            inner: self.inner.difference(&other.inner).cloned().collect(),
+        }
+    }
+
+    /// Returns `true` if every scope in `self` is also in `other`.
+    pub fn is_subset(&self, other: &ScopeSet) -> bool {
+        self.inner.is_subset(&other.inner)
+    }
+
+    /// Iterate over scopes in sorted order.
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        self.inner.iter().map(|s| s.as_str())
+    }
+}
+
+impl Default for ScopeSet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<&[String]> for ScopeSet {
+    fn from(scopes: &[String]) -> Self {
+        Self {
+            inner: scopes.iter().cloned().collect(),
+        }
+    }
+}
+
+impl From<Vec<String>> for ScopeSet {
+    fn from(scopes: Vec<String>) -> Self {
+        Self {
+            inner: scopes.into_iter().collect(),
+        }
+    }
+}
+
+impl fmt::Display for ScopeSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let scopes: Vec<&str> = self.iter().collect();
+        write!(f, "{{{}}}", scopes.join(", "))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SessionValidator – validates sessions against configurable rules
+// ---------------------------------------------------------------------------
+
+/// Validates [`AuthSession`] instances against configurable rules.
+#[derive(Debug, Clone)]
+pub struct SessionValidator {
+    required_scopes: ScopeSet,
+    allowed_providers: Option<Vec<String>>,
+    require_email: bool,
+    require_non_empty_token: bool,
+}
+
+impl SessionValidator {
+    /// Create a validator with default settings (only checks for non-empty token).
+    pub fn new() -> Self {
+        Self {
+            required_scopes: ScopeSet::new(),
+            allowed_providers: None,
+            require_email: false,
+            require_non_empty_token: true,
+        }
+    }
+
+    /// Require that sessions include all of the given scopes.
+    pub fn require_scopes(mut self, scopes: &[&str]) -> Self {
+        self.required_scopes = ScopeSet::from_scopes(scopes);
+        self
+    }
+
+    /// Restrict sessions to a set of allowed provider IDs.
+    pub fn allowed_providers(mut self, providers: &[&str]) -> Self {
+        self.allowed_providers = Some(providers.iter().map(|s| s.to_string()).collect());
+        self
+    }
+
+    /// Require that the account has an email address.
+    pub fn require_email(mut self) -> Self {
+        self.require_email = true;
+        self
+    }
+
+    /// Validate a session, returning a list of validation errors (empty = valid).
+    pub fn validate(&self, session: &AuthSession) -> Vec<AccountError> {
+        let mut errors = Vec::new();
+        if self.require_non_empty_token && session.access_token.is_empty() {
+            errors.push(AccountError::InvalidToken);
+        }
+        for scope in self.required_scopes.iter() {
+            if !session.has_scope(scope) {
+                errors.push(AccountError::MissingScope(scope.to_string()));
+            }
+        }
+        if let Some(ref allowed) = self.allowed_providers {
+            if !allowed.iter().any(|p| p == &session.account.provider_id) {
+                errors.push(AccountError::ProviderNotFound(
+                    session.account.provider_id.clone(),
+                ));
+            }
+        }
+        if self.require_email && session.account.email.is_none() {
+            errors.push(AccountError::SessionNotFound(
+                "account email is required".to_string(),
+            ));
+        }
+        errors
+    }
+
+    /// Returns `true` if the session passes all validation rules.
+    pub fn is_valid(&self, session: &AuthSession) -> bool {
+        self.validate(session).is_empty()
+    }
+}
+
+impl Default for SessionValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AccountMatcher – match accounts by pattern
+// ---------------------------------------------------------------------------
+
+/// Matches [`AccountInfo`] instances by various patterns.
+#[derive(Debug, Clone)]
+pub struct AccountMatcher {
+    email_domain: Option<String>,
+    provider: Option<String>,
+    label_substring: Option<String>,
+}
+
+impl AccountMatcher {
+    /// Create a matcher with no filters (matches everything).
+    pub fn new() -> Self {
+        Self {
+            email_domain: None,
+            provider: None,
+            label_substring: None,
+        }
+    }
+
+    /// Only match accounts whose email ends with `@domain`.
+    pub fn email_domain(mut self, domain: impl Into<String>) -> Self {
+        self.email_domain = Some(domain.into());
+        self
+    }
+
+    /// Only match accounts with the given provider ID.
+    pub fn provider(mut self, provider: impl Into<String>) -> Self {
+        self.provider = Some(provider.into());
+        self
+    }
+
+    /// Only match accounts whose label contains the given substring (case-insensitive).
+    pub fn label_contains(mut self, substring: impl Into<String>) -> Self {
+        self.label_substring = Some(substring.into());
+        self
+    }
+
+    /// Returns `true` if the account matches all configured filters.
+    pub fn matches(&self, account: &AccountInfo) -> bool {
+        if let Some(ref domain) = self.email_domain {
+            let suffix = format!("@{domain}");
+            match &account.email {
+                Some(email) => {
+                    if !email.to_lowercase().ends_with(&suffix.to_lowercase()) {
+                        return false;
+                    }
+                }
+                None => return false,
+            }
+        }
+        if let Some(ref provider) = self.provider {
+            if account.provider_id != *provider {
+                return false;
+            }
+        }
+        if let Some(ref sub) = self.label_substring {
+            if !account.label.to_lowercase().contains(&sub.to_lowercase()) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Filter a slice of sessions, returning those whose account matches.
+    pub fn filter_sessions<'a>(&self, sessions: &'a [AuthSession]) -> Vec<&'a AuthSession> {
+        sessions
+            .iter()
+            .filter(|s| self.matches(&s.account))
+            .collect()
+    }
+}
+
+impl Default for AccountMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SessionSummary – aggregate statistics from a collection of sessions
+// ---------------------------------------------------------------------------
+
+/// Aggregate statistics computed from a slice of [`AuthSession`] instances.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SessionSummary {
+    pub counts_by_provider: Vec<(String, usize)>,
+    pub total_scopes: usize,
+    pub unique_emails: Vec<String>,
+    pub total_sessions: usize,
+}
+
+impl SessionSummary {
+    /// Build a summary from a slice of sessions.
+    pub fn from_sessions(sessions: &[AuthSession]) -> Self {
+        let mut provider_counts: HashMap<&str, usize> = HashMap::new();
+        let mut scope_set: BTreeSet<&str> = BTreeSet::new();
+        let mut email_set: BTreeSet<&str> = BTreeSet::new();
+
+        for session in sessions {
+            *provider_counts
+                .entry(session.account.provider_id.as_str())
+                .or_insert(0) += 1;
+            for scope in &session.scopes {
+                scope_set.insert(scope.as_str());
+            }
+            if let Some(ref email) = session.account.email {
+                email_set.insert(email.as_str());
+            }
+        }
+
+        let mut counts_by_provider: Vec<(String, usize)> = provider_counts
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect();
+        counts_by_provider.sort_by(|a, b| a.0.cmp(&b.0));
+
+        SessionSummary {
+            counts_by_provider,
+            total_scopes: scope_set.len(),
+            unique_emails: email_set.into_iter().map(|s| s.to_string()).collect(),
+            total_sessions: sessions.len(),
+        }
+    }
+
+    /// Number of distinct providers.
+    pub fn provider_count(&self) -> usize {
+        self.counts_by_provider.len()
+    }
+
+    /// Number of unique email addresses.
+    pub fn unique_email_count(&self) -> usize {
+        self.unique_emails.len()
+    }
+}
+
+impl fmt::Display for SessionSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SessionSummary(sessions={}, providers={}, scopes={}, emails={})",
+            self.total_sessions,
+            self.provider_count(),
+            self.total_scopes,
+            self.unique_email_count(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1409,5 +1746,181 @@ mod tests {
         assert_eq!(filtered[0].id, "s2");
         let all = svc.find_by_filter("User");
         assert_eq!(all.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // ScopeSet tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn scope_set_union_intersection_difference() {
+        let a = ScopeSet::from_scopes(&["read", "write"]);
+        let b = ScopeSet::from_scopes(&["write", "admin"]);
+
+        let union = a.union(&b);
+        assert_eq!(union.len(), 3);
+        assert!(union.contains("read"));
+        assert!(union.contains("write"));
+        assert!(union.contains("admin"));
+
+        let inter = a.intersection(&b);
+        assert_eq!(inter.len(), 1);
+        assert!(inter.contains("write"));
+
+        let diff = a.difference(&b);
+        assert_eq!(diff.len(), 1);
+        assert!(diff.contains("read"));
+        assert!(!diff.contains("write"));
+
+        assert!(!a.is_subset(&b));
+        let subset = ScopeSet::from_scopes(&["write"]);
+        assert!(subset.is_subset(&a));
+    }
+
+    #[test]
+    fn scope_set_display_and_from() {
+        let scopes = vec!["beta".to_string(), "alpha".to_string()];
+        let set = ScopeSet::from(scopes);
+        // BTreeSet sorts, so alpha < beta
+        assert_eq!(format!("{set}"), "{alpha, beta}");
+
+        let slice_scopes = vec!["x".to_string(), "y".to_string()];
+        let set2 = ScopeSet::from(slice_scopes.as_slice());
+        assert!(set2.contains("x"));
+        assert!(set2.contains("y"));
+    }
+
+    // -----------------------------------------------------------------------
+    // SessionValidator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn session_validator_valid_session() {
+        let account = AccountInfo::new("a1", "Alice", "github", Some("a@b.com".to_string()));
+        let session = AuthSession::new("s1", account, vec!["read".to_string()], "tok");
+
+        let validator = SessionValidator::new()
+            .require_scopes(&["read"])
+            .allowed_providers(&["github", "azure"])
+            .require_email();
+
+        assert!(validator.is_valid(&session));
+        assert!(validator.validate(&session).is_empty());
+    }
+
+    #[test]
+    fn session_validator_multiple_errors() {
+        let account = AccountInfo::new("a1", "Alice", "bitbucket", None);
+        let session = AuthSession::new("s1", account, vec![], "");
+
+        let validator = SessionValidator::new()
+            .require_scopes(&["admin"])
+            .allowed_providers(&["github"])
+            .require_email();
+
+        let errors = validator.validate(&session);
+        assert!(!validator.is_valid(&session));
+        // Should have: InvalidToken, MissingScope("admin"), ProviderNotFound, missing email
+        assert!(errors.iter().any(|e| matches!(e, AccountError::InvalidToken)));
+        assert!(errors.iter().any(|e| matches!(e, AccountError::MissingScope(_))));
+        assert!(errors.iter().any(|e| matches!(e, AccountError::ProviderNotFound(_))));
+        assert_eq!(errors.len(), 4);
+    }
+
+    // -----------------------------------------------------------------------
+    // AccountMatcher tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn account_matcher_filters() {
+        let sessions = vec![
+            AuthSession::new(
+                "s1",
+                AccountInfo::new("a1", "Alice Smith", "github", Some("alice@corp.com".to_string())),
+                vec!["read".to_string()],
+                "tok1",
+            ),
+            AuthSession::new(
+                "s2",
+                AccountInfo::new("a2", "Bob Jones", "azure", Some("bob@example.com".to_string())),
+                vec!["write".to_string()],
+                "tok2",
+            ),
+            AuthSession::new(
+                "s3",
+                AccountInfo::new("a3", "Carol Smith", "github", None),
+                vec!["read".to_string()],
+                "tok3",
+            ),
+        ];
+
+        // Match by email domain
+        let by_domain = AccountMatcher::new().email_domain("corp.com");
+        let matched = by_domain.filter_sessions(&sessions);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].id, "s1");
+
+        // Match by provider
+        let by_provider = AccountMatcher::new().provider("azure");
+        let matched = by_provider.filter_sessions(&sessions);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].id, "s2");
+
+        // Match by label substring
+        let by_label = AccountMatcher::new().label_contains("smith");
+        let matched = by_label.filter_sessions(&sessions);
+        assert_eq!(matched.len(), 2);
+
+        // Combined filters
+        let combined = AccountMatcher::new()
+            .provider("github")
+            .label_contains("alice");
+        let matched = combined.filter_sessions(&sessions);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].id, "s1");
+
+        // No email means domain filter excludes
+        let no_email = AccountMatcher::new().email_domain("any.com");
+        assert!(!no_email.matches(&sessions[2].account));
+    }
+
+    // -----------------------------------------------------------------------
+    // SessionSummary tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn session_summary_aggregates() {
+        let sessions = vec![
+            AuthSession::new(
+                "s1",
+                AccountInfo::new("a1", "Alice", "github", Some("alice@x.com".to_string())),
+                vec!["read".to_string(), "write".to_string()],
+                "tok1",
+            ),
+            AuthSession::new(
+                "s2",
+                AccountInfo::new("a2", "Bob", "azure", Some("bob@y.com".to_string())),
+                vec!["read".to_string(), "admin".to_string()],
+                "tok2",
+            ),
+            AuthSession::new(
+                "s3",
+                AccountInfo::new("a3", "Carol", "github", Some("alice@x.com".to_string())),
+                vec!["read".to_string()],
+                "tok3",
+            ),
+        ];
+
+        let summary = SessionSummary::from_sessions(&sessions);
+        assert_eq!(summary.total_sessions, 3);
+        assert_eq!(summary.provider_count(), 2);
+        assert_eq!(summary.total_scopes, 3); // read, write, admin
+        assert_eq!(summary.unique_email_count(), 2); // alice@x.com, bob@y.com
+
+        let display = format!("{summary}");
+        assert!(display.contains("sessions=3"));
+        assert!(display.contains("providers=2"));
+        assert!(display.contains("scopes=3"));
+        assert!(display.contains("emails=2"));
     }
 }

@@ -5,6 +5,7 @@
 //! via ratatui.
 
 use std::collections::HashSet;
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -819,6 +820,359 @@ fn is_last_sibling(entry_idx: usize, depth: usize, entries: &[FlatFileEntry]) ->
 }
 
 // ---------------------------------------------------------------------------
+// FileSearchResult — search-within-explorer results
+// ---------------------------------------------------------------------------
+
+/// A result from searching for files within the explorer tree.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FileSearchResult {
+    /// Full path to the matching file.
+    pub path: PathBuf,
+    /// Relevance score (higher is better). Exact prefix matches score highest.
+    pub score: u32,
+    /// Byte positions within the file name where the query matched.
+    pub match_positions: Vec<usize>,
+}
+
+impl FileSearchResult {
+    /// Create a new search result.
+    pub fn new(path: PathBuf, score: u32, match_positions: Vec<usize>) -> Self {
+        Self {
+            path,
+            score,
+            match_positions,
+        }
+    }
+
+    /// The file name component of the matched path.
+    pub fn file_name(&self) -> &str {
+        self.path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+    }
+}
+
+impl fmt::Display for FileSearchResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} (score: {})", self.path.display(), self.score)
+    }
+}
+
+/// Perform a fuzzy file-name search over a flat list of entries.
+///
+/// Returns results sorted by descending score. The algorithm gives higher
+/// scores to exact prefix matches and consecutive character runs.
+pub fn search_files(entries: &[FlatFileEntry], query: &str) -> Vec<FileSearchResult> {
+    if query.is_empty() {
+        return Vec::new();
+    }
+    let query_lower = query.to_lowercase();
+    let mut results = Vec::new();
+
+    for entry in entries {
+        if entry.is_dir {
+            continue;
+        }
+        let name_lower = entry.name.to_lowercase();
+        if let Some((score, positions)) = fuzzy_match(&name_lower, &query_lower) {
+            results.push(FileSearchResult::new(entry.path.clone(), score, positions));
+        }
+    }
+
+    results.sort_by(|a, b| b.score.cmp(&a.score));
+    results
+}
+
+/// Simple fuzzy matcher: returns (score, match_positions) if all query chars
+/// appear in order within `text`. Consecutive matches and prefix matches
+/// score higher.
+fn fuzzy_match(text: &str, query: &str) -> Option<(u32, Vec<usize>)> {
+    let text_bytes = text.as_bytes();
+    let query_bytes = query.as_bytes();
+    let mut positions = Vec::with_capacity(query_bytes.len());
+    let mut ti = 0;
+    for &qb in query_bytes {
+        let mut found = false;
+        while ti < text_bytes.len() {
+            if text_bytes[ti] == qb {
+                positions.push(ti);
+                ti += 1;
+                found = true;
+                break;
+            }
+            ti += 1;
+        }
+        if !found {
+            return None;
+        }
+    }
+
+    // Score: base 10 per matched char, +5 for consecutive, +10 for starting at 0
+    let mut score: u32 = positions.len() as u32 * 10;
+    if positions.first() == Some(&0) {
+        score += 10;
+    }
+    for w in positions.windows(2) {
+        if w[1] == w[0] + 1 {
+            score += 5;
+        }
+    }
+    Some((score, positions))
+}
+
+// ---------------------------------------------------------------------------
+// FileFilter — include/exclude files by pattern
+// ---------------------------------------------------------------------------
+
+/// Filter specification for showing/hiding files in the explorer.
+#[derive(Debug, Clone, Default)]
+pub struct FileFilter {
+    /// File extensions to include (e.g. `["rs", "toml"]`). Empty means all.
+    pub include_extensions: Vec<String>,
+    /// File extensions to exclude (e.g. `["log", "tmp"]`).
+    pub exclude_extensions: Vec<String>,
+    /// Exact file names to exclude.
+    pub exclude_names: Vec<String>,
+    /// Whether to hide hidden files (names starting with `.`).
+    pub hide_hidden: bool,
+}
+
+impl FileFilter {
+    /// Create a new empty filter that accepts everything.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Check if a file entry passes through this filter.
+    /// Directories always pass to preserve tree structure.
+    pub fn matches(&self, name: &str, is_dir: bool) -> bool {
+        if is_dir {
+            return true;
+        }
+        if self.hide_hidden && name.starts_with('.') {
+            return false;
+        }
+        if self.exclude_names.iter().any(|n| n == name) {
+            return false;
+        }
+        let ext = name.rsplit('.').next().unwrap_or("");
+        if self
+            .exclude_extensions
+            .iter()
+            .any(|e| e.eq_ignore_ascii_case(ext))
+        {
+            return false;
+        }
+        if !self.include_extensions.is_empty()
+            && !self
+                .include_extensions
+                .iter()
+                .any(|e| e.eq_ignore_ascii_case(ext))
+        {
+            return false;
+        }
+        true
+    }
+
+    /// Apply this filter to a list of flat entries, returning only those that pass.
+    pub fn apply<'a>(&self, entries: &'a [FlatFileEntry]) -> Vec<&'a FlatFileEntry> {
+        entries
+            .iter()
+            .filter(|e| self.matches(&e.name, e.is_dir))
+            .collect()
+    }
+}
+
+impl fmt::Display for FileFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut parts = Vec::new();
+        if !self.include_extensions.is_empty() {
+            parts.push(format!("+[{}]", self.include_extensions.join(",")));
+        }
+        if !self.exclude_extensions.is_empty() {
+            parts.push(format!("-[{}]", self.exclude_extensions.join(",")));
+        }
+        if self.hide_hidden {
+            parts.push("no-hidden".into());
+        }
+        if parts.is_empty() {
+            write!(f, "FileFilter(all)")
+        } else {
+            write!(f, "FileFilter({})", parts.join(" "))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DirectoryStats — aggregate statistics for a directory tree
+// ---------------------------------------------------------------------------
+
+/// Aggregate statistics computed from a directory tree.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct DirectoryStats {
+    /// Total number of files.
+    pub file_count: usize,
+    /// Total number of directories (not counting the root).
+    pub dir_count: usize,
+    /// Estimated total size in bytes (sum of file sizes).
+    pub total_size: u64,
+    /// Deepest nesting level encountered.
+    pub deepest_level: usize,
+}
+
+impl DirectoryStats {
+    /// Compute stats by walking a directory on disk.
+    pub fn from_path(path: &Path) -> std::io::Result<Self> {
+        let mut stats = Self::default();
+        Self::walk(path, 0, &mut stats)?;
+        Ok(stats)
+    }
+
+    fn walk(dir: &Path, depth: usize, stats: &mut Self) -> std::io::Result<()> {
+        if depth > stats.deepest_level {
+            stats.deepest_level = depth;
+        }
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let ft = entry.file_type()?;
+            if ft.is_dir() {
+                stats.dir_count += 1;
+                Self::walk(&entry.path(), depth + 1, stats)?;
+            } else if ft.is_file() {
+                stats.file_count += 1;
+                stats.total_size += entry.metadata().map(|m| m.len()).unwrap_or(0);
+            }
+        }
+        Ok(())
+    }
+
+    /// Compute stats from an already-flattened entry list (no disk I/O).
+    pub fn from_entries(entries: &[FlatFileEntry]) -> Self {
+        let mut stats = Self::default();
+        for e in entries {
+            if e.is_dir {
+                stats.dir_count += 1;
+            } else {
+                stats.file_count += 1;
+            }
+            if e.depth > stats.deepest_level {
+                stats.deepest_level = e.depth;
+            }
+        }
+        stats
+    }
+}
+
+impl fmt::Display for DirectoryStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} files, {} dirs, {} bytes, depth {}",
+            self.file_count, self.dir_count, self.total_size, self.deepest_level,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BreadcrumbPath — clickable path segments
+// ---------------------------------------------------------------------------
+
+/// A single segment in a breadcrumb path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BreadcrumbSegment {
+    /// Display label for this segment.
+    pub label: String,
+    /// Full path up to and including this segment.
+    pub full_path: PathBuf,
+}
+
+/// Splits a filesystem path into clickable breadcrumb segments.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BreadcrumbPath {
+    /// Ordered segments from root to leaf.
+    pub segments: Vec<BreadcrumbSegment>,
+}
+
+impl BreadcrumbPath {
+    /// Create breadcrumbs from a path, optionally relative to a root.
+    ///
+    /// If `root` is provided, only the portion of `path` below `root` is used
+    /// and the first segment is labelled with the root directory name.
+    pub fn from_path(path: &Path, root: Option<&Path>) -> Self {
+        let effective = match root {
+            Some(r) => path.strip_prefix(r).unwrap_or(path),
+            None => path,
+        };
+
+        let mut segments = Vec::new();
+
+        // If we have a root, add it as the first segment.
+        if let Some(r) = root {
+            let label = r
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| r.to_string_lossy().to_string());
+            segments.push(BreadcrumbSegment {
+                label,
+                full_path: r.to_path_buf(),
+            });
+        }
+
+        let mut accumulated = root.map(|r| r.to_path_buf()).unwrap_or_default();
+        for component in effective.components() {
+            let label = component.as_os_str().to_string_lossy().to_string();
+            accumulated = accumulated.join(&label);
+            segments.push(BreadcrumbSegment {
+                label,
+                full_path: accumulated.clone(),
+            });
+        }
+
+        Self { segments }
+    }
+
+    /// Number of breadcrumb segments.
+    pub fn len(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// Whether the breadcrumb path is empty.
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+
+    /// Get the segment at a given index.
+    pub fn get(&self, index: usize) -> Option<&BreadcrumbSegment> {
+        self.segments.get(index)
+    }
+
+    /// The last (leaf) segment, if any.
+    pub fn leaf(&self) -> Option<&BreadcrumbSegment> {
+        self.segments.last()
+    }
+}
+
+impl fmt::Display for BreadcrumbPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let labels: Vec<&str> = self.segments.iter().map(|s| s.label.as_str()).collect();
+        write!(f, "{}", labels.join(" › "))
+    }
+}
+
+impl From<&Path> for BreadcrumbPath {
+    fn from(path: &Path) -> Self {
+        Self::from_path(path, None)
+    }
+}
+
+impl From<PathBuf> for BreadcrumbPath {
+    fn from(path: PathBuf) -> Self {
+        Self::from_path(&path, None)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1417,5 +1771,177 @@ mod tests {
         assert!(dest.join("a.txt").exists());
         assert!(dest.join("sub").join("b.txt").exists());
         assert_eq!(std::fs::read_to_string(dest.join("a.txt")).unwrap(), "aaa");
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for FileSearchResult and search_files
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn search_files_finds_matching_entries() {
+        let entries = vec![
+            FlatFileEntry {
+                name: "main.rs".into(),
+                path: PathBuf::from("/project/src/main.rs"),
+                is_dir: false,
+                is_expanded: false,
+                depth: 2,
+            },
+            FlatFileEntry {
+                name: "lib.rs".into(),
+                path: PathBuf::from("/project/src/lib.rs"),
+                is_dir: false,
+                is_expanded: false,
+                depth: 2,
+            },
+            FlatFileEntry {
+                name: "src".into(),
+                path: PathBuf::from("/project/src"),
+                is_dir: true,
+                is_expanded: true,
+                depth: 1,
+            },
+            FlatFileEntry {
+                name: "manifest.json".into(),
+                path: PathBuf::from("/project/manifest.json"),
+                is_dir: false,
+                is_expanded: false,
+                depth: 1,
+            },
+        ];
+        let results = search_files(&entries, "main");
+        // Should match "main.rs" and "manifest.json" (m-a-i-n subsequence), skip dir
+        assert!(results.len() >= 1);
+        assert_eq!(results[0].file_name(), "main.rs");
+        assert!(!results[0].match_positions.is_empty());
+        // Display impl
+        let display = format!("{}", results[0]);
+        assert!(display.contains("score:"));
+    }
+
+    #[test]
+    fn search_files_empty_query_returns_empty() {
+        let entries = vec![FlatFileEntry {
+            name: "main.rs".into(),
+            path: PathBuf::from("/project/src/main.rs"),
+            is_dir: false,
+            is_expanded: false,
+            depth: 0,
+        }];
+        assert!(search_files(&entries, "").is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for FileFilter
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn file_filter_include_extensions() {
+        let mut filter = FileFilter::new();
+        filter.include_extensions = vec!["rs".into(), "toml".into()];
+        assert!(filter.matches("main.rs", false));
+        assert!(filter.matches("Cargo.toml", false));
+        assert!(!filter.matches("readme.md", false));
+        // Directories always pass
+        assert!(filter.matches("src", true));
+        // Display
+        let display = format!("{filter}");
+        assert!(display.contains("+[rs,toml]"));
+    }
+
+    #[test]
+    fn file_filter_exclude_and_hidden() {
+        let mut filter = FileFilter::new();
+        filter.exclude_extensions = vec!["log".into()];
+        filter.exclude_names = vec!["Thumbs.db".into()];
+        filter.hide_hidden = true;
+        assert!(!filter.matches("debug.log", false));
+        assert!(!filter.matches("Thumbs.db", false));
+        assert!(!filter.matches(".gitignore", false));
+        assert!(filter.matches("main.rs", false));
+        // Display
+        let display = format!("{filter}");
+        assert!(display.contains("no-hidden"));
+    }
+
+    #[test]
+    fn file_filter_default_accepts_all() {
+        let filter = FileFilter::new();
+        assert!(filter.matches("anything.xyz", false));
+        assert!(filter.matches(".hidden", false));
+        assert_eq!(format!("{filter}"), "FileFilter(all)");
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for DirectoryStats
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn directory_stats_from_path() {
+        let dir = make_test_dir();
+        let stats = DirectoryStats::from_path(dir.path()).unwrap();
+        // make_test_dir creates: src/main.rs, src/lib.rs, tests/test1.rs, Cargo.toml, README.md
+        assert_eq!(stats.file_count, 5);
+        // Dirs: src, tests
+        assert_eq!(stats.dir_count, 2);
+        assert!(stats.deepest_level >= 1);
+        // Display impl
+        let display = format!("{stats}");
+        assert!(display.contains("5 files"));
+        assert!(display.contains("2 dirs"));
+    }
+
+    #[test]
+    fn directory_stats_from_entries() {
+        let entries = vec![
+            FlatFileEntry { name: "root".into(), path: PathBuf::from("/r"), is_dir: true, is_expanded: true, depth: 0 },
+            FlatFileEntry { name: "src".into(), path: PathBuf::from("/r/src"), is_dir: true, is_expanded: true, depth: 1 },
+            FlatFileEntry { name: "main.rs".into(), path: PathBuf::from("/r/src/main.rs"), is_dir: false, is_expanded: false, depth: 2 },
+            FlatFileEntry { name: "README.md".into(), path: PathBuf::from("/r/README.md"), is_dir: false, is_expanded: false, depth: 1 },
+        ];
+        let stats = DirectoryStats::from_entries(&entries);
+        assert_eq!(stats.file_count, 2);
+        assert_eq!(stats.dir_count, 2);
+        assert_eq!(stats.deepest_level, 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for BreadcrumbPath
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn breadcrumb_from_path_no_root() {
+        let path = PathBuf::from("src/utils/helpers.rs");
+        let bc = BreadcrumbPath::from(path);
+        assert_eq!(bc.len(), 3);
+        assert_eq!(bc.segments[0].label, "src");
+        assert_eq!(bc.segments[1].label, "utils");
+        assert_eq!(bc.segments[2].label, "helpers.rs");
+        assert_eq!(bc.leaf().unwrap().label, "helpers.rs");
+        // Display: joined by " › "
+        let display = format!("{bc}");
+        assert_eq!(display, "src › utils › helpers.rs");
+    }
+
+    #[test]
+    fn breadcrumb_from_path_with_root() {
+        let root = Path::new("/home/user/project");
+        let path = Path::new("/home/user/project/src/main.rs");
+        let bc = BreadcrumbPath::from_path(path, Some(root));
+        // First segment is the root label, then "src", then "main.rs"
+        assert_eq!(bc.len(), 3);
+        assert_eq!(bc.segments[0].label, "project");
+        assert_eq!(bc.segments[1].label, "src");
+        assert_eq!(bc.segments[2].label, "main.rs");
+        assert!(!bc.is_empty());
+        assert_eq!(bc.get(1).unwrap().label, "src");
+    }
+
+    #[test]
+    fn breadcrumb_empty_path() {
+        let bc = BreadcrumbPath::from_path(Path::new(""), None);
+        assert!(bc.is_empty());
+        assert!(bc.leaf().is_none());
+        assert_eq!(format!("{bc}"), "");
     }
 }

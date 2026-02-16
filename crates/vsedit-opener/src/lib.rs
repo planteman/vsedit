@@ -894,6 +894,475 @@ pub fn group_by_scheme<'a>(uris: &[&'a str]) -> HashMap<String, Vec<&'a str>> {
     groups
 }
 
+// ---------------------------------------------------------------------------
+// URI history with dedup and capacity
+// ---------------------------------------------------------------------------
+
+/// Entry in the URI history.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UriHistoryEntry {
+    pub uri: String,
+    pub timestamp_ms: u64,
+    pub open_count: u64,
+}
+
+/// Tracks recently opened URIs with deduplication and max capacity.
+///
+/// When a URI is recorded that already exists in history its timestamp is
+/// updated and its open count is incremented instead of creating a duplicate.
+/// When capacity is exceeded the least-recently-used entry is evicted.
+#[derive(Debug, Clone)]
+pub struct UriHistory {
+    entries: Vec<UriHistoryEntry>,
+    capacity: usize,
+}
+
+impl UriHistory {
+    /// Create a new history with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0, "UriHistory capacity must be > 0");
+        Self {
+            entries: Vec::new(),
+            capacity,
+        }
+    }
+
+    /// Record a URI open. Deduplicates by URI string: if the URI is already
+    /// present its timestamp is updated and its count incremented; otherwise a
+    /// new entry is appended and the oldest entry is evicted if at capacity.
+    pub fn record(&mut self, uri: impl Into<String>, timestamp_ms: u64) {
+        let uri = uri.into();
+        if let Some(existing) = self.entries.iter_mut().find(|e| e.uri == uri) {
+            existing.timestamp_ms = timestamp_ms;
+            existing.open_count += 1;
+            return;
+        }
+        if self.entries.len() >= self.capacity {
+            // Evict the entry with the oldest timestamp.
+            if let Some(oldest_idx) = self
+                .entries
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, e)| e.timestamp_ms)
+                .map(|(i, _)| i)
+            {
+                self.entries.remove(oldest_idx);
+            }
+        }
+        self.entries.push(UriHistoryEntry {
+            uri,
+            timestamp_ms,
+            open_count: 1,
+        });
+    }
+
+    /// Return all entries ordered by most-recently-used first.
+    pub fn recent(&self) -> Vec<&UriHistoryEntry> {
+        let mut sorted: Vec<_> = self.entries.iter().collect();
+        sorted.sort_by(|a, b| b.timestamp_ms.cmp(&a.timestamp_ms));
+        sorted
+    }
+
+    /// Look up an entry by URI.
+    pub fn get(&self, uri: &str) -> Option<&UriHistoryEntry> {
+        self.entries.iter().find(|e| e.uri == uri)
+    }
+
+    /// Remove a specific URI from history. Returns `true` if found.
+    pub fn remove(&mut self, uri: &str) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|e| e.uri != uri);
+        self.entries.len() < before
+    }
+
+    /// Number of entries currently stored.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Return the most-recently-used entry.
+    pub fn most_recent(&self) -> Option<&UriHistoryEntry> {
+        self.entries.iter().max_by_key(|e| e.timestamp_ms)
+    }
+
+    /// Total number of opens across all entries.
+    pub fn total_opens(&self) -> u64 {
+        self.entries.iter().map(|e| e.open_count).sum()
+    }
+}
+
+impl fmt::Display for UriHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UriHistory({} entries, {} total opens)",
+            self.len(),
+            self.total_opens()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Opener matcher
+// ---------------------------------------------------------------------------
+
+/// A rule that matches URIs to a named opener based on scheme, host substring,
+/// and/or a path prefix.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenerMatchRule {
+    pub opener_name: String,
+    pub scheme: Option<String>,
+    pub host_contains: Option<String>,
+    pub path_prefix: Option<String>,
+}
+
+/// Matches URIs against a set of rules to find the appropriate opener.
+#[derive(Debug, Clone)]
+pub struct OpenerMatcher {
+    rules: Vec<OpenerMatchRule>,
+}
+
+impl OpenerMatcher {
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    /// Add a match rule.
+    pub fn add_rule(
+        &mut self,
+        opener_name: impl Into<String>,
+        scheme: Option<&str>,
+        host_contains: Option<&str>,
+        path_prefix: Option<&str>,
+    ) {
+        self.rules.push(OpenerMatchRule {
+            opener_name: opener_name.into(),
+            scheme: scheme.map(|s| s.to_ascii_lowercase()),
+            host_contains: host_contains.map(|s| s.to_string()),
+            path_prefix: path_prefix.map(|s| s.to_string()),
+        });
+    }
+
+    /// Find the first matching opener name for a URI string.
+    pub fn match_uri(&self, uri: &str) -> Option<&str> {
+        let components = UriComponents::parse(uri)?;
+        for rule in &self.rules {
+            if let Some(ref s) = rule.scheme {
+                if !s.eq_ignore_ascii_case(&components.scheme) {
+                    continue;
+                }
+            }
+            if let Some(ref host) = rule.host_contains {
+                if !components.authority.contains(host.as_str()) {
+                    continue;
+                }
+            }
+            if let Some(ref prefix) = rule.path_prefix {
+                if !components.path.starts_with(prefix.as_str()) {
+                    continue;
+                }
+            }
+            return Some(&rule.opener_name);
+        }
+        None
+    }
+
+    /// Return all matching opener names (not just the first).
+    pub fn match_all(&self, uri: &str) -> Vec<&str> {
+        let components = match UriComponents::parse(uri) {
+            Some(c) => c,
+            None => return Vec::new(),
+        };
+        self.rules
+            .iter()
+            .filter(|rule| {
+                if let Some(ref s) = rule.scheme {
+                    if !s.eq_ignore_ascii_case(&components.scheme) {
+                        return false;
+                    }
+                }
+                if let Some(ref host) = rule.host_contains {
+                    if !components.authority.contains(host.as_str()) {
+                        return false;
+                    }
+                }
+                if let Some(ref prefix) = rule.path_prefix {
+                    if !components.path.starts_with(prefix.as_str()) {
+                        return false;
+                    }
+                }
+                true
+            })
+            .map(|r| r.opener_name.as_str())
+            .collect()
+    }
+
+    /// Number of rules registered.
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+}
+
+impl Default for OpenerMatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for OpenerMatcher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "OpenerMatcher({} rules)", self.rules.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Open attempt diagnostics
+// ---------------------------------------------------------------------------
+
+/// Records the outcome of a single open attempt for diagnostics.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenAttempt {
+    pub uri: String,
+    pub opener_name: String,
+    pub result: OpenResult,
+    pub timestamp_ms: u64,
+    pub error_message: Option<String>,
+}
+
+impl OpenAttempt {
+    pub fn success(
+        uri: impl Into<String>,
+        opener_name: impl Into<String>,
+        timestamp_ms: u64,
+    ) -> Self {
+        Self {
+            uri: uri.into(),
+            opener_name: opener_name.into(),
+            result: OpenResult::Handled,
+            timestamp_ms,
+            error_message: None,
+        }
+    }
+
+    pub fn failure(
+        uri: impl Into<String>,
+        opener_name: impl Into<String>,
+        timestamp_ms: u64,
+        error: impl Into<String>,
+    ) -> Self {
+        Self {
+            uri: uri.into(),
+            opener_name: opener_name.into(),
+            result: OpenResult::NotHandled,
+            timestamp_ms,
+            error_message: Some(error.into()),
+        }
+    }
+
+    pub fn is_success(&self) -> bool {
+        self.result == OpenResult::Handled
+    }
+}
+
+impl fmt::Display for OpenAttempt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.is_success() { "ok" } else { "fail" };
+        write!(
+            f,
+            "[{}] {} via {} @ {}ms",
+            status, self.uri, self.opener_name, self.timestamp_ms
+        )?;
+        if let Some(ref err) = self.error_message {
+            write!(f, " ({})", err)?;
+        }
+        Ok(())
+    }
+}
+
+impl From<OpenAttempt> for OpenResult {
+    fn from(attempt: OpenAttempt) -> Self {
+        attempt.result
+    }
+}
+
+/// Collects open attempts for diagnostics and replay.
+#[derive(Debug, Clone, Default)]
+pub struct OpenAttemptLog {
+    attempts: Vec<OpenAttempt>,
+}
+
+impl OpenAttemptLog {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record(&mut self, attempt: OpenAttempt) {
+        self.attempts.push(attempt);
+    }
+
+    pub fn attempts(&self) -> &[OpenAttempt] {
+        &self.attempts
+    }
+
+    pub fn successes(&self) -> Vec<&OpenAttempt> {
+        self.attempts.iter().filter(|a| a.is_success()).collect()
+    }
+
+    pub fn failures(&self) -> Vec<&OpenAttempt> {
+        self.attempts.iter().filter(|a| !a.is_success()).collect()
+    }
+
+    pub fn by_opener(&self, name: &str) -> Vec<&OpenAttempt> {
+        self.attempts
+            .iter()
+            .filter(|a| a.opener_name == name)
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.attempts.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.attempts.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.attempts.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// URI sanitizer
+// ---------------------------------------------------------------------------
+
+/// Schemes considered dangerous and blocked by the sanitizer.
+const DANGEROUS_SCHEMES: &[&str] = &["javascript", "data", "vbscript", "blob"];
+
+/// Validates and cleans URI strings: blocks dangerous schemes, strips control
+/// characters, and normalises percent-encoding.
+#[derive(Debug, Clone)]
+pub struct UriSanitizer {
+    blocked_schemes: Vec<String>,
+    strip_fragments: bool,
+    strip_credentials: bool,
+}
+
+impl UriSanitizer {
+    /// Create a sanitizer with default dangerous-scheme blocklist.
+    pub fn new() -> Self {
+        Self {
+            blocked_schemes: DANGEROUS_SCHEMES.iter().map(|s| s.to_string()).collect(),
+            strip_fragments: false,
+            strip_credentials: true,
+        }
+    }
+
+    /// Add a custom blocked scheme.
+    pub fn block_scheme(&mut self, scheme: &str) {
+        let lower = scheme.to_ascii_lowercase();
+        if !self.blocked_schemes.contains(&lower) {
+            self.blocked_schemes.push(lower);
+        }
+    }
+
+    /// Configure whether fragments (`#...`) are stripped.
+    pub fn strip_fragments(mut self, strip: bool) -> Self {
+        self.strip_fragments = strip;
+        self
+    }
+
+    /// Configure whether embedded credentials (`user:pass@`) are stripped.
+    pub fn strip_credentials(mut self, strip: bool) -> Self {
+        self.strip_credentials = strip;
+        self
+    }
+
+    /// Sanitize a URI string. Returns `Err` if the URI uses a blocked scheme
+    /// or is otherwise invalid.
+    pub fn sanitize(&self, uri: &str) -> Result<String, OpenerError> {
+        // Remove control characters.
+        let cleaned: String = uri.chars().filter(|c| !c.is_control()).collect();
+        let trimmed = cleaned.trim();
+
+        if trimmed.is_empty() {
+            return Err(OpenerError::EmptyUri);
+        }
+
+        // Normalise the scheme to lowercase.
+        let normalised = normalize_uri(trimmed);
+
+        // Check for blocked schemes.
+        if let Some(scheme) = extract_scheme(&normalised) {
+            let lower = scheme.to_ascii_lowercase();
+            if self.blocked_schemes.contains(&lower) {
+                return Err(OpenerError::UnsupportedScheme(lower));
+            }
+        }
+
+        let mut result = normalised;
+
+        // Strip credentials from authority (user:pass@host → host).
+        if self.strip_credentials {
+            if let Some(scheme_end) = result.find("://") {
+                let after_scheme = scheme_end + 3;
+                let rest = &result[after_scheme..];
+                // Find the end of the authority section.
+                let auth_end = rest.find('/').unwrap_or(rest.len());
+                let authority = &rest[..auth_end];
+                if let Some(at_pos) = authority.rfind('@') {
+                    let prefix = &result[..after_scheme];
+                    let host_part = &authority[at_pos + 1..];
+                    let suffix = &rest[auth_end..];
+                    result = format!("{}{}{}", prefix, host_part, suffix);
+                }
+            }
+        }
+
+        // Optionally strip fragments.
+        if self.strip_fragments {
+            if let Some(hash_pos) = result.rfind('#') {
+                result.truncate(hash_pos);
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Returns `true` if the URI uses a blocked scheme.
+    pub fn is_blocked(&self, uri: &str) -> bool {
+        extract_scheme(uri)
+            .map(|s| self.blocked_schemes.contains(&s.to_ascii_lowercase()))
+            .unwrap_or(false)
+    }
+}
+
+impl Default for UriSanitizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for UriSanitizer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "UriSanitizer(blocked: [{}])",
+            self.blocked_schemes.join(", ")
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1428,5 +1897,189 @@ mod tests {
         let groups = group_by_scheme(&uris);
         assert_eq!(groups["https"].len(), 2);
         assert_eq!(groups["file"].len(), 1);
+    }
+
+    // -------------------------------------------------------------------
+    // UriHistory tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn uri_history_dedup_and_count() {
+        let mut h = UriHistory::new(10);
+        h.record("https://a.com", 100);
+        h.record("https://b.com", 200);
+        h.record("https://a.com", 300);
+        assert_eq!(h.len(), 2, "duplicate URI should not create new entry");
+        let entry = h.get("https://a.com").unwrap();
+        assert_eq!(entry.open_count, 2);
+        assert_eq!(entry.timestamp_ms, 300, "timestamp should be updated");
+        assert_eq!(h.total_opens(), 3);
+    }
+
+    #[test]
+    fn uri_history_capacity_eviction() {
+        let mut h = UriHistory::new(2);
+        h.record("https://a.com", 100);
+        h.record("https://b.com", 200);
+        h.record("https://c.com", 300);
+        assert_eq!(h.len(), 2);
+        assert!(h.get("https://a.com").is_none(), "oldest entry evicted");
+        assert!(h.get("https://b.com").is_some());
+        assert!(h.get("https://c.com").is_some());
+    }
+
+    #[test]
+    fn uri_history_most_recent_and_display() {
+        let mut h = UriHistory::new(5);
+        h.record("https://a.com", 10);
+        h.record("https://b.com", 50);
+        h.record("https://c.com", 30);
+        let mr = h.most_recent().unwrap();
+        assert_eq!(mr.uri, "https://b.com");
+        let recent = h.recent();
+        assert_eq!(recent[0].uri, "https://b.com");
+        assert_eq!(recent[1].uri, "https://c.com");
+        let display = format!("{h}");
+        assert!(display.contains("3 entries"));
+    }
+
+    #[test]
+    fn uri_history_remove_and_clear() {
+        let mut h = UriHistory::new(5);
+        h.record("https://a.com", 1);
+        h.record("https://b.com", 2);
+        assert!(h.remove("https://a.com"));
+        assert!(!h.remove("https://a.com"));
+        assert_eq!(h.len(), 1);
+        h.clear();
+        assert!(h.is_empty());
+    }
+
+    // -------------------------------------------------------------------
+    // OpenerMatcher tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn opener_matcher_scheme_and_host() {
+        let mut m = OpenerMatcher::new();
+        m.add_rule("browser", Some("https"), None, None);
+        m.add_rule("github-app", Some("https"), Some("github.com"), None);
+        m.add_rule("editor", Some("file"), None, None);
+
+        assert_eq!(m.match_uri("https://example.com/page"), Some("browser"));
+        assert_eq!(m.match_uri("file:///tmp/foo.rs"), Some("editor"));
+        assert_eq!(m.match_uri("ftp://x.com"), None);
+
+        // match_all returns all matches
+        let all = m.match_all("https://github.com/repo");
+        assert!(all.contains(&"browser"));
+        assert!(all.contains(&"github-app"));
+        assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn opener_matcher_path_prefix() {
+        let mut m = OpenerMatcher::new();
+        m.add_rule("api-handler", Some("https"), None, Some("/api/"));
+
+        assert_eq!(
+            m.match_uri("https://example.com/api/v1/users"),
+            Some("api-handler")
+        );
+        assert_eq!(m.match_uri("https://example.com/docs"), None);
+        assert_eq!(format!("{m}"), "OpenerMatcher(1 rules)");
+    }
+
+    // -------------------------------------------------------------------
+    // OpenAttempt & OpenAttemptLog tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn open_attempt_success_and_failure() {
+        let ok = OpenAttempt::success("https://a.com", "browser", 1000);
+        assert!(ok.is_success());
+        assert!(ok.error_message.is_none());
+        let display = format!("{ok}");
+        assert!(display.contains("[ok]"));
+        assert!(display.contains("browser"));
+
+        let fail = OpenAttempt::failure("ftp://x.com", "ftp-client", 2000, "connection refused");
+        assert!(!fail.is_success());
+        assert_eq!(fail.error_message.as_deref(), Some("connection refused"));
+        let display = format!("{fail}");
+        assert!(display.contains("[fail]"));
+        assert!(display.contains("connection refused"));
+
+        // From impl
+        let result: OpenResult = ok.clone().into();
+        assert_eq!(result, OpenResult::Handled);
+    }
+
+    #[test]
+    fn open_attempt_log_filtering() {
+        let mut log = OpenAttemptLog::new();
+        log.record(OpenAttempt::success("https://a.com", "browser", 100));
+        log.record(OpenAttempt::failure("ftp://x.com", "ftp-client", 200, "err"));
+        log.record(OpenAttempt::success("https://b.com", "browser", 300));
+
+        assert_eq!(log.len(), 3);
+        assert_eq!(log.successes().len(), 2);
+        assert_eq!(log.failures().len(), 1);
+        assert_eq!(log.by_opener("browser").len(), 2);
+        assert_eq!(log.by_opener("ftp-client").len(), 1);
+
+        log.clear();
+        assert!(log.is_empty());
+    }
+
+    // -------------------------------------------------------------------
+    // UriSanitizer tests
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn uri_sanitizer_blocks_dangerous_schemes() {
+        let s = UriSanitizer::new();
+        assert!(s.is_blocked("javascript:alert(1)"));
+        assert!(s.is_blocked("data:text/html,<h1>hi</h1>"));
+        assert!(s.is_blocked("vbscript:foo"));
+        assert!(!s.is_blocked("https://example.com"));
+
+        let result = s.sanitize("javascript:alert(1)");
+        assert_eq!(result, Err(OpenerError::UnsupportedScheme("javascript".into())));
+    }
+
+    #[test]
+    fn uri_sanitizer_strips_credentials() {
+        let s = UriSanitizer::new();
+        let cleaned = s.sanitize("https://user:pass@example.com/path").unwrap();
+        assert_eq!(cleaned, "https://example.com/path");
+        assert!(!cleaned.contains("user"));
+        assert!(!cleaned.contains("pass"));
+    }
+
+    #[test]
+    fn uri_sanitizer_strips_fragments_and_control_chars() {
+        let s = UriSanitizer::new().strip_fragments(true);
+        let cleaned = s.sanitize("https://example.com/page#section\x00").unwrap();
+        assert_eq!(cleaned, "https://example.com/page");
+
+        let display = format!("{}", UriSanitizer::new());
+        assert!(display.contains("javascript"));
+    }
+
+    #[test]
+    fn uri_sanitizer_custom_blocked_scheme() {
+        let mut s = UriSanitizer::new();
+        s.block_scheme("ftp");
+        assert!(s.is_blocked("ftp://evil.com"));
+        assert!(s.sanitize("ftp://evil.com").is_err());
+    }
+
+    #[test]
+    fn uri_sanitizer_preserves_safe_uri() {
+        let s = UriSanitizer::new();
+        let uri = "https://example.com/path?q=1#frag";
+        let cleaned = s.sanitize(uri).unwrap();
+        assert_eq!(cleaned, uri);
     }
 }

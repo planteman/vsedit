@@ -841,6 +841,215 @@ impl UserDataLocation {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// UserPreferences - key-value user preferences store
+// ---------------------------------------------------------------------------
+
+/// A key-value store for user preferences.
+#[derive(Debug, Clone, Default)]
+pub struct UserPreferences {
+    values: HashMap<String, String>,
+}
+
+impl UserPreferences {
+    /// Create an empty preferences store.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Get a preference value by key.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.values.get(key).map(|s| s.as_str())
+    }
+
+    /// Set a preference value. Returns the previous value if any.
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) -> Option<String> {
+        self.values.insert(key.into(), value.into())
+    }
+
+    /// Remove a preference by key. Returns the removed value if any.
+    pub fn remove(&mut self, key: &str) -> Option<String> {
+        self.values.remove(key)
+    }
+
+    /// List all preference keys.
+    pub fn keys(&self) -> Vec<&str> {
+        self.values.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Number of stored preferences.
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    /// Returns true if no preferences are stored.
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    /// Check if a key exists.
+    pub fn has_key(&self, key: &str) -> bool {
+        self.values.contains_key(key)
+    }
+
+    /// Get a value with a default fallback.
+    pub fn get_or(&self, key: &str, default: &str) -> String {
+        self.values
+            .get(key)
+            .map(|s| s.clone())
+            .unwrap_or_else(|| default.to_string())
+    }
+
+    /// Merge another set of preferences, overwriting existing keys.
+    pub fn merge(&mut self, other: &UserPreferences) {
+        for (k, v) in &other.values {
+            self.values.insert(k.clone(), v.clone());
+        }
+    }
+}
+
+impl fmt::Display for UserPreferences {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UserPreferences({} keys)", self.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PreferencesMigration - upgrade preferences across versions
+// ---------------------------------------------------------------------------
+
+/// Describes a migration rule for upgrading preferences between versions.
+#[derive(Debug, Clone)]
+pub struct PreferencesMigration {
+    pub from_version: u32,
+    pub to_version: u32,
+    renames: Vec<(String, String)>,
+    removals: Vec<String>,
+    defaults: Vec<(String, String)>,
+}
+
+impl PreferencesMigration {
+    /// Create a new migration rule.
+    pub fn new(from_version: u32, to_version: u32) -> Self {
+        Self {
+            from_version,
+            to_version,
+            renames: Vec::new(),
+            removals: Vec::new(),
+            defaults: Vec::new(),
+        }
+    }
+
+    /// Add a key rename.
+    pub fn rename(mut self, old_key: impl Into<String>, new_key: impl Into<String>) -> Self {
+        self.renames.push((old_key.into(), new_key.into()));
+        self
+    }
+
+    /// Add a key removal.
+    pub fn remove_key(mut self, key: impl Into<String>) -> Self {
+        self.removals.push(key.into());
+        self
+    }
+
+    /// Add a default value for a new key.
+    pub fn add_default(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.defaults.push((key.into(), value.into()));
+        self
+    }
+
+    /// Apply this migration to a set of preferences.
+    pub fn migrate(&self, prefs: &mut UserPreferences) {
+        for (old, new) in &self.renames {
+            if let Some(val) = prefs.remove(old) {
+                prefs.set(new.clone(), val);
+            }
+        }
+        for key in &self.removals {
+            prefs.remove(key);
+        }
+        for (key, value) in &self.defaults {
+            if !prefs.has_key(key) {
+                prefs.set(key.clone(), value.clone());
+            }
+        }
+    }
+
+    /// Number of operations in this migration.
+    pub fn operation_count(&self) -> usize {
+        self.renames.len() + self.removals.len() + self.defaults.len()
+    }
+}
+
+impl fmt::Display for PreferencesMigration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Migration(v{} -> v{}, {} ops)",
+            self.from_version, self.to_version, self.operation_count()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UserDataExporter - backup/restore user data
+// ---------------------------------------------------------------------------
+
+/// Exports and imports user preferences as a simple key=value string format.
+#[derive(Debug, Clone, Default)]
+pub struct UserDataExporter;
+
+impl UserDataExporter {
+    /// Export preferences to a string.
+    pub fn export_to_string(prefs: &UserPreferences) -> String {
+        let mut lines: Vec<String> = prefs
+            .keys()
+            .iter()
+            .map(|k| {
+                let v = prefs.get(k).unwrap_or("");
+                format!("{k}={v}")
+            })
+            .collect();
+        lines.sort();
+        lines.join("\n")
+    }
+
+    /// Import preferences from a string.
+    pub fn import_from_string(data: &str) -> UserPreferences {
+        let mut prefs = UserPreferences::new();
+        for line in data.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            if let Some((key, value)) = line.split_once('=') {
+                prefs.set(key.trim(), value.trim());
+            }
+        }
+        prefs
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DataIntegrityChecker - compute and verify checksums
+// ---------------------------------------------------------------------------
+
+/// Computes and verifies simple checksums on data strings.
+#[derive(Debug, Clone, Default)]
+pub struct DataIntegrityChecker;
+
+impl DataIntegrityChecker {
+    /// Compute a simple checksum (sum of bytes mod 2^32).
+    pub fn compute_checksum(data: &str) -> u32 {
+        data.as_bytes().iter().fold(0u32, |acc, &b| acc.wrapping_add(b as u32))
+    }
+
+    /// Verify that data matches an expected checksum.
+    pub fn verify(data: &str, expected: u32) -> bool {
+        Self::compute_checksum(data) == expected
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1492,5 +1701,77 @@ mod tests {
     fn location_resolve_nested() {
         let loc = UserDataLocation::for_windows("app");
         assert_eq!(loc.resolve("profiles/work/settings.json"), "%APPDATA%/app/profiles/work/settings.json");
+    }
+
+    #[test]
+    fn user_preferences_basic_ops() {
+        let mut prefs = UserPreferences::new();
+        assert!(prefs.is_empty());
+        prefs.set("theme", "dark");
+        prefs.set("fontSize", "14");
+        assert_eq!(prefs.len(), 2);
+        assert!(prefs.has_key("theme"));
+        assert_eq!(prefs.get("theme"), Some("dark"));
+        assert_eq!(prefs.get_or("missing", "default"), "default");
+        prefs.remove("theme");
+        assert!(!prefs.has_key("theme"));
+    }
+
+    #[test]
+    fn user_preferences_merge() {
+        let mut a = UserPreferences::new();
+        a.set("x", "1");
+        a.set("y", "2");
+        let mut b = UserPreferences::new();
+        b.set("y", "3");
+        b.set("z", "4");
+        a.merge(&b);
+        assert_eq!(a.get("y"), Some("3"));
+        assert_eq!(a.get("z"), Some("4"));
+        assert_eq!(a.len(), 3);
+    }
+
+    #[test]
+    fn preferences_migration_apply() {
+        let mut prefs = UserPreferences::new();
+        prefs.set("old_key", "value");
+        prefs.set("deprecated", "x");
+        let migration = PreferencesMigration::new(1, 2)
+            .rename("old_key", "new_key")
+            .remove_key("deprecated")
+            .add_default("new_setting", "on");
+        migration.migrate(&mut prefs);
+        assert!(!prefs.has_key("old_key"));
+        assert_eq!(prefs.get("new_key"), Some("value"));
+        assert!(!prefs.has_key("deprecated"));
+        assert_eq!(prefs.get("new_setting"), Some("on"));
+    }
+
+    #[test]
+    fn user_data_exporter_round_trip() {
+        let mut prefs = UserPreferences::new();
+        prefs.set("a", "1");
+        prefs.set("b", "2");
+        let exported = UserDataExporter::export_to_string(&prefs);
+        let imported = UserDataExporter::import_from_string(&exported);
+        assert_eq!(imported.get("a"), Some("1"));
+        assert_eq!(imported.get("b"), Some("2"));
+        assert_eq!(imported.len(), 2);
+    }
+
+    #[test]
+    fn user_data_exporter_ignores_comments() {
+        let data = "# comment\nkey=value\n\n# another\nfoo=bar";
+        let prefs = UserDataExporter::import_from_string(data);
+        assert_eq!(prefs.len(), 2);
+        assert_eq!(prefs.get("key"), Some("value"));
+    }
+
+    #[test]
+    fn data_integrity_checker_verify() {
+        let data = "hello world";
+        let checksum = DataIntegrityChecker::compute_checksum(data);
+        assert!(DataIntegrityChecker::verify(data, checksum));
+        assert!(!DataIntegrityChecker::verify("different", checksum));
     }
 }

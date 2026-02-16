@@ -812,6 +812,308 @@ impl UrlValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DownloadBandwidth – rolling window average
+// ---------------------------------------------------------------------------
+
+/// Tracks bytes-per-second throughput using a rolling window of samples.
+#[derive(Debug, Clone)]
+pub struct DownloadBandwidth {
+    /// Each sample is (timestamp_secs, bytes_transferred_in_interval).
+    samples: Vec<(f64, u64)>,
+    /// Maximum number of samples retained in the window.
+    window_size: usize,
+}
+
+impl DownloadBandwidth {
+    /// Create a new tracker with the given rolling window size.
+    pub fn new(window_size: usize) -> Self {
+        Self {
+            samples: Vec::new(),
+            window_size: window_size.max(1),
+        }
+    }
+
+    /// Record a sample: `bytes` transferred at `timestamp` seconds.
+    pub fn record(&mut self, timestamp: f64, bytes: u64) {
+        self.samples.push((timestamp, bytes));
+        if self.samples.len() > self.window_size {
+            self.samples.remove(0);
+        }
+    }
+
+    /// Rolling-window average speed in bytes per second.
+    pub fn average_bps(&self) -> f64 {
+        if self.samples.len() < 2 {
+            return 0.0;
+        }
+        let first_ts = self.samples[0].0;
+        let last_ts = self.samples[self.samples.len() - 1].0;
+        let dt = last_ts - first_ts;
+        if dt <= 0.0 {
+            return 0.0;
+        }
+        let total_bytes: u64 = self.samples[1..].iter().map(|s| s.1).sum();
+        total_bytes as f64 / dt
+    }
+
+    /// Number of samples currently in the window.
+    pub fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+
+    /// Estimate time remaining in seconds given `remaining_bytes`.
+    pub fn estimate_remaining(&self, remaining_bytes: u64) -> Option<f64> {
+        let bps = self.average_bps();
+        if bps <= 0.0 {
+            return None;
+        }
+        Some(remaining_bytes as f64 / bps)
+    }
+}
+
+impl fmt::Display for DownloadBandwidth {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let bps = self.average_bps();
+        if bps >= 1_048_576.0 {
+            write!(f, "{:.2} MB/s", bps / 1_048_576.0)
+        } else if bps >= 1024.0 {
+            write!(f, "{:.2} KB/s", bps / 1024.0)
+        } else {
+            write!(f, "{:.0} B/s", bps)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DownloadRetryPolicy – backoff strategy
+// ---------------------------------------------------------------------------
+
+/// Backoff strategy for retry delays.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BackoffStrategy {
+    /// Delay increases linearly: `base_delay * attempt`.
+    Linear,
+    /// Delay doubles each attempt: `base_delay * 2^(attempt-1)`.
+    Exponential,
+}
+
+/// Policy controlling how failed downloads are retried.
+#[derive(Debug, Clone)]
+pub struct DownloadRetryPolicy {
+    pub max_retries: u32,
+    pub strategy: BackoffStrategy,
+    /// Base delay in seconds before the first retry.
+    pub base_delay_secs: f64,
+    /// Maximum delay cap in seconds.
+    pub max_delay_secs: f64,
+}
+
+impl DownloadRetryPolicy {
+    /// Compute the delay in seconds for the given attempt (1-based).
+    /// Returns `None` if the attempt exceeds `max_retries`.
+    pub fn delay_for_attempt(&self, attempt: u32) -> Option<f64> {
+        if attempt == 0 || attempt > self.max_retries {
+            return None;
+        }
+        let raw = match self.strategy {
+            BackoffStrategy::Linear => self.base_delay_secs * attempt as f64,
+            BackoffStrategy::Exponential => {
+                self.base_delay_secs * 2.0_f64.powi(attempt as i32 - 1)
+            }
+        };
+        Some(raw.min(self.max_delay_secs))
+    }
+
+    /// Whether retries are exhausted after the given number of attempts.
+    pub fn is_exhausted(&self, attempts: u32) -> bool {
+        attempts >= self.max_retries
+    }
+}
+
+impl Default for DownloadRetryPolicy {
+    fn default() -> Self {
+        Self {
+            max_retries: 3,
+            strategy: BackoffStrategy::Exponential,
+            base_delay_secs: 1.0,
+            max_delay_secs: 30.0,
+        }
+    }
+}
+
+impl fmt::Display for DownloadRetryPolicy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "RetryPolicy(max={}, {:?}, base={:.1}s, cap={:.1}s)",
+            self.max_retries, self.strategy, self.base_delay_secs, self.max_delay_secs
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DownloadFilter – query downloads
+// ---------------------------------------------------------------------------
+
+/// Filter criteria for querying download entries.
+#[derive(Debug, Clone, Default)]
+pub struct DownloadFilter {
+    /// If set, only entries in this state match.
+    pub state: Option<DownloadState>,
+    /// If set, only entries whose URL contains this substring match.
+    pub url_contains: Option<String>,
+    /// If set, only entries with this priority match.
+    pub priority: Option<DownloadPriority>,
+}
+
+impl DownloadFilter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_state(mut self, state: DownloadState) -> Self {
+        self.state = Some(state);
+        self
+    }
+
+    pub fn with_url_contains(mut self, pattern: &str) -> Self {
+        self.url_contains = Some(pattern.to_string());
+        self
+    }
+
+    pub fn with_priority(mut self, priority: DownloadPriority) -> Self {
+        self.priority = Some(priority);
+        self
+    }
+
+    /// Test whether a download entry matches all set criteria.
+    pub fn matches(&self, entry: &DownloadEntry, priority: DownloadPriority) -> bool {
+        if let Some(s) = self.state {
+            if entry.state != s {
+                return false;
+            }
+        }
+        if let Some(ref pat) = self.url_contains {
+            if !entry.request.url.contains(pat.as_str()) {
+                return false;
+            }
+        }
+        if let Some(p) = self.priority {
+            if priority != p {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl DownloadService {
+    /// Query entries using a filter. Returns matching entries.
+    pub fn query(&self, filter: &DownloadFilter) -> Vec<&DownloadEntry> {
+        self.entries
+            .iter()
+            .filter(|e| filter.matches(e, self.priority_for(e.id)))
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DownloadSummary – aggregate view
+// ---------------------------------------------------------------------------
+
+/// High-level summary of the download service state.
+#[derive(Debug, Clone)]
+pub struct DownloadSummary {
+    pub pending: usize,
+    pub in_progress: usize,
+    pub completed: usize,
+    pub failed: usize,
+    pub cancelled: usize,
+    pub total_bytes: u64,
+    pub average_speed_bps: f64,
+}
+
+impl DownloadSummary {
+    /// Total number of entries across all states.
+    pub fn total(&self) -> usize {
+        self.pending + self.in_progress + self.completed + self.failed + self.cancelled
+    }
+
+    /// Fraction of all entries that are complete.
+    pub fn completion_ratio(&self) -> f64 {
+        let total = self.total();
+        if total == 0 {
+            return 0.0;
+        }
+        self.completed as f64 / total as f64
+    }
+
+    /// Estimated seconds to finish all remaining bytes at the recorded average
+    /// speed. Returns `None` if speed is zero or unknown.
+    pub fn estimate_remaining_secs(&self, remaining_bytes: u64) -> Option<f64> {
+        if self.average_speed_bps <= 0.0 {
+            return None;
+        }
+        Some(remaining_bytes as f64 / self.average_speed_bps)
+    }
+}
+
+impl fmt::Display for DownloadSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Summary: {} total ({} done, {} active, {} pending, {} failed, {} cancelled), {:.0} B/s",
+            self.total(),
+            self.completed,
+            self.in_progress,
+            self.pending,
+            self.failed,
+            self.cancelled,
+            self.average_speed_bps,
+        )
+    }
+}
+
+impl DownloadService {
+    /// Build a summary of the current service state.
+    pub fn summarize(&self, elapsed_secs: f64) -> DownloadSummary {
+        let stats = self.get_stats();
+        DownloadSummary {
+            pending: stats.pending,
+            in_progress: stats.in_progress,
+            completed: stats.completed,
+            failed: stats.failed,
+            cancelled: stats.cancelled,
+            total_bytes: stats.total_bytes,
+            average_speed_bps: self.get_throughput(elapsed_secs),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// From impls
+// ---------------------------------------------------------------------------
+
+impl From<&str> for DownloadRequest {
+    /// Create a minimal request from a URL string, using the last path segment
+    /// as the destination filename.
+    fn from(url: &str) -> Self {
+        let dest = UrlValidator::extract_filename(url)
+            .unwrap_or_else(|| "download".to_string());
+        Self {
+            url: url.to_string(),
+            destination: dest,
+            headers: Vec::new(),
+        }
+    }
+}
+
+impl From<DownloadPriority> for u8 {
+    fn from(p: DownloadPriority) -> Self {
+        p.rank()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1415,5 +1717,264 @@ mod tests {
 
         assert_eq!(svc.find_by_url(url_b).len(), 1);
         assert_eq!(svc.find_by_url("https://nope.com").len(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for DownloadBandwidth, DownloadRetryPolicy, DownloadFilter,
+    // DownloadSummary, and From impls
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn bandwidth_rolling_window_average() {
+        let mut bw = DownloadBandwidth::new(4);
+        assert_eq!(bw.average_bps(), 0.0);
+        assert_eq!(bw.sample_count(), 0);
+
+        // t=0: baseline, t=1: 1000B, t=2: 2000B, t=3: 3000B
+        bw.record(0.0, 0);
+        bw.record(1.0, 1000);
+        bw.record(2.0, 2000);
+        bw.record(3.0, 3000);
+        // total bytes in window (excluding first) = 1000+2000+3000 = 6000
+        // dt = 3.0 - 0.0 = 3.0 → 2000 B/s
+        assert!((bw.average_bps() - 2000.0).abs() < f64::EPSILON);
+        assert_eq!(bw.sample_count(), 4);
+
+        // Add one more sample – window_size=4 so oldest is evicted.
+        bw.record(4.0, 4000);
+        assert_eq!(bw.sample_count(), 4);
+        // Window is now [(1,1000),(2,2000),(3,3000),(4,4000)]
+        // bytes = 2000+3000+4000 = 9000, dt = 4-1 = 3 → 3000 B/s
+        assert!((bw.average_bps() - 3000.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn bandwidth_estimate_remaining() {
+        let mut bw = DownloadBandwidth::new(10);
+        // No samples → None
+        assert!(bw.estimate_remaining(1000).is_none());
+
+        bw.record(0.0, 0);
+        bw.record(2.0, 1000);
+        // 500 B/s → 10_000 bytes remaining ≈ 20 seconds
+        let est = bw.estimate_remaining(10_000).unwrap();
+        assert!((est - 20.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn bandwidth_display_formatting() {
+        let mut bw = DownloadBandwidth::new(10);
+        bw.record(0.0, 0);
+        bw.record(1.0, 2_000_000); // 2 MB/s
+        let s = bw.to_string();
+        assert!(s.contains("MB/s"), "expected MB/s in: {s}");
+
+        let mut bw2 = DownloadBandwidth::new(10);
+        bw2.record(0.0, 0);
+        bw2.record(1.0, 5120); // 5 KB/s
+        let s2 = bw2.to_string();
+        assert!(s2.contains("KB/s"), "expected KB/s in: {s2}");
+
+        let mut bw3 = DownloadBandwidth::new(10);
+        bw3.record(0.0, 0);
+        bw3.record(1.0, 100); // 100 B/s
+        let s3 = bw3.to_string();
+        assert!(s3.contains("B/s"), "expected B/s in: {s3}");
+    }
+
+    #[test]
+    fn retry_policy_linear_backoff() {
+        let policy = DownloadRetryPolicy {
+            max_retries: 4,
+            strategy: BackoffStrategy::Linear,
+            base_delay_secs: 2.0,
+            max_delay_secs: 10.0,
+        };
+        assert_eq!(policy.delay_for_attempt(0), None); // invalid
+        assert!((policy.delay_for_attempt(1).unwrap() - 2.0).abs() < f64::EPSILON);
+        assert!((policy.delay_for_attempt(2).unwrap() - 4.0).abs() < f64::EPSILON);
+        assert!((policy.delay_for_attempt(3).unwrap() - 6.0).abs() < f64::EPSILON);
+        // Attempt 4: 2*4=8, under cap
+        assert!((policy.delay_for_attempt(4).unwrap() - 8.0).abs() < f64::EPSILON);
+        // Attempt 5 exceeds max_retries
+        assert_eq!(policy.delay_for_attempt(5), None);
+
+        assert!(!policy.is_exhausted(2));
+        assert!(policy.is_exhausted(4));
+    }
+
+    #[test]
+    fn retry_policy_exponential_backoff_with_cap() {
+        let policy = DownloadRetryPolicy {
+            max_retries: 5,
+            strategy: BackoffStrategy::Exponential,
+            base_delay_secs: 1.0,
+            max_delay_secs: 10.0,
+        };
+        // 1*2^0=1, 1*2^1=2, 1*2^2=4, 1*2^3=8, 1*2^4=16 → capped to 10
+        assert!((policy.delay_for_attempt(1).unwrap() - 1.0).abs() < f64::EPSILON);
+        assert!((policy.delay_for_attempt(2).unwrap() - 2.0).abs() < f64::EPSILON);
+        assert!((policy.delay_for_attempt(3).unwrap() - 4.0).abs() < f64::EPSILON);
+        assert!((policy.delay_for_attempt(4).unwrap() - 8.0).abs() < f64::EPSILON);
+        assert!((policy.delay_for_attempt(5).unwrap() - 10.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn retry_policy_display() {
+        let policy = DownloadRetryPolicy::default();
+        let s = policy.to_string();
+        assert!(s.contains("max=3"));
+        assert!(s.contains("Exponential"));
+    }
+
+    #[test]
+    fn filter_matches_by_state() {
+        let mut svc = DownloadService::new();
+        let id1 = svc.enqueue(sample_request());
+        let id2 = svc.enqueue(sample_request());
+        svc.fail(id1);
+
+        let filter = DownloadFilter::new().with_state(DownloadState::Failed);
+        let results = svc.query(&filter);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, id1);
+
+        let filter_pending = DownloadFilter::new().with_state(DownloadState::Pending);
+        let results2 = svc.query(&filter_pending);
+        assert_eq!(results2.len(), 1);
+        assert_eq!(results2[0].id, id2);
+    }
+
+    #[test]
+    fn filter_matches_by_url_substring() {
+        let mut svc = DownloadService::new();
+        svc.enqueue(DownloadRequest {
+            url: "https://cdn.example.com/video.mp4".into(),
+            destination: "/tmp/video.mp4".into(),
+            headers: vec![],
+        });
+        svc.enqueue(DownloadRequest {
+            url: "https://cdn.example.com/audio.mp3".into(),
+            destination: "/tmp/audio.mp3".into(),
+            headers: vec![],
+        });
+        svc.enqueue(DownloadRequest {
+            url: "https://other.com/file.zip".into(),
+            destination: "/tmp/file.zip".into(),
+            headers: vec![],
+        });
+
+        let filter = DownloadFilter::new().with_url_contains("cdn.example.com");
+        assert_eq!(svc.query(&filter).len(), 2);
+
+        let filter2 = DownloadFilter::new().with_url_contains("audio");
+        assert_eq!(svc.query(&filter2).len(), 1);
+
+        let filter3 = DownloadFilter::new().with_url_contains("nope");
+        assert_eq!(svc.query(&filter3).len(), 0);
+    }
+
+    #[test]
+    fn filter_combined_state_and_url() {
+        let mut svc = DownloadService::new();
+        let id1 = svc.enqueue(DownloadRequest {
+            url: "https://cdn.example.com/a.bin".into(),
+            destination: "/tmp/a.bin".into(),
+            headers: vec![],
+        });
+        svc.enqueue(DownloadRequest {
+            url: "https://cdn.example.com/b.bin".into(),
+            destination: "/tmp/b.bin".into(),
+            headers: vec![],
+        });
+        svc.fail(id1);
+
+        let filter = DownloadFilter::new()
+            .with_state(DownloadState::Failed)
+            .with_url_contains("cdn");
+        let results = svc.query(&filter);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, id1);
+    }
+
+    #[test]
+    fn summary_totals_and_completion_ratio() {
+        let mut svc = DownloadService::new();
+        let id1 = svc.enqueue(sample_request());
+        let id2 = svc.enqueue(sample_request());
+        let id3 = svc.enqueue(sample_request());
+        let _id4 = svc.enqueue(sample_request());
+
+        svc.complete(id1, "/tmp/a".into(), 500);
+        svc.complete(id2, "/tmp/b".into(), 300);
+        svc.fail(id3);
+
+        let summary = svc.summarize(4.0);
+        assert_eq!(summary.total(), 4);
+        assert_eq!(summary.completed, 2);
+        assert_eq!(summary.failed, 1);
+        assert_eq!(summary.pending, 1);
+        assert!((summary.completion_ratio() - 0.5).abs() < f64::EPSILON);
+        // 800 bytes / 4 sec = 200 B/s
+        assert!((summary.average_speed_bps - 200.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn summary_estimate_remaining() {
+        let summary = DownloadSummary {
+            pending: 1,
+            in_progress: 1,
+            completed: 2,
+            failed: 0,
+            cancelled: 0,
+            total_bytes: 1000,
+            average_speed_bps: 250.0,
+        };
+        // 2000 remaining bytes at 250 B/s = 8 seconds
+        let est = summary.estimate_remaining_secs(2000).unwrap();
+        assert!((est - 8.0).abs() < f64::EPSILON);
+
+        let zero_speed = DownloadSummary {
+            average_speed_bps: 0.0,
+            ..summary
+        };
+        assert!(zero_speed.estimate_remaining_secs(2000).is_none());
+    }
+
+    #[test]
+    fn summary_display() {
+        let summary = DownloadSummary {
+            pending: 1,
+            in_progress: 2,
+            completed: 3,
+            failed: 0,
+            cancelled: 0,
+            total_bytes: 0,
+            average_speed_bps: 1024.0,
+        };
+        let s = summary.to_string();
+        assert!(s.contains("6 total"));
+        assert!(s.contains("3 done"));
+        assert!(s.contains("2 active"));
+    }
+
+    #[test]
+    fn from_str_for_download_request() {
+        let req = DownloadRequest::from("https://example.com/path/archive.tar.gz");
+        assert_eq!(req.url, "https://example.com/path/archive.tar.gz");
+        assert_eq!(req.destination, "archive.tar.gz");
+        assert!(req.headers.is_empty());
+
+        // URL without filename segment
+        let req2 = DownloadRequest::from("https://example.com/");
+        assert_eq!(req2.destination, "download");
+    }
+
+    #[test]
+    fn from_priority_to_u8() {
+        assert_eq!(u8::from(DownloadPriority::Low), 0);
+        assert_eq!(u8::from(DownloadPriority::Normal), 1);
+        assert_eq!(u8::from(DownloadPriority::High), 2);
+        assert_eq!(u8::from(DownloadPriority::Urgent), 3);
     }
 }

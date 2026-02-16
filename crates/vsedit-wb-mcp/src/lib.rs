@@ -793,6 +793,53 @@ pub fn search_tools<'a>(service: &'a McpService, query: &str) -> Vec<(&'a McpSer
     results
 }
 
+
+// ---------------------------------------------------------------------------
+// McpConnectionConfig
+// ---------------------------------------------------------------------------
+
+/// Connection configuration for an MCP server.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpConnectionConfig {
+    pub host: String,
+    pub port: u16,
+    pub tls: bool,
+    pub timeout_ms: u64,
+}
+
+impl McpConnectionConfig {
+    pub fn new(host: impl Into<String>, port: u16) -> Self {
+        Self {
+            host: host.into(),
+            port,
+            tls: false,
+            timeout_ms: 5000,
+        }
+    }
+
+    pub fn with_tls(mut self, tls: bool) -> Self {
+        self.tls = tls;
+        self
+    }
+
+    pub fn with_timeout_ms(mut self, ms: u64) -> Self {
+        self.timeout_ms = ms;
+        self
+    }
+
+    /// Build a URI string from the config.
+    pub fn uri(&self) -> String {
+        let scheme = if self.tls { "https" } else { "http" };
+        format!("{scheme}://{}:{}", self.host, self.port)
+    }
+}
+
+impl fmt::Display for McpConnectionConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} (timeout {}ms)", self.uri(), self.timeout_ms)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1463,4 +1510,64 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].1.name, "file_read");
     }
+
+    // --- new tests ---
+
+    #[test]
+    fn invocation_log_record_and_by_tool() {
+        let mut log = McpInvocationLog::new();
+        log.record(make_invocation("read", "s1", 100, Some(true)));
+        log.record(make_invocation("write", "s1", 200, Some(true)));
+        log.record(make_invocation("read", "s1", 300, None));
+        assert_eq!(log.count(), 3);
+        assert_eq!(log.get_by_tool("read").len(), 2);
+        assert_eq!(log.get_by_server("s1").len(), 3);
+    }
+
+    #[test]
+    fn invocation_log_clear_and_count() {
+        let mut log = McpInvocationLog::new();
+        log.record(make_invocation("x", "s1", 0, None));
+        log.clear();
+        assert_eq!(log.count(), 0);
+    }
+
+    #[test]
+    fn server_health_record_and_healthy() {
+        let mut h = McpServerHealth::new("s1".to_string());
+        assert!(h.is_healthy());
+        h.record_success(100);
+        h.record_success(200);
+        assert!(h.is_healthy());
+        assert_eq!(h.total_invocations, 2);
+        assert!((h.failure_rate() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn server_health_failures_mark_unhealthy() {
+        let mut h = McpServerHealth::new("s1".to_string());
+        h.record_failure(100);
+        h.record_failure(200);
+        h.record_failure(300);
+        assert!(!h.is_healthy());
+        assert_eq!(h.consecutive_failures, 3);
+    }
+
+    #[test]
+    fn connection_config_uri() {
+        let cfg = McpConnectionConfig::new("localhost", 8080).with_tls(true).with_timeout_ms(3000);
+        assert_eq!(cfg.uri(), "https://localhost:8080");
+        assert_eq!(cfg.timeout_ms, 3000);
+        let s = format!("{cfg}");
+        assert!(s.contains("https"));
+    }
+
+    #[test]
+    fn connection_config_default() {
+        let cfg = McpConnectionConfig::new("example.com", 443);
+        assert!(!cfg.tls);
+        assert_eq!(cfg.timeout_ms, 5000);
+        assert_eq!(cfg.uri(), "http://example.com:443");
+    }
+
 }

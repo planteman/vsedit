@@ -872,6 +872,273 @@ impl fmt::Display for EditorSnapshot {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// EditorDecorationManager - manages decorations by type
+// ---------------------------------------------------------------------------
+
+/// Manages editor decorations organized by decoration type.
+#[derive(Debug, Clone, Default)]
+pub struct EditorDecorationManager {
+    types: HashMap<String, DecorationStyle>,
+    decorations: HashMap<String, Vec<TextEditorDecoration>>,
+}
+
+/// Style for a decoration type.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DecorationStyle {
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub background_color: Option<String>,
+    #[serde(default)]
+    pub font_weight: Option<String>,
+    #[serde(default)]
+    pub font_style: Option<String>,
+    #[serde(default)]
+    pub border: Option<String>,
+}
+
+impl DecorationStyle {
+    /// Create an empty style.
+    pub fn new() -> Self {
+        Self {
+            color: None,
+            background_color: None,
+            font_weight: None,
+            font_style: None,
+            border: None,
+        }
+    }
+
+    /// Set the foreground color.
+    pub fn with_color(mut self, color: impl Into<String>) -> Self {
+        self.color = Some(color.into());
+        self
+    }
+
+    /// Set the background color.
+    pub fn with_background(mut self, bg: impl Into<String>) -> Self {
+        self.background_color = Some(bg.into());
+        self
+    }
+
+    /// Set the font weight.
+    pub fn with_font_weight(mut self, weight: impl Into<String>) -> Self {
+        self.font_weight = Some(weight.into());
+        self
+    }
+
+    /// Set the font style.
+    pub fn with_font_style(mut self, style: impl Into<String>) -> Self {
+        self.font_style = Some(style.into());
+        self
+    }
+
+    /// Set the border.
+    pub fn with_border(mut self, border: impl Into<String>) -> Self {
+        self.border = Some(border.into());
+        self
+    }
+
+    /// Returns true if no style properties are set.
+    pub fn is_empty(&self) -> bool {
+        self.color.is_none()
+            && self.background_color.is_none()
+            && self.font_weight.is_none()
+            && self.font_style.is_none()
+            && self.border.is_none()
+    }
+}
+
+impl Default for DecorationStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EditorDecorationManager {
+    /// Create a new empty decoration manager.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a new decoration type with a style.
+    pub fn add_type(&mut self, type_name: impl Into<String>, style: DecorationStyle) {
+        let name = type_name.into();
+        self.types.insert(name.clone(), style);
+        self.decorations.entry(name).or_default();
+    }
+
+    /// Remove a decoration type and all its decorations.
+    pub fn remove_type(&mut self, type_name: &str) -> bool {
+        self.decorations.remove(type_name);
+        self.types.remove(type_name).is_some()
+    }
+
+    /// Set decorations for a given type. Replaces any existing decorations.
+    pub fn set_decorations(&mut self, type_name: &str, decorations: Vec<TextEditorDecoration>) {
+        if self.types.contains_key(type_name) {
+            self.decorations.insert(type_name.to_string(), decorations);
+        }
+    }
+
+    /// Get decorations for a given type.
+    pub fn get_decorations(&self, type_name: &str) -> &[TextEditorDecoration] {
+        self.decorations
+            .get(type_name)
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Clear all decoration types and decorations.
+    pub fn clear_all(&mut self) {
+        self.types.clear();
+        self.decorations.clear();
+    }
+
+    /// Number of registered decoration types.
+    pub fn type_count(&self) -> usize {
+        self.types.len()
+    }
+
+    /// Total number of decorations across all types.
+    pub fn total_decoration_count(&self) -> usize {
+        self.decorations.values().map(|v| v.len()).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorCommandDispatcher - dispatches named commands
+// ---------------------------------------------------------------------------
+
+/// Dispatches named editor commands to registered handlers.
+#[derive(Debug, Clone, Default)]
+pub struct EditorCommandDispatcher {
+    commands: HashMap<String, EditorCommandEntry>,
+}
+
+/// A registered command.
+#[derive(Debug, Clone)]
+pub struct EditorCommandEntry {
+    pub id: String,
+    pub title: String,
+    pub category: Option<String>,
+    pub invocation_count: u64,
+}
+
+impl EditorCommandDispatcher {
+    /// Create a new empty dispatcher.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a command.
+    pub fn register(&mut self, id: impl Into<String>, title: impl Into<String>, category: Option<String>) {
+        let id = id.into();
+        self.commands.insert(
+            id.clone(),
+            EditorCommandEntry {
+                id,
+                title: title.into(),
+                category,
+                invocation_count: 0,
+            },
+        );
+    }
+
+    /// Dispatch (invoke) a command by id. Returns true if the command existed.
+    pub fn dispatch(&mut self, id: &str) -> bool {
+        if let Some(entry) = self.commands.get_mut(id) {
+            entry.invocation_count += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// List all registered command ids.
+    pub fn list_commands(&self) -> Vec<&str> {
+        self.commands.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Get a command entry by id.
+    pub fn get_command(&self, id: &str) -> Option<&EditorCommandEntry> {
+        self.commands.get(id)
+    }
+
+    /// Number of registered commands.
+    pub fn len(&self) -> usize {
+        self.commands.len()
+    }
+
+    /// Returns true if no commands are registered.
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorEditBatch - batches text edits
+// ---------------------------------------------------------------------------
+
+/// A batch of text edits to apply atomically.
+#[derive(Debug, Clone, Default)]
+pub struct EditorEditBatch {
+    edits: Vec<EditorBatchEdit>,
+}
+
+/// A single text edit in a batch.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EditorBatchEdit {
+    pub range: EditorRange,
+    pub new_text: String,
+}
+
+impl EditorEditBatch {
+    /// Create a new empty batch.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add an edit to the batch.
+    pub fn add_edit(&mut self, range: EditorRange, new_text: impl Into<String>) {
+        self.edits.push(EditorBatchEdit {
+            range,
+            new_text: new_text.into(),
+        });
+    }
+
+    /// Apply all edits, returning them sorted by position (bottom-up for safe application).
+    pub fn apply_all(&mut self) -> Vec<EditorBatchEdit> {
+        self.edits.sort_by(|a, b| {
+            (b.range.start_line, b.range.start_col).cmp(&(a.range.start_line, a.range.start_col))
+        });
+        std::mem::take(&mut self.edits)
+    }
+
+    /// Number of edits in the batch.
+    pub fn len(&self) -> usize {
+        self.edits.len()
+    }
+
+    /// Returns true if the batch is empty.
+    pub fn is_empty(&self) -> bool {
+        self.edits.is_empty()
+    }
+
+    /// Total characters of new text across all edits.
+    pub fn total_new_chars(&self) -> usize {
+        self.edits.iter().map(|e| e.new_text.len()).sum()
+    }
+}
+
+impl fmt::Display for EditorEditBatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EditBatch({} edits, {} chars)", self.len(), self.total_new_chars())
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1492,5 +1759,100 @@ mod tests {
         let d = format!("{diff}");
         assert!(d.contains("uri_changed=true"));
         assert!(d.contains("+2/-1"));
+    }
+
+    #[test]
+    fn decoration_style_builder() {
+        let style = DecorationStyle::new()
+            .with_color("red")
+            .with_background("yellow")
+            .with_font_weight("bold");
+        assert!(!style.is_empty());
+        assert_eq!(style.color, Some("red".to_string()));
+        assert_eq!(style.background_color, Some("yellow".to_string()));
+        assert_eq!(style.font_weight, Some("bold".to_string()));
+        assert!(style.font_style.is_none());
+    }
+
+    #[test]
+    fn decoration_manager_operations() {
+        let mut mgr = EditorDecorationManager::new();
+        mgr.add_type("highlight", DecorationStyle::new().with_color("blue"));
+        mgr.add_type("error", DecorationStyle::new().with_color("red"));
+        assert_eq!(mgr.type_count(), 2);
+
+        let decs = vec![TextEditorDecoration {
+            range: EditorRange { start_line: 1, start_col: 1, end_line: 1, end_col: 5 },
+            hover_message: Some("test".into()),
+            style: None,
+        }];
+        mgr.set_decorations("highlight", decs);
+        assert_eq!(mgr.get_decorations("highlight").len(), 1);
+        assert_eq!(mgr.total_decoration_count(), 1);
+
+        mgr.remove_type("highlight");
+        assert_eq!(mgr.type_count(), 1);
+        mgr.clear_all();
+        assert_eq!(mgr.type_count(), 0);
+    }
+
+    #[test]
+    fn command_dispatcher_register_dispatch() {
+        let mut disp = EditorCommandDispatcher::new();
+        disp.register("editor.save", "Save File", Some("File".into()));
+        disp.register("editor.copy", "Copy", Some("Edit".into()));
+        assert_eq!(disp.len(), 2);
+
+        assert!(disp.dispatch("editor.save"));
+        assert!(disp.dispatch("editor.save"));
+        assert!(!disp.dispatch("unknown.cmd"));
+        let cmd = disp.get_command("editor.save").unwrap();
+        assert_eq!(cmd.invocation_count, 2);
+    }
+
+    #[test]
+    fn command_dispatcher_list() {
+        let mut disp = EditorCommandDispatcher::new();
+        disp.register("a", "A", None);
+        disp.register("b", "B", None);
+        let mut cmds = disp.list_commands();
+        cmds.sort();
+        assert_eq!(cmds, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn edit_batch_operations() {
+        let mut batch = EditorEditBatch::new();
+        assert!(batch.is_empty());
+        batch.add_edit(
+            EditorRange { start_line: 1, start_col: 1, end_line: 1, end_col: 5 },
+            "hello",
+        );
+        batch.add_edit(
+            EditorRange { start_line: 3, start_col: 1, end_line: 3, end_col: 3 },
+            "world",
+        );
+        assert_eq!(batch.len(), 2);
+        assert_eq!(batch.total_new_chars(), 10);
+        let s = format!("{batch}");
+        assert!(s.contains("2 edits"));
+    }
+
+    #[test]
+    fn edit_batch_apply_sorted() {
+        let mut batch = EditorEditBatch::new();
+        batch.add_edit(
+            EditorRange { start_line: 1, start_col: 1, end_line: 1, end_col: 1 },
+            "first",
+        );
+        batch.add_edit(
+            EditorRange { start_line: 5, start_col: 1, end_line: 5, end_col: 1 },
+            "second",
+        );
+        let edits = batch.apply_all();
+        // Should be sorted bottom-up (line 5 first)
+        assert_eq!(edits[0].range.start_line, 5);
+        assert_eq!(edits[1].range.start_line, 1);
+        assert!(batch.is_empty());
     }
 }

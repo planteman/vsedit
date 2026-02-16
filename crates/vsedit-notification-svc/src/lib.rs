@@ -834,6 +834,386 @@ impl Notification {
     }
 }
 
+// ---------------------------------------------------------------------------
+// NotificationFilter – builder-pattern predicate combinator
+// ---------------------------------------------------------------------------
+
+/// A composable filter for selecting notifications matching multiple criteria.
+///
+/// Criteria are combined with logical AND: a notification must satisfy every
+/// configured predicate to pass the filter.
+#[derive(Debug, Clone, Default)]
+pub struct NotificationFilter {
+    severities: Option<Vec<NotificationSeverity>>,
+    priorities: Option<Vec<NotificationPriority>>,
+    source: Option<String>,
+    dismissed: Option<bool>,
+    sticky: Option<bool>,
+    message_contains: Option<String>,
+}
+
+impl NotificationFilter {
+    /// Create an empty filter that matches everything.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Only match notifications with one of the given severities.
+    pub fn severity(mut self, severities: &[NotificationSeverity]) -> Self {
+        self.severities = Some(severities.to_vec());
+        self
+    }
+
+    /// Only match notifications with one of the given priorities.
+    pub fn priority(mut self, priorities: &[NotificationPriority]) -> Self {
+        self.priorities = Some(priorities.to_vec());
+        self
+    }
+
+    /// Only match notifications whose source equals `source`.
+    pub fn source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    /// Only match notifications with the given dismissed state.
+    pub fn dismissed(mut self, dismissed: bool) -> Self {
+        self.dismissed = Some(dismissed);
+        self
+    }
+
+    /// Only match notifications with the given sticky state.
+    pub fn sticky(mut self, sticky: bool) -> Self {
+        self.sticky = Some(sticky);
+        self
+    }
+
+    /// Only match notifications whose message contains `substring`.
+    pub fn message_contains(mut self, substring: impl Into<String>) -> Self {
+        self.message_contains = Some(substring.into());
+        self
+    }
+
+    /// Test whether a single notification matches this filter.
+    pub fn matches(&self, n: &Notification) -> bool {
+        if let Some(ref sevs) = self.severities {
+            if !sevs.contains(&n.severity) {
+                return false;
+            }
+        }
+        if let Some(ref pris) = self.priorities {
+            let matched = match n.priority {
+                Some(p) => pris.contains(&p),
+                None => false,
+            };
+            if !matched {
+                return false;
+            }
+        }
+        if let Some(ref src) = self.source {
+            if n.source.as_deref() != Some(src.as_str()) {
+                return false;
+            }
+        }
+        if let Some(d) = self.dismissed {
+            if n.dismissed != d {
+                return false;
+            }
+        }
+        if let Some(s) = self.sticky {
+            if n.sticky != s {
+                return false;
+            }
+        }
+        if let Some(ref sub) = self.message_contains {
+            if !n.message.contains(sub.as_str()) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Apply this filter to a slice and return matching notifications.
+    pub fn apply<'a>(&self, notifications: &'a [Notification]) -> Vec<&'a Notification> {
+        notifications.iter().filter(|n| self.matches(n)).collect()
+    }
+}
+
+impl fmt::Display for NotificationFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut parts = Vec::new();
+        if let Some(ref sevs) = self.severities {
+            parts.push(format!("severity={sevs:?}"));
+        }
+        if let Some(ref pris) = self.priorities {
+            parts.push(format!("priority={pris:?}"));
+        }
+        if let Some(ref src) = self.source {
+            parts.push(format!("source={src}"));
+        }
+        if let Some(d) = self.dismissed {
+            parts.push(format!("dismissed={d}"));
+        }
+        if let Some(s) = self.sticky {
+            parts.push(format!("sticky={s}"));
+        }
+        if let Some(ref sub) = self.message_contains {
+            parts.push(format!("message_contains={sub}"));
+        }
+        if parts.is_empty() {
+            write!(f, "NotificationFilter(match_all)")
+        } else {
+            write!(f, "NotificationFilter({})", parts.join(", "))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationSorter – configurable sorting
+// ---------------------------------------------------------------------------
+
+/// Sort criterion for notifications.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotificationSortKey {
+    /// Sort by priority (notifications without a priority sort last).
+    Priority,
+    /// Sort by age (using id as a proxy timestamp – lower id = older).
+    Age,
+    /// Sort by severity (Error > Warning > Info).
+    Severity,
+}
+
+/// Configurable sorter that applies one or more sort keys in sequence.
+///
+/// When multiple keys are specified the first key is the primary sort;
+/// ties are broken by subsequent keys.
+#[derive(Debug, Clone)]
+pub struct NotificationSorter {
+    keys: Vec<(NotificationSortKey, bool)>, // (key, ascending)
+}
+
+impl NotificationSorter {
+    /// Create a sorter with no keys (preserves original order).
+    pub fn new() -> Self {
+        Self { keys: Vec::new() }
+    }
+
+    /// Append a sort key in ascending order.
+    pub fn asc(mut self, key: NotificationSortKey) -> Self {
+        self.keys.push((key, true));
+        self
+    }
+
+    /// Append a sort key in descending order.
+    pub fn desc(mut self, key: NotificationSortKey) -> Self {
+        self.keys.push((key, false));
+        self
+    }
+
+    /// Sort a mutable slice of notifications in place.
+    pub fn sort(&self, notifications: &mut [Notification]) {
+        notifications.sort_by(|a, b| {
+            for &(key, ascending) in &self.keys {
+                let ord = match key {
+                    NotificationSortKey::Priority => {
+                        let pa = a.priority.unwrap_or(NotificationPriority::Low);
+                        let pb = b.priority.unwrap_or(NotificationPriority::Low);
+                        pa.cmp(&pb)
+                    }
+                    NotificationSortKey::Age => {
+                        // Lower id = older notification.
+                        a.id.cmp(&b.id)
+                    }
+                    NotificationSortKey::Severity => {
+                        (a.severity as u8).cmp(&(b.severity as u8))
+                    }
+                };
+                let ord = if ascending { ord } else { ord.reverse() };
+                if ord != std::cmp::Ordering::Equal {
+                    return ord;
+                }
+            }
+            std::cmp::Ordering::Equal
+        });
+    }
+
+    /// Return a sorted copy, leaving the original untouched.
+    pub fn sorted(&self, notifications: &[Notification]) -> Vec<Notification> {
+        let mut v = notifications.to_vec();
+        self.sort(&mut v);
+        v
+    }
+}
+
+impl Default for NotificationSorter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationBatch – group related notifications
+// ---------------------------------------------------------------------------
+
+/// A batch of related notifications that can be operated on as a unit.
+#[derive(Debug, Clone)]
+pub struct NotificationBatch {
+    label: String,
+    items: Vec<Notification>,
+}
+
+impl NotificationBatch {
+    /// Create a new empty batch with the given label.
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            items: Vec::new(),
+        }
+    }
+
+    /// Add a notification to the batch.
+    pub fn push(&mut self, notification: Notification) {
+        self.items.push(notification);
+    }
+
+    /// Number of notifications in the batch.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Returns `true` if the batch is empty.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Return the batch label.
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    /// Return a reference to all items.
+    pub fn items(&self) -> &[Notification] {
+        &self.items
+    }
+
+    /// Merge all notification messages into a single newline-separated string.
+    pub fn merge_messages(&self) -> String {
+        self.items
+            .iter()
+            .map(|n| n.message.as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Return the highest severity present in the batch, or `None` if empty.
+    pub fn highest_severity(&self) -> Option<NotificationSeverity> {
+        self.items
+            .iter()
+            .map(|n| n.severity as u8)
+            .max()
+            .map(|v| match v {
+                0 => NotificationSeverity::Info,
+                1 => NotificationSeverity::Warning,
+                _ => NotificationSeverity::Error,
+            })
+    }
+
+    /// Mark every notification in the batch as dismissed.
+    pub fn dismiss_all(&mut self) {
+        for n in &mut self.items {
+            n.dismissed = true;
+        }
+    }
+
+    /// Return only the non-dismissed notifications.
+    pub fn active(&self) -> Vec<&Notification> {
+        self.items.iter().filter(|n| !n.dismissed).collect()
+    }
+
+    /// Return the highest priority in the batch, or `None` if empty / no priorities set.
+    pub fn highest_priority(&self) -> Option<NotificationPriority> {
+        self.items.iter().filter_map(|n| n.priority).max()
+    }
+
+    /// Iterate over the notifications in the batch.
+    pub fn iter(&self) -> std::slice::Iter<'_, Notification> {
+        self.items.iter()
+    }
+}
+
+impl fmt::Display for NotificationBatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "NotificationBatch(\"{}\", count={})",
+            self.label,
+            self.items.len()
+        )
+    }
+}
+
+impl<'a> IntoIterator for &'a NotificationBatch {
+    type Item = &'a Notification;
+    type IntoIter = std::slice::Iter<'a, Notification>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.iter()
+    }
+}
+
+impl IntoIterator for NotificationBatch {
+    type Item = Notification;
+    type IntoIter = std::vec::IntoIter<Notification>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
+
+impl FromIterator<Notification> for NotificationBatch {
+    fn from_iter<T: IntoIterator<Item = Notification>>(iter: T) -> Self {
+        let mut batch = NotificationBatch::new("collected");
+        for n in iter {
+            batch.push(n);
+        }
+        batch
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display & From impls for NotificationSeverity
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for NotificationSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            NotificationSeverity::Info => "Info",
+            NotificationSeverity::Warning => "Warning",
+            NotificationSeverity::Error => "Error",
+        };
+        write!(f, "{s}")
+    }
+}
+
+impl From<NotificationSeverity> for u8 {
+    fn from(s: NotificationSeverity) -> Self {
+        match s {
+            NotificationSeverity::Info => 0,
+            NotificationSeverity::Warning => 1,
+            NotificationSeverity::Error => 2,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationService integration with filter/sorter
+// ---------------------------------------------------------------------------
+
+impl NotificationService {
+    /// Return notifications matching `filter`.
+    pub fn query(&self, filter: &NotificationFilter) -> Vec<&Notification> {
+        filter.apply(&self.notifications)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1394,5 +1774,194 @@ mod tests {
         };
         assert_eq!(n.age_seconds(15), 5);
         assert_eq!(n.age_seconds(5), 0);
+    }
+
+    // -- NotificationFilter tests --
+
+    #[test]
+    fn filter_by_severity_and_dismissed() {
+        let notifications = vec![
+            Notification { id: 1, message: "a".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 2, message: "b".into(), severity: NotificationSeverity::Error, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 3, message: "c".into(), severity: NotificationSeverity::Error, source: None, actions: vec![], sticky: false, dismissed: true, priority: None },
+        ];
+
+        let filter = NotificationFilter::new()
+            .severity(&[NotificationSeverity::Error])
+            .dismissed(false);
+
+        let result = filter.apply(&notifications);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message, "b");
+    }
+
+    #[test]
+    fn filter_by_source_and_message() {
+        let notifications = vec![
+            Notification { id: 1, message: "lint: unused var".into(), severity: NotificationSeverity::Warning, source: Some("linter".into()), actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 2, message: "lint: missing semi".into(), severity: NotificationSeverity::Warning, source: Some("linter".into()), actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 3, message: "build failed".into(), severity: NotificationSeverity::Error, source: Some("builder".into()), actions: vec![], sticky: false, dismissed: false, priority: None },
+        ];
+
+        let filter = NotificationFilter::new()
+            .source("linter")
+            .message_contains("unused");
+
+        let result = filter.apply(&notifications);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, 1);
+    }
+
+    #[test]
+    fn filter_empty_matches_all() {
+        let notifications = vec![
+            Notification { id: 1, message: "a".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 2, message: "b".into(), severity: NotificationSeverity::Error, source: None, actions: vec![], sticky: false, dismissed: true, priority: None },
+        ];
+        let filter = NotificationFilter::new();
+        assert_eq!(filter.apply(&notifications).len(), 2);
+    }
+
+    #[test]
+    fn filter_display() {
+        let f = NotificationFilter::new()
+            .severity(&[NotificationSeverity::Error])
+            .dismissed(false);
+        let s = format!("{f}");
+        assert!(s.contains("severity="));
+        assert!(s.contains("dismissed=false"));
+
+        let empty = NotificationFilter::new();
+        assert_eq!(format!("{empty}"), "NotificationFilter(match_all)");
+    }
+
+    // -- NotificationSorter tests --
+
+    #[test]
+    fn sorter_by_severity_desc() {
+        let mut notifications = vec![
+            Notification { id: 1, message: "info".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 2, message: "error".into(), severity: NotificationSeverity::Error, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 3, message: "warn".into(), severity: NotificationSeverity::Warning, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+        ];
+        let sorter = NotificationSorter::new().desc(NotificationSortKey::Severity);
+        sorter.sort(&mut notifications);
+        assert_eq!(notifications[0].severity, NotificationSeverity::Error);
+        assert_eq!(notifications[1].severity, NotificationSeverity::Warning);
+        assert_eq!(notifications[2].severity, NotificationSeverity::Info);
+    }
+
+    #[test]
+    fn sorter_by_priority_asc_then_age() {
+        let notifications = vec![
+            Notification { id: 3, message: "c".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: Some(NotificationPriority::High) },
+            Notification { id: 1, message: "a".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: Some(NotificationPriority::High) },
+            Notification { id: 2, message: "b".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: Some(NotificationPriority::Low) },
+        ];
+        let sorter = NotificationSorter::new()
+            .asc(NotificationSortKey::Priority)
+            .asc(NotificationSortKey::Age);
+        let sorted = sorter.sorted(&notifications);
+        // Low priority first, then High sorted by id (age)
+        assert_eq!(sorted[0].message, "b"); // Low, id=2
+        assert_eq!(sorted[1].message, "a"); // High, id=1
+        assert_eq!(sorted[2].message, "c"); // High, id=3
+    }
+
+    // -- NotificationBatch tests --
+
+    #[test]
+    fn batch_merge_and_severity() {
+        let mut batch = NotificationBatch::new("build errors");
+        batch.push(Notification { id: 1, message: "error in foo.rs".into(), severity: NotificationSeverity::Warning, source: None, actions: vec![], sticky: false, dismissed: false, priority: None });
+        batch.push(Notification { id: 2, message: "error in bar.rs".into(), severity: NotificationSeverity::Error, source: None, actions: vec![], sticky: false, dismissed: false, priority: None });
+
+        assert_eq!(batch.len(), 2);
+        assert!(!batch.is_empty());
+        assert_eq!(batch.label(), "build errors");
+        assert_eq!(batch.merge_messages(), "error in foo.rs\nerror in bar.rs");
+        assert_eq!(batch.highest_severity(), Some(NotificationSeverity::Error));
+    }
+
+    #[test]
+    fn batch_dismiss_all_and_active() {
+        let mut batch = NotificationBatch::new("test");
+        batch.push(Notification { id: 1, message: "a".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: None });
+        batch.push(Notification { id: 2, message: "b".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: None });
+
+        assert_eq!(batch.active().len(), 2);
+        batch.dismiss_all();
+        assert_eq!(batch.active().len(), 0);
+        assert_eq!(batch.len(), 2); // still present, just dismissed
+    }
+
+    #[test]
+    fn batch_from_iterator_and_into_iter() {
+        let items = vec![
+            Notification { id: 1, message: "x".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+            Notification { id: 2, message: "y".into(), severity: NotificationSeverity::Warning, source: None, actions: vec![], sticky: false, dismissed: false, priority: None },
+        ];
+
+        let batch: NotificationBatch = items.into_iter().collect();
+        assert_eq!(batch.len(), 2);
+
+        let messages: Vec<String> = batch.into_iter().map(|n| n.message).collect();
+        assert_eq!(messages, vec!["x", "y"]);
+    }
+
+    #[test]
+    fn batch_display() {
+        let mut batch = NotificationBatch::new("deploys");
+        batch.push(Notification { id: 1, message: "a".into(), severity: NotificationSeverity::Info, source: None, actions: vec![], sticky: false, dismissed: false, priority: None });
+        let s = format!("{batch}");
+        assert!(s.contains("deploys"));
+        assert!(s.contains("count=1"));
+    }
+
+    #[test]
+    fn batch_empty() {
+        let batch = NotificationBatch::new("empty");
+        assert!(batch.is_empty());
+        assert_eq!(batch.highest_severity(), None);
+        assert_eq!(batch.highest_priority(), None);
+        assert_eq!(batch.merge_messages(), "");
+    }
+
+    // -- Severity Display & From --
+
+    #[test]
+    fn severity_display() {
+        assert_eq!(NotificationSeverity::Info.to_string(), "Info");
+        assert_eq!(NotificationSeverity::Warning.to_string(), "Warning");
+        assert_eq!(NotificationSeverity::Error.to_string(), "Error");
+    }
+
+    #[test]
+    fn severity_into_u8() {
+        let v: u8 = NotificationSeverity::Info.into();
+        assert_eq!(v, 0);
+        let v: u8 = NotificationSeverity::Warning.into();
+        assert_eq!(v, 1);
+        let v: u8 = NotificationSeverity::Error.into();
+        assert_eq!(v, 2);
+    }
+
+    // -- NotificationService::query --
+
+    #[test]
+    fn service_query_integration() {
+        let mut svc = NotificationService::new();
+        svc.info("all good");
+        svc.warn("watch out");
+        svc.error("boom");
+        let id = svc.info("dismissed info");
+        svc.dismiss(id);
+
+        let filter = NotificationFilter::new()
+            .severity(&[NotificationSeverity::Info])
+            .dismissed(false);
+        let result = svc.query(&filter);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].message, "all good");
     }
 }

@@ -904,6 +904,177 @@ impl<'a, T> Iterator for DepthIter<'a, T> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TreeFilter<T> – predicate-based visible-node filtering
+// ---------------------------------------------------------------------------
+
+/// Filters visible tree nodes using a predicate function.
+pub struct TreeFilter<T> {
+    predicate: Option<Box<dyn Fn(&T) -> bool>>,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> TreeFilter<T> {
+    pub fn new() -> Self {
+        Self { predicate: None, _marker: std::marker::PhantomData }
+    }
+
+    /// Set the filter predicate. Only nodes matching it will be included in `apply`.
+    pub fn set_filter(&mut self, pred: Box<dyn Fn(&T) -> bool>) {
+        self.predicate = Some(pred);
+    }
+
+    /// Clear the filter so all nodes are included.
+    pub fn clear_filter(&mut self) {
+        self.predicate = None;
+    }
+
+    /// Returns true if a filter is currently set.
+    pub fn has_filter(&self) -> bool {
+        self.predicate.is_some()
+    }
+
+    /// Apply the filter to a model, returning references to matching nodes.
+    pub fn apply<'a>(&self, model: &'a TreeModel<T>) -> Vec<&'a T> {
+        let mut results = Vec::new();
+        for root in &model.roots {
+            self.collect_matching(root, &mut results);
+        }
+        results
+    }
+
+    fn collect_matching<'a>(&self, node: &'a TreeNode<T>, out: &mut Vec<&'a T>) {
+        let matches = match &self.predicate {
+            Some(pred) => pred(&node.data),
+            None => true,
+        };
+        if matches {
+            out.push(&node.data);
+        }
+        for child in &node.children {
+            self.collect_matching(child, out);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TreeSearchResultWithPath<T> – search with path tracking
+// ---------------------------------------------------------------------------
+
+/// A search result that includes the matched data reference and the path to it.
+pub struct TreeSearchResultWithPath<'a, T> {
+    pub data: &'a T,
+    pub path: Vec<usize>,
+    pub depth: u32,
+}
+
+/// Search the tree for nodes matching a predicate, returning full paths.
+pub fn tree_search_with_paths<'a, T, F>(
+    model: &'a TreeModel<T>,
+    predicate: F,
+) -> Vec<TreeSearchResultWithPath<'a, T>>
+where
+    F: Fn(&T) -> bool,
+{
+    let mut results = Vec::new();
+    for (i, root) in model.roots.iter().enumerate() {
+        let mut path = vec![i];
+        search_node_with_path(root, &predicate, &mut path, &mut results);
+        path.pop();
+    }
+    results
+}
+
+fn search_node_with_path<'a, T, F>(
+    node: &'a TreeNode<T>,
+    predicate: &F,
+    path: &mut Vec<usize>,
+    results: &mut Vec<TreeSearchResultWithPath<'a, T>>,
+) where
+    F: Fn(&T) -> bool,
+{
+    if predicate(&node.data) {
+        results.push(TreeSearchResultWithPath {
+            data: &node.data,
+            path: path.clone(),
+            depth: node.depth,
+        });
+    }
+    for (i, child) in node.children.iter().enumerate() {
+        path.push(i);
+        search_node_with_path(child, predicate, path, results);
+        path.pop();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TreeFilterStats – compute filter-aware statistics about a tree model
+// ---------------------------------------------------------------------------
+
+/// Statistics about the current state of a tree model (filter-aware).
+pub struct TreeFilterStats {
+    pub total: usize,
+    pub expanded: usize,
+    pub collapsed: usize,
+    pub leaf: usize,
+}
+
+/// Compute statistics about the current state of a tree model.
+pub fn compute_tree_stats<T>(model: &TreeModel<T>) -> TreeFilterStats {
+    let mut stats = TreeFilterStats {
+        total: 0,
+        expanded: 0,
+        collapsed: 0,
+        leaf: 0,
+    };
+    for root in &model.roots {
+        count_stats(root, &mut stats);
+    }
+    stats
+}
+
+fn count_stats<T>(node: &TreeNode<T>, stats: &mut TreeFilterStats) {
+    stats.total += 1;
+    if node.children.is_empty() {
+        stats.leaf += 1;
+    } else if node.is_expanded {
+        stats.expanded += 1;
+    } else {
+        stats.collapsed += 1;
+    }
+    for child in &node.children {
+        count_stats(child, stats);
+    }
+}
+
+impl std::fmt::Display for TreeFilterStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} total, {} expanded, {} collapsed, {} leaf",
+            self.total, self.expanded, self.collapsed, self.leaf,
+        )
+    }
+}
+
+/// Collect all leaf nodes from a tree model.
+pub fn collect_leaves<'a, T>(model: &'a TreeModel<T>) -> Vec<&'a T> {
+    let mut leaves = Vec::new();
+    for root in &model.roots {
+        collect_leaves_node(root, &mut leaves);
+    }
+    leaves
+}
+
+fn collect_leaves_node<'a, T>(node: &'a TreeNode<T>, out: &mut Vec<&'a T>) {
+    if node.children.is_empty() {
+        out.push(&node.data);
+    }
+    for child in &node.children {
+        collect_leaves_node(child, out);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

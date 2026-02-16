@@ -3,6 +3,7 @@
 //! RPC bridge between the extension host and the main thread for progress reporting.
 
 use std::fmt;
+use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
 /// Proxy identifier for this extension API namespace.
@@ -827,6 +828,385 @@ impl ProgressSummary {
     }
 }
 
+// ── Progress Timeline (ETA estimation) ──
+
+/// A single recorded data point in the progress timeline.
+#[derive(Debug, Clone)]
+pub struct TimelineEntry {
+    pub percentage: f64,
+    pub timestamp: Instant,
+}
+
+/// Tracks progress changes over time to provide ETA and rate estimation.
+#[derive(Debug)]
+pub struct ProgressTimeline {
+    entries: Vec<TimelineEntry>,
+    start: Instant,
+}
+
+impl ProgressTimeline {
+    /// Create a new timeline starting at the current instant.
+    pub fn new() -> Self {
+        let now = Instant::now();
+        Self {
+            entries: vec![TimelineEntry {
+                percentage: 0.0,
+                timestamp: now,
+            }],
+            start: now,
+        }
+    }
+
+    /// Create a timeline with a specific start instant (useful for testing).
+    pub fn with_start(start: Instant) -> Self {
+        Self {
+            entries: vec![TimelineEntry {
+                percentage: 0.0,
+                timestamp: start,
+            }],
+            start,
+        }
+    }
+
+    /// Record a progress percentage at the current instant.
+    pub fn record(&mut self, percentage: f64) {
+        self.entries.push(TimelineEntry {
+            percentage: percentage.clamp(0.0, 100.0),
+            timestamp: Instant::now(),
+        });
+    }
+
+    /// Record a progress percentage at a specific instant.
+    pub fn record_at(&mut self, percentage: f64, at: Instant) {
+        self.entries.push(TimelineEntry {
+            percentage: percentage.clamp(0.0, 100.0),
+            timestamp: at,
+        });
+    }
+
+    /// Total elapsed time since the timeline was created.
+    pub fn elapsed(&self) -> Duration {
+        self.start.elapsed()
+    }
+
+    /// The most recently recorded percentage.
+    pub fn current_percentage(&self) -> f64 {
+        self.entries.last().map(|e| e.percentage).unwrap_or(0.0)
+    }
+
+    /// Compute the rate of progress in percentage-points per second,
+    /// based on the first and last entries.
+    pub fn rate_pct_per_sec(&self) -> Option<f64> {
+        if self.entries.len() < 2 {
+            return None;
+        }
+        let first = &self.entries[0];
+        let last = self.entries.last().unwrap();
+        let dt = last.timestamp.duration_since(first.timestamp).as_secs_f64();
+        if dt <= 0.0 {
+            return None;
+        }
+        Some((last.percentage - first.percentage) / dt)
+    }
+
+    /// Estimate the remaining duration until 100% based on the current rate.
+    pub fn eta(&self) -> Option<Duration> {
+        let rate = self.rate_pct_per_sec()?;
+        if rate <= 0.0 {
+            return None;
+        }
+        let remaining_pct = 100.0 - self.current_percentage();
+        if remaining_pct <= 0.0 {
+            return Some(Duration::ZERO);
+        }
+        Some(Duration::from_secs_f64(remaining_pct / rate))
+    }
+
+    /// Number of recorded data points.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the timeline has no entries beyond the initial point.
+    pub fn is_empty(&self) -> bool {
+        self.entries.len() <= 1
+    }
+}
+
+impl Default for ProgressTimeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Progress Throttle ──
+
+/// Limits the frequency of progress updates by dropping updates that arrive
+/// too quickly.
+#[derive(Debug)]
+pub struct ProgressThrottle {
+    interval: Duration,
+    last_emit: Option<Instant>,
+    last_value: Option<f64>,
+}
+
+impl ProgressThrottle {
+    /// Create a throttle that allows at most one update per `interval`.
+    pub fn new(interval: Duration) -> Self {
+        Self {
+            interval,
+            last_emit: None,
+            last_value: None,
+        }
+    }
+
+    /// Create a throttle from milliseconds.
+    pub fn from_millis(ms: u64) -> Self {
+        Self::new(Duration::from_millis(ms))
+    }
+
+    /// Attempt to emit a progress value. Returns `Some(value)` if enough time
+    /// has elapsed since the last emit, or `None` if throttled.
+    pub fn try_emit(&mut self, value: f64) -> Option<f64> {
+        self.try_emit_at(value, Instant::now())
+    }
+
+    /// Attempt to emit at a specific instant (useful for testing).
+    pub fn try_emit_at(&mut self, value: f64, now: Instant) -> Option<f64> {
+        self.last_value = Some(value);
+        match self.last_emit {
+            None => {
+                self.last_emit = Some(now);
+                Some(value)
+            }
+            Some(prev) if now.duration_since(prev) >= self.interval => {
+                self.last_emit = Some(now);
+                Some(value)
+            }
+            _ => None,
+        }
+    }
+
+    /// Force-emit the last recorded value regardless of the throttle interval.
+    /// Useful for flushing a final update when an operation completes.
+    pub fn flush(&mut self) -> Option<f64> {
+        self.last_emit = Some(Instant::now());
+        self.last_value
+    }
+
+    /// The configured throttle interval.
+    pub fn interval(&self) -> Duration {
+        self.interval
+    }
+}
+
+// ── Multi-Progress Tracker ──
+
+/// Entry within a [`MultiProgressTracker`].
+#[derive(Debug)]
+struct MultiEntry {
+    label: String,
+    percentage: f64,
+    weight: f64,
+    done: bool,
+}
+
+/// Manages multiple concurrent progress operations and provides a combined
+/// overall view.
+#[derive(Debug)]
+pub struct MultiProgressTracker {
+    entries: Vec<(u64, MultiEntry)>,
+    next_id: u64,
+}
+
+impl MultiProgressTracker {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            next_id: 1,
+        }
+    }
+
+    /// Add a new tracked operation, returning its unique id.
+    pub fn add(&mut self, label: impl Into<String>, weight: f64) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.entries.push((
+            id,
+            MultiEntry {
+                label: label.into(),
+                percentage: 0.0,
+                weight: weight.max(0.0),
+                done: false,
+            },
+        ));
+        id
+    }
+
+    /// Update the percentage for a tracked operation.
+    pub fn update(&mut self, id: u64, percentage: f64) {
+        if let Some((_, entry)) = self.entries.iter_mut().find(|(eid, _)| *eid == id) {
+            entry.percentage = percentage.clamp(0.0, 100.0);
+        }
+    }
+
+    /// Mark an operation as done (100%).
+    pub fn finish(&mut self, id: u64) {
+        if let Some((_, entry)) = self.entries.iter_mut().find(|(eid, _)| *eid == id) {
+            entry.percentage = 100.0;
+            entry.done = true;
+        }
+    }
+
+    /// The weighted overall percentage across all tracked operations.
+    pub fn overall_percentage(&self) -> f64 {
+        let total_weight: f64 = self.entries.iter().map(|(_, e)| e.weight).sum();
+        if total_weight <= 0.0 {
+            return 0.0;
+        }
+        let weighted: f64 = self
+            .entries
+            .iter()
+            .map(|(_, e)| e.percentage * e.weight / total_weight)
+            .sum();
+        weighted.clamp(0.0, 100.0)
+    }
+
+    /// Number of operations that are still active (not done).
+    pub fn active_count(&self) -> usize {
+        self.entries.iter().filter(|(_, e)| !e.done).count()
+    }
+
+    /// Number of completed operations.
+    pub fn done_count(&self) -> usize {
+        self.entries.iter().filter(|(_, e)| e.done).count()
+    }
+
+    /// Total number of tracked operations.
+    pub fn total_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether all tracked operations are done.
+    pub fn all_done(&self) -> bool {
+        !self.entries.is_empty() && self.entries.iter().all(|(_, e)| e.done)
+    }
+
+    /// Get the label for a tracked operation.
+    pub fn label(&self, id: u64) -> Option<&str> {
+        self.entries
+            .iter()
+            .find(|(eid, _)| *eid == id)
+            .map(|(_, e)| e.label.as_str())
+    }
+}
+
+impl Default for MultiProgressTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for MultiProgressTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "MultiProgress({}/{} done, overall {:.1}%)",
+            self.done_count(),
+            self.total_count(),
+            self.overall_percentage()
+        )
+    }
+}
+
+// ── Progress Formatter ──
+
+/// Formats progress values for terminal display.
+pub struct ProgressFormatter;
+
+impl ProgressFormatter {
+    /// Render a progress bar string of the given `width` (in characters).
+    ///
+    /// Example: `[##########----------]` for 50% with width 20.
+    pub fn bar(percentage: f64, width: usize) -> String {
+        let pct = percentage.clamp(0.0, 100.0);
+        let filled = ((pct / 100.0) * width as f64).round() as usize;
+        let empty = width.saturating_sub(filled);
+        format!("[{}{}]", "#".repeat(filled), "-".repeat(empty))
+    }
+
+    /// Format a [`Duration`] as a human-readable ETA string.
+    ///
+    /// * Under 60 s → `"12s"`
+    /// * Under 60 min → `"3m 12s"`
+    /// * Otherwise → `"1h 03m"`
+    pub fn eta_string(d: Duration) -> String {
+        let secs = d.as_secs();
+        if secs < 60 {
+            format!("{}s", secs)
+        } else if secs < 3600 {
+            format!("{}m {:02}s", secs / 60, secs % 60)
+        } else {
+            format!("{}h {:02}m", secs / 3600, (secs % 3600) / 60)
+        }
+    }
+
+    /// Format a rate as items/sec or percentage-points/sec.
+    pub fn rate_string(rate: f64, unit: &str) -> String {
+        if rate < 0.01 {
+            format!("<0.01 {unit}/s")
+        } else if rate >= 1000.0 {
+            format!("{:.0} {unit}/s", rate)
+        } else {
+            format!("{:.2} {unit}/s", rate)
+        }
+    }
+
+    /// Produce a single-line summary combining bar, percentage, ETA, and message.
+    pub fn summary_line(
+        percentage: f64,
+        eta: Option<Duration>,
+        message: Option<&str>,
+    ) -> String {
+        let bar = Self::bar(percentage, 20);
+        let pct = percentage.clamp(0.0, 100.0).round() as u32;
+        let mut parts = vec![format!("{bar} {pct}%")];
+        if let Some(d) = eta {
+            parts.push(format!("ETA {}", Self::eta_string(d)));
+        }
+        if let Some(msg) = message {
+            parts.push(msg.to_string());
+        }
+        parts.join(" ")
+    }
+}
+
+// ── From impls ──
+
+impl From<ProgressLocation> for String {
+    fn from(loc: ProgressLocation) -> Self {
+        loc.to_string()
+    }
+}
+
+impl From<&ProgressState> for ProgressSummary {
+    fn from(state: &ProgressState) -> Self {
+        if state.is_done {
+            ProgressSummary {
+                active: 0,
+                completed: 1,
+                overall_progress: 100.0,
+            }
+        } else {
+            ProgressSummary {
+                active: 1,
+                completed: 0,
+                overall_progress: state.percentage,
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1427,5 +1807,156 @@ mod tests {
         let display = summary.display();
         assert!(display.contains("1 active"));
         assert!(display.contains("1 completed"));
+    }
+
+    // ── ProgressTimeline tests ──
+
+    #[test]
+    fn timeline_eta_estimation() {
+        let start = Instant::now();
+        let mut tl = ProgressTimeline::with_start(start);
+        // Simulate 50% done after 2 seconds
+        tl.record_at(50.0, start + Duration::from_secs(2));
+
+        let rate = tl.rate_pct_per_sec().unwrap();
+        assert!((rate - 25.0).abs() < 0.01, "expected ~25 %/s, got {rate}");
+
+        let eta = tl.eta().unwrap();
+        // 50% remaining at 25%/s = 2s
+        assert!(
+            (eta.as_secs_f64() - 2.0).abs() < 0.1,
+            "expected ~2s ETA, got {:.2}s",
+            eta.as_secs_f64()
+        );
+        assert_eq!(tl.current_percentage(), 50.0);
+        assert_eq!(tl.len(), 2);
+        assert!(!tl.is_empty());
+    }
+
+    #[test]
+    fn timeline_complete_eta_zero() {
+        let start = Instant::now();
+        let mut tl = ProgressTimeline::with_start(start);
+        tl.record_at(100.0, start + Duration::from_secs(5));
+
+        let eta = tl.eta().unwrap();
+        assert_eq!(eta, Duration::ZERO);
+    }
+
+    // ── ProgressThrottle tests ──
+
+    #[test]
+    fn throttle_limits_frequency() {
+        let mut throttle = ProgressThrottle::from_millis(100);
+        let t0 = Instant::now();
+
+        // First emit always succeeds
+        assert_eq!(throttle.try_emit_at(10.0, t0), Some(10.0));
+        // Too soon → throttled
+        assert_eq!(throttle.try_emit_at(20.0, t0 + Duration::from_millis(50)), None);
+        // After interval → succeeds
+        assert_eq!(
+            throttle.try_emit_at(30.0, t0 + Duration::from_millis(100)),
+            Some(30.0)
+        );
+    }
+
+    #[test]
+    fn throttle_flush_emits_last() {
+        let mut throttle = ProgressThrottle::from_millis(100);
+        let t0 = Instant::now();
+        throttle.try_emit_at(10.0, t0);
+        throttle.try_emit_at(99.0, t0 + Duration::from_millis(10)); // throttled
+
+        let flushed = throttle.flush();
+        assert_eq!(flushed, Some(99.0));
+    }
+
+    // ── MultiProgressTracker tests ──
+
+    #[test]
+    fn multi_tracker_overall_and_lifecycle() {
+        let mut mt = MultiProgressTracker::new();
+        let a = mt.add("download", 1.0);
+        let b = mt.add("extract", 1.0);
+
+        mt.update(a, 50.0);
+        mt.update(b, 0.0);
+        // (50*1 + 0*1) / 2 = 25%
+        assert!(
+            (mt.overall_percentage() - 25.0).abs() < 0.01,
+            "expected 25%, got {:.1}%",
+            mt.overall_percentage()
+        );
+        assert_eq!(mt.active_count(), 2);
+        assert!(!mt.all_done());
+
+        mt.finish(a);
+        mt.finish(b);
+        assert!(mt.all_done());
+        assert_eq!(mt.done_count(), 2);
+        assert!((mt.overall_percentage() - 100.0).abs() < 0.01);
+        assert_eq!(mt.label(a), Some("download"));
+
+        let display = mt.to_string();
+        assert!(display.contains("2/2 done"), "got: {display}");
+    }
+
+    // ── ProgressFormatter tests ──
+
+    #[test]
+    fn formatter_bar_and_eta() {
+        let bar = ProgressFormatter::bar(50.0, 10);
+        assert_eq!(bar, "[#####-----]");
+
+        let bar_full = ProgressFormatter::bar(100.0, 10);
+        assert_eq!(bar_full, "[##########]");
+
+        let bar_empty = ProgressFormatter::bar(0.0, 10);
+        assert_eq!(bar_empty, "[----------]");
+
+        assert_eq!(ProgressFormatter::eta_string(Duration::from_secs(45)), "45s");
+        assert_eq!(ProgressFormatter::eta_string(Duration::from_secs(125)), "2m 05s");
+        assert_eq!(ProgressFormatter::eta_string(Duration::from_secs(3661)), "1h 01m");
+
+        let line = ProgressFormatter::summary_line(50.0, Some(Duration::from_secs(30)), Some("compiling"));
+        assert!(line.contains("50%"));
+        assert!(line.contains("ETA 30s"));
+        assert!(line.contains("compiling"));
+
+        let rate = ProgressFormatter::rate_string(12.5, "%");
+        assert_eq!(rate, "12.50 %/s");
+
+        let slow_rate = ProgressFormatter::rate_string(0.001, "items");
+        assert_eq!(slow_rate, "<0.01 items/s");
+    }
+
+    // ── From impls tests ──
+
+    #[test]
+    fn from_impls() {
+        let s: String = ProgressLocation::Window.into();
+        assert_eq!(s, "Window");
+
+        let state = ProgressState {
+            handle: 1,
+            percentage: 60.0,
+            message: None,
+            is_done: false,
+        };
+        let summary = ProgressSummary::from(&state);
+        assert_eq!(summary.active, 1);
+        assert_eq!(summary.completed, 0);
+        assert!((summary.overall_progress - 60.0).abs() < f64::EPSILON);
+
+        let done_state = ProgressState {
+            handle: 2,
+            percentage: 100.0,
+            message: None,
+            is_done: true,
+        };
+        let summary = ProgressSummary::from(&done_state);
+        assert_eq!(summary.active, 0);
+        assert_eq!(summary.completed, 1);
     }
 }

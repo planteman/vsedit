@@ -871,6 +871,182 @@ pub fn format_duration_ms(ms: u64) -> String {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// LifecycleHook
+// ---------------------------------------------------------------------------
+
+/// A named hook that fires during a specific lifecycle phase.
+#[derive(Debug, Clone)]
+pub struct LifecycleHook {
+    /// Unique name for this hook.
+    pub name: String,
+    /// The phase during which this hook should fire.
+    pub phase: LifecyclePhase,
+    /// Human-readable description of what the hook callback does.
+    pub callback_description: String,
+}
+
+impl LifecycleHook {
+    pub fn new(name: impl Into<String>, phase: LifecyclePhase, desc: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            phase,
+            callback_description: desc.into(),
+        }
+    }
+}
+
+impl fmt::Display for LifecycleHook {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {} - {}", phase_name(self.phase), self.name, self.callback_description)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HookRegistry
+// ---------------------------------------------------------------------------
+
+/// Registry that collects lifecycle hooks and retrieves them by phase.
+#[derive(Debug, Default)]
+pub struct HookRegistry {
+    hooks: Vec<LifecycleHook>,
+}
+
+impl HookRegistry {
+    pub fn new() -> Self {
+        Self { hooks: Vec::new() }
+    }
+
+    /// Register a new hook. Returns `false` if a hook with the same name
+    /// already exists.
+    pub fn register(&mut self, hook: LifecycleHook) -> bool {
+        if self.hooks.iter().any(|h| h.name == hook.name) {
+            return false;
+        }
+        self.hooks.push(hook);
+        true
+    }
+
+    /// Remove a hook by name. Returns `true` if found and removed.
+    pub fn unregister(&mut self, name: &str) -> bool {
+        let before = self.hooks.len();
+        self.hooks.retain(|h| h.name != name);
+        self.hooks.len() < before
+    }
+
+    /// Return all hooks registered for a given phase.
+    pub fn hooks_for_phase(&self, phase: LifecyclePhase) -> Vec<&LifecycleHook> {
+        self.hooks.iter().filter(|h| h.phase == phase).collect()
+    }
+
+    /// Total number of registered hooks.
+    pub fn len(&self) -> usize {
+        self.hooks.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.hooks.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LifecycleMetrics
+// ---------------------------------------------------------------------------
+
+/// Tracks phase-transition durations for performance monitoring.
+#[derive(Debug, Default)]
+pub struct LifecycleMetrics {
+    transitions: Vec<(LifecyclePhase, LifecyclePhase, u64)>,
+}
+
+impl LifecycleMetrics {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record the time (in ms) taken to move from `from` to `to`.
+    pub fn record(&mut self, from: LifecyclePhase, to: LifecyclePhase, ms: u64) {
+        self.transitions.push((from, to, ms));
+    }
+
+    /// Average transition time across all recorded transitions.
+    pub fn average_transition_ms(&self) -> Option<f64> {
+        if self.transitions.is_empty() {
+            return None;
+        }
+        let total: u64 = self.transitions.iter().map(|t| t.2).sum();
+        Some(total as f64 / self.transitions.len() as f64)
+    }
+
+    /// Sum of all transition durations (approximates total startup time).
+    pub fn total_startup_ms(&self) -> u64 {
+        self.transitions.iter().map(|t| t.2).sum()
+    }
+
+    /// Number of recorded transitions.
+    pub fn len(&self) -> usize {
+        self.transitions.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.transitions.is_empty()
+    }
+}
+
+impl fmt::Display for LifecycleMetrics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LifecycleMetrics({} transitions, total {}ms", self.len(), self.total_startup_ms())?;
+        if let Some(avg) = self.average_transition_ms() {
+            write!(f, ", avg {avg:.1}ms")?;
+        }
+        write!(f, ")")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ShutdownGuard
+// ---------------------------------------------------------------------------
+
+/// Token-based shutdown veto system. Each guard holds a token; shutdown is
+/// blocked as long as at least one token is outstanding.
+#[derive(Debug, Default)]
+pub struct ShutdownGuard {
+    tokens: HashSet<String>,
+}
+
+impl ShutdownGuard {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Acquire a veto token. Returns `false` if the token name is already held.
+    pub fn acquire(&mut self, token: impl Into<String>) -> bool {
+        self.tokens.insert(token.into())
+    }
+
+    /// Release a veto token. Returns `false` if the token was not held.
+    pub fn release(&mut self, token: &str) -> bool {
+        self.tokens.remove(token)
+    }
+
+    /// Returns `true` if shutdown is currently allowed (no outstanding tokens).
+    pub fn can_shutdown(&self) -> bool {
+        self.tokens.is_empty()
+    }
+
+    /// Number of outstanding veto tokens.
+    pub fn outstanding(&self) -> usize {
+        self.tokens.len()
+    }
+
+    /// List all outstanding token names.
+    pub fn token_names(&self) -> Vec<&str> {
+        self.tokens.iter().map(|s| s.as_str()).collect()
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1462,4 +1638,67 @@ mod tests {
         assert!(s.contains("alpha"));
         assert!(s.contains("beta"));
     }
+
+    // --- new tests ---
+
+    #[test]
+    fn hook_registry_register_and_query() {
+        let mut reg = HookRegistry::new();
+        assert!(reg.register(LifecycleHook::new("init-db", LifecyclePhase::Ready, "open database")));
+        assert!(reg.register(LifecycleHook::new("load-ui", LifecyclePhase::Restored, "render UI")));
+        assert!(!reg.register(LifecycleHook::new("init-db", LifecyclePhase::Ready, "dup")));
+        assert_eq!(reg.len(), 2);
+        assert_eq!(reg.hooks_for_phase(LifecyclePhase::Ready).len(), 1);
+        assert_eq!(reg.hooks_for_phase(LifecyclePhase::Starting).len(), 0);
+    }
+
+    #[test]
+    fn hook_registry_unregister() {
+        let mut reg = HookRegistry::new();
+        reg.register(LifecycleHook::new("a", LifecyclePhase::Starting, "desc"));
+        assert!(reg.unregister("a"));
+        assert!(!reg.unregister("a"));
+        assert!(reg.is_empty());
+    }
+
+    #[test]
+    fn lifecycle_metrics_record_and_stats() {
+        let mut m = LifecycleMetrics::new();
+        m.record(LifecyclePhase::Starting, LifecyclePhase::Ready, 100);
+        m.record(LifecyclePhase::Ready, LifecyclePhase::Restored, 200);
+        assert_eq!(m.total_startup_ms(), 300);
+        assert!((m.average_transition_ms().unwrap() - 150.0).abs() < f64::EPSILON);
+        assert_eq!(m.len(), 2);
+        let display = format!("{m}");
+        assert!(display.contains("300ms"));
+    }
+
+    #[test]
+    fn lifecycle_metrics_empty() {
+        let m = LifecycleMetrics::new();
+        assert!(m.average_transition_ms().is_none());
+        assert_eq!(m.total_startup_ms(), 0);
+        assert!(m.is_empty());
+    }
+
+    #[test]
+    fn shutdown_guard_acquire_release() {
+        let mut guard = ShutdownGuard::new();
+        assert!(guard.can_shutdown());
+        assert!(guard.acquire("save-file"));
+        assert!(!guard.can_shutdown());
+        assert_eq!(guard.outstanding(), 1);
+        assert!(!guard.acquire("save-file")); // duplicate
+        assert!(guard.release("save-file"));
+        assert!(guard.can_shutdown());
+    }
+
+    #[test]
+    fn lifecycle_hook_display() {
+        let h = LifecycleHook::new("db", LifecyclePhase::Ready, "open db");
+        let s = format!("{h}");
+        assert!(s.contains("Ready"));
+        assert!(s.contains("db"));
+    }
+
 }

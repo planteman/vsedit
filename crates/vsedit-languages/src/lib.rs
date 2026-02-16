@@ -538,6 +538,501 @@ impl Default for LanguageBracketConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Language ID normalizer
+// ---------------------------------------------------------------------------
+
+/// Normalizes language identifiers by lowercasing and resolving common aliases.
+pub struct LanguageIdNormalizer {
+    aliases: std::collections::HashMap<String, String>,
+}
+
+impl LanguageIdNormalizer {
+    /// Create a normalizer pre-loaded with common aliases.
+    pub fn new() -> Self {
+        let mut aliases = std::collections::HashMap::new();
+        for (alias, canonical) in [
+            ("js", "javascript"),
+            ("jsx", "javascriptreact"),
+            ("ts", "typescript"),
+            ("tsx", "typescriptreact"),
+            ("py", "python"),
+            ("rb", "ruby"),
+            ("rs", "rust"),
+            ("sh", "shellscript"),
+            ("bash", "shellscript"),
+            ("zsh", "shellscript"),
+            ("yml", "yaml"),
+            ("md", "markdown"),
+            ("cpp", "cpp"),
+            ("c++", "cpp"),
+            ("cxx", "cpp"),
+            ("cc", "cpp"),
+            ("objective-c", "objectivec"),
+            ("objc", "objectivec"),
+            ("dockerfile", "dockerfile"),
+            ("docker", "dockerfile"),
+            ("make", "makefile"),
+        ] {
+            aliases.insert(alias.to_string(), canonical.to_string());
+        }
+        Self { aliases }
+    }
+
+    /// Add a custom alias mapping.
+    pub fn add_alias(&mut self, alias: &str, canonical: &str) {
+        self.aliases
+            .insert(alias.to_lowercase(), canonical.to_lowercase());
+    }
+
+    /// Normalize a language identifier: lowercase then resolve aliases.
+    pub fn normalize(&self, id: &str) -> String {
+        let lower = id.to_lowercase();
+        self.aliases.get(&lower).cloned().unwrap_or(lower)
+    }
+
+    /// Return true if two identifiers refer to the same language.
+    pub fn are_equivalent(&self, a: &str, b: &str) -> bool {
+        self.normalize(a) == self.normalize(b)
+    }
+
+    /// Return the number of registered aliases.
+    pub fn alias_count(&self) -> usize {
+        self.aliases.len()
+    }
+}
+
+impl Default for LanguageIdNormalizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for LanguageIdNormalizer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LanguageIdNormalizer({} aliases)", self.aliases.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Language detector (content-based)
+// ---------------------------------------------------------------------------
+
+/// Detects language from file content using shebangs, magic strings, and
+/// heuristic patterns beyond simple extension matching.
+pub struct LanguageDetector {
+    magic_patterns: Vec<(regex::Regex, String)>,
+}
+
+impl LanguageDetector {
+    /// Create a detector pre-loaded with common content heuristics.
+    pub fn new() -> Self {
+        let patterns: Vec<(&str, &str)> = vec![
+            (r"^#!\s*/usr/bin/env\s+python", "python"),
+            (r"^#!\s*/usr/bin/env\s+node", "javascript"),
+            (r"^#!\s*/usr/bin/env\s+ruby", "ruby"),
+            (r"^#!\s*/usr/bin/env\s+perl", "perl"),
+            (r"^#!\s*/usr/bin/env\s+bash", "shellscript"),
+            (r"^#!\s*/bin/bash", "shellscript"),
+            (r"^#!\s*/bin/sh", "shellscript"),
+            (r"^#!\s*/usr/bin/env\s+php", "php"),
+            (r"^<\?xml\s", "xml"),
+            (r"^<!DOCTYPE\s+html", "html"),
+            (r"^<html", "html"),
+            (r"^\{", "json"),
+            (r"^---\s*$", "yaml"),
+        ];
+        let magic_patterns = patterns
+            .into_iter()
+            .filter_map(|(pat, lang)| {
+                regex::Regex::new(pat).ok().map(|re| (re, lang.to_string()))
+            })
+            .collect();
+        Self { magic_patterns }
+    }
+
+    /// Detect language from the full content of a file.
+    ///
+    /// Examines the first line for shebangs/magic strings, then applies
+    /// heuristic keyword scanning on the body.
+    pub fn detect_from_content(&self, content: &str) -> Option<String> {
+        let first_line = content.lines().next().unwrap_or("");
+
+        // Try magic patterns on the first line.
+        for (re, lang) in &self.magic_patterns {
+            if re.is_match(first_line) {
+                return Some(lang.clone());
+            }
+        }
+
+        // Heuristic: scan body for distinctive keywords.
+        self.detect_by_keywords(content)
+    }
+
+    /// Detect language by scanning for distinctive keyword patterns.
+    fn detect_by_keywords(&self, content: &str) -> Option<String> {
+        // Count keyword hits for candidate languages.
+        let mut scores: std::collections::HashMap<&str, u32> = std::collections::HashMap::new();
+
+        let checks: &[(&[&str], &str)] = &[
+            (&["fn ", "let mut ", "impl ", "pub fn ", "use std::"], "rust"),
+            (&["def ", "import ", "class ", "if __name__"], "python"),
+            (&["func ", "package ", "import (", "go func"], "go"),
+            (&["function ", "const ", "=> {", "require("], "javascript"),
+            (&["interface ", ": string", ": number", "export "], "typescript"),
+            (&["public class ", "System.out", "void main"], "java"),
+            (&["#include", "int main(", "printf(", "nullptr"], "cpp"),
+        ];
+
+        for (keywords, lang) in checks {
+            let hits: u32 = keywords
+                .iter()
+                .filter(|kw| content.contains(**kw))
+                .count() as u32;
+            if hits >= 2 {
+                *scores.entry(lang).or_default() += hits;
+            }
+        }
+
+        scores
+            .into_iter()
+            .max_by_key(|(_, score)| *score)
+            .map(|(lang, _)| lang.to_string())
+    }
+
+    /// Register an additional magic pattern for first-line detection.
+    pub fn add_magic_pattern(&mut self, pattern: &str, language_id: &str) -> Result<(), regex::Error> {
+        let re = regex::Regex::new(pattern)?;
+        self.magic_patterns.push((re, language_id.to_string()));
+        Ok(())
+    }
+
+    /// Return the number of registered magic patterns.
+    pub fn pattern_count(&self) -> usize {
+        self.magic_patterns.len()
+    }
+}
+
+impl Default for LanguageDetector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl std::fmt::Display for LanguageDetector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LanguageDetector({} patterns)", self.magic_patterns.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Language comparison
+// ---------------------------------------------------------------------------
+
+/// Compares two languages' features and capabilities.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanguageComparison {
+    pub lang_a: String,
+    pub lang_b: String,
+    pub shared_extensions: Vec<String>,
+    pub a_only_extensions: Vec<String>,
+    pub b_only_extensions: Vec<String>,
+    pub same_line_comment: bool,
+    pub same_block_comment: bool,
+    pub a_has_shebang: bool,
+    pub b_has_shebang: bool,
+}
+
+impl LanguageComparison {
+    /// Compare two languages registered in a [`LanguageService`].
+    /// Returns `None` if either language is not registered.
+    pub fn compare(svc: &LanguageService, a: &str, b: &str) -> Option<Self> {
+        let lang_a = svc.get_language(a)?;
+        let lang_b = svc.get_language(b)?;
+
+        let exts_a: std::collections::HashSet<String> =
+            lang_a.extensions.iter().map(|e| e.to_lowercase()).collect();
+        let exts_b: std::collections::HashSet<String> =
+            lang_b.extensions.iter().map(|e| e.to_lowercase()).collect();
+
+        let shared: Vec<String> = exts_a.intersection(&exts_b).cloned().collect();
+        let a_only: Vec<String> = exts_a.difference(&exts_b).cloned().collect();
+        let b_only: Vec<String> = exts_b.difference(&exts_a).cloned().collect();
+
+        let cfg_a = svc.get_edit_config(a);
+        let cfg_b = svc.get_edit_config(b);
+
+        let same_line = match (cfg_a.as_ref(), cfg_b.as_ref()) {
+            (Some(ca), Some(cb)) => ca.comments.line_comment == cb.comments.line_comment,
+            _ => false,
+        };
+        let same_block = match (cfg_a.as_ref(), cfg_b.as_ref()) {
+            (Some(ca), Some(cb)) => ca.comments.block_comment == cb.comments.block_comment,
+            _ => false,
+        };
+
+        Some(Self {
+            lang_a: a.to_string(),
+            lang_b: b.to_string(),
+            shared_extensions: shared,
+            a_only_extensions: a_only,
+            b_only_extensions: b_only,
+            same_line_comment: same_line,
+            same_block_comment: same_block,
+            a_has_shebang: lang_a.first_line.is_some(),
+            b_has_shebang: lang_b.first_line.is_some(),
+        })
+    }
+
+    /// Return a similarity score from 0 to 100.
+    pub fn similarity_score(&self) -> u32 {
+        let mut score = 0u32;
+        if !self.shared_extensions.is_empty() {
+            score += 20;
+        }
+        if self.same_line_comment {
+            score += 30;
+        }
+        if self.same_block_comment {
+            score += 30;
+        }
+        if self.a_has_shebang == self.b_has_shebang {
+            score += 20;
+        }
+        score
+    }
+}
+
+impl std::fmt::Display for LanguageComparison {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} vs {} (similarity: {}%)",
+            self.lang_a,
+            self.lang_b,
+            self.similarity_score()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Language filter (builder pattern)
+// ---------------------------------------------------------------------------
+
+/// Builder for querying languages by features.
+pub struct LanguageFilter<'a> {
+    svc: &'a LanguageService,
+    require_block_comments: Option<bool>,
+    require_shebangs: Option<bool>,
+    extension_pattern: Option<String>,
+    min_extensions: Option<usize>,
+    require_line_comments: Option<bool>,
+}
+
+impl<'a> LanguageFilter<'a> {
+    /// Create a new filter targeting the given service.
+    pub fn new(svc: &'a LanguageService) -> Self {
+        Self {
+            svc,
+            require_block_comments: None,
+            require_shebangs: None,
+            extension_pattern: None,
+            min_extensions: None,
+            require_line_comments: None,
+        }
+    }
+
+    /// Only include languages that have (or lack) block comments.
+    pub fn has_block_comments(mut self, yes: bool) -> Self {
+        self.require_block_comments = Some(yes);
+        self
+    }
+
+    /// Only include languages that have (or lack) line comments.
+    pub fn has_line_comments(mut self, yes: bool) -> Self {
+        self.require_line_comments = Some(yes);
+        self
+    }
+
+    /// Only include languages that have (or lack) shebang/first-line patterns.
+    pub fn has_shebangs(mut self, yes: bool) -> Self {
+        self.require_shebangs = Some(yes);
+        self
+    }
+
+    /// Only include languages with an extension matching the given substring.
+    pub fn extension_contains(mut self, pattern: &str) -> Self {
+        self.extension_pattern = Some(pattern.to_lowercase());
+        self
+    }
+
+    /// Only include languages with at least `n` registered extensions.
+    pub fn min_extensions(mut self, n: usize) -> Self {
+        self.min_extensions = Some(n);
+        self
+    }
+
+    /// Execute the filter and return matching language IDs.
+    pub fn execute(&self) -> Vec<String> {
+        self.svc
+            .get_registered_language_ids()
+            .into_iter()
+            .filter(|id| self.matches(id))
+            .map(|id| id.to_string())
+            .collect()
+    }
+
+    fn matches(&self, id: &str) -> bool {
+        let lang = match self.svc.get_language(id) {
+            Some(l) => l,
+            None => return false,
+        };
+
+        if let Some(need_shebang) = self.require_shebangs {
+            if lang.first_line.is_some() != need_shebang {
+                return false;
+            }
+        }
+
+        if let Some(min) = self.min_extensions {
+            if lang.extensions.len() < min {
+                return false;
+            }
+        }
+
+        if let Some(ref pat) = self.extension_pattern {
+            if !lang.extensions.iter().any(|e| e.to_lowercase().contains(pat)) {
+                return false;
+            }
+        }
+
+        if let Some(need_block) = self.require_block_comments {
+            let has = self
+                .svc
+                .get_edit_config(id)
+                .map_or(false, |cfg| cfg.comments.block_comment.is_some());
+            if has != need_block {
+                return false;
+            }
+        }
+
+        if let Some(need_line) = self.require_line_comments {
+            let has = self
+                .svc
+                .get_edit_config(id)
+                .map_or(false, |cfg| cfg.comments.line_comment.is_some());
+            if has != need_line {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+impl std::fmt::Display for LanguageFilter<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut parts = Vec::new();
+        if let Some(v) = self.require_block_comments {
+            parts.push(format!("block_comments={v}"));
+        }
+        if let Some(v) = self.require_line_comments {
+            parts.push(format!("line_comments={v}"));
+        }
+        if let Some(v) = self.require_shebangs {
+            parts.push(format!("shebangs={v}"));
+        }
+        if let Some(ref p) = self.extension_pattern {
+            parts.push(format!("ext~{p}"));
+        }
+        if let Some(n) = self.min_extensions {
+            parts.push(format!("min_ext={n}"));
+        }
+        if parts.is_empty() {
+            write!(f, "LanguageFilter(no constraints)")
+        } else {
+            write!(f, "LanguageFilter({})", parts.join(", "))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display impls for existing types
+// ---------------------------------------------------------------------------
+
+impl std::fmt::Display for LanguageStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} languages, {} extensions, {} with shebangs, {} with block comments",
+            self.total_languages,
+            self.total_extensions,
+            self.languages_with_shebangs,
+            self.languages_with_block_comments,
+        )
+    }
+}
+
+impl std::fmt::Display for LanguageSimilarity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} (shared: {})",
+            self.language_id,
+            self.shared_extensions.join(", ")
+        )
+    }
+}
+
+impl std::fmt::Display for LanguageMatchScore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} (score: {})", self.language_id, self.score())
+    }
+}
+
+impl std::fmt::Display for ShebangInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.args.is_empty() {
+            write!(f, "{}", self.interpreter_name)
+        } else {
+            write!(f, "{} {}", self.interpreter_name, self.args.join(" "))
+        }
+    }
+}
+
+impl std::fmt::Display for LanguageBracketConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} bracket pairs (colorized: {})",
+            self.pairs.len(),
+            self.enabled,
+        )
+    }
+}
+
+impl From<&str> for LanguageBracketConfig {
+    /// Create a bracket config from a comma-separated list of open/close pairs
+    /// like `"(),[],{}"`.
+    fn from(s: &str) -> Self {
+        let mut cfg = Self {
+            pairs: Vec::new(),
+            colorized_pairs: Vec::new(),
+            enabled: true,
+        };
+        for pair in s.split(',') {
+            let chars: Vec<char> = pair.chars().collect();
+            if chars.len() == 2 {
+                let open = chars[0].to_string();
+                let close = chars[1].to_string();
+                cfg.colorized_pairs.push((open.clone(), close.clone()));
+                cfg.pairs.push((open, close));
+            }
+        }
+        cfg
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1411,5 +1906,220 @@ mod tests {
         let cfg = LanguageBracketConfig::default();
         assert_eq!(cfg.pair_count(), 3);
         assert!(cfg.enabled);
+    }
+
+    // -- LanguageIdNormalizer ------------------------------------------------
+
+    #[test]
+    fn normalizer_resolves_common_aliases() {
+        let norm = LanguageIdNormalizer::new();
+        assert_eq!(norm.normalize("js"), "javascript");
+        assert_eq!(norm.normalize("ts"), "typescript");
+        assert_eq!(norm.normalize("py"), "python");
+        assert_eq!(norm.normalize("rb"), "ruby");
+        assert_eq!(norm.normalize("rs"), "rust");
+        assert_eq!(norm.normalize("sh"), "shellscript");
+        assert_eq!(norm.normalize("yml"), "yaml");
+    }
+
+    #[test]
+    fn normalizer_lowercases_and_passes_through() {
+        let norm = LanguageIdNormalizer::new();
+        assert_eq!(norm.normalize("Rust"), "rust");
+        assert_eq!(norm.normalize("PYTHON"), "python");
+        assert_eq!(norm.normalize("brainfuck"), "brainfuck");
+    }
+
+    #[test]
+    fn normalizer_equivalence() {
+        let norm = LanguageIdNormalizer::new();
+        assert!(norm.are_equivalent("JS", "javascript"));
+        assert!(norm.are_equivalent("bash", "sh"));
+        assert!(!norm.are_equivalent("rust", "python"));
+    }
+
+    #[test]
+    fn normalizer_custom_alias() {
+        let mut norm = LanguageIdNormalizer::new();
+        norm.add_alias("bf", "brainfuck");
+        assert_eq!(norm.normalize("bf"), "brainfuck");
+        assert!(norm.are_equivalent("BF", "brainfuck"));
+    }
+
+    #[test]
+    fn normalizer_display() {
+        let norm = LanguageIdNormalizer::new();
+        let s = format!("{norm}");
+        assert!(s.contains("aliases"));
+    }
+
+    // -- LanguageDetector ---------------------------------------------------
+
+    #[test]
+    fn detector_shebang_python() {
+        let det = LanguageDetector::new();
+        let content = "#!/usr/bin/env python3\nprint('hello')";
+        assert_eq!(det.detect_from_content(content), Some("python".to_string()));
+    }
+
+    #[test]
+    fn detector_shebang_bash() {
+        let det = LanguageDetector::new();
+        let content = "#!/bin/bash\necho hello";
+        assert_eq!(det.detect_from_content(content), Some("shellscript".to_string()));
+    }
+
+    #[test]
+    fn detector_xml_declaration() {
+        let det = LanguageDetector::new();
+        let content = "<?xml version=\"1.0\"?>\n<root/>";
+        assert_eq!(det.detect_from_content(content), Some("xml".to_string()));
+    }
+
+    #[test]
+    fn detector_keyword_heuristic_rust() {
+        let det = LanguageDetector::new();
+        let content = "use std::io;\nfn main() {\n    let mut x = 5;\n    println!(\"{}\", x);\n}";
+        assert_eq!(det.detect_from_content(content), Some("rust".to_string()));
+    }
+
+    #[test]
+    fn detector_no_match() {
+        let det = LanguageDetector::new();
+        assert_eq!(det.detect_from_content(""), None);
+    }
+
+    #[test]
+    fn detector_custom_pattern() {
+        let mut det = LanguageDetector::new();
+        det.add_magic_pattern(r"^%% Erlang", "erlang").unwrap();
+        let content = "%% Erlang module\n-module(test).";
+        assert_eq!(det.detect_from_content(content), Some("erlang".to_string()));
+    }
+
+    #[test]
+    fn detector_display() {
+        let det = LanguageDetector::new();
+        let s = format!("{det}");
+        assert!(s.contains("patterns"));
+    }
+
+    // -- LanguageComparison -------------------------------------------------
+
+    #[test]
+    fn comparison_rust_vs_cpp() {
+        let svc = make_registry();
+        let cmp = LanguageComparison::compare(&svc, "rust", "cpp").unwrap();
+        assert_eq!(cmp.lang_a, "rust");
+        assert_eq!(cmp.lang_b, "cpp");
+        // Both use // and /* */, so comment styles should match.
+        assert!(cmp.same_line_comment);
+        assert!(cmp.same_block_comment);
+        assert!(cmp.similarity_score() > 0);
+    }
+
+    #[test]
+    fn comparison_unknown_returns_none() {
+        let svc = make_registry();
+        assert!(LanguageComparison::compare(&svc, "rust", "nonexistent").is_none());
+    }
+
+    #[test]
+    fn comparison_display() {
+        let svc = make_registry();
+        let cmp = LanguageComparison::compare(&svc, "rust", "python").unwrap();
+        let s = format!("{cmp}");
+        assert!(s.contains("rust"));
+        assert!(s.contains("python"));
+        assert!(s.contains('%'));
+    }
+
+    // -- LanguageFilter -----------------------------------------------------
+
+    #[test]
+    fn filter_with_shebangs() {
+        let svc = make_registry();
+        let results = LanguageFilter::new(&svc).has_shebangs(true).execute();
+        assert!(results.len() >= 4); // python, shellscript, ruby, perl, ...
+        // Every result should actually have a first_line pattern
+        for id in &results {
+            let lang = svc.get_language(id).unwrap();
+            assert!(lang.first_line.is_some(), "{id} should have first_line");
+        }
+    }
+
+    #[test]
+    fn filter_no_block_comments() {
+        let svc = make_registry();
+        let results = LanguageFilter::new(&svc).has_block_comments(false).execute();
+        for id in &results {
+            if let Some(cfg) = svc.get_edit_config(id) {
+                assert!(cfg.comments.block_comment.is_none(), "{id} should lack block comments");
+            }
+        }
+    }
+
+    #[test]
+    fn filter_extension_contains() {
+        let svc = make_registry();
+        let results = LanguageFilter::new(&svc).extension_contains(".rs").execute();
+        assert!(results.contains(&"rust".to_string()));
+    }
+
+    #[test]
+    fn filter_chained() {
+        let svc = make_registry();
+        let results = LanguageFilter::new(&svc)
+            .has_block_comments(true)
+            .has_line_comments(true)
+            .min_extensions(1)
+            .execute();
+        // C-family languages should appear
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn filter_display() {
+        let svc = make_registry();
+        let f = LanguageFilter::new(&svc).has_shebangs(true).has_block_comments(false);
+        let s = format!("{f}");
+        assert!(s.contains("shebangs"));
+        assert!(s.contains("block_comments"));
+    }
+
+    // -- Display impls for existing types -----------------------------------
+
+    #[test]
+    fn display_language_stats() {
+        let svc = make_registry();
+        let stats = compute_language_stats(&svc);
+        let s = format!("{stats}");
+        assert!(s.contains("languages"));
+        assert!(s.contains("extensions"));
+    }
+
+    #[test]
+    fn display_shebang_info() {
+        let info = parse_shebang("#!/usr/bin/env python3 -u").unwrap();
+        let s = format!("{info}");
+        assert_eq!(s, "python3 -u");
+    }
+
+    #[test]
+    fn display_bracket_config() {
+        let cfg = LanguageBracketConfig::new();
+        let s = format!("{cfg}");
+        assert!(s.contains("3 bracket pairs"));
+    }
+
+    // -- From impl for LanguageBracketConfig --------------------------------
+
+    #[test]
+    fn bracket_config_from_str() {
+        let cfg = LanguageBracketConfig::from("(),[],{}");
+        assert_eq!(cfg.pair_count(), 3);
+        assert!(cfg.is_open_bracket("("));
+        assert!(cfg.is_close_bracket("]"));
+        assert_eq!(cfg.matching_close("{"), Some("}"));
     }
 }

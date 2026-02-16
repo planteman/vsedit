@@ -969,6 +969,259 @@ impl Padding {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// LayoutTreeNode - tree-based layout representation
+// ---------------------------------------------------------------------------
+
+/// Split direction for a layout tree node.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SplitDirection {
+    Horizontal,
+    Vertical,
+}
+
+/// A node in a layout tree that can be either a leaf or an interior split.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LayoutTreeNode {
+    pub split: Option<SplitDirection>,
+    pub children: Vec<LayoutTreeNode>,
+    pub area: Rect,
+}
+
+impl LayoutTreeNode {
+    pub fn leaf(area: Rect) -> Self {
+        Self { split: None, children: Vec::new(), area }
+    }
+
+    pub fn split_node(direction: SplitDirection, children: Vec<LayoutTreeNode>, area: Rect) -> Self {
+        Self { split: Some(direction), children, area }
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        self.children.is_empty()
+    }
+
+    pub fn leaf_count(&self) -> usize {
+        if self.is_leaf() {
+            1
+        } else {
+            self.children.iter().map(|c| c.leaf_count()).sum()
+        }
+    }
+
+    pub fn depth(&self) -> usize {
+        if self.is_leaf() {
+            0
+        } else {
+            1 + self.children.iter().map(|c| c.depth()).max().unwrap_or(0)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutSerializer
+// ---------------------------------------------------------------------------
+
+pub struct LayoutSerializer;
+
+impl LayoutSerializer {
+    pub fn serialize(node: &LayoutTreeNode) -> String {
+        let mut out = String::new();
+        Self::serialize_inner(node, 0, &mut out);
+        out
+    }
+
+    fn serialize_inner(node: &LayoutTreeNode, indent: usize, out: &mut String) {
+        let pad: String = "  ".repeat(indent);
+        if node.is_leaf() {
+            out.push_str(&format!(
+                "{pad}leaf({},{},{},{})\n",
+                node.area.x, node.area.y, node.area.width, node.area.height
+            ));
+        } else {
+            let dir = match node.split {
+                Some(SplitDirection::Horizontal) => "H",
+                Some(SplitDirection::Vertical) => "V",
+                None => "?",
+            };
+            out.push_str(&format!(
+                "{pad}split-{dir}({},{},{},{}) {{\n",
+                node.area.x, node.area.y, node.area.width, node.area.height
+            ));
+            for child in &node.children {
+                Self::serialize_inner(child, indent + 1, out);
+            }
+            out.push_str(&format!("{pad}}}\n"));
+        }
+    }
+
+    pub fn deserialize(input: &str) -> Option<LayoutTreeNode> {
+        let lines: Vec<&str> = input.lines().collect();
+        if lines.is_empty() {
+            return None;
+        }
+        let (node, _) = Self::parse_node(&lines, 0)?;
+        Some(node)
+    }
+
+    fn parse_node(lines: &[&str], idx: usize) -> Option<(LayoutTreeNode, usize)> {
+        if idx >= lines.len() {
+            return None;
+        }
+        let trimmed = lines[idx].trim();
+        if trimmed.starts_with("leaf(") {
+            let inner = trimmed.strip_prefix("leaf(")?.strip_suffix(')')?;
+            let nums: Vec<u16> = inner.split(',').filter_map(|s| s.trim().parse().ok()).collect();
+            if nums.len() != 4 { return None; }
+            Some((LayoutTreeNode::leaf(Rect::new(nums[0], nums[1], nums[2], nums[3])), idx + 1))
+        } else if trimmed.starts_with("split-") {
+            let dir = if trimmed.starts_with("split-H") {
+                SplitDirection::Horizontal
+            } else {
+                SplitDirection::Vertical
+            };
+            let paren_start = trimmed.find('(')?;
+            let paren_end = trimmed.find(')')?;
+            let inner = &trimmed[paren_start + 1..paren_end];
+            let nums: Vec<u16> = inner.split(',').filter_map(|s| s.trim().parse().ok()).collect();
+            if nums.len() != 4 { return None; }
+            let area = Rect::new(nums[0], nums[1], nums[2], nums[3]);
+            let mut children = Vec::new();
+            let mut cur = idx + 1;
+            while cur < lines.len() && !lines[cur].trim().starts_with('}') {
+                let (child, next) = Self::parse_node(lines, cur)?;
+                children.push(child);
+                cur = next;
+            }
+            Some((LayoutTreeNode::split_node(dir, children, area), cur + 1))
+        } else {
+            None
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutAnimation
+// ---------------------------------------------------------------------------
+
+/// Describes an animated transition between two rectangles.
+#[derive(Debug, Clone)]
+pub struct LayoutAnimation {
+    pub from_rect: Rect,
+    pub to_rect: Rect,
+    pub progress: f64,
+}
+
+impl LayoutAnimation {
+    pub fn new(from: Rect, to: Rect) -> Self {
+        Self { from_rect: from, to_rect: to, progress: 0.0 }
+    }
+
+    pub fn set_progress(&mut self, p: f64) {
+        self.progress = p.clamp(0.0, 1.0);
+    }
+
+    fn lerp(a: u16, b: u16, t: f64) -> u16 {
+        (a as f64 + (b as f64 - a as f64) * t).round() as u16
+    }
+
+    pub fn interpolated_rect(&self) -> Rect {
+        Rect::new(
+            Self::lerp(self.from_rect.x, self.to_rect.x, self.progress),
+            Self::lerp(self.from_rect.y, self.to_rect.y, self.progress),
+            Self::lerp(self.from_rect.width, self.to_rect.width, self.progress),
+            Self::lerp(self.from_rect.height, self.to_rect.height, self.progress),
+        )
+    }
+
+    pub fn is_done(&self) -> bool {
+        (self.progress - 1.0).abs() < f64::EPSILON
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutPreset
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LayoutPreset {
+    Default,
+    SidebarLeft,
+    SidebarRight,
+    CenteredEditor,
+    TwoColumn,
+}
+
+impl LayoutPreset {
+    pub fn build(self, area: Rect) -> LayoutTreeNode {
+        match self {
+            LayoutPreset::Default => LayoutTreeNode::leaf(area),
+            LayoutPreset::SidebarLeft => {
+                let sidebar_w = area.width / 4;
+                let main_w = area.width.saturating_sub(sidebar_w);
+                LayoutTreeNode::split_node(
+                    SplitDirection::Horizontal,
+                    vec![
+                        LayoutTreeNode::leaf(Rect::new(area.x, area.y, sidebar_w, area.height)),
+                        LayoutTreeNode::leaf(Rect::new(area.x + sidebar_w, area.y, main_w, area.height)),
+                    ],
+                    area,
+                )
+            }
+            LayoutPreset::SidebarRight => {
+                let main_w = area.width * 3 / 4;
+                let sidebar_w = area.width.saturating_sub(main_w);
+                LayoutTreeNode::split_node(
+                    SplitDirection::Horizontal,
+                    vec![
+                        LayoutTreeNode::leaf(Rect::new(area.x, area.y, main_w, area.height)),
+                        LayoutTreeNode::leaf(Rect::new(area.x + main_w, area.y, sidebar_w, area.height)),
+                    ],
+                    area,
+                )
+            }
+            LayoutPreset::CenteredEditor => {
+                let margin = area.width / 6;
+                let inner_w = area.width.saturating_sub(margin * 2);
+                LayoutTreeNode::split_node(
+                    SplitDirection::Horizontal,
+                    vec![
+                        LayoutTreeNode::leaf(Rect::new(area.x, area.y, margin, area.height)),
+                        LayoutTreeNode::leaf(Rect::new(area.x + margin, area.y, inner_w, area.height)),
+                        LayoutTreeNode::leaf(Rect::new(area.x + margin + inner_w, area.y, margin, area.height)),
+                    ],
+                    area,
+                )
+            }
+            LayoutPreset::TwoColumn => {
+                let half = area.width / 2;
+                let rest = area.width.saturating_sub(half);
+                LayoutTreeNode::split_node(
+                    SplitDirection::Horizontal,
+                    vec![
+                        LayoutTreeNode::leaf(Rect::new(area.x, area.y, half, area.height)),
+                        LayoutTreeNode::leaf(Rect::new(area.x + half, area.y, rest, area.height)),
+                    ],
+                    area,
+                )
+            }
+        }
+    }
+}
+
+impl fmt::Display for LayoutPreset {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Default => write!(f, "Default"),
+            Self::SidebarLeft => write!(f, "Sidebar Left"),
+            Self::SidebarRight => write!(f, "Sidebar Right"),
+            Self::CenteredEditor => write!(f, "Centered Editor"),
+            Self::TwoColumn => write!(f, "Two Column"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1466,4 +1719,80 @@ mod tests {
         let r = p.apply(rect(0, 0, 50, 50));
         assert_eq!(r, rect(0, 0, 0, 0));
     }
+
+    // --- new tests ---
+
+    #[test]
+    fn layout_tree_node_leaf_count() {
+        let root = LayoutTreeNode::split_node(
+            SplitDirection::Horizontal,
+            vec![
+                LayoutTreeNode::leaf(rect(0, 0, 50, 100)),
+                LayoutTreeNode::split_node(
+                    SplitDirection::Vertical,
+                    vec![
+                        LayoutTreeNode::leaf(rect(50, 0, 50, 50)),
+                        LayoutTreeNode::leaf(rect(50, 50, 50, 50)),
+                    ],
+                    rect(50, 0, 50, 100),
+                ),
+            ],
+            rect(0, 0, 100, 100),
+        );
+        assert_eq!(root.leaf_count(), 3);
+        assert_eq!(root.depth(), 2);
+        assert!(!root.is_leaf());
+    }
+
+    #[test]
+    fn layout_serialize_roundtrip() {
+        let node = LayoutTreeNode::split_node(
+            SplitDirection::Horizontal,
+            vec![
+                LayoutTreeNode::leaf(rect(0, 0, 40, 100)),
+                LayoutTreeNode::leaf(rect(40, 0, 60, 100)),
+            ],
+            rect(0, 0, 100, 100),
+        );
+        let text = LayoutSerializer::serialize(&node);
+        let parsed = LayoutSerializer::deserialize(&text).expect("should parse");
+        assert_eq!(parsed.leaf_count(), 2);
+        assert_eq!(parsed.area, rect(0, 0, 100, 100));
+    }
+
+    #[test]
+    fn layout_animation_interpolation() {
+        let mut anim = LayoutAnimation::new(rect(0, 0, 100, 100), rect(10, 10, 80, 80));
+        anim.set_progress(0.5);
+        let r = anim.interpolated_rect();
+        assert_eq!(r.x, 5);
+        assert_eq!(r.y, 5);
+        assert_eq!(r.width, 90);
+        assert!(!anim.is_done());
+        anim.set_progress(1.0);
+        assert!(anim.is_done());
+    }
+
+    #[test]
+    fn layout_preset_sidebar_left() {
+        let area = rect(0, 0, 120, 60);
+        let tree = LayoutPreset::SidebarLeft.build(area);
+        assert_eq!(tree.leaf_count(), 2);
+        assert_eq!(tree.area, area);
+        assert_eq!(tree.children[0].area.width, 30);
+    }
+
+    #[test]
+    fn layout_preset_two_column() {
+        let area = rect(0, 0, 100, 50);
+        let tree = LayoutPreset::TwoColumn.build(area);
+        assert_eq!(tree.leaf_count(), 2);
+        assert_eq!(tree.children[0].area.width, 50);
+    }
+
+    #[test]
+    fn layout_preset_display() {
+        assert_eq!(format!("{}", LayoutPreset::CenteredEditor), "Centered Editor");
+    }
+
 }

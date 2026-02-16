@@ -5,6 +5,7 @@
 //! for VS Code-style quick-input UIs.
 
 use std::collections::VecDeque;
+use std::fmt;
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -926,6 +927,376 @@ pub fn render_input_box(
 }
 
 // ---------------------------------------------------------------------------
+// QuickPickHistory — LRU cache of recently selected items
+// ---------------------------------------------------------------------------
+
+/// Stores recently selected quick-pick item labels with LRU eviction.
+#[derive(Debug, Clone)]
+pub struct QuickPickHistory {
+    entries: VecDeque<String>,
+    capacity: usize,
+}
+
+impl QuickPickHistory {
+    /// Create a new history with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: VecDeque::new(),
+            capacity: capacity.max(1),
+        }
+    }
+
+    /// Record an item selection.  If the label already exists it is promoted
+    /// to the front (most-recent).  Evicts the oldest entry when full.
+    pub fn record(&mut self, label: impl Into<String>) {
+        let label = label.into();
+        self.entries.retain(|e| e != &label);
+        self.entries.push_front(label);
+        if self.entries.len() > self.capacity {
+            self.entries.pop_back();
+        }
+    }
+
+    /// Return the entries in most-recently-used order.
+    pub fn entries(&self) -> &VecDeque<String> {
+        &self.entries
+    }
+
+    /// Check whether `label` is present in the history.
+    pub fn contains(&self, label: &str) -> bool {
+        self.entries.iter().any(|e| e == label)
+    }
+
+    /// Remove all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Number of entries currently stored.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` when the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+impl fmt::Display for QuickPickHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "QuickPickHistory({}/{})", self.entries.len(), self.capacity)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// QuickPickGrouper — group items by category with section headers
+// ---------------------------------------------------------------------------
+
+/// A group of quick-pick items sharing a category label.
+#[derive(Debug, Clone)]
+pub struct QuickPickGroup {
+    pub category: String,
+    pub items: Vec<QuickPickItem>,
+}
+
+/// Groups quick-pick items by a category extracted from each item's label
+/// prefix (everything before the first `:`) or from its description.
+#[derive(Debug)]
+pub struct QuickPickGrouper {
+    use_description: bool,
+}
+
+impl QuickPickGrouper {
+    /// Create a grouper that extracts the category from the label prefix
+    /// (text before the first `:`).
+    pub fn from_label_prefix() -> Self {
+        Self { use_description: false }
+    }
+
+    /// Create a grouper that uses the item's `description` field as the
+    /// category (items without a description go into `"Uncategorized"`).
+    pub fn from_description() -> Self {
+        Self { use_description: true }
+    }
+
+    /// Group the provided items, returning a list of `QuickPickGroup`s in the
+    /// order their categories were first encountered.
+    pub fn group(&self, items: &[QuickPickItem]) -> Vec<QuickPickGroup> {
+        let mut groups: Vec<QuickPickGroup> = Vec::new();
+
+        for item in items {
+            if item.kind == QuickPickItemKind::Separator {
+                continue;
+            }
+            let category = self.extract_category(item);
+            if let Some(group) = groups.iter_mut().find(|g| g.category == category) {
+                group.items.push(item.clone());
+            } else {
+                groups.push(QuickPickGroup {
+                    category,
+                    items: vec![item.clone()],
+                });
+            }
+        }
+
+        groups
+    }
+
+    /// Flatten groups back into a list of `QuickPickItem`s with separator
+    /// headers inserted before each group.
+    pub fn into_items(groups: &[QuickPickGroup]) -> Vec<QuickPickItem> {
+        let mut out = Vec::new();
+        for group in groups {
+            out.push(QuickPickItem::separator(&group.category));
+            out.extend(group.items.iter().cloned());
+        }
+        out
+    }
+
+    fn extract_category(&self, item: &QuickPickItem) -> String {
+        if self.use_description {
+            item.description
+                .as_deref()
+                .unwrap_or("Uncategorized")
+                .to_string()
+        } else {
+            item.label
+                .split_once(':')
+                .map(|(prefix, _)| prefix.trim().to_string())
+                .unwrap_or_else(|| "Uncategorized".to_string())
+        }
+    }
+}
+
+impl fmt::Display for QuickPickGrouper {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.use_description {
+            write!(f, "QuickPickGrouper(by description)")
+        } else {
+            write!(f, "QuickPickGrouper(by label prefix)")
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScoreBreakdown — detailed fuzzy match scoring explanation
+// ---------------------------------------------------------------------------
+
+/// Breakdown of individual scoring components from a fuzzy match.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScoreBreakdown {
+    /// Points from consecutive character runs.
+    pub consecutive_bonus: i32,
+    /// Points from matches at word boundaries.
+    pub boundary_bonus: i32,
+    /// Points from exact-case matches.
+    pub case_bonus: i32,
+    /// Total score (sum of all bonuses).
+    pub total: i32,
+    /// Matched character positions.
+    pub positions: Vec<usize>,
+}
+
+impl fmt::Display for ScoreBreakdown {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "score {} (consecutive={}, boundary={}, case={})",
+            self.total, self.consecutive_bonus, self.boundary_bonus, self.case_bonus,
+        )
+    }
+}
+
+/// Perform a fuzzy match with a detailed score breakdown.
+pub fn fuzzy_match_detailed(pattern: &str, text: &str) -> Option<ScoreBreakdown> {
+    if pattern.is_empty() {
+        return Some(ScoreBreakdown {
+            consecutive_bonus: 0,
+            boundary_bonus: 0,
+            case_bonus: 0,
+            total: 0,
+            positions: Vec::new(),
+        });
+    }
+
+    let pattern_chars: Vec<char> = pattern.chars().collect();
+    let pattern_lower: Vec<char> = pattern_chars.iter().map(|c| c.to_ascii_lowercase()).collect();
+    let text_chars: Vec<char> = text.chars().collect();
+    let text_lower: Vec<char> = text_chars.iter().map(|c| c.to_ascii_lowercase()).collect();
+
+    let mut positions = Vec::with_capacity(pattern_lower.len());
+    let mut consecutive_bonus: i32 = 0;
+    let mut boundary_bonus: i32 = 0;
+    let mut case_bonus: i32 = 0;
+    let mut text_idx = 0;
+
+    for (pi, &pc) in pattern_lower.iter().enumerate() {
+        let mut found = false;
+        while text_idx < text_lower.len() {
+            if text_lower[text_idx] == pc {
+                if let Some(&prev) = positions.last() {
+                    if text_idx == prev + 1 {
+                        consecutive_bonus += 5;
+                    }
+                }
+
+                if text_idx == 0 || !text_chars[text_idx - 1].is_alphanumeric() {
+                    boundary_bonus += 10;
+                }
+
+                if text_chars[text_idx] == pattern_chars[pi] {
+                    case_bonus += 1;
+                }
+
+                positions.push(text_idx);
+                text_idx += 1;
+                found = true;
+                break;
+            }
+            text_idx += 1;
+        }
+        if !found {
+            return None;
+        }
+    }
+
+    let total = consecutive_bonus + boundary_bonus + case_bonus;
+    Some(ScoreBreakdown {
+        consecutive_bonus,
+        boundary_bonus,
+        case_bonus,
+        total,
+        positions,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// QuickPickValidator — configurable validation for input boxes
+// ---------------------------------------------------------------------------
+
+/// The result of an input validation check.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ValidationResult {
+    /// Input is valid.
+    Ok,
+    /// Input is invalid with a human-readable message.
+    Error(String),
+}
+
+impl ValidationResult {
+    pub fn is_ok(&self) -> bool {
+        matches!(self, Self::Ok)
+    }
+
+    pub fn message(&self) -> Option<&str> {
+        match self {
+            Self::Ok => None,
+            Self::Error(msg) => Some(msg),
+        }
+    }
+}
+
+impl fmt::Display for ValidationResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ok => write!(f, "OK"),
+            Self::Error(msg) => write!(f, "Error: {msg}"),
+        }
+    }
+}
+
+/// Rule-based validator for quick-input text fields.
+///
+/// Supports minimum / maximum length constraints, regex-like pattern matching
+/// (simplified glob: `*` matches any chars), and custom validator closures.
+#[derive(Default)]
+pub struct QuickPickValidator {
+    min_length: Option<usize>,
+    max_length: Option<usize>,
+    pattern: Option<String>,
+    custom: Vec<Box<dyn Fn(&str) -> ValidationResult>>,
+}
+
+impl QuickPickValidator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Require at least `n` characters.
+    pub fn min_length(mut self, n: usize) -> Self {
+        self.min_length = Some(n);
+        self
+    }
+
+    /// Allow at most `n` characters.
+    pub fn max_length(mut self, n: usize) -> Self {
+        self.max_length = Some(n);
+        self
+    }
+
+    /// Require the input to contain the literal substring `pat`.
+    pub fn must_contain(mut self, pat: impl Into<String>) -> Self {
+        self.pattern = Some(pat.into());
+        self
+    }
+
+    /// Add an arbitrary validation closure.
+    pub fn custom(mut self, f: impl Fn(&str) -> ValidationResult + 'static) -> Self {
+        self.custom.push(Box::new(f));
+        self
+    }
+
+    /// Run all configured validations against `input`, returning the first
+    /// error encountered or `ValidationResult::Ok`.
+    pub fn validate(&self, input: &str) -> ValidationResult {
+        if let Some(min) = self.min_length {
+            if input.len() < min {
+                return ValidationResult::Error(format!(
+                    "Must be at least {min} characters (got {})",
+                    input.len()
+                ));
+            }
+        }
+
+        if let Some(max) = self.max_length {
+            if input.len() > max {
+                return ValidationResult::Error(format!(
+                    "Must be at most {max} characters (got {})",
+                    input.len()
+                ));
+            }
+        }
+
+        if let Some(ref pat) = self.pattern {
+            if !input.contains(pat.as_str()) {
+                return ValidationResult::Error(format!("Must contain \"{pat}\""));
+            }
+        }
+
+        for f in &self.custom {
+            let result = f(input);
+            if !result.is_ok() {
+                return result;
+            }
+        }
+
+        ValidationResult::Ok
+    }
+}
+
+impl fmt::Debug for QuickPickValidator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("QuickPickValidator")
+            .field("min_length", &self.min_length)
+            .field("max_length", &self.max_length)
+            .field("pattern", &self.pattern)
+            .field("custom_count", &self.custom.len())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1414,5 +1785,186 @@ mod tests {
             always_show: false,
             keybinding: None,
         }
+    }
+
+    fn make_item_with_desc(label: &str, desc: &str) -> QuickPickItem {
+        QuickPickItem {
+            label: label.to_string(),
+            description: Some(desc.to_string()),
+            detail: None,
+            icon: None,
+            kind: QuickPickItemKind::Default,
+            picked: false,
+            always_show: false,
+            keybinding: None,
+        }
+    }
+
+    // -- QuickPickHistory ---------------------------------------------------
+
+    #[test]
+    fn history_lru_eviction() {
+        let mut h = QuickPickHistory::new(3);
+        h.record("a");
+        h.record("b");
+        h.record("c");
+        h.record("d"); // "a" evicted
+        assert_eq!(h.len(), 3);
+        assert!(!h.contains("a"));
+        assert!(h.contains("d"));
+        assert_eq!(h.entries()[0], "d");
+    }
+
+    #[test]
+    fn history_promotes_existing_entry() {
+        let mut h = QuickPickHistory::new(5);
+        h.record("x");
+        h.record("y");
+        h.record("z");
+        h.record("x"); // promote to front
+        assert_eq!(h.entries()[0], "x");
+        assert_eq!(h.len(), 3); // no duplicates
+    }
+
+    #[test]
+    fn history_display() {
+        let h = QuickPickHistory::new(10);
+        assert_eq!(format!("{h}"), "QuickPickHistory(0/10)");
+    }
+
+    // -- QuickPickGrouper ---------------------------------------------------
+
+    #[test]
+    fn grouper_by_label_prefix() {
+        let items = vec![
+            make_item("File: Save"),
+            make_item("File: Open"),
+            make_item("Edit: Undo"),
+            make_item("Standalone"),
+        ];
+        let grouper = QuickPickGrouper::from_label_prefix();
+        let groups = grouper.group(&items);
+        assert_eq!(groups.len(), 3);
+        assert_eq!(groups[0].category, "File");
+        assert_eq!(groups[0].items.len(), 2);
+        assert_eq!(groups[1].category, "Edit");
+        assert_eq!(groups[2].category, "Uncategorized");
+    }
+
+    #[test]
+    fn grouper_by_description() {
+        let items = vec![
+            make_item_with_desc("Save", "File"),
+            make_item_with_desc("Open", "File"),
+            make_item_with_desc("Undo", "Edit"),
+            make_item("NoDesc"),
+        ];
+        let grouper = QuickPickGrouper::from_description();
+        let groups = grouper.group(&items);
+        assert_eq!(groups.len(), 3);
+        assert_eq!(groups[2].category, "Uncategorized");
+    }
+
+    #[test]
+    fn grouper_into_items_adds_separators() {
+        let groups = vec![QuickPickGroup {
+            category: "File".into(),
+            items: vec![make_item("Save"), make_item("Open")],
+        }];
+        let items = QuickPickGrouper::into_items(&groups);
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].kind, QuickPickItemKind::Separator);
+        assert_eq!(items[0].label, "File");
+    }
+
+    #[test]
+    fn grouper_display() {
+        assert_eq!(
+            format!("{}", QuickPickGrouper::from_label_prefix()),
+            "QuickPickGrouper(by label prefix)"
+        );
+    }
+
+    // -- ScoreBreakdown / fuzzy_match_detailed ------------------------------
+
+    #[test]
+    fn score_breakdown_components() {
+        let bd = fuzzy_match_detailed("abc", "xabcx").unwrap();
+        assert!(bd.consecutive_bonus > 0, "expected consecutive bonus");
+        assert_eq!(bd.total, bd.consecutive_bonus + bd.boundary_bonus + bd.case_bonus);
+    }
+
+    #[test]
+    fn score_breakdown_boundary() {
+        let bd = fuzzy_match_detailed("fb", "FooBar").unwrap();
+        // 'F' is at position 0 (word boundary); 'B' is preceded by 'o' (not a boundary)
+        assert!(bd.boundary_bonus >= 10, "boundary_bonus={}", bd.boundary_bonus);
+    }
+
+    #[test]
+    fn score_breakdown_no_match() {
+        assert!(fuzzy_match_detailed("xyz", "abc").is_none());
+    }
+
+    #[test]
+    fn score_breakdown_display() {
+        let bd = fuzzy_match_detailed("a", "a").unwrap();
+        let s = format!("{bd}");
+        assert!(s.contains("score"), "display={s}");
+    }
+
+    // -- QuickPickValidator -------------------------------------------------
+
+    #[test]
+    fn validator_min_length() {
+        let v = QuickPickValidator::new().min_length(3);
+        assert!(!v.validate("ab").is_ok());
+        assert!(v.validate("abc").is_ok());
+    }
+
+    #[test]
+    fn validator_max_length() {
+        let v = QuickPickValidator::new().max_length(5);
+        assert!(v.validate("hello").is_ok());
+        assert!(!v.validate("toolong").is_ok());
+    }
+
+    #[test]
+    fn validator_must_contain() {
+        let v = QuickPickValidator::new().must_contain("@");
+        assert!(!v.validate("nope").is_ok());
+        assert!(v.validate("user@host").is_ok());
+    }
+
+    #[test]
+    fn validator_custom_rule() {
+        let v = QuickPickValidator::new().custom(|input| {
+            if input.chars().all(|c| c.is_ascii_digit()) {
+                ValidationResult::Ok
+            } else {
+                ValidationResult::Error("digits only".into())
+            }
+        });
+        assert!(v.validate("123").is_ok());
+        assert!(!v.validate("12a").is_ok());
+    }
+
+    #[test]
+    fn validator_combined_rules() {
+        let v = QuickPickValidator::new()
+            .min_length(2)
+            .max_length(10)
+            .must_contain("@");
+        assert!(!v.validate("a").is_ok()); // too short
+        assert!(!v.validate("ab").is_ok()); // missing @
+        assert!(v.validate("a@b").is_ok());
+        assert!(!v.validate("a@bcdefghijk").is_ok()); // too long
+    }
+
+    #[test]
+    fn validation_result_display() {
+        assert_eq!(format!("{}", ValidationResult::Ok), "OK");
+        let err = ValidationResult::Error("bad".into());
+        assert_eq!(format!("{err}"), "Error: bad");
     }
 }

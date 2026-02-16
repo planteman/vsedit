@@ -769,6 +769,254 @@ impl ViewlayoutStats {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// ViewLayoutPreset - predefined layout configurations
+// ---------------------------------------------------------------------------
+
+/// Predefined layout presets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ViewLayoutPreset {
+    /// Default layout with sidebar and panel.
+    Default,
+    /// Zen mode: no sidebar, no panel, full editor.
+    Zen,
+    /// Side by side: two editors horizontally.
+    SideBySide,
+    /// Focus mode: sidebar visible, panel hidden.
+    FocusMode,
+}
+
+impl ViewLayoutPreset {
+    /// Apply this preset to a layout.
+    pub fn apply_to(&self, layout: &mut ViewLayout) {
+        match self {
+            Self::Default => {
+                layout.sidebar_visible = true;
+                layout.panel_visible = true;
+                layout.auxiliary_bar_visible = false;
+            }
+            Self::Zen => {
+                layout.sidebar_visible = false;
+                layout.panel_visible = false;
+                layout.auxiliary_bar_visible = false;
+            }
+            Self::SideBySide => {
+                layout.sidebar_visible = true;
+                layout.panel_visible = false;
+                layout.auxiliary_bar_visible = true;
+            }
+            Self::FocusMode => {
+                layout.sidebar_visible = true;
+                layout.panel_visible = false;
+                layout.auxiliary_bar_visible = false;
+            }
+        }
+    }
+
+    /// Name of the preset.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Default => "Default",
+            Self::Zen => "Zen",
+            Self::SideBySide => "Side by Side",
+            Self::FocusMode => "Focus Mode",
+        }
+    }
+
+    /// All available presets.
+    pub fn all() -> &'static [ViewLayoutPreset] {
+        &[Self::Default, Self::Zen, Self::SideBySide, Self::FocusMode]
+    }
+}
+
+impl fmt::Display for ViewLayoutPreset {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewLayoutSerializer - persist layout state
+// ---------------------------------------------------------------------------
+
+/// Serializes and deserializes layout state as a simple string format.
+#[derive(Debug, Clone, Default)]
+pub struct ViewLayoutSerializer;
+
+impl ViewLayoutSerializer {
+    /// Serialize a layout to a compact string.
+    pub fn to_string(layout: &ViewLayout) -> String {
+        format!(
+            "sidebar={};panel={};aux={};panel_pos={};views={}",
+            layout.sidebar_visible,
+            layout.panel_visible,
+            layout.auxiliary_bar_visible,
+            layout.panel_position,
+            layout.views.len()
+        )
+    }
+
+    /// Deserialize a layout from a string. Returns a layout with the parsed visibility flags.
+    pub fn from_string(s: &str) -> ViewLayout {
+        let mut layout = ViewLayout::default();
+        for part in s.split(';') {
+            if let Some((key, value)) = part.split_once('=') {
+                match key.trim() {
+                    "sidebar" => layout.sidebar_visible = value.trim() == "true",
+                    "panel" => layout.panel_visible = value.trim() == "true",
+                    "aux" => layout.auxiliary_bar_visible = value.trim() == "true",
+                    "panel_pos" => {
+                        layout.panel_position = match value.trim().to_lowercase().as_str() {
+                            "left" => PanelPosition::Left,
+                            "right" => PanelPosition::Right,
+                            _ => PanelPosition::Bottom,
+                        };
+                    }
+                    _ => {}
+                }
+            }
+        }
+        layout
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewVisibilityManager - track view visibility
+// ---------------------------------------------------------------------------
+
+/// Tracks the visibility state of named views.
+#[derive(Debug, Clone, Default)]
+pub struct ViewVisibilityManager {
+    visibility: HashMap<String, bool>,
+}
+
+impl ViewVisibilityManager {
+    /// Create a new empty manager.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Show a view.
+    pub fn show(&mut self, id: impl Into<String>) {
+        self.visibility.insert(id.into(), true);
+    }
+
+    /// Hide a view.
+    pub fn hide(&mut self, id: impl Into<String>) {
+        self.visibility.insert(id.into(), false);
+    }
+
+    /// Toggle a view's visibility. If unknown, defaults to showing.
+    pub fn toggle(&mut self, id: impl Into<String>) {
+        let id = id.into();
+        let current = self.visibility.get(&id).copied().unwrap_or(false);
+        self.visibility.insert(id, !current);
+    }
+
+    /// Check if a view is visible.
+    pub fn is_visible(&self, id: &str) -> bool {
+        self.visibility.get(id).copied().unwrap_or(false)
+    }
+
+    /// Number of currently visible views.
+    pub fn visible_count(&self) -> usize {
+        self.visibility.values().filter(|v| **v).count()
+    }
+
+    /// Total tracked views.
+    pub fn total_count(&self) -> usize {
+        self.visibility.len()
+    }
+
+    /// List all visible view ids.
+    pub fn visible_ids(&self) -> Vec<&str> {
+        self.visibility
+            .iter()
+            .filter(|(_, v)| **v)
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+}
+
+impl fmt::Display for ViewVisibilityManager {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Visibility({}/{} visible)", self.visible_count(), self.total_count())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutTransition - animated layout transitions
+// ---------------------------------------------------------------------------
+
+/// Represents a transition between two layout states.
+#[derive(Debug, Clone)]
+pub struct LayoutTransition {
+    pub from_sidebar: bool,
+    pub to_sidebar: bool,
+    pub from_panel: bool,
+    pub to_panel: bool,
+    pub from_aux: bool,
+    pub to_aux: bool,
+}
+
+impl LayoutTransition {
+    /// Create a transition between two layouts.
+    pub fn new(from: &ViewLayout, to: &ViewLayout) -> Self {
+        Self {
+            from_sidebar: from.sidebar_visible,
+            to_sidebar: to.sidebar_visible,
+            from_panel: from.panel_visible,
+            to_panel: to.panel_visible,
+            from_aux: from.auxiliary_bar_visible,
+            to_aux: to.auxiliary_bar_visible,
+        }
+    }
+
+    /// Interpolate the transition at time t (0.0 to 1.0).
+    /// Returns intermediate visibility states based on threshold.
+    pub fn interpolate(&self, t: f64) -> (bool, bool, bool) {
+        let t = t.clamp(0.0, 1.0);
+        let interp = |from: bool, to: bool| -> bool {
+            if from == to {
+                from
+            } else if to {
+                t >= 0.5
+            } else {
+                t < 0.5
+            }
+        };
+        (
+            interp(self.from_sidebar, self.to_sidebar),
+            interp(self.from_panel, self.to_panel),
+            interp(self.from_aux, self.to_aux),
+        )
+    }
+
+    /// Returns true if the transition involves any change.
+    pub fn has_changes(&self) -> bool {
+        self.from_sidebar != self.to_sidebar
+            || self.from_panel != self.to_panel
+            || self.from_aux != self.to_aux
+    }
+
+    /// Number of elements that change.
+    pub fn change_count(&self) -> usize {
+        let mut count = 0;
+        if self.from_sidebar != self.to_sidebar { count += 1; }
+        if self.from_panel != self.to_panel { count += 1; }
+        if self.from_aux != self.to_aux { count += 1; }
+        count
+    }
+}
+
+impl fmt::Display for LayoutTransition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Transition({} changes)", self.change_count())
+    }
+}
+
+use std::collections::HashMap;
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1494,5 +1742,77 @@ mod tests {
             stats.record_failure(50);
         }
         assert!(!stats.is_healthy());
+    }
+
+    #[test]
+    fn layout_preset_zen() {
+        let mut layout = ViewLayout::default();
+        layout.sidebar_visible = true;
+        layout.panel_visible = true;
+        ViewLayoutPreset::Zen.apply_to(&mut layout);
+        assert!(!layout.sidebar_visible);
+        assert!(!layout.panel_visible);
+        assert!(!layout.auxiliary_bar_visible);
+        assert_eq!(ViewLayoutPreset::Zen.name(), "Zen");
+    }
+
+    #[test]
+    fn layout_preset_all() {
+        assert_eq!(ViewLayoutPreset::all().len(), 4);
+    }
+
+    #[test]
+    fn layout_serializer_round_trip() {
+        let mut layout = ViewLayout::default();
+        layout.sidebar_visible = true;
+        layout.panel_visible = false;
+        layout.auxiliary_bar_visible = true;
+        let s = ViewLayoutSerializer::to_string(&layout);
+        let restored = ViewLayoutSerializer::from_string(&s);
+        assert_eq!(restored.sidebar_visible, true);
+        assert_eq!(restored.panel_visible, false);
+        assert_eq!(restored.auxiliary_bar_visible, true);
+    }
+
+    #[test]
+    fn view_visibility_manager_ops() {
+        let mut mgr = ViewVisibilityManager::new();
+        mgr.show("explorer");
+        mgr.show("search");
+        mgr.hide("debug");
+        assert!(mgr.is_visible("explorer"));
+        assert!(!mgr.is_visible("debug"));
+        assert_eq!(mgr.visible_count(), 2);
+        assert_eq!(mgr.total_count(), 3);
+        mgr.toggle("debug");
+        assert!(mgr.is_visible("debug"));
+        assert_eq!(mgr.visible_count(), 3);
+    }
+
+    #[test]
+    fn layout_transition_interpolation() {
+        let mut from = ViewLayout::default();
+        from.sidebar_visible = true;
+        from.panel_visible = true;
+        let mut to = ViewLayout::default();
+        to.sidebar_visible = false;
+        to.panel_visible = false;
+        let transition = LayoutTransition::new(&from, &to);
+        assert!(transition.has_changes());
+        assert_eq!(transition.change_count(), 2);
+        let (s, p, _a) = transition.interpolate(0.0);
+        assert!(s); // still original
+        assert!(p);
+        let (s2, p2, _a2) = transition.interpolate(1.0);
+        assert!(!s2); // final
+        assert!(!p2);
+    }
+
+    #[test]
+    fn layout_transition_no_change() {
+        let layout = ViewLayout::default();
+        let transition = LayoutTransition::new(&layout, &layout);
+        assert!(!transition.has_changes());
+        assert_eq!(transition.change_count(), 0);
     }
 }

@@ -925,6 +925,106 @@ pub fn parse_lsp_hover(response: &serde_json::Value) -> Option<HoverContent> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// HoverProviderRegistry – per-language provider management
+// ---------------------------------------------------------------------------
+
+/// Registry that associates hover providers with specific language IDs.
+pub struct HoverProviderRegistry {
+    entries: Vec<(String, Box<dyn HoverProvider>)>,
+}
+
+impl HoverProviderRegistry {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Register a provider for a specific language.
+    pub fn register(&mut self, language_id: impl Into<String>, provider: Box<dyn HoverProvider>) {
+        self.entries.push((language_id.into(), provider));
+    }
+
+    /// Unregister all providers for a given language. Returns count removed.
+    pub fn unregister(&mut self, language_id: &str) -> usize {
+        let before = self.entries.len();
+        self.entries.retain(|(lang, _)| lang != language_id);
+        before - self.entries.len()
+    }
+
+    pub fn provider_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Get all providers registered for a given language.
+    pub fn providers_for_language(&self, language_id: &str) -> Vec<&dyn HoverProvider> {
+        self.entries.iter()
+            .filter(|(lang, _)| lang == language_id)
+            .map(|(_, p)| p.as_ref())
+            .collect()
+    }
+
+    /// List all registered language IDs (deduplicated).
+    pub fn languages(&self) -> Vec<&str> {
+        let mut langs: Vec<&str> = self.entries.iter().map(|(l, _)| l.as_str()).collect();
+        langs.sort();
+        langs.dedup();
+        langs
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverCache – simple memoization for hover results
+// ---------------------------------------------------------------------------
+
+/// Caches hover results keyed by (line, column).
+pub struct HoverCache {
+    entries: Vec<((u32, u32), Hover)>,
+    capacity: usize,
+}
+
+impl HoverCache {
+    pub fn new(capacity: usize) -> Self {
+        Self { entries: Vec::with_capacity(capacity), capacity }
+    }
+
+    pub fn get(&self, line: u32, column: u32) -> Option<&Hover> {
+        self.entries.iter()
+            .find(|((l, c), _)| *l == line && *c == column)
+            .map(|(_, h)| h)
+    }
+
+    pub fn put(&mut self, line: u32, column: u32, hover: Hover) {
+        self.entries.retain(|((l, c), _)| !(*l == line && *c == column));
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push(((line, column), hover));
+    }
+
+    pub fn invalidate(&mut self, line: u32, column: u32) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|((l, c), _)| !(*l == line && *c == column));
+        self.entries.len() < before
+    }
+
+    /// Invalidate all entries on a given line.
+    pub fn invalidate_line(&mut self, line: u32) {
+        self.entries.retain(|((l, _), _)| *l != line);
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1457,5 +1557,85 @@ mod tests {
             HoverContent::Text(s) => assert_eq!(s, "no kind field"),
             _ => panic!("expected Text variant"),
         }
+    }
+
+    struct LangHoverProvider {
+        lang: String,
+    }
+    impl HoverProvider for LangHoverProvider {
+        fn provide_hover(&self, line: u32, _column: u32) -> Option<Hover> {
+            if line == 10 {
+                Some(Hover::text(format!("{} hover", self.lang)))
+            } else {
+                None
+            }
+        }
+    }
+
+    #[test]
+    fn test_hover_provider_registry_register_and_lookup() {
+        let mut reg = HoverProviderRegistry::new();
+        reg.register("rust", Box::new(LangHoverProvider { lang: "rust".into() }));
+        reg.register("python", Box::new(LangHoverProvider { lang: "python".into() }));
+        assert_eq!(reg.provider_count(), 2);
+        assert_eq!(reg.providers_for_language("rust").len(), 1);
+        assert_eq!(reg.providers_for_language("go").len(), 0);
+    }
+
+    #[test]
+    fn test_hover_provider_registry_unregister() {
+        let mut reg = HoverProviderRegistry::new();
+        reg.register("rust", Box::new(LangHoverProvider { lang: "rust".into() }));
+        reg.register("rust", Box::new(LangHoverProvider { lang: "rust2".into() }));
+        let removed = reg.unregister("rust");
+        assert_eq!(removed, 2);
+        assert_eq!(reg.provider_count(), 0);
+    }
+
+    #[test]
+    fn test_hover_content_builder_full() {
+        let hover = HoverContentBuilder::new()
+            .add_text("hello")
+            .add_code("let x = 1;", Some("rust"))
+            .add_separator()
+            .add_markdown("**bold**")
+            .build();
+        assert_eq!(hover.content_count(), 4);
+        assert!(!hover.is_empty());
+    }
+
+    #[test]
+    fn test_hover_content_builder_with_range() {
+        let range = HoverRange { start_line: 1, start_column: 0, end_line: 1, end_column: 5 };
+        let hover = HoverContentBuilder::new()
+            .add_text("info")
+            .set_range(range)
+            .build();
+        assert!(hover.range.is_some());
+        assert_eq!(hover.contents.len(), 1);
+    }
+
+    #[test]
+    fn test_hover_cache_put_get_invalidate() {
+        let mut cache = HoverCache::new(10);
+        cache.put(5, 3, Hover::text("hello"));
+        assert_eq!(cache.len(), 1);
+        assert!(cache.get(5, 3).is_some());
+        assert!(cache.get(5, 4).is_none());
+        cache.invalidate(5, 3);
+        assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn test_hover_cache_capacity() {
+        let mut cache = HoverCache::new(2);
+        cache.put(1, 0, Hover::text("a"));
+        cache.put(2, 0, Hover::text("b"));
+        cache.put(3, 0, Hover::text("c"));
+        assert_eq!(cache.len(), 2);
+        assert!(cache.get(1, 0).is_none());
+        assert!(cache.get(2, 0).is_some());
+        cache.invalidate_line(2);
+        assert_eq!(cache.len(), 1);
     }
 }

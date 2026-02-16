@@ -876,6 +876,224 @@ pub fn has_overlapping_edits(edits: &[TextEdit]) -> bool {
     false
 }
 
+// ---------------------------------------------------------------------------
+// FormattingResult – outcome of a formatting pass
+// ---------------------------------------------------------------------------
+
+/// Captures the outcome of a formatting operation.
+pub struct FormattingResult {
+    pub edits: Vec<TextEdit>,
+    pub elapsed_ms: u64,
+    pub provider_name: String,
+}
+
+impl FormattingResult {
+    pub fn new(edits: Vec<TextEdit>, elapsed_ms: u64, provider_name: impl Into<String>) -> Self {
+        Self { edits, elapsed_ms, provider_name: provider_name.into() }
+    }
+
+    pub fn edit_count(&self) -> usize {
+        self.edits.len()
+    }
+
+    pub fn is_noop(&self) -> bool {
+        self.edits.is_empty()
+    }
+}
+
+impl fmt::Display for FormattingResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: {} edit(s) in {}ms",
+            self.provider_name,
+            self.edits.len(),
+            self.elapsed_ms,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IndentationDetector – detect indent style from text
+// ---------------------------------------------------------------------------
+
+/// Analyzes text to detect whether it uses tabs or spaces and the indent size.
+pub struct IndentationDetector;
+
+/// The detected indentation style.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IndentStyle {
+    Tabs,
+    Spaces(u32),
+    Mixed,
+    Unknown,
+}
+
+impl IndentationDetector {
+    /// Analyze the text and return the detected indentation style.
+    pub fn detect(text: &str) -> IndentStyle {
+        let mut tab_lines = 0u32;
+        let mut space_lines = 0u32;
+        let mut space_sizes: Vec<u32> = Vec::new();
+
+        for line in text.lines() {
+            if line.is_empty() {
+                continue;
+            }
+            let leading: String = line.chars().take_while(|c| c.is_whitespace()).collect();
+            if leading.is_empty() {
+                continue;
+            }
+            if leading.contains('\t') {
+                tab_lines += 1;
+            } else {
+                space_lines += 1;
+                let len = leading.len() as u32;
+                if len > 0 {
+                    space_sizes.push(len);
+                }
+            }
+        }
+
+        if tab_lines == 0 && space_lines == 0 {
+            return IndentStyle::Unknown;
+        }
+        if tab_lines > 0 && space_lines > 0 {
+            return IndentStyle::Mixed;
+        }
+        if tab_lines > 0 {
+            return IndentStyle::Tabs;
+        }
+
+        let size = space_sizes.iter().copied().reduce(indent_gcd).unwrap_or(4);
+        IndentStyle::Spaces(if size == 0 { 4 } else { size })
+    }
+}
+
+fn indent_gcd(a: u32, b: u32) -> u32 {
+    if b == 0 { a } else { indent_gcd(b, a % b) }
+}
+
+// ---------------------------------------------------------------------------
+// WhitespaceNormalizer – fix line endings and trailing whitespace
+// ---------------------------------------------------------------------------
+
+/// Utilities for normalizing whitespace in text.
+pub struct WhitespaceNormalizer;
+
+impl WhitespaceNormalizer {
+    /// Convert all line endings to `\n` (LF).
+    pub fn normalize_line_endings(text: &str) -> String {
+        text.replace("\r\n", "\n").replace('\r', "\n")
+    }
+
+    /// Remove trailing whitespace from each line.
+    pub fn trim_trailing(text: &str) -> String {
+        text.lines()
+            .map(|line| line.trim_end())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Ensure the text ends with exactly one newline.
+    pub fn ensure_final_newline(text: &str) -> String {
+        let trimmed = text.trim_end_matches('\n').trim_end_matches('\r');
+        format!("{}\n", trimmed)
+    }
+
+    /// Apply all normalizations in order.
+    pub fn normalize_all(text: &str) -> String {
+        let text = Self::normalize_line_endings(text);
+        let text = Self::trim_trailing(&text);
+        Self::ensure_final_newline(&text)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FormattingConfig – builder for extended configuration
+// ---------------------------------------------------------------------------
+
+/// Extended formatting configuration with builder pattern.
+pub struct FormattingConfig {
+    pub options: FormattingOptions,
+    pub format_on_save: bool,
+    pub format_on_paste: bool,
+    pub format_on_type: bool,
+    pub default_provider: Option<String>,
+}
+
+impl FormattingConfig {
+    pub fn builder() -> FormattingConfigBuilder {
+        FormattingConfigBuilder::new()
+    }
+}
+
+pub struct FormattingConfigBuilder {
+    options: FormattingOptions,
+    format_on_save: bool,
+    format_on_paste: bool,
+    format_on_type: bool,
+    default_provider: Option<String>,
+}
+
+impl FormattingConfigBuilder {
+    pub fn new() -> Self {
+        Self {
+            options: FormattingOptions {
+                tab_size: 4,
+                insert_spaces: true,
+                trim_trailing_whitespace: true,
+                insert_final_newline: true,
+                trim_final_newlines: false,
+            },
+            format_on_save: false,
+            format_on_paste: false,
+            format_on_type: false,
+            default_provider: None,
+        }
+    }
+
+    pub fn tab_size(mut self, size: u32) -> Self {
+        self.options.tab_size = size;
+        self
+    }
+
+    pub fn insert_spaces(mut self, yes: bool) -> Self {
+        self.options.insert_spaces = yes;
+        self
+    }
+
+    pub fn format_on_save(mut self, yes: bool) -> Self {
+        self.format_on_save = yes;
+        self
+    }
+
+    pub fn format_on_paste(mut self, yes: bool) -> Self {
+        self.format_on_paste = yes;
+        self
+    }
+
+    pub fn format_on_type(mut self, yes: bool) -> Self {
+        self.format_on_type = yes;
+        self
+    }
+
+    pub fn default_provider(mut self, name: impl Into<String>) -> Self {
+        self.default_provider = Some(name.into());
+        self
+    }
+
+    pub fn build(self) -> FormattingConfig {
+        FormattingConfig {
+            options: self.options,
+            format_on_save: self.format_on_save,
+            format_on_paste: self.format_on_paste,
+            format_on_type: self.format_on_type,
+            default_provider: self.default_provider,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1460,5 +1678,66 @@ mod tests {
             TextEdit { start_line: 1, start_column: 0, end_line: 1, end_column: 3, new_text: String::new() },
         ];
         assert!(!has_overlapping_edits(&no_overlap));
+    }
+
+    #[test]
+    fn test_formatting_result_display() {
+        let result = FormattingResult::new(
+            vec![TextEdit { start_line: 0, start_column: 0, end_line: 0, end_column: 1, new_text: "x".into() }],
+            42,
+            "rustfmt",
+        );
+        assert_eq!(format!("{}", result), "rustfmt: 1 edit(s) in 42ms");
+        assert!(!result.is_noop());
+    }
+
+    #[test]
+    fn test_formatting_result_noop() {
+        let result = FormattingResult::new(vec![], 0, "none");
+        assert!(result.is_noop());
+        assert_eq!(result.edit_count(), 0);
+    }
+
+    #[test]
+    fn test_indentation_detector_spaces() {
+        let text = "fn main() {\n    let x = 1;\n    let y = 2;\n}\n";
+        assert_eq!(IndentationDetector::detect(text), IndentStyle::Spaces(4));
+    }
+
+    #[test]
+    fn test_indentation_detector_tabs() {
+        let text = "fn main() {\n\tlet x = 1;\n\tlet y = 2;\n}\n";
+        assert_eq!(IndentationDetector::detect(text), IndentStyle::Tabs);
+    }
+
+    #[test]
+    fn test_whitespace_normalizer() {
+        assert_eq!(
+            WhitespaceNormalizer::normalize_line_endings("a\r\nb\rc"),
+            "a\nb\nc"
+        );
+        assert_eq!(
+            WhitespaceNormalizer::trim_trailing("hello   \nworld  "),
+            "hello\nworld"
+        );
+        assert_eq!(
+            WhitespaceNormalizer::ensure_final_newline("hello\n\n"),
+            "hello\n"
+        );
+    }
+
+    #[test]
+    fn test_formatting_config_builder() {
+        let cfg = FormattingConfig::builder()
+            .tab_size(2)
+            .insert_spaces(true)
+            .format_on_save(true)
+            .format_on_paste(false)
+            .default_provider("rustfmt")
+            .build();
+        assert_eq!(cfg.options.tab_size, 2);
+        assert!(cfg.format_on_save);
+        assert!(!cfg.format_on_paste);
+        assert_eq!(cfg.default_provider.as_deref(), Some("rustfmt"));
     }
 }

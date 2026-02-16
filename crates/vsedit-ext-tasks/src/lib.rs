@@ -914,6 +914,311 @@ impl TaskDependencyChain {
     }
 }
 
+// ── Task Filter ──
+
+/// Filter for querying tasks by type, group, source, and running state.
+///
+/// Uses a builder pattern: construct with `TaskFilter::new()`, chain
+/// predicates, then call `matches()` or `apply()`.
+#[derive(Debug, Clone, Default)]
+pub struct TaskFilter {
+    task_type: Option<String>,
+    group: Option<String>,
+    source: Option<String>,
+    name_contains: Option<String>,
+    running_only: Option<bool>,
+}
+
+impl TaskFilter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Only match tasks whose definition type equals `task_type`.
+    pub fn task_type(mut self, task_type: impl Into<String>) -> Self {
+        self.task_type = Some(task_type.into());
+        self
+    }
+
+    /// Only match tasks belonging to the given group.
+    pub fn group(mut self, group: impl Into<String>) -> Self {
+        self.group = Some(group.into());
+        self
+    }
+
+    /// Only match tasks from the given source.
+    pub fn source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    /// Only match tasks whose name contains the given substring.
+    pub fn name_contains(mut self, needle: impl Into<String>) -> Self {
+        self.name_contains = Some(needle.into());
+        self
+    }
+
+    /// When applied to executions, only match running (or stopped) ones.
+    pub fn running_only(mut self, running: bool) -> Self {
+        self.running_only = Some(running);
+        self
+    }
+
+    /// Test whether a [`Task`] satisfies this filter.
+    pub fn matches_task(&self, task: &Task) -> bool {
+        if let Some(ref tt) = self.task_type {
+            if task.definition.task_type != *tt {
+                return false;
+            }
+        }
+        if let Some(ref g) = self.group {
+            if task.group.as_deref() != Some(g.as_str()) {
+                return false;
+            }
+        }
+        if let Some(ref s) = self.source {
+            if task.source != *s {
+                return false;
+            }
+        }
+        if let Some(ref nc) = self.name_contains {
+            if !task.name.contains(nc.as_str()) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Test whether a [`TaskExecution`] satisfies this filter.
+    pub fn matches_execution(&self, exec: &TaskExecution) -> bool {
+        if !self.matches_task(&exec.task) {
+            return false;
+        }
+        if let Some(running) = self.running_only {
+            if exec.is_running != running {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Filter a slice of tasks, returning those that match.
+    pub fn apply<'a>(&self, tasks: &'a [Task]) -> Vec<&'a Task> {
+        tasks.iter().filter(|t| self.matches_task(t)).collect()
+    }
+
+    /// Filter a slice of executions, returning those that match.
+    pub fn apply_executions<'a>(&self, execs: &'a [TaskExecution]) -> Vec<&'a TaskExecution> {
+        execs.iter().filter(|e| self.matches_execution(e)).collect()
+    }
+}
+
+impl fmt::Display for TaskFilter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut parts = Vec::new();
+        if let Some(ref tt) = self.task_type {
+            parts.push(format!("type={tt}"));
+        }
+        if let Some(ref g) = self.group {
+            parts.push(format!("group={g}"));
+        }
+        if let Some(ref s) = self.source {
+            parts.push(format!("source={s}"));
+        }
+        if let Some(ref nc) = self.name_contains {
+            parts.push(format!("name~={nc}"));
+        }
+        if let Some(r) = self.running_only {
+            parts.push(format!("running={r}"));
+        }
+        if parts.is_empty() {
+            write!(f, "TaskFilter(*)")
+        } else {
+            write!(f, "TaskFilter({})", parts.join(", "))
+        }
+    }
+}
+
+// ── Task Group Summary ──
+
+/// Per-group statistics computed from a collection of tasks.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GroupStats {
+    pub group: String,
+    pub count: usize,
+    pub task_types: Vec<String>,
+}
+
+/// Summary of tasks grouped by their `group` field.
+#[derive(Debug, Clone)]
+pub struct TaskGroupSummary {
+    groups: HashMap<String, Vec<String>>,
+}
+
+impl TaskGroupSummary {
+    /// Build a summary from a slice of tasks.
+    pub fn from_tasks(tasks: &[Task]) -> Self {
+        let mut groups: HashMap<String, Vec<String>> = HashMap::new();
+        for task in tasks {
+            let key = task.group.clone().unwrap_or_else(|| "(ungrouped)".into());
+            groups.entry(key).or_default().push(task.definition.task_type.clone());
+        }
+        Self { groups }
+    }
+
+    /// Return the number of distinct groups (including ungrouped).
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Return a sorted list of group names.
+    pub fn group_names(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self.groups.keys().map(|s| s.as_str()).collect();
+        names.sort();
+        names
+    }
+
+    /// Return statistics for a single group, or `None` if the group has no tasks.
+    pub fn stats_for(&self, group: &str) -> Option<GroupStats> {
+        self.groups.get(group).map(|types| {
+            let mut unique: Vec<String> = types.clone();
+            unique.sort();
+            unique.dedup();
+            GroupStats {
+                group: group.to_string(),
+                count: types.len(),
+                task_types: unique,
+            }
+        })
+    }
+
+    /// Total number of tasks across all groups.
+    pub fn total_tasks(&self) -> usize {
+        self.groups.values().map(|v| v.len()).sum()
+    }
+}
+
+impl fmt::Display for TaskGroupSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "TaskGroupSummary(groups={}, tasks={})",
+            self.group_count(),
+            self.total_tasks()
+        )
+    }
+}
+
+// ── Task Environment ──
+
+/// Environment variable set for task execution.
+///
+/// Supports merging multiple layers (system → workspace → task) and resolving
+/// `${VAR}` references within values.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TaskEnvironment {
+    vars: HashMap<String, String>,
+}
+
+impl TaskEnvironment {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create from an iterator of key-value pairs.
+    pub fn from_iter(iter: impl IntoIterator<Item = (String, String)>) -> Self {
+        Self {
+            vars: iter.into_iter().collect(),
+        }
+    }
+
+    /// Set a single variable, overwriting any previous value.
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.vars.insert(key.into(), value.into());
+    }
+
+    /// Get the value of a variable.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.vars.get(key).map(|s| s.as_str())
+    }
+
+    /// Remove a variable, returning its former value.
+    pub fn remove(&mut self, key: &str) -> Option<String> {
+        self.vars.remove(key)
+    }
+
+    /// Return the number of variables.
+    pub fn len(&self) -> usize {
+        self.vars.len()
+    }
+
+    /// Return whether the environment is empty.
+    pub fn is_empty(&self) -> bool {
+        self.vars.is_empty()
+    }
+
+    /// Merge another environment on top of this one.  Values from `other`
+    /// overwrite existing keys.
+    pub fn merge(&mut self, other: &TaskEnvironment) {
+        for (k, v) in &other.vars {
+            self.vars.insert(k.clone(), v.clone());
+        }
+    }
+
+    /// Resolve `${VAR}` references in all values using the variables defined
+    /// in this environment.  Unknown references are left as-is.
+    /// Returns the number of substitutions made.
+    pub fn resolve_references(&mut self) -> usize {
+        let snapshot: HashMap<String, String> = self.vars.clone();
+        let mut count = 0usize;
+        for value in self.vars.values_mut() {
+            let mut resolved = value.clone();
+            for (k, v) in &snapshot {
+                let pattern = format!("${{{}}}", k);
+                if resolved.contains(&pattern) {
+                    resolved = resolved.replace(&pattern, v);
+                    count += 1;
+                }
+            }
+            *value = resolved;
+        }
+        count
+    }
+
+    /// Return a sorted list of variable names.
+    pub fn keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.vars.keys().map(|s| s.as_str()).collect();
+        keys.sort();
+        keys
+    }
+
+    /// Convert into a sorted `Vec` of `(key, value)` pairs, suitable for
+    /// passing to a process builder.
+    pub fn into_sorted_vec(self) -> Vec<(String, String)> {
+        let mut pairs: Vec<(String, String)> = self.vars.into_iter().collect();
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        pairs
+    }
+}
+
+impl fmt::Display for TaskEnvironment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TaskEnvironment({} vars)", self.vars.len())
+    }
+}
+
+impl From<HashMap<String, String>> for TaskEnvironment {
+    fn from(map: HashMap<String, String>) -> Self {
+        Self { vars: map }
+    }
+}
+
+impl From<TaskEnvironment> for HashMap<String, String> {
+    fn from(env: TaskEnvironment) -> Self {
+        env.vars
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1414,5 +1719,216 @@ mod tests {
         let s = format!("{}", p);
         assert!(s.contains("main.rs:5"));
         assert!(s.contains("error"));
+    }
+
+    // ── TaskFilter tests ──
+
+    #[test]
+    fn task_filter_matches_all_by_default() {
+        let filter = TaskFilter::new();
+        let t = test_task();
+        assert!(filter.matches_task(&t));
+        assert_eq!(format!("{filter}"), "TaskFilter(*)");
+    }
+
+    #[test]
+    fn task_filter_by_type_and_group() {
+        let filter = TaskFilter::new()
+            .task_type("shell")
+            .group("build");
+        let t = test_task(); // type=shell, group=build
+        assert!(filter.matches_task(&t));
+
+        let no_match = TaskFilter::new().task_type("process");
+        assert!(!no_match.matches_task(&t));
+    }
+
+    #[test]
+    fn task_filter_by_source_and_name() {
+        let filter = TaskFilter::new()
+            .source("workspace")
+            .name_contains("bui");
+        assert!(filter.matches_task(&test_task()));
+
+        let miss = TaskFilter::new().name_contains("deploy");
+        assert!(!miss.matches_task(&test_task()));
+    }
+
+    #[test]
+    fn task_filter_apply_slice() {
+        let tasks = vec![
+            test_task(),
+            TaskBuilder::new("test-all", TaskDefinition::shell("cargo test"))
+                .group("test")
+                .build()
+                .unwrap(),
+            TaskBuilder::new("lint", TaskDefinition::new("npm"))
+                .group("build")
+                .build()
+                .unwrap(),
+        ];
+        let filter = TaskFilter::new().group("build");
+        let matched = filter.apply(&tasks);
+        assert_eq!(matched.len(), 2);
+        assert!(matched.iter().all(|t| t.is_in_group("build")));
+    }
+
+    #[test]
+    fn task_filter_running_only() {
+        let mut bridge = TaskBridge::new();
+        let id = bridge.execute_task(test_task());
+        bridge.execute_task(test_task());
+        bridge.terminate_task(&id);
+
+        let running = TaskFilter::new().running_only(true);
+        let stopped = TaskFilter::new().running_only(false);
+        assert_eq!(running.apply_executions(&bridge.executions).len(), 1);
+        assert_eq!(stopped.apply_executions(&bridge.executions).len(), 1);
+    }
+
+    #[test]
+    fn task_filter_display_with_predicates() {
+        let f = TaskFilter::new().task_type("shell").source("user");
+        let s = format!("{f}");
+        assert!(s.contains("type=shell"));
+        assert!(s.contains("source=user"));
+    }
+
+    // ── TaskGroupSummary tests ──
+
+    #[test]
+    fn task_group_summary_basic() {
+        let tasks = vec![
+            test_task(), // group=build, type=shell
+            TaskBuilder::new("test-all", TaskDefinition::shell("cargo test"))
+                .group("test")
+                .build()
+                .unwrap(),
+            TaskBuilder::new("lint", TaskDefinition::new("npm"))
+                .group("build")
+                .build()
+                .unwrap(),
+        ];
+        let summary = TaskGroupSummary::from_tasks(&tasks);
+        assert_eq!(summary.group_count(), 2);
+        assert_eq!(summary.total_tasks(), 3);
+
+        let build_stats = summary.stats_for("build").unwrap();
+        assert_eq!(build_stats.count, 2);
+        assert!(build_stats.task_types.contains(&"shell".to_string()));
+        assert!(build_stats.task_types.contains(&"npm".to_string()));
+
+        let test_stats = summary.stats_for("test").unwrap();
+        assert_eq!(test_stats.count, 1);
+
+        assert!(summary.stats_for("deploy").is_none());
+    }
+
+    #[test]
+    fn task_group_summary_ungrouped() {
+        let tasks = vec![Task {
+            name: "orphan".into(),
+            definition: TaskDefinition::new("shell"),
+            source: "ws".into(),
+            group: None,
+            detail: None,
+        }];
+        let summary = TaskGroupSummary::from_tasks(&tasks);
+        assert!(summary.group_names().contains(&"(ungrouped)"));
+        assert_eq!(summary.stats_for("(ungrouped)").unwrap().count, 1);
+    }
+
+    #[test]
+    fn task_group_summary_display() {
+        let summary = TaskGroupSummary::from_tasks(&[test_task()]);
+        let s = format!("{summary}");
+        assert!(s.contains("groups=1"));
+        assert!(s.contains("tasks=1"));
+    }
+
+    // ── TaskEnvironment tests ──
+
+    #[test]
+    fn task_environment_set_get_remove() {
+        let mut env = TaskEnvironment::new();
+        assert!(env.is_empty());
+        env.set("PATH", "/usr/bin");
+        env.set("HOME", "/home/user");
+        assert_eq!(env.len(), 2);
+        assert_eq!(env.get("PATH"), Some("/usr/bin"));
+        assert_eq!(env.remove("PATH"), Some("/usr/bin".into()));
+        assert_eq!(env.len(), 1);
+        assert_eq!(env.get("PATH"), None);
+    }
+
+    #[test]
+    fn task_environment_merge_overwrites() {
+        let mut base = TaskEnvironment::new();
+        base.set("A", "1");
+        base.set("B", "2");
+
+        let mut overlay = TaskEnvironment::new();
+        overlay.set("B", "overridden");
+        overlay.set("C", "3");
+
+        base.merge(&overlay);
+        assert_eq!(base.get("A"), Some("1"));
+        assert_eq!(base.get("B"), Some("overridden"));
+        assert_eq!(base.get("C"), Some("3"));
+        assert_eq!(base.len(), 3);
+    }
+
+    #[test]
+    fn task_environment_resolve_references() {
+        let mut env = TaskEnvironment::new();
+        env.set("BASE", "/opt");
+        env.set("BIN", "${BASE}/bin");
+        env.set("LIB", "${BASE}/lib");
+
+        let subs = env.resolve_references();
+        assert!(subs >= 2);
+        assert_eq!(env.get("BIN"), Some("/opt/bin"));
+        assert_eq!(env.get("LIB"), Some("/opt/lib"));
+    }
+
+    #[test]
+    fn task_environment_unknown_ref_left_as_is() {
+        let mut env = TaskEnvironment::new();
+        env.set("X", "${UNKNOWN}/path");
+        env.resolve_references();
+        assert_eq!(env.get("X"), Some("${UNKNOWN}/path"));
+    }
+
+    #[test]
+    fn task_environment_from_hashmap_and_back() {
+        let mut map = HashMap::new();
+        map.insert("K".into(), "V".into());
+        let env = TaskEnvironment::from(map);
+        assert_eq!(env.get("K"), Some("V"));
+
+        let back: HashMap<String, String> = env.into();
+        assert_eq!(back.get("K").unwrap(), "V");
+    }
+
+    #[test]
+    fn task_environment_sorted_output() {
+        let mut env = TaskEnvironment::new();
+        env.set("Z", "last");
+        env.set("A", "first");
+        env.set("M", "middle");
+
+        assert_eq!(env.keys(), vec!["A", "M", "Z"]);
+
+        let pairs = env.into_sorted_vec();
+        assert_eq!(pairs[0], ("A".into(), "first".into()));
+        assert_eq!(pairs[2], ("Z".into(), "last".into()));
+    }
+
+    #[test]
+    fn task_environment_display() {
+        let mut env = TaskEnvironment::new();
+        env.set("A", "1");
+        env.set("B", "2");
+        assert_eq!(format!("{env}"), "TaskEnvironment(2 vars)");
     }
 }
