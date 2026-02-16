@@ -3011,6 +3011,7 @@ dependencies = [
  "vsedit-environment",
  "vsedit-ext-host",
  "vsedit-ext-mgmt",
+ "vsedit-ext-rpc",
  "vsedit-ext-scm",
  "vsedit-ext-testing",
  "vsedit-ext-timeline",

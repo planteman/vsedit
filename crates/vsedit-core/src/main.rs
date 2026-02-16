@@ -549,6 +549,12 @@ async fn run() -> io::Result<()> {
         }
     }
 
+    // Notify extension host about the initially opened document.
+    if let Some(ref file_path) = app.file_path.clone() {
+        let content = app.controller.model.get_value();
+        notify_ext_did_open(&mut app, file_path, &content);
+    }
+
     let result = run_event_loop(&mut terminal, &mut app).await;
 
     // ── 16. Shutdown ───────────────────────────────────────────────────
@@ -1351,6 +1357,12 @@ fn dispatch_command(cmd: &str, app: &mut AppState) -> bool {
             switch_to_prev_tab(app);
         }
         "workbench.action.closeActiveEditor" => {
+            // Notify ext host about document close before removing tab.
+            let close_path = app.workbench.tab_service.get_active_tab()
+                .and_then(|tab| tab.file_path.clone());
+            if let Some(fp) = close_path {
+                notify_ext_did_close(app, &fp);
+            }
             app.workbench.execute_command(cmd);
             load_active_tab_into_controller(app);
         }
@@ -1630,6 +1642,8 @@ fn save_active_file(app: &mut AppState) {
                     let id = tab.id;
                     app.workbench.tab_service.set_modified(id, false);
                 }
+                // Notify extension host about save.
+                notify_ext_did_save(app, &path);
                 // Refresh git branch in case of external commits.
                 refresh_git_branch(app);
             }
@@ -1643,8 +1657,82 @@ fn save_active_file(app: &mut AppState) {
 }
 
 // ---------------------------------------------------------------------------
-// Git branch refresh
+// Extension host document notifications
 // ---------------------------------------------------------------------------
+
+/// Notify the extension host that a document was opened.
+fn notify_ext_did_open(app: &mut AppState, path: &std::path::Path, content: &str) {
+    let uri = format!("file://{}", path.display());
+    let lang_id = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|ext| match ext {
+            "rs" => "rust",
+            "py" | "pyw" => "python",
+            "js" | "mjs" | "cjs" => "javascript",
+            "ts" | "mts" | "cts" => "typescript",
+            "tsx" => "typescriptreact",
+            "jsx" => "javascriptreact",
+            "json" | "jsonc" => "json",
+            "toml" => "toml",
+            "yaml" | "yml" => "yaml",
+            "md" | "markdown" => "markdown",
+            "html" | "htm" => "html",
+            "css" => "css",
+            "go" => "go",
+            "java" => "java",
+            "c" | "h" => "c",
+            "cpp" | "cc" | "hpp" => "cpp",
+            "rb" | "rake" => "ruby",
+            "sh" | "bash" | "zsh" => "shellscript",
+            "sql" => "sql",
+            "xml" => "xml",
+            _ => "plaintext",
+        })
+        .unwrap_or("plaintext")
+        .to_string();
+
+    let event = vsedit_ext_host::handlers::DocumentEvent::DidOpen {
+        uri,
+        language_id: lang_id,
+        version: 1,
+        content: content.to_string(),
+    };
+    let (method, params) = event.to_rpc_notification();
+    send_ext_event(app, &method, params);
+}
+
+/// Notify the extension host that a document was saved.
+fn notify_ext_did_save(app: &mut AppState, path: &std::path::Path) {
+    let event = vsedit_ext_host::handlers::DocumentEvent::DidSave {
+        uri: format!("file://{}", path.display()),
+    };
+    let (method, params) = event.to_rpc_notification();
+    send_ext_event(app, &method, params);
+}
+
+/// Notify the extension host that a document was closed.
+fn notify_ext_did_close(app: &mut AppState, path: &std::path::Path) {
+    let event = vsedit_ext_host::handlers::DocumentEvent::DidClose {
+        uri: format!("file://{}", path.display()),
+    };
+    let (method, params) = event.to_rpc_notification();
+    send_ext_event(app, &method, params);
+}
+
+/// Send an RPC event to the extension host process.
+fn send_ext_event(app: &mut AppState, event_name: &str, data: serde_json::Value) {
+    if let Some(proc) = app.ext_host.process_mut() {
+        let msg = vsedit_ext_rpc::RpcMessage::Event(vsedit_ext_rpc::RpcEvent {
+            proxy_id: "mainThread".to_string(),
+            event_name: event_name.to_string(),
+            data,
+        });
+        if let Err(e) = proc.send_message(&msg) {
+            tracing::debug!("Failed to send event to ext host: {e}");
+        }
+    }
+}
 
 /// Re-read the current git branch and update the status bar.
 fn refresh_git_branch(app: &mut AppState) {

@@ -16,6 +16,7 @@ vsedit-editor-controller = { path = "../vsedit-editor-controller" }
 vsedit-editor-widget = { path = "../vsedit-editor-widget" }
 vsedit-environment = { path = "../vsedit-environment" }
 vsedit-ext-host = { path = "../vsedit-ext-host" }
+vsedit-ext-rpc = { path = "../vsedit-ext-rpc" }
 vsedit-ext-mgmt = { path = "../vsedit-ext-mgmt" }
 vsedit-input = { path = "../vsedit-input" }
 vsedit-keybinding-svc = { path = "../vsedit-keybinding-svc" }
