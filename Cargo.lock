@@ -2650,6 +2650,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "vsedit-di",
+ "vsedit-events",
  "vsedit-json",
  "vsedit-registry",
 ]
@@ -3287,10 +3288,13 @@ version = "0.1.0"
 name = "vsedit-keybinding-svc"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "vsedit-commands",
  "vsedit-contextkey",
  "vsedit-keybindings",
  "vsedit-keycodes",
+ "vsedit-platform",
 ]
 
 [[package]]
