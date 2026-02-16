@@ -242,6 +242,7 @@ members = [
     "crates/vsedit-workbench",
     "crates/vsedit-workspace",
     "crates/vsedit-workspaces",
+    "crates/vsedit-syntax",
 ]
 
 [workspace.package]
