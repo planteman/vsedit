@@ -1104,6 +1104,414 @@ impl CommandDependencyGraph {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CommandSource — tracks whether a command is extension-provided or built-in
+// ---------------------------------------------------------------------------
+
+/// Origin of a command registration.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CommandSource {
+    BuiltIn,
+    Extension,
+    User,
+}
+
+impl fmt::Display for CommandSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CommandSource::BuiltIn => write!(f, "built-in"),
+            CommandSource::Extension => write!(f, "extension"),
+            CommandSource::User => write!(f, "user"),
+        }
+    }
+}
+
+/// Extended registration that tracks command source and metadata.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandEntry {
+    pub command_id: String,
+    pub source: CommandSource,
+    pub extension_id: Option<String>,
+    pub overridden_by: Option<String>,
+    pub disposed: bool,
+}
+
+impl CommandEntry {
+    pub fn new(command_id: &str, source: CommandSource) -> Self {
+        Self {
+            command_id: command_id.to_string(),
+            source,
+            extension_id: None,
+            overridden_by: None,
+            disposed: false,
+        }
+    }
+
+    pub fn with_extension_id(mut self, ext_id: &str) -> Self {
+        self.extension_id = Some(ext_id.to_string());
+        self
+    }
+
+    pub fn is_active(&self) -> bool {
+        !self.disposed && self.overridden_by.is_none()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandOverrideManager — manages command override chains
+// ---------------------------------------------------------------------------
+
+/// Manages override relationships where one command replaces another.
+#[derive(Debug, Clone, Default)]
+pub struct CommandOverrideManager {
+    entries: HashMap<String, CommandEntry>,
+    /// Maps overridden command_id → the command_id that replaced it.
+    overrides: HashMap<String, String>,
+}
+
+impl CommandOverrideManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a command entry. If a command with the same ID exists and is
+    /// active, the old one is marked as overridden.
+    pub fn register(&mut self, entry: CommandEntry) -> Option<CommandEntry> {
+        let id = entry.command_id.clone();
+        let previous = self.entries.insert(id.clone(), entry);
+        if let Some(mut prev) = previous {
+            prev.overridden_by = Some(id.clone());
+            self.overrides.insert(prev.command_id.clone(), id);
+            return Some(prev);
+        }
+        None
+    }
+
+    /// Dispose a command, marking it inactive.
+    pub fn dispose(&mut self, command_id: &str) -> bool {
+        if let Some(entry) = self.entries.get_mut(command_id) {
+            entry.disposed = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Restore a previously overridden command by removing the override.
+    pub fn restore(&mut self, command_id: &str) -> bool {
+        if let Some(overrider) = self.overrides.remove(command_id) {
+            self.entries.remove(&overrider);
+            if let Some(entry) = self.entries.get_mut(command_id) {
+                entry.overridden_by = None;
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn get(&self, command_id: &str) -> Option<&CommandEntry> {
+        self.entries.get(command_id)
+    }
+
+    /// Return all active (not disposed, not overridden) command entries.
+    pub fn active_commands(&self) -> Vec<&CommandEntry> {
+        self.entries.values().filter(|e| e.is_active()).collect()
+    }
+
+    /// Return all disposed command IDs.
+    pub fn disposed_commands(&self) -> Vec<&str> {
+        self.entries
+            .values()
+            .filter(|e| e.disposed)
+            .map(|e| e.command_id.as_str())
+            .collect()
+    }
+
+    /// Count of commands by source.
+    pub fn count_by_source(&self, source: CommandSource) -> usize {
+        self.entries.values().filter(|e| e.source == source).count()
+    }
+
+    /// Return command IDs registered by a specific extension.
+    pub fn commands_by_extension(&self, extension_id: &str) -> Vec<&str> {
+        self.entries
+            .values()
+            .filter(|e| e.extension_id.as_deref() == Some(extension_id))
+            .map(|e| e.command_id.as_str())
+            .collect()
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandArgValidator — validates arguments before command execution
+// ---------------------------------------------------------------------------
+
+/// Describes the expected type of a command argument.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArgType {
+    String,
+    Number,
+    Bool,
+    Object,
+    Array,
+    Any,
+}
+
+/// Schema for validating command arguments.
+#[derive(Debug, Clone)]
+pub struct CommandArgSchema {
+    pub command_id: String,
+    pub required_args: Vec<(String, ArgType)>,
+    pub optional_args: Vec<(String, ArgType)>,
+    pub min_args: usize,
+    pub max_args: Option<usize>,
+}
+
+impl CommandArgSchema {
+    pub fn new(command_id: &str) -> Self {
+        Self {
+            command_id: command_id.to_string(),
+            required_args: Vec::new(),
+            optional_args: Vec::new(),
+            min_args: 0,
+            max_args: None,
+        }
+    }
+
+    pub fn require(mut self, name: &str, arg_type: ArgType) -> Self {
+        self.required_args.push((name.to_string(), arg_type));
+        self.min_args = self.required_args.len();
+        self
+    }
+
+    pub fn optional(mut self, name: &str, arg_type: ArgType) -> Self {
+        self.optional_args.push((name.to_string(), arg_type));
+        self
+    }
+
+    pub fn max_args(mut self, max: usize) -> Self {
+        self.max_args = Some(max);
+        self
+    }
+
+    /// Validate a list of argument values against this schema.
+    pub fn validate(&self, args: &[Value]) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+
+        if args.len() < self.min_args {
+            errors.push(format!(
+                "command '{}' requires at least {} argument(s), got {}",
+                self.command_id, self.min_args, args.len()
+            ));
+        }
+
+        if let Some(max) = self.max_args {
+            if args.len() > max {
+                errors.push(format!(
+                    "command '{}' accepts at most {} argument(s), got {}",
+                    self.command_id, max, args.len()
+                ));
+            }
+        }
+
+        for (i, (name, expected_type)) in self.required_args.iter().enumerate() {
+            if let Some(val) = args.get(i) {
+                if !value_matches_type(val, *expected_type) {
+                    errors.push(format!(
+                        "argument '{}' (position {}) expected {:?}, got {:?}",
+                        name, i, expected_type, json_type_name(val)
+                    ));
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+fn value_matches_type(val: &Value, expected: ArgType) -> bool {
+    match expected {
+        ArgType::Any => true,
+        ArgType::String => val.is_string(),
+        ArgType::Number => val.is_number(),
+        ArgType::Bool => val.is_boolean(),
+        ArgType::Object => val.is_object(),
+        ArgType::Array => val.is_array(),
+    }
+}
+
+fn json_type_name(val: &Value) -> &'static str {
+    match val {
+        Value::Null => "null",
+        Value::Bool(_) => "bool",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandErrorAggregator — collects and summarizes command errors
+// ---------------------------------------------------------------------------
+
+/// A single recorded command error.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommandError {
+    pub command_id: String,
+    pub message: String,
+    pub is_user_facing: bool,
+}
+
+/// Collects errors from command execution for reporting.
+#[derive(Debug, Clone, Default)]
+pub struct CommandErrorAggregator {
+    errors: Vec<CommandError>,
+}
+
+impl CommandErrorAggregator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record(&mut self, command_id: &str, message: &str, user_facing: bool) {
+        self.errors.push(CommandError {
+            command_id: command_id.to_string(),
+            message: message.to_string(),
+            is_user_facing: user_facing,
+        });
+    }
+
+    pub fn total_errors(&self) -> usize {
+        self.errors.len()
+    }
+
+    /// Errors that should be shown to the user.
+    pub fn user_facing_errors(&self) -> Vec<&CommandError> {
+        self.errors.iter().filter(|e| e.is_user_facing).collect()
+    }
+
+    /// All errors for a specific command.
+    pub fn errors_for(&self, command_id: &str) -> Vec<&CommandError> {
+        self.errors
+            .iter()
+            .filter(|e| e.command_id == command_id)
+            .collect()
+    }
+
+    /// Unique command IDs that have errors.
+    pub fn failing_commands(&self) -> Vec<&str> {
+        let mut ids: Vec<&str> = self
+            .errors
+            .iter()
+            .map(|e| e.command_id.as_str())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    /// Produce a summary string of all errors grouped by command.
+    pub fn summary(&self) -> String {
+        if self.errors.is_empty() {
+            return "No errors".to_string();
+        }
+        let mut by_cmd: HashMap<&str, Vec<&str>> = HashMap::new();
+        for err in &self.errors {
+            by_cmd
+                .entry(err.command_id.as_str())
+                .or_default()
+                .push(err.message.as_str());
+        }
+        let mut lines: Vec<String> = by_cmd
+            .iter()
+            .map(|(cmd, msgs)| format!("{} ({} error(s)): {}", cmd, msgs.len(), msgs.join("; ")))
+            .collect();
+        lines.sort();
+        lines.join("\n")
+    }
+
+    pub fn clear(&mut self) {
+        self.errors.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandEnablementCondition — evaluates when-clause style conditions
+// ---------------------------------------------------------------------------
+
+/// Evaluates simple boolean conditions to determine if a command is enabled.
+#[derive(Debug, Clone, Default)]
+pub struct CommandEnablementEvaluator {
+    context: HashMap<String, bool>,
+}
+
+impl CommandEnablementEvaluator {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set a context key to a boolean value.
+    pub fn set_context(&mut self, key: &str, value: bool) {
+        self.context.insert(key.to_string(), value);
+    }
+
+    /// Remove a context key.
+    pub fn remove_context(&mut self, key: &str) {
+        self.context.remove(key);
+    }
+
+    /// Evaluate a simple when-clause. Supports:
+    /// - Single key lookup (e.g. `"editorFocus"`)
+    /// - Negation with `!` prefix (e.g. `"!editorReadonly"`)
+    /// - Conjunction with `&&` (e.g. `"editorFocus && !editorReadonly"`)
+    pub fn evaluate(&self, when_clause: &str) -> bool {
+        let clause = when_clause.trim();
+        if clause.is_empty() {
+            return true;
+        }
+        clause.split("&&").all(|part| {
+            let part = part.trim();
+            if let Some(key) = part.strip_prefix('!') {
+                !self.context.get(key.trim()).copied().unwrap_or(false)
+            } else {
+                self.context.get(part).copied().unwrap_or(false)
+            }
+        })
+    }
+
+    /// Check if a command described by `desc` is enabled under the current context.
+    pub fn is_command_enabled(&self, desc: &CommandDescription) -> bool {
+        match &desc.when_clause {
+            Some(clause) => self.evaluate(clause),
+            None => true,
+        }
+    }
+
+    /// Filter a list of command descriptions to only those currently enabled.
+    pub fn enabled_commands<'a>(
+        &self,
+        descs: &'a [&CommandDescription],
+    ) -> Vec<&'a CommandDescription> {
+        descs
+            .iter()
+            .filter(|d| self.is_command_enabled(d))
+            .copied()
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1867,5 +2275,238 @@ mod tests {
         let test_pos = order.iter().position(|s| s == "test").unwrap();
         assert!(compile_pos < build_pos);
         assert!(build_pos < test_pos);
+    }
+
+    // -- CommandSource & CommandEntry --
+
+    #[test]
+    fn command_source_display() {
+        assert_eq!(format!("{}", CommandSource::BuiltIn), "built-in");
+        assert_eq!(format!("{}", CommandSource::Extension), "extension");
+        assert_eq!(format!("{}", CommandSource::User), "user");
+    }
+
+    #[test]
+    fn command_source_serde_round_trip() {
+        let src = CommandSource::Extension;
+        let json = serde_json::to_string(&src).unwrap();
+        let parsed: CommandSource = serde_json::from_str(&json).unwrap();
+        assert_eq!(src, parsed);
+    }
+
+    #[test]
+    fn command_entry_active_logic() {
+        let entry = CommandEntry::new("cmd.a", CommandSource::Extension);
+        assert!(entry.is_active());
+
+        let mut disposed = entry.clone();
+        disposed.disposed = true;
+        assert!(!disposed.is_active());
+
+        let mut overridden = CommandEntry::new("cmd.a", CommandSource::Extension);
+        overridden.overridden_by = Some("cmd.b".to_string());
+        assert!(!overridden.is_active());
+    }
+
+    #[test]
+    fn command_entry_with_extension_id() {
+        let entry = CommandEntry::new("cmd.a", CommandSource::Extension)
+            .with_extension_id("my-ext");
+        assert_eq!(entry.extension_id.as_deref(), Some("my-ext"));
+    }
+
+    // -- CommandOverrideManager --
+
+    #[test]
+    fn override_manager_register_and_dispose() {
+        let mut mgr = CommandOverrideManager::new();
+        let entry = CommandEntry::new("cmd.save", CommandSource::BuiltIn);
+        assert!(mgr.register(entry).is_none());
+        assert_eq!(mgr.total_count(), 1);
+        assert_eq!(mgr.active_commands().len(), 1);
+
+        assert!(mgr.dispose("cmd.save"));
+        assert!(mgr.disposed_commands().contains(&"cmd.save"));
+        assert_eq!(mgr.active_commands().len(), 0);
+        assert!(!mgr.dispose("nonexistent"));
+    }
+
+    #[test]
+    fn override_manager_override_and_restore() {
+        let mut mgr = CommandOverrideManager::new();
+        let original = CommandEntry::new("cmd.save", CommandSource::BuiltIn);
+        mgr.register(original);
+
+        let replacement = CommandEntry::new("cmd.save", CommandSource::Extension);
+        let prev = mgr.register(replacement);
+        assert!(prev.is_some());
+        assert_eq!(prev.unwrap().source, CommandSource::BuiltIn);
+    }
+
+    #[test]
+    fn override_manager_count_by_source() {
+        let mut mgr = CommandOverrideManager::new();
+        mgr.register(CommandEntry::new("a", CommandSource::BuiltIn));
+        mgr.register(CommandEntry::new("b", CommandSource::Extension));
+        mgr.register(CommandEntry::new("c", CommandSource::Extension));
+        assert_eq!(mgr.count_by_source(CommandSource::BuiltIn), 1);
+        assert_eq!(mgr.count_by_source(CommandSource::Extension), 2);
+        assert_eq!(mgr.count_by_source(CommandSource::User), 0);
+    }
+
+    #[test]
+    fn override_manager_commands_by_extension() {
+        let mut mgr = CommandOverrideManager::new();
+        mgr.register(CommandEntry::new("a", CommandSource::Extension).with_extension_id("ext1"));
+        mgr.register(CommandEntry::new("b", CommandSource::Extension).with_extension_id("ext1"));
+        mgr.register(CommandEntry::new("c", CommandSource::Extension).with_extension_id("ext2"));
+        let mut ext1_cmds = mgr.commands_by_extension("ext1");
+        ext1_cmds.sort();
+        assert_eq!(ext1_cmds, vec!["a", "b"]);
+        assert_eq!(mgr.commands_by_extension("ext2"), vec!["c"]);
+        assert!(mgr.commands_by_extension("ext3").is_empty());
+    }
+
+    // -- CommandArgValidator --
+
+    #[test]
+    fn arg_schema_validates_required_args() {
+        let schema = CommandArgSchema::new("editor.goto")
+            .require("line", ArgType::Number)
+            .require("column", ArgType::Number);
+
+        let good = vec![Value::from(10), Value::from(5)];
+        assert!(schema.validate(&good).is_ok());
+
+        let too_few: Vec<Value> = vec![Value::from(10)];
+        let errs = schema.validate(&too_few).unwrap_err();
+        assert!(errs.iter().any(|e| e.contains("at least 2")));
+
+        let wrong_type = vec![Value::from("not a number"), Value::from(5)];
+        let errs = schema.validate(&wrong_type).unwrap_err();
+        assert!(errs.iter().any(|e| e.contains("expected Number")));
+    }
+
+    #[test]
+    fn arg_schema_max_args_enforced() {
+        let schema = CommandArgSchema::new("cmd.simple")
+            .require("name", ArgType::String)
+            .max_args(2);
+
+        let ok = vec![Value::from("hello"), Value::from(42)];
+        assert!(schema.validate(&ok).is_ok());
+
+        let too_many = vec![Value::from("a"), Value::from("b"), Value::from("c")];
+        let errs = schema.validate(&too_many).unwrap_err();
+        assert!(errs.iter().any(|e| e.contains("at most 2")));
+    }
+
+    #[test]
+    fn arg_schema_any_type_accepts_all() {
+        let schema = CommandArgSchema::new("cmd.flex").require("arg", ArgType::Any);
+        assert!(schema.validate(&[Value::from("str")]).is_ok());
+        assert!(schema.validate(&[Value::from(42)]).is_ok());
+        assert!(schema.validate(&[Value::Bool(true)]).is_ok());
+        assert!(schema.validate(&[Value::Null]).is_ok());
+    }
+
+    // -- CommandErrorAggregator --
+
+    #[test]
+    fn error_aggregator_record_and_query() {
+        let mut agg = CommandErrorAggregator::new();
+        agg.record("cmd.a", "file not found", true);
+        agg.record("cmd.a", "timeout", false);
+        agg.record("cmd.b", "permission denied", true);
+
+        assert_eq!(agg.total_errors(), 3);
+        assert_eq!(agg.errors_for("cmd.a").len(), 2);
+        assert_eq!(agg.errors_for("cmd.b").len(), 1);
+        assert_eq!(agg.errors_for("cmd.c").len(), 0);
+
+        assert_eq!(agg.user_facing_errors().len(), 2);
+        assert_eq!(agg.failing_commands(), vec!["cmd.a", "cmd.b"]);
+    }
+
+    #[test]
+    fn error_aggregator_summary_and_clear() {
+        let mut agg = CommandErrorAggregator::new();
+        assert_eq!(agg.summary(), "No errors");
+
+        agg.record("cmd.a", "err1", true);
+        agg.record("cmd.a", "err2", false);
+        let summary = agg.summary();
+        assert!(summary.contains("cmd.a"));
+        assert!(summary.contains("2 error(s)"));
+
+        agg.clear();
+        assert_eq!(agg.total_errors(), 0);
+        assert_eq!(agg.summary(), "No errors");
+    }
+
+    // -- CommandEnablementEvaluator --
+
+    #[test]
+    fn enablement_simple_key() {
+        let mut eval = CommandEnablementEvaluator::new();
+        eval.set_context("editorFocus", true);
+        assert!(eval.evaluate("editorFocus"));
+        assert!(!eval.evaluate("editorReadonly"));
+    }
+
+    #[test]
+    fn enablement_negation() {
+        let mut eval = CommandEnablementEvaluator::new();
+        eval.set_context("editorReadonly", false);
+        assert!(eval.evaluate("!editorReadonly"));
+        eval.set_context("editorReadonly", true);
+        assert!(!eval.evaluate("!editorReadonly"));
+    }
+
+    #[test]
+    fn enablement_conjunction() {
+        let mut eval = CommandEnablementEvaluator::new();
+        eval.set_context("editorFocus", true);
+        eval.set_context("editorReadonly", false);
+        assert!(eval.evaluate("editorFocus && !editorReadonly"));
+        eval.set_context("editorReadonly", true);
+        assert!(!eval.evaluate("editorFocus && !editorReadonly"));
+    }
+
+    #[test]
+    fn enablement_empty_clause_always_true() {
+        let eval = CommandEnablementEvaluator::new();
+        assert!(eval.evaluate(""));
+        assert!(eval.evaluate("   "));
+    }
+
+    #[test]
+    fn enablement_filters_command_descriptions() {
+        let mut eval = CommandEnablementEvaluator::new();
+        eval.set_context("editorFocus", true);
+        eval.set_context("terminalFocus", false);
+
+        let cmd_a = CommandDescription::new("a", "A").with_when("editorFocus");
+        let cmd_b = CommandDescription::new("b", "B").with_when("terminalFocus");
+        let cmd_c = CommandDescription::new("c", "C"); // no when clause → always enabled
+
+        assert!(eval.is_command_enabled(&cmd_a));
+        assert!(!eval.is_command_enabled(&cmd_b));
+        assert!(eval.is_command_enabled(&cmd_c));
+
+        let all = vec![&cmd_a, &cmd_b, &cmd_c];
+        let enabled = eval.enabled_commands(&all);
+        assert_eq!(enabled.len(), 2);
+        assert!(enabled.iter().any(|d| d.command_id == "a"));
+        assert!(enabled.iter().any(|d| d.command_id == "c"));
+    }
+
+    #[test]
+    fn enablement_remove_context() {
+        let mut eval = CommandEnablementEvaluator::new();
+        eval.set_context("key", true);
+        assert!(eval.evaluate("key"));
+        eval.remove_context("key");
+        assert!(!eval.evaluate("key"));
     }
 }

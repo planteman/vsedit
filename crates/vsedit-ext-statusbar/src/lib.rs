@@ -1139,6 +1139,439 @@ impl StatusBarBridge {
     }
 }
 
+// ---------------------------------------------------------------------------
+// StatusBarRenderer — terminal-width-aware rendering
+// ---------------------------------------------------------------------------
+
+/// Renders status bar items for a fixed terminal width, truncating as needed.
+#[derive(Debug, Clone)]
+pub struct StatusBarRenderer {
+    /// Total available terminal columns.
+    pub width: usize,
+    /// Separator between left and right sections.
+    pub separator: String,
+    /// Ellipsis string used when truncating.
+    pub ellipsis: String,
+    /// Minimum characters to keep per item before truncating it away entirely.
+    pub min_item_width: usize,
+}
+
+impl StatusBarRenderer {
+    pub fn new(width: usize) -> Self {
+        Self {
+            width,
+            separator: " | ".to_string(),
+            ellipsis: "…".to_string(),
+            min_item_width: 3,
+        }
+    }
+
+    /// Set a custom separator string.
+    pub fn with_separator(mut self, sep: impl Into<String>) -> Self {
+        self.separator = sep.into();
+        self
+    }
+
+    /// Set the minimum width before an item is dropped entirely.
+    pub fn with_min_item_width(mut self, w: usize) -> Self {
+        self.min_item_width = w;
+        self
+    }
+
+    /// Truncate a single text string to fit within `max_chars`, appending
+    /// the configured ellipsis if truncation occurs.
+    pub fn truncate_text(&self, text: &str, max_chars: usize) -> String {
+        let char_count = text.chars().count();
+        if char_count <= max_chars {
+            return text.to_string();
+        }
+        if max_chars <= self.ellipsis.chars().count() {
+            return self.ellipsis.chars().take(max_chars).collect();
+        }
+        let keep = max_chars - self.ellipsis.chars().count();
+        let truncated: String = text.chars().take(keep).collect();
+        format!("{}{}", truncated, self.ellipsis)
+    }
+
+    /// Render a set of items into a single line that fits within `self.width`.
+    ///
+    /// Left-aligned items appear first, then the separator, then right-aligned
+    /// items. Items within each group are separated by two spaces and sorted by
+    /// descending priority.
+    pub fn render(&self, items: &[StatusBarItem]) -> String {
+        let sep_len = self.separator.chars().count();
+        let item_sep = "  ";
+        let item_sep_len = item_sep.chars().count();
+
+        let mut left: Vec<&StatusBarItem> = items
+            .iter()
+            .filter(|i| i.is_visible && i.alignment == StatusBarAlignment::Left)
+            .collect();
+        let mut right: Vec<&StatusBarItem> = items
+            .iter()
+            .filter(|i| i.is_visible && i.alignment == StatusBarAlignment::Right)
+            .collect();
+
+        left.sort_by(|a, b| b.priority.cmp(&a.priority));
+        right.sort_by(|a, b| b.priority.cmp(&a.priority));
+
+        let left_texts: Vec<String> = left.iter().map(|i| i.display_text().to_string()).collect();
+        let right_texts: Vec<String> = right.iter().map(|i| i.display_text().to_string()).collect();
+
+        let joined_left = left_texts.join(item_sep);
+        let joined_right = right_texts.join(item_sep);
+        let full = format!("{}{}{}", joined_left, self.separator, joined_right);
+
+        if full.chars().count() <= self.width {
+            return full;
+        }
+
+        // Budget: split available space between left and right
+        let usable = self.width.saturating_sub(sep_len);
+        let left_budget = usable / 2;
+        let right_budget = usable.saturating_sub(left_budget);
+
+        let trunc_left = self.truncate_section(&left_texts, left_budget, item_sep_len);
+        let trunc_right = self.truncate_section(&right_texts, right_budget, item_sep_len);
+
+        format!("{}{}{}", trunc_left, self.separator, trunc_right)
+    }
+
+    /// Truncate a section of item texts to fit within a character budget.
+    fn truncate_section(&self, texts: &[String], budget: usize, sep_len: usize) -> String {
+        if texts.is_empty() {
+            return String::new();
+        }
+
+        let mut result: Vec<String> = Vec::new();
+        let mut remaining = budget;
+
+        for (i, text) in texts.iter().enumerate() {
+            let need_sep = if i > 0 { sep_len } else { 0 };
+            if remaining < need_sep + self.min_item_width {
+                break;
+            }
+            remaining -= need_sep;
+            let available = remaining;
+            let truncated = self.truncate_text(text, available);
+            let used = truncated.chars().count();
+            remaining = remaining.saturating_sub(used);
+            result.push(truncated);
+        }
+
+        result.join("  ")
+    }
+}
+
+impl Default for StatusBarRenderer {
+    fn default() -> Self {
+        Self::new(80)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarColorStyle — styling metadata for items
+// ---------------------------------------------------------------------------
+
+/// Color/style metadata that can be attached to a status bar item.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusBarColorStyle {
+    /// Foreground color as a CSS-style hex string, e.g. `"#ffffff"`.
+    pub foreground: Option<String>,
+    /// Background color as a CSS-style hex string.
+    pub background: Option<String>,
+    /// Whether the text should be rendered bold.
+    pub bold: bool,
+    /// Whether the text should be rendered italic.
+    pub italic: bool,
+}
+
+impl StatusBarColorStyle {
+    pub fn new() -> Self {
+        Self {
+            foreground: None,
+            background: None,
+            bold: false,
+            italic: false,
+        }
+    }
+
+    /// Create a style with only a foreground color.
+    pub fn fg(color: impl Into<String>) -> Self {
+        Self {
+            foreground: Some(color.into()),
+            ..Self::new()
+        }
+    }
+
+    /// Create a style with foreground and background colors.
+    pub fn fg_bg(fg: impl Into<String>, bg: impl Into<String>) -> Self {
+        Self {
+            foreground: Some(fg.into()),
+            background: Some(bg.into()),
+            ..Self::new()
+        }
+    }
+
+    /// Return a new style with bold enabled.
+    pub fn with_bold(mut self) -> Self {
+        self.bold = true;
+        self
+    }
+
+    /// Return a new style with italic enabled.
+    pub fn with_italic(mut self) -> Self {
+        self.italic = true;
+        self
+    }
+
+    /// Validate that color strings are well-formed hex colors (`#rrggbb`).
+    pub fn validate(&self) -> Result<(), StatusBarError> {
+        if let Some(ref fg) = self.foreground {
+            Self::validate_hex_color(fg)?;
+        }
+        if let Some(ref bg) = self.background {
+            Self::validate_hex_color(bg)?;
+        }
+        Ok(())
+    }
+
+    fn validate_hex_color(s: &str) -> Result<(), StatusBarError> {
+        let valid = s.len() == 7
+            && s.starts_with('#')
+            && s[1..].chars().all(|c| c.is_ascii_hexdigit());
+        if !valid {
+            return Err(StatusBarError::InvalidField {
+                field: "color",
+                reason: format!("'{}' is not a valid #rrggbb color", s),
+            });
+        }
+        Ok(())
+    }
+
+    /// Merge another style on top of this one. Non-`None` fields in `other`
+    /// override values in `self`.
+    pub fn merge(&self, other: &StatusBarColorStyle) -> StatusBarColorStyle {
+        StatusBarColorStyle {
+            foreground: other.foreground.clone().or_else(|| self.foreground.clone()),
+            background: other.background.clone().or_else(|| self.background.clone()),
+            bold: other.bold || self.bold,
+            italic: other.italic || self.italic,
+        }
+    }
+}
+
+impl Default for StatusBarColorStyle {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for StatusBarColorStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let fg = self.foreground.as_deref().unwrap_or("inherit");
+        let bg = self.background.as_deref().unwrap_or("inherit");
+        let mut flags = Vec::new();
+        if self.bold {
+            flags.push("bold");
+        }
+        if self.italic {
+            flags.push("italic");
+        }
+        let flag_str = if flags.is_empty() {
+            String::new()
+        } else {
+            format!(" [{}]", flags.join(", "))
+        };
+        write!(f, "fg={} bg={}{}", fg, bg, flag_str)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClickAction — dispatching click actions for status bar items
+// ---------------------------------------------------------------------------
+
+/// Represents an action to be dispatched when a status bar item is clicked.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "camelCase")]
+pub enum ClickAction {
+    /// Run an editor command by name.
+    RunCommand { command: String, args: Vec<String> },
+    /// Open a URL in the default browser.
+    OpenUrl { url: String },
+    /// Show a quick-pick menu with the given options.
+    ShowQuickPick { items: Vec<String> },
+    /// Do nothing (the item is informational only).
+    None,
+}
+
+impl Default for ClickAction {
+    fn default() -> Self {
+        ClickAction::None
+    }
+}
+
+impl fmt::Display for ClickAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ClickAction::RunCommand { command, args } => {
+                if args.is_empty() {
+                    write!(f, "cmd:{}", command)
+                } else {
+                    write!(f, "cmd:{}({})", command, args.join(", "))
+                }
+            }
+            ClickAction::OpenUrl { url } => write!(f, "url:{}", url),
+            ClickAction::ShowQuickPick { items } => {
+                write!(f, "pick:[{}]", items.join(", "))
+            }
+            ClickAction::None => write!(f, "none"),
+        }
+    }
+}
+
+/// Manages the mapping from status bar item IDs to click actions.
+#[derive(Debug, Clone, Default)]
+pub struct ClickActionDispatcher {
+    actions: Vec<(String, ClickAction)>,
+}
+
+impl ClickActionDispatcher {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a click action for an item.
+    pub fn register(&mut self, item_id: impl Into<String>, action: ClickAction) {
+        let id = item_id.into();
+        if let Some(entry) = self.actions.iter_mut().find(|(k, _)| k == &id) {
+            entry.1 = action;
+        } else {
+            self.actions.push((id, action));
+        }
+    }
+
+    /// Remove the click action for an item.
+    pub fn unregister(&mut self, item_id: &str) {
+        self.actions.retain(|(k, _)| k != item_id);
+    }
+
+    /// Look up the click action for an item.
+    pub fn get(&self, item_id: &str) -> Option<&ClickAction> {
+        self.actions.iter().find(|(k, _)| k == item_id).map(|(_, v)| v)
+    }
+
+    /// Dispatch a click for the given item ID. Returns the action if one is
+    /// registered, or `ClickAction::None` otherwise.
+    pub fn dispatch(&self, item_id: &str) -> ClickAction {
+        self.get(item_id).cloned().unwrap_or(ClickAction::None)
+    }
+
+    /// Return the number of registered actions.
+    pub fn action_count(&self) -> usize {
+        self.actions.len()
+    }
+
+    /// Return all item IDs that have a `RunCommand` action.
+    pub fn command_items(&self) -> Vec<&str> {
+        self.actions
+            .iter()
+            .filter_map(|(id, a)| match a {
+                ClickAction::RunCommand { .. } => Some(id.as_str()),
+                _ => Option::None,
+            })
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TooltipManager — rich tooltip content for items
+// ---------------------------------------------------------------------------
+
+/// Manages rich tooltip content for status bar items.
+#[derive(Debug, Clone, Default)]
+pub struct TooltipManager {
+    tooltips: Vec<(String, TooltipContent)>,
+}
+
+/// Rich tooltip content that can include multiple lines and a title.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TooltipContent {
+    pub title: Option<String>,
+    pub lines: Vec<String>,
+}
+
+impl TooltipContent {
+    pub fn simple(text: impl Into<String>) -> Self {
+        Self {
+            title: None,
+            lines: vec![text.into()],
+        }
+    }
+
+    pub fn titled(title: impl Into<String>, lines: Vec<String>) -> Self {
+        Self {
+            title: Some(title.into()),
+            lines,
+        }
+    }
+
+    /// Render the tooltip as a single multi-line string.
+    pub fn render(&self) -> String {
+        let mut parts = Vec::new();
+        if let Some(ref t) = self.title {
+            parts.push(t.clone());
+            parts.push("─".repeat(t.chars().count()));
+        }
+        parts.extend(self.lines.iter().cloned());
+        parts.join("\n")
+    }
+
+    /// Total number of lines in the rendered tooltip.
+    pub fn line_count(&self) -> usize {
+        let header = if self.title.is_some() { 2 } else { 0 };
+        header + self.lines.len()
+    }
+}
+
+impl fmt::Display for TooltipContent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.render())
+    }
+}
+
+impl TooltipManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set tooltip content for an item.
+    pub fn set(&mut self, item_id: impl Into<String>, content: TooltipContent) {
+        let id = item_id.into();
+        if let Some(entry) = self.tooltips.iter_mut().find(|(k, _)| k == &id) {
+            entry.1 = content;
+        } else {
+            self.tooltips.push((id, content));
+        }
+    }
+
+    /// Get tooltip content for an item.
+    pub fn get(&self, item_id: &str) -> Option<&TooltipContent> {
+        self.tooltips.iter().find(|(k, _)| k == item_id).map(|(_, v)| v)
+    }
+
+    /// Remove tooltip content for an item.
+    pub fn remove(&mut self, item_id: &str) {
+        self.tooltips.retain(|(k, _)| k != item_id);
+    }
+
+    /// Number of items with tooltip content.
+    pub fn count(&self) -> usize {
+        self.tooltips.len()
+    }
+}
+
 /// Render a compact one-line summary of a set of status bar items.
 pub fn render_summary(items: &[StatusBarItem]) -> String {
     let visible = items.iter().filter(|i| i.is_visible).count();
@@ -1827,5 +2260,209 @@ mod tests {
         assert!(s.contains("1/2 visible"));
         assert!(s.contains("1 left"));
         assert!(s.contains("1 right"));
+    }
+
+    // -- StatusBarRenderer tests -------------------------------------------
+
+    #[test]
+    fn renderer_truncate_text_short() {
+        let r = StatusBarRenderer::new(80);
+        assert_eq!(r.truncate_text("hello", 10), "hello");
+    }
+
+    #[test]
+    fn renderer_truncate_text_long() {
+        let r = StatusBarRenderer::new(80);
+        let result = r.truncate_text("hello world", 6);
+        assert_eq!(result, "hello…");
+        assert_eq!(result.chars().count(), 6);
+    }
+
+    #[test]
+    fn renderer_render_fits_in_width() {
+        let r = StatusBarRenderer::new(120);
+        let items = vec![
+            StatusBarItemBuilder::new().id("branch").text("main").alignment(StatusBarAlignment::Left).priority(10).visible(true).build().unwrap(),
+            StatusBarItemBuilder::new().id("line").text("Ln 42").alignment(StatusBarAlignment::Right).priority(5).visible(true).build().unwrap(),
+        ];
+        let out = r.render(&items);
+        assert!(out.contains("main"));
+        assert!(out.contains("Ln 42"));
+        assert!(out.chars().count() <= 120);
+    }
+
+    #[test]
+    fn renderer_render_truncates_to_width() {
+        let r = StatusBarRenderer::new(20);
+        let items = vec![
+            StatusBarItemBuilder::new().id("a").text("A very long left item").alignment(StatusBarAlignment::Left).priority(10).visible(true).build().unwrap(),
+            StatusBarItemBuilder::new().id("b").text("A very long right item").alignment(StatusBarAlignment::Right).priority(5).visible(true).build().unwrap(),
+        ];
+        let out = r.render(&items);
+        assert!(out.chars().count() <= 20);
+    }
+
+    #[test]
+    fn renderer_hides_invisible_items() {
+        let r = StatusBarRenderer::new(80);
+        let items = vec![
+            StatusBarItemBuilder::new().id("vis").text("Visible").alignment(StatusBarAlignment::Left).priority(10).visible(true).build().unwrap(),
+            StatusBarItemBuilder::new().id("hid").text("Hidden").alignment(StatusBarAlignment::Left).priority(20).visible(false).build().unwrap(),
+        ];
+        let out = r.render(&items);
+        assert!(out.contains("Visible"));
+        assert!(!out.contains("Hidden"));
+    }
+
+    // -- StatusBarColorStyle tests -----------------------------------------
+
+    #[test]
+    fn color_style_validate_good() {
+        let style = StatusBarColorStyle::fg_bg("#ff0000", "#00ff00");
+        assert!(style.validate().is_ok());
+    }
+
+    #[test]
+    fn color_style_validate_bad() {
+        let style = StatusBarColorStyle::fg("red");
+        assert!(style.validate().is_err());
+    }
+
+    #[test]
+    fn color_style_merge() {
+        let base = StatusBarColorStyle::fg("#ffffff").with_bold();
+        let overlay = StatusBarColorStyle {
+            foreground: None,
+            background: Some("#000000".into()),
+            bold: false,
+            italic: true,
+        };
+        let merged = base.merge(&overlay);
+        assert_eq!(merged.foreground.as_deref(), Some("#ffffff"));
+        assert_eq!(merged.background.as_deref(), Some("#000000"));
+        assert!(merged.bold);
+        assert!(merged.italic);
+    }
+
+    #[test]
+    fn color_style_display() {
+        let style = StatusBarColorStyle::fg("#aabbcc").with_bold();
+        let s = format!("{style}");
+        assert!(s.contains("#aabbcc"));
+        assert!(s.contains("bold"));
+    }
+
+    #[test]
+    fn color_style_serialization_roundtrip() {
+        let style = StatusBarColorStyle::fg_bg("#112233", "#445566").with_italic();
+        let json = serde_json::to_string(&style).unwrap();
+        let back: StatusBarColorStyle = serde_json::from_str(&json).unwrap();
+        assert_eq!(style, back);
+    }
+
+    // -- ClickAction / ClickActionDispatcher tests -------------------------
+
+    #[test]
+    fn click_action_dispatch_registered() {
+        let mut dispatcher = ClickActionDispatcher::new();
+        dispatcher.register("git.branch", ClickAction::RunCommand {
+            command: "git.checkout".into(),
+            args: vec![],
+        });
+        let action = dispatcher.dispatch("git.branch");
+        assert!(matches!(action, ClickAction::RunCommand { .. }));
+        assert_eq!(dispatcher.action_count(), 1);
+    }
+
+    #[test]
+    fn click_action_dispatch_unregistered() {
+        let dispatcher = ClickActionDispatcher::new();
+        assert_eq!(dispatcher.dispatch("unknown"), ClickAction::None);
+    }
+
+    #[test]
+    fn click_action_unregister() {
+        let mut dispatcher = ClickActionDispatcher::new();
+        dispatcher.register("x", ClickAction::OpenUrl { url: "https://example.com".into() });
+        assert_eq!(dispatcher.action_count(), 1);
+        dispatcher.unregister("x");
+        assert_eq!(dispatcher.action_count(), 0);
+    }
+
+    #[test]
+    fn click_action_command_items() {
+        let mut dispatcher = ClickActionDispatcher::new();
+        dispatcher.register("a", ClickAction::RunCommand { command: "cmd.a".into(), args: vec![] });
+        dispatcher.register("b", ClickAction::OpenUrl { url: "https://b.com".into() });
+        dispatcher.register("c", ClickAction::RunCommand { command: "cmd.c".into(), args: vec!["--flag".into()] });
+        let cmds = dispatcher.command_items();
+        assert_eq!(cmds.len(), 2);
+        assert!(cmds.contains(&"a"));
+        assert!(cmds.contains(&"c"));
+    }
+
+    #[test]
+    fn click_action_display() {
+        let a = ClickAction::RunCommand { command: "foo".into(), args: vec!["bar".into()] };
+        assert_eq!(format!("{a}"), "cmd:foo(bar)");
+        let b = ClickAction::OpenUrl { url: "https://x.com".into() };
+        assert_eq!(format!("{b}"), "url:https://x.com");
+        assert_eq!(format!("{}", ClickAction::None), "none");
+    }
+
+    #[test]
+    fn click_action_serialization_roundtrip() {
+        let action = ClickAction::ShowQuickPick { items: vec!["a".into(), "b".into()] };
+        let json = serde_json::to_string(&action).unwrap();
+        let back: ClickAction = serde_json::from_str(&json).unwrap();
+        assert_eq!(action, back);
+    }
+
+    // -- TooltipManager / TooltipContent tests -----------------------------
+
+    #[test]
+    fn tooltip_simple_render() {
+        let tc = TooltipContent::simple("Hello tooltip");
+        assert_eq!(tc.render(), "Hello tooltip");
+        assert_eq!(tc.line_count(), 1);
+    }
+
+    #[test]
+    fn tooltip_titled_render() {
+        let tc = TooltipContent::titled("Git Branch", vec!["main".into(), "3 commits ahead".into()]);
+        let rendered = tc.render();
+        assert!(rendered.contains("Git Branch"));
+        assert!(rendered.contains("main"));
+        assert!(rendered.contains("3 commits ahead"));
+        assert_eq!(tc.line_count(), 4); // title + separator + 2 lines
+    }
+
+    #[test]
+    fn tooltip_manager_set_get_remove() {
+        let mut mgr = TooltipManager::new();
+        mgr.set("branch", TooltipContent::simple("Current branch: main"));
+        assert_eq!(mgr.count(), 1);
+        let tt = mgr.get("branch").unwrap();
+        assert_eq!(tt.lines[0], "Current branch: main");
+        mgr.remove("branch");
+        assert_eq!(mgr.count(), 0);
+        assert!(mgr.get("branch").is_none());
+    }
+
+    #[test]
+    fn tooltip_manager_overwrite() {
+        let mut mgr = TooltipManager::new();
+        mgr.set("x", TooltipContent::simple("first"));
+        mgr.set("x", TooltipContent::simple("second"));
+        assert_eq!(mgr.count(), 1);
+        assert_eq!(mgr.get("x").unwrap().lines[0], "second");
+    }
+
+    #[test]
+    fn tooltip_content_serialization_roundtrip() {
+        let tc = TooltipContent::titled("Info", vec!["line1".into(), "line2".into()]);
+        let json = serde_json::to_string(&tc).unwrap();
+        let back: TooltipContent = serde_json::from_str(&json).unwrap();
+        assert_eq!(tc, back);
     }
 }

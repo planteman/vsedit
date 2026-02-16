@@ -1218,6 +1218,549 @@ impl Disposable for TerminalService {
 }
 
 // ---------------------------------------------------------------------------
+// Terminal link detection
+// ---------------------------------------------------------------------------
+
+/// A detected link in terminal output.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerminalLink {
+    /// Row in the buffer (absolute index).
+    pub row: usize,
+    /// Start column (inclusive).
+    pub col_start: usize,
+    /// End column (exclusive).
+    pub col_end: usize,
+    /// The URL or file path text.
+    pub target: String,
+    /// The kind of link detected.
+    pub kind: LinkKind,
+}
+
+/// Classification of a detected link.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkKind {
+    /// An http:// or https:// URL.
+    Url,
+    /// A file path, possibly with line/column (e.g. `src/main.rs:42:5`).
+    FilePath,
+}
+
+/// Scans a single line of terminal cells for links.
+pub fn detect_links_in_line(row: usize, cells: &[TerminalCell]) -> Vec<TerminalLink> {
+    let text: String = cells.iter().map(|c| c.ch).collect();
+    let mut links = Vec::new();
+
+    // Detect URLs (http:// and https://)
+    let mut search_from = 0;
+    while search_from < text.len() {
+        let haystack = &text[search_from..];
+        let url_start = haystack
+            .find("https://")
+            .or_else(|| haystack.find("http://"));
+        if let Some(rel) = url_start {
+            let abs_start = search_from + rel;
+            let end = text[abs_start..]
+                .find(|c: char| c.is_whitespace() || c == ')' || c == ']' || c == '>' || c == '"' || c == '\'')
+                .map(|e| abs_start + e)
+                .unwrap_or(text.len());
+            // Trim trailing punctuation that's unlikely part of the URL.
+            let mut trimmed_end = end;
+            while trimmed_end > abs_start
+                && matches!(text.as_bytes()[trimmed_end - 1], b'.' | b',' | b';' | b':')
+            {
+                trimmed_end -= 1;
+            }
+            if trimmed_end > abs_start + 8 {
+                links.push(TerminalLink {
+                    row,
+                    col_start: abs_start,
+                    col_end: trimmed_end,
+                    target: text[abs_start..trimmed_end].to_string(),
+                    kind: LinkKind::Url,
+                });
+            }
+            search_from = trimmed_end;
+        } else {
+            break;
+        }
+    }
+
+    // Detect file paths with line numbers (e.g. `src/main.rs:42` or `./foo/bar.txt:10:5`)
+    search_from = 0;
+    while search_from < text.len() {
+        let haystack = &text[search_from..];
+        // Look for patterns like `word/word.ext:digits`
+        if let Some(colon_pos) = haystack.find(':') {
+            let abs_colon = search_from + colon_pos;
+            // Check if the character after the colon is a digit
+            if abs_colon + 1 < text.len() && text.as_bytes()[abs_colon + 1].is_ascii_digit() {
+                // Walk backwards to find path start
+                let mut path_start = abs_colon;
+                while path_start > search_from {
+                    let prev = text.as_bytes()[path_start - 1];
+                    if prev.is_ascii_alphanumeric()
+                        || prev == b'/'
+                        || prev == b'.'
+                        || prev == b'-'
+                        || prev == b'_'
+                    {
+                        path_start -= 1;
+                    } else {
+                        break;
+                    }
+                }
+                // Must contain a dot or slash to look like a file path
+                let path_part = &text[path_start..abs_colon];
+                if (path_part.contains('.') || path_part.contains('/')) && !path_part.is_empty() {
+                    // Walk forward to capture `:line` and optional `:col`
+                    let mut path_end = abs_colon + 1;
+                    while path_end < text.len() && text.as_bytes()[path_end].is_ascii_digit() {
+                        path_end += 1;
+                    }
+                    if path_end < text.len() && text.as_bytes()[path_end] == b':' {
+                        let maybe_col = path_end + 1;
+                        if maybe_col < text.len() && text.as_bytes()[maybe_col].is_ascii_digit() {
+                            path_end = maybe_col;
+                            while path_end < text.len()
+                                && text.as_bytes()[path_end].is_ascii_digit()
+                            {
+                                path_end += 1;
+                            }
+                        }
+                    }
+                    // Don't add if this range overlaps a URL we already found
+                    let overlaps = links.iter().any(|l| {
+                        l.row == row && path_start < l.col_end && path_end > l.col_start
+                    });
+                    if !overlaps {
+                        links.push(TerminalLink {
+                            row,
+                            col_start: path_start,
+                            col_end: path_end,
+                            target: text[path_start..path_end].to_string(),
+                            kind: LinkKind::FilePath,
+                        });
+                    }
+                }
+            }
+            search_from = abs_colon + 1;
+        } else {
+            break;
+        }
+    }
+
+    links
+}
+
+/// Scan all lines of a terminal buffer for links.
+pub fn detect_links(buffer: &TerminalBuffer) -> Vec<TerminalLink> {
+    let mut all = Vec::new();
+    for row in 0..buffer.line_count() {
+        if let Some(cells) = buffer.line(row) {
+            all.extend(detect_links_in_line(row, cells));
+        }
+    }
+    all
+}
+
+// ---------------------------------------------------------------------------
+// Terminal search
+// ---------------------------------------------------------------------------
+
+/// A match found by terminal search.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchMatch {
+    /// Row in the buffer (absolute index).
+    pub row: usize,
+    /// Start column (inclusive).
+    pub col_start: usize,
+    /// End column (exclusive).
+    pub col_end: usize,
+}
+
+/// Options controlling terminal search behavior.
+#[derive(Debug, Clone)]
+pub struct SearchOptions {
+    pub case_sensitive: bool,
+    pub whole_word: bool,
+    pub regex: bool,
+}
+
+impl Default for SearchOptions {
+    fn default() -> Self {
+        Self {
+            case_sensitive: false,
+            whole_word: false,
+            regex: false,
+        }
+    }
+}
+
+/// Search the terminal buffer for a needle string.
+pub fn search_buffer(
+    buffer: &TerminalBuffer,
+    needle: &str,
+    options: &SearchOptions,
+) -> Vec<SearchMatch> {
+    if needle.is_empty() {
+        return Vec::new();
+    }
+    let mut matches = Vec::new();
+    let needle_cmp: String = if options.case_sensitive {
+        needle.to_string()
+    } else {
+        needle.to_lowercase()
+    };
+
+    for row in 0..buffer.line_count() {
+        if let Some(cells) = buffer.line(row) {
+            let line_text: String = cells.iter().map(|c| c.ch).collect();
+            let line_cmp: String = if options.case_sensitive {
+                line_text.clone()
+            } else {
+                line_text.to_lowercase()
+            };
+
+            let mut start = 0;
+            while let Some(pos) = line_cmp[start..].find(&needle_cmp) {
+                let abs_pos = start + pos;
+                let end_pos = abs_pos + needle_cmp.len();
+
+                if options.whole_word {
+                    let before_ok = abs_pos == 0
+                        || !line_text.as_bytes()[abs_pos - 1].is_ascii_alphanumeric();
+                    let after_ok = end_pos >= line_text.len()
+                        || !line_text.as_bytes()[end_pos].is_ascii_alphanumeric();
+                    if before_ok && after_ok {
+                        matches.push(SearchMatch {
+                            row,
+                            col_start: abs_pos,
+                            col_end: end_pos,
+                        });
+                    }
+                } else {
+                    matches.push(SearchMatch {
+                        row,
+                        col_start: abs_pos,
+                        col_end: end_pos,
+                    });
+                }
+                start = abs_pos + 1;
+            }
+        }
+    }
+    matches
+}
+
+// ---------------------------------------------------------------------------
+// Terminal selection
+// ---------------------------------------------------------------------------
+
+/// A rectangular or stream selection in the terminal buffer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerminalSelection {
+    pub start_row: usize,
+    pub start_col: usize,
+    pub end_row: usize,
+    pub end_col: usize,
+}
+
+impl TerminalSelection {
+    pub fn new(start_row: usize, start_col: usize, end_row: usize, end_col: usize) -> Self {
+        // Normalize so start <= end
+        if (start_row, start_col) <= (end_row, end_col) {
+            Self {
+                start_row,
+                start_col,
+                end_row,
+                end_col,
+            }
+        } else {
+            Self {
+                start_row: end_row,
+                start_col: end_col,
+                end_row: start_row,
+                end_col: start_col,
+            }
+        }
+    }
+
+    /// Check if a given cell position is inside this selection.
+    pub fn contains(&self, row: usize, col: usize) -> bool {
+        if row < self.start_row || row > self.end_row {
+            return false;
+        }
+        if row == self.start_row && row == self.end_row {
+            return col >= self.start_col && col < self.end_col;
+        }
+        if row == self.start_row {
+            return col >= self.start_col;
+        }
+        if row == self.end_row {
+            return col < self.end_col;
+        }
+        true
+    }
+
+    /// Extract the selected text from a terminal buffer.
+    pub fn extract_text(&self, buffer: &TerminalBuffer) -> String {
+        let mut result = String::new();
+        for row in self.start_row..=self.end_row {
+            if let Some(cells) = buffer.line(row) {
+                let col_start = if row == self.start_row {
+                    self.start_col
+                } else {
+                    0
+                };
+                let col_end = if row == self.end_row {
+                    self.end_col.min(cells.len())
+                } else {
+                    cells.len()
+                };
+                for col in col_start..col_end {
+                    result.push(cells[col].ch);
+                }
+                // Trim trailing spaces on each line and add newline between rows
+                if row < self.end_row {
+                    let trimmed = result.trim_end_matches(' ');
+                    result.truncate(trimmed.len());
+                    result.push('\n');
+                }
+            }
+        }
+        // Trim trailing spaces from the last line
+        let trimmed = result.trim_end_matches(' ');
+        trimmed.to_string()
+    }
+
+    /// Returns true if the selection spans zero cells.
+    pub fn is_empty(&self) -> bool {
+        self.start_row == self.end_row && self.start_col == self.end_col
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Terminal title tracker
+// ---------------------------------------------------------------------------
+
+/// Tracks the history of terminal title changes.
+pub struct TitleTracker {
+    history: Vec<String>,
+    current: String,
+    max_history: usize,
+}
+
+impl TitleTracker {
+    pub fn new() -> Self {
+        Self {
+            history: Vec::new(),
+            current: String::new(),
+            max_history: 100,
+        }
+    }
+
+    /// Update the current title, pushing the previous one to history.
+    pub fn set_title(&mut self, title: impl Into<String>) {
+        let new = title.into();
+        if new != self.current {
+            if !self.current.is_empty() {
+                self.history.push(self.current.clone());
+                if self.history.len() > self.max_history {
+                    self.history.remove(0);
+                }
+            }
+            self.current = new;
+        }
+    }
+
+    pub fn current(&self) -> &str {
+        &self.current
+    }
+
+    pub fn history(&self) -> &[String] {
+        &self.history
+    }
+
+    /// Get the previous title (if any).
+    pub fn previous(&self) -> Option<&str> {
+        self.history.last().map(|s| s.as_str())
+    }
+
+    /// Process ANSI actions and update the title if a SetTitle is found.
+    pub fn process_actions(&mut self, actions: &[AnsiAction]) {
+        for action in actions {
+            if let AnsiAction::SetTitle(title) = action {
+                self.set_title(title.clone());
+            }
+        }
+    }
+}
+
+impl Default for TitleTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Terminal environment variable management
+// ---------------------------------------------------------------------------
+
+/// Manages environment variables for terminal sessions, supporting
+/// variable inheritance, overrides, and shell-specific formatting.
+pub struct TerminalEnv {
+    base: HashMap<String, String>,
+    overrides: HashMap<String, String>,
+    removed: Vec<String>,
+}
+
+impl TerminalEnv {
+    /// Create a new environment starting from the current process environment.
+    pub fn from_current() -> Self {
+        let base: HashMap<String, String> = env::vars().collect();
+        Self {
+            base,
+            overrides: HashMap::new(),
+            removed: Vec::new(),
+        }
+    }
+
+    /// Create an empty environment.
+    pub fn empty() -> Self {
+        Self {
+            base: HashMap::new(),
+            overrides: HashMap::new(),
+            removed: Vec::new(),
+        }
+    }
+
+    /// Set or override an environment variable.
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        let key = key.into();
+        self.removed.retain(|k| k != &key);
+        self.overrides.insert(key, value.into());
+    }
+
+    /// Remove an environment variable.
+    pub fn remove(&mut self, key: impl Into<String>) {
+        let key = key.into();
+        self.overrides.remove(&key);
+        if !self.removed.contains(&key) {
+            self.removed.push(key);
+        }
+    }
+
+    /// Get a variable, checking overrides first, then base.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        if self.removed.contains(&key.to_string()) {
+            return None;
+        }
+        self.overrides
+            .get(key)
+            .or_else(|| self.base.get(key))
+            .map(|s| s.as_str())
+    }
+
+    /// Build the final resolved environment as a HashMap.
+    pub fn resolve(&self) -> HashMap<String, String> {
+        let mut result = self.base.clone();
+        for key in &self.removed {
+            result.remove(key);
+        }
+        for (k, v) in &self.overrides {
+            result.insert(k.clone(), v.clone());
+        }
+        result
+    }
+
+    /// Append a value to a PATH-style variable with the given separator.
+    pub fn append_path(&mut self, key: &str, value: &str, separator: char) {
+        let current = self.get(key).unwrap_or("").to_string();
+        if current.is_empty() {
+            self.set(key, value);
+        } else {
+            self.set(key, format!("{}{}{}", current, separator, value));
+        }
+    }
+
+    /// Prepend a value to a PATH-style variable with the given separator.
+    pub fn prepend_path(&mut self, key: &str, value: &str, separator: char) {
+        let current = self.get(key).unwrap_or("").to_string();
+        if current.is_empty() {
+            self.set(key, value);
+        } else {
+            self.set(key, format!("{}{}{}", value, separator, current));
+        }
+    }
+
+    /// Format a single variable as a shell `export` statement.
+    pub fn format_export(&self, key: &str) -> Option<String> {
+        self.get(key)
+            .map(|v| format!("export {}=\"{}\"", key, v.replace('"', "\\\"")))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalBuffer text extraction helpers
+// ---------------------------------------------------------------------------
+
+impl TerminalBuffer {
+    /// Extract the text content of a single line (trailing spaces trimmed).
+    pub fn line_text(&self, row: usize) -> Option<String> {
+        self.line(row).map(|cells| {
+            let s: String = cells.iter().map(|c| c.ch).collect();
+            s.trim_end().to_string()
+        })
+    }
+
+    /// Extract all visible text as a single string with newlines.
+    pub fn visible_text(&self) -> String {
+        self.visible_lines()
+            .iter()
+            .map(|line| {
+                let s: String = line.iter().map(|c| c.ch).collect();
+                s.trim_end().to_string()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Check whether the buffer contains the given text on any line.
+    pub fn contains_text(&self, needle: &str) -> bool {
+        for row in 0..self.line_count() {
+            if let Some(text) = self.line_text(row) {
+                if text.contains(needle) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Get the word at the given row and column position.
+    pub fn word_at(&self, row: usize, col: usize) -> Option<String> {
+        let cells = self.line(row)?;
+        if col >= cells.len() || cells[col].ch.is_whitespace() {
+            return None;
+        }
+        let mut start = col;
+        while start > 0 && !cells[start - 1].ch.is_whitespace() {
+            start -= 1;
+        }
+        let mut end = col;
+        while end < cells.len() && !cells[end].ch.is_whitespace() {
+            end += 1;
+        }
+        let word: String = cells[start..end].iter().map(|c| c.ch).collect();
+        if word.is_empty() {
+            None
+        } else {
+            Some(word)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1856,5 +2399,300 @@ mod tests {
         let result = svc.create_with_pty(Some("/nonexistent/shell"), 80, 24);
         assert!(result.is_err());
         assert_eq!(svc.count(), 0);
+    }
+
+    // -- Link detection tests -----------------------------------------------
+
+    #[test]
+    fn detect_url_link() {
+        let mut buf = TerminalBuffer::new(120, 24);
+        buf.write_str("Visit https://example.com/path for info");
+        let links = detect_links(&buf);
+        assert!(links.iter().any(|l| l.kind == LinkKind::Url
+            && l.target == "https://example.com/path"));
+    }
+
+    #[test]
+    fn detect_http_url() {
+        let mut buf = TerminalBuffer::new(120, 24);
+        buf.write_str("Go to http://localhost:8080/api/test now");
+        let links = detect_links(&buf);
+        assert!(links.iter().any(|l| l.kind == LinkKind::Url
+            && l.target == "http://localhost:8080/api/test"));
+    }
+
+    #[test]
+    fn detect_file_path_link() {
+        let mut buf = TerminalBuffer::new(120, 24);
+        buf.write_str("error at src/main.rs:42");
+        let links = detect_links(&buf);
+        assert!(links.iter().any(|l| l.kind == LinkKind::FilePath
+            && l.target.contains("src/main.rs:42")));
+    }
+
+    #[test]
+    fn detect_file_path_with_col() {
+        let mut buf = TerminalBuffer::new(120, 24);
+        buf.write_str("warning: src/lib.rs:10:5 unused variable");
+        let links = detect_links(&buf);
+        assert!(links.iter().any(|l| l.kind == LinkKind::FilePath
+            && l.target.contains("src/lib.rs:10:5")));
+    }
+
+    #[test]
+    fn detect_no_links_in_plain_text() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("Hello world, nothing special here");
+        let links = detect_links(&buf);
+        assert!(links.is_empty());
+    }
+
+    // -- Search tests -------------------------------------------------------
+
+    #[test]
+    fn search_case_insensitive() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("Hello World");
+        let matches = search_buffer(&buf, "hello", &SearchOptions::default());
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].col_start, 0);
+        assert_eq!(matches[0].col_end, 5);
+    }
+
+    #[test]
+    fn search_case_sensitive() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("Hello World");
+        let opts = SearchOptions {
+            case_sensitive: true,
+            ..Default::default()
+        };
+        let matches = search_buffer(&buf, "hello", &opts);
+        assert!(matches.is_empty());
+        let matches2 = search_buffer(&buf, "Hello", &opts);
+        assert_eq!(matches2.len(), 1);
+    }
+
+    #[test]
+    fn search_whole_word() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("foobar foo barfoo");
+        let opts = SearchOptions {
+            whole_word: true,
+            ..Default::default()
+        };
+        let matches = search_buffer(&buf, "foo", &opts);
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].col_start, 7);
+    }
+
+    #[test]
+    fn search_multiple_matches() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("abcabcabc");
+        let matches = search_buffer(&buf, "abc", &SearchOptions::default());
+        assert_eq!(matches.len(), 3);
+    }
+
+    #[test]
+    fn search_empty_needle() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("Hello");
+        let matches = search_buffer(&buf, "", &SearchOptions::default());
+        assert!(matches.is_empty());
+    }
+
+    // -- Selection tests ----------------------------------------------------
+
+    #[test]
+    fn selection_contains() {
+        let sel = TerminalSelection::new(1, 5, 3, 10);
+        assert!(!sel.contains(0, 5));
+        assert!(sel.contains(1, 5));
+        assert!(sel.contains(1, 20));
+        assert!(sel.contains(2, 0));
+        assert!(sel.contains(3, 9));
+        assert!(!sel.contains(3, 10));
+        assert!(!sel.contains(4, 0));
+    }
+
+    #[test]
+    fn selection_single_row() {
+        let sel = TerminalSelection::new(2, 3, 2, 8);
+        assert!(!sel.contains(2, 2));
+        assert!(sel.contains(2, 3));
+        assert!(sel.contains(2, 7));
+        assert!(!sel.contains(2, 8));
+    }
+
+    #[test]
+    fn selection_extract_text() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("Hello World");
+        let sel = TerminalSelection::new(0, 0, 0, 5);
+        assert_eq!(sel.extract_text(&buf), "Hello");
+    }
+
+    #[test]
+    fn selection_normalizes_reverse() {
+        let sel = TerminalSelection::new(5, 10, 2, 3);
+        assert_eq!(sel.start_row, 2);
+        assert_eq!(sel.start_col, 3);
+        assert_eq!(sel.end_row, 5);
+        assert_eq!(sel.end_col, 10);
+    }
+
+    #[test]
+    fn selection_is_empty() {
+        let sel = TerminalSelection::new(3, 5, 3, 5);
+        assert!(sel.is_empty());
+        let sel2 = TerminalSelection::new(3, 5, 3, 6);
+        assert!(!sel2.is_empty());
+    }
+
+    // -- Title tracker tests ------------------------------------------------
+
+    #[test]
+    fn title_tracker_set_and_history() {
+        let mut tracker = TitleTracker::new();
+        assert_eq!(tracker.current(), "");
+        tracker.set_title("First");
+        assert_eq!(tracker.current(), "First");
+        assert!(tracker.history().is_empty());
+        tracker.set_title("Second");
+        assert_eq!(tracker.current(), "Second");
+        assert_eq!(tracker.previous(), Some("First"));
+        tracker.set_title("Third");
+        assert_eq!(tracker.history().len(), 2);
+    }
+
+    #[test]
+    fn title_tracker_duplicate_no_push() {
+        let mut tracker = TitleTracker::new();
+        tracker.set_title("Same");
+        tracker.set_title("Same");
+        assert!(tracker.history().is_empty());
+    }
+
+    #[test]
+    fn title_tracker_process_actions() {
+        let mut tracker = TitleTracker::new();
+        let actions = vec![
+            AnsiAction::Print('x'),
+            AnsiAction::SetTitle("My Terminal".into()),
+            AnsiAction::Print('y'),
+        ];
+        tracker.process_actions(&actions);
+        assert_eq!(tracker.current(), "My Terminal");
+    }
+
+    // -- Terminal environment tests -----------------------------------------
+
+    #[test]
+    fn terminal_env_set_and_get() {
+        let mut env = TerminalEnv::empty();
+        env.set("FOO", "bar");
+        assert_eq!(env.get("FOO"), Some("bar"));
+        assert_eq!(env.get("MISSING"), None);
+    }
+
+    #[test]
+    fn terminal_env_remove() {
+        let mut env = TerminalEnv::empty();
+        env.set("KEY", "value");
+        env.remove("KEY");
+        assert_eq!(env.get("KEY"), None);
+    }
+
+    #[test]
+    fn terminal_env_override_base() {
+        let mut env = TerminalEnv::empty();
+        // Simulate a base var
+        env.base.insert("LANG".into(), "en_US".into());
+        assert_eq!(env.get("LANG"), Some("en_US"));
+        env.set("LANG", "C");
+        assert_eq!(env.get("LANG"), Some("C"));
+    }
+
+    #[test]
+    fn terminal_env_resolve() {
+        let mut env = TerminalEnv::empty();
+        env.base.insert("A".into(), "1".into());
+        env.base.insert("B".into(), "2".into());
+        env.set("C", "3");
+        env.remove("B");
+        let resolved = env.resolve();
+        assert_eq!(resolved.get("A").unwrap(), "1");
+        assert!(!resolved.contains_key("B"));
+        assert_eq!(resolved.get("C").unwrap(), "3");
+    }
+
+    #[test]
+    fn terminal_env_append_path() {
+        let mut env = TerminalEnv::empty();
+        env.set("PATH", "/usr/bin");
+        env.append_path("PATH", "/home/bin", ':');
+        assert_eq!(env.get("PATH"), Some("/usr/bin:/home/bin"));
+    }
+
+    #[test]
+    fn terminal_env_prepend_path() {
+        let mut env = TerminalEnv::empty();
+        env.set("PATH", "/usr/bin");
+        env.prepend_path("PATH", "/home/bin", ':');
+        assert_eq!(env.get("PATH"), Some("/home/bin:/usr/bin"));
+    }
+
+    #[test]
+    fn terminal_env_format_export() {
+        let mut env = TerminalEnv::empty();
+        env.set("MY_VAR", "hello world");
+        assert_eq!(
+            env.format_export("MY_VAR"),
+            Some("export MY_VAR=\"hello world\"".to_string())
+        );
+        assert_eq!(env.format_export("NOPE"), None);
+    }
+
+    // -- Buffer text extraction tests ---------------------------------------
+
+    #[test]
+    fn buffer_line_text() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("Hello World");
+        assert_eq!(buf.line_text(0), Some("Hello World".to_string()));
+    }
+
+    #[test]
+    fn buffer_contains_text() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("error: file not found");
+        assert!(buf.contains_text("not found"));
+        assert!(!buf.contains_text("success"));
+    }
+
+    #[test]
+    fn buffer_visible_text() {
+        let mut buf = TerminalBuffer::new(20, 3);
+        buf.write_str("AAA\r\nBBB\r\nCCC");
+        let text = buf.visible_text();
+        assert!(text.contains("AAA"));
+        assert!(text.contains("BBB"));
+        assert!(text.contains("CCC"));
+    }
+
+    #[test]
+    fn buffer_word_at() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.write_str("hello world foo");
+        assert_eq!(buf.word_at(0, 0), Some("hello".to_string()));
+        assert_eq!(buf.word_at(0, 6), Some("world".to_string()));
+        assert_eq!(buf.word_at(0, 5), None); // space
+    }
+
+    #[test]
+    fn buffer_word_at_out_of_bounds() {
+        let buf = TerminalBuffer::new(80, 24);
+        assert_eq!(buf.word_at(0, 999), None);
     }
 }

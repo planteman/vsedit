@@ -1154,6 +1154,282 @@ impl<T: Clone + 'static> Pipeline<T> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Lazy — deferred computation with caching
+// ---------------------------------------------------------------------------
+
+/// A lazily evaluated value that computes on first access and caches the result.
+pub struct Lazy<T> {
+    init: Cell<Option<Box<dyn FnOnce() -> T>>>,
+    value: Cell<Option<T>>,
+}
+
+impl<T: Clone> Lazy<T> {
+    /// Create a new lazy value from a closure.
+    pub fn new(f: impl FnOnce() -> T + 'static) -> Self {
+        Self {
+            init: Cell::new(Some(Box::new(f))),
+            value: Cell::new(None),
+        }
+    }
+
+    /// Force evaluation and return the value. Subsequent calls return the
+    /// cached result without re-evaluating.
+    pub fn force(&self) -> T {
+        let current = self.value.take();
+        if let Some(v) = current {
+            let cloned = v.clone();
+            self.value.set(Some(v));
+            return cloned;
+        }
+        let init = self.init.take();
+        if let Some(f) = init {
+            let v = f();
+            let cloned = v.clone();
+            self.value.set(Some(v));
+            cloned
+        } else {
+            panic!("Lazy value already consumed without caching");
+        }
+    }
+
+    /// Returns `true` if the value has been computed.
+    pub fn is_evaluated(&self) -> bool {
+        let v = self.value.take();
+        let evaluated = v.is_some();
+        self.value.set(v);
+        evaluated
+    }
+}
+
+// ---------------------------------------------------------------------------
+// unique — deduplicate while preserving order
+// ---------------------------------------------------------------------------
+
+/// Remove duplicate elements while preserving the first occurrence order.
+pub fn unique<T: Eq + std::hash::Hash + Clone>(items: impl IntoIterator<Item = T>) -> Vec<T> {
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::new();
+    for item in items {
+        if seen.insert(item.clone()) {
+            result.push(item);
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// frequency_map — count occurrences
+// ---------------------------------------------------------------------------
+
+/// Count the frequency of each element, returning a map of element → count.
+pub fn frequency_map<T: Eq + std::hash::Hash>(
+    items: impl IntoIterator<Item = T>,
+) -> HashMap<T, usize> {
+    let mut map = HashMap::new();
+    for item in items {
+        *map.entry(item).or_insert(0) += 1;
+    }
+    map
+}
+
+// ---------------------------------------------------------------------------
+// min_by_key / max_by_key — find extremes by a key function
+// ---------------------------------------------------------------------------
+
+/// Return the element with the minimum key, or `None` if empty.
+pub fn min_by_key<T, K: Ord>(
+    items: impl IntoIterator<Item = T>,
+    key_fn: impl Fn(&T) -> K,
+) -> Option<T> {
+    items.into_iter().min_by_key(|x| key_fn(x))
+}
+
+/// Return the element with the maximum key, or `None` if empty.
+pub fn max_by_key<T, K: Ord>(
+    items: impl IntoIterator<Item = T>,
+    key_fn: impl Fn(&T) -> K,
+) -> Option<T> {
+    items.into_iter().max_by_key(|x| key_fn(x))
+}
+
+// ---------------------------------------------------------------------------
+// chain_results — sequence multiple fallible operations
+// ---------------------------------------------------------------------------
+
+/// Apply a sequence of fallible transformations to a value, short-circuiting
+/// on the first error.
+pub fn chain_results<T, E>(
+    value: T,
+    fns: &[fn(T) -> Result<T, E>],
+) -> Result<T, E> {
+    let mut current = value;
+    for f in fns {
+        current = f(current)?;
+    }
+    Ok(current)
+}
+
+// ---------------------------------------------------------------------------
+// map_keys / map_values — transform HashMap entries
+// ---------------------------------------------------------------------------
+
+/// Transform all keys in a `HashMap`, merging values with the same new key by
+/// keeping the last one encountered.
+pub fn map_keys<K1, K2, V>(
+    map: HashMap<K1, V>,
+    f: impl Fn(K1) -> K2,
+) -> HashMap<K2, V>
+where
+    K2: Eq + std::hash::Hash,
+{
+    map.into_iter().map(|(k, v)| (f(k), v)).collect()
+}
+
+/// Transform all values in a `HashMap`.
+pub fn map_values<K, V1, V2>(
+    map: HashMap<K, V1>,
+    f: impl Fn(V1) -> V2,
+) -> HashMap<K, V2>
+where
+    K: Eq + std::hash::Hash,
+{
+    map.into_iter().map(|(k, v)| (k, f(v))).collect()
+}
+
+// ---------------------------------------------------------------------------
+// try_fold — fold with early error return
+// ---------------------------------------------------------------------------
+
+/// Fold over items with a fallible accumulator function, returning the first
+/// error encountered or the final accumulator value.
+pub fn try_fold<T, A, E>(
+    items: impl IntoIterator<Item = T>,
+    init: A,
+    f: impl Fn(A, T) -> Result<A, E>,
+) -> Result<A, E> {
+    let mut acc = init;
+    for item in items {
+        acc = f(acc, item)?;
+    }
+    Ok(acc)
+}
+
+// ---------------------------------------------------------------------------
+// interleave — alternate elements from two iterators
+// ---------------------------------------------------------------------------
+
+/// Alternate elements from two iterators: `[a0, b0, a1, b1, ...]`.
+/// Remaining elements from the longer iterator are appended at the end.
+pub fn interleave<T>(
+    a: impl IntoIterator<Item = T>,
+    b: impl IntoIterator<Item = T>,
+) -> Vec<T> {
+    let mut a_iter = a.into_iter().peekable();
+    let mut b_iter = b.into_iter().peekable();
+    let mut result = Vec::new();
+    loop {
+        match (a_iter.next(), b_iter.next()) {
+            (Some(av), Some(bv)) => {
+                result.push(av);
+                result.push(bv);
+            }
+            (Some(av), None) => {
+                result.push(av);
+                result.extend(a_iter);
+                break;
+            }
+            (None, Some(bv)) => {
+                result.push(bv);
+                result.extend(b_iter);
+                break;
+            }
+            (None, None) => break,
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// span — split at the first element that doesn't match
+// ---------------------------------------------------------------------------
+
+/// Split items into a prefix that matches the predicate and the remaining suffix.
+///
+/// Like `take_while` + remainder: `span(pred, [a,b,c,d])` returns
+/// `([a,b], [c,d])` where `a,b` satisfy `pred` and `c` does not.
+pub fn span<T>(
+    items: impl IntoIterator<Item = T>,
+    pred: impl Fn(&T) -> bool,
+) -> (Vec<T>, Vec<T>) {
+    let mut prefix = Vec::new();
+    let mut suffix = Vec::new();
+    let mut matched = true;
+    for item in items {
+        if matched && pred(&item) {
+            prefix.push(item);
+        } else {
+            matched = false;
+            suffix.push(item);
+        }
+    }
+    (prefix, suffix)
+}
+
+// ---------------------------------------------------------------------------
+// all_equal — check if all elements are the same
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if all elements are equal, or the collection is empty.
+pub fn all_equal<T: PartialEq>(items: impl IntoIterator<Item = T>) -> bool {
+    let mut iter = items.into_iter();
+    let first = match iter.next() {
+        Some(v) => v,
+        None => return true,
+    };
+    iter.all(|x| x == first)
+}
+
+// ---------------------------------------------------------------------------
+// successors — generate a sequence from an initial value
+// ---------------------------------------------------------------------------
+
+/// Generate a sequence by repeatedly applying `f` to the previous value.
+/// Stops when `f` returns `None`.
+pub fn successors<T: Clone>(first: T, f: impl Fn(&T) -> Option<T>) -> Vec<T> {
+    let mut result = vec![first];
+    loop {
+        let next = f(result.last().unwrap());
+        match next {
+            Some(v) => result.push(v),
+            None => break,
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// converge_until — apply a function repeatedly until the value stabilizes
+// ---------------------------------------------------------------------------
+
+/// Apply `f` repeatedly until the output equals the input (a fixed point),
+/// or until `max_iters` iterations have been performed.
+pub fn converge_until<T: PartialEq + Clone>(
+    initial: T,
+    f: impl Fn(&T) -> T,
+    max_iters: usize,
+) -> T {
+    let mut current = initial;
+    for _ in 0..max_iters {
+        let next = f(&current);
+        if next == current {
+            return current;
+        }
+        current = next;
+    }
+    current
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1857,5 +2133,140 @@ mod tests {
             .then(|x: i32| x * 2);
         let trace = p.execute_trace(5);
         assert_eq!(trace, vec![5, 6, 12]);
+    }
+
+    #[test]
+    fn test_lazy_deferred_evaluation() {
+        let call_count = std::cell::Cell::new(0);
+        let lazy = Lazy::new(move || {
+            call_count.set(call_count.get() + 1);
+            42
+        });
+        assert!(!lazy.is_evaluated());
+        assert_eq!(lazy.force(), 42);
+        assert!(lazy.is_evaluated());
+        // Second call returns cached value
+        assert_eq!(lazy.force(), 42);
+    }
+
+    #[test]
+    fn test_unique_preserves_order() {
+        let result = unique(vec![3, 1, 2, 1, 3, 4, 2]);
+        assert_eq!(result, vec![3, 1, 2, 4]);
+        let empty: Vec<i32> = unique(Vec::new());
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn test_frequency_map() {
+        let freq = frequency_map(vec!["a", "b", "a", "c", "b", "a"]);
+        assert_eq!(freq["a"], 3);
+        assert_eq!(freq["b"], 2);
+        assert_eq!(freq["c"], 1);
+    }
+
+    #[test]
+    fn test_min_max_by_key() {
+        let items = vec!["hello", "hi", "hey", "greetings"];
+        assert_eq!(min_by_key(items.clone(), |s| s.len()), Some("hi"));
+        assert_eq!(max_by_key(items, |s| s.len()), Some("greetings"));
+        assert_eq!(min_by_key(Vec::<i32>::new(), |x| *x), None);
+    }
+
+    #[test]
+    fn test_chain_results_success() {
+        let fns: Vec<fn(i32) -> Result<i32, &'static str>> = vec![
+            |x| Ok(x + 1),
+            |x| Ok(x * 2),
+            |x| Ok(x - 3),
+        ];
+        assert_eq!(chain_results(5, &fns), Ok(9)); // (5+1)*2-3 = 9
+    }
+
+    #[test]
+    fn test_chain_results_short_circuit() {
+        let fns: Vec<fn(i32) -> Result<i32, &'static str>> = vec![
+            |x| Ok(x + 1),
+            |_| Err("boom"),
+            |x| Ok(x * 100), // should not run
+        ];
+        assert_eq!(chain_results(5, &fns), Err("boom"));
+    }
+
+    #[test]
+    fn test_map_keys_and_values() {
+        let mut m = HashMap::new();
+        m.insert(1, "one");
+        m.insert(2, "two");
+        let mapped = map_keys(m, |k| k * 10);
+        assert_eq!(mapped[&10], "one");
+        assert_eq!(mapped[&20], "two");
+
+        let mut m2 = HashMap::new();
+        m2.insert("a", 1);
+        m2.insert("b", 2);
+        let mapped2 = map_values(m2, |v| v * 100);
+        assert_eq!(mapped2["a"], 100);
+        assert_eq!(mapped2["b"], 200);
+    }
+
+    #[test]
+    fn test_try_fold_success_and_failure() {
+        let result = try_fold(vec![1, 2, 3], 0i32, |acc, x| {
+            let sum = acc + x;
+            if sum > 10 { Err("overflow") } else { Ok(sum) }
+        });
+        assert_eq!(result, Ok(6));
+
+        let result2 = try_fold(vec![5, 5, 5], 0i32, |acc, x| {
+            let sum = acc + x;
+            if sum > 10 { Err("overflow") } else { Ok(sum) }
+        });
+        assert_eq!(result2, Err("overflow"));
+    }
+
+    #[test]
+    fn test_interleave() {
+        let result = interleave(vec![1, 3, 5], vec![2, 4, 6]);
+        assert_eq!(result, vec![1, 2, 3, 4, 5, 6]);
+        let uneven = interleave(vec![1, 3, 5, 7], vec![2, 4]);
+        assert_eq!(uneven, vec![1, 2, 3, 4, 5, 7]);
+    }
+
+    #[test]
+    fn test_span() {
+        let (prefix, suffix) = span(vec![2, 4, 6, 7, 8], |x| x % 2 == 0);
+        assert_eq!(prefix, vec![2, 4, 6]);
+        assert_eq!(suffix, vec![7, 8]);
+
+        let (all, none) = span(vec![1, 2, 3], |_| true);
+        assert_eq!(all, vec![1, 2, 3]);
+        assert!(none.is_empty());
+    }
+
+    #[test]
+    fn test_all_equal() {
+        assert!(all_equal(vec![1, 1, 1]));
+        assert!(!all_equal(vec![1, 2, 1]));
+        assert!(all_equal(Vec::<i32>::new()));
+        assert!(all_equal(vec![42]));
+    }
+
+    #[test]
+    fn test_successors() {
+        let powers = successors(1, |x| if *x < 16 { Some(x * 2) } else { None });
+        assert_eq!(powers, vec![1, 2, 4, 8, 16]);
+    }
+
+    #[test]
+    fn test_converge_until_fixed_point() {
+        // Newton's method approximation: sqrt(4) ≈ 2
+        // Start with guess=3, converge x -> (x + 4/x) / 2 with integer division
+        let result = converge_until(10i32, |x| (x + 4 / x) / 2, 100);
+        assert_eq!(result, 2);
+
+        // Already at fixed point
+        let result2 = converge_until(5, |x| *x, 100);
+        assert_eq!(result2, 5);
     }
 }

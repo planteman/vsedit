@@ -962,6 +962,236 @@ impl Range {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Position → offset conversion
+// ---------------------------------------------------------------------------
+
+impl Position {
+    /// Convert a 1-based position to a 0-based byte offset within the given
+    /// line lengths.  `line_lengths` is a slice where index 0 is the length
+    /// of line 1 (not counting the newline).  Returns `None` if the position
+    /// refers to a line or column that is out of bounds.
+    pub fn to_offset(&self, line_lengths: &[u32]) -> Option<usize> {
+        if self.line == 0 || self.column == 0 {
+            return None;
+        }
+        let line_idx = (self.line - 1) as usize;
+        if line_idx >= line_lengths.len() {
+            return None;
+        }
+        let col_idx = self.column - 1;
+        // Allow column == line_length + 1 (one past the end, like a cursor
+        // after the last character).
+        if col_idx > line_lengths[line_idx] {
+            return None;
+        }
+        let mut offset: usize = 0;
+        for &len in &line_lengths[..line_idx] {
+            // +1 for the newline character between lines
+            offset += len as usize + 1;
+        }
+        offset += col_idx as usize;
+        Some(offset)
+    }
+
+    /// Create a position from a 0-based byte offset and a set of line lengths.
+    /// Returns `None` if the offset is past the end of the document.
+    pub fn from_offset(offset: usize, line_lengths: &[u32]) -> Option<Position> {
+        let mut remaining = offset;
+        for (i, &len) in line_lengths.iter().enumerate() {
+            let line_len_with_nl = len as usize + 1; // +1 for '\n'
+            if remaining <= len as usize {
+                return Some(Position::new(i as u32 + 1, remaining as u32 + 1));
+            }
+            // If this is the last line, allow landing right at the end
+            if i == line_lengths.len() - 1 {
+                if remaining == len as usize {
+                    return Some(Position::new(i as u32 + 1, remaining as u32 + 1));
+                }
+                return None;
+            }
+            if remaining < line_len_with_nl {
+                // offset points to the newline character itself; snap to end of line
+                return Some(Position::new(i as u32 + 1, len + 1));
+            }
+            remaining -= line_len_with_nl;
+        }
+        None
+    }
+
+    /// Returns `true` if this position is on the given 1-based line number.
+    pub fn is_on_line(&self, line: u32) -> bool {
+        self.line == line
+    }
+
+    /// Create a position at the start of the given 1-based line (column 1).
+    pub fn line_start(line: u32) -> Position {
+        Position::new(line, 1)
+    }
+
+    /// Returns a new position with the same line but the given column.
+    pub fn with_column(&self, column: u32) -> Position {
+        Position::new(self.line, column)
+    }
+
+    /// Returns a new position with the same column but the given line.
+    pub fn with_line(&self, line: u32) -> Position {
+        Position::new(line, self.column)
+    }
+
+    /// Returns the delta (line_delta, column_delta) needed to go from `self`
+    /// to `other`.
+    pub fn delta_to(&self, other: &Position) -> (i64, i64) {
+        (
+            other.line as i64 - self.line as i64,
+            other.column as i64 - self.column as i64,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Range — advanced operations
+// ---------------------------------------------------------------------------
+
+impl Range {
+    /// Clamp this range so it falls within the given document bounds.
+    pub fn clamp_to_document(&self, max_line: u32, max_column: u32) -> Range {
+        Range {
+            start: self.start.clamp_to_bounds(max_line, max_column),
+            end: self.end.clamp_to_bounds(max_line, max_column),
+        }
+    }
+
+    /// Expand the range to cover entire lines (column 1 to `max_column`).
+    pub fn expand_to_full_lines(&self, max_column: u32) -> Range {
+        Range {
+            start: Position::new(self.start.line, 1),
+            end: Position::new(self.end.line, max_column),
+        }
+    }
+
+    /// Returns `true` if `pos` is at the start of this range.
+    pub fn is_at_start(&self, pos: &Position) -> bool {
+        *pos == self.start
+    }
+
+    /// Returns `true` if `pos` is at the end of this range.
+    pub fn is_at_end(&self, pos: &Position) -> bool {
+        *pos == self.end
+    }
+
+    /// Returns `true` if the position is contained *or* equals the end
+    /// (i.e. inclusive on both ends).
+    pub fn contains_position_inclusive(&self, pos: &Position) -> bool {
+        pos >= &self.start && pos <= &self.end
+    }
+
+    /// Returns the set of 1-based line numbers touched by this range.
+    pub fn covered_lines(&self) -> std::ops::RangeInclusive<u32> {
+        self.start.line..=self.end.line
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-cursor / multi-selection utilities
+// ---------------------------------------------------------------------------
+
+/// Sort a list of ranges by start position, breaking ties by end position.
+pub fn sort_ranges(ranges: &mut [Range]) {
+    ranges.sort_by(|a, b| a.start.cmp(&b.start).then(a.end.cmp(&b.end)));
+}
+
+/// Merge a sorted slice of ranges, combining any that touch or overlap.
+/// Input should be sorted by start position (use `sort_ranges` first).
+pub fn merge_sorted_ranges(ranges: &[Range]) -> Vec<Range> {
+    if ranges.is_empty() {
+        return Vec::new();
+    }
+    let mut merged: Vec<Range> = Vec::with_capacity(ranges.len());
+    merged.push(ranges[0]);
+    for r in &ranges[1..] {
+        let last = merged.last_mut().unwrap();
+        if last.touches(r) {
+            *last = last.union(r);
+        } else {
+            merged.push(*r);
+        }
+    }
+    merged
+}
+
+/// Sort and merge a collection of ranges, returning a minimal non-overlapping
+/// set of ranges that covers the same area.
+pub fn normalize_ranges(ranges: &[Range]) -> Vec<Range> {
+    let mut sorted: Vec<Range> = ranges.to_vec();
+    sort_ranges(&mut sorted);
+    merge_sorted_ranges(&sorted)
+}
+
+/// Sort selections by their range start position.
+pub fn sort_selections(selections: &mut [Selection]) {
+    selections.sort_by(|a, b| {
+        let ra = a.as_range();
+        let rb = b.as_range();
+        ra.start.cmp(&rb.start).then(ra.end.cmp(&rb.end))
+    });
+}
+
+/// Returns `true` if any of the given selections overlap.
+pub fn selections_overlap(selections: &[Selection]) -> bool {
+    let mut ranges: Vec<Range> = selections.iter().map(|s| s.as_range()).collect();
+    sort_ranges(&mut ranges);
+    for i in 1..ranges.len() {
+        if ranges[i - 1].intersects(&ranges[i]) {
+            return true;
+        }
+    }
+    false
+}
+
+// ---------------------------------------------------------------------------
+// Selection — cursor movement helpers
+// ---------------------------------------------------------------------------
+
+impl Selection {
+    /// Move the active (cursor) position by the given deltas, preserving the
+    /// anchor to extend the selection.
+    pub fn extend_active(&self, line_delta: i32, column_delta: i32) -> Selection {
+        Selection {
+            anchor: self.anchor,
+            active: self.active.translate(line_delta, column_delta),
+        }
+    }
+
+    /// Move both anchor and active by the same deltas (shift without resizing).
+    pub fn translate(&self, line_delta: i32, column_delta: i32) -> Selection {
+        Selection {
+            anchor: self.anchor.translate(line_delta, column_delta),
+            active: self.active.translate(line_delta, column_delta),
+        }
+    }
+
+    /// Create a cursor (zero-width selection) at the given position.
+    pub fn cursor(pos: Position) -> Selection {
+        Selection {
+            anchor: pos,
+            active: pos,
+        }
+    }
+
+    /// Create a cursor at the given 1-based line and column.
+    pub fn cursor_at(line: u32, column: u32) -> Selection {
+        let pos = Position::new(line, column);
+        Selection::cursor(pos)
+    }
+
+    /// Returns `true` if the given position is within this selection's range
+    /// (inclusive start, exclusive end).
+    pub fn contains_position(&self, pos: &Position) -> bool {
+        self.as_range().contains_position(pos)
+    }
+}
+
 impl Selection {
     /// Swap the anchor and active positions, reversing the direction.
     pub fn swap_anchor(&self) -> Selection {
@@ -1866,5 +2096,209 @@ mod tests {
         let extended = sel.extend_to_full_lines(80);
         assert_eq!(extended.anchor, Position::new(2, 1));
         assert_eq!(extended.active, Position::new(4, 80));
+    }
+
+    // -- Position offset conversion tests --
+
+    #[test]
+    fn position_to_offset_basic() {
+        // "hello\nworld\n!" → line_lengths = [5, 5, 1]
+        let lens = [5, 5, 1];
+        assert_eq!(Position::new(1, 1).to_offset(&lens), Some(0));
+        assert_eq!(Position::new(1, 6).to_offset(&lens), Some(5));
+        assert_eq!(Position::new(2, 1).to_offset(&lens), Some(6));
+        assert_eq!(Position::new(2, 3).to_offset(&lens), Some(8));
+        assert_eq!(Position::new(3, 1).to_offset(&lens), Some(12));
+        assert_eq!(Position::new(3, 2).to_offset(&lens), Some(13));
+    }
+
+    #[test]
+    fn position_to_offset_out_of_bounds() {
+        let lens = [5, 5];
+        assert_eq!(Position::new(0, 1).to_offset(&lens), None);
+        assert_eq!(Position::new(1, 0).to_offset(&lens), None);
+        assert_eq!(Position::new(3, 1).to_offset(&lens), None);
+        assert_eq!(Position::new(1, 7).to_offset(&lens), None); // col > len+1
+    }
+
+    #[test]
+    fn position_from_offset_basic() {
+        let lens = [5, 5, 1];
+        assert_eq!(Position::from_offset(0, &lens), Some(Position::new(1, 1)));
+        assert_eq!(Position::from_offset(5, &lens), Some(Position::new(1, 6)));
+        assert_eq!(Position::from_offset(6, &lens), Some(Position::new(2, 1)));
+        assert_eq!(Position::from_offset(12, &lens), Some(Position::new(3, 1)));
+    }
+
+    #[test]
+    fn position_from_offset_past_end() {
+        let lens = [3];
+        assert_eq!(Position::from_offset(3, &lens), Some(Position::new(1, 4)));
+        assert_eq!(Position::from_offset(4, &lens), None);
+    }
+
+    #[test]
+    fn position_delta_to() {
+        let a = Position::new(1, 5);
+        let b = Position::new(3, 2);
+        assert_eq!(a.delta_to(&b), (2, -3));
+        assert_eq!(b.delta_to(&a), (-2, 3));
+    }
+
+    #[test]
+    fn position_with_column_and_line() {
+        let p = Position::new(3, 7);
+        assert_eq!(p.with_column(1), Position::new(3, 1));
+        assert_eq!(p.with_line(10), Position::new(10, 7));
+    }
+
+    #[test]
+    fn position_line_start() {
+        assert_eq!(Position::line_start(5), Position::new(5, 1));
+    }
+
+    #[test]
+    fn position_is_on_line() {
+        let p = Position::new(4, 10);
+        assert!(p.is_on_line(4));
+        assert!(!p.is_on_line(5));
+    }
+
+    // -- Range advanced tests --
+
+    #[test]
+    fn range_expand_to_full_lines() {
+        let r = Range::new(2, 5, 4, 10);
+        let expanded = r.expand_to_full_lines(80);
+        assert_eq!(expanded.start, Position::new(2, 1));
+        assert_eq!(expanded.end, Position::new(4, 80));
+    }
+
+    #[test]
+    fn range_clamp_to_document() {
+        let r = Range::new(0, 0, 200, 300);
+        let clamped = r.clamp_to_document(100, 80);
+        assert_eq!(clamped.start, Position::new(1, 1));
+        assert_eq!(clamped.end, Position::new(100, 80));
+    }
+
+    #[test]
+    fn range_is_at_start_and_end() {
+        let r = Range::new(2, 3, 5, 10);
+        assert!(r.is_at_start(&Position::new(2, 3)));
+        assert!(!r.is_at_start(&Position::new(2, 4)));
+        assert!(r.is_at_end(&Position::new(5, 10)));
+        assert!(!r.is_at_end(&Position::new(5, 9)));
+    }
+
+    #[test]
+    fn range_contains_position_inclusive() {
+        let r = Range::new(1, 1, 1, 5);
+        assert!(r.contains_position_inclusive(&Position::new(1, 1)));
+        assert!(r.contains_position_inclusive(&Position::new(1, 5))); // inclusive!
+        assert!(!r.contains_position_inclusive(&Position::new(1, 6)));
+    }
+
+    #[test]
+    fn range_covered_lines() {
+        let r = Range::new(3, 1, 7, 10);
+        let lines: Vec<u32> = r.covered_lines().collect();
+        assert_eq!(lines, vec![3, 4, 5, 6, 7]);
+    }
+
+    // -- Multi-cursor / normalize tests --
+
+    #[test]
+    fn sort_and_merge_ranges() {
+        let ranges = vec![
+            Range::new(5, 1, 6, 1),
+            Range::new(1, 1, 3, 1),
+            Range::new(2, 5, 5, 5),
+        ];
+        let normalized = normalize_ranges(&ranges);
+        assert_eq!(normalized.len(), 1);
+        assert_eq!(normalized[0].start, Position::new(1, 1));
+        assert_eq!(normalized[0].end, Position::new(6, 1));
+    }
+
+    #[test]
+    fn normalize_ranges_disjoint() {
+        let ranges = vec![
+            Range::new(1, 1, 2, 1),
+            Range::new(5, 1, 6, 1),
+        ];
+        let normalized = normalize_ranges(&ranges);
+        assert_eq!(normalized.len(), 2);
+    }
+
+    #[test]
+    fn selections_overlap_true() {
+        let sels = vec![
+            Selection::new(1, 1, 3, 1),
+            Selection::new(2, 1, 4, 1),
+        ];
+        assert!(selections_overlap(&sels));
+    }
+
+    #[test]
+    fn selections_overlap_false() {
+        let sels = vec![
+            Selection::new(1, 1, 2, 1),
+            Selection::new(3, 1, 4, 1),
+        ];
+        assert!(!selections_overlap(&sels));
+    }
+
+    #[test]
+    fn sort_selections_by_range() {
+        let mut sels = vec![
+            Selection::new(5, 1, 6, 1),
+            Selection::new(1, 1, 2, 1),
+            Selection::new(3, 1, 4, 1),
+        ];
+        sort_selections(&mut sels);
+        assert_eq!(sels[0].anchor, Position::new(1, 1));
+        assert_eq!(sels[1].anchor, Position::new(3, 1));
+        assert_eq!(sels[2].anchor, Position::new(5, 1));
+    }
+
+    // -- Selection cursor / movement tests --
+
+    #[test]
+    fn selection_cursor_creates_empty() {
+        let sel = Selection::cursor(Position::new(3, 7));
+        assert!(sel.is_empty_selection());
+        assert_eq!(sel.anchor, Position::new(3, 7));
+        assert_eq!(sel.active, Position::new(3, 7));
+    }
+
+    #[test]
+    fn selection_cursor_at() {
+        let sel = Selection::cursor_at(5, 10);
+        assert!(sel.is_empty_selection());
+        assert_eq!(sel.anchor, Position::new(5, 10));
+    }
+
+    #[test]
+    fn selection_extend_active_grows() {
+        let sel = Selection::new(1, 1, 1, 5);
+        let extended = sel.extend_active(2, 3);
+        assert_eq!(extended.anchor, Position::new(1, 1));
+        assert_eq!(extended.active, Position::new(3, 8));
+    }
+
+    #[test]
+    fn selection_translate_moves_both() {
+        let sel = Selection::new(2, 3, 4, 7);
+        let moved = sel.translate(1, 2);
+        assert_eq!(moved.anchor, Position::new(3, 5));
+        assert_eq!(moved.active, Position::new(5, 9));
+    }
+
+    #[test]
+    fn selection_contains_position_method() {
+        let sel = Selection::new(1, 1, 1, 10);
+        assert!(sel.contains_position(&Position::new(1, 5)));
+        assert!(!sel.contains_position(&Position::new(1, 10))); // exclusive end
     }
 }

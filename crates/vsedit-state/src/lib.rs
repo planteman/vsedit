@@ -1088,6 +1088,263 @@ pub fn import_state(svc: &mut StateService, text: &str, scope: StateScope) -> us
     count
 }
 
+// ---------------------------------------------------------------------------
+// Dirty tracking – knows whether state has been modified since last save
+// ---------------------------------------------------------------------------
+
+/// Wraps a `StateService` with change-tracking so callers know when
+/// state has been modified since the last acknowledged save point.
+pub struct DirtyTracker {
+    dirty: bool,
+    changes_since_save: u64,
+}
+
+impl DirtyTracker {
+    pub fn new() -> Self {
+        Self { dirty: false, changes_since_save: 0 }
+    }
+
+    /// Mark the state as dirty (a mutation happened).
+    pub fn mark_dirty(&mut self) {
+        self.dirty = true;
+        self.changes_since_save += 1;
+    }
+
+    /// Acknowledge a save – resets the dirty flag and change counter.
+    pub fn mark_saved(&mut self) {
+        self.dirty = false;
+        self.changes_since_save = 0;
+    }
+
+    /// Returns `true` if state has been modified since the last save.
+    pub fn is_dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// Number of mutations since the last save.
+    pub fn changes_since_save(&self) -> u64 {
+        self.changes_since_save
+    }
+}
+
+impl Default for DirtyTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// State value type-conversion helpers
+// ---------------------------------------------------------------------------
+
+/// Helpers that parse stored string values into typed Rust values.
+pub struct StateValueParser;
+
+impl StateValueParser {
+    /// Parse a stored value as `i64`.
+    pub fn as_i64(value: &str) -> Option<i64> {
+        value.parse().ok()
+    }
+
+    /// Parse a stored value as `f64`.
+    pub fn as_f64(value: &str) -> Option<f64> {
+        value.parse().ok()
+    }
+
+    /// Parse a stored value as `bool` (accepts "true"/"false"/"1"/"0").
+    pub fn as_bool(value: &str) -> Option<bool> {
+        match value {
+            "true" | "1" => Some(true),
+            "false" | "0" => Some(false),
+            _ => None,
+        }
+    }
+
+    /// Parse a comma-separated value into a `Vec<String>`.
+    pub fn as_string_list(value: &str) -> Vec<String> {
+        if value.is_empty() {
+            return Vec::new();
+        }
+        value.split(',').map(|s| s.trim().to_string()).collect()
+    }
+
+    /// Encode a list of strings as a comma-separated value.
+    pub fn from_string_list(items: &[&str]) -> String {
+        items.join(",")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Typed getters on StateService
+// ---------------------------------------------------------------------------
+
+impl StateService {
+    /// Get a value parsed as `i64`.
+    pub fn get_i64(&self, key: &str) -> Option<i64> {
+        self.get(key).and_then(StateValueParser::as_i64)
+    }
+
+    /// Get a value parsed as `f64`.
+    pub fn get_f64(&self, key: &str) -> Option<f64> {
+        self.get(key).and_then(StateValueParser::as_f64)
+    }
+
+    /// Get a value parsed as `bool`.
+    pub fn get_bool(&self, key: &str) -> Option<bool> {
+        self.get(key).and_then(StateValueParser::as_bool)
+    }
+
+    /// Get a value parsed as a comma-separated list.
+    pub fn get_string_list(&self, key: &str) -> Vec<String> {
+        self.get(key)
+            .map(StateValueParser::as_string_list)
+            .unwrap_or_default()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot restore on StateService
+// ---------------------------------------------------------------------------
+
+impl StateService {
+    /// Restore state from a previously captured `StateSnapshot`, replacing
+    /// all current entries.
+    pub fn restore(&mut self, snapshot: &StateSnapshot) {
+        self.state = snapshot.entries.clone();
+    }
+
+    /// Apply a diff to the current state (replay additions, removals, changes).
+    pub fn apply_diff(&mut self, diffs: &[StateDiff]) {
+        for diff in diffs {
+            match diff {
+                StateDiff::Added { key, value } => {
+                    // Additions default to Global scope
+                    self.set(key.clone(), value.clone(), StateScope::Global);
+                }
+                StateDiff::Removed { key, .. } => {
+                    self.remove(key);
+                }
+                StateDiff::Changed { key, new_value, .. } => {
+                    if let Some(entry) = self.state.get_mut(key) {
+                        entry.value = new_value.clone();
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Prefix queries on StateService
+// ---------------------------------------------------------------------------
+
+impl StateService {
+    /// Return all entries whose key starts with the given prefix.
+    pub fn prefix_query(&self, prefix: &str) -> Vec<(&str, &str)> {
+        self.state
+            .values()
+            .filter(|s| s.key.starts_with(prefix))
+            .map(|s| (s.key.as_str(), s.value.as_str()))
+            .collect()
+    }
+
+    /// Remove all entries whose key starts with the given prefix.
+    /// Returns the number of entries removed.
+    pub fn prefix_remove(&mut self, prefix: &str) -> usize {
+        let keys: Vec<String> = self.state
+            .keys()
+            .filter(|k| k.starts_with(prefix))
+            .cloned()
+            .collect();
+        let count = keys.len();
+        for k in keys {
+            self.state.remove(&k);
+        }
+        count
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Batch operations on StateService
+// ---------------------------------------------------------------------------
+
+impl StateService {
+    /// Atomically set multiple key-value pairs, rolling back all changes
+    /// if any key fails validation.
+    pub fn try_set_batch(
+        &mut self,
+        entries: &[(&str, &str, StateScope)],
+    ) -> Result<usize, StateError> {
+        // Validate everything first
+        for (key, value, _scope) in entries {
+            validate_key(key)?;
+            validate_value(key, value)?;
+        }
+        // All valid – apply
+        for (key, value, scope) in entries {
+            self.set(*key, *value, *scope);
+        }
+        Ok(entries.len())
+    }
+
+    /// Remove multiple keys at once. Returns the number actually removed.
+    pub fn remove_batch(&mut self, keys: &[&str]) -> usize {
+        keys.iter().filter(|k| self.state.remove(**k).is_some()).count()
+    }
+
+    /// Swap the values of two keys. Both must exist.
+    pub fn swap(&mut self, key_a: &str, key_b: &str) -> Result<(), StateError> {
+        let val_a = self.state.get(key_a)
+            .ok_or_else(|| StateError::KeyNotFound(key_a.to_string()))?
+            .value.clone();
+        let val_b = self.state.get(key_b)
+            .ok_or_else(|| StateError::KeyNotFound(key_b.to_string()))?
+            .value.clone();
+
+        self.state.get_mut(key_a).unwrap().value = val_b;
+        self.state.get_mut(key_b).unwrap().value = val_a;
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// State merge strategies
+// ---------------------------------------------------------------------------
+
+/// Strategy for resolving conflicts when merging two `StateService` instances.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MergeStrategy {
+    /// Incoming values overwrite existing values on key collision.
+    Overwrite,
+    /// Existing values are kept on key collision.
+    KeepExisting,
+    /// Only merge keys that don't already exist.
+    AddOnly,
+}
+
+impl StateService {
+    /// Merge another `StateService` using the specified strategy.
+    pub fn merge_with_strategy(&mut self, other: &StateService, strategy: MergeStrategy) {
+        for (key, stored) in &other.state {
+            match strategy {
+                MergeStrategy::Overwrite => {
+                    self.state.insert(key.clone(), stored.clone());
+                }
+                MergeStrategy::KeepExisting => {
+                    if !self.state.contains_key(key) {
+                        self.state.insert(key.clone(), stored.clone());
+                    }
+                }
+                MergeStrategy::AddOnly => {
+                    if !self.state.contains_key(key) {
+                        self.state.insert(key.clone(), stored.clone());
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1822,5 +2079,217 @@ mod tests {
         assert_eq!(svc2.get("alpha"), Some("one"));
         assert_eq!(svc2.get("beta"), Some("two"));
         assert_eq!(svc2.get_scope("alpha"), Some(StateScope::Workspace));
+    }
+
+    // ── DirtyTracker, typed getters, restore, prefix, batch, merge strategy ──
+
+    #[test]
+    fn dirty_tracker_lifecycle() {
+        let mut dt = DirtyTracker::new();
+        assert!(!dt.is_dirty());
+        assert_eq!(dt.changes_since_save(), 0);
+
+        dt.mark_dirty();
+        dt.mark_dirty();
+        assert!(dt.is_dirty());
+        assert_eq!(dt.changes_since_save(), 2);
+
+        dt.mark_saved();
+        assert!(!dt.is_dirty());
+        assert_eq!(dt.changes_since_save(), 0);
+    }
+
+    #[test]
+    fn value_parser_i64() {
+        assert_eq!(StateValueParser::as_i64("42"), Some(42));
+        assert_eq!(StateValueParser::as_i64("-7"), Some(-7));
+        assert_eq!(StateValueParser::as_i64("nope"), None);
+    }
+
+    #[test]
+    fn value_parser_f64() {
+        assert!((StateValueParser::as_f64("3.14").unwrap() - 3.14).abs() < f64::EPSILON);
+        assert_eq!(StateValueParser::as_f64("bad"), None);
+    }
+
+    #[test]
+    fn value_parser_bool() {
+        assert_eq!(StateValueParser::as_bool("true"), Some(true));
+        assert_eq!(StateValueParser::as_bool("false"), Some(false));
+        assert_eq!(StateValueParser::as_bool("1"), Some(true));
+        assert_eq!(StateValueParser::as_bool("0"), Some(false));
+        assert_eq!(StateValueParser::as_bool("yes"), None);
+    }
+
+    #[test]
+    fn value_parser_string_list_round_trip() {
+        let encoded = StateValueParser::from_string_list(&["a", "b", "c"]);
+        assert_eq!(encoded, "a,b,c");
+        let decoded = StateValueParser::as_string_list(&encoded);
+        assert_eq!(decoded, vec!["a", "b", "c"]);
+        assert!(StateValueParser::as_string_list("").is_empty());
+    }
+
+    #[test]
+    fn typed_getters_on_state_service() {
+        let mut svc = StateService::new();
+        svc.set("count", "42", StateScope::Global);
+        svc.set("ratio", "2.5", StateScope::Global);
+        svc.set("enabled", "true", StateScope::Global);
+        svc.set("tags", "rust,editor,fast", StateScope::Global);
+
+        assert_eq!(svc.get_i64("count"), Some(42));
+        assert!((svc.get_f64("ratio").unwrap() - 2.5).abs() < f64::EPSILON);
+        assert_eq!(svc.get_bool("enabled"), Some(true));
+        assert_eq!(svc.get_string_list("tags"), vec!["rust", "editor", "fast"]);
+
+        assert_eq!(svc.get_i64("missing"), None);
+        assert!(svc.get_string_list("missing").is_empty());
+    }
+
+    #[test]
+    fn restore_from_snapshot() {
+        let mut svc = StateService::new();
+        svc.set("a", "1", StateScope::Global);
+        svc.set("b", "2", StateScope::Workspace);
+        let snap = StateSnapshot::capture(&svc, "checkpoint");
+
+        // Mutate
+        svc.set("a", "changed", StateScope::Global);
+        svc.set("c", "new", StateScope::Window);
+        svc.remove("b");
+        assert_eq!(svc.key_count(), 2);
+
+        // Restore
+        svc.restore(&snap);
+        assert_eq!(svc.key_count(), 2);
+        assert_eq!(svc.get("a"), Some("1"));
+        assert_eq!(svc.get("b"), Some("2"));
+        assert!(!svc.has("c"));
+    }
+
+    #[test]
+    fn apply_diff_replays_changes() {
+        let mut svc = StateService::new();
+        svc.set("x", "10", StateScope::Global);
+        svc.set("y", "20", StateScope::Global);
+
+        let diffs = vec![
+            StateDiff::Added { key: "z".into(), value: "30".into() },
+            StateDiff::Changed { key: "x".into(), old_value: "10".into(), new_value: "99".into() },
+            StateDiff::Removed { key: "y".into(), value: "20".into() },
+        ];
+        svc.apply_diff(&diffs);
+
+        assert_eq!(svc.get("x"), Some("99"));
+        assert!(!svc.has("y"));
+        assert_eq!(svc.get("z"), Some("30"));
+    }
+
+    #[test]
+    fn prefix_query_and_remove() {
+        let mut svc = StateService::new();
+        svc.set("editor.fontSize", "14", StateScope::Global);
+        svc.set("editor.tabSize", "4", StateScope::Global);
+        svc.set("theme.name", "dark", StateScope::Global);
+
+        let editor_entries = svc.prefix_query("editor.");
+        assert_eq!(editor_entries.len(), 2);
+
+        let removed = svc.prefix_remove("editor.");
+        assert_eq!(removed, 2);
+        assert_eq!(svc.key_count(), 1);
+        assert_eq!(svc.get("theme.name"), Some("dark"));
+    }
+
+    #[test]
+    fn try_set_batch_validates_then_applies() {
+        let mut svc = StateService::new();
+        let ok = svc.try_set_batch(&[
+            ("a", "1", StateScope::Global),
+            ("b", "2", StateScope::Workspace),
+        ]);
+        assert_eq!(ok.unwrap(), 2);
+        assert_eq!(svc.key_count(), 2);
+
+        // Batch with an invalid key should reject everything
+        let mut svc2 = StateService::new();
+        let err = svc2.try_set_batch(&[
+            ("good", "val", StateScope::Global),
+            ("", "bad_key", StateScope::Global),
+        ]);
+        assert!(err.is_err());
+        assert_eq!(svc2.key_count(), 0); // nothing applied
+    }
+
+    #[test]
+    fn remove_batch_removes_multiple() {
+        let mut svc = StateService::new();
+        svc.set("a", "1", StateScope::Global);
+        svc.set("b", "2", StateScope::Global);
+        svc.set("c", "3", StateScope::Global);
+        let removed = svc.remove_batch(&["a", "c", "nonexistent"]);
+        assert_eq!(removed, 2);
+        assert_eq!(svc.key_count(), 1);
+        assert_eq!(svc.get("b"), Some("2"));
+    }
+
+    #[test]
+    fn swap_exchanges_values() {
+        let mut svc = StateService::new();
+        svc.set("x", "alpha", StateScope::Global);
+        svc.set("y", "beta", StateScope::Workspace);
+        svc.swap("x", "y").unwrap();
+        assert_eq!(svc.get("x"), Some("beta"));
+        assert_eq!(svc.get("y"), Some("alpha"));
+        // Scopes unchanged
+        assert_eq!(svc.get_scope("x"), Some(StateScope::Global));
+        assert_eq!(svc.get_scope("y"), Some(StateScope::Workspace));
+    }
+
+    #[test]
+    fn swap_error_on_missing_key() {
+        let mut svc = StateService::new();
+        svc.set("a", "1", StateScope::Global);
+        assert!(svc.swap("a", "missing").is_err());
+    }
+
+    #[test]
+    fn merge_with_strategy_overwrite() {
+        let mut a = StateService::new();
+        a.set("k", "old", StateScope::Global);
+        let mut b = StateService::new();
+        b.set("k", "new", StateScope::Workspace);
+        b.set("k2", "extra", StateScope::Global);
+
+        a.merge_with_strategy(&b, MergeStrategy::Overwrite);
+        assert_eq!(a.get("k"), Some("new"));
+        assert_eq!(a.get("k2"), Some("extra"));
+    }
+
+    #[test]
+    fn merge_with_strategy_keep_existing() {
+        let mut a = StateService::new();
+        a.set("k", "old", StateScope::Global);
+        let mut b = StateService::new();
+        b.set("k", "new", StateScope::Workspace);
+        b.set("k2", "extra", StateScope::Global);
+
+        a.merge_with_strategy(&b, MergeStrategy::KeepExisting);
+        assert_eq!(a.get("k"), Some("old")); // kept
+        assert_eq!(a.get("k2"), Some("extra")); // added
+    }
+
+    #[test]
+    fn merge_with_strategy_add_only() {
+        let mut a = StateService::new();
+        a.set("existing", "keep_me", StateScope::Global);
+        let mut b = StateService::new();
+        b.set("existing", "ignored", StateScope::Workspace);
+        b.set("new_key", "added", StateScope::Global);
+
+        a.merge_with_strategy(&b, MergeStrategy::AddOnly);
+        assert_eq!(a.get("existing"), Some("keep_me"));
+        assert_eq!(a.get("new_key"), Some("added"));
     }
 }

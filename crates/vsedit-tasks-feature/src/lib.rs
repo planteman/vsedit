@@ -1050,6 +1050,306 @@ pub fn task_service_summary(service: &TaskService) -> String {
     )
 }
 
+// ---------------------------------------------------------------------------
+// Task variable substitution
+// ---------------------------------------------------------------------------
+
+/// Manages variable definitions and performs substitution in strings.
+///
+/// Variables use the `${name}` syntax. Undefined variables are left as-is.
+#[derive(Debug, Clone)]
+pub struct TaskVariableResolver {
+    variables: HashMap<String, String>,
+}
+
+impl TaskVariableResolver {
+    pub fn new() -> Self {
+        Self {
+            variables: HashMap::new(),
+        }
+    }
+
+    /// Define a variable.
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.variables.insert(key.into(), value.into());
+    }
+
+    /// Remove a variable.
+    pub fn unset(&mut self, key: &str) -> Option<String> {
+        self.variables.remove(key)
+    }
+
+    /// Look up a variable value.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.variables.get(key).map(|s| s.as_str())
+    }
+
+    /// Return the number of defined variables.
+    pub fn len(&self) -> usize {
+        self.variables.len()
+    }
+
+    /// Return true if no variables are defined.
+    pub fn is_empty(&self) -> bool {
+        self.variables.is_empty()
+    }
+
+    /// Substitute all `${key}` occurrences in `input` with their values.
+    /// Unknown variables are left as-is.
+    pub fn resolve(&self, input: &str) -> String {
+        let mut result = input.to_string();
+        for (k, v) in &self.variables {
+            result = result.replace(&format!("${{{}}}", k), v);
+        }
+        result
+    }
+
+    /// Substitute variables in all elements of a slice, returning a new `Vec`.
+    pub fn resolve_all(&self, inputs: &[String]) -> Vec<String> {
+        inputs.iter().map(|s| self.resolve(s)).collect()
+    }
+
+    /// List all defined variable names sorted alphabetically.
+    pub fn keys_sorted(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.variables.keys().map(|s| s.as_str()).collect();
+        keys.sort_unstable();
+        keys
+    }
+}
+
+impl Default for TaskVariableResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task environment manager
+// ---------------------------------------------------------------------------
+
+/// Manages environment variables for task execution.
+///
+/// Supports layered overrides: base env → workspace env → task-specific env.
+#[derive(Debug, Clone)]
+pub struct TaskEnvironment {
+    base: HashMap<String, String>,
+    overrides: HashMap<String, String>,
+}
+
+impl TaskEnvironment {
+    pub fn new() -> Self {
+        Self {
+            base: HashMap::new(),
+            overrides: HashMap::new(),
+        }
+    }
+
+    /// Set a base environment variable.
+    pub fn set_base(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.base.insert(key.into(), value.into());
+    }
+
+    /// Set an override environment variable (takes precedence over base).
+    pub fn set_override(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.overrides.insert(key.into(), value.into());
+    }
+
+    /// Resolve a single environment variable (override wins over base).
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.overrides
+            .get(key)
+            .or_else(|| self.base.get(key))
+            .map(|s| s.as_str())
+    }
+
+    /// Produce the merged environment (base + overrides).
+    pub fn merged(&self) -> HashMap<String, String> {
+        let mut env = self.base.clone();
+        for (k, v) in &self.overrides {
+            env.insert(k.clone(), v.clone());
+        }
+        env
+    }
+
+    /// Return the number of unique keys across both layers.
+    pub fn len(&self) -> usize {
+        self.merged().len()
+    }
+
+    /// Return true if there are no env vars defined.
+    pub fn is_empty(&self) -> bool {
+        self.base.is_empty() && self.overrides.is_empty()
+    }
+
+    /// Remove an override, falling back to the base value.
+    pub fn remove_override(&mut self, key: &str) -> Option<String> {
+        self.overrides.remove(key)
+    }
+
+    /// Clear all overrides.
+    pub fn clear_overrides(&mut self) {
+        self.overrides.clear();
+    }
+}
+
+impl Default for TaskEnvironment {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task retry policy
+// ---------------------------------------------------------------------------
+
+/// Configuration for automatically retrying failed tasks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetryPolicy {
+    pub max_attempts: u32,
+    pub retry_on_exit_codes: Vec<i32>,
+}
+
+impl RetryPolicy {
+    /// Create a policy that retries up to `max_attempts` times on any failure.
+    pub fn new(max_attempts: u32) -> Self {
+        Self {
+            max_attempts,
+            retry_on_exit_codes: Vec::new(),
+        }
+    }
+
+    /// Only retry when the exit code matches one of the given codes.
+    pub fn on_exit_codes(mut self, codes: Vec<i32>) -> Self {
+        self.retry_on_exit_codes = codes;
+        self
+    }
+
+    /// Whether the given exit code should trigger a retry.
+    pub fn should_retry(&self, exit_code: i32, attempt: u32) -> bool {
+        if attempt >= self.max_attempts {
+            return false;
+        }
+        if exit_code == 0 {
+            return false;
+        }
+        if self.retry_on_exit_codes.is_empty() {
+            return true; // retry on any non-zero
+        }
+        self.retry_on_exit_codes.contains(&exit_code)
+    }
+}
+
+/// Tracks the state of a retryable task execution.
+#[derive(Debug, Clone)]
+pub struct RetryTracker {
+    policy: RetryPolicy,
+    attempts: Vec<i32>, // exit codes of each attempt
+}
+
+impl RetryTracker {
+    pub fn new(policy: RetryPolicy) -> Self {
+        Self {
+            policy,
+            attempts: Vec::new(),
+        }
+    }
+
+    /// Record an attempt with the given exit code. Returns `true` if another
+    /// retry should be made.
+    pub fn record_attempt(&mut self, exit_code: i32) -> bool {
+        self.attempts.push(exit_code);
+        self.policy
+            .should_retry(exit_code, self.attempts.len() as u32)
+    }
+
+    /// Number of attempts so far.
+    pub fn attempt_count(&self) -> u32 {
+        self.attempts.len() as u32
+    }
+
+    /// Whether the last attempt succeeded.
+    pub fn last_succeeded(&self) -> bool {
+        self.attempts.last() == Some(&0)
+    }
+
+    /// Whether we have exhausted all retries without success.
+    pub fn exhausted(&self) -> bool {
+        if self.attempts.is_empty() {
+            return false;
+        }
+        !self.last_succeeded()
+            && self.attempts.len() as u32 >= self.policy.max_attempts
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task group manager
+// ---------------------------------------------------------------------------
+
+/// Organises tasks into named groups and provides batch operations.
+#[derive(Debug)]
+pub struct TaskGroupManager {
+    groups: HashMap<String, Vec<String>>, // group name → task names
+}
+
+impl TaskGroupManager {
+    pub fn new() -> Self {
+        Self {
+            groups: HashMap::new(),
+        }
+    }
+
+    /// Add a task to a named group.
+    pub fn add_to_group(&mut self, group: &str, task_name: &str) {
+        self.groups
+            .entry(group.to_string())
+            .or_default()
+            .push(task_name.to_string());
+    }
+
+    /// Get the task names in a group.
+    pub fn tasks_in_group(&self, group: &str) -> Vec<&str> {
+        self.groups
+            .get(group)
+            .map(|v| v.iter().map(|s| s.as_str()).collect())
+            .unwrap_or_default()
+    }
+
+    /// List all group names sorted.
+    pub fn group_names(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self.groups.keys().map(|s| s.as_str()).collect();
+        names.sort_unstable();
+        names
+    }
+
+    /// Total number of groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Remove a task from a group. Returns true if the task was found.
+    pub fn remove_from_group(&mut self, group: &str, task_name: &str) -> bool {
+        if let Some(members) = self.groups.get_mut(group) {
+            if let Some(pos) = members.iter().position(|n| n == task_name) {
+                members.remove(pos);
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Remove an entire group. Returns the contained task names.
+    pub fn remove_group(&mut self, group: &str) -> Option<Vec<String>> {
+        self.groups.remove(group)
+    }
+}
+
+impl Default for TaskGroupManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1811,5 +2111,184 @@ mod tests {
         assert!(summary.contains("1 task(s) registered"));
         assert!(summary.contains("0 execution(s)"));
         assert!(summary.contains("0 running"));
+    }
+
+    // -- TaskVariableResolver --
+
+    #[test]
+    fn variable_resolver_substitutes_known_vars() {
+        let mut r = TaskVariableResolver::new();
+        r.set("workspaceFolder", "/home/user/project");
+        r.set("file", "src/main.rs");
+        let result = r.resolve("cd ${workspaceFolder} && edit ${file}");
+        assert_eq!(result, "cd /home/user/project && edit src/main.rs");
+    }
+
+    #[test]
+    fn variable_resolver_leaves_unknown_vars() {
+        let r = TaskVariableResolver::new();
+        let result = r.resolve("echo ${unknown}");
+        assert_eq!(result, "echo ${unknown}");
+    }
+
+    #[test]
+    fn variable_resolver_unset_and_len() {
+        let mut r = TaskVariableResolver::new();
+        r.set("a", "1");
+        r.set("b", "2");
+        assert_eq!(r.len(), 2);
+        assert!(!r.is_empty());
+        assert_eq!(r.unset("a"), Some("1".to_string()));
+        assert_eq!(r.len(), 1);
+        assert!(r.get("a").is_none());
+        assert_eq!(r.get("b"), Some("2"));
+    }
+
+    #[test]
+    fn variable_resolver_resolve_all() {
+        let mut r = TaskVariableResolver::new();
+        r.set("name", "world");
+        let inputs = vec!["hello ${name}".to_string(), "${name}!".to_string()];
+        let resolved = r.resolve_all(&inputs);
+        assert_eq!(resolved, vec!["hello world", "world!"]);
+    }
+
+    #[test]
+    fn variable_resolver_keys_sorted() {
+        let mut r = TaskVariableResolver::new();
+        r.set("zebra", "z");
+        r.set("alpha", "a");
+        r.set("mid", "m");
+        assert_eq!(r.keys_sorted(), vec!["alpha", "mid", "zebra"]);
+    }
+
+    // -- TaskEnvironment --
+
+    #[test]
+    fn task_environment_override_wins() {
+        let mut env = TaskEnvironment::new();
+        env.set_base("PATH", "/usr/bin");
+        env.set_override("PATH", "/custom/bin");
+        assert_eq!(env.get("PATH"), Some("/custom/bin"));
+    }
+
+    #[test]
+    fn task_environment_fallback_to_base() {
+        let mut env = TaskEnvironment::new();
+        env.set_base("HOME", "/home/user");
+        assert_eq!(env.get("HOME"), Some("/home/user"));
+        assert!(env.get("MISSING").is_none());
+    }
+
+    #[test]
+    fn task_environment_merged() {
+        let mut env = TaskEnvironment::new();
+        env.set_base("A", "1");
+        env.set_base("B", "2");
+        env.set_override("B", "override");
+        env.set_override("C", "3");
+        let merged = env.merged();
+        assert_eq!(merged.get("A").unwrap(), "1");
+        assert_eq!(merged.get("B").unwrap(), "override");
+        assert_eq!(merged.get("C").unwrap(), "3");
+        assert_eq!(env.len(), 3);
+    }
+
+    #[test]
+    fn task_environment_clear_overrides() {
+        let mut env = TaskEnvironment::new();
+        env.set_base("X", "base");
+        env.set_override("X", "over");
+        assert_eq!(env.get("X"), Some("over"));
+        env.clear_overrides();
+        assert_eq!(env.get("X"), Some("base"));
+    }
+
+    // -- RetryPolicy / RetryTracker --
+
+    #[test]
+    fn retry_policy_basic() {
+        let policy = RetryPolicy::new(3);
+        assert!(policy.should_retry(1, 0));
+        assert!(policy.should_retry(1, 2));
+        assert!(!policy.should_retry(1, 3)); // exhausted
+        assert!(!policy.should_retry(0, 0)); // success never retries
+    }
+
+    #[test]
+    fn retry_policy_specific_exit_codes() {
+        let policy = RetryPolicy::new(3).on_exit_codes(vec![2, 137]);
+        assert!(policy.should_retry(2, 0));
+        assert!(policy.should_retry(137, 1));
+        assert!(!policy.should_retry(1, 0)); // exit code 1 not in list
+    }
+
+    #[test]
+    fn retry_tracker_records_and_exhausts() {
+        let policy = RetryPolicy::new(2);
+        let mut tracker = RetryTracker::new(policy);
+        assert!(!tracker.exhausted());
+        let should = tracker.record_attempt(1);
+        assert!(should); // 1 of 2, should retry
+        assert_eq!(tracker.attempt_count(), 1);
+        let should = tracker.record_attempt(1);
+        assert!(!should); // 2 of 2, exhausted
+        assert!(tracker.exhausted());
+        assert!(!tracker.last_succeeded());
+    }
+
+    #[test]
+    fn retry_tracker_succeeds_on_second_try() {
+        let policy = RetryPolicy::new(3);
+        let mut tracker = RetryTracker::new(policy);
+        tracker.record_attempt(1); // fail
+        tracker.record_attempt(0); // success
+        assert!(tracker.last_succeeded());
+        assert!(!tracker.exhausted());
+        assert_eq!(tracker.attempt_count(), 2);
+    }
+
+    // -- TaskGroupManager --
+
+    #[test]
+    fn group_manager_add_and_list() {
+        let mut mgr = TaskGroupManager::new();
+        mgr.add_to_group("build", "compile");
+        mgr.add_to_group("build", "link");
+        mgr.add_to_group("test", "unit-test");
+        assert_eq!(mgr.tasks_in_group("build"), vec!["compile", "link"]);
+        assert_eq!(mgr.tasks_in_group("test"), vec!["unit-test"]);
+        assert!(mgr.tasks_in_group("deploy").is_empty());
+        assert_eq!(mgr.group_count(), 2);
+    }
+
+    #[test]
+    fn group_manager_remove_task_from_group() {
+        let mut mgr = TaskGroupManager::new();
+        mgr.add_to_group("ci", "lint");
+        mgr.add_to_group("ci", "test");
+        assert!(mgr.remove_from_group("ci", "lint"));
+        assert!(!mgr.remove_from_group("ci", "lint")); // already removed
+        assert_eq!(mgr.tasks_in_group("ci"), vec!["test"]);
+    }
+
+    #[test]
+    fn group_manager_remove_group() {
+        let mut mgr = TaskGroupManager::new();
+        mgr.add_to_group("release", "build");
+        mgr.add_to_group("release", "publish");
+        let removed = mgr.remove_group("release").unwrap();
+        assert_eq!(removed, vec!["build", "publish"]);
+        assert!(mgr.remove_group("release").is_none());
+        assert_eq!(mgr.group_count(), 0);
+    }
+
+    #[test]
+    fn group_manager_group_names_sorted() {
+        let mut mgr = TaskGroupManager::new();
+        mgr.add_to_group("z-group", "t1");
+        mgr.add_to_group("a-group", "t2");
+        mgr.add_to_group("m-group", "t3");
+        assert_eq!(mgr.group_names(), vec!["a-group", "m-group", "z-group"]);
     }
 }

@@ -1094,6 +1094,377 @@ impl std::fmt::Display for EditorStats {
         )
     }
 }
+// ---------------------------------------------------------------------------
+// VisibleRange - tracks which lines are currently visible in the viewport
+// ---------------------------------------------------------------------------
+
+/// Represents the range of lines currently visible in the editor viewport.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VisibleRange {
+    /// 0-based index of the first visible line.
+    pub scroll_top: u32,
+    /// Number of visible rows.
+    pub viewport_height: u32,
+    /// Total number of lines in the document.
+    pub total_lines: u32,
+}
+
+impl VisibleRange {
+    /// Create a new visible range.
+    pub fn new(scroll_top: u32, viewport_height: u32, total_lines: u32) -> Self {
+        Self {
+            scroll_top,
+            viewport_height,
+            total_lines,
+        }
+    }
+
+    /// The 1-based line number of the first visible line.
+    pub fn first_visible_line(&self) -> u32 {
+        self.scroll_top + 1
+    }
+
+    /// The 1-based line number of the last visible line (clamped to total_lines).
+    pub fn last_visible_line(&self) -> u32 {
+        (self.scroll_top + self.viewport_height).min(self.total_lines)
+    }
+
+    /// Whether the viewport is scrolled to the very top.
+    pub fn is_at_top(&self) -> bool {
+        self.scroll_top == 0
+    }
+
+    /// Whether the viewport is scrolled to the very bottom.
+    pub fn is_at_bottom(&self) -> bool {
+        self.scroll_top + self.viewport_height >= self.total_lines
+    }
+
+    /// Returns true if the given 1-based line number is visible.
+    pub fn contains_line(&self, line_1based: u32) -> bool {
+        if line_1based == 0 {
+            return false;
+        }
+        let line_0based = line_1based - 1;
+        line_0based >= self.scroll_top && line_0based < self.scroll_top + self.viewport_height
+    }
+
+    /// The percentage of the document currently visible (0.0..=100.0).
+    pub fn visible_percentage(&self) -> f64 {
+        if self.total_lines == 0 {
+            return 100.0;
+        }
+        let visible = self.viewport_height.min(self.total_lines);
+        (visible as f64 / self.total_lines as f64) * 100.0
+    }
+
+    /// The scroll position as a fraction (0.0..=1.0) for scrollbar rendering.
+    pub fn scroll_fraction(&self) -> f64 {
+        if self.total_lines <= self.viewport_height {
+            return 0.0;
+        }
+        self.scroll_top as f64 / (self.total_lines - self.viewport_height) as f64
+    }
+
+    /// How many lines can still be scrolled down.
+    pub fn lines_below(&self) -> u32 {
+        self.total_lines
+            .saturating_sub(self.scroll_top + self.viewport_height)
+    }
+
+    /// How many lines are above the viewport.
+    pub fn lines_above(&self) -> u32 {
+        self.scroll_top
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BracketMatcher - finds matching brackets in a line
+// ---------------------------------------------------------------------------
+
+/// Utility for matching bracket pairs within a single line of text.
+pub struct BracketMatcher;
+
+impl BracketMatcher {
+    const OPEN_BRACKETS: &'static [char] = &['(', '[', '{'];
+    const CLOSE_BRACKETS: &'static [char] = &[')', ']', '}'];
+
+    /// Find the matching bracket for the character at `column_1based`.
+    /// Returns the 1-based column of the matching bracket, or `None`.
+    pub fn find_matching_bracket(line: &str, column_1based: u32) -> Option<u32> {
+        if column_1based == 0 {
+            return None;
+        }
+        let chars: Vec<char> = line.chars().collect();
+        let idx = (column_1based - 1) as usize;
+        if idx >= chars.len() {
+            return None;
+        }
+        let ch = chars[idx];
+
+        if let Some(bracket_idx) = Self::OPEN_BRACKETS.iter().position(|&b| b == ch) {
+            // Search forward for matching close bracket
+            let close = Self::CLOSE_BRACKETS[bracket_idx];
+            let mut depth = 1i32;
+            for i in (idx + 1)..chars.len() {
+                if chars[i] == ch {
+                    depth += 1;
+                } else if chars[i] == close {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some((i + 1) as u32);
+                    }
+                }
+            }
+            None
+        } else if let Some(bracket_idx) = Self::CLOSE_BRACKETS.iter().position(|&b| b == ch) {
+            // Search backward for matching open bracket
+            let open = Self::OPEN_BRACKETS[bracket_idx];
+            let mut depth = 1i32;
+            for i in (0..idx).rev() {
+                if chars[i] == ch {
+                    depth += 1;
+                } else if chars[i] == open {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some((i + 1) as u32);
+                    }
+                }
+            }
+            None
+        } else {
+            None
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GutterInfo - detailed gutter layout computation
+// ---------------------------------------------------------------------------
+
+/// Detailed information about gutter layout and widths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GutterInfo {
+    /// Width allocated for line numbers (0 if hidden).
+    pub line_number_width: u16,
+    /// Width allocated for fold markers (0 or 1).
+    pub fold_marker_width: u16,
+    /// Width allocated for breakpoint indicators (0 or 2).
+    pub breakpoint_width: u16,
+}
+
+impl GutterInfo {
+    /// Compute the gutter layout for the given configuration.
+    pub fn compute(
+        line_count: u32,
+        show_line_numbers: bool,
+        show_fold_markers: bool,
+        show_breakpoints: bool,
+    ) -> Self {
+        let line_number_width = if show_line_numbers {
+            EditorRenderer::line_number_width_for(line_count)
+        } else {
+            0
+        };
+        Self {
+            line_number_width,
+            fold_marker_width: if show_fold_markers { 1 } else { 0 },
+            breakpoint_width: if show_breakpoints { 2 } else { 0 },
+        }
+    }
+
+    /// Total width of the gutter in columns.
+    pub fn total_width(&self) -> u16 {
+        self.line_number_width + self.fold_marker_width + self.breakpoint_width
+    }
+
+    /// Width available for content given a total editor width.
+    pub fn content_width(&self, total_width: u16) -> u16 {
+        total_width.saturating_sub(self.total_width())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MinimapData - generates minimap density data from lines
+// ---------------------------------------------------------------------------
+
+/// A single entry in the minimap representing one source line.
+#[derive(Debug, Clone)]
+pub struct MinimapEntry {
+    /// The 1-based model line number.
+    pub line: u32,
+    /// Character density (ratio of non-whitespace to total width), 0.0..=1.0.
+    pub density: f64,
+    /// Indent level in characters.
+    pub indent: u32,
+}
+
+/// Data structure for rendering a minimap / code overview.
+#[derive(Debug, Clone)]
+pub struct MinimapData {
+    pub entries: Vec<MinimapEntry>,
+}
+
+impl MinimapData {
+    /// Build minimap data from a slice of line contents.
+    /// `max_width` is the reference width for density calculation.
+    pub fn from_lines(lines: &[String], max_width: u16) -> Self {
+        let entries = lines
+            .iter()
+            .enumerate()
+            .map(|(i, line)| {
+                let trimmed = line.trim_start();
+                let indent = (line.len() - trimmed.len()) as u32;
+                let non_ws = line.chars().filter(|c| !c.is_whitespace()).count();
+                let density = if max_width > 0 {
+                    (non_ws as f64 / max_width as f64).min(1.0)
+                } else {
+                    0.0
+                };
+                MinimapEntry {
+                    line: (i + 1) as u32,
+                    density,
+                    indent,
+                }
+            })
+            .collect();
+        Self { entries }
+    }
+
+    /// Return the subset of entries visible in the given viewport range.
+    pub fn visible_entries(&self, scroll_top: u32, height: u32) -> &[MinimapEntry] {
+        let start = scroll_top as usize;
+        let end = (scroll_top + height) as usize;
+        let clamped_end = end.min(self.entries.len());
+        if start >= self.entries.len() {
+            return &[];
+        }
+        &self.entries[start..clamped_end]
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IndentInfo - analyzes indentation of a line
+// ---------------------------------------------------------------------------
+
+/// Information about the indentation of a single line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IndentInfo {
+    /// Number of leading whitespace characters.
+    pub level: u32,
+    /// Whether tabs are used in the indentation.
+    pub uses_tabs: bool,
+    /// Number of leading tab characters.
+    pub tab_count: u32,
+    /// Number of leading space characters (after tabs).
+    pub space_count: u32,
+}
+
+impl IndentInfo {
+    /// Analyze the indentation of a line.
+    pub fn from_line(line: &str) -> Self {
+        let mut tabs = 0u32;
+        let mut spaces = 0u32;
+        let mut in_tabs = true;
+        for ch in line.chars() {
+            match ch {
+                '\t' if in_tabs => tabs += 1,
+                ' ' => {
+                    in_tabs = false;
+                    spaces += 1;
+                }
+                '\t' if !in_tabs => {
+                    // Tab after spaces - count it but mark mixed
+                    tabs += 1;
+                }
+                _ => break,
+            }
+        }
+        Self {
+            level: tabs + spaces,
+            uses_tabs: tabs > 0,
+            tab_count: tabs,
+            space_count: spaces,
+        }
+    }
+
+    /// Compute the visual width of this indentation given a tab size.
+    pub fn visual_width(&self, tab_size: u32) -> u32 {
+        self.tab_count * tab_size + self.space_count
+    }
+
+    /// Convert this indentation to a string using the specified style.
+    pub fn to_string_with_style(&self, use_tabs: bool, tab_size: u32) -> String {
+        if use_tabs {
+            let full_tabs = self.visual_width(tab_size) / tab_size;
+            let remaining = self.visual_width(tab_size) % tab_size;
+            let mut s = "\t".repeat(full_tabs as usize);
+            s.push_str(&" ".repeat(remaining as usize));
+            s
+        } else {
+            " ".repeat(self.visual_width(tab_size) as usize)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewportLineMap - maps between viewport rows and model lines
+// ---------------------------------------------------------------------------
+
+/// Maps between viewport row indices and 1-based model line numbers.
+#[derive(Debug, Clone)]
+pub struct ViewportLineMap {
+    scroll_top: u32,
+    viewport_height: u32,
+    total_lines: u32,
+}
+
+impl ViewportLineMap {
+    /// Create a new mapping.
+    pub fn new(scroll_top: u32, viewport_height: u32, total_lines: u32) -> Self {
+        Self {
+            scroll_top,
+            viewport_height,
+            total_lines,
+        }
+    }
+
+    /// Convert a viewport row (0-based) to a 1-based model line number.
+    /// Returns `None` if the row is past the end of the document or viewport.
+    pub fn viewport_to_model(&self, row: u32) -> Option<u32> {
+        if row >= self.viewport_height {
+            return None;
+        }
+        let line_0based = self.scroll_top + row;
+        if line_0based >= self.total_lines {
+            return None;
+        }
+        Some(line_0based + 1)
+    }
+
+    /// Convert a 1-based model line to a viewport row (0-based).
+    /// Returns `None` if the line is not visible.
+    pub fn model_to_viewport(&self, line_1based: u32) -> Option<u32> {
+        if line_1based == 0 {
+            return None;
+        }
+        let line_0based = line_1based - 1;
+        if line_0based < self.scroll_top {
+            return None;
+        }
+        let row = line_0based - self.scroll_top;
+        if row >= self.viewport_height {
+            return None;
+        }
+        Some(row)
+    }
+
+    /// The number of document lines that actually map to viewport rows.
+    pub fn visible_line_count(&self) -> u32 {
+        let available = self.total_lines.saturating_sub(self.scroll_top);
+        available.min(self.viewport_height)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1834,6 +2205,189 @@ mod tests {
         assert_eq!(set.len(), 3);
         set.merge_overlapping();
         assert_eq!(set.len(), 2);
+    }
+
+    // ---- VisibleRange tests ----
+
+    #[test]
+    fn visible_range_basic() {
+        let vr = VisibleRange::new(5, 24, 100);
+        assert_eq!(vr.first_visible_line(), 6);
+        assert_eq!(vr.last_visible_line(), 29);
+        assert!(!vr.is_at_top());
+        assert!(!vr.is_at_bottom());
+    }
+
+    #[test]
+    fn visible_range_at_top() {
+        let vr = VisibleRange::new(0, 24, 100);
+        assert!(vr.is_at_top());
+    }
+
+    #[test]
+    fn visible_range_at_bottom() {
+        let vr = VisibleRange::new(76, 24, 100);
+        assert!(vr.is_at_bottom());
+    }
+
+    #[test]
+    fn visible_range_contains_line() {
+        let vr = VisibleRange::new(10, 20, 100);
+        assert!(vr.contains_line(11)); // 1-based line 11 = 0-based 10
+        assert!(vr.contains_line(30)); // 1-based line 30 = 0-based 29
+        assert!(!vr.contains_line(31)); // 0-based 30 >= 10+20
+        assert!(!vr.contains_line(5));
+    }
+
+    #[test]
+    fn visible_range_visible_percentage() {
+        let vr = VisibleRange::new(0, 50, 100);
+        let pct = vr.visible_percentage();
+        assert!((pct - 50.0).abs() < 0.01);
+    }
+
+    // ---- BracketMatcher tests ----
+
+    #[test]
+    fn bracket_matcher_find_opening_paren() {
+        let result = BracketMatcher::find_matching_bracket("(hello)", 1);
+        assert_eq!(result, Some(7));
+    }
+
+    #[test]
+    fn bracket_matcher_find_closing_paren() {
+        let result = BracketMatcher::find_matching_bracket("(hello)", 7);
+        assert_eq!(result, Some(1));
+    }
+
+    #[test]
+    fn bracket_matcher_nested_brackets() {
+        let result = BracketMatcher::find_matching_bracket("{a[b(c)d]e}", 1);
+        assert_eq!(result, Some(11));
+        let result2 = BracketMatcher::find_matching_bracket("{a[b(c)d]e}", 3);
+        assert_eq!(result2, Some(9));
+        let result3 = BracketMatcher::find_matching_bracket("{a[b(c)d]e}", 5);
+        assert_eq!(result3, Some(7));
+    }
+
+    #[test]
+    fn bracket_matcher_no_match() {
+        let result = BracketMatcher::find_matching_bracket("(abc", 1);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn bracket_matcher_not_on_bracket() {
+        let result = BracketMatcher::find_matching_bracket("abc", 2);
+        assert_eq!(result, None);
+    }
+
+    // ---- GutterInfo tests ----
+
+    #[test]
+    fn gutter_info_basic() {
+        let gi = GutterInfo::compute(100, true, false, false);
+        assert!(gi.line_number_width > 0);
+        assert_eq!(gi.fold_marker_width, 0);
+        assert_eq!(gi.breakpoint_width, 0);
+        assert!(gi.total_width() > 0);
+    }
+
+    #[test]
+    fn gutter_info_all_features() {
+        let gi = GutterInfo::compute(1000, true, true, true);
+        assert!(gi.line_number_width > 0);
+        assert_eq!(gi.fold_marker_width, 1);
+        assert_eq!(gi.breakpoint_width, 2);
+        let total = gi.line_number_width + 1 + 2;
+        assert_eq!(gi.total_width(), total);
+    }
+
+    #[test]
+    fn gutter_info_no_line_numbers() {
+        let gi = GutterInfo::compute(100, false, false, false);
+        assert_eq!(gi.line_number_width, 0);
+        assert_eq!(gi.total_width(), 0);
+    }
+
+    // ---- MinimapData tests ----
+
+    #[test]
+    fn minimap_data_generation() {
+        let lines = vec![
+            "fn main() {".to_string(),
+            "    println!(\"hello\");".to_string(),
+            "}".to_string(),
+        ];
+        let data = MinimapData::from_lines(&lines, 20);
+        assert_eq!(data.entries.len(), 3);
+        assert!(data.entries[0].density > 0.0);
+    }
+
+    #[test]
+    fn minimap_data_empty() {
+        let lines: Vec<String> = vec![];
+        let data = MinimapData::from_lines(&lines, 20);
+        assert!(data.entries.is_empty());
+    }
+
+    // ---- IndentInfo tests ----
+
+    #[test]
+    fn indent_info_spaces() {
+        let info = IndentInfo::from_line("    hello");
+        assert_eq!(info.level, 4);
+        assert!(!info.uses_tabs);
+        assert_eq!(info.visual_width(4), 4);
+    }
+
+    #[test]
+    fn indent_info_tabs() {
+        let info = IndentInfo::from_line("\t\thello");
+        assert_eq!(info.level, 2);
+        assert!(info.uses_tabs);
+        assert_eq!(info.visual_width(4), 8);
+    }
+
+    #[test]
+    fn indent_info_mixed() {
+        let info = IndentInfo::from_line("\t  hello");
+        assert!(info.uses_tabs);
+        assert_eq!(info.visual_width(4), 6);
+    }
+
+    #[test]
+    fn indent_info_no_indent() {
+        let info = IndentInfo::from_line("hello");
+        assert_eq!(info.level, 0);
+        assert!(!info.uses_tabs);
+        assert_eq!(info.visual_width(4), 0);
+    }
+
+    // ---- ViewportLineMap tests ----
+
+    #[test]
+    fn viewport_line_map_basic() {
+        let map = ViewportLineMap::new(10, 5, 100);
+        assert_eq!(map.viewport_to_model(0), Some(11));
+        assert_eq!(map.viewport_to_model(4), Some(15));
+        assert_eq!(map.viewport_to_model(5), None);
+    }
+
+    #[test]
+    fn viewport_line_map_model_to_viewport() {
+        let map = ViewportLineMap::new(10, 5, 100);
+        assert_eq!(map.model_to_viewport(11), Some(0));
+        assert_eq!(map.model_to_viewport(15), Some(4));
+        assert_eq!(map.model_to_viewport(16), None);
+        assert_eq!(map.model_to_viewport(5), None);
+    }
+
+    #[test]
+    fn viewport_line_map_clamps_to_total() {
+        let map = ViewportLineMap::new(95, 10, 100);
+        assert_eq!(map.viewport_to_model(4), Some(100));
+        assert_eq!(map.viewport_to_model(5), None);
     }
 
     #[test]

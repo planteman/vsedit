@@ -1155,6 +1155,312 @@ impl InMemorySecretStorage {
         });
         Ok(())
     }
+
+    /// Return the total size in bytes of all stored secret values.
+    pub fn total_value_bytes(&self) -> usize {
+        self.secrets.values().map(|v| v.len()).sum()
+    }
+
+    /// Delete all keys matching a prefix. Returns the number of keys removed.
+    pub fn delete_with_prefix(&mut self, prefix: &str) -> usize {
+        let matching: Vec<String> = self
+            .secrets
+            .keys()
+            .filter(|k| k.starts_with(prefix))
+            .cloned()
+            .collect();
+        let count = matching.len();
+        for key in matching {
+            self.secrets.remove(&key);
+            self.change_log.push(SecretStorageChangeEvent {
+                key,
+                kind: SecretChangeKind::Deleted,
+            });
+        }
+        count
+    }
+
+    /// Export all keys and their redacted values as a summary report.
+    pub fn redacted_summary(&self) -> Vec<String> {
+        let mut entries: Vec<_> = self.secrets.iter().collect();
+        entries.sort_by_key(|(k, _)| k.clone());
+        entries
+            .into_iter()
+            .map(|(k, v)| {
+                let entry = SecretEntry {
+                    key: k.clone(),
+                    value: v.clone(),
+                };
+                entry.to_string()
+            })
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Secret value strength validation
+// ---------------------------------------------------------------------------
+
+/// Strength rating for a secret value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SecretStrength {
+    Weak,
+    Fair,
+    Strong,
+}
+
+impl fmt::Display for SecretStrength {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Weak => write!(f, "weak"),
+            Self::Fair => write!(f, "fair"),
+            Self::Strong => write!(f, "strong"),
+        }
+    }
+}
+
+/// Evaluate the strength of a secret value based on length and character diversity.
+pub fn evaluate_secret_strength(value: &str) -> SecretStrength {
+    if value.len() < 8 {
+        return SecretStrength::Weak;
+    }
+    let has_upper = value.chars().any(|c| c.is_ascii_uppercase());
+    let has_lower = value.chars().any(|c| c.is_ascii_lowercase());
+    let has_digit = value.chars().any(|c| c.is_ascii_digit());
+    let has_special = value.chars().any(|c| !c.is_alphanumeric());
+    let categories = [has_upper, has_lower, has_digit, has_special]
+        .iter()
+        .filter(|&&b| b)
+        .count();
+    if value.len() >= 16 && categories >= 3 {
+        SecretStrength::Strong
+    } else if value.len() >= 8 && categories >= 2 {
+        SecretStrength::Fair
+    } else {
+        SecretStrength::Weak
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Secret size policy
+// ---------------------------------------------------------------------------
+
+/// Enforces size limits on secret values.
+#[derive(Debug, Clone)]
+pub struct SecretSizePolicy {
+    max_value_bytes: usize,
+    max_total_bytes: usize,
+}
+
+impl SecretSizePolicy {
+    /// Create a policy with given per-value and total limits.
+    pub fn new(max_value_bytes: usize, max_total_bytes: usize) -> Self {
+        Self {
+            max_value_bytes,
+            max_total_bytes,
+        }
+    }
+
+    /// Check whether a single value exceeds the per-value limit.
+    pub fn check_value(&self, value: &str) -> Result<(), SecretStorageError> {
+        if value.len() > self.max_value_bytes {
+            return Err(SecretStorageError::Other(format!(
+                "secret value size {} exceeds maximum {}",
+                value.len(),
+                self.max_value_bytes
+            )));
+        }
+        Ok(())
+    }
+
+    /// Check whether adding `new_value_bytes` would exceed the total storage limit
+    /// given the current usage.
+    pub fn check_total(
+        &self,
+        current_total_bytes: usize,
+        new_value_bytes: usize,
+    ) -> Result<(), SecretStorageError> {
+        let projected = current_total_bytes.saturating_add(new_value_bytes);
+        if projected > self.max_total_bytes {
+            return Err(SecretStorageError::Other(format!(
+                "total storage {} would exceed maximum {}",
+                projected, self.max_total_bytes
+            )));
+        }
+        Ok(())
+    }
+
+    /// Maximum bytes for a single value.
+    pub fn max_value_bytes(&self) -> usize {
+        self.max_value_bytes
+    }
+
+    /// Maximum total bytes across all values.
+    pub fn max_total_bytes(&self) -> usize {
+        self.max_total_bytes
+    }
+}
+
+impl Default for SecretSizePolicy {
+    fn default() -> Self {
+        Self::new(64 * 1024, 1024 * 1024) // 64 KiB per value, 1 MiB total
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Secret migration between backends
+// ---------------------------------------------------------------------------
+
+/// Migrate all secrets from one storage backend to another.
+///
+/// Returns the number of secrets migrated. Secrets that already exist in the
+/// destination are overwritten.
+pub fn migrate_secrets(
+    source: &dyn SecretStorage,
+    dest: &mut dyn SecretStorage,
+) -> Result<usize, SecretStorageError> {
+    let keys = source.keys();
+    let mut count = 0;
+    for key in &keys {
+        if let Some(value) = source.get(key) {
+            dest.store(key, &value)?;
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+/// Migrate secrets matching a prefix from one backend to another.
+pub fn migrate_secrets_with_prefix(
+    source: &dyn SecretStorage,
+    dest: &mut dyn SecretStorage,
+    prefix: &str,
+) -> Result<usize, SecretStorageError> {
+    let keys = source.keys();
+    let mut count = 0;
+    for key in &keys {
+        if key.starts_with(prefix) {
+            if let Some(value) = source.get(key) {
+                dest.store(key, &value)?;
+                count += 1;
+            }
+        }
+    }
+    Ok(count)
+}
+
+// ---------------------------------------------------------------------------
+// Secret snapshot / diff
+// ---------------------------------------------------------------------------
+
+/// A point-in-time snapshot of secret keys and their hashed values.
+#[derive(Debug, Clone)]
+pub struct SecretSnapshot {
+    /// Mapping from key to a simple hash of the value (for change detection, not security).
+    entries: HashMap<String, u64>,
+    timestamp: u64,
+}
+
+impl SecretSnapshot {
+    /// Capture a snapshot from a storage backend.
+    pub fn capture(storage: &dyn SecretStorage, timestamp: u64) -> Self {
+        let keys = storage.keys();
+        let mut entries = HashMap::new();
+        for key in &keys {
+            if let Some(value) = storage.get(key) {
+                entries.insert(key.clone(), Self::simple_hash(&value));
+            }
+        }
+        Self { entries, timestamp }
+    }
+
+    /// Return the timestamp of this snapshot.
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    /// Number of secrets in the snapshot.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the snapshot is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Compute the diff between two snapshots: keys added, removed, and changed.
+    pub fn diff(&self, newer: &SecretSnapshot) -> SecretDiff {
+        let mut added = Vec::new();
+        let mut removed = Vec::new();
+        let mut changed = Vec::new();
+
+        for key in newer.entries.keys() {
+            match self.entries.get(key) {
+                None => added.push(key.clone()),
+                Some(old_hash) => {
+                    if newer.entries.get(key) != Some(old_hash) {
+                        changed.push(key.clone());
+                    }
+                }
+            }
+        }
+        for key in self.entries.keys() {
+            if !newer.entries.contains_key(key) {
+                removed.push(key.clone());
+            }
+        }
+
+        added.sort();
+        removed.sort();
+        changed.sort();
+
+        SecretDiff {
+            added,
+            removed,
+            changed,
+        }
+    }
+
+    fn simple_hash(s: &str) -> u64 {
+        let mut h: u64 = 5381;
+        for b in s.bytes() {
+            h = h.wrapping_mul(33).wrapping_add(b as u64);
+        }
+        h
+    }
+}
+
+/// The difference between two secret snapshots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecretDiff {
+    pub added: Vec<String>,
+    pub removed: Vec<String>,
+    pub changed: Vec<String>,
+}
+
+impl SecretDiff {
+    /// True if no differences exist.
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty() && self.changed.is_empty()
+    }
+
+    /// Total number of differences.
+    pub fn total(&self) -> usize {
+        self.added.len() + self.removed.len() + self.changed.len()
+    }
+}
+
+impl fmt::Display for SecretDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SecretDiff(+{} -{} ~{})",
+            self.added.len(),
+            self.removed.len(),
+            self.changed.len()
+        )
+    }
 }
 
 #[cfg(test)]
@@ -1859,5 +2165,172 @@ mod tests {
         store.rename_key("old-name", "new-name").unwrap();
         assert!(store.get("old-name").is_none());
         assert_eq!(store.get("new-name").unwrap(), "value123");
+    }
+
+    // -- Secret strength evaluation -------------------------------------------
+
+    #[test]
+    fn strength_weak_short_value() {
+        assert_eq!(evaluate_secret_strength("abc"), SecretStrength::Weak);
+        assert_eq!(evaluate_secret_strength("1234567"), SecretStrength::Weak);
+    }
+
+    #[test]
+    fn strength_fair_mixed_value() {
+        assert_eq!(evaluate_secret_strength("Abcdefg1"), SecretStrength::Fair);
+        assert_eq!(evaluate_secret_strength("password1A"), SecretStrength::Fair);
+    }
+
+    #[test]
+    fn strength_strong_long_diverse_value() {
+        assert_eq!(
+            evaluate_secret_strength("MyP@ssw0rd!LongEnough"),
+            SecretStrength::Strong
+        );
+    }
+
+    #[test]
+    fn strength_display() {
+        assert_eq!(SecretStrength::Weak.to_string(), "weak");
+        assert_eq!(SecretStrength::Fair.to_string(), "fair");
+        assert_eq!(SecretStrength::Strong.to_string(), "strong");
+    }
+
+    #[test]
+    fn strength_ordering() {
+        assert!(SecretStrength::Weak < SecretStrength::Fair);
+        assert!(SecretStrength::Fair < SecretStrength::Strong);
+    }
+
+    // -- Secret size policy ---------------------------------------------------
+
+    #[test]
+    fn size_policy_rejects_large_value() {
+        let policy = SecretSizePolicy::new(10, 1000);
+        assert!(policy.check_value("short").is_ok());
+        assert!(policy.check_value(&"x".repeat(11)).is_err());
+    }
+
+    #[test]
+    fn size_policy_rejects_total_overflow() {
+        let policy = SecretSizePolicy::new(100, 50);
+        assert!(policy.check_total(40, 5).is_ok());
+        assert!(policy.check_total(40, 20).is_err());
+    }
+
+    #[test]
+    fn size_policy_default() {
+        let policy = SecretSizePolicy::default();
+        assert_eq!(policy.max_value_bytes(), 64 * 1024);
+        assert_eq!(policy.max_total_bytes(), 1024 * 1024);
+    }
+
+    // -- Migration ------------------------------------------------------------
+
+    #[test]
+    fn migrate_all_secrets() {
+        let mut src = InMemorySecretStorage::new();
+        src.store("key1", "val1").unwrap();
+        src.store("key2", "val2").unwrap();
+        let mut dst = InMemorySecretStorage::new();
+        let count = migrate_secrets(&src, &mut dst).unwrap();
+        assert_eq!(count, 2);
+        assert_eq!(dst.get("key1"), Some("val1".to_string()));
+        assert_eq!(dst.get("key2"), Some("val2".to_string()));
+    }
+
+    #[test]
+    fn migrate_secrets_with_prefix_filter() {
+        let mut src = InMemorySecretStorage::new();
+        src.store("prod.token", "t1").unwrap();
+        src.store("prod.pass", "p1").unwrap();
+        src.store("dev.token", "t2").unwrap();
+        let mut dst = InMemorySecretStorage::new();
+        let count = migrate_secrets_with_prefix(&src, &mut dst, "prod.").unwrap();
+        assert_eq!(count, 2);
+        assert!(dst.get("dev.token").is_none());
+        assert_eq!(dst.get("prod.token"), Some("t1".to_string()));
+    }
+
+    // -- Snapshot / Diff ------------------------------------------------------
+
+    #[test]
+    fn snapshot_capture_and_diff() {
+        let mut store = InMemorySecretStorage::new();
+        store.store("alpha", "a1").unwrap();
+        store.store("beta", "b1").unwrap();
+        let snap1 = SecretSnapshot::capture(&store, 100);
+        assert_eq!(snap1.len(), 2);
+        assert!(!snap1.is_empty());
+
+        // Modify storage
+        store.store("beta", "b2").unwrap(); // changed
+        store.store("gamma", "g1").unwrap(); // added
+        store.delete("alpha").unwrap(); // removed
+        let snap2 = SecretSnapshot::capture(&store, 200);
+
+        let diff = snap1.diff(&snap2);
+        assert_eq!(diff.added, vec!["gamma"]);
+        assert_eq!(diff.removed, vec!["alpha"]);
+        assert_eq!(diff.changed, vec!["beta"]);
+        assert_eq!(diff.total(), 3);
+        assert!(!diff.is_empty());
+    }
+
+    #[test]
+    fn snapshot_diff_no_changes() {
+        let mut store = InMemorySecretStorage::new();
+        store.store("key", "val").unwrap();
+        let snap1 = SecretSnapshot::capture(&store, 1);
+        let snap2 = SecretSnapshot::capture(&store, 2);
+        let diff = snap1.diff(&snap2);
+        assert!(diff.is_empty());
+        assert_eq!(diff.total(), 0);
+    }
+
+    #[test]
+    fn snapshot_diff_display() {
+        let diff = SecretDiff {
+            added: vec!["a".into()],
+            removed: vec!["b".into(), "c".into()],
+            changed: vec![],
+        };
+        assert_eq!(diff.to_string(), "SecretDiff(+1 -2 ~0)");
+    }
+
+    // -- InMemorySecretStorage extended (new) ---------------------------------
+
+    #[test]
+    fn storage_total_value_bytes() {
+        let mut store = InMemorySecretStorage::new();
+        store.store("a", "12345").unwrap();
+        store.store("b", "67").unwrap();
+        assert_eq!(store.total_value_bytes(), 7);
+    }
+
+    #[test]
+    fn storage_delete_with_prefix() {
+        let mut store = InMemorySecretStorage::new();
+        store.store("cache.a", "1").unwrap();
+        store.store("cache.b", "2").unwrap();
+        store.store("perm.c", "3").unwrap();
+        let removed = store.delete_with_prefix("cache.");
+        assert_eq!(removed, 2);
+        assert_eq!(store.key_count(), 1);
+        assert!(store.has("perm.c"));
+    }
+
+    #[test]
+    fn storage_redacted_summary() {
+        let mut store = InMemorySecretStorage::new();
+        store.store("api-key", "supersecretvalue").unwrap();
+        store.store("token", "ab").unwrap();
+        let summary = store.redacted_summary();
+        assert_eq!(summary.len(), 2);
+        // Keys are sorted; api-key comes first
+        assert!(summary[0].starts_with("api-key="));
+        assert!(!summary[0].contains("supersecretvalue"));
+        // Short value is fully redacted
+        assert!(summary[1].contains("****"));
     }
 }

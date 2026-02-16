@@ -1127,6 +1127,378 @@ pub fn pane_swap(service: &mut PaneService, id_a: &str, id_b: &str) -> Result<()
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// PaneGrid – 2D grid layout for neighbor detection and navigation
+// ---------------------------------------------------------------------------
+
+/// A cell in a pane grid, mapping a pane id to its bounding rectangle.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GridCell {
+    pub pane_id: String,
+    pub bounds: Rectangle,
+}
+
+/// Cardinal direction for pane navigation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+/// A 2D grid of pane cells, supporting neighbor detection and navigation.
+#[derive(Debug, Clone)]
+pub struct PaneGrid {
+    cells: Vec<GridCell>,
+}
+
+impl PaneGrid {
+    pub fn new() -> Self {
+        Self { cells: Vec::new() }
+    }
+
+    /// Build a grid from a layout and a list of panes using horizontal splitting.
+    pub fn from_horizontal_layout(layout: &PaneLayout, panes: &[Pane]) -> Self {
+        let rects = layout.split_horizontal(panes);
+        let visible: Vec<&Pane> = panes.iter().filter(|p| p.visible).collect();
+        let cells = visible
+            .iter()
+            .zip(rects.iter())
+            .map(|(p, r)| GridCell {
+                pane_id: p.id.clone(),
+                bounds: *r,
+            })
+            .collect();
+        Self { cells }
+    }
+
+    /// Build a grid from a layout and a list of panes using vertical splitting.
+    pub fn from_vertical_layout(layout: &PaneLayout, panes: &[Pane]) -> Self {
+        let rects = layout.split_vertical(panes);
+        let visible: Vec<&Pane> = panes.iter().filter(|p| p.visible).collect();
+        let cells = visible
+            .iter()
+            .zip(rects.iter())
+            .map(|(p, r)| GridCell {
+                pane_id: p.id.clone(),
+                bounds: *r,
+            })
+            .collect();
+        Self { cells }
+    }
+
+    /// Add a cell manually.
+    pub fn add_cell(&mut self, pane_id: impl Into<String>, bounds: Rectangle) {
+        self.cells.push(GridCell {
+            pane_id: pane_id.into(),
+            bounds,
+        });
+    }
+
+    /// Number of cells in the grid.
+    pub fn len(&self) -> usize {
+        self.cells.len()
+    }
+
+    /// Whether the grid is empty.
+    pub fn is_empty(&self) -> bool {
+        self.cells.is_empty()
+    }
+
+    /// Get the cell for a given pane id.
+    pub fn cell_for(&self, pane_id: &str) -> Option<&GridCell> {
+        self.cells.iter().find(|c| c.pane_id == pane_id)
+    }
+
+    /// Find the neighbor of a pane in the given direction.
+    ///
+    /// Neighbor detection uses the center point of each cell. For a given
+    /// direction, we look for the closest cell whose center is strictly in
+    /// that direction from the source cell's center.
+    pub fn neighbor(&self, pane_id: &str, direction: Direction) -> Option<&str> {
+        let source = self.cell_for(pane_id)?;
+        let src_cx = source.bounds.x as i64 + source.bounds.width as i64 / 2;
+        let src_cy = source.bounds.y as i64 + source.bounds.height as i64 / 2;
+
+        let mut best: Option<(&GridCell, i64)> = None;
+
+        for cell in &self.cells {
+            if cell.pane_id == pane_id {
+                continue;
+            }
+            let cx = cell.bounds.x as i64 + cell.bounds.width as i64 / 2;
+            let cy = cell.bounds.y as i64 + cell.bounds.height as i64 / 2;
+
+            let qualifies = match direction {
+                Direction::Right => cx > src_cx,
+                Direction::Left => cx < src_cx,
+                Direction::Down => cy > src_cy,
+                Direction::Up => cy < src_cy,
+            };
+
+            if !qualifies {
+                continue;
+            }
+
+            let dist = (cx - src_cx).abs() + (cy - src_cy).abs();
+            if best.map_or(true, |(_, d)| dist < d) {
+                best = Some((cell, dist));
+            }
+        }
+
+        best.map(|(cell, _)| cell.pane_id.as_str())
+    }
+
+    /// Return all pane ids in the grid.
+    pub fn pane_ids(&self) -> Vec<&str> {
+        self.cells.iter().map(|c| c.pane_id.as_str()).collect()
+    }
+
+    /// Validate that no cells overlap. Returns the ids of overlapping pairs.
+    pub fn find_overlaps(&self) -> Vec<(&str, &str)> {
+        let mut overlaps = Vec::new();
+        for i in 0..self.cells.len() {
+            for j in (i + 1)..self.cells.len() {
+                if rects_overlap(&self.cells[i].bounds, &self.cells[j].bounds) {
+                    overlaps.push((
+                        self.cells[i].pane_id.as_str(),
+                        self.cells[j].pane_id.as_str(),
+                    ));
+                }
+            }
+        }
+        overlaps
+    }
+
+    /// Validate that all cells fit within the given container bounds.
+    pub fn all_within(&self, container: &Rectangle) -> bool {
+        self.cells.iter().all(|c| rect_within(&c.bounds, container))
+    }
+}
+
+impl Default for PaneGrid {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Check whether two rectangles overlap (share any interior area).
+fn rects_overlap(a: &Rectangle, b: &Rectangle) -> bool {
+    let a_right = a.x + a.width;
+    let b_right = b.x + b.width;
+    let a_bottom = a.y + a.height;
+    let b_bottom = b.y + b.height;
+
+    a.x < b_right && b.x < a_right && a.y < b_bottom && b.y < a_bottom
+}
+
+/// Check whether `inner` is fully contained within `outer`.
+fn rect_within(inner: &Rectangle, outer: &Rectangle) -> bool {
+    inner.x >= outer.x
+        && inner.y >= outer.y
+        && inner.x + inner.width <= outer.x + outer.width
+        && inner.y + inner.height <= outer.y + outer.height
+}
+
+// ---------------------------------------------------------------------------
+// Proportional resize – resize panes while maintaining proportions
+// ---------------------------------------------------------------------------
+
+/// Distributes a total size among `count` items proportionally to `weights`.
+/// Each weight is a positive f64. Returns a vector of integer sizes that sum
+/// to exactly `total`.
+pub fn distribute_proportional(total: u32, weights: &[f64]) -> Vec<u32> {
+    if weights.is_empty() {
+        return Vec::new();
+    }
+    let weight_sum: f64 = weights.iter().sum();
+    if weight_sum <= 0.0 {
+        let each = total / weights.len() as u32;
+        let mut result = vec![each; weights.len()];
+        let remainder = total - each * weights.len() as u32;
+        for r in result.iter_mut().take(remainder as usize) {
+            *r += 1;
+        }
+        return result;
+    }
+
+    let mut sizes: Vec<u32> = weights
+        .iter()
+        .map(|w| ((w / weight_sum) * total as f64).floor() as u32)
+        .collect();
+
+    let assigned: u32 = sizes.iter().sum();
+    let mut remainder = total.saturating_sub(assigned);
+
+    // Distribute remaining pixels to the items with the largest fractional parts.
+    let mut fractionals: Vec<(usize, f64)> = weights
+        .iter()
+        .enumerate()
+        .map(|(i, w)| {
+            let exact = (w / weight_sum) * total as f64;
+            (i, exact - exact.floor())
+        })
+        .collect();
+    fractionals.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    for (idx, _) in fractionals {
+        if remainder == 0 {
+            break;
+        }
+        sizes[idx] += 1;
+        remainder -= 1;
+    }
+
+    sizes
+}
+
+/// Resize a list of pane rectangles horizontally so they fill `total_width`,
+/// keeping their current proportions. Returns the new rectangles.
+pub fn resize_horizontal_proportional(rects: &[Rectangle], total_width: u32) -> Vec<Rectangle> {
+    if rects.is_empty() {
+        return Vec::new();
+    }
+    let weights: Vec<f64> = rects.iter().map(|r| r.width as f64).collect();
+    let widths = distribute_proportional(total_width, &weights);
+
+    let mut result = Vec::with_capacity(rects.len());
+    let mut x = rects.first().map_or(0, |r| r.x);
+    for (r, &w) in rects.iter().zip(widths.iter()) {
+        result.push(Rectangle::new(x, r.y, w, r.height));
+        x += w;
+    }
+    result
+}
+
+/// Resize a list of pane rectangles vertically so they fill `total_height`,
+/// keeping their current proportions. Returns the new rectangles.
+pub fn resize_vertical_proportional(rects: &[Rectangle], total_height: u32) -> Vec<Rectangle> {
+    if rects.is_empty() {
+        return Vec::new();
+    }
+    let weights: Vec<f64> = rects.iter().map(|r| r.height as f64).collect();
+    let heights = distribute_proportional(total_height, &weights);
+
+    let mut result = Vec::with_capacity(rects.len());
+    let mut y = rects.first().map_or(0, |r| r.y);
+    for (r, &h) in rects.iter().zip(heights.iter()) {
+        result.push(Rectangle::new(r.x, y, r.width, h));
+        y += h;
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// PaneSizeConstraints – validate and enforce min/max size limits
+// ---------------------------------------------------------------------------
+
+/// Enforces min/max width and height constraints on pane sizes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PaneSizeConstraints {
+    pub min_width: u32,
+    pub max_width: u32,
+    pub min_height: u32,
+    pub max_height: u32,
+}
+
+impl PaneSizeConstraints {
+    pub fn new(min_width: u32, max_width: u32, min_height: u32, max_height: u32) -> Self {
+        Self {
+            min_width: min_width.min(max_width),
+            max_width: max_width.max(min_width),
+            min_height: min_height.min(max_height),
+            max_height: max_height.max(min_height),
+        }
+    }
+
+    /// Clamp width and height to these constraints.
+    pub fn clamp(&self, width: u32, height: u32) -> (u32, u32) {
+        (
+            width.clamp(self.min_width, self.max_width),
+            height.clamp(self.min_height, self.max_height),
+        )
+    }
+
+    /// Check whether the given dimensions satisfy these constraints.
+    pub fn satisfies(&self, width: u32, height: u32) -> bool {
+        width >= self.min_width
+            && width <= self.max_width
+            && height >= self.min_height
+            && height <= self.max_height
+    }
+
+    /// Apply constraints to a Rectangle, clamping its width and height.
+    pub fn clamp_rect(&self, rect: &Rectangle) -> Rectangle {
+        let (w, h) = self.clamp(rect.width, rect.height);
+        Rectangle::new(rect.x, rect.y, w, h)
+    }
+}
+
+impl Default for PaneSizeConstraints {
+    fn default() -> Self {
+        Self::new(50, 2000, 50, 2000)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Layout validation
+// ---------------------------------------------------------------------------
+
+/// Errors found during layout validation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LayoutValidationError {
+    /// Two panes overlap.
+    Overlap { a: String, b: String },
+    /// A pane extends beyond the container.
+    OutOfBounds { pane_id: String },
+    /// A pane is below minimum size.
+    BelowMinSize { pane_id: String, width: u32, height: u32 },
+    /// No panes in the layout.
+    Empty,
+}
+
+/// Validate a grid layout against a container and minimum size.
+pub fn validate_layout(
+    grid: &PaneGrid,
+    container: &Rectangle,
+    min_width: u32,
+    min_height: u32,
+) -> Vec<LayoutValidationError> {
+    let mut errors = Vec::new();
+
+    if grid.is_empty() {
+        errors.push(LayoutValidationError::Empty);
+        return errors;
+    }
+
+    // Check overlaps
+    for (a, b) in grid.find_overlaps() {
+        errors.push(LayoutValidationError::Overlap {
+            a: a.to_string(),
+            b: b.to_string(),
+        });
+    }
+
+    // Check bounds and minimum sizes
+    for cell in &grid.cells {
+        if !rect_within(&cell.bounds, container) {
+            errors.push(LayoutValidationError::OutOfBounds {
+                pane_id: cell.pane_id.clone(),
+            });
+        }
+        if cell.bounds.width < min_width || cell.bounds.height < min_height {
+            errors.push(LayoutValidationError::BelowMinSize {
+                pane_id: cell.pane_id.clone(),
+                width: cell.bounds.width,
+                height: cell.bounds.height,
+            });
+        }
+    }
+
+    errors
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1856,5 +2228,195 @@ mod tests {
         policy.set_rule("follower", VisibilityRule::FollowPane("main".into()));
         let vis = policy.evaluate_visibility(None);
         assert_eq!(*vis.get("follower").unwrap(), true);
+    }
+
+    // ---- PaneGrid tests ----
+
+    #[test]
+    fn grid_neighbor_horizontal() {
+        let layout = PaneLayout::new(Rectangle::new(0, 0, 900, 300));
+        let panes = vec![
+            pane("left", PaneLocation::Editor),
+            pane("mid", PaneLocation::Editor),
+            pane("right", PaneLocation::Editor),
+        ];
+        let grid = PaneGrid::from_horizontal_layout(&layout, &panes);
+        assert_eq!(grid.len(), 3);
+        assert_eq!(grid.neighbor("left", Direction::Right), Some("mid"));
+        assert_eq!(grid.neighbor("mid", Direction::Right), Some("right"));
+        assert_eq!(grid.neighbor("right", Direction::Left), Some("mid"));
+        assert_eq!(grid.neighbor("left", Direction::Left), None);
+        assert_eq!(grid.neighbor("right", Direction::Right), None);
+    }
+
+    #[test]
+    fn grid_neighbor_vertical() {
+        let layout = PaneLayout::new(Rectangle::new(0, 0, 400, 600));
+        let panes = vec![
+            pane("top", PaneLocation::Editor),
+            pane("bottom", PaneLocation::Editor),
+        ];
+        let grid = PaneGrid::from_vertical_layout(&layout, &panes);
+        assert_eq!(grid.len(), 2);
+        assert_eq!(grid.neighbor("top", Direction::Down), Some("bottom"));
+        assert_eq!(grid.neighbor("bottom", Direction::Up), Some("top"));
+        assert_eq!(grid.neighbor("top", Direction::Up), None);
+    }
+
+    #[test]
+    fn grid_no_overlaps_from_layout() {
+        let layout = PaneLayout::new(Rectangle::new(0, 0, 1000, 500));
+        let panes = vec![
+            pane("a", PaneLocation::Editor),
+            pane("b", PaneLocation::Editor),
+            pane("c", PaneLocation::Editor),
+        ];
+        let grid = PaneGrid::from_horizontal_layout(&layout, &panes);
+        assert!(grid.find_overlaps().is_empty());
+        assert!(grid.all_within(&Rectangle::new(0, 0, 1000, 500)));
+    }
+
+    #[test]
+    fn grid_detects_overlaps() {
+        let mut grid = PaneGrid::new();
+        grid.add_cell("a", Rectangle::new(0, 0, 200, 200));
+        grid.add_cell("b", Rectangle::new(100, 0, 200, 200));
+        let overlaps = grid.find_overlaps();
+        assert_eq!(overlaps.len(), 1);
+        assert_eq!(overlaps[0], ("a", "b"));
+    }
+
+    #[test]
+    fn grid_all_within_check() {
+        let mut grid = PaneGrid::new();
+        grid.add_cell("inside", Rectangle::new(10, 10, 80, 80));
+        assert!(grid.all_within(&Rectangle::new(0, 0, 100, 100)));
+        grid.add_cell("outside", Rectangle::new(90, 90, 20, 20));
+        assert!(!grid.all_within(&Rectangle::new(0, 0, 100, 100)));
+    }
+
+    // ---- Proportional resize tests ----
+
+    #[test]
+    fn distribute_proportional_even() {
+        let sizes = distribute_proportional(900, &[1.0, 1.0, 1.0]);
+        assert_eq!(sizes, vec![300, 300, 300]);
+        let total: u32 = sizes.iter().sum();
+        assert_eq!(total, 900);
+    }
+
+    #[test]
+    fn distribute_proportional_uneven() {
+        let sizes = distribute_proportional(100, &[1.0, 2.0, 2.0]);
+        let total: u32 = sizes.iter().sum();
+        assert_eq!(total, 100);
+        // The 2x-weight items should be roughly double the 1x-weight item
+        assert!(sizes[1] >= sizes[0]);
+        assert!(sizes[2] >= sizes[0]);
+    }
+
+    #[test]
+    fn resize_horizontal_proportional_preserves_total() {
+        let rects = vec![
+            Rectangle::new(0, 0, 200, 100),
+            Rectangle::new(200, 0, 300, 100),
+            Rectangle::new(500, 0, 500, 100),
+        ];
+        let resized = resize_horizontal_proportional(&rects, 1200);
+        let total_width: u32 = resized.iter().map(|r| r.width).sum();
+        assert_eq!(total_width, 1200);
+        // x-coordinates should be contiguous
+        assert_eq!(resized[0].x, 0);
+        assert_eq!(resized[1].x, resized[0].width);
+        assert_eq!(resized[2].x, resized[0].width + resized[1].width);
+    }
+
+    #[test]
+    fn resize_vertical_proportional_preserves_total() {
+        let rects = vec![
+            Rectangle::new(0, 0, 400, 100),
+            Rectangle::new(0, 100, 400, 300),
+        ];
+        let resized = resize_vertical_proportional(&rects, 800);
+        let total_height: u32 = resized.iter().map(|r| r.height).sum();
+        assert_eq!(total_height, 800);
+    }
+
+    // ---- PaneSizeConstraints tests ----
+
+    #[test]
+    fn size_constraints_clamp() {
+        let c = PaneSizeConstraints::new(100, 500, 80, 400);
+        assert_eq!(c.clamp(50, 50), (100, 80));
+        assert_eq!(c.clamp(600, 600), (500, 400));
+        assert_eq!(c.clamp(200, 200), (200, 200));
+    }
+
+    #[test]
+    fn size_constraints_satisfies() {
+        let c = PaneSizeConstraints::new(100, 500, 100, 400);
+        assert!(c.satisfies(200, 200));
+        assert!(!c.satisfies(50, 200));
+        assert!(!c.satisfies(200, 50));
+        assert!(!c.satisfies(600, 200));
+    }
+
+    #[test]
+    fn size_constraints_clamp_rect() {
+        let c = PaneSizeConstraints::new(100, 500, 100, 400);
+        let r = Rectangle::new(10, 20, 50, 600);
+        let clamped = c.clamp_rect(&r);
+        assert_eq!(clamped.x, 10);
+        assert_eq!(clamped.y, 20);
+        assert_eq!(clamped.width, 100);
+        assert_eq!(clamped.height, 400);
+    }
+
+    // ---- Layout validation tests ----
+
+    #[test]
+    fn validate_layout_valid() {
+        let container = Rectangle::new(0, 0, 1000, 500);
+        let layout = PaneLayout::new(container);
+        let panes = vec![
+            pane("a", PaneLocation::Editor),
+            pane("b", PaneLocation::Editor),
+        ];
+        let grid = PaneGrid::from_horizontal_layout(&layout, &panes);
+        let errors = validate_layout(&grid, &container, 100, 100);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn validate_layout_empty_grid() {
+        let container = Rectangle::new(0, 0, 100, 100);
+        let grid = PaneGrid::new();
+        let errors = validate_layout(&grid, &container, 50, 50);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0], LayoutValidationError::Empty);
+    }
+
+    #[test]
+    fn validate_layout_detects_below_min() {
+        let container = Rectangle::new(0, 0, 1000, 1000);
+        let mut grid = PaneGrid::new();
+        grid.add_cell("tiny", Rectangle::new(0, 0, 30, 30));
+        let errors = validate_layout(&grid, &container, 50, 50);
+        assert!(errors.iter().any(|e| matches!(
+            e,
+            LayoutValidationError::BelowMinSize { pane_id, .. } if pane_id == "tiny"
+        )));
+    }
+
+    #[test]
+    fn validate_layout_detects_out_of_bounds() {
+        let container = Rectangle::new(0, 0, 100, 100);
+        let mut grid = PaneGrid::new();
+        grid.add_cell("oob", Rectangle::new(90, 90, 50, 50));
+        let errors = validate_layout(&grid, &container, 10, 10);
+        assert!(errors.iter().any(|e| matches!(
+            e,
+            LayoutValidationError::OutOfBounds { pane_id } if pane_id == "oob"
+        )));
     }
 }

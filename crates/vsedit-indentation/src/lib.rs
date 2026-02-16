@@ -1222,6 +1222,322 @@ pub fn extract_block(text: &str, target_level: u32, style: IndentStyle) -> Optio
     }
 }
 
+// ---------------------------------------------------------------------------
+// Indentation histogram
+// ---------------------------------------------------------------------------
+
+/// A histogram entry recording how many non-blank lines appear at each indent level.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndentHistogramEntry {
+    pub level: u32,
+    pub count: usize,
+}
+
+/// Compute a histogram of indent levels present in `text`.
+///
+/// Returns entries sorted by level (ascending). Levels with zero occurrences
+/// between the minimum and maximum are included with `count = 0` so the
+/// caller can render a contiguous bar chart.
+pub fn indent_histogram(text: &str, style: IndentStyle) -> Vec<IndentHistogramEntry> {
+    let mut counts: std::collections::BTreeMap<u32, usize> = std::collections::BTreeMap::new();
+
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let level = get_line_indent_level(line, style);
+        *counts.entry(level).or_insert(0) += 1;
+    }
+
+    if counts.is_empty() {
+        return Vec::new();
+    }
+
+    let max_level = *counts.keys().last().unwrap();
+    (0..=max_level)
+        .map(|level| IndentHistogramEntry {
+            level,
+            count: counts.get(&level).copied().unwrap_or(0),
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Foldable region detection
+// ---------------------------------------------------------------------------
+
+/// A foldable region detected by indentation: a line followed by one or more
+/// lines at a deeper indent level.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoldRegion {
+    /// Zero-based line number of the fold header.
+    pub header_line: usize,
+    /// Zero-based line number of the last line in the fold body (inclusive).
+    pub end_line: usize,
+    /// Indent level of the header line.
+    pub indent_level: u32,
+}
+
+impl FoldRegion {
+    /// Number of lines that would be hidden when folded (excludes header).
+    pub fn hidden_lines(&self) -> usize {
+        self.end_line - self.header_line
+    }
+}
+
+/// Detect foldable regions based on indentation structure.
+///
+/// A fold starts at a line whose next non-blank line is indented deeper, and
+/// extends until the indent level returns to the header's level or shallower.
+pub fn detect_fold_regions(text: &str, style: IndentStyle) -> Vec<FoldRegion> {
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.len() < 2 {
+        return Vec::new();
+    }
+
+    let levels: Vec<Option<u32>> = lines
+        .iter()
+        .map(|l| {
+            if l.trim().is_empty() {
+                None
+            } else {
+                Some(get_line_indent_level(l, style))
+            }
+        })
+        .collect();
+
+    let mut regions = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        let header_level = match levels[i] {
+            Some(l) => l,
+            None => {
+                i += 1;
+                continue;
+            }
+        };
+
+        // Find next non-blank line
+        let mut j = i + 1;
+        while j < lines.len() && levels[j].is_none() {
+            j += 1;
+        }
+        if j >= lines.len() {
+            break;
+        }
+
+        let next_level = levels[j].unwrap();
+        if next_level <= header_level {
+            i += 1;
+            continue;
+        }
+
+        // Extend the fold region until we return to header level or shallower
+        let mut end = j;
+        let mut k = j + 1;
+        while k < lines.len() {
+            match levels[k] {
+                None => {}
+                Some(l) if l > header_level => {
+                    end = k;
+                }
+                Some(_) => break,
+            }
+            k += 1;
+        }
+
+        regions.push(FoldRegion {
+            header_line: i,
+            end_line: end,
+            indent_level: header_level,
+        });
+
+        i = end + 1;
+    }
+
+    regions
+}
+
+// ---------------------------------------------------------------------------
+// Indent/dedent selected line ranges (by line numbers)
+// ---------------------------------------------------------------------------
+
+/// Indent specific lines (0-indexed) by one level, leaving others unchanged.
+pub fn indent_selected_lines(text: &str, selected: &[usize], style: IndentStyle) -> String {
+    let one = style.indent_string();
+    let lines: Vec<&str> = text.lines().collect();
+    let mut result = Vec::with_capacity(lines.len());
+    for (i, &line) in lines.iter().enumerate() {
+        if selected.contains(&i) && !line.trim().is_empty() {
+            result.push(format!("{}{}", one, line));
+        } else {
+            result.push(line.to_string());
+        }
+    }
+    result.join("\n")
+}
+
+/// Dedent specific lines (0-indexed) by one level, leaving others unchanged.
+/// Lines with no indentation are left as-is.
+pub fn dedent_selected_lines(text: &str, selected: &[usize], style: IndentStyle) -> String {
+    let strip = match style {
+        IndentStyle::Tabs => 1usize,
+        IndentStyle::Spaces(n) => n as usize,
+    };
+    let lines: Vec<&str> = text.lines().collect();
+    let mut result = Vec::with_capacity(lines.len());
+    for (i, &line) in lines.iter().enumerate() {
+        if selected.contains(&i) {
+            let current = get_line_indent_level(line, style);
+            if current > 0 {
+                result.push(line[strip..].to_string());
+            } else {
+                result.push(line.to_string());
+            }
+        } else {
+            result.push(line.to_string());
+        }
+    }
+    result.join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// Mixed indentation diagnostics
+// ---------------------------------------------------------------------------
+
+/// A diagnostic for a line with mixed tabs and spaces in its leading whitespace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MixedIndentDiagnostic {
+    /// Zero-based line number.
+    pub line: usize,
+    /// Number of tab characters in leading whitespace.
+    pub tabs: usize,
+    /// Number of space characters in leading whitespace.
+    pub spaces: usize,
+}
+
+/// Scan text and return diagnostics for every line whose leading whitespace
+/// contains *both* tabs and spaces (within the same line).
+pub fn find_mixed_indent_lines(text: &str) -> Vec<MixedIndentDiagnostic> {
+    let mut diags = Vec::new();
+    for (i, line) in text.lines().enumerate() {
+        let ws = &line[..line.len() - line.trim_start().len()];
+        if ws.is_empty() {
+            continue;
+        }
+        let tabs = ws.chars().filter(|&c| c == '\t').count();
+        let spaces = ws.chars().filter(|&c| c == ' ').count();
+        if tabs > 0 && spaces > 0 {
+            diags.push(MixedIndentDiagnostic { line: i, tabs, spaces });
+        }
+    }
+    diags
+}
+
+// ---------------------------------------------------------------------------
+// Whitespace-visible rendering
+// ---------------------------------------------------------------------------
+
+/// Render whitespace characters visibly for debugging/display purposes.
+///
+/// Tabs are replaced with `→` followed by spaces to the next tab stop, and
+/// trailing spaces on each line are replaced with `·`.
+pub fn render_whitespace_visible(text: &str, tab_width: u32) -> String {
+    let mut result = Vec::new();
+    for line in text.lines() {
+        let trimmed_end = line.trim_end();
+        let trailing_count = line.len() - trimmed_end.len();
+
+        let mut visible = String::with_capacity(line.len() * 2);
+        let mut col = 0u32;
+        for ch in trimmed_end.chars() {
+            if ch == '\t' {
+                visible.push('→');
+                col += 1;
+                let fill = tab_width.saturating_sub(col % tab_width);
+                // Fill to next tab stop (minus the arrow itself if at boundary)
+                let pad = if col % tab_width == 0 {
+                    tab_width - 1
+                } else {
+                    fill - 1
+                };
+                for _ in 0..pad {
+                    visible.push(' ');
+                    col += 1;
+                }
+            } else {
+                visible.push(ch);
+                col += 1;
+            }
+        }
+        for _ in 0..trailing_count {
+            visible.push('·');
+        }
+        result.push(visible);
+    }
+    result.join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// Ensure final newline / strip final newline
+// ---------------------------------------------------------------------------
+
+/// Ensure `text` ends with exactly one newline character.
+pub fn ensure_final_newline(text: &str) -> String {
+    let trimmed = text.trim_end_matches('\n');
+    format!("{}\n", trimmed)
+}
+
+/// Strip all trailing newlines from `text`.
+pub fn strip_final_newlines(text: &str) -> &str {
+    text.trim_end_matches('\n')
+}
+
+// ---------------------------------------------------------------------------
+// Re-tab / un-tab operations
+// ---------------------------------------------------------------------------
+
+/// Convert leading spaces to tabs in every line, using the given tab width.
+/// Only converts complete groups of `tab_width` spaces; leftover spaces remain.
+pub fn retab(text: &str, tab_width: u32) -> String {
+    if tab_width == 0 {
+        return text.to_string();
+    }
+    let tw = tab_width as usize;
+    let mut result = Vec::new();
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        let ws = &line[..line.len() - trimmed.len()];
+        // Count only spaces (tabs pass through)
+        let space_count = ws.chars().filter(|&c| c == ' ').count();
+        let existing_tabs = ws.chars().filter(|&c| c == '\t').count();
+        let new_tabs = existing_tabs + space_count / tw;
+        let remaining_spaces = space_count % tw;
+        let new_ws = format!(
+            "{}{}",
+            "\t".repeat(new_tabs),
+            " ".repeat(remaining_spaces),
+        );
+        result.push(format!("{}{}", new_ws, trimmed));
+    }
+    result.join("\n")
+}
+
+/// Convert leading tabs to spaces in every line, using the given tab width.
+pub fn untab(text: &str, tab_width: u32) -> String {
+    let tw = tab_width as usize;
+    let mut result = Vec::new();
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        let ws = &line[..line.len() - trimmed.len()];
+        let tab_count = ws.chars().filter(|&c| c == '\t').count();
+        let space_count = ws.chars().filter(|&c| c == ' ').count();
+        let total_spaces = tab_count * tw + space_count;
+        result.push(format!("{}{}", " ".repeat(total_spaces), trimmed));
+    }
+    result.join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1800,5 +2116,184 @@ mod tests {
         let text = "top\n    inner1\n    inner2\nbottom";
         let block = extract_block(text, 1, IndentStyle::Spaces(4));
         assert_eq!(block, Some("    inner1\n    inner2".to_string()));
+    }
+
+    // -- indent_histogram tests ---------------------------------------------
+
+    #[test]
+    fn histogram_basic() {
+        let text = "a\n    b\n    c\n        d\na";
+        let hist = indent_histogram(text, IndentStyle::Spaces(4));
+        assert_eq!(hist.len(), 3); // levels 0, 1, 2
+        assert_eq!(hist[0].level, 0);
+        assert_eq!(hist[0].count, 2); // "a" and "a"
+        assert_eq!(hist[1].level, 1);
+        assert_eq!(hist[1].count, 2); // "b" and "c"
+        assert_eq!(hist[2].level, 2);
+        assert_eq!(hist[2].count, 1); // "d"
+    }
+
+    #[test]
+    fn histogram_empty() {
+        let hist = indent_histogram("", IndentStyle::Spaces(4));
+        assert!(hist.is_empty());
+    }
+
+    #[test]
+    fn histogram_fills_gaps() {
+        // Level 0 and level 3, levels 1 and 2 should appear with count 0
+        let text = "a\n            deep";
+        let hist = indent_histogram(text, IndentStyle::Spaces(4));
+        assert_eq!(hist.len(), 4); // 0, 1, 2, 3
+        assert_eq!(hist[1].count, 0);
+        assert_eq!(hist[2].count, 0);
+        assert_eq!(hist[3].count, 1);
+    }
+
+    // -- fold region tests --------------------------------------------------
+
+    #[test]
+    fn fold_regions_basic() {
+        let text = "fn main() {\n    let x = 1;\n    let y = 2;\n}\nfn other() {\n    body();\n}";
+        let regions = detect_fold_regions(text, IndentStyle::Spaces(4));
+        assert_eq!(regions.len(), 2);
+        assert_eq!(regions[0].header_line, 0);
+        assert_eq!(regions[0].end_line, 2);
+        assert_eq!(regions[0].hidden_lines(), 2);
+        assert_eq!(regions[1].header_line, 4);
+    }
+
+    #[test]
+    fn fold_regions_empty() {
+        assert!(detect_fold_regions("", IndentStyle::Spaces(4)).is_empty());
+        assert!(detect_fold_regions("single", IndentStyle::Spaces(4)).is_empty());
+    }
+
+    #[test]
+    fn fold_regions_nested() {
+        let text = "a\n    b\n        c\n    d\ne";
+        let regions = detect_fold_regions(text, IndentStyle::Spaces(4));
+        // "a" folds over "b", "c", "d"
+        assert!(!regions.is_empty());
+        assert_eq!(regions[0].header_line, 0);
+        assert_eq!(regions[0].end_line, 3);
+    }
+
+    // -- indent/dedent selected lines tests ---------------------------------
+
+    #[test]
+    fn indent_selected_lines_basic() {
+        let text = "aaa\nbbb\nccc\nddd";
+        let result = indent_selected_lines(text, &[1, 2], IndentStyle::Spaces(4));
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines[0], "aaa");
+        assert_eq!(lines[1], "    bbb");
+        assert_eq!(lines[2], "    ccc");
+        assert_eq!(lines[3], "ddd");
+    }
+
+    #[test]
+    fn dedent_selected_lines_basic() {
+        let text = "aaa\n    bbb\n    ccc\nddd";
+        let result = dedent_selected_lines(text, &[1, 2], IndentStyle::Spaces(4));
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines[0], "aaa");
+        assert_eq!(lines[1], "bbb");
+        assert_eq!(lines[2], "ccc");
+        assert_eq!(lines[3], "ddd");
+    }
+
+    #[test]
+    fn dedent_selected_noop_at_zero() {
+        let text = "aaa\nbbb";
+        let result = dedent_selected_lines(text, &[0, 1], IndentStyle::Spaces(4));
+        assert_eq!(result, "aaa\nbbb");
+    }
+
+    // -- mixed indent diagnostics tests -------------------------------------
+
+    #[test]
+    fn find_mixed_indent_lines_detects_mixed() {
+        let text = "clean\n\t  mixed\n    spaces\n\ttabs";
+        let diags = find_mixed_indent_lines(text);
+        assert_eq!(diags.len(), 1);
+        assert_eq!(diags[0].line, 1);
+        assert_eq!(diags[0].tabs, 1);
+        assert_eq!(diags[0].spaces, 2);
+    }
+
+    #[test]
+    fn find_mixed_indent_lines_clean() {
+        let text = "    a\n    b\n        c";
+        assert!(find_mixed_indent_lines(text).is_empty());
+    }
+
+    // -- whitespace rendering tests -----------------------------------------
+
+    #[test]
+    fn render_whitespace_trailing_dots() {
+        let text = "hello   ";
+        let rendered = render_whitespace_visible(text, 4);
+        assert!(rendered.contains("hello···"));
+    }
+
+    #[test]
+    fn render_whitespace_tabs() {
+        let text = "\thello";
+        let rendered = render_whitespace_visible(text, 4);
+        assert!(rendered.starts_with('→'));
+    }
+
+    // -- final newline tests ------------------------------------------------
+
+    #[test]
+    fn ensure_final_newline_adds_when_missing() {
+        assert_eq!(ensure_final_newline("hello"), "hello\n");
+    }
+
+    #[test]
+    fn ensure_final_newline_normalizes_multiple() {
+        assert_eq!(ensure_final_newline("hello\n\n\n"), "hello\n");
+    }
+
+    #[test]
+    fn strip_final_newlines_removes_all() {
+        assert_eq!(strip_final_newlines("hello\n\n\n"), "hello");
+        assert_eq!(strip_final_newlines("hello"), "hello");
+    }
+
+    // -- retab / untab tests ------------------------------------------------
+
+    #[test]
+    fn retab_converts_spaces_to_tabs() {
+        let text = "        line1\n    line2\n  partial";
+        let result = retab(text, 4);
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines[0], "\t\tline1");
+        assert_eq!(lines[1], "\tline2");
+        assert_eq!(lines[2], "  partial"); // 2 spaces < 4, stays
+    }
+
+    #[test]
+    fn untab_converts_tabs_to_spaces() {
+        let text = "\t\tline1\n\tline2";
+        let result = untab(text, 4);
+        let lines: Vec<&str> = result.lines().collect();
+        assert_eq!(lines[0], "        line1");
+        assert_eq!(lines[1], "    line2");
+    }
+
+    #[test]
+    fn retab_zero_width_noop() {
+        let text = "    hello";
+        assert_eq!(retab(text, 0), text);
+    }
+
+    #[test]
+    fn retab_untab_roundtrip() {
+        let original = "\t\tdeep\n\tshallow\ntop";
+        let spaced = untab(original, 4);
+        let back = retab(&spaced, 4);
+        assert_eq!(back, original);
     }
 }

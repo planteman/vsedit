@@ -1071,6 +1071,489 @@ impl HighlightCache {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TokenClassification — semantic token categories
+// ---------------------------------------------------------------------------
+
+/// Semantic token classification for editor features like bracket matching,
+/// auto-indent, and code navigation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TokenClass {
+    Keyword,
+    Identifier,
+    StringLiteral,
+    NumericLiteral,
+    Comment,
+    Operator,
+    Punctuation,
+    Whitespace,
+    Type,
+    Function,
+    Macro,
+    Attribute,
+    Unknown,
+}
+
+impl TokenClass {
+    /// Classify a token based on its scope string.
+    pub fn from_scope(scope: &str) -> Self {
+        if scope.starts_with("keyword") {
+            TokenClass::Keyword
+        } else if scope.starts_with("entity.name.function") || scope.starts_with("support.function") {
+            TokenClass::Function
+        } else if scope.starts_with("entity.name.type") || scope.starts_with("support.type") || scope.starts_with("storage.type") {
+            TokenClass::Type
+        } else if scope.starts_with("entity.name.macro") || scope.starts_with("support.macro") {
+            TokenClass::Macro
+        } else if scope.starts_with("entity.name") || scope.starts_with("variable") {
+            TokenClass::Identifier
+        } else if scope.starts_with("string") {
+            TokenClass::StringLiteral
+        } else if scope.starts_with("constant.numeric") {
+            TokenClass::NumericLiteral
+        } else if scope.starts_with("comment") {
+            TokenClass::Comment
+        } else if scope.starts_with("keyword.operator") || scope.starts_with("punctuation.separator") {
+            TokenClass::Operator
+        } else if scope.starts_with("punctuation") {
+            TokenClass::Punctuation
+        } else if scope.starts_with("meta.attribute") {
+            TokenClass::Attribute
+        } else {
+            TokenClass::Unknown
+        }
+    }
+
+    /// Whether this token class represents a "word" token (for word-based navigation).
+    pub fn is_word(&self) -> bool {
+        matches!(
+            self,
+            TokenClass::Keyword
+                | TokenClass::Identifier
+                | TokenClass::Type
+                | TokenClass::Function
+                | TokenClass::Macro
+        )
+    }
+
+    /// Whether this class is a literal value.
+    pub fn is_literal(&self) -> bool {
+        matches!(self, TokenClass::StringLiteral | TokenClass::NumericLiteral)
+    }
+
+    /// Whether this class should be ignored for semantic purposes (whitespace/comments).
+    pub fn is_trivia(&self) -> bool {
+        matches!(self, TokenClass::Whitespace | TokenClass::Comment)
+    }
+}
+
+impl fmt::Display for TokenClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            TokenClass::Keyword => "keyword",
+            TokenClass::Identifier => "identifier",
+            TokenClass::StringLiteral => "string",
+            TokenClass::NumericLiteral => "number",
+            TokenClass::Comment => "comment",
+            TokenClass::Operator => "operator",
+            TokenClass::Punctuation => "punctuation",
+            TokenClass::Whitespace => "whitespace",
+            TokenClass::Type => "type",
+            TokenClass::Function => "function",
+            TokenClass::Macro => "macro",
+            TokenClass::Attribute => "attribute",
+            TokenClass::Unknown => "unknown",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScopeName — parsed scope name with components
+// ---------------------------------------------------------------------------
+
+/// A parsed scope name broken into dotted components.
+///
+/// For example, `"entity.name.function.rust"` is parsed into
+/// `["entity", "name", "function", "rust"]`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ScopeName {
+    raw: String,
+    components: Vec<String>,
+}
+
+impl ScopeName {
+    /// Parse a dotted scope name string.
+    pub fn parse(scope: &str) -> Self {
+        let components: Vec<String> = scope.split('.').map(|s| s.to_string()).collect();
+        Self {
+            raw: scope.to_string(),
+            components,
+        }
+    }
+
+    /// The raw scope string.
+    pub fn as_str(&self) -> &str {
+        &self.raw
+    }
+
+    /// The individual components of the scope.
+    pub fn components(&self) -> &[String] {
+        &self.components
+    }
+
+    /// Number of dotted components.
+    pub fn depth(&self) -> usize {
+        self.components.len()
+    }
+
+    /// The top-level category (first component), e.g. `"entity"` from `"entity.name.function"`.
+    pub fn category(&self) -> &str {
+        self.components.first().map(|s| s.as_str()).unwrap_or("")
+    }
+
+    /// The most specific component (last), e.g. `"function"` from `"entity.name.function"`.
+    pub fn leaf(&self) -> &str {
+        self.components.last().map(|s| s.as_str()).unwrap_or("")
+    }
+
+    /// The language component if the scope ends with a language identifier.
+    /// Convention: the last component is the language when depth >= 3.
+    pub fn language_hint(&self) -> Option<&str> {
+        if self.components.len() >= 3 {
+            self.components.last().map(|s| s.as_str())
+        } else {
+            None
+        }
+    }
+
+    /// Check if this scope is a child of (starts with) another scope.
+    pub fn is_child_of(&self, parent: &ScopeName) -> bool {
+        if self.components.len() <= parent.components.len() {
+            return false;
+        }
+        self.components[..parent.components.len()] == parent.components[..]
+    }
+
+    /// Returns the parent scope (all components except the last), or None if already root.
+    pub fn parent(&self) -> Option<ScopeName> {
+        if self.components.len() <= 1 {
+            return None;
+        }
+        let parent_raw = self.components[..self.components.len() - 1].join(".");
+        Some(ScopeName::parse(&parent_raw))
+    }
+
+    /// Classify this scope into a semantic token class.
+    pub fn classify(&self) -> TokenClass {
+        TokenClass::from_scope(&self.raw)
+    }
+}
+
+impl fmt::Display for ScopeName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.raw)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TokenRange — byte range-based token representation
+// ---------------------------------------------------------------------------
+
+/// A token with byte range information, useful for mapping between editor
+/// positions and syntax tokens.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenRange {
+    pub start: usize,
+    pub end: usize,
+    pub class: TokenClass,
+}
+
+impl TokenRange {
+    /// Create a new token range.
+    pub fn new(start: usize, end: usize, class: TokenClass) -> Self {
+        Self { start, end, class }
+    }
+
+    /// Length in bytes.
+    pub fn len(&self) -> usize {
+        self.end - self.start
+    }
+
+    /// Whether the range is empty.
+    pub fn is_empty(&self) -> bool {
+        self.start == self.end
+    }
+
+    /// Whether this range contains a byte offset.
+    pub fn contains(&self, offset: usize) -> bool {
+        offset >= self.start && offset < self.end
+    }
+
+    /// Whether this range overlaps with another.
+    pub fn overlaps(&self, other: &TokenRange) -> bool {
+        self.start < other.end && other.start < self.end
+    }
+
+    /// Compute the intersection of two ranges, if they overlap.
+    pub fn intersection(&self, other: &TokenRange) -> Option<TokenRange> {
+        if !self.overlaps(other) {
+            return None;
+        }
+        Some(TokenRange {
+            start: self.start.max(other.start),
+            end: self.end.min(other.end),
+            class: self.class,
+        })
+    }
+
+    /// Merge two adjacent or overlapping ranges of the same class.
+    pub fn merge(&self, other: &TokenRange) -> Option<TokenRange> {
+        if self.class != other.class {
+            return None;
+        }
+        if self.end < other.start || other.end < self.start {
+            return None;
+        }
+        Some(TokenRange {
+            start: self.start.min(other.start),
+            end: self.end.max(other.end),
+            class: self.class,
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EmbeddedLanguageDetector — detect embedded languages in source
+// ---------------------------------------------------------------------------
+
+/// Detects embedded language regions within source code.
+#[derive(Debug, Clone)]
+pub struct EmbeddedRegion {
+    pub language: String,
+    pub start_line: usize,
+    pub end_line: usize,
+}
+
+/// Detect embedded language regions in a document.
+///
+/// Recognises common patterns like markdown fenced code blocks and HTML
+/// `<script>` / `<style>` tags.
+pub fn detect_embedded_languages(lines: &[&str], host_language: &str) -> Vec<EmbeddedRegion> {
+    let mut regions = Vec::new();
+    match host_language {
+        "markdown" | "md" => detect_markdown_fenced_blocks(lines, &mut regions),
+        "html" | "htm" => detect_html_embedded(lines, &mut regions),
+        _ => {}
+    }
+    regions
+}
+
+fn detect_markdown_fenced_blocks(lines: &[&str], regions: &mut Vec<EmbeddedRegion>) {
+    let mut i = 0;
+    while i < lines.len() {
+        let trimmed = lines[i].trim();
+        if trimmed.starts_with("```") && trimmed.len() > 3 {
+            let lang = trimmed[3..].trim().to_lowercase();
+            if !lang.is_empty() && !lang.contains('`') {
+                let start = i + 1;
+                let mut end = start;
+                // Find closing fence
+                for j in start..lines.len() {
+                    if lines[j].trim().starts_with("```") {
+                        end = j;
+                        break;
+                    }
+                }
+                if end > start {
+                    regions.push(EmbeddedRegion {
+                        language: lang,
+                        start_line: start,
+                        end_line: end,
+                    });
+                    i = end + 1;
+                    continue;
+                }
+            }
+        }
+        i += 1;
+    }
+}
+
+fn detect_html_embedded(lines: &[&str], regions: &mut Vec<EmbeddedRegion>) {
+    let mut i = 0;
+    while i < lines.len() {
+        let lower = lines[i].to_lowercase();
+        let (tag, lang) = if lower.contains("<script") {
+            ("</script>", "javascript")
+        } else if lower.contains("<style") {
+            ("</style>", "css")
+        } else {
+            i += 1;
+            continue;
+        };
+        let start = i + 1;
+        let mut end = start;
+        for j in start..lines.len() {
+            if lines[j].to_lowercase().contains(tag) {
+                end = j;
+                break;
+            }
+        }
+        if end > start {
+            regions.push(EmbeddedRegion {
+                language: lang.to_string(),
+                start_line: start,
+                end_line: end,
+            });
+            i = end + 1;
+        } else {
+            i += 1;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BracketMatcher — bracket pair matching from token spans
+// ---------------------------------------------------------------------------
+
+/// A matched bracket pair with positions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BracketPair {
+    pub open_col: usize,
+    pub close_col: usize,
+    pub kind: BracketKind,
+}
+
+/// The kind of bracket.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BracketKind {
+    Paren,
+    Square,
+    Curly,
+    Angle,
+}
+
+impl BracketKind {
+    fn open_char(self) -> char {
+        match self {
+            BracketKind::Paren => '(',
+            BracketKind::Square => '[',
+            BracketKind::Curly => '{',
+            BracketKind::Angle => '<',
+        }
+    }
+
+    fn close_char(self) -> char {
+        match self {
+            BracketKind::Paren => ')',
+            BracketKind::Square => ']',
+            BracketKind::Curly => '}',
+            BracketKind::Angle => '>',
+        }
+    }
+
+    fn from_char(c: char) -> Option<(BracketKind, bool)> {
+        match c {
+            '(' => Some((BracketKind::Paren, true)),
+            ')' => Some((BracketKind::Paren, false)),
+            '[' => Some((BracketKind::Square, true)),
+            ']' => Some((BracketKind::Square, false)),
+            '{' => Some((BracketKind::Curly, true)),
+            '}' => Some((BracketKind::Curly, false)),
+            '<' => Some((BracketKind::Angle, true)),
+            '>' => Some((BracketKind::Angle, false)),
+            _ => None,
+        }
+    }
+}
+
+/// Find matching bracket pairs within a single line of text.
+///
+/// Skips brackets inside string literals and comments by using span style info.
+pub fn find_bracket_pairs_in_line(line: &str) -> Vec<BracketPair> {
+    let mut pairs = Vec::new();
+    let mut stack: Vec<(usize, BracketKind)> = Vec::new();
+
+    for (col, ch) in line.char_indices() {
+        if let Some((kind, is_open)) = BracketKind::from_char(ch) {
+            if is_open {
+                stack.push((col, kind));
+            } else if let Some(pos) = stack.iter().rposition(|&(_, k)| k == kind) {
+                let (open_col, _) = stack.remove(pos);
+                pairs.push(BracketPair {
+                    open_col,
+                    close_col: col,
+                    kind,
+                });
+            }
+        }
+    }
+    pairs
+}
+
+/// Find the matching bracket position for a bracket at the given column.
+pub fn find_matching_bracket(line: &str, col: usize) -> Option<usize> {
+    let pairs = find_bracket_pairs_in_line(line);
+    for pair in &pairs {
+        if pair.open_col == col {
+            return Some(pair.close_col);
+        }
+        if pair.close_col == col {
+            return Some(pair.open_col);
+        }
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
+// IndentGuide — compute indentation levels from highlighted lines
+// ---------------------------------------------------------------------------
+
+/// Indentation information for a line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndentInfo {
+    pub line_number: usize,
+    pub level: usize,
+    pub is_blank: bool,
+    pub indent_chars: usize,
+}
+
+/// Compute indentation info for a set of lines.
+///
+/// Uses `tab_width` to normalize mixed tabs/spaces.
+pub fn compute_indent_info(lines: &[&str], tab_width: usize) -> Vec<IndentInfo> {
+    lines
+        .iter()
+        .enumerate()
+        .map(|(i, line)| {
+            let is_blank = line.trim().is_empty();
+            let indent_chars = line.len() - line.trim_start().len();
+            let visual_indent: usize = line
+                .chars()
+                .take_while(|c| c.is_whitespace())
+                .map(|c| if c == '\t' { tab_width } else { 1 })
+                .sum();
+            let level = if tab_width > 0 {
+                visual_indent / tab_width
+            } else {
+                0
+            };
+            IndentInfo {
+                line_number: i,
+                level,
+                is_blank,
+                indent_chars,
+            }
+        })
+        .collect()
+}
+
+/// Compute indent delta between two adjacent lines (for auto-indent heuristics).
+pub fn indent_delta(current: &IndentInfo, next: &IndentInfo) -> i32 {
+    next.level as i32 - current.level as i32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1861,5 +2344,256 @@ mod tests {
         cache.set(8, vec![ColoredSpan::plain("c")]);
         let lines = cache.cached_lines();
         assert_eq!(lines, vec![2, 5, 8]);
+    }
+
+    // ---- TokenClass tests ----
+
+    #[test]
+    fn token_class_from_scope() {
+        assert_eq!(TokenClass::from_scope("keyword.control"), TokenClass::Keyword);
+        assert_eq!(TokenClass::from_scope("entity.name.function.rust"), TokenClass::Function);
+        assert_eq!(TokenClass::from_scope("string.quoted.double"), TokenClass::StringLiteral);
+        assert_eq!(TokenClass::from_scope("constant.numeric.integer"), TokenClass::NumericLiteral);
+        assert_eq!(TokenClass::from_scope("comment.line.double-slash"), TokenClass::Comment);
+        assert_eq!(TokenClass::from_scope("punctuation.definition.string"), TokenClass::Punctuation);
+        assert_eq!(TokenClass::from_scope("storage.type.rust"), TokenClass::Type);
+        assert_eq!(TokenClass::from_scope("variable.other.member"), TokenClass::Identifier);
+        assert_eq!(TokenClass::from_scope("meta.attribute.rust"), TokenClass::Attribute);
+        assert_eq!(TokenClass::from_scope("some.random.scope"), TokenClass::Unknown);
+    }
+
+    #[test]
+    fn token_class_predicates() {
+        assert!(TokenClass::Keyword.is_word());
+        assert!(TokenClass::Function.is_word());
+        assert!(!TokenClass::Operator.is_word());
+
+        assert!(TokenClass::StringLiteral.is_literal());
+        assert!(TokenClass::NumericLiteral.is_literal());
+        assert!(!TokenClass::Keyword.is_literal());
+
+        assert!(TokenClass::Comment.is_trivia());
+        assert!(TokenClass::Whitespace.is_trivia());
+        assert!(!TokenClass::Identifier.is_trivia());
+    }
+
+    #[test]
+    fn token_class_display() {
+        assert_eq!(format!("{}", TokenClass::Keyword), "keyword");
+        assert_eq!(format!("{}", TokenClass::Function), "function");
+        assert_eq!(format!("{}", TokenClass::StringLiteral), "string");
+    }
+
+    // ---- ScopeName tests ----
+
+    #[test]
+    fn scope_name_parse_and_components() {
+        let s = ScopeName::parse("entity.name.function.rust");
+        assert_eq!(s.as_str(), "entity.name.function.rust");
+        assert_eq!(s.depth(), 4);
+        assert_eq!(s.category(), "entity");
+        assert_eq!(s.leaf(), "rust");
+        assert_eq!(s.components(), &["entity", "name", "function", "rust"]);
+    }
+
+    #[test]
+    fn scope_name_language_hint() {
+        let deep = ScopeName::parse("entity.name.function.rust");
+        assert_eq!(deep.language_hint(), Some("rust"));
+
+        let shallow = ScopeName::parse("keyword.control");
+        assert_eq!(shallow.language_hint(), None);
+    }
+
+    #[test]
+    fn scope_name_parent_and_child() {
+        let child = ScopeName::parse("entity.name.function");
+        let parent = ScopeName::parse("entity.name");
+        assert!(child.is_child_of(&parent));
+        assert!(!parent.is_child_of(&child));
+
+        let par = child.parent().unwrap();
+        assert_eq!(par.as_str(), "entity.name");
+
+        let root = ScopeName::parse("keyword");
+        assert!(root.parent().is_none());
+    }
+
+    #[test]
+    fn scope_name_classify() {
+        let s = ScopeName::parse("keyword.control.if");
+        assert_eq!(s.classify(), TokenClass::Keyword);
+        let s2 = ScopeName::parse("entity.name.function.main");
+        assert_eq!(s2.classify(), TokenClass::Function);
+    }
+
+    #[test]
+    fn scope_name_display() {
+        let s = ScopeName::parse("source.rust");
+        assert_eq!(format!("{}", s), "source.rust");
+    }
+
+    // ---- TokenRange tests ----
+
+    #[test]
+    fn token_range_basics() {
+        let r = TokenRange::new(5, 10, TokenClass::Keyword);
+        assert_eq!(r.len(), 5);
+        assert!(!r.is_empty());
+        assert!(r.contains(5));
+        assert!(r.contains(9));
+        assert!(!r.contains(10));
+    }
+
+    #[test]
+    fn token_range_overlap_and_intersection() {
+        let a = TokenRange::new(0, 10, TokenClass::Keyword);
+        let b = TokenRange::new(5, 15, TokenClass::Identifier);
+        assert!(a.overlaps(&b));
+
+        let inter = a.intersection(&b).unwrap();
+        assert_eq!(inter.start, 5);
+        assert_eq!(inter.end, 10);
+
+        let c = TokenRange::new(20, 30, TokenClass::Comment);
+        assert!(!a.overlaps(&c));
+        assert!(a.intersection(&c).is_none());
+    }
+
+    #[test]
+    fn token_range_merge() {
+        let a = TokenRange::new(0, 5, TokenClass::Keyword);
+        let b = TokenRange::new(5, 10, TokenClass::Keyword);
+        let merged = a.merge(&b).unwrap();
+        assert_eq!(merged.start, 0);
+        assert_eq!(merged.end, 10);
+
+        // Different classes can't merge
+        let c = TokenRange::new(5, 10, TokenClass::Comment);
+        assert!(a.merge(&c).is_none());
+
+        // Non-adjacent can't merge
+        let d = TokenRange::new(20, 25, TokenClass::Keyword);
+        assert!(a.merge(&d).is_none());
+    }
+
+    // ---- Embedded language detection tests ----
+
+    #[test]
+    fn detect_markdown_fenced_code_blocks() {
+        let lines = vec![
+            "# Title",
+            "",
+            "```rust",
+            "fn main() {}",
+            "```",
+            "",
+            "```python",
+            "print('hello')",
+            "x = 1",
+            "```",
+        ];
+        let regions = detect_embedded_languages(&lines, "markdown");
+        assert_eq!(regions.len(), 2);
+        assert_eq!(regions[0].language, "rust");
+        assert_eq!(regions[0].start_line, 3);
+        assert_eq!(regions[0].end_line, 4);
+        assert_eq!(regions[1].language, "python");
+        assert_eq!(regions[1].start_line, 7);
+        assert_eq!(regions[1].end_line, 9);
+    }
+
+    #[test]
+    fn detect_html_script_and_style() {
+        let lines = vec![
+            "<html>",
+            "<script>",
+            "console.log('hi');",
+            "</script>",
+            "<style>",
+            "body { color: red; }",
+            "</style>",
+            "</html>",
+        ];
+        let regions = detect_embedded_languages(&lines, "html");
+        assert_eq!(regions.len(), 2);
+        assert_eq!(regions[0].language, "javascript");
+        assert_eq!(regions[1].language, "css");
+    }
+
+    #[test]
+    fn detect_embedded_no_match_for_plain_language() {
+        let lines = vec!["fn main() {}", "    println!(\"hello\");", "}"];
+        let regions = detect_embedded_languages(&lines, "rust");
+        assert!(regions.is_empty());
+    }
+
+    // ---- Bracket matching tests ----
+
+    #[test]
+    fn bracket_pairs_simple() {
+        let pairs = find_bracket_pairs_in_line("fn main() { x }");
+        assert!(pairs.iter().any(|p| p.kind == BracketKind::Paren));
+        assert!(pairs.iter().any(|p| p.kind == BracketKind::Curly));
+    }
+
+    #[test]
+    fn bracket_pairs_nested() {
+        let pairs = find_bracket_pairs_in_line("((a))");
+        assert_eq!(pairs.len(), 2);
+    }
+
+    #[test]
+    fn find_matching_bracket_works() {
+        let line = "(hello)";
+        assert_eq!(find_matching_bracket(line, 0), Some(6));
+        assert_eq!(find_matching_bracket(line, 6), Some(0));
+        assert_eq!(find_matching_bracket(line, 3), None);
+    }
+
+    #[test]
+    fn bracket_kind_chars() {
+        assert_eq!(BracketKind::Paren.open_char(), '(');
+        assert_eq!(BracketKind::Paren.close_char(), ')');
+        assert_eq!(BracketKind::Square.open_char(), '[');
+        assert_eq!(BracketKind::Square.close_char(), ']');
+        assert_eq!(BracketKind::Curly.open_char(), '{');
+        assert_eq!(BracketKind::Curly.close_char(), '}');
+    }
+
+    // ---- Indentation tests ----
+
+    #[test]
+    fn indent_info_basic() {
+        let lines = vec!["fn main() {", "    let x = 1;", "        nested();", "}"];
+        let info = compute_indent_info(&lines, 4);
+        assert_eq!(info[0].level, 0);
+        assert_eq!(info[1].level, 1);
+        assert_eq!(info[2].level, 2);
+        assert_eq!(info[3].level, 0);
+        assert!(!info[0].is_blank);
+    }
+
+    #[test]
+    fn indent_info_blank_lines() {
+        let lines = vec!["code", "", "  more"];
+        let info = compute_indent_info(&lines, 2);
+        assert!(!info[0].is_blank);
+        assert!(info[1].is_blank);
+        assert!(!info[2].is_blank);
+    }
+
+    #[test]
+    fn indent_delta_computation() {
+        let lines = vec!["fn main() {", "    body"];
+        let info = compute_indent_info(&lines, 4);
+        assert_eq!(indent_delta(&info[0], &info[1]), 1);
+    }
+
+    #[test]
+    fn indent_info_tabs() {
+        let lines = vec!["\t\tindented"];
+        let info = compute_indent_info(&lines, 4);
+        assert_eq!(info[0].level, 2);
     }
 }

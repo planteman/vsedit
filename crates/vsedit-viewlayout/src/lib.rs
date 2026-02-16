@@ -1017,6 +1017,385 @@ impl fmt::Display for LayoutTransition {
 }
 
 use std::collections::HashMap;
+
+// ---------------------------------------------------------------------------
+// SplitTree — recursive editor pane splitting (like VS Code editor groups)
+// ---------------------------------------------------------------------------
+
+/// Unique identifier for a pane within a split tree.
+pub type PaneId = u32;
+
+/// A node in the split tree: either a single editor pane or a split container.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SplitNode {
+    /// A leaf pane that holds a tab group.
+    Pane {
+        id: PaneId,
+        tabs: Vec<TabEntry>,
+        active_tab: usize,
+    },
+    /// A container that splits space between children along an orientation.
+    Split {
+        orientation: LayoutOrientation,
+        children: Vec<SplitNode>,
+        /// Proportional sizes for each child, summing to 1.0.
+        ratios: Vec<f64>,
+    },
+}
+
+/// An entry in a tab bar within a pane.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TabEntry {
+    pub id: String,
+    pub title: String,
+    pub is_dirty: bool,
+    pub is_pinned: bool,
+}
+
+impl TabEntry {
+    pub fn new(id: impl Into<String>, title: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            title: title.into(),
+            is_dirty: false,
+            is_pinned: false,
+        }
+    }
+}
+
+impl SplitNode {
+    /// Create a new leaf pane with no tabs.
+    pub fn new_pane(id: PaneId) -> Self {
+        Self::Pane {
+            id,
+            tabs: Vec::new(),
+            active_tab: 0,
+        }
+    }
+
+    /// Create a split node with two children and equal ratios.
+    pub fn new_split(orientation: LayoutOrientation, a: SplitNode, b: SplitNode) -> Self {
+        Self::Split {
+            orientation,
+            children: vec![a, b],
+            ratios: vec![0.5, 0.5],
+        }
+    }
+
+    /// Returns `true` if this is a leaf pane.
+    pub fn is_pane(&self) -> bool {
+        matches!(self, Self::Pane { .. })
+    }
+
+    /// Total number of leaf panes in the tree.
+    pub fn pane_count(&self) -> usize {
+        match self {
+            Self::Pane { .. } => 1,
+            Self::Split { children, .. } => children.iter().map(|c| c.pane_count()).sum(),
+        }
+    }
+
+    /// Collect all pane ids in depth-first order.
+    pub fn pane_ids(&self) -> Vec<PaneId> {
+        let mut out = Vec::new();
+        self.collect_pane_ids(&mut out);
+        out
+    }
+
+    fn collect_pane_ids(&self, out: &mut Vec<PaneId>) {
+        match self {
+            Self::Pane { id, .. } => out.push(*id),
+            Self::Split { children, .. } => {
+                for child in children {
+                    child.collect_pane_ids(out);
+                }
+            }
+        }
+    }
+
+    /// Find a mutable reference to a pane by its id.
+    pub fn find_pane_mut(&mut self, target: PaneId) -> Option<&mut SplitNode> {
+        match self {
+            Self::Pane { id, .. } if *id == target => Some(self),
+            Self::Split { children, .. } => {
+                for child in children.iter_mut() {
+                    if let Some(found) = child.find_pane_mut(target) {
+                        return Some(found);
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// Add a tab to the specified pane. Returns `Err` if the pane is not found.
+    pub fn add_tab(&mut self, pane_id: PaneId, tab: TabEntry) -> Result<(), LayoutError> {
+        match self.find_pane_mut(pane_id) {
+            Some(SplitNode::Pane { tabs, active_tab, .. }) => {
+                tabs.push(tab);
+                *active_tab = tabs.len() - 1;
+                Ok(())
+            }
+            _ => Err(LayoutError::ViewNotFound(format!("pane {pane_id}"))),
+        }
+    }
+
+    /// Remove a tab by id from the specified pane. Returns the removed tab.
+    pub fn remove_tab(
+        &mut self,
+        pane_id: PaneId,
+        tab_id: &str,
+    ) -> Result<TabEntry, LayoutError> {
+        match self.find_pane_mut(pane_id) {
+            Some(SplitNode::Pane { tabs, active_tab, .. }) => {
+                let pos = tabs
+                    .iter()
+                    .position(|t| t.id == tab_id)
+                    .ok_or_else(|| LayoutError::ViewNotFound(tab_id.to_string()))?;
+                let removed = tabs.remove(pos);
+                if *active_tab >= tabs.len() && !tabs.is_empty() {
+                    *active_tab = tabs.len() - 1;
+                }
+                Ok(removed)
+            }
+            _ => Err(LayoutError::ViewNotFound(format!("pane {pane_id}"))),
+        }
+    }
+
+    /// Reorder tabs in a pane by moving the tab at `from` to `to`.
+    pub fn move_tab(
+        &mut self,
+        pane_id: PaneId,
+        from: usize,
+        to: usize,
+    ) -> Result<(), LayoutError> {
+        match self.find_pane_mut(pane_id) {
+            Some(SplitNode::Pane { tabs, active_tab, .. }) => {
+                if from >= tabs.len() || to >= tabs.len() {
+                    return Err(LayoutError::InvalidPosition(format!(
+                        "tab index out of range: from={from}, to={to}, len={}",
+                        tabs.len()
+                    )));
+                }
+                let tab = tabs.remove(from);
+                tabs.insert(to, tab);
+                // Keep active_tab pointing to the same tab after the move.
+                if *active_tab == from {
+                    *active_tab = to;
+                } else if from < *active_tab && *active_tab <= to {
+                    *active_tab -= 1;
+                } else if to <= *active_tab && *active_tab < from {
+                    *active_tab += 1;
+                }
+                Ok(())
+            }
+            _ => Err(LayoutError::ViewNotFound(format!("pane {pane_id}"))),
+        }
+    }
+
+    /// Compute absolute pixel rectangles for every pane given a bounding rect.
+    /// Returns `(PaneId, x, y, width, height)` for each leaf.
+    pub fn compute_rects(
+        &self,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+    ) -> Vec<(PaneId, f64, f64, f64, f64)> {
+        let mut out = Vec::new();
+        self.collect_rects(x, y, width, height, &mut out);
+        out
+    }
+
+    fn collect_rects(
+        &self,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+        out: &mut Vec<(PaneId, f64, f64, f64, f64)>,
+    ) {
+        match self {
+            Self::Pane { id, .. } => {
+                out.push((*id, x, y, width, height));
+            }
+            Self::Split {
+                orientation,
+                children,
+                ratios,
+            } => {
+                let mut offset = 0.0;
+                for (i, child) in children.iter().enumerate() {
+                    let ratio = ratios.get(i).copied().unwrap_or(0.0);
+                    match orientation {
+                        LayoutOrientation::Horizontal => {
+                            let w = width * ratio;
+                            child.collect_rects(x + offset, y, w, height, out);
+                            offset += w;
+                        }
+                        LayoutOrientation::Vertical => {
+                            let h = height * ratio;
+                            child.collect_rects(x, y + offset, width, h, out);
+                            offset += h;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Maximum nesting depth of the tree (1 for a single pane).
+    pub fn depth(&self) -> usize {
+        match self {
+            Self::Pane { .. } => 1,
+            Self::Split { children, .. } => {
+                1 + children.iter().map(|c| c.depth()).max().unwrap_or(0)
+            }
+        }
+    }
+
+    /// Total number of tabs across all panes.
+    pub fn total_tab_count(&self) -> usize {
+        match self {
+            Self::Pane { tabs, .. } => tabs.len(),
+            Self::Split { children, .. } => {
+                children.iter().map(|c| c.total_tab_count()).sum()
+            }
+        }
+    }
+
+    /// Get the active tab of a pane, if any.
+    pub fn active_tab(&self, pane_id: PaneId) -> Option<&TabEntry> {
+        match self {
+            Self::Pane { id, tabs, active_tab } if *id == pane_id => {
+                tabs.get(*active_tab)
+            }
+            Self::Split { children, .. } => {
+                for child in children {
+                    if let Some(tab) = child.active_tab(pane_id) {
+                        return Some(tab);
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// Set the active tab index for a pane.
+    pub fn set_active_tab(
+        &mut self,
+        pane_id: PaneId,
+        index: usize,
+    ) -> Result<(), LayoutError> {
+        match self.find_pane_mut(pane_id) {
+            Some(SplitNode::Pane { tabs, active_tab, .. }) => {
+                if index >= tabs.len() {
+                    return Err(LayoutError::InvalidPosition(format!(
+                        "tab index {index} out of range (len={})",
+                        tabs.len()
+                    )));
+                }
+                *active_tab = index;
+                Ok(())
+            }
+            _ => Err(LayoutError::ViewNotFound(format!("pane {pane_id}"))),
+        }
+    }
+
+    /// Normalize ratios in every split node so they sum to exactly 1.0.
+    pub fn normalize_ratios(&mut self) {
+        if let Self::Split {
+            children, ratios, ..
+        } = self
+        {
+            let sum: f64 = ratios.iter().sum();
+            if sum > 0.0 {
+                for r in ratios.iter_mut() {
+                    *r /= sum;
+                }
+            } else if !ratios.is_empty() {
+                let equal = 1.0 / ratios.len() as f64;
+                for r in ratios.iter_mut() {
+                    *r = equal;
+                }
+            }
+            for child in children.iter_mut() {
+                child.normalize_ratios();
+            }
+        }
+    }
+}
+
+impl fmt::Display for SplitNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pane { id, tabs, active_tab } => {
+                write!(f, "Pane({id}, {}/{} tabs)", active_tab + 1, tabs.len())
+            }
+            Self::Split { orientation, children, .. } => {
+                write!(f, "Split({orientation}, {} children)", children.len())
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FocusTracker — manage which pane currently has focus
+// ---------------------------------------------------------------------------
+
+/// Tracks focus history across panes for most-recently-used navigation.
+#[derive(Debug, Clone)]
+pub struct FocusTracker {
+    history: Vec<PaneId>,
+    max_history: usize,
+}
+
+impl FocusTracker {
+    pub fn new(max_history: usize) -> Self {
+        Self {
+            history: Vec::new(),
+            max_history,
+        }
+    }
+
+    /// Focus a pane, pushing it to the front of the MRU list.
+    pub fn focus(&mut self, pane_id: PaneId) {
+        self.history.retain(|&id| id != pane_id);
+        self.history.insert(0, pane_id);
+        if self.history.len() > self.max_history {
+            self.history.truncate(self.max_history);
+        }
+    }
+
+    /// The currently focused pane, if any.
+    pub fn current(&self) -> Option<PaneId> {
+        self.history.first().copied()
+    }
+
+    /// The previously focused pane (second in MRU list).
+    pub fn previous(&self) -> Option<PaneId> {
+        self.history.get(1).copied()
+    }
+
+    /// Remove a pane from the history (e.g. when it is closed).
+    pub fn remove(&mut self, pane_id: PaneId) {
+        self.history.retain(|&id| id != pane_id);
+    }
+
+    /// Full MRU history.
+    pub fn history(&self) -> &[PaneId] {
+        &self.history
+    }
+}
+
+impl Default for FocusTracker {
+    fn default() -> Self {
+        Self::new(32)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1814,5 +2193,152 @@ mod tests {
         let transition = LayoutTransition::new(&layout, &layout);
         assert!(!transition.has_changes());
         assert_eq!(transition.change_count(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // SplitNode / TabEntry / FocusTracker tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn split_tree_pane_count_and_ids() {
+        let tree = SplitNode::new_split(
+            LayoutOrientation::Horizontal,
+            SplitNode::new_pane(1),
+            SplitNode::new_split(
+                LayoutOrientation::Vertical,
+                SplitNode::new_pane(2),
+                SplitNode::new_pane(3),
+            ),
+        );
+        assert_eq!(tree.pane_count(), 3);
+        assert_eq!(tree.pane_ids(), vec![1, 2, 3]);
+        assert_eq!(tree.depth(), 3);
+        assert!(!tree.is_pane());
+    }
+
+    #[test]
+    fn split_tree_add_remove_tabs() {
+        let mut tree = SplitNode::new_split(
+            LayoutOrientation::Horizontal,
+            SplitNode::new_pane(1),
+            SplitNode::new_pane(2),
+        );
+        tree.add_tab(1, TabEntry::new("a", "File A")).unwrap();
+        tree.add_tab(1, TabEntry::new("b", "File B")).unwrap();
+        tree.add_tab(2, TabEntry::new("c", "File C")).unwrap();
+        assert_eq!(tree.total_tab_count(), 3);
+
+        // Active tab should be last added
+        let active = tree.active_tab(1).unwrap();
+        assert_eq!(active.id, "b");
+
+        // Remove a tab
+        let removed = tree.remove_tab(1, "a").unwrap();
+        assert_eq!(removed.title, "File A");
+        assert_eq!(tree.total_tab_count(), 2);
+
+        // Error on missing pane
+        assert!(tree.add_tab(99, TabEntry::new("x", "X")).is_err());
+    }
+
+    #[test]
+    fn split_tree_move_tab_reorders() {
+        let mut pane = SplitNode::new_pane(1);
+        pane.add_tab(1, TabEntry::new("a", "A")).unwrap();
+        pane.add_tab(1, TabEntry::new("b", "B")).unwrap();
+        pane.add_tab(1, TabEntry::new("c", "C")).unwrap();
+
+        // Active is "c" (index 2). Move "a" (0) to position 2.
+        pane.set_active_tab(1, 0).unwrap();
+        pane.move_tab(1, 0, 2).unwrap();
+
+        if let SplitNode::Pane { tabs, active_tab, .. } = &pane {
+            assert_eq!(tabs[0].id, "b");
+            assert_eq!(tabs[1].id, "c");
+            assert_eq!(tabs[2].id, "a");
+            assert_eq!(*active_tab, 2); // followed the moved tab
+        } else {
+            panic!("expected pane");
+        }
+
+        // Invalid indices
+        assert!(pane.move_tab(1, 0, 99).is_err());
+    }
+
+    #[test]
+    fn split_tree_compute_rects() {
+        let tree = SplitNode::new_split(
+            LayoutOrientation::Horizontal,
+            SplitNode::new_pane(1),
+            SplitNode::new_pane(2),
+        );
+        let rects = tree.compute_rects(0.0, 0.0, 1000.0, 600.0);
+        assert_eq!(rects.len(), 2);
+        // pane 1: left half
+        assert_eq!(rects[0].0, 1);
+        assert!((rects[0].1 - 0.0).abs() < f64::EPSILON); // x
+        assert!((rects[0].3 - 500.0).abs() < f64::EPSILON); // width
+        // pane 2: right half
+        assert_eq!(rects[1].0, 2);
+        assert!((rects[1].1 - 500.0).abs() < f64::EPSILON); // x
+        assert!((rects[1].3 - 500.0).abs() < f64::EPSILON); // width
+    }
+
+    #[test]
+    fn split_tree_normalize_ratios() {
+        let mut tree = SplitNode::Split {
+            orientation: LayoutOrientation::Horizontal,
+            children: vec![SplitNode::new_pane(1), SplitNode::new_pane(2)],
+            ratios: vec![3.0, 1.0],
+        };
+        tree.normalize_ratios();
+        if let SplitNode::Split { ratios, .. } = &tree {
+            assert!((ratios[0] - 0.75).abs() < 1e-9);
+            assert!((ratios[1] - 0.25).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn focus_tracker_mru_order() {
+        let mut ft = FocusTracker::new(4);
+        ft.focus(1);
+        ft.focus(2);
+        ft.focus(3);
+        assert_eq!(ft.current(), Some(3));
+        assert_eq!(ft.previous(), Some(2));
+
+        // Re-focusing 1 brings it to front
+        ft.focus(1);
+        assert_eq!(ft.current(), Some(1));
+        assert_eq!(ft.previous(), Some(3));
+        assert_eq!(ft.history(), &[1, 3, 2]);
+
+        // Remove
+        ft.remove(3);
+        assert_eq!(ft.history(), &[1, 2]);
+    }
+
+    #[test]
+    fn split_node_display() {
+        let pane = SplitNode::new_pane(1);
+        assert!(pane.to_string().contains("Pane(1"));
+
+        let split = SplitNode::new_split(
+            LayoutOrientation::Vertical,
+            SplitNode::new_pane(1),
+            SplitNode::new_pane(2),
+        );
+        assert!(split.to_string().contains("Split(Vertical"));
+    }
+
+    #[test]
+    fn tab_entry_dirty_and_pinned() {
+        let mut tab = TabEntry::new("main.rs", "main.rs");
+        assert!(!tab.is_dirty);
+        assert!(!tab.is_pinned);
+        tab.is_dirty = true;
+        tab.is_pinned = true;
+        assert!(tab.is_dirty);
+        assert!(tab.is_pinned);
     }
 }

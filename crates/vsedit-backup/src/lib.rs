@@ -1045,6 +1045,269 @@ impl BackupService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// BackupMetadata – rich metadata for backup entries
+// ---------------------------------------------------------------------------
+
+/// Metadata associated with a backup entry for tracking provenance and context.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackupMetadata {
+    pub original_path: String,
+    pub backup_path: String,
+    pub timestamp: u64,
+    pub size: u64,
+    pub content_hash: u64,
+    pub description: String,
+    pub tags: Vec<String>,
+}
+
+impl BackupMetadata {
+    /// Create metadata from a backup entry and its content.
+    pub fn from_entry(entry: &BackupEntry, content: &[u8], description: &str) -> Self {
+        Self {
+            original_path: entry.original_path.clone(),
+            backup_path: entry.backup_path.clone(),
+            timestamp: entry.timestamp,
+            size: entry.size,
+            content_hash: simple_hash(content),
+            description: description.to_string(),
+            tags: Vec::new(),
+        }
+    }
+
+    /// Add a tag to this metadata.
+    pub fn add_tag(&mut self, tag: impl Into<String>) {
+        let tag = tag.into();
+        if !self.tags.contains(&tag) {
+            self.tags.push(tag);
+        }
+    }
+
+    /// Remove a tag. Returns `true` if it was present.
+    pub fn remove_tag(&mut self, tag: &str) -> bool {
+        if let Some(pos) = self.tags.iter().position(|t| t == tag) {
+            self.tags.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check if this metadata has a specific tag.
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    /// Verify content integrity against stored hash.
+    pub fn verify_content(&self, content: &[u8]) -> bool {
+        simple_hash(content) == self.content_hash
+    }
+}
+
+impl fmt::Display for BackupMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "BackupMetadata({}, hash={:#x}, tags=[{}])",
+            self.backup_path,
+            self.content_hash,
+            self.tags.join(", ")
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BackupIndex – fast lookup of backups by content hash or path
+// ---------------------------------------------------------------------------
+
+/// Index structure for efficient backup lookups by content hash and path.
+#[derive(Debug, Clone)]
+pub struct BackupIndex {
+    entries: Vec<BackupMetadata>,
+}
+
+impl BackupIndex {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Insert metadata into the index.
+    pub fn insert(&mut self, meta: BackupMetadata) {
+        self.entries.push(meta);
+    }
+
+    /// Find all backups with a given content hash (deduplication lookup).
+    pub fn find_by_hash(&self, hash: u64) -> Vec<&BackupMetadata> {
+        self.entries
+            .iter()
+            .filter(|m| m.content_hash == hash)
+            .collect()
+    }
+
+    /// Find all backups for a given original path.
+    pub fn find_by_path(&self, path: &str) -> Vec<&BackupMetadata> {
+        self.entries
+            .iter()
+            .filter(|m| m.original_path == path)
+            .collect()
+    }
+
+    /// Find backups matching a specific tag.
+    pub fn find_by_tag(&self, tag: &str) -> Vec<&BackupMetadata> {
+        self.entries.iter().filter(|m| m.has_tag(tag)).collect()
+    }
+
+    /// Check if content with the given hash already exists in the index.
+    pub fn has_hash(&self, hash: u64) -> bool {
+        self.entries.iter().any(|m| m.content_hash == hash)
+    }
+
+    /// Remove all entries for a given backup path. Returns count removed.
+    pub fn remove_by_backup_path(&mut self, backup_path: &str) -> usize {
+        let before = self.entries.len();
+        self.entries.retain(|m| m.backup_path != backup_path);
+        before - self.entries.len()
+    }
+
+    /// Return total number of indexed entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` if the index is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return all distinct content hashes in the index.
+    pub fn distinct_hashes(&self) -> Vec<u64> {
+        let mut hashes: Vec<u64> = self.entries.iter().map(|m| m.content_hash).collect();
+        hashes.sort();
+        hashes.dedup();
+        hashes
+    }
+
+    /// Return total storage size of all indexed entries.
+    pub fn total_size(&self) -> u64 {
+        self.entries.iter().map(|m| m.size).sum()
+    }
+}
+
+impl Default for BackupIndex {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BackupTimeline – query backups across time windows
+// ---------------------------------------------------------------------------
+
+/// A time-windowed view over backup entries for temporal queries.
+pub struct BackupTimeline {
+    entries: Vec<BackupEntry>,
+}
+
+impl BackupTimeline {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    /// Build a timeline from a slice of entries.
+    pub fn from_entries(entries: &[BackupEntry]) -> Self {
+        let mut sorted = entries.to_vec();
+        sorted.sort_by_key(|e| e.timestamp);
+        Self { entries: sorted }
+    }
+
+    /// Add an entry to the timeline (maintains sorted order).
+    pub fn add(&mut self, entry: BackupEntry) {
+        let pos = self
+            .entries
+            .binary_search_by_key(&entry.timestamp, |e| e.timestamp)
+            .unwrap_or_else(|p| p);
+        self.entries.insert(pos, entry);
+    }
+
+    /// Return all entries in the time window `[start, end]` (inclusive).
+    pub fn range(&self, start: u64, end: u64) -> Vec<&BackupEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.timestamp >= start && e.timestamp <= end)
+            .collect()
+    }
+
+    /// Return the most recent entry at or before `timestamp`.
+    pub fn latest_before(&self, timestamp: u64) -> Option<&BackupEntry> {
+        self.entries
+            .iter()
+            .rev()
+            .find(|e| e.timestamp <= timestamp)
+    }
+
+    /// Return the oldest entry at or after `timestamp`.
+    pub fn earliest_after(&self, timestamp: u64) -> Option<&BackupEntry> {
+        self.entries.iter().find(|e| e.timestamp >= timestamp)
+    }
+
+    /// Compute the time gap (in timestamp units) between consecutive backups.
+    /// Returns an empty vec if fewer than 2 entries exist.
+    pub fn gaps(&self) -> Vec<u64> {
+        self.entries
+            .windows(2)
+            .map(|w| w[1].timestamp.saturating_sub(w[0].timestamp))
+            .collect()
+    }
+
+    /// Return the average gap between consecutive backups, or `None` if fewer
+    /// than 2 entries.
+    pub fn average_gap(&self) -> Option<u64> {
+        let gaps = self.gaps();
+        if gaps.is_empty() {
+            return None;
+        }
+        let sum: u64 = gaps.iter().sum();
+        Some(sum / gaps.len() as u64)
+    }
+
+    /// Return the maximum gap between consecutive backups.
+    pub fn max_gap(&self) -> Option<u64> {
+        self.gaps().into_iter().max()
+    }
+
+    /// Return total number of entries in the timeline.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` if the timeline has no entries.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Group entries by original path.
+    pub fn group_by_file(&self) -> std::collections::HashMap<&str, Vec<&BackupEntry>> {
+        let mut map: std::collections::HashMap<&str, Vec<&BackupEntry>> =
+            std::collections::HashMap::new();
+        for entry in &self.entries {
+            map.entry(entry.original_path.as_str())
+                .or_default()
+                .push(entry);
+        }
+        map
+    }
+}
+
+impl Default for BackupTimeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1839,5 +2102,197 @@ mod tests {
         };
         assert!(e1.same_file(&e2));
         assert!(!e1.same_file(&e3));
+    }
+
+    // -----------------------------------------------------------------------
+    // BackupMetadata tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn backup_metadata_from_entry_and_verify() {
+        let entry = BackupEntry {
+            original_path: "/src/main.rs".into(),
+            backup_path: "/backups/main.rs.1.bak".into(),
+            timestamp: 100,
+            size: 13,
+        };
+        let content = b"hello, world!";
+        let meta = BackupMetadata::from_entry(&entry, content, "initial save");
+        assert_eq!(meta.original_path, "/src/main.rs");
+        assert_eq!(meta.size, 13);
+        assert_eq!(meta.description, "initial save");
+        assert_eq!(meta.content_hash, simple_hash(content));
+        assert!(meta.verify_content(content));
+        assert!(!meta.verify_content(b"modified"));
+    }
+
+    #[test]
+    fn backup_metadata_tags() {
+        let entry = BackupEntry {
+            original_path: "/a.txt".into(),
+            backup_path: "/b/a.1.bak".into(),
+            timestamp: 1,
+            size: 4,
+        };
+        let mut meta = BackupMetadata::from_entry(&entry, b"data", "test");
+        assert!(!meta.has_tag("release"));
+        meta.add_tag("release");
+        meta.add_tag("important");
+        meta.add_tag("release"); // duplicate should be ignored
+        assert_eq!(meta.tags.len(), 2);
+        assert!(meta.has_tag("release"));
+        assert!(meta.remove_tag("release"));
+        assert!(!meta.has_tag("release"));
+        assert!(!meta.remove_tag("nonexistent"));
+    }
+
+    // -----------------------------------------------------------------------
+    // BackupIndex tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn backup_index_insert_and_find_by_hash() {
+        let mut index = BackupIndex::new();
+        assert!(index.is_empty());
+
+        let entry = BackupEntry {
+            original_path: "/a.txt".into(),
+            backup_path: "/b/a.1.bak".into(),
+            timestamp: 1,
+            size: 5,
+        };
+        let content = b"alpha";
+        let meta = BackupMetadata::from_entry(&entry, content, "v1");
+        let hash = meta.content_hash;
+        index.insert(meta);
+
+        assert_eq!(index.len(), 1);
+        assert!(index.has_hash(hash));
+        assert!(!index.has_hash(0xDEAD));
+        assert_eq!(index.find_by_hash(hash).len(), 1);
+        assert_eq!(index.find_by_path("/a.txt").len(), 1);
+        assert_eq!(index.find_by_path("/nonexistent").len(), 0);
+    }
+
+    #[test]
+    fn backup_index_find_by_tag_and_dedup() {
+        let mut index = BackupIndex::new();
+        let content = b"same content";
+        let hash = simple_hash(content);
+
+        let e1 = BackupEntry {
+            original_path: "/a.txt".into(),
+            backup_path: "/b/a.1.bak".into(),
+            timestamp: 1,
+            size: 12,
+        };
+        let mut m1 = BackupMetadata::from_entry(&e1, content, "first");
+        m1.add_tag("release");
+        index.insert(m1);
+
+        let e2 = BackupEntry {
+            original_path: "/a.txt".into(),
+            backup_path: "/b/a.2.bak".into(),
+            timestamp: 2,
+            size: 12,
+        };
+        let m2 = BackupMetadata::from_entry(&e2, content, "second");
+        index.insert(m2);
+
+        // Both have the same hash → duplicate content
+        assert_eq!(index.find_by_hash(hash).len(), 2);
+        assert_eq!(index.find_by_tag("release").len(), 1);
+        assert_eq!(index.distinct_hashes().len(), 1);
+        assert_eq!(index.total_size(), 24);
+
+        // Remove one by backup path
+        assert_eq!(index.remove_by_backup_path("/b/a.1.bak"), 1);
+        assert_eq!(index.len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // BackupTimeline tests
+    // -----------------------------------------------------------------------
+
+    fn make_entry(path: &str, ts: u64, size: u64) -> BackupEntry {
+        BackupEntry {
+            original_path: path.to_string(),
+            backup_path: format!("/b/{}.{}.bak", path, ts),
+            timestamp: ts,
+            size,
+        }
+    }
+
+    #[test]
+    fn backup_timeline_range_and_navigation() {
+        let entries = vec![
+            make_entry("/a.txt", 10, 100),
+            make_entry("/a.txt", 20, 200),
+            make_entry("/b.txt", 30, 150),
+            make_entry("/a.txt", 40, 120),
+            make_entry("/b.txt", 50, 180),
+        ];
+        let timeline = BackupTimeline::from_entries(&entries);
+        assert_eq!(timeline.len(), 5);
+
+        // Range query
+        let window = timeline.range(15, 35);
+        assert_eq!(window.len(), 2);
+        assert_eq!(window[0].timestamp, 20);
+        assert_eq!(window[1].timestamp, 30);
+
+        // Navigation
+        let before = timeline.latest_before(25).unwrap();
+        assert_eq!(before.timestamp, 20);
+        let after = timeline.earliest_after(25).unwrap();
+        assert_eq!(after.timestamp, 30);
+
+        assert!(timeline.latest_before(5).is_none());
+        assert!(timeline.earliest_after(100).is_none());
+    }
+
+    #[test]
+    fn backup_timeline_gaps_and_grouping() {
+        let entries = vec![
+            make_entry("/a.txt", 10, 100),
+            make_entry("/a.txt", 15, 100),
+            make_entry("/b.txt", 25, 200),
+            make_entry("/a.txt", 50, 100),
+        ];
+        let timeline = BackupTimeline::from_entries(&entries);
+
+        // Gaps: 5, 10, 25
+        let gaps = timeline.gaps();
+        assert_eq!(gaps, vec![5, 10, 25]);
+        assert_eq!(timeline.average_gap(), Some(13)); // (5+10+25)/3 = 13
+        assert_eq!(timeline.max_gap(), Some(25));
+
+        // Group by file
+        let groups = timeline.group_by_file();
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups["/a.txt"].len(), 3);
+        assert_eq!(groups["/b.txt"].len(), 1);
+    }
+
+    #[test]
+    fn backup_timeline_add_maintains_order() {
+        let mut timeline = BackupTimeline::new();
+        assert!(timeline.is_empty());
+
+        timeline.add(make_entry("/a.txt", 30, 100));
+        timeline.add(make_entry("/a.txt", 10, 50));
+        timeline.add(make_entry("/a.txt", 20, 75));
+
+        assert_eq!(timeline.len(), 3);
+        let range = timeline.range(0, 100);
+        assert_eq!(range[0].timestamp, 10);
+        assert_eq!(range[1].timestamp, 20);
+        assert_eq!(range[2].timestamp, 30);
+
+        // Empty timeline edge cases
+        let empty = BackupTimeline::new();
+        assert_eq!(empty.average_gap(), None);
+        assert_eq!(empty.max_gap(), None);
+        assert!(empty.gaps().is_empty());
     }
 }

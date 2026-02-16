@@ -1119,6 +1119,355 @@ impl ViewDescriptor {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ViewBadge
+// ---------------------------------------------------------------------------
+
+/// A badge displayed on a view, typically showing a count or short label.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewBadge {
+    pub view_id: String,
+    pub value: ViewBadgeValue,
+}
+
+/// The content of a view badge.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ViewBadgeValue {
+    /// A numeric counter (e.g. unread items, problems).
+    Count(u32),
+    /// A short text label (e.g. "!").
+    Label(String),
+    /// No badge — used to clear.
+    None,
+}
+
+impl ViewBadge {
+    /// Create a counter badge for a view.
+    pub fn count(view_id: impl Into<String>, n: u32) -> Self {
+        Self {
+            view_id: view_id.into(),
+            value: ViewBadgeValue::Count(n),
+        }
+    }
+
+    /// Create a label badge for a view.
+    pub fn label(view_id: impl Into<String>, text: impl Into<String>) -> Self {
+        Self {
+            view_id: view_id.into(),
+            value: ViewBadgeValue::Label(text.into()),
+        }
+    }
+
+    /// Create an empty badge (clears the badge).
+    pub fn none(view_id: impl Into<String>) -> Self {
+        Self {
+            view_id: view_id.into(),
+            value: ViewBadgeValue::None,
+        }
+    }
+
+    /// Whether this badge has displayable content.
+    pub fn is_visible(&self) -> bool {
+        match &self.value {
+            ViewBadgeValue::Count(n) => *n > 0,
+            ViewBadgeValue::Label(s) => !s.is_empty(),
+            ViewBadgeValue::None => false,
+        }
+    }
+
+    /// Return display text for the badge.
+    pub fn display_text(&self) -> Option<String> {
+        match &self.value {
+            ViewBadgeValue::Count(0) | ViewBadgeValue::None => None,
+            ViewBadgeValue::Count(n) => Some(n.to_string()),
+            ViewBadgeValue::Label(s) if s.is_empty() => None,
+            ViewBadgeValue::Label(s) => Some(s.clone()),
+        }
+    }
+
+    /// Increment a counter badge. No-op for label/none badges.
+    pub fn increment(&mut self) {
+        if let ViewBadgeValue::Count(ref mut n) = self.value {
+            *n = n.saturating_add(1);
+        }
+    }
+
+    /// Decrement a counter badge (saturating at 0). No-op for label/none.
+    pub fn decrement(&mut self) {
+        if let ViewBadgeValue::Count(ref mut n) = self.value {
+            *n = n.saturating_sub(1);
+        }
+    }
+}
+
+impl fmt::Display for ViewBadge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.value {
+            ViewBadgeValue::Count(n) => write!(f, "[{}]({})", self.view_id, n),
+            ViewBadgeValue::Label(s) => write!(f, "[{}]({})", self.view_id, s),
+            ViewBadgeValue::None => write!(f, "[{}](none)", self.view_id),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewBadgeManager
+// ---------------------------------------------------------------------------
+
+/// Manages badges across all views.
+pub struct ViewBadgeManager {
+    badges: HashMap<String, ViewBadge>,
+    on_did_change: Emitter<String>,
+}
+
+impl ViewBadgeManager {
+    /// Create a new badge manager.
+    pub fn new() -> Self {
+        Self {
+            badges: HashMap::new(),
+            on_did_change: Emitter::new(),
+        }
+    }
+
+    /// Set or update a badge for a view. Fires a change event.
+    pub fn set_badge(&mut self, badge: ViewBadge) {
+        let view_id = badge.view_id.clone();
+        self.badges.insert(view_id.clone(), badge);
+        self.on_did_change.fire(&view_id);
+    }
+
+    /// Get the badge for a view, if any.
+    pub fn get_badge(&self, view_id: &str) -> Option<&ViewBadge> {
+        self.badges.get(view_id)
+    }
+
+    /// Remove the badge for a view. Returns `true` if one existed.
+    pub fn clear_badge(&mut self, view_id: &str) -> bool {
+        let removed = self.badges.remove(view_id).is_some();
+        if removed {
+            self.on_did_change.fire(&view_id.to_string());
+        }
+        removed
+    }
+
+    /// Clear all badges.
+    pub fn clear_all(&mut self) {
+        self.badges.clear();
+    }
+
+    /// Return all view ids that currently have a visible badge.
+    pub fn views_with_badges(&self) -> Vec<&str> {
+        self.badges
+            .iter()
+            .filter(|(_, b)| b.is_visible())
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+
+    /// Total count across all counter badges.
+    pub fn total_count(&self) -> u32 {
+        self.badges.values().fold(0u32, |acc, b| match &b.value {
+            ViewBadgeValue::Count(n) => acc.saturating_add(*n),
+            _ => acc,
+        })
+    }
+
+    /// Subscribe to badge change events. The event payload is the view id.
+    pub fn on_did_change(&self) -> Event<String> {
+        self.on_did_change.event()
+    }
+}
+
+impl Default for ViewBadgeManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WelcomeViewContent
+// ---------------------------------------------------------------------------
+
+/// A single content item for a view's welcome/empty-state page.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WelcomeViewItem {
+    pub content: String,
+    pub when: Option<ContextKeyExpr>,
+    pub order: i32,
+}
+
+/// Manages welcome view content for views.
+#[derive(Debug, Clone)]
+pub struct WelcomeViewContent {
+    items: HashMap<String, Vec<WelcomeViewItem>>,
+}
+
+impl WelcomeViewContent {
+    /// Create a new empty welcome-view content manager.
+    pub fn new() -> Self {
+        Self {
+            items: HashMap::new(),
+        }
+    }
+
+    /// Add a content item to a view's welcome page.
+    pub fn add_item(&mut self, view_id: &str, item: WelcomeViewItem) {
+        self.items
+            .entry(view_id.to_string())
+            .or_default()
+            .push(item);
+    }
+
+    /// Get all welcome items for a view, sorted by order.
+    pub fn get_items(&self, view_id: &str) -> Vec<&WelcomeViewItem> {
+        match self.items.get(view_id) {
+            Some(items) => {
+                let mut sorted: Vec<&WelcomeViewItem> = items.iter().collect();
+                sorted.sort_by_key(|i| i.order);
+                sorted
+            }
+            None => Vec::new(),
+        }
+    }
+
+    /// Remove all welcome items for a view.
+    pub fn clear_view(&mut self, view_id: &str) {
+        self.items.remove(view_id);
+    }
+
+    /// Check if a view has any welcome content.
+    pub fn has_content(&self, view_id: &str) -> bool {
+        self.items
+            .get(view_id)
+            .map_or(false, |items| !items.is_empty())
+    }
+
+    /// Count how many views have welcome content.
+    pub fn view_count_with_content(&self) -> usize {
+        self.items.values().filter(|items| !items.is_empty()).count()
+    }
+}
+
+impl Default for WelcomeViewContent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewContainerModel — tracks runtime state for a single container
+// ---------------------------------------------------------------------------
+
+/// Runtime model for an active view container, tracking its views' state.
+pub struct ViewContainerModel {
+    container_id: String,
+    visible_views: Vec<String>,
+    collapsed: HashMap<String, bool>,
+    active_view: Option<String>,
+    on_did_change: Emitter<()>,
+}
+
+impl ViewContainerModel {
+    /// Create a model for a container with initial view ids.
+    pub fn new(container_id: impl Into<String>, view_ids: &[&str]) -> Self {
+        Self {
+            container_id: container_id.into(),
+            visible_views: view_ids.iter().map(|s| s.to_string()).collect(),
+            collapsed: HashMap::new(),
+            active_view: view_ids.first().map(|s| s.to_string()),
+            on_did_change: Emitter::new(),
+        }
+    }
+
+    /// The container this model is for.
+    pub fn container_id(&self) -> &str {
+        &self.container_id
+    }
+
+    /// Whether a view is collapsed (tree folded).
+    pub fn is_collapsed(&self, view_id: &str) -> bool {
+        self.collapsed.get(view_id).copied().unwrap_or(false)
+    }
+
+    /// Set the collapsed state for a view.
+    pub fn set_collapsed(&mut self, view_id: &str, collapsed: bool) {
+        self.collapsed.insert(view_id.to_string(), collapsed);
+        self.on_did_change.fire(&());
+    }
+
+    /// Toggle collapse for a view.
+    pub fn toggle_collapsed(&mut self, view_id: &str) {
+        let current = self.is_collapsed(view_id);
+        self.set_collapsed(view_id, !current);
+    }
+
+    /// Get the currently active (focused) view in this container.
+    pub fn active_view(&self) -> Option<&str> {
+        self.active_view.as_deref()
+    }
+
+    /// Set which view is active in this container.
+    pub fn set_active_view(&mut self, view_id: &str) {
+        if self.visible_views.iter().any(|v| v == view_id) {
+            self.active_view = Some(view_id.to_string());
+            self.on_did_change.fire(&());
+        }
+    }
+
+    /// Get the ordered list of visible view ids.
+    pub fn visible_views(&self) -> &[String] {
+        &self.visible_views
+    }
+
+    /// Hide a view (remove from visible list). Returns `true` if found.
+    pub fn hide_view(&mut self, view_id: &str) -> bool {
+        let before = self.visible_views.len();
+        self.visible_views.retain(|v| v != view_id);
+        let removed = self.visible_views.len() < before;
+        if removed {
+            if self.active_view.as_deref() == Some(view_id) {
+                self.active_view = self.visible_views.first().cloned();
+            }
+            self.on_did_change.fire(&());
+        }
+        removed
+    }
+
+    /// Show a view (append to visible list if not already present).
+    pub fn show_view(&mut self, view_id: &str) {
+        if !self.visible_views.iter().any(|v| v == view_id) {
+            self.visible_views.push(view_id.to_string());
+            self.on_did_change.fire(&());
+        }
+    }
+
+    /// Reorder a view to a new index. Returns false if view not found or
+    /// index is out of bounds.
+    pub fn move_view_to_index(&mut self, view_id: &str, new_index: usize) -> bool {
+        let pos = match self.visible_views.iter().position(|v| v == view_id) {
+            Some(p) => p,
+            None => return false,
+        };
+        if new_index >= self.visible_views.len() {
+            return false;
+        }
+        let v = self.visible_views.remove(pos);
+        self.visible_views.insert(new_index, v);
+        self.on_did_change.fire(&());
+        true
+    }
+
+    /// Number of currently visible views.
+    pub fn visible_count(&self) -> usize {
+        self.visible_views.len()
+    }
+
+    /// Subscribe to model change events.
+    pub fn on_did_change(&self) -> Event<()> {
+        self.on_did_change.event()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1817,5 +2166,177 @@ mod tests {
         let v3 = ViewDescriptor::new("c", "Gamma", "c1").with_order(0);
         assert_eq!(v3.cmp_by_order_then_name(&v1), std::cmp::Ordering::Less);
         assert_eq!(v2.cmp_by_order_then_name(&v1), std::cmp::Ordering::Less);
+    }
+
+    // -- ViewBadge / ViewBadgeManager tests --
+
+    #[test]
+    fn badge_count_visibility_and_display() {
+        let mut badge = ViewBadge::count("files", 3);
+        assert!(badge.is_visible());
+        assert_eq!(badge.display_text(), Some("3".to_string()));
+        badge.increment();
+        assert_eq!(badge.display_text(), Some("4".to_string()));
+        badge.decrement();
+        badge.decrement();
+        badge.decrement();
+        badge.decrement(); // saturates at 0
+        assert_eq!(badge.display_text(), None);
+        assert!(!badge.is_visible());
+    }
+
+    #[test]
+    fn badge_label_and_none() {
+        let label = ViewBadge::label("scm", "!");
+        assert!(label.is_visible());
+        assert_eq!(label.display_text(), Some("!".to_string()));
+        assert!(label.to_string().contains("!"));
+
+        let empty_label = ViewBadge::label("scm", "");
+        assert!(!empty_label.is_visible());
+        assert_eq!(empty_label.display_text(), None);
+
+        let none = ViewBadge::none("x");
+        assert!(!none.is_visible());
+        assert_eq!(none.display_text(), None);
+    }
+
+    #[test]
+    fn badge_manager_set_get_clear() {
+        let mut mgr = ViewBadgeManager::new();
+        mgr.set_badge(ViewBadge::count("problems", 5));
+        mgr.set_badge(ViewBadge::count("scm", 2));
+        assert_eq!(mgr.total_count(), 7);
+        assert_eq!(mgr.get_badge("problems").unwrap().display_text(), Some("5".to_string()));
+
+        let mut with_badges = mgr.views_with_badges();
+        with_badges.sort();
+        assert_eq!(with_badges, vec!["problems", "scm"]);
+
+        assert!(mgr.clear_badge("problems"));
+        assert!(!mgr.clear_badge("problems")); // already gone
+        assert_eq!(mgr.total_count(), 2);
+
+        mgr.clear_all();
+        assert_eq!(mgr.total_count(), 0);
+    }
+
+    #[test]
+    fn badge_manager_fires_change_event() {
+        let mut mgr = ViewBadgeManager::new();
+        let changed = Arc::new(Mutex::new(Vec::<String>::new()));
+        let c = changed.clone();
+        let _handle = mgr.on_did_change().on(move |view_id| {
+            c.lock().unwrap().push(view_id.clone());
+        });
+        mgr.set_badge(ViewBadge::count("files", 1));
+        mgr.clear_badge("files");
+        let events = changed.lock().unwrap();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0], "files");
+    }
+
+    // -- WelcomeViewContent tests --
+
+    #[test]
+    fn welcome_view_content_add_and_retrieve() {
+        let mut wv = WelcomeViewContent::new();
+        wv.add_item("explorer", WelcomeViewItem {
+            content: "Open a folder to get started.".into(),
+            when: None,
+            order: 1,
+        });
+        wv.add_item("explorer", WelcomeViewItem {
+            content: "Clone a repository.".into(),
+            when: None,
+            order: 0,
+        });
+        assert!(wv.has_content("explorer"));
+        assert!(!wv.has_content("scm"));
+        assert_eq!(wv.view_count_with_content(), 1);
+
+        let items = wv.get_items("explorer");
+        assert_eq!(items.len(), 2);
+        // Sorted by order
+        assert_eq!(items[0].content, "Clone a repository.");
+        assert_eq!(items[1].content, "Open a folder to get started.");
+    }
+
+    #[test]
+    fn welcome_view_content_clear() {
+        let mut wv = WelcomeViewContent::new();
+        wv.add_item("explorer", WelcomeViewItem {
+            content: "Hello".into(),
+            when: None,
+            order: 0,
+        });
+        wv.clear_view("explorer");
+        assert!(!wv.has_content("explorer"));
+        assert!(wv.get_items("explorer").is_empty());
+    }
+
+    // -- ViewContainerModel tests --
+
+    #[test]
+    fn container_model_active_view_and_collapse() {
+        let mut model = ViewContainerModel::new("explorer", &["files", "outline", "timeline"]);
+        assert_eq!(model.container_id(), "explorer");
+        assert_eq!(model.active_view(), Some("files"));
+        assert_eq!(model.visible_count(), 3);
+
+        model.set_active_view("outline");
+        assert_eq!(model.active_view(), Some("outline"));
+
+        // Non-existent view is ignored
+        model.set_active_view("nonexistent");
+        assert_eq!(model.active_view(), Some("outline"));
+
+        assert!(!model.is_collapsed("files"));
+        model.toggle_collapsed("files");
+        assert!(model.is_collapsed("files"));
+        model.toggle_collapsed("files");
+        assert!(!model.is_collapsed("files"));
+    }
+
+    #[test]
+    fn container_model_hide_show_reorder() {
+        let mut model = ViewContainerModel::new("explorer", &["files", "outline", "timeline"]);
+
+        // Hide the active view — active moves to next
+        assert!(model.hide_view("files"));
+        assert_eq!(model.visible_count(), 2);
+        assert_eq!(model.active_view(), Some("outline"));
+        assert!(!model.hide_view("files")); // already hidden
+
+        // Show it back
+        model.show_view("files");
+        assert_eq!(model.visible_count(), 3);
+        // Appended at end
+        assert_eq!(model.visible_views().last().unwrap(), "files");
+
+        // Reorder: move "files" (index 2) to index 0
+        assert!(model.move_view_to_index("files", 0));
+        assert_eq!(model.visible_views()[0], "files");
+
+        // Out of bounds
+        assert!(!model.move_view_to_index("files", 99));
+        // Unknown view
+        assert!(!model.move_view_to_index("unknown", 0));
+    }
+
+    #[test]
+    fn container_model_fires_change_events() {
+        let mut model = ViewContainerModel::new("c", &["a", "b"]);
+        let count = Arc::new(Mutex::new(0u32));
+        let c = count.clone();
+        let _handle = model.on_did_change().on(move |_| {
+            *c.lock().unwrap() += 1;
+        });
+        model.set_active_view("b");
+        model.set_collapsed("a", true);
+        model.hide_view("b");
+        model.show_view("b");
+        model.move_view_to_index("b", 0);
+        assert_eq!(*count.lock().unwrap(), 5);
     }
 }

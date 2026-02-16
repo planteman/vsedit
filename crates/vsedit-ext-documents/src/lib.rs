@@ -1142,6 +1142,409 @@ pub fn sort_edits_by_position(edits: &mut [TextEdit]) {
     });
 }
 
+// ---------------------------------------------------------------------------
+// Document lifecycle state machine
+// ---------------------------------------------------------------------------
+
+/// Lifecycle state of a document in the editor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DocumentLifecycleState {
+    /// Document has just been opened and has no unsaved changes.
+    Pristine,
+    /// Document has been modified since the last save.
+    Modified,
+    /// Document has been saved (transitions back from Modified).
+    Saved,
+    /// Document is in the process of being saved.
+    Saving,
+    /// Document has been closed.
+    Closed,
+}
+
+impl fmt::Display for DocumentLifecycleState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Pristine => "pristine",
+            Self::Modified => "modified",
+            Self::Saved => "saved",
+            Self::Saving => "saving",
+            Self::Closed => "closed",
+        };
+        f.write_str(s)
+    }
+}
+
+/// Tracks the lifecycle state of documents with valid state transitions.
+#[derive(Debug, Clone)]
+pub struct DocumentLifecycleTracker {
+    states: HashMap<String, DocumentLifecycleState>,
+}
+
+impl DocumentLifecycleTracker {
+    pub fn new() -> Self {
+        Self { states: HashMap::new() }
+    }
+
+    /// Register a document as opened (Pristine).
+    pub fn open(&mut self, uri: impl Into<String>) {
+        self.states.insert(uri.into(), DocumentLifecycleState::Pristine);
+    }
+
+    /// Get the current lifecycle state of a document.
+    pub fn state(&self, uri: &str) -> Option<DocumentLifecycleState> {
+        self.states.get(uri).copied()
+    }
+
+    /// Attempt a state transition; returns the new state or an error if invalid.
+    pub fn transition(
+        &mut self,
+        uri: &str,
+        to: DocumentLifecycleState,
+    ) -> Result<DocumentLifecycleState, DocumentError> {
+        let current = self
+            .states
+            .get(uri)
+            .copied()
+            .ok_or_else(|| DocumentError::NotFound { uri: uri.to_string() })?;
+
+        if !Self::is_valid_transition(current, to) {
+            return Err(DocumentError::InvalidUri(format!(
+                "invalid transition from {} to {} for {}",
+                current, to, uri
+            )));
+        }
+
+        if to == DocumentLifecycleState::Closed {
+            self.states.remove(uri);
+        } else {
+            self.states.insert(uri.to_string(), to);
+        }
+        Ok(to)
+    }
+
+    /// Check whether a state transition is valid.
+    pub fn is_valid_transition(from: DocumentLifecycleState, to: DocumentLifecycleState) -> bool {
+        use DocumentLifecycleState::*;
+        matches!(
+            (from, to),
+            (Pristine, Modified)
+                | (Pristine, Closed)
+                | (Modified, Saving)
+                | (Modified, Closed)
+                | (Saving, Saved)
+                | (Saving, Modified) // save failed or concurrent edit
+                | (Saved, Modified)
+                | (Saved, Closed)
+        )
+    }
+
+    /// Return all URIs currently in the Modified state.
+    pub fn modified_uris(&self) -> Vec<&str> {
+        self.states
+            .iter()
+            .filter(|(_, s)| **s == DocumentLifecycleState::Modified)
+            .map(|(uri, _)| uri.as_str())
+            .collect()
+    }
+
+    /// Return the count of documents in each state.
+    pub fn state_counts(&self) -> HashMap<DocumentLifecycleState, usize> {
+        let mut counts = HashMap::new();
+        for &state in self.states.values() {
+            *counts.entry(state).or_insert(0) += 1;
+        }
+        counts
+    }
+
+    /// True if any document is in the Modified state.
+    pub fn has_unsaved_changes(&self) -> bool {
+        self.states.values().any(|s| *s == DocumentLifecycleState::Modified)
+    }
+
+    /// Number of tracked documents (excludes Closed).
+    pub fn tracked_count(&self) -> usize {
+        self.states.len()
+    }
+}
+
+impl Default for DocumentLifecycleTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Document metadata
+// ---------------------------------------------------------------------------
+
+/// Rich metadata about an open document.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentMetadata {
+    pub uri: String,
+    pub language_id: String,
+    pub version: u32,
+    pub line_count: usize,
+    pub byte_size: usize,
+    pub encoding: String,
+    pub is_untitled: bool,
+    pub scheme: String,
+}
+
+impl DocumentMetadata {
+    /// Build metadata from a URI and content.
+    pub fn from_content(
+        uri: &str,
+        language_id: &str,
+        version: u32,
+        content: &str,
+    ) -> Self {
+        let scheme = uri
+            .find("://")
+            .map(|i| &uri[..i])
+            .unwrap_or("file")
+            .to_string();
+        let is_untitled = scheme == "untitled";
+        let line_count = if content.is_empty() { 0 } else { content.lines().count().max(1) };
+
+        Self {
+            uri: uri.to_string(),
+            language_id: language_id.to_string(),
+            version,
+            line_count,
+            byte_size: content.len(),
+            encoding: "utf-8".to_string(),
+            is_untitled,
+            scheme,
+        }
+    }
+}
+
+impl fmt::Display for DocumentMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} [{}] v{} ({} lines, {} bytes)",
+            self.uri, self.language_id, self.version, self.line_count, self.byte_size
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Document change event log
+// ---------------------------------------------------------------------------
+
+/// A recorded change event for auditing / undo history.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChangeRecord {
+    pub uri: String,
+    pub from_version: u32,
+    pub to_version: u32,
+    pub edit_count: usize,
+    pub chars_added: usize,
+    pub chars_deleted: usize,
+}
+
+/// Append-only log of document change events.
+#[derive(Debug, Clone, Default)]
+pub struct ChangeEventLog {
+    records: Vec<ChangeRecord>,
+}
+
+impl ChangeEventLog {
+    pub fn new() -> Self {
+        Self { records: Vec::new() }
+    }
+
+    /// Record a change event.
+    pub fn record(
+        &mut self,
+        uri: &str,
+        from_version: u32,
+        to_version: u32,
+        edits: &[TextEdit],
+    ) {
+        let chars_added: usize = edits.iter().map(|e| e.text.len()).sum();
+        let chars_deleted: usize = edits
+            .iter()
+            .filter(|e| e.is_delete())
+            .map(|e| ((e.end_line - e.start_line) as usize + 1) * 80) // estimate
+            .sum();
+
+        self.records.push(ChangeRecord {
+            uri: uri.to_string(),
+            from_version,
+            to_version,
+            edit_count: edits.len(),
+            chars_added,
+            chars_deleted,
+        });
+    }
+
+    /// Get all records for a specific URI.
+    pub fn records_for(&self, uri: &str) -> Vec<&ChangeRecord> {
+        self.records.iter().filter(|r| r.uri == uri).collect()
+    }
+
+    /// Total number of recorded change events.
+    pub fn len(&self) -> usize {
+        self.records.len()
+    }
+
+    /// True if no change events have been recorded.
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    /// Get the most recent change record, if any.
+    pub fn last(&self) -> Option<&ChangeRecord> {
+        self.records.last()
+    }
+
+    /// Sum of all chars added across all records.
+    pub fn total_chars_added(&self) -> usize {
+        self.records.iter().map(|r| r.chars_added).sum()
+    }
+
+    /// Clear all recorded events.
+    pub fn clear(&mut self) {
+        self.records.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DocumentBridge filtering and bulk operations
+// ---------------------------------------------------------------------------
+
+impl DocumentBridge {
+    /// Filter open documents by language ID, returning matching URIs.
+    pub fn filter_by_language(&self, language_id: &str) -> Vec<&str> {
+        self.documents
+            .iter()
+            .filter(|(_, state)| state.language_id == language_id)
+            .map(|(uri, _)| uri.as_str())
+            .collect()
+    }
+
+    /// Filter open documents by URI scheme (e.g., "file", "untitled").
+    pub fn filter_by_scheme(&self, scheme: &str) -> Vec<&str> {
+        let prefix = format!("{}://", scheme);
+        self.documents
+            .keys()
+            .filter(|uri| uri.starts_with(&prefix))
+            .map(|uri| uri.as_str())
+            .collect()
+    }
+
+    /// Close all documents matching a predicate on URI.
+    pub fn close_matching(&mut self, predicate: impl Fn(&str) -> bool) -> usize {
+        let to_remove: Vec<String> = self
+            .documents
+            .keys()
+            .filter(|uri| predicate(uri.as_str()))
+            .cloned()
+            .collect();
+        let count = to_remove.len();
+        for uri in to_remove {
+            self.documents.remove(&uri);
+        }
+        count
+    }
+
+    /// Collect metadata for all open documents.
+    pub fn all_metadata(&self) -> Vec<DocumentMetadata> {
+        self.documents
+            .iter()
+            .map(|(uri, state)| {
+                DocumentMetadata::from_content(uri, &state.language_id, state.version, &state.content)
+            })
+            .collect()
+    }
+
+    /// Get the content of a document, if open.
+    pub fn get_content(&self, uri: &str) -> Option<&str> {
+        self.documents.get(uri).map(|s| s.content.as_str())
+    }
+
+    /// Get the language ID of a document, if open.
+    pub fn get_language_id(&self, uri: &str) -> Option<&str> {
+        self.documents.get(uri).map(|s| s.language_id.as_str())
+    }
+
+    /// Find all documents whose content contains the given substring.
+    pub fn search_content(&self, needle: &str) -> Vec<&str> {
+        self.documents
+            .iter()
+            .filter(|(_, state)| state.content.contains(needle))
+            .map(|(uri, _)| uri.as_str())
+            .collect()
+    }
+
+    /// Get the URI of the document with the highest version number.
+    pub fn newest_document(&self) -> Option<&str> {
+        self.documents
+            .iter()
+            .max_by_key(|(_, state)| state.version)
+            .map(|(uri, _)| uri.as_str())
+    }
+
+    /// Compute total byte size across all open documents.
+    pub fn total_content_size(&self) -> usize {
+        self.documents.values().map(|s| s.content.len()).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// URI resolution utilities
+// ---------------------------------------------------------------------------
+
+/// Extract the scheme portion of a URI (e.g., "file" from "file:///foo").
+pub fn uri_scheme(uri: &str) -> Option<&str> {
+    uri.find("://").map(|i| &uri[..i])
+}
+
+/// Extract the path portion of a URI (after the scheme + authority).
+pub fn uri_path(uri: &str) -> Option<&str> {
+    let rest = uri.find("://").map(|i| &uri[i + 3..])?;
+    // For file:///path, rest is "/path"; for scheme://host/path, find first /
+    Some(rest)
+}
+
+/// Get the filename component from a URI.
+pub fn uri_filename(uri: &str) -> Option<&str> {
+    uri.rsplit('/').next().filter(|s| !s.is_empty())
+}
+
+/// Guess a language ID from a file extension.
+pub fn language_id_from_extension(ext: &str) -> &str {
+    match ext {
+        "rs" => "rust",
+        "js" | "mjs" | "cjs" => "javascript",
+        "ts" | "mts" | "cts" => "typescript",
+        "py" => "python",
+        "go" => "go",
+        "c" | "h" => "c",
+        "cpp" | "hpp" | "cc" | "cxx" => "cpp",
+        "md" => "markdown",
+        "json" => "json",
+        "toml" => "toml",
+        "yaml" | "yml" => "yaml",
+        "html" | "htm" => "html",
+        "css" => "css",
+        "sh" | "bash" => "shellscript",
+        _ => "plaintext",
+    }
+}
+
+/// Infer language ID from a full URI by extracting its extension.
+pub fn language_id_from_uri(uri: &str) -> &str {
+    match uri_extension(uri) {
+        Some(ext) => language_id_from_extension(ext),
+        None => "plaintext",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1807,5 +2210,236 @@ mod tests {
         assert_eq!(edits[1].start_line, 1);
         assert_eq!(edits[1].start_col, 5);
         assert_eq!(edits[2].start_line, 5);
+    }
+
+    // ── New tests: lifecycle, metadata, change log, filtering, URI utils ──
+
+    #[test]
+    fn lifecycle_tracker_open_and_transition() {
+        let mut tracker = DocumentLifecycleTracker::new();
+        tracker.open("file:///a.rs");
+        assert_eq!(tracker.state("file:///a.rs"), Some(DocumentLifecycleState::Pristine));
+
+        // Pristine -> Modified
+        let s = tracker.transition("file:///a.rs", DocumentLifecycleState::Modified).unwrap();
+        assert_eq!(s, DocumentLifecycleState::Modified);
+
+        // Modified -> Saving
+        tracker.transition("file:///a.rs", DocumentLifecycleState::Saving).unwrap();
+
+        // Saving -> Saved
+        tracker.transition("file:///a.rs", DocumentLifecycleState::Saved).unwrap();
+        assert_eq!(tracker.state("file:///a.rs"), Some(DocumentLifecycleState::Saved));
+
+        // Saved -> Closed (removes from tracker)
+        tracker.transition("file:///a.rs", DocumentLifecycleState::Closed).unwrap();
+        assert_eq!(tracker.state("file:///a.rs"), None);
+        assert_eq!(tracker.tracked_count(), 0);
+    }
+
+    #[test]
+    fn lifecycle_invalid_transition_rejected() {
+        let mut tracker = DocumentLifecycleTracker::new();
+        tracker.open("file:///b.rs");
+        // Pristine -> Saved is not valid
+        let result = tracker.transition("file:///b.rs", DocumentLifecycleState::Saved);
+        assert!(result.is_err());
+        // Pristine -> Saving is not valid
+        let result = tracker.transition("file:///b.rs", DocumentLifecycleState::Saving);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn lifecycle_modified_uris_and_unsaved() {
+        let mut tracker = DocumentLifecycleTracker::new();
+        tracker.open("file:///x.rs");
+        tracker.open("file:///y.rs");
+        tracker.open("file:///z.rs");
+        assert!(!tracker.has_unsaved_changes());
+
+        tracker.transition("file:///x.rs", DocumentLifecycleState::Modified).unwrap();
+        tracker.transition("file:///z.rs", DocumentLifecycleState::Modified).unwrap();
+        assert!(tracker.has_unsaved_changes());
+
+        let modified = tracker.modified_uris();
+        assert_eq!(modified.len(), 2);
+        assert!(modified.contains(&"file:///x.rs"));
+        assert!(modified.contains(&"file:///z.rs"));
+
+        let counts = tracker.state_counts();
+        assert_eq!(counts[&DocumentLifecycleState::Modified], 2);
+        assert_eq!(counts[&DocumentLifecycleState::Pristine], 1);
+    }
+
+    #[test]
+    fn document_metadata_from_content() {
+        let meta = DocumentMetadata::from_content(
+            "file:///src/main.rs",
+            "rust",
+            3,
+            "fn main() {\n    println!(\"hi\");\n}\n",
+        );
+        assert_eq!(meta.scheme, "file");
+        assert!(!meta.is_untitled);
+        assert_eq!(meta.version, 3);
+        assert_eq!(meta.line_count, 3);
+        assert!(meta.byte_size > 0);
+        assert_eq!(meta.language_id, "rust");
+
+        // Untitled document
+        let untitled = DocumentMetadata::from_content("untitled://1", "plaintext", 1, "");
+        assert!(untitled.is_untitled);
+        assert_eq!(untitled.line_count, 0);
+        assert_eq!(untitled.scheme, "untitled");
+
+        // Display
+        let s = format!("{meta}");
+        assert!(s.contains("main.rs"));
+        assert!(s.contains("rust"));
+    }
+
+    #[test]
+    fn change_event_log_record_and_query() {
+        let mut log = ChangeEventLog::new();
+        assert!(log.is_empty());
+
+        let edits = vec![
+            TextEdit::new(0, 0, 0, 0, "hello"),
+            TextEdit::new(1, 0, 1, 5, ""),
+        ];
+        log.record("file:///a.rs", 1, 2, &edits);
+        log.record("file:///b.rs", 1, 2, &[TextEdit::new(0, 0, 0, 0, "world")]);
+        log.record("file:///a.rs", 2, 3, &[TextEdit::new(0, 0, 0, 3, "hi")]);
+
+        assert_eq!(log.len(), 3);
+        assert!(!log.is_empty());
+        assert_eq!(log.records_for("file:///a.rs").len(), 2);
+        assert_eq!(log.records_for("file:///b.rs").len(), 1);
+        assert_eq!(log.records_for("file:///c.rs").len(), 0);
+
+        let last = log.last().unwrap();
+        assert_eq!(last.uri, "file:///a.rs");
+        assert_eq!(last.to_version, 3);
+
+        assert!(log.total_chars_added() > 0);
+
+        log.clear();
+        assert!(log.is_empty());
+    }
+
+    #[test]
+    fn bridge_filter_by_language() {
+        let mut bridge = DocumentBridge::new();
+        bridge.handle(DocumentMessage::Open {
+            uri: "file:///a.rs".into(), language_id: "rust".into(), version: 1, content: "".into(),
+        });
+        bridge.handle(DocumentMessage::Open {
+            uri: "file:///b.py".into(), language_id: "python".into(), version: 1, content: "".into(),
+        });
+        bridge.handle(DocumentMessage::Open {
+            uri: "file:///c.rs".into(), language_id: "rust".into(), version: 1, content: "".into(),
+        });
+
+        let rust_docs = bridge.filter_by_language("rust");
+        assert_eq!(rust_docs.len(), 2);
+        let py_docs = bridge.filter_by_language("python");
+        assert_eq!(py_docs.len(), 1);
+        let go_docs = bridge.filter_by_language("go");
+        assert!(go_docs.is_empty());
+    }
+
+    #[test]
+    fn bridge_filter_by_scheme_and_close_matching() {
+        let mut bridge = DocumentBridge::new();
+        bridge.handle(DocumentMessage::Open {
+            uri: "file:///a.rs".into(), language_id: "rust".into(), version: 1, content: "a".into(),
+        });
+        bridge.handle(DocumentMessage::Open {
+            uri: "untitled://1".into(), language_id: "plaintext".into(), version: 1, content: "b".into(),
+        });
+        bridge.handle(DocumentMessage::Open {
+            uri: "file:///c.rs".into(), language_id: "rust".into(), version: 1, content: "c".into(),
+        });
+
+        let file_docs = bridge.filter_by_scheme("file");
+        assert_eq!(file_docs.len(), 2);
+        let untitled = bridge.filter_by_scheme("untitled");
+        assert_eq!(untitled.len(), 1);
+
+        let closed = bridge.close_matching(|uri| uri.starts_with("untitled://"));
+        assert_eq!(closed, 1);
+        assert_eq!(bridge.open_count(), 2);
+    }
+
+    #[test]
+    fn bridge_search_content_and_metadata() {
+        let mut bridge = DocumentBridge::new();
+        bridge.handle(DocumentMessage::Open {
+            uri: "file:///x.rs".into(), language_id: "rust".into(), version: 3,
+            content: "fn main() { println!(\"hello\"); }".into(),
+        });
+        bridge.handle(DocumentMessage::Open {
+            uri: "file:///y.py".into(), language_id: "python".into(), version: 1,
+            content: "print('world')".into(),
+        });
+
+        let hits = bridge.search_content("hello");
+        assert_eq!(hits.len(), 1);
+        assert!(hits.contains(&"file:///x.rs"));
+
+        let hits2 = bridge.search_content("nonexistent");
+        assert!(hits2.is_empty());
+
+        assert_eq!(bridge.get_content("file:///x.rs").unwrap(), "fn main() { println!(\"hello\"); }");
+        assert_eq!(bridge.get_language_id("file:///y.py"), Some("python"));
+        assert!(bridge.get_content("file:///missing").is_none());
+
+        let newest = bridge.newest_document().unwrap();
+        assert_eq!(newest, "file:///x.rs"); // version 3 > version 1
+
+        let total = bridge.total_content_size();
+        assert!(total > 40);
+
+        let all_meta = bridge.all_metadata();
+        assert_eq!(all_meta.len(), 2);
+    }
+
+    #[test]
+    fn uri_utilities() {
+        assert_eq!(uri_scheme("file:///foo.rs"), Some("file"));
+        assert_eq!(uri_scheme("untitled://1"), Some("untitled"));
+        assert_eq!(uri_scheme("noscheme"), None);
+
+        assert_eq!(uri_path("file:///home/user/a.rs"), Some("/home/user/a.rs"));
+        assert_eq!(uri_path("noscheme"), None);
+
+        assert_eq!(uri_filename("file:///home/user/main.rs"), Some("main.rs"));
+        assert_eq!(uri_filename("file:///"), None);
+
+        assert_eq!(language_id_from_extension("rs"), "rust");
+        assert_eq!(language_id_from_extension("ts"), "typescript");
+        assert_eq!(language_id_from_extension("py"), "python");
+        assert_eq!(language_id_from_extension("json"), "json");
+        assert_eq!(language_id_from_extension("toml"), "toml");
+        assert_eq!(language_id_from_extension("yaml"), "yaml");
+        assert_eq!(language_id_from_extension("html"), "html");
+        assert_eq!(language_id_from_extension("css"), "css");
+        assert_eq!(language_id_from_extension("sh"), "shellscript");
+        assert_eq!(language_id_from_extension("xyz"), "plaintext");
+
+        assert_eq!(language_id_from_uri("file:///main.rs"), "rust");
+        assert_eq!(language_id_from_uri("file:///app.js"), "javascript");
+        assert_eq!(language_id_from_uri("file:///noext"), "plaintext");
+    }
+
+    #[test]
+    fn lifecycle_state_display_and_serde() {
+        assert_eq!(format!("{}", DocumentLifecycleState::Pristine), "pristine");
+        assert_eq!(format!("{}", DocumentLifecycleState::Modified), "modified");
+        assert_eq!(format!("{}", DocumentLifecycleState::Closed), "closed");
+
+        let json = serde_json::to_string(&DocumentLifecycleState::Modified).unwrap();
+        let parsed: DocumentLifecycleState = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, DocumentLifecycleState::Modified);
     }
 }

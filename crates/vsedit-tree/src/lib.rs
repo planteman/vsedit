@@ -1156,6 +1156,300 @@ where
     None
 }
 
+// ---------------------------------------------------------------------------
+// map_tree – transform all node data producing a new tree
+// ---------------------------------------------------------------------------
+
+/// Transform every node's data using the given function, producing a new `TreeModel`.
+pub fn map_tree<T, U, F>(model: &TreeModel<T>, f: &F) -> TreeModel<U>
+where
+    F: Fn(&T) -> U,
+{
+    TreeModel {
+        roots: model.roots.iter().map(|r| map_node(r, f)).collect(),
+    }
+}
+
+fn map_node<T, U, F>(node: &TreeNode<T>, f: &F) -> TreeNode<U>
+where
+    F: Fn(&T) -> U,
+{
+    TreeNode {
+        data: f(&node.data),
+        children: node.children.iter().map(|c| map_node(c, f)).collect(),
+        is_expanded: node.is_expanded,
+        depth: node.depth,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// filter_tree – keep only nodes matching a predicate (ancestors preserved)
+// ---------------------------------------------------------------------------
+
+/// Create a new tree keeping only nodes where `predicate` returns true.
+///
+/// A parent node is retained if any of its descendants match, ensuring the
+/// tree structure stays connected. The `default` closure produces placeholder
+/// data for retained-but-unmatched ancestors.
+pub fn filter_tree<T: Clone>(
+    model: &TreeModel<T>,
+    predicate: &dyn Fn(&T) -> bool,
+) -> TreeModel<T> {
+    TreeModel {
+        roots: model
+            .roots
+            .iter()
+            .filter_map(|r| filter_node(r, predicate))
+            .collect(),
+    }
+}
+
+fn filter_node<T: Clone>(
+    node: &TreeNode<T>,
+    predicate: &dyn Fn(&T) -> bool,
+) -> Option<TreeNode<T>> {
+    let filtered_children: Vec<TreeNode<T>> = node
+        .children
+        .iter()
+        .filter_map(|c| filter_node(c, predicate))
+        .collect();
+
+    if predicate(&node.data) || !filtered_children.is_empty() {
+        Some(TreeNode {
+            data: node.data.clone(),
+            children: filtered_children,
+            is_expanded: node.is_expanded,
+            depth: node.depth,
+        })
+    } else {
+        None
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ancestors – collect ancestor data along a path
+// ---------------------------------------------------------------------------
+
+/// Given an index-path, return data references for every ancestor from root
+/// down to (but not including) the final node.
+pub fn ancestors<'a, T>(model: &'a TreeModel<T>, path: &[usize]) -> Vec<&'a T> {
+    let mut result = Vec::new();
+    let mut nodes: &[TreeNode<T>] = &model.roots;
+    for &idx in path.iter().take(path.len().saturating_sub(1)) {
+        if let Some(node) = nodes.get(idx) {
+            result.push(&node.data);
+            nodes = &node.children;
+        } else {
+            break;
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// breadth_first – BFS traversal collecting data references
+// ---------------------------------------------------------------------------
+
+/// Iterate all nodes in breadth-first order, returning data references.
+pub fn breadth_first<'a, T>(model: &'a TreeModel<T>) -> Vec<&'a T> {
+    let mut result = Vec::new();
+    let mut queue = std::collections::VecDeque::new();
+    for root in &model.roots {
+        queue.push_back(root);
+    }
+    while let Some(node) = queue.pop_front() {
+        result.push(&node.data);
+        for child in &node.children {
+            queue.push_back(child);
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// merge_trees – combine two tree models into one
+// ---------------------------------------------------------------------------
+
+/// Merge two tree models by appending the roots of `other` after `base`.
+pub fn merge_trees<T>(base: TreeModel<T>, other: TreeModel<T>) -> TreeModel<T> {
+    let mut roots = base.roots;
+    roots.extend(other.roots);
+    TreeModel { roots }
+}
+
+// ---------------------------------------------------------------------------
+// TreeNode extra methods
+// ---------------------------------------------------------------------------
+
+impl<T> TreeNode<T> {
+    /// Find the first node (DFS) whose data satisfies the predicate.
+    pub fn find<F: Fn(&T) -> bool>(&self, predicate: &F) -> Option<&TreeNode<T>> {
+        if predicate(&self.data) {
+            return Some(self);
+        }
+        for child in &self.children {
+            if let Some(found) = child.find(predicate) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
+    /// Collect data from all nodes in this subtree (DFS order).
+    pub fn collect_all_data(&self) -> Vec<&T> {
+        let mut out = Vec::new();
+        self.collect_data_into(&mut out);
+        out
+    }
+
+    fn collect_data_into<'a>(&'a self, out: &mut Vec<&'a T>) {
+        out.push(&self.data);
+        for child in &self.children {
+            child.collect_data_into(out);
+        }
+    }
+
+    /// Count all descendants (not including self).
+    pub fn descendant_count(&self) -> usize {
+        self.total_count() - 1
+    }
+
+    /// Return the depth of the deepest leaf relative to this node.
+    pub fn height(&self) -> u32 {
+        if self.children.is_empty() {
+            0
+        } else {
+            1 + self
+                .children
+                .iter()
+                .map(|c| c.height())
+                .max()
+                .unwrap_or(0)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TreeModel extra methods
+// ---------------------------------------------------------------------------
+
+impl<T> TreeModel<T> {
+    /// Find the first node (DFS) matching the predicate.
+    pub fn find_node<F: Fn(&T) -> bool>(&self, predicate: &F) -> Option<&TreeNode<T>> {
+        for root in &self.roots {
+            if let Some(found) = root.find(predicate) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
+    /// Access a node by index-path (immutable).
+    pub fn node_at_path(&self, path: &[usize]) -> Option<&TreeNode<T>> {
+        node_at_path_ref(&self.roots, path)
+    }
+
+    /// Iterate all node data in BFS order.
+    pub fn breadth_first_data(&self) -> Vec<&T> {
+        breadth_first(self)
+    }
+
+    /// Compute the height of the tallest root subtree.
+    pub fn tree_height(&self) -> u32 {
+        self.roots.iter().map(|r| r.height()).max().unwrap_or(0)
+    }
+
+    /// Return true if any node matches the predicate.
+    pub fn contains<F: Fn(&T) -> bool>(&self, predicate: &F) -> bool {
+        self.find_node(predicate).is_some()
+    }
+
+    /// Apply a mutable visitor to every node in DFS order.
+    pub fn for_each_mut<F: FnMut(&mut TreeNode<T>)>(&mut self, f: &mut F) {
+        for root in &mut self.roots {
+            root.for_each_mut(f);
+        }
+    }
+
+    /// Expand only the nodes along the given index-path.
+    pub fn expand_path(&mut self, path: &[usize]) {
+        let mut nodes: &mut [TreeNode<T>] = &mut self.roots;
+        for &idx in path {
+            if let Some(node) = nodes.get_mut(idx) {
+                node.is_expanded = true;
+                nodes = &mut node.children;
+            } else {
+                break;
+            }
+        }
+    }
+
+    /// Reveal a node by expanding all its ancestors (path must include the target).
+    pub fn reveal(&mut self, path: &[usize]) {
+        if path.is_empty() {
+            return;
+        }
+        // Expand all ancestors but not the target itself
+        let mut nodes: &mut [TreeNode<T>] = &mut self.roots;
+        for &idx in &path[..path.len() - 1] {
+            if let Some(node) = nodes.get_mut(idx) {
+                node.is_expanded = true;
+                nodes = &mut node.children;
+            } else {
+                break;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// serialize_tree_box_drawing – pretty print with box-drawing characters
+// ---------------------------------------------------------------------------
+
+/// Render a tree using box-drawing characters (├── └── │).
+pub fn serialize_tree_box<T, F>(model: &TreeModel<T>, to_label: &F) -> String
+where
+    F: Fn(&T) -> String,
+{
+    let mut out = String::new();
+    let root_count = model.roots.len();
+    for (i, root) in model.roots.iter().enumerate() {
+        let is_last = i + 1 == root_count;
+        serialize_box_node(root, to_label, &mut out, "", is_last);
+    }
+    out
+}
+
+fn serialize_box_node<T, F>(
+    node: &TreeNode<T>,
+    to_label: &F,
+    out: &mut String,
+    prefix: &str,
+    is_last: bool,
+) where
+    F: Fn(&T) -> String,
+{
+    let connector = if node.depth == 0 {
+        ""
+    } else if is_last {
+        "└── "
+    } else {
+        "├── "
+    };
+    out.push_str(&format!("{}{}{}\n", prefix, connector, to_label(&node.data)));
+
+    let child_prefix = if node.depth == 0 {
+        String::new()
+    } else {
+        format!("{}{}", prefix, if is_last { "    " } else { "│   " })
+    };
+
+    let child_count = node.children.len();
+    for (i, child) in node.children.iter().enumerate() {
+        serialize_box_node(child, to_label, out, &child_prefix, i + 1 == child_count);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1796,5 +2090,149 @@ mod tests {
         let model = sample_model();
         let d = find_depth(&model, |s| *s == "nonexistent");
         assert!(d.is_none());
+    }
+
+    // ── New tests ──
+
+    #[test]
+    fn test_map_tree() {
+        let model = sample_model();
+        let mapped = map_tree(&model, &|s: &&str| s.to_uppercase());
+        let flat = flatten_tree(&mapped);
+        let names: Vec<&String> = flat.iter().map(|f| f.data).collect();
+        assert_eq!(names, vec!["SRC", "MAIN.RS", "LIB", "MOD.RS", "UTILS.RS", "CARGO.TOML"]);
+        assert_eq!(mapped.node_count(), 6);
+    }
+
+    #[test]
+    fn test_filter_tree_keeps_ancestors() {
+        let model = sample_model();
+        let filtered = filter_tree(&model, &|s: &&str| s.ends_with(".rs"));
+        // "src" is kept as ancestor of main.rs; "lib" as ancestor of mod.rs/utils.rs
+        assert_eq!(filtered.node_count(), 5); // src, main.rs, lib, mod.rs, utils.rs
+        // Cargo.toml is removed (not .rs, no children matching)
+        assert_eq!(filtered.root_count(), 1);
+    }
+
+    #[test]
+    fn test_ancestors() {
+        let model = sample_model();
+        // path to utils.rs is [0, 1, 1]
+        let anc = ancestors(&model, &[0, 1, 1]);
+        assert_eq!(anc, vec![&"src", &"lib"]);
+        // path to src is [0]
+        let anc_root = ancestors(&model, &[0]);
+        assert!(anc_root.is_empty());
+    }
+
+    #[test]
+    fn test_breadth_first_order() {
+        let model = sample_model();
+        let bfs = breadth_first(&model);
+        // BFS: roots first (src, Cargo.toml), then depth-1 (main.rs, lib), then depth-2 (mod.rs, utils.rs)
+        assert_eq!(bfs, vec![&"src", &"Cargo.toml", &"main.rs", &"lib", &"mod.rs", &"utils.rs"]);
+    }
+
+    #[test]
+    fn test_merge_trees() {
+        let m1 = sample_model();
+        let mut m2 = TreeModel::new();
+        m2.add_root("README.md");
+        let merged = merge_trees(m1, m2);
+        assert_eq!(merged.root_count(), 3);
+        assert_eq!(merged.node_count(), 7);
+    }
+
+    #[test]
+    fn test_find_node_on_model() {
+        let model = sample_model();
+        let found = model.find_node(&|s: &&str| *s == "mod.rs");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().data, "mod.rs");
+        assert_eq!(found.unwrap().depth, 2);
+        assert!(model.find_node(&|s: &&str| *s == "nope").is_none());
+    }
+
+    #[test]
+    fn test_node_height() {
+        let model = sample_model();
+        // src has height 2 (src -> lib -> mod.rs)
+        assert_eq!(model.roots[0].height(), 2);
+        // Cargo.toml is a leaf, height 0
+        assert_eq!(model.roots[1].height(), 0);
+        assert_eq!(model.tree_height(), 2);
+    }
+
+    #[test]
+    fn test_descendant_count() {
+        let model = sample_model();
+        // src has 4 descendants: main.rs, lib, mod.rs, utils.rs
+        assert_eq!(model.roots[0].descendant_count(), 4);
+        assert_eq!(model.roots[1].descendant_count(), 0);
+    }
+
+    #[test]
+    fn test_node_at_path_immutable() {
+        let model = sample_model();
+        let node = model.node_at_path(&[0, 1, 0]);
+        assert!(node.is_some());
+        assert_eq!(node.unwrap().data, "mod.rs");
+        assert!(model.node_at_path(&[5]).is_none());
+    }
+
+    #[test]
+    fn test_contains() {
+        let model = sample_model();
+        assert!(model.contains(&|s: &&str| *s == "lib"));
+        assert!(!model.contains(&|s: &&str| *s == "missing"));
+    }
+
+    #[test]
+    fn test_expand_path() {
+        let mut model = sample_model();
+        model.expand_path(&[0, 1]); // expand src and lib
+        assert!(model.roots[0].is_expanded);
+        assert!(model.roots[0].children[1].is_expanded);
+        // main.rs and Cargo.toml untouched
+        assert!(!model.roots[0].children[0].is_expanded);
+        assert!(!model.roots[1].is_expanded);
+    }
+
+    #[test]
+    fn test_reveal() {
+        let mut model = sample_model();
+        // reveal mod.rs at [0, 1, 0]: expands src and lib but not mod.rs
+        model.reveal(&[0, 1, 0]);
+        assert!(model.roots[0].is_expanded);
+        assert!(model.roots[0].children[1].is_expanded);
+        assert!(!model.roots[0].children[1].children[0].is_expanded);
+    }
+
+    #[test]
+    fn test_serialize_tree_box_drawing() {
+        let model = sample_model();
+        let output = serialize_tree_box(&model, &|d: &&str| d.to_string());
+        assert!(output.contains("src\n"));
+        assert!(output.contains("├── main.rs\n"));
+        assert!(output.contains("└── lib\n"));
+        assert!(output.contains("├── mod.rs\n"));
+        assert!(output.contains("└── utils.rs\n"));
+        assert!(output.contains("Cargo.toml\n"));
+    }
+
+    #[test]
+    fn test_collect_all_data_node() {
+        let model = sample_model();
+        let all = model.roots[0].collect_all_data();
+        assert_eq!(all, vec![&"src", &"main.rs", &"lib", &"mod.rs", &"utils.rs"]);
+    }
+
+    #[test]
+    fn test_breadth_first_data_method() {
+        let model = sample_model();
+        let bfs = model.breadth_first_data();
+        assert_eq!(bfs[0], &"src");
+        assert_eq!(bfs[1], &"Cargo.toml");
+        assert_eq!(bfs.len(), 6);
     }
 }

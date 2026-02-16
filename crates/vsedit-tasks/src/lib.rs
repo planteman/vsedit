@@ -1174,6 +1174,490 @@ impl TaskResult {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TaskSource — identifies where a task definition comes from
+// ---------------------------------------------------------------------------
+
+/// Identifies the origin of a task definition.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum TaskSource {
+    /// Defined in the workspace `.vscode/tasks.json`.
+    Workspace,
+    /// Defined in user-level settings.
+    User,
+    /// Auto-detected by an extension or built-in provider.
+    AutoDetected { provider: String },
+    /// Contributed by a specific extension.
+    Extension { id: String },
+}
+
+impl fmt::Display for TaskSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Workspace => write!(f, "workspace"),
+            Self::User => write!(f, "user"),
+            Self::AutoDetected { provider } => write!(f, "auto-detected ({provider})"),
+            Self::Extension { id } => write!(f, "extension ({id})"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TaskRunOptions — controls re-evaluation and instance behaviour
+// ---------------------------------------------------------------------------
+
+/// Controls how a task behaves when re-run or when multiple instances exist.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskRunOptions {
+    /// When true, variables in the command are re-evaluated on every run.
+    #[serde(default)]
+    pub reevaluate_on_rerun: bool,
+    /// Behaviour when the same task is launched while still running.
+    #[serde(default)]
+    pub instance_limit: TaskInstancePolicy,
+}
+
+impl Default for TaskRunOptions {
+    fn default() -> Self {
+        Self {
+            reevaluate_on_rerun: true,
+            instance_limit: TaskInstancePolicy::default(),
+        }
+    }
+}
+
+/// Policy for handling multiple simultaneous instances of the same task.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TaskInstancePolicy {
+    /// Allow parallel instances.
+    Parallel,
+    /// Terminate the running instance and start a new one.
+    Terminate,
+    /// Discard the new launch request.
+    Ignore,
+}
+
+impl Default for TaskInstancePolicy {
+    fn default() -> Self {
+        Self::Terminate
+    }
+}
+
+/// Parse [`TaskRunOptions`] from a JSON value (as found in tasks.json).
+pub fn parse_run_options(json: &serde_json::Value) -> TaskRunOptions {
+    let mut opts = TaskRunOptions::default();
+    if let Some(obj) = json.as_object() {
+        if let Some(r) = obj.get("reevaluateOnRerun").and_then(|v| v.as_bool()) {
+            opts.reevaluate_on_rerun = r;
+        }
+        if let Some(il) = obj.get("instanceLimit").and_then(|v| v.as_str()) {
+            opts.instance_limit = match il {
+                "parallel" => TaskInstancePolicy::Parallel,
+                "ignore" => TaskInstancePolicy::Ignore,
+                _ => TaskInstancePolicy::Terminate,
+            };
+        }
+    }
+    opts
+}
+
+// ---------------------------------------------------------------------------
+// Shell quoting helpers
+// ---------------------------------------------------------------------------
+
+/// Escape a string for safe inclusion in a POSIX shell command.
+///
+/// Wraps the value in single quotes, escaping any embedded single quotes.
+pub fn shell_quote_posix(s: &str) -> String {
+    if s.is_empty() {
+        return "''".to_string();
+    }
+    // If the string contains no special chars, return as-is
+    if s.chars()
+        .all(|c| c.is_alphanumeric() || "-_./=:@,".contains(c))
+    {
+        return s.to_string();
+    }
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+/// Escape a string for safe inclusion in a Windows `cmd.exe` command.
+///
+/// Wraps in double quotes and escapes internal special characters.
+pub fn shell_quote_cmd(s: &str) -> String {
+    if s.is_empty() {
+        return "\"\"".to_string();
+    }
+    if s.chars()
+        .all(|c| c.is_alphanumeric() || "-_./=:@,".contains(c))
+    {
+        return s.to_string();
+    }
+    let escaped = s
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('%', "%%");
+    format!("\"{escaped}\"")
+}
+
+/// Build a command string from a program and argument list, quoting each
+/// argument for POSIX shells.
+pub fn build_shell_command(program: &str, args: &[&str]) -> String {
+    let mut parts = vec![shell_quote_posix(program)];
+    for arg in args {
+        parts.push(shell_quote_posix(arg));
+    }
+    parts.join(" ")
+}
+
+// ---------------------------------------------------------------------------
+// Task label formatting helpers
+// ---------------------------------------------------------------------------
+
+/// Format a task label from optional group and name components.
+///
+/// If a group is provided the label is `"group: name"`, otherwise just `"name"`.
+pub fn format_task_label(group: Option<&str>, name: &str) -> String {
+    match group {
+        Some(g) if !g.is_empty() => format!("{g}: {name}"),
+        _ => name.to_string(),
+    }
+}
+
+/// Normalize a task label by trimming whitespace and collapsing multiple
+/// spaces into one.
+pub fn normalize_task_label(label: &str) -> String {
+    label.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+// ---------------------------------------------------------------------------
+// TaskDependencyGraph — richer graph with parallel-group support
+// ---------------------------------------------------------------------------
+
+/// A dependency graph that can compute execution levels for maximum
+/// parallelism.
+///
+/// Each level in the result contains tasks that can run in parallel,
+/// provided all tasks in previous levels have completed.
+#[derive(Debug, Default)]
+pub struct TaskDependencyGraph {
+    deps: BTreeMap<String, Vec<String>>,
+}
+
+impl TaskDependencyGraph {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a task (with no dependencies if not already present).
+    pub fn add_task(&mut self, id: impl Into<String>) {
+        self.deps.entry(id.into()).or_default();
+    }
+
+    /// Add a dependency edge: `id` depends on `dependency`.
+    pub fn add_dependency(&mut self, id: impl Into<String>, dependency: impl Into<String>) {
+        let dep = dependency.into();
+        let id = id.into();
+        self.deps.entry(dep.clone()).or_default();
+        self.deps.entry(id.clone()).or_default().push(dep);
+    }
+
+    /// Return the set of tasks that have no dependents (i.e., nothing
+    /// depends on them). These are the "leaf" / final tasks.
+    pub fn leaf_tasks(&self) -> Vec<&str> {
+        let mut depended_on: std::collections::HashSet<&str> =
+            std::collections::HashSet::new();
+        for deps_list in self.deps.values() {
+            for d in deps_list {
+                depended_on.insert(d.as_str());
+            }
+        }
+        self.deps
+            .keys()
+            .filter(|k| !depended_on.contains(k.as_str()))
+            .map(String::as_str)
+            .collect()
+    }
+
+    /// Return the set of tasks that have no dependencies (roots).
+    pub fn root_tasks(&self) -> Vec<&str> {
+        self.deps
+            .iter()
+            .filter(|(_, deps)| deps.is_empty())
+            .map(|(id, _)| id.as_str())
+            .collect()
+    }
+
+    /// Compute execution levels using topological layering.
+    ///
+    /// Returns `Ok(levels)` where each inner `Vec` contains tasks that may
+    /// execute in parallel. Returns an error on cycles.
+    pub fn execution_levels(&self) -> Result<Vec<Vec<String>>, TaskError> {
+        let mut in_degree: BTreeMap<&str, usize> = BTreeMap::new();
+        for (id, deps_list) in &self.deps {
+            in_degree.entry(id.as_str()).or_insert(0);
+            // Ensure deps_list length is reflected
+            *in_degree.entry(id.as_str()).or_insert(0) = deps_list.len();
+        }
+
+        let mut levels: Vec<Vec<String>> = Vec::new();
+        let mut remaining = in_degree.clone();
+
+        loop {
+            let current_level: Vec<String> = remaining
+                .iter()
+                .filter(|(_, deg)| **deg == 0)
+                .map(|(id, _)| id.to_string())
+                .collect();
+
+            if current_level.is_empty() {
+                break;
+            }
+
+            for id in &current_level {
+                remaining.remove(id.as_str());
+            }
+
+            // Reduce in-degree for dependents
+            for (id, deg) in remaining.iter_mut() {
+                if let Some(deps_list) = self.deps.get(*id) {
+                    let resolved = deps_list
+                        .iter()
+                        .filter(|d| current_level.contains(d))
+                        .count();
+                    *deg = deg.saturating_sub(resolved);
+                }
+            }
+
+            levels.push(current_level);
+        }
+
+        if !remaining.is_empty() {
+            let stuck = remaining
+                .keys()
+                .next()
+                .map(|s| s.to_string())
+                .unwrap_or_default();
+            return Err(TaskError::DependencyCycle(stuck));
+        }
+
+        Ok(levels)
+    }
+
+    /// Total number of registered tasks.
+    pub fn task_count(&self) -> usize {
+        self.deps.len()
+    }
+
+    /// Check if `id` transitively depends on `target`.
+    pub fn depends_on(&self, id: &str, target: &str) -> bool {
+        let mut visited: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut stack: Vec<&str> = vec![id];
+        while let Some(current) = stack.pop() {
+            if current == target && current != id {
+                return true;
+            }
+            if !visited.insert(current) {
+                continue;
+            }
+            if let Some(deps_list) = self.deps.get(current) {
+                for d in deps_list {
+                    stack.push(d.as_str());
+                }
+            }
+        }
+        false
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Problem matcher pattern compilation helper
+// ---------------------------------------------------------------------------
+
+/// A compiled problem matcher pattern ready for matching against output lines.
+#[derive(Debug)]
+pub struct CompiledPattern {
+    pub regex: Regex,
+    pub file_group: Option<usize>,
+    pub line_group: Option<usize>,
+    pub column_group: Option<usize>,
+    pub message_group: Option<usize>,
+    pub severity_group: Option<usize>,
+}
+
+impl CompiledPattern {
+    /// Compile a problem matcher pattern from its regex string and group
+    /// indices.
+    pub fn new(
+        pattern: &str,
+        file_group: Option<usize>,
+        line_group: Option<usize>,
+        column_group: Option<usize>,
+        message_group: Option<usize>,
+        severity_group: Option<usize>,
+    ) -> Result<Self, TaskError> {
+        let regex = Regex::new(pattern).map_err(|e| {
+            TaskError::ParseError(format!("invalid problem matcher regex: {e}"))
+        })?;
+        Ok(Self {
+            regex,
+            file_group,
+            line_group,
+            column_group,
+            message_group,
+            severity_group,
+        })
+    }
+
+    /// Extract a diagnostic match from an output line.
+    ///
+    /// Returns `None` if the line does not match.
+    pub fn match_line(&self, line: &str) -> Option<DiagnosticMatch> {
+        let caps = self.regex.captures(line)?;
+        let get = |group: Option<usize>| -> Option<String> {
+            group.and_then(|g| caps.get(g).map(|m| m.as_str().to_string()))
+        };
+        Some(DiagnosticMatch {
+            file: get(self.file_group),
+            line: get(self.line_group).and_then(|s| s.parse().ok()),
+            column: get(self.column_group).and_then(|s| s.parse().ok()),
+            message: get(self.message_group),
+            severity: get(self.severity_group),
+        })
+    }
+}
+
+/// A single diagnostic extracted from a compiler output line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticMatch {
+    pub file: Option<String>,
+    pub line: Option<usize>,
+    pub column: Option<usize>,
+    pub message: Option<String>,
+    pub severity: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Task definition JSON parsing helpers
+// ---------------------------------------------------------------------------
+
+/// Extract the list of task labels from a parsed tasks.json `Value`.
+///
+/// Expects the standard `{ "tasks": [ { "label": "..." }, ... ] }` format.
+pub fn extract_task_labels(tasks_json: &serde_json::Value) -> Vec<String> {
+    tasks_json
+        .get("tasks")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|t| t.get("label").and_then(|l| l.as_str()))
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Extract task `dependsOn` entries for a given label.
+///
+/// Returns the list of dependency labels, or an empty vec if the task has
+/// none or is not found.
+pub fn extract_depends_on(
+    tasks_json: &serde_json::Value,
+    label: &str,
+) -> Vec<String> {
+    let tasks = match tasks_json.get("tasks").and_then(|v| v.as_array()) {
+        Some(arr) => arr,
+        None => return Vec::new(),
+    };
+    for task in tasks {
+        let task_label = task.get("label").and_then(|l| l.as_str()).unwrap_or("");
+        if task_label != label {
+            continue;
+        }
+        if let Some(deps) = task.get("dependsOn") {
+            if let Some(arr) = deps.as_array() {
+                return arr
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect();
+            }
+            if let Some(s) = deps.as_str() {
+                return vec![s.to_string()];
+            }
+        }
+    }
+    Vec::new()
+}
+
+/// Build a [`TaskDependencyGraph`] from a full tasks.json `Value`.
+pub fn build_dependency_graph(
+    tasks_json: &serde_json::Value,
+) -> Result<TaskDependencyGraph, TaskError> {
+    let labels = extract_task_labels(tasks_json);
+    let mut graph = TaskDependencyGraph::new();
+    for label in &labels {
+        graph.add_task(label);
+    }
+    for label in &labels {
+        for dep in extract_depends_on(tasks_json, label) {
+            graph.add_dependency(label, dep);
+        }
+    }
+    Ok(graph)
+}
+
+/// Filter tasks from a tasks.json `Value` by group kind.
+///
+/// Returns the JSON objects for tasks whose `group` matches `kind`.
+pub fn filter_tasks_by_group(
+    tasks_json: &serde_json::Value,
+    kind: &str,
+) -> Vec<serde_json::Value> {
+    let tasks = match tasks_json.get("tasks").and_then(|v| v.as_array()) {
+        Some(arr) => arr,
+        None => return Vec::new(),
+    };
+    tasks
+        .iter()
+        .filter(|t| {
+            if let Some(g) = t.get("group") {
+                if let Some(s) = g.as_str() {
+                    return s == kind;
+                }
+                if let Some(obj) = g.as_object() {
+                    if let Some(k) = obj.get("kind").and_then(|v| v.as_str()) {
+                        return k == kind;
+                    }
+                }
+            }
+            false
+        })
+        .cloned()
+        .collect()
+}
+
+/// Determine the default task for a given group kind, if one is marked.
+///
+/// Looks for `{ "group": { "kind": "<kind>", "isDefault": true } }`.
+pub fn find_default_task(
+    tasks_json: &serde_json::Value,
+    kind: &str,
+) -> Option<String> {
+    let tasks = tasks_json.get("tasks")?.as_array()?;
+    for task in tasks {
+        if let Some(g) = task.get("group").and_then(|v| v.as_object()) {
+            let is_kind = g.get("kind").and_then(|v| v.as_str()) == Some(kind);
+            let is_default = g.get("isDefault").and_then(|v| v.as_bool()) == Some(true);
+            if is_kind && is_default {
+                return task.get("label").and_then(|l| l.as_str()).map(String::from);
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1848,5 +2332,372 @@ mod tests {
         q.cancel("b").unwrap();
         assert_eq!(q.count_by_status(TaskRunStatus::Pending), 2);
         assert_eq!(q.count_by_status(TaskRunStatus::Cancelled), 1);
+    }
+
+    // -- TaskSource ---------------------------------------------------------
+
+    #[test]
+    fn task_source_display() {
+        assert_eq!(TaskSource::Workspace.to_string(), "workspace");
+        assert_eq!(TaskSource::User.to_string(), "user");
+        assert_eq!(
+            TaskSource::AutoDetected {
+                provider: "npm".into()
+            }
+            .to_string(),
+            "auto-detected (npm)"
+        );
+        assert_eq!(
+            TaskSource::Extension {
+                id: "rust-analyzer".into()
+            }
+            .to_string(),
+            "extension (rust-analyzer)"
+        );
+    }
+
+    #[test]
+    fn task_source_serde_roundtrip() {
+        let src = TaskSource::AutoDetected {
+            provider: "cargo".into(),
+        };
+        let json = serde_json::to_string(&src).unwrap();
+        let restored: TaskSource = serde_json::from_str(&json).unwrap();
+        assert_eq!(src, restored);
+    }
+
+    // -- TaskRunOptions -----------------------------------------------------
+
+    #[test]
+    fn run_options_defaults() {
+        let opts = TaskRunOptions::default();
+        assert!(opts.reevaluate_on_rerun);
+        assert_eq!(opts.instance_limit, TaskInstancePolicy::Terminate);
+    }
+
+    #[test]
+    fn parse_run_options_from_json() {
+        let json = serde_json::json!({
+            "reevaluateOnRerun": false,
+            "instanceLimit": "parallel"
+        });
+        let opts = parse_run_options(&json);
+        assert!(!opts.reevaluate_on_rerun);
+        assert_eq!(opts.instance_limit, TaskInstancePolicy::Parallel);
+    }
+
+    #[test]
+    fn parse_run_options_partial() {
+        let json = serde_json::json!({ "instanceLimit": "ignore" });
+        let opts = parse_run_options(&json);
+        assert!(opts.reevaluate_on_rerun); // default
+        assert_eq!(opts.instance_limit, TaskInstancePolicy::Ignore);
+    }
+
+    #[test]
+    fn parse_run_options_empty() {
+        let opts = parse_run_options(&serde_json::json!({}));
+        assert_eq!(opts, TaskRunOptions::default());
+    }
+
+    // -- Shell quoting ------------------------------------------------------
+
+    #[test]
+    fn shell_quote_posix_simple() {
+        assert_eq!(shell_quote_posix("hello"), "hello");
+        assert_eq!(shell_quote_posix(""), "''");
+    }
+
+    #[test]
+    fn shell_quote_posix_special_chars() {
+        assert_eq!(shell_quote_posix("hello world"), "'hello world'");
+        assert_eq!(
+            shell_quote_posix("it's"),
+            "'it'\\''s'"
+        );
+    }
+
+    #[test]
+    fn shell_quote_cmd_simple() {
+        assert_eq!(shell_quote_cmd("hello"), "hello");
+        assert_eq!(shell_quote_cmd(""), "\"\"");
+    }
+
+    #[test]
+    fn shell_quote_cmd_special_chars() {
+        assert_eq!(shell_quote_cmd("hello world"), "\"hello world\"");
+        assert_eq!(shell_quote_cmd("say \"hi\""), "\"say \\\"hi\\\"\"");
+        assert_eq!(shell_quote_cmd("100%"), "\"100%%\"");
+    }
+
+    #[test]
+    fn build_shell_command_basic() {
+        let cmd = build_shell_command("cargo", &["build", "--release"]);
+        assert_eq!(cmd, "cargo build --release");
+    }
+
+    #[test]
+    fn build_shell_command_with_spaces() {
+        let cmd = build_shell_command("my program", &["arg one", "arg2"]);
+        assert_eq!(cmd, "'my program' 'arg one' arg2");
+    }
+
+    // -- Label formatting ---------------------------------------------------
+
+    #[test]
+    fn format_task_label_with_group() {
+        assert_eq!(format_task_label(Some("build"), "release"), "build: release");
+    }
+
+    #[test]
+    fn format_task_label_without_group() {
+        assert_eq!(format_task_label(None, "lint"), "lint");
+        assert_eq!(format_task_label(Some(""), "lint"), "lint");
+    }
+
+    #[test]
+    fn normalize_task_label_collapses_spaces() {
+        assert_eq!(normalize_task_label("  build   release  "), "build release");
+        assert_eq!(normalize_task_label("already fine"), "already fine");
+    }
+
+    // -- TaskDependencyGraph ------------------------------------------------
+
+    #[test]
+    fn dep_graph_execution_levels() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_task("compile");
+        g.add_dependency("link", "compile");
+        g.add_dependency("test", "link");
+
+        let levels = g.execution_levels().unwrap();
+        assert_eq!(levels.len(), 3);
+        assert!(levels[0].contains(&"compile".to_string()));
+        assert!(levels[1].contains(&"link".to_string()));
+        assert!(levels[2].contains(&"test".to_string()));
+    }
+
+    #[test]
+    fn dep_graph_parallel_roots() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_task("lint");
+        g.add_task("format");
+        g.add_dependency("check", "lint");
+        g.add_dependency("check", "format");
+
+        let levels = g.execution_levels().unwrap();
+        assert_eq!(levels.len(), 2);
+        // lint and format should be in level 0
+        assert!(levels[0].contains(&"lint".to_string()));
+        assert!(levels[0].contains(&"format".to_string()));
+        assert!(levels[1].contains(&"check".to_string()));
+    }
+
+    #[test]
+    fn dep_graph_cycle_detected() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_dependency("a", "b");
+        g.add_dependency("b", "a");
+        assert!(matches!(
+            g.execution_levels(),
+            Err(TaskError::DependencyCycle(_))
+        ));
+    }
+
+    #[test]
+    fn dep_graph_root_and_leaf_tasks() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_task("compile");
+        g.add_dependency("link", "compile");
+        g.add_dependency("test", "link");
+
+        let roots = g.root_tasks();
+        assert_eq!(roots, vec!["compile"]);
+
+        let leaves = g.leaf_tasks();
+        assert_eq!(leaves, vec!["test"]);
+    }
+
+    #[test]
+    fn dep_graph_depends_on_transitive() {
+        let mut g = TaskDependencyGraph::new();
+        g.add_task("a");
+        g.add_dependency("b", "a");
+        g.add_dependency("c", "b");
+
+        assert!(g.depends_on("c", "a"));
+        assert!(g.depends_on("c", "b"));
+        assert!(!g.depends_on("a", "c"));
+        assert!(!g.depends_on("a", "a")); // self
+    }
+
+    // -- CompiledPattern / DiagnosticMatch ----------------------------------
+
+    #[test]
+    fn compiled_pattern_matches_gcc_style() {
+        let pat = CompiledPattern::new(
+            r"^(.+):(\d+):(\d+):\s+(warning|error):\s+(.+)$",
+            Some(1),
+            Some(2),
+            Some(3),
+            Some(5),
+            Some(4),
+        )
+        .unwrap();
+
+        let diag = pat
+            .match_line("main.c:10:5: error: undeclared identifier")
+            .unwrap();
+        assert_eq!(diag.file.as_deref(), Some("main.c"));
+        assert_eq!(diag.line, Some(10));
+        assert_eq!(diag.column, Some(5));
+        assert_eq!(diag.severity.as_deref(), Some("error"));
+        assert_eq!(diag.message.as_deref(), Some("undeclared identifier"));
+    }
+
+    #[test]
+    fn compiled_pattern_no_match() {
+        let pat = CompiledPattern::new(
+            r"^ERROR:\s+(.+)$",
+            None,
+            None,
+            None,
+            Some(1),
+            None,
+        )
+        .unwrap();
+        assert!(pat.match_line("all good").is_none());
+    }
+
+    #[test]
+    fn compiled_pattern_invalid_regex() {
+        let result = CompiledPattern::new(
+            r"[invalid",
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(result.is_err());
+    }
+
+    // -- Task JSON parsing helpers ------------------------------------------
+
+    #[test]
+    fn extract_task_labels_basic() {
+        let json = serde_json::json!({
+            "version": "2.0.0",
+            "tasks": [
+                { "label": "build", "command": "cargo build" },
+                { "label": "test", "command": "cargo test" },
+                { "command": "no-label" }
+            ]
+        });
+        let labels = extract_task_labels(&json);
+        assert_eq!(labels, vec!["build", "test"]);
+    }
+
+    #[test]
+    fn extract_task_labels_empty() {
+        assert!(extract_task_labels(&serde_json::json!({})).is_empty());
+        assert!(extract_task_labels(&serde_json::json!({ "tasks": [] })).is_empty());
+    }
+
+    #[test]
+    fn extract_depends_on_array() {
+        let json = serde_json::json!({
+            "tasks": [
+                {
+                    "label": "all",
+                    "dependsOn": ["build", "lint"]
+                }
+            ]
+        });
+        let deps = extract_depends_on(&json, "all");
+        assert_eq!(deps, vec!["build", "lint"]);
+    }
+
+    #[test]
+    fn extract_depends_on_string() {
+        let json = serde_json::json!({
+            "tasks": [
+                { "label": "test", "dependsOn": "build" }
+            ]
+        });
+        let deps = extract_depends_on(&json, "test");
+        assert_eq!(deps, vec!["build"]);
+    }
+
+    #[test]
+    fn extract_depends_on_missing() {
+        let json = serde_json::json!({ "tasks": [{ "label": "build" }] });
+        assert!(extract_depends_on(&json, "build").is_empty());
+        assert!(extract_depends_on(&json, "nonexistent").is_empty());
+    }
+
+    #[test]
+    fn build_dependency_graph_from_json() {
+        let json = serde_json::json!({
+            "tasks": [
+                { "label": "compile" },
+                { "label": "link", "dependsOn": ["compile"] },
+                { "label": "test", "dependsOn": ["link"] }
+            ]
+        });
+        let graph = build_dependency_graph(&json).unwrap();
+        assert_eq!(graph.task_count(), 3);
+        let levels = graph.execution_levels().unwrap();
+        assert_eq!(levels.len(), 3);
+    }
+
+    #[test]
+    fn filter_tasks_by_group_simple() {
+        let json = serde_json::json!({
+            "tasks": [
+                { "label": "build", "group": "build" },
+                { "label": "test", "group": "test" },
+                { "label": "lint", "group": "build" }
+            ]
+        });
+        let build_tasks = filter_tasks_by_group(&json, "build");
+        assert_eq!(build_tasks.len(), 2);
+    }
+
+    #[test]
+    fn filter_tasks_by_group_detailed() {
+        let json = serde_json::json!({
+            "tasks": [
+                {
+                    "label": "build-release",
+                    "group": { "kind": "build", "isDefault": true }
+                },
+                { "label": "test", "group": "test" }
+            ]
+        });
+        let build_tasks = filter_tasks_by_group(&json, "build");
+        assert_eq!(build_tasks.len(), 1);
+        assert_eq!(build_tasks[0]["label"], "build-release");
+    }
+
+    #[test]
+    fn find_default_task_found() {
+        let json = serde_json::json!({
+            "tasks": [
+                { "label": "build-debug", "group": { "kind": "build", "isDefault": false } },
+                { "label": "build-release", "group": { "kind": "build", "isDefault": true } }
+            ]
+        });
+        assert_eq!(find_default_task(&json, "build"), Some("build-release".into()));
+    }
+
+    #[test]
+    fn find_default_task_none() {
+        let json = serde_json::json!({
+            "tasks": [
+                { "label": "build", "group": "build" }
+            ]
+        });
+        assert_eq!(find_default_task(&json, "build"), None);
     }
 }

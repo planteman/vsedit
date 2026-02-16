@@ -1024,6 +1024,266 @@ impl OutlineModel {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Outline hierarchy builder – reconstruct tree from a flat list
+// ---------------------------------------------------------------------------
+
+/// A flat symbol entry used as input for hierarchy reconstruction.
+#[derive(Debug, Clone)]
+pub struct FlatSymbol {
+    pub label: String,
+    pub kind: OutlineKind,
+    pub start_line: u32,
+    pub end_line: u32,
+    pub detail: Option<String>,
+}
+
+/// Build a hierarchical `OutlineModel` from a flat list of symbols.
+///
+/// Symbols whose ranges are fully contained within another symbol become
+/// children of the innermost enclosing symbol. The input does not need
+/// to be sorted; the function sorts by start line internally.
+pub fn build_hierarchy(uri: impl Into<String>, symbols: &[FlatSymbol]) -> OutlineModel {
+    let mut sorted: Vec<&FlatSymbol> = symbols.iter().collect();
+    sorted.sort_by(|a, b| a.start_line.cmp(&b.start_line).then(b.end_line.cmp(&a.end_line)));
+
+    let mut root_elements: Vec<OutlineElement> = Vec::new();
+
+    fn insert_into(target: &mut Vec<OutlineElement>, sym: &FlatSymbol) {
+        // Try to insert into the last element if it fully contains the symbol.
+        if let Some(last) = target.last_mut() {
+            if last.range_start_line <= sym.start_line && last.range_end_line >= sym.end_line {
+                insert_into(&mut last.children, sym);
+                return;
+            }
+        }
+        target.push(OutlineElement {
+            label: sym.label.clone(),
+            detail: sym.detail.clone(),
+            kind: sym.kind,
+            range_start_line: sym.start_line,
+            range_end_line: sym.end_line,
+            children: Vec::new(),
+        });
+    }
+
+    for sym in &sorted {
+        insert_into(&mut root_elements, sym);
+    }
+
+    OutlineModel {
+        elements: root_elements,
+        uri: uri.into(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Symbol navigation – go to parent / first child
+// ---------------------------------------------------------------------------
+
+impl OutlineModel {
+    /// Find the parent element of the deepest element containing `line`.
+    /// Returns `None` if the cursor is at a top-level element or outside
+    /// any element.
+    pub fn parent_at_line(&self, line: u32) -> Option<&OutlineElement> {
+        fn search<'a>(
+            elems: &'a [OutlineElement],
+            line: u32,
+            parent: Option<&'a OutlineElement>,
+        ) -> Option<&'a OutlineElement> {
+            for e in elems {
+                if line >= e.range_start_line && line <= e.range_end_line {
+                    if let Some(found) = search(&e.children, line, Some(e)) {
+                        return Some(found);
+                    }
+                    return parent;
+                }
+            }
+            None
+        }
+        search(&self.elements, line, None)
+    }
+
+    /// Return the first child of the deepest element containing `line`,
+    /// or `None` if that element has no children.
+    pub fn first_child_at_line(&self, line: u32) -> Option<&OutlineElement> {
+        self.find_at_line(line).and_then(|e| e.children.first())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Outline walking / visiting
+// ---------------------------------------------------------------------------
+
+impl OutlineModel {
+    /// Walk all elements in pre-order, calling `visitor` with each element
+    /// and its depth. If the visitor returns `false`, traversal of that
+    /// subtree is skipped.
+    pub fn walk<F>(&self, mut visitor: F)
+    where
+        F: FnMut(&OutlineElement, usize) -> bool,
+    {
+        fn walk_inner<F: FnMut(&OutlineElement, usize) -> bool>(
+            elems: &[OutlineElement],
+            depth: usize,
+            visitor: &mut F,
+        ) {
+            for e in elems {
+                if visitor(e, depth) {
+                    walk_inner(&e.children, depth + 1, visitor);
+                }
+            }
+        }
+        walk_inner(&self.elements, 0, &mut visitor);
+    }
+
+    /// Collect all elements at a specific nesting depth (0 = top-level).
+    pub fn elements_at_depth(&self, target_depth: usize) -> Vec<&OutlineElement> {
+        let mut out = Vec::new();
+        fn collect<'a>(elems: &'a [OutlineElement], depth: usize, target: usize, out: &mut Vec<&'a OutlineElement>) {
+            for e in elems {
+                if depth == target {
+                    out.push(e);
+                } else if depth < target {
+                    collect(&e.children, depth + 1, target, out);
+                }
+            }
+        }
+        collect(&self.elements, 0, target_depth, &mut out);
+        out
+    }
+
+    /// Return all leaf elements (elements with no children).
+    pub fn leaves(&self) -> Vec<&OutlineElement> {
+        self.flatten().into_iter().filter(|e| e.children.is_empty()).collect()
+    }
+
+    /// Return the total line span covered by all top-level elements.
+    /// This is the difference between the smallest start line and the
+    /// largest end line across all elements, or 0 if the model is empty.
+    pub fn total_line_span(&self) -> u32 {
+        let flat = self.flatten();
+        if flat.is_empty() {
+            return 0;
+        }
+        let min_start = flat.iter().map(|e| e.range_start_line).min().unwrap();
+        let max_end = flat.iter().map(|e| e.range_end_line).max().unwrap();
+        max_end - min_start + 1
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutlineElement – ancestry / descendant queries
+// ---------------------------------------------------------------------------
+
+impl OutlineElement {
+    /// Total count of all descendants (children, grandchildren, etc.).
+    pub fn descendant_count(&self) -> usize {
+        fn count(elems: &[OutlineElement]) -> usize {
+            elems.iter().map(|e| 1 + count(&e.children)).sum()
+        }
+        count(&self.children)
+    }
+
+    /// Maximum nesting depth from this element (1 if leaf).
+    pub fn subtree_depth(&self) -> usize {
+        if self.children.is_empty() {
+            return 1;
+        }
+        1 + self.children.iter().map(|c| c.subtree_depth()).max().unwrap_or(0)
+    }
+
+    /// Returns `true` if this element's range contains the given line.
+    pub fn contains_line(&self, line: u32) -> bool {
+        line >= self.range_start_line && line <= self.range_end_line
+    }
+
+    /// Collect all unique kinds in this element's subtree (including self).
+    pub fn subtree_kinds(&self) -> Vec<OutlineKind> {
+        let mut kinds = vec![self.kind];
+        fn collect(elems: &[OutlineElement], out: &mut Vec<OutlineKind>) {
+            for e in elems {
+                if !out.contains(&e.kind) {
+                    out.push(e.kind);
+                }
+                collect(&e.children, out);
+            }
+        }
+        collect(&self.children, &mut kinds);
+        kinds
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Outline model – range-based queries
+// ---------------------------------------------------------------------------
+
+impl OutlineModel {
+    /// Return all elements (at any depth) whose range intersects [start, end].
+    pub fn elements_in_range(&self, start: u32, end: u32) -> Vec<&OutlineElement> {
+        self.flatten()
+            .into_iter()
+            .filter(|e| e.range_start_line <= end && e.range_end_line >= start)
+            .collect()
+    }
+
+    /// Return the element with the largest line span.
+    pub fn largest_element(&self) -> Option<&OutlineElement> {
+        self.flatten().into_iter().max_by_key(|e| e.line_span())
+    }
+
+    /// Return the element with the smallest line span.
+    pub fn smallest_element(&self) -> Option<&OutlineElement> {
+        self.flatten().into_iter().min_by_key(|e| e.line_span())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Outline model – structural comparison helpers
+// ---------------------------------------------------------------------------
+
+impl OutlineModel {
+    /// Returns `true` if two models have the same set of (label, kind) pairs
+    /// regardless of position.
+    pub fn structurally_equal(&self, other: &OutlineModel) -> bool {
+        let mut self_sigs: Vec<(String, OutlineKind)> = self
+            .flatten()
+            .iter()
+            .map(|e| (e.label.clone(), e.kind))
+            .collect();
+        let mut other_sigs: Vec<(String, OutlineKind)> = other
+            .flatten()
+            .iter()
+            .map(|e| (e.label.clone(), e.kind))
+            .collect();
+        self_sigs.sort_by(|a, b| a.0.cmp(&b.0).then(format!("{:?}", a.1).cmp(&format!("{:?}", b.1))));
+        other_sigs.sort_by(|a, b| a.0.cmp(&b.0).then(format!("{:?}", a.1).cmp(&format!("{:?}", b.1))));
+        self_sigs == other_sigs
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutlineKind – additional classification helpers
+// ---------------------------------------------------------------------------
+
+impl OutlineKind {
+    /// Returns `true` for value-like kinds: Variable, Constant, Field, Property.
+    pub fn is_value(&self) -> bool {
+        matches!(
+            self,
+            OutlineKind::Variable | OutlineKind::Constant | OutlineKind::Field | OutlineKind::Property
+        )
+    }
+
+    /// Returns `true` for container-like kinds: File, Module, Namespace.
+    pub fn is_container_kind(&self) -> bool {
+        matches!(
+            self,
+            OutlineKind::File | OutlineKind::Module | OutlineKind::Namespace
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1844,5 +2104,276 @@ mod tests {
         assert_eq!(hist[0].kind, OutlineKind::Function);
         assert_eq!(hist[0].count, 3);
         assert_eq!(hist.len(), 3);
+    }
+
+    // -- build_hierarchy tests ----------------------------------------------
+
+    #[test]
+    fn build_hierarchy_nests_contained_symbols() {
+        let symbols = vec![
+            FlatSymbol { label: "MyClass".into(), kind: OutlineKind::Class, start_line: 1, end_line: 50, detail: None },
+            FlatSymbol { label: "method_a".into(), kind: OutlineKind::Method, start_line: 5, end_line: 20, detail: None },
+            FlatSymbol { label: "local_var".into(), kind: OutlineKind::Variable, start_line: 10, end_line: 10, detail: None },
+            FlatSymbol { label: "standalone".into(), kind: OutlineKind::Function, start_line: 55, end_line: 65, detail: None },
+        ];
+        let model = build_hierarchy("test.rs", &symbols);
+        assert_eq!(model.elements.len(), 2);
+        assert_eq!(model.elements[0].label, "MyClass");
+        assert_eq!(model.elements[0].children.len(), 1);
+        assert_eq!(model.elements[0].children[0].label, "method_a");
+        assert_eq!(model.elements[0].children[0].children.len(), 1);
+        assert_eq!(model.elements[0].children[0].children[0].label, "local_var");
+        assert_eq!(model.elements[1].label, "standalone");
+    }
+
+    #[test]
+    fn build_hierarchy_empty_input() {
+        let model = build_hierarchy("empty.rs", &[]);
+        assert!(model.is_elements_empty());
+        assert_eq!(model.uri, "empty.rs");
+    }
+
+    // -- parent_at_line / first_child_at_line tests -------------------------
+
+    #[test]
+    fn parent_at_line_returns_enclosing_element() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(
+            elem("Outer", OutlineKind::Class, 1, 50)
+                .with_child(elem("inner", OutlineKind::Method, 10, 20)),
+        );
+        let parent = model.parent_at_line(15).unwrap();
+        assert_eq!(parent.label, "Outer");
+        // At the outer level, no parent exists
+        assert!(model.parent_at_line(5).is_none());
+        // Outside all elements
+        assert!(model.parent_at_line(100).is_none());
+    }
+
+    #[test]
+    fn first_child_at_line_returns_first_child() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(
+            elem("Cls", OutlineKind::Class, 1, 50)
+                .with_child(elem("alpha", OutlineKind::Method, 5, 10))
+                .with_child(elem("beta", OutlineKind::Method, 12, 20)),
+        );
+        // Cursor on Cls but not inside a child
+        let child = model.first_child_at_line(3).unwrap();
+        assert_eq!(child.label, "alpha");
+        // Cursor inside alpha (leaf) – no children
+        assert!(model.first_child_at_line(7).is_none());
+    }
+
+    // -- elements_at_depth tests --------------------------------------------
+
+    #[test]
+    fn elements_at_depth_returns_correct_level() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(
+            elem("Root", OutlineKind::Class, 1, 50)
+                .with_child(
+                    elem("Mid", OutlineKind::Method, 5, 40)
+                        .with_child(elem("Leaf", OutlineKind::Variable, 10, 10)),
+                ),
+        );
+        model.add_element(elem("TopFn", OutlineKind::Function, 55, 65));
+
+        let d0 = model.elements_at_depth(0);
+        assert_eq!(d0.len(), 2);
+
+        let d1 = model.elements_at_depth(1);
+        assert_eq!(d1.len(), 1);
+        assert_eq!(d1[0].label, "Mid");
+
+        let d2 = model.elements_at_depth(2);
+        assert_eq!(d2.len(), 1);
+        assert_eq!(d2[0].label, "Leaf");
+
+        let d3 = model.elements_at_depth(3);
+        assert!(d3.is_empty());
+    }
+
+    // -- leaves tests -------------------------------------------------------
+
+    #[test]
+    fn leaves_returns_only_childless_elements() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(
+            elem("Parent", OutlineKind::Class, 1, 50)
+                .with_child(elem("child_a", OutlineKind::Field, 2, 2))
+                .with_child(elem("child_b", OutlineKind::Method, 5, 10)),
+        );
+        model.add_element(elem("lonely", OutlineKind::Function, 55, 60));
+        let lvs = model.leaves();
+        let labels: Vec<&str> = lvs.iter().map(|e| e.label.as_str()).collect();
+        assert!(labels.contains(&"child_a"));
+        assert!(labels.contains(&"child_b"));
+        assert!(labels.contains(&"lonely"));
+        assert!(!labels.contains(&"Parent"));
+    }
+
+    // -- total_line_span tests ----------------------------------------------
+
+    #[test]
+    fn total_line_span_covers_full_range() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(elem("a", OutlineKind::Function, 5, 15));
+        model.add_element(elem("b", OutlineKind::Function, 20, 30));
+        assert_eq!(model.total_line_span(), 26); // 30 - 5 + 1
+    }
+
+    #[test]
+    fn total_line_span_empty_model() {
+        let model = OutlineModel::new("empty.rs");
+        assert_eq!(model.total_line_span(), 0);
+    }
+
+    // -- descendant_count / subtree_depth tests -----------------------------
+
+    #[test]
+    fn element_descendant_count() {
+        let e = elem("Root", OutlineKind::Class, 1, 50)
+            .with_child(
+                elem("Mid", OutlineKind::Method, 5, 40)
+                    .with_child(elem("Leaf1", OutlineKind::Variable, 10, 10))
+                    .with_child(elem("Leaf2", OutlineKind::Variable, 15, 15)),
+            )
+            .with_child(elem("Other", OutlineKind::Field, 42, 42));
+        assert_eq!(e.descendant_count(), 4);
+    }
+
+    #[test]
+    fn element_subtree_depth() {
+        let leaf = elem("x", OutlineKind::Variable, 1, 1);
+        assert_eq!(leaf.subtree_depth(), 1);
+
+        let nested = elem("A", OutlineKind::Class, 1, 50)
+            .with_child(
+                elem("B", OutlineKind::Method, 5, 40)
+                    .with_child(elem("C", OutlineKind::Variable, 10, 10)),
+            );
+        assert_eq!(nested.subtree_depth(), 3);
+    }
+
+    // -- contains_line / subtree_kinds tests --------------------------------
+
+    #[test]
+    fn element_contains_line() {
+        let e = elem("fn", OutlineKind::Function, 10, 20);
+        assert!(e.contains_line(10));
+        assert!(e.contains_line(15));
+        assert!(e.contains_line(20));
+        assert!(!e.contains_line(9));
+        assert!(!e.contains_line(21));
+    }
+
+    #[test]
+    fn element_subtree_kinds() {
+        let e = elem("Cls", OutlineKind::Class, 1, 50)
+            .with_child(elem("m", OutlineKind::Method, 5, 20))
+            .with_child(elem("f", OutlineKind::Field, 22, 22));
+        let kinds = e.subtree_kinds();
+        assert!(kinds.contains(&OutlineKind::Class));
+        assert!(kinds.contains(&OutlineKind::Method));
+        assert!(kinds.contains(&OutlineKind::Field));
+        assert_eq!(kinds.len(), 3);
+    }
+
+    // -- elements_in_range tests --------------------------------------------
+
+    #[test]
+    fn elements_in_range_returns_intersecting() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(elem("a", OutlineKind::Function, 1, 10));
+        model.add_element(elem("b", OutlineKind::Function, 15, 25));
+        model.add_element(elem("c", OutlineKind::Function, 30, 40));
+        let result = model.elements_in_range(8, 20);
+        let labels: Vec<&str> = result.iter().map(|e| e.label.as_str()).collect();
+        assert!(labels.contains(&"a"));
+        assert!(labels.contains(&"b"));
+        assert!(!labels.contains(&"c"));
+    }
+
+    // -- largest / smallest element tests -----------------------------------
+
+    #[test]
+    fn largest_and_smallest_element() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(elem("small", OutlineKind::Variable, 1, 1));
+        model.add_element(elem("big", OutlineKind::Function, 5, 50));
+        model.add_element(elem("mid", OutlineKind::Struct, 55, 65));
+
+        assert_eq!(model.largest_element().unwrap().label, "big");
+        assert_eq!(model.smallest_element().unwrap().label, "small");
+    }
+
+    // -- structurally_equal tests -------------------------------------------
+
+    #[test]
+    fn structurally_equal_same_symbols() {
+        let mut a = OutlineModel::new("a.rs");
+        a.add_element(elem("foo", OutlineKind::Function, 1, 10));
+        a.add_element(elem("Bar", OutlineKind::Struct, 12, 20));
+
+        let mut b = OutlineModel::new("b.rs");
+        b.add_element(elem("foo", OutlineKind::Function, 5, 15));
+        b.add_element(elem("Bar", OutlineKind::Struct, 20, 30));
+
+        assert!(a.structurally_equal(&b));
+    }
+
+    #[test]
+    fn structurally_equal_different_symbols() {
+        let mut a = OutlineModel::new("a.rs");
+        a.add_element(elem("foo", OutlineKind::Function, 1, 10));
+
+        let mut b = OutlineModel::new("b.rs");
+        b.add_element(elem("bar", OutlineKind::Function, 1, 10));
+
+        assert!(!a.structurally_equal(&b));
+    }
+
+    // -- OutlineKind::is_value / is_container_kind tests --------------------
+
+    #[test]
+    fn outline_kind_is_value() {
+        assert!(OutlineKind::Variable.is_value());
+        assert!(OutlineKind::Constant.is_value());
+        assert!(OutlineKind::Field.is_value());
+        assert!(OutlineKind::Property.is_value());
+        assert!(!OutlineKind::Function.is_value());
+        assert!(!OutlineKind::Class.is_value());
+    }
+
+    #[test]
+    fn outline_kind_is_container_kind() {
+        assert!(OutlineKind::File.is_container_kind());
+        assert!(OutlineKind::Module.is_container_kind());
+        assert!(OutlineKind::Namespace.is_container_kind());
+        assert!(!OutlineKind::Class.is_container_kind());
+        assert!(!OutlineKind::Function.is_container_kind());
+    }
+
+    // -- walk tests ---------------------------------------------------------
+
+    #[test]
+    fn walk_visits_all_elements() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(
+            elem("A", OutlineKind::Class, 1, 50)
+                .with_child(elem("B", OutlineKind::Method, 5, 20)),
+        );
+        model.add_element(elem("C", OutlineKind::Function, 55, 60));
+        let mut visited = Vec::new();
+        model.walk(|e, d| {
+            visited.push((e.label.clone(), d));
+            true
+        });
+        assert_eq!(visited, vec![
+            ("A".to_string(), 0),
+            ("B".to_string(), 1),
+            ("C".to_string(), 0),
+        ]);
     }
 }

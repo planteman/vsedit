@@ -1022,6 +1022,402 @@ pub fn merge_render_options(
     }
 }
 
+// ── Decoration Hit Testing ──
+
+/// Result of a hit test against decoration ranges.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecorationHit {
+    /// Index of the decoration in the original slice.
+    pub index: usize,
+    /// The matched decoration range.
+    pub range: DecorationOptions,
+    /// The decoration type key.
+    pub type_key: String,
+}
+
+/// Test whether a cursor position (line, character) falls inside any decoration range.
+pub fn hit_test(
+    decorations: &[(&str, &[DecorationOptions])],
+    line: u32,
+    character: u32,
+) -> Vec<DecorationHit> {
+    let mut hits = Vec::new();
+    for &(key, ranges) in decorations {
+        for (i, r) in ranges.iter().enumerate() {
+            if point_in_range(line, character, r) {
+                hits.push(DecorationHit {
+                    index: i,
+                    range: r.clone(),
+                    type_key: key.to_string(),
+                });
+            }
+        }
+    }
+    hits
+}
+
+/// Check if a point (line, character) is inside a decoration range (inclusive on both ends).
+fn point_in_range(line: u32, character: u32, r: &DecorationOptions) -> bool {
+    if line < r.start_line || line > r.end_line {
+        return false;
+    }
+    if line == r.start_line && character < r.start_character {
+        return false;
+    }
+    if line == r.end_line && character > r.end_character {
+        return false;
+    }
+    true
+}
+
+// ── Decoration Range Splitting ──
+
+impl DecorationOptions {
+    /// Split a multi-line decoration into per-line decorations.
+    /// Each resulting decoration covers exactly one line: from the appropriate
+    /// start character to `line_length` (or the original end character for the last line).
+    /// `line_lengths` maps line number → length; lines not in the map use `default_length`.
+    pub fn split_by_line(
+        &self,
+        line_lengths: &std::collections::HashMap<u32, u32>,
+        default_length: u32,
+    ) -> Vec<DecorationOptions> {
+        if self.start_line == self.end_line {
+            return vec![self.clone()];
+        }
+        let mut result = Vec::new();
+        for line in self.start_line..=self.end_line {
+            let start_ch = if line == self.start_line {
+                self.start_character
+            } else {
+                0
+            };
+            let end_ch = if line == self.end_line {
+                self.end_character
+            } else {
+                *line_lengths.get(&line).unwrap_or(&default_length)
+            };
+            result.push(DecorationOptions {
+                start_line: line,
+                start_character: start_ch,
+                end_line: line,
+                end_character: end_ch,
+                hover_message: self.hover_message.clone(),
+            });
+        }
+        result
+    }
+
+    /// Returns `true` if this range fully contains `other`.
+    pub fn contains(&self, other: &DecorationOptions) -> bool {
+        let self_start = (self.start_line, self.start_character);
+        let self_end = (self.end_line, self.end_character);
+        let other_start = (other.start_line, other.start_character);
+        let other_end = (other.end_line, other.end_character);
+        self_start <= other_start && self_end >= other_end
+    }
+
+    /// Compute the intersection of two ranges, if they overlap.
+    pub fn intersect(&self, other: &DecorationOptions) -> Option<DecorationOptions> {
+        if !self.overlaps(other) {
+            return None;
+        }
+        let start = if (self.start_line, self.start_character)
+            > (other.start_line, other.start_character)
+        {
+            (self.start_line, self.start_character)
+        } else {
+            (other.start_line, other.start_character)
+        };
+        let end = if (self.end_line, self.end_character) < (other.end_line, other.end_character) {
+            (self.end_line, self.end_character)
+        } else {
+            (other.end_line, other.end_character)
+        };
+        Some(DecorationOptions {
+            start_line: start.0,
+            start_character: start.1,
+            end_line: end.0,
+            end_character: end.1,
+            hover_message: None,
+        })
+    }
+}
+
+// ── Decoration Diff Computation ──
+
+/// Describes the difference between two decoration sets.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecorationDiff {
+    /// Ranges present in `new` but not in `old`.
+    pub added: Vec<DecorationOptions>,
+    /// Ranges present in `old` but not in `new`.
+    pub removed: Vec<DecorationOptions>,
+    /// Ranges unchanged between `old` and `new`.
+    pub unchanged: Vec<DecorationOptions>,
+}
+
+/// Compute the diff between an old and new set of decoration ranges.
+pub fn diff_decorations(
+    old: &[DecorationOptions],
+    new: &[DecorationOptions],
+) -> DecorationDiff {
+    let mut added = Vec::new();
+    let mut removed = Vec::new();
+    let mut unchanged = Vec::new();
+
+    for o in old {
+        if new.contains(o) {
+            unchanged.push(o.clone());
+        } else {
+            removed.push(o.clone());
+        }
+    }
+    for n in new {
+        if !old.contains(n) {
+            added.push(n.clone());
+        }
+    }
+    DecorationDiff {
+        added,
+        removed,
+        unchanged,
+    }
+}
+
+// ── Decoration Filtering ──
+
+/// Category for filtering decorations by their visual properties.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecorationCategory {
+    /// Has a background color set.
+    Background,
+    /// Has a border set.
+    Border,
+    /// Has a foreground color set.
+    Foreground,
+    /// Applies to the whole line.
+    WholeLine,
+}
+
+/// Filter registered decoration types by category.
+pub fn filter_types_by_category<'a>(
+    types: &'a [DecorationType],
+    category: DecorationCategory,
+) -> Vec<&'a DecorationType> {
+    types
+        .iter()
+        .filter(|t| match category {
+            DecorationCategory::Background => t.options.background_color.is_some(),
+            DecorationCategory::Border => t.options.border.is_some(),
+            DecorationCategory::Foreground => t.options.color.is_some(),
+            DecorationCategory::WholeLine => t.options.is_whole_line,
+        })
+        .collect()
+}
+
+// ── Computed Style ──
+
+/// A fully resolved computed style combining multiple decoration render options
+/// according to priority order.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ComputedStyle {
+    pub background_color: Option<String>,
+    pub border: Option<String>,
+    pub color: Option<String>,
+    pub font_style: Option<String>,
+    pub font_weight: Option<String>,
+    pub is_whole_line: bool,
+}
+
+/// Compute the final style for a position by layering render options in priority order.
+/// `layers` must be sorted highest-priority-first; the first layer with a value wins.
+pub fn compute_style(layers: &[&DecorationRenderOptions]) -> ComputedStyle {
+    let mut style = ComputedStyle::default();
+    for layer in layers {
+        if style.background_color.is_none() {
+            style.background_color = layer.background_color.clone();
+        }
+        if style.border.is_none() {
+            style.border = layer.border.clone();
+        }
+        if style.color.is_none() {
+            style.color = layer.color.clone();
+        }
+        if style.font_style.is_none() {
+            style.font_style = layer.font_style.clone();
+        }
+        if style.font_weight.is_none() {
+            style.font_weight = layer.font_weight.clone();
+        }
+        if layer.is_whole_line {
+            style.is_whole_line = true;
+        }
+    }
+    style
+}
+
+// ── Decoration Lifecycle Manager ──
+
+/// Tracks the lifecycle state of a decoration type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LifecycleState {
+    Created,
+    Active,
+    Paused,
+    Disposed,
+}
+
+/// Manages decoration type lifecycle transitions.
+#[derive(Debug, Clone)]
+pub struct DecorationLifecycleManager {
+    states: Vec<(String, LifecycleState)>,
+}
+
+impl DecorationLifecycleManager {
+    pub fn new() -> Self {
+        Self {
+            states: Vec::new(),
+        }
+    }
+
+    /// Register a new decoration type in Created state.
+    pub fn create(&mut self, key: impl Into<String>) {
+        let key = key.into();
+        if !self.states.iter().any(|(k, _)| k == &key) {
+            self.states.push((key, LifecycleState::Created));
+        }
+    }
+
+    /// Transition a decoration type to Active state.
+    pub fn activate(&mut self, key: &str) -> Result<(), String> {
+        self.transition(key, &[LifecycleState::Created, LifecycleState::Paused], LifecycleState::Active)
+    }
+
+    /// Transition a decoration type to Paused state.
+    pub fn pause(&mut self, key: &str) -> Result<(), String> {
+        self.transition(key, &[LifecycleState::Active], LifecycleState::Paused)
+    }
+
+    /// Transition a decoration type to Disposed state (terminal).
+    pub fn dispose(&mut self, key: &str) -> Result<(), String> {
+        self.transition(
+            key,
+            &[LifecycleState::Created, LifecycleState::Active, LifecycleState::Paused],
+            LifecycleState::Disposed,
+        )
+    }
+
+    /// Get the current state of a decoration type.
+    pub fn state(&self, key: &str) -> Option<LifecycleState> {
+        self.states.iter().find(|(k, _)| k == key).map(|(_, s)| *s)
+    }
+
+    /// Return all keys currently in Active state.
+    pub fn active_keys(&self) -> Vec<&str> {
+        self.states
+            .iter()
+            .filter(|(_, s)| *s == LifecycleState::Active)
+            .map(|(k, _)| k.as_str())
+            .collect()
+    }
+
+    /// Return the total number of tracked decoration types.
+    pub fn len(&self) -> usize {
+        self.states.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
+    }
+
+    fn transition(
+        &mut self,
+        key: &str,
+        valid_from: &[LifecycleState],
+        to: LifecycleState,
+    ) -> Result<(), String> {
+        let entry = self
+            .states
+            .iter_mut()
+            .find(|(k, _)| k == key)
+            .ok_or_else(|| format!("unknown key: {key}"))?;
+        if !valid_from.contains(&entry.1) {
+            return Err(format!(
+                "cannot transition {key} from {:?} to {to:?}",
+                entry.1
+            ));
+        }
+        entry.1 = to;
+        Ok(())
+    }
+}
+
+impl Default for DecorationLifecycleManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Decoration Serialization Snapshot ──
+
+/// A serializable snapshot of the entire decoration bridge state.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DecorationSnapshot {
+    pub types: Vec<DecorationType>,
+    pub applied: Vec<AppliedDecorationSet>,
+}
+
+/// A single applied decoration set entry for serialization.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AppliedDecorationSet {
+    pub key: String,
+    pub uri: String,
+    pub ranges: Vec<DecorationOptions>,
+}
+
+impl DecorationBridge {
+    /// Serialize the current state into a snapshot.
+    pub fn snapshot(&self) -> DecorationSnapshot {
+        DecorationSnapshot {
+            types: self.types.clone(),
+            applied: self
+                .applied
+                .iter()
+                .map(|(k, u, r)| AppliedDecorationSet {
+                    key: k.clone(),
+                    uri: u.clone(),
+                    ranges: r.clone(),
+                })
+                .collect(),
+        }
+    }
+
+    /// Restore state from a snapshot, replacing current state entirely.
+    pub fn restore(&mut self, snapshot: DecorationSnapshot) {
+        self.types = snapshot.types;
+        self.applied = snapshot
+            .applied
+            .into_iter()
+            .map(|a| (a.key, a.uri, a.ranges))
+            .collect();
+    }
+
+    /// Collect all decorations at a specific line across all URIs and types,
+    /// returning (type_key, uri, &DecorationOptions) triples.
+    pub fn all_decorations_at_line(&self, line: u32) -> Vec<(&str, &str, &DecorationOptions)> {
+        let mut result = Vec::new();
+        for (key, uri, ranges) in &self.applied {
+            for r in ranges {
+                if decoration_covers_line(r, line) {
+                    result.push((key.as_str(), uri.as_str(), r));
+                }
+            }
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1812,5 +2208,236 @@ mod tests {
         let overlay = RenderOptionsBuilder::new().build();
         let merged = merge_render_options(&base, &overlay);
         assert_eq!(merged.font_style.as_deref(), Some("italic"));
+    }
+
+    // ── Hit testing tests ──
+
+    #[test]
+    fn hit_test_finds_matching_decorations() {
+        let ranges = vec![
+            DecorationOptions { start_line: 1, start_character: 0, end_line: 1, end_character: 10, hover_message: None },
+            DecorationOptions { start_line: 3, start_character: 5, end_line: 3, end_character: 15, hover_message: None },
+        ];
+        let decorations = vec![("err", ranges.as_slice())];
+        let hits = hit_test(&decorations, 1, 5);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].type_key, "err");
+        assert_eq!(hits[0].index, 0);
+
+        let hits_miss = hit_test(&decorations, 2, 0);
+        assert!(hits_miss.is_empty());
+    }
+
+    #[test]
+    fn hit_test_multiple_types_overlap() {
+        let err_ranges = vec![
+            DecorationOptions { start_line: 5, start_character: 0, end_line: 5, end_character: 20, hover_message: None },
+        ];
+        let warn_ranges = vec![
+            DecorationOptions { start_line: 5, start_character: 10, end_line: 5, end_character: 30, hover_message: None },
+        ];
+        let decorations = vec![("err", err_ranges.as_slice()), ("warn", warn_ranges.as_slice())];
+        let hits = hit_test(&decorations, 5, 15);
+        assert_eq!(hits.len(), 2);
+        let keys: Vec<&str> = hits.iter().map(|h| h.type_key.as_str()).collect();
+        assert!(keys.contains(&"err"));
+        assert!(keys.contains(&"warn"));
+    }
+
+    // ── Range splitting tests ──
+
+    #[test]
+    fn split_single_line_returns_self() {
+        let opt = DecorationOptions {
+            start_line: 3, start_character: 5, end_line: 3, end_character: 15,
+            hover_message: Some("msg".into()),
+        };
+        let result = opt.split_by_line(&std::collections::HashMap::new(), 80);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], opt);
+    }
+
+    #[test]
+    fn split_multi_line_creates_per_line() {
+        let opt = DecorationOptions {
+            start_line: 1, start_character: 5, end_line: 3, end_character: 10,
+            hover_message: None,
+        };
+        let mut lengths = std::collections::HashMap::new();
+        lengths.insert(1, 40);
+        lengths.insert(2, 30);
+        let result = opt.split_by_line(&lengths, 80);
+        assert_eq!(result.len(), 3);
+        // First line: keep original start
+        assert_eq!(result[0].start_character, 5);
+        assert_eq!(result[0].end_character, 40);
+        // Middle line: full line
+        assert_eq!(result[1].start_character, 0);
+        assert_eq!(result[1].end_character, 30);
+        // Last line: keep original end
+        assert_eq!(result[2].start_character, 0);
+        assert_eq!(result[2].end_character, 10);
+    }
+
+    // ── Contains / intersect tests ──
+
+    #[test]
+    fn contains_range() {
+        let outer = DecorationOptions { start_line: 1, start_character: 0, end_line: 5, end_character: 20, hover_message: None };
+        let inner = DecorationOptions { start_line: 2, start_character: 3, end_line: 4, end_character: 10, hover_message: None };
+        let outside = DecorationOptions { start_line: 6, start_character: 0, end_line: 7, end_character: 5, hover_message: None };
+        assert!(outer.contains(&inner));
+        assert!(!inner.contains(&outer));
+        assert!(!outer.contains(&outside));
+    }
+
+    #[test]
+    fn intersect_overlapping() {
+        let a = DecorationOptions { start_line: 1, start_character: 5, end_line: 1, end_character: 20, hover_message: None };
+        let b = DecorationOptions { start_line: 1, start_character: 10, end_line: 1, end_character: 30, hover_message: None };
+        let inter = a.intersect(&b).unwrap();
+        assert_eq!(inter.start_line, 1);
+        assert_eq!(inter.start_character, 10);
+        assert_eq!(inter.end_line, 1);
+        assert_eq!(inter.end_character, 20);
+    }
+
+    #[test]
+    fn intersect_non_overlapping() {
+        let a = DecorationOptions { start_line: 1, start_character: 0, end_line: 1, end_character: 5, hover_message: None };
+        let b = DecorationOptions { start_line: 2, start_character: 0, end_line: 2, end_character: 5, hover_message: None };
+        assert!(a.intersect(&b).is_none());
+    }
+
+    // ── Diff tests ──
+
+    #[test]
+    fn diff_decorations_detects_changes() {
+        let r1 = DecorationOptions { start_line: 1, start_character: 0, end_line: 1, end_character: 5, hover_message: None };
+        let r2 = DecorationOptions { start_line: 2, start_character: 0, end_line: 2, end_character: 5, hover_message: None };
+        let r3 = DecorationOptions { start_line: 3, start_character: 0, end_line: 3, end_character: 5, hover_message: None };
+        let old = vec![r1.clone(), r2.clone()];
+        let new = vec![r2.clone(), r3.clone()];
+        let diff = diff_decorations(&old, &new);
+        assert_eq!(diff.added, vec![r3]);
+        assert_eq!(diff.removed, vec![r1]);
+        assert_eq!(diff.unchanged, vec![r2]);
+    }
+
+    // ── Filter by category tests ──
+
+    #[test]
+    fn filter_types_by_category_background() {
+        let types = vec![
+            DecorationType { key: "a".into(), options: RenderOptionsBuilder::new().background_color("red").build() },
+            DecorationType { key: "b".into(), options: RenderOptionsBuilder::new().color("blue").build() },
+            DecorationType { key: "c".into(), options: RenderOptionsBuilder::new().background_color("green").border("1px").build() },
+        ];
+        let bg = filter_types_by_category(&types, DecorationCategory::Background);
+        assert_eq!(bg.len(), 2);
+        assert_eq!(bg[0].key, "a");
+        assert_eq!(bg[1].key, "c");
+
+        let fg = filter_types_by_category(&types, DecorationCategory::Foreground);
+        assert_eq!(fg.len(), 1);
+        assert_eq!(fg[0].key, "b");
+
+        let border = filter_types_by_category(&types, DecorationCategory::Border);
+        assert_eq!(border.len(), 1);
+        assert_eq!(border[0].key, "c");
+    }
+
+    // ── Computed style tests ──
+
+    #[test]
+    fn compute_style_layers_priority() {
+        let high = RenderOptionsBuilder::new().background_color("red").color("white").build();
+        let low = RenderOptionsBuilder::new().background_color("blue").font_style("italic").build();
+        let style = compute_style(&[&high, &low]);
+        // High priority wins for background
+        assert_eq!(style.background_color.as_deref(), Some("red"));
+        assert_eq!(style.color.as_deref(), Some("white"));
+        // Low priority fills in missing
+        assert_eq!(style.font_style.as_deref(), Some("italic"));
+    }
+
+    // ── Lifecycle manager tests ──
+
+    #[test]
+    fn lifecycle_state_transitions() {
+        let mut mgr = DecorationLifecycleManager::new();
+        mgr.create("highlight");
+        assert_eq!(mgr.state("highlight"), Some(LifecycleState::Created));
+        assert_eq!(mgr.len(), 1);
+
+        mgr.activate("highlight").unwrap();
+        assert_eq!(mgr.state("highlight"), Some(LifecycleState::Active));
+        assert_eq!(mgr.active_keys(), vec!["highlight"]);
+
+        mgr.pause("highlight").unwrap();
+        assert_eq!(mgr.state("highlight"), Some(LifecycleState::Paused));
+        assert!(mgr.active_keys().is_empty());
+
+        mgr.activate("highlight").unwrap();
+        assert_eq!(mgr.state("highlight"), Some(LifecycleState::Active));
+
+        mgr.dispose("highlight").unwrap();
+        assert_eq!(mgr.state("highlight"), Some(LifecycleState::Disposed));
+    }
+
+    #[test]
+    fn lifecycle_invalid_transition_rejected() {
+        let mut mgr = DecorationLifecycleManager::new();
+        mgr.create("x");
+        // Cannot pause from Created
+        assert!(mgr.pause("x").is_err());
+        // Cannot transition unknown key
+        assert!(mgr.activate("unknown").is_err());
+        // Dispose then try to reactivate
+        mgr.dispose("x").unwrap();
+        assert!(mgr.activate("x").is_err());
+    }
+
+    // ── Snapshot serialization tests ──
+
+    #[test]
+    fn snapshot_roundtrip() {
+        let mut bridge = DecorationBridge::new();
+        let opts = RenderOptionsBuilder::new().background_color("red").build();
+        bridge.register_type("err", opts);
+        bridge.set_decorations("err", "file:///a.rs", vec![
+            DecorationOptions { start_line: 1, start_character: 0, end_line: 1, end_character: 10, hover_message: Some("oops".into()) },
+        ]);
+
+        let snap = bridge.snapshot();
+        let json = serde_json::to_string(&snap).unwrap();
+        let restored_snap: DecorationSnapshot = serde_json::from_str(&json).unwrap();
+
+        let mut bridge2 = DecorationBridge::new();
+        bridge2.restore(restored_snap);
+        assert_eq!(bridge2.type_count(), 1);
+        assert!(bridge2.has_type("err"));
+        assert_eq!(bridge2.applied_count(), 1);
+        assert_eq!(bridge2.total_ranges(), 1);
+    }
+
+    // ── all_decorations_at_line tests ──
+
+    #[test]
+    fn all_decorations_at_line_across_types() {
+        let mut bridge = DecorationBridge::new();
+        bridge.register_type("err", RenderOptionsBuilder::new().background_color("red").build());
+        bridge.register_type("warn", RenderOptionsBuilder::new().background_color("yellow").build());
+        bridge.set_decorations("err", "file:///a.rs", vec![
+            DecorationOptions { start_line: 5, start_character: 0, end_line: 5, end_character: 20, hover_message: None },
+        ]);
+        bridge.set_decorations("warn", "file:///b.rs", vec![
+            DecorationOptions { start_line: 5, start_character: 3, end_line: 7, end_character: 10, hover_message: None },
+        ]);
+        let at5 = bridge.all_decorations_at_line(5);
+        assert_eq!(at5.len(), 2);
+        let at6 = bridge.all_decorations_at_line(6);
+        assert_eq!(at6.len(), 1);
+        assert_eq!(at6[0].0, "warn");
     }
 }

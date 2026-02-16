@@ -907,6 +907,270 @@ impl CommentFormatter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Comment draft management
+// ---------------------------------------------------------------------------
+
+/// A draft comment that has not yet been submitted.
+#[derive(Debug, Clone)]
+pub struct CommentDraft {
+    pub thread_id: Option<String>,
+    pub uri: String,
+    pub line: u32,
+    pub author: String,
+    pub body: String,
+    pub created_at: u64,
+    pub modified_at: u64,
+}
+
+/// Manages pending comment drafts across multiple files.
+pub struct DraftManager {
+    drafts: Vec<CommentDraft>,
+}
+
+impl DraftManager {
+    pub fn new() -> Self {
+        Self {
+            drafts: Vec::new(),
+        }
+    }
+
+    /// Add a new draft. Returns the index at which it was inserted.
+    pub fn add_draft(&mut self, draft: CommentDraft) -> usize {
+        self.drafts.push(draft);
+        self.drafts.len() - 1
+    }
+
+    /// Get all drafts for a given URI.
+    pub fn drafts_for_uri(&self, uri: &str) -> Vec<&CommentDraft> {
+        self.drafts.iter().filter(|d| d.uri == uri).collect()
+    }
+
+    /// Get all drafts by a given author.
+    pub fn drafts_by_author(&self, author: &str) -> Vec<&CommentDraft> {
+        self.drafts.iter().filter(|d| d.author == author).collect()
+    }
+
+    /// Update the body of a draft at the given index. Returns `true` if updated.
+    pub fn update_draft(&mut self, index: usize, new_body: &str, modified_at: u64) -> bool {
+        if let Some(draft) = self.drafts.get_mut(index) {
+            draft.body = new_body.to_string();
+            draft.modified_at = modified_at;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Remove a draft at the given index. Returns the removed draft if valid.
+    pub fn remove_draft(&mut self, index: usize) -> Option<CommentDraft> {
+        if index < self.drafts.len() {
+            Some(self.drafts.remove(index))
+        } else {
+            None
+        }
+    }
+
+    /// Discard all drafts.
+    pub fn clear(&mut self) {
+        self.drafts.clear();
+    }
+
+    /// Total number of pending drafts.
+    pub fn count(&self) -> usize {
+        self.drafts.len()
+    }
+
+    /// Convert a draft into a real `Comment` and append it to the given thread.
+    /// The draft is consumed (removed) and a new comment ID is assigned.
+    pub fn submit_draft(
+        &mut self,
+        draft_index: usize,
+        thread: &mut CommentThread,
+        submit_time: u64,
+    ) -> bool {
+        if let Some(draft) = self.remove_draft(draft_index) {
+            let id = thread.comments.len() as u64 + 1;
+            thread.comments.push(Comment {
+                id,
+                author: draft.author,
+                body: draft.body,
+                timestamp: submit_time,
+                reactions: Vec::new(),
+            });
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Default for DraftManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Comment navigation – next/previous unresolved thread
+// ---------------------------------------------------------------------------
+
+/// Navigate among unresolved threads within a single URI, ordered by line.
+pub struct ThreadNavigator;
+
+impl ThreadNavigator {
+    /// Find the next unresolved thread after the given line in the same URI.
+    /// Wraps around to the beginning if no match is found after `current_line`.
+    pub fn next_unresolved<'a>(
+        threads: &'a [CommentThread],
+        uri: &str,
+        current_line: u32,
+    ) -> Option<&'a CommentThread> {
+        let mut candidates: Vec<&CommentThread> = threads
+            .iter()
+            .filter(|t| t.uri == uri && !t.resolved)
+            .collect();
+        candidates.sort_by_key(|t| t.line);
+
+        // Try after current_line first, then wrap.
+        candidates
+            .iter()
+            .find(|t| t.line > current_line)
+            .or_else(|| candidates.first())
+            .copied()
+    }
+
+    /// Find the previous unresolved thread before the given line in the same URI.
+    /// Wraps around to the end if no match is found before `current_line`.
+    pub fn prev_unresolved<'a>(
+        threads: &'a [CommentThread],
+        uri: &str,
+        current_line: u32,
+    ) -> Option<&'a CommentThread> {
+        let mut candidates: Vec<&CommentThread> = threads
+            .iter()
+            .filter(|t| t.uri == uri && !t.resolved)
+            .collect();
+        candidates.sort_by_key(|t| t.line);
+
+        candidates
+            .iter()
+            .rev()
+            .find(|t| t.line < current_line)
+            .or_else(|| candidates.last())
+            .copied()
+    }
+
+    /// Count how many unresolved threads remain for a given URI.
+    pub fn unresolved_remaining(threads: &[CommentThread], uri: &str) -> usize {
+        threads
+            .iter()
+            .filter(|t| t.uri == uri && !t.resolved)
+            .count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Comment text helpers
+// ---------------------------------------------------------------------------
+
+/// Utilities for processing comment text.
+pub struct CommentText;
+
+impl CommentText {
+    /// Extract all `@mention` user-names from a comment body.
+    pub fn extract_mentions(body: &str) -> Vec<&str> {
+        let mut mentions = Vec::new();
+        for word in body.split_whitespace() {
+            if let Some(name) = word.strip_prefix('@') {
+                // Trim trailing punctuation so "@alice," becomes "alice"
+                let name = name.trim_end_matches(|c: char| c.is_ascii_punctuation());
+                if !name.is_empty() && !mentions.contains(&name) {
+                    mentions.push(name);
+                }
+            }
+        }
+        mentions
+    }
+
+    /// Truncate a comment body to `max_len` characters, appending "…" if truncated.
+    pub fn truncate(body: &str, max_len: usize) -> String {
+        if body.len() <= max_len {
+            body.to_string()
+        } else {
+            let mut s = body[..max_len].to_string();
+            s.push('…');
+            s
+        }
+    }
+
+    /// Count the number of words in a comment body.
+    pub fn word_count(body: &str) -> usize {
+        body.split_whitespace().count()
+    }
+
+    /// Check whether the body contains a code block (fenced with ```).
+    pub fn has_code_block(body: &str) -> bool {
+        body.contains("```")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Per-file comment summary
+// ---------------------------------------------------------------------------
+
+/// A compact summary of comment activity for a single file URI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileCommentSummary {
+    pub uri: String,
+    pub total_threads: usize,
+    pub resolved_threads: usize,
+    pub unresolved_threads: usize,
+    pub total_comments: usize,
+    pub unique_authors: usize,
+}
+
+/// Build per-file summaries from a set of threads.
+pub fn build_file_summaries(threads: &[CommentThread]) -> Vec<FileCommentSummary> {
+    let mut map: HashMap<String, (usize, usize, usize, Vec<String>)> = HashMap::new();
+    for t in threads {
+        let entry = map.entry(t.uri.clone()).or_insert_with(|| (0, 0, 0, Vec::new()));
+        entry.0 += 1; // total_threads
+        if t.resolved {
+            entry.1 += 1; // resolved
+        }
+        entry.2 += t.comments.len(); // total_comments
+        for c in &t.comments {
+            if !entry.3.contains(&c.author) {
+                entry.3.push(c.author.clone());
+            }
+        }
+    }
+    let mut summaries: Vec<FileCommentSummary> = map
+        .into_iter()
+        .map(|(uri, (total, resolved, comments, authors))| FileCommentSummary {
+            uri,
+            total_threads: total,
+            resolved_threads: resolved,
+            unresolved_threads: total - resolved,
+            total_comments: comments,
+            unique_authors: authors.len(),
+        })
+        .collect();
+    summaries.sort_by(|a, b| b.unresolved_threads.cmp(&a.unresolved_threads).then_with(|| a.uri.cmp(&b.uri)));
+    summaries
+}
+
+impl fmt::Display for FileCommentSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: {} threads ({} unresolved), {} comments",
+            self.uri, self.total_threads, self.unresolved_threads, self.total_comments,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1852,5 +2116,173 @@ mod tests {
         assert!(md.contains("**Unresolved:** 1"));
         assert!(md.contains("alice"));
         assert!(md.contains("needs work"));
+    }
+
+    // ── Draft management ──────────────────────────────────────────
+
+    #[test]
+    fn draft_manager_add_update_submit() {
+        let mut mgr = DraftManager::new();
+        let idx = mgr.add_draft(CommentDraft {
+            thread_id: Some("t1".into()),
+            uri: "main.rs".into(),
+            line: 10,
+            author: "alice".into(),
+            body: "initial draft".into(),
+            created_at: 100,
+            modified_at: 100,
+        });
+        assert_eq!(mgr.count(), 1);
+        assert_eq!(mgr.drafts_for_uri("main.rs").len(), 1);
+        assert_eq!(mgr.drafts_by_author("alice").len(), 1);
+        assert!(mgr.drafts_by_author("bob").is_empty());
+
+        // Update the draft body
+        assert!(mgr.update_draft(idx, "revised draft", 200));
+        assert_eq!(mgr.drafts_for_uri("main.rs")[0].body, "revised draft");
+        assert_eq!(mgr.drafts_for_uri("main.rs")[0].modified_at, 200);
+        // Invalid index
+        assert!(!mgr.update_draft(99, "nope", 300));
+
+        // Submit draft into a thread
+        let mut thread = make_thread("t1", "main.rs", 10);
+        assert!(mgr.submit_draft(0, &mut thread, 500));
+        assert_eq!(mgr.count(), 0);
+        assert_eq!(thread.comments.len(), 1);
+        assert_eq!(thread.comments[0].author, "alice");
+        assert_eq!(thread.comments[0].body, "revised draft");
+        assert_eq!(thread.comments[0].timestamp, 500);
+
+        // Submit on empty manager fails
+        assert!(!mgr.submit_draft(0, &mut thread, 600));
+    }
+
+    #[test]
+    fn draft_manager_remove_and_clear() {
+        let mut mgr = DraftManager::new();
+        mgr.add_draft(CommentDraft {
+            thread_id: None,
+            uri: "a.rs".into(),
+            line: 1,
+            author: "bob".into(),
+            body: "d1".into(),
+            created_at: 1,
+            modified_at: 1,
+        });
+        mgr.add_draft(CommentDraft {
+            thread_id: None,
+            uri: "b.rs".into(),
+            line: 2,
+            author: "carol".into(),
+            body: "d2".into(),
+            created_at: 2,
+            modified_at: 2,
+        });
+        assert_eq!(mgr.count(), 2);
+        let removed = mgr.remove_draft(0);
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().author, "bob");
+        assert_eq!(mgr.count(), 1);
+        assert!(mgr.remove_draft(99).is_none());
+        mgr.clear();
+        assert_eq!(mgr.count(), 0);
+    }
+
+    // ── Thread navigation ─────────────────────────────────────────
+
+    #[test]
+    fn thread_navigator_next_prev_unresolved() {
+        let t1 = make_thread("t1", "f.rs", 5);
+        let mut t2 = make_thread("t2", "f.rs", 15);
+        t2.resolved = true;
+        let t3 = make_thread("t3", "f.rs", 25);
+        let t4 = make_thread("t4", "f.rs", 35);
+        let threads = [t1, t2, t3, t4];
+
+        // Next after line 10 should skip resolved t2 and land on t3
+        let next = ThreadNavigator::next_unresolved(&threads, "f.rs", 10);
+        assert_eq!(next.unwrap().id, "t3");
+
+        // Next after line 30 should find t4
+        let next2 = ThreadNavigator::next_unresolved(&threads, "f.rs", 30);
+        assert_eq!(next2.unwrap().id, "t4");
+
+        // Next after line 40 wraps around to t1
+        let wrap = ThreadNavigator::next_unresolved(&threads, "f.rs", 40);
+        assert_eq!(wrap.unwrap().id, "t1");
+
+        // Prev before line 30 should find t1 (skipping resolved t2)
+        let prev = ThreadNavigator::prev_unresolved(&threads, "f.rs", 20);
+        assert_eq!(prev.unwrap().id, "t1");
+
+        // Prev before line 5 wraps around to t4
+        let wrap_prev = ThreadNavigator::prev_unresolved(&threads, "f.rs", 3);
+        assert_eq!(wrap_prev.unwrap().id, "t4");
+
+        assert_eq!(ThreadNavigator::unresolved_remaining(&threads, "f.rs"), 3);
+        assert_eq!(ThreadNavigator::unresolved_remaining(&threads, "other.rs"), 0);
+    }
+
+    // ── Comment text helpers ──────────────────────────────────────
+
+    #[test]
+    fn comment_text_extract_mentions() {
+        let mentions = CommentText::extract_mentions("Hey @alice and @bob, please review @alice");
+        assert_eq!(mentions, vec!["alice", "bob"]);
+
+        let m2 = CommentText::extract_mentions("@carol, can you look?");
+        assert_eq!(m2, vec!["carol"]);
+
+        let m3 = CommentText::extract_mentions("no mentions here");
+        assert!(m3.is_empty());
+    }
+
+    #[test]
+    fn comment_text_truncate_and_word_count() {
+        assert_eq!(CommentText::truncate("hello world", 20), "hello world");
+        assert_eq!(CommentText::truncate("hello world", 5), "hello…");
+
+        assert_eq!(CommentText::word_count("one two three"), 3);
+        assert_eq!(CommentText::word_count(""), 0);
+
+        assert!(CommentText::has_code_block("see ```rust\nfn main()```"));
+        assert!(!CommentText::has_code_block("plain text"));
+    }
+
+    // ── File comment summaries ────────────────────────────────────
+
+    #[test]
+    fn build_file_summaries_groups_by_uri() {
+        let mut t1 = make_thread("t1", "a.rs", 1);
+        t1.comments.push(make_comment(1, "alice", "c1", 10));
+        t1.resolved = true;
+
+        let mut t2 = make_thread("t2", "a.rs", 5);
+        t2.comments.push(make_comment(2, "bob", "c2", 20));
+
+        let mut t3 = make_thread("t3", "b.rs", 1);
+        t3.comments.push(make_comment(3, "alice", "c3", 30));
+        t3.comments.push(make_comment(4, "carol", "c4", 40));
+
+        let summaries = build_file_summaries(&[t1, t2, t3]);
+        assert_eq!(summaries.len(), 2);
+
+        // b.rs has 1 unresolved, a.rs has 1 unresolved — sorted by unresolved desc, then name
+        let a = summaries.iter().find(|s| s.uri == "a.rs").unwrap();
+        assert_eq!(a.total_threads, 2);
+        assert_eq!(a.resolved_threads, 1);
+        assert_eq!(a.unresolved_threads, 1);
+        assert_eq!(a.total_comments, 2);
+        assert_eq!(a.unique_authors, 2);
+
+        let b = summaries.iter().find(|s| s.uri == "b.rs").unwrap();
+        assert_eq!(b.total_threads, 1);
+        assert_eq!(b.total_comments, 2);
+        assert_eq!(b.unique_authors, 2);
+
+        // Display impl
+        let display = format!("{}", a);
+        assert!(display.contains("a.rs"));
+        assert!(display.contains("2 threads"));
     }
 }

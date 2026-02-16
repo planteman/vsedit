@@ -1037,6 +1037,293 @@ impl Default for ScmView {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Filtering helpers
+// ---------------------------------------------------------------------------
+
+/// Filter a slice of changes, keeping only those matching the given status.
+pub fn filter_by_status(
+    changes: &[ScmFileChange],
+    status: ScmFileStatus,
+) -> Vec<ScmFileChange> {
+    changes.iter().filter(|c| c.status == status).cloned().collect()
+}
+
+/// Filter changes to only those whose path is under the given directory.
+pub fn filter_by_directory(
+    changes: &[ScmFileChange],
+    dir: &Path,
+) -> Vec<ScmFileChange> {
+    changes.iter().filter(|c| c.path.starts_with(dir)).cloned().collect()
+}
+
+// ---------------------------------------------------------------------------
+// Grouping helpers
+// ---------------------------------------------------------------------------
+
+/// Group changes by their parent directory. Returns `(directory, changes)` pairs
+/// sorted by directory name. Files at the root use an empty path key.
+pub fn group_by_directory(changes: &[ScmFileChange]) -> Vec<(PathBuf, Vec<ScmFileChange>)> {
+    use std::collections::BTreeMap;
+    let mut map: BTreeMap<PathBuf, Vec<ScmFileChange>> = BTreeMap::new();
+    for change in changes {
+        let dir = change
+            .path
+            .parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_default();
+        map.entry(dir).or_default().push(change.clone());
+    }
+    map.into_iter().collect()
+}
+
+// ---------------------------------------------------------------------------
+// Sorting helpers
+// ---------------------------------------------------------------------------
+
+/// Sort changes alphabetically by path.
+pub fn sort_by_path(changes: &mut [ScmFileChange]) {
+    changes.sort_by(|a, b| a.path.cmp(&b.path));
+}
+
+/// Sort changes by status priority (conflicts first, then modified, added,
+/// deleted, renamed, untracked, ignored).
+pub fn sort_by_status(changes: &mut [ScmFileChange]) {
+    fn priority(s: ScmFileStatus) -> u8 {
+        match s {
+            ScmFileStatus::Conflicted => 0,
+            ScmFileStatus::Modified => 1,
+            ScmFileStatus::Added => 2,
+            ScmFileStatus::Deleted => 3,
+            ScmFileStatus::Renamed => 4,
+            ScmFileStatus::Untracked => 5,
+            ScmFileStatus::Ignored => 6,
+        }
+    }
+    changes.sort_by_key(|c| priority(c.status));
+}
+
+// ---------------------------------------------------------------------------
+// Statistics
+// ---------------------------------------------------------------------------
+
+/// Summary statistics computed from a set of diff hunks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DiffStats {
+    pub files: usize,
+    pub insertions: usize,
+    pub deletions: usize,
+}
+
+impl DiffStats {
+    /// Compute diff stats from a slice of hunks belonging to a single file.
+    pub fn from_hunks(hunks: &[DiffHunk]) -> Self {
+        let mut insertions = 0usize;
+        let mut deletions = 0usize;
+        for hunk in hunks {
+            for line in &hunk.lines {
+                match line {
+                    DiffLine::Added(_) => insertions += 1,
+                    DiffLine::Removed(_) => deletions += 1,
+                    DiffLine::Context(_) => {}
+                }
+            }
+        }
+        Self { files: 1, insertions, deletions }
+    }
+
+    /// Merge multiple per-file stats into one aggregate.
+    pub fn aggregate(stats: &[DiffStats]) -> Self {
+        let mut total = DiffStats { files: 0, insertions: 0, deletions: 0 };
+        for s in stats {
+            total.files += s.files;
+            total.insertions += s.insertions;
+            total.deletions += s.deletions;
+        }
+        total
+    }
+
+    /// Net change (insertions − deletions). Positive means the file grew.
+    pub fn net_change(&self) -> isize {
+        self.insertions as isize - self.deletions as isize
+    }
+}
+
+impl fmt::Display for DiffStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} file{} changed, {} insertion{} (+), {} deletion{} (-)",
+            self.files,
+            if self.files == 1 { "" } else { "s" },
+            self.insertions,
+            if self.insertions == 1 { "" } else { "s" },
+            self.deletions,
+            if self.deletions == 1 { "" } else { "s" },
+        )
+    }
+}
+
+/// Count how many changes match each status in a slice.
+pub fn status_counts(changes: &[ScmFileChange]) -> std::collections::HashMap<ScmFileStatus, usize> {
+    let mut map = std::collections::HashMap::new();
+    for c in changes {
+        *map.entry(c.status).or_insert(0) += 1;
+    }
+    map
+}
+
+// ---------------------------------------------------------------------------
+// Diffstat bar formatting
+// ---------------------------------------------------------------------------
+
+/// Format a single-file diffstat bar similar to `git diff --stat`.
+///
+/// Example: `src/lib.rs | 5 +++--`
+///
+/// `max_width` controls the maximum number of `+`/`-` characters in the bar.
+pub fn format_diffstat_line(path: &Path, insertions: usize, deletions: usize, max_width: usize) -> String {
+    let total = insertions + deletions;
+    if total == 0 {
+        return format!("{} | 0", path.display());
+    }
+    let scale = if total > max_width { max_width as f64 / total as f64 } else { 1.0 };
+    let plus_count = (insertions as f64 * scale).round().max(if insertions > 0 { 1.0 } else { 0.0 }) as usize;
+    let minus_count = (deletions as f64 * scale).round().max(if deletions > 0 { 1.0 } else { 0.0 }) as usize;
+    let bar: String = std::iter::repeat('+').take(plus_count)
+        .chain(std::iter::repeat('-').take(minus_count))
+        .collect();
+    format!("{} | {} {}", path.display(), total, bar)
+}
+
+// ---------------------------------------------------------------------------
+// Conflict detection helpers
+// ---------------------------------------------------------------------------
+
+/// Return `true` if the change list contains any conflicted files.
+pub fn has_conflicts(changes: &[ScmFileChange]) -> bool {
+    changes.iter().any(|c| c.status == ScmFileStatus::Conflicted)
+}
+
+/// Extract only the conflicted files from a change list.
+pub fn conflicted_files(changes: &[ScmFileChange]) -> Vec<&ScmFileChange> {
+    changes.iter().filter(|c| c.status == ScmFileStatus::Conflicted).collect()
+}
+
+// ---------------------------------------------------------------------------
+// Staging / Unstaging helpers (in-memory view manipulation)
+// ---------------------------------------------------------------------------
+
+impl ScmView {
+    /// Toggle the staged flag on the currently selected entry.
+    pub fn toggle_staged_selected(&mut self) {
+        if let Some(entry) = self.entries.get_mut(self.selected_index) {
+            entry.staged = !entry.staged;
+        }
+    }
+
+    /// Stage all entries.
+    pub fn stage_all(&mut self) {
+        for entry in &mut self.entries {
+            entry.staged = true;
+        }
+    }
+
+    /// Unstage all entries.
+    pub fn unstage_all(&mut self) {
+        for entry in &mut self.entries {
+            entry.staged = false;
+        }
+    }
+
+    /// Return paths of all currently staged entries.
+    pub fn staged_paths(&self) -> Vec<&Path> {
+        self.entries.iter().filter(|e| e.staged).map(|e| e.path.as_path()).collect()
+    }
+
+    /// Return paths of all currently unstaged entries.
+    pub fn unstaged_paths(&self) -> Vec<&Path> {
+        self.entries.iter().filter(|e| !e.staged).map(|e| e.path.as_path()).collect()
+    }
+
+    /// Move the selection cursor down, wrapping at the bottom.
+    pub fn select_next(&mut self) {
+        if !self.entries.is_empty() {
+            self.selected_index = (self.selected_index + 1) % self.entries.len();
+        }
+    }
+
+    /// Move the selection cursor up, wrapping at the top.
+    pub fn select_prev(&mut self) {
+        if !self.entries.is_empty() {
+            if self.selected_index == 0 {
+                self.selected_index = self.entries.len() - 1;
+            } else {
+                self.selected_index -= 1;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Status summary formatting
+// ---------------------------------------------------------------------------
+
+/// Format a compact status summary string suitable for a status bar.
+///
+/// Example: `main ↑2 ↓1 | 3M 1A 2? 1!`
+pub fn format_status_summary(
+    branch: Option<&str>,
+    ahead: usize,
+    behind: usize,
+    changes: &[ScmFileChange],
+) -> String {
+    let mut parts = Vec::new();
+
+    // Branch
+    parts.push(branch.unwrap_or("(detached)").to_string());
+
+    // Ahead/behind
+    if ahead > 0 || behind > 0 {
+        let mut ab = String::new();
+        if ahead > 0 {
+            ab.push_str(&format!("↑{ahead}"));
+        }
+        if behind > 0 {
+            if !ab.is_empty() {
+                ab.push(' ');
+            }
+            ab.push_str(&format!("↓{behind}"));
+        }
+        parts.push(ab);
+    }
+
+    // Change counts by status
+    if !changes.is_empty() {
+        let counts = status_counts(changes);
+        let mut status_parts = Vec::new();
+        // Deterministic ordering
+        for &st in &[
+            ScmFileStatus::Modified,
+            ScmFileStatus::Added,
+            ScmFileStatus::Deleted,
+            ScmFileStatus::Renamed,
+            ScmFileStatus::Untracked,
+            ScmFileStatus::Conflicted,
+            ScmFileStatus::Ignored,
+        ] {
+            if let Some(&n) = counts.get(&st) {
+                status_parts.push(format!("{n}{}", st.icon()));
+            }
+        }
+        if !status_parts.is_empty() {
+            parts.push(status_parts.join(" "));
+        }
+    }
+
+    parts.join(" | ")
+}
+
 // ===========================================================================
 // Tests
 // ===========================================================================
@@ -1797,5 +2084,327 @@ index abc..def 100644
         let area = Rect::new(0, 0, 0, 0);
         let mut buf = Buffer::empty(area);
         view.render_entries(area, &mut buf);
+    }
+
+    // -- filter_by_status tests -------------------------------------------
+
+    #[test]
+    fn filter_by_status_modified_only() {
+        let changes = vec![
+            ScmFileChange::new("a.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("b.rs", ScmFileStatus::Added),
+            ScmFileChange::new("c.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("d.rs", ScmFileStatus::Deleted),
+        ];
+        let filtered = filter_by_status(&changes, ScmFileStatus::Modified);
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|c| c.status == ScmFileStatus::Modified));
+    }
+
+    #[test]
+    fn filter_by_status_no_match() {
+        let changes = vec![
+            ScmFileChange::new("a.rs", ScmFileStatus::Added),
+        ];
+        let filtered = filter_by_status(&changes, ScmFileStatus::Conflicted);
+        assert!(filtered.is_empty());
+    }
+
+    // -- filter_by_directory tests ----------------------------------------
+
+    #[test]
+    fn filter_by_directory_matches_prefix() {
+        let changes = vec![
+            ScmFileChange::new("src/main.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("src/lib.rs", ScmFileStatus::Added),
+            ScmFileChange::new("tests/test.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("README.md", ScmFileStatus::Modified),
+        ];
+        let filtered = filter_by_directory(&changes, Path::new("src"));
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|c| c.path.starts_with("src")));
+    }
+
+    // -- group_by_directory tests -----------------------------------------
+
+    #[test]
+    fn group_by_directory_separates_dirs() {
+        let changes = vec![
+            ScmFileChange::new("src/main.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("src/lib.rs", ScmFileStatus::Added),
+            ScmFileChange::new("tests/test.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("Cargo.toml", ScmFileStatus::Modified),
+        ];
+        let groups = group_by_directory(&changes);
+        // BTreeMap: "" < "src" < "tests"
+        assert_eq!(groups.len(), 3);
+        assert_eq!(groups[0].0, PathBuf::from(""));
+        assert_eq!(groups[0].1.len(), 1); // Cargo.toml
+        assert_eq!(groups[1].0, PathBuf::from("src"));
+        assert_eq!(groups[1].1.len(), 2);
+        assert_eq!(groups[2].0, PathBuf::from("tests"));
+        assert_eq!(groups[2].1.len(), 1);
+    }
+
+    // -- sort_by_path tests -----------------------------------------------
+
+    #[test]
+    fn sort_by_path_orders_alphabetically() {
+        let mut changes = vec![
+            ScmFileChange::new("z.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("a.rs", ScmFileStatus::Added),
+            ScmFileChange::new("m.rs", ScmFileStatus::Deleted),
+        ];
+        sort_by_path(&mut changes);
+        let paths: Vec<_> = changes.iter().map(|c| c.path.to_str().unwrap()).collect();
+        assert_eq!(paths, vec!["a.rs", "m.rs", "z.rs"]);
+    }
+
+    // -- sort_by_status tests ---------------------------------------------
+
+    #[test]
+    fn sort_by_status_conflicts_first() {
+        let mut changes = vec![
+            ScmFileChange::new("a.rs", ScmFileStatus::Added),
+            ScmFileChange::new("b.rs", ScmFileStatus::Conflicted),
+            ScmFileChange::new("c.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("d.rs", ScmFileStatus::Untracked),
+        ];
+        sort_by_status(&mut changes);
+        assert_eq!(changes[0].status, ScmFileStatus::Conflicted);
+        assert_eq!(changes[1].status, ScmFileStatus::Modified);
+        assert_eq!(changes[2].status, ScmFileStatus::Added);
+        assert_eq!(changes[3].status, ScmFileStatus::Untracked);
+    }
+
+    // -- DiffStats tests --------------------------------------------------
+
+    #[test]
+    fn diff_stats_from_hunks() {
+        let hunks = vec![DiffHunk {
+            old_start: 1,
+            old_count: 3,
+            new_start: 1,
+            new_count: 4,
+            lines: vec![
+                DiffLine::Context("ctx".into()),
+                DiffLine::Removed("old".into()),
+                DiffLine::Added("new1".into()),
+                DiffLine::Added("new2".into()),
+                DiffLine::Context("ctx2".into()),
+            ],
+        }];
+        let stats = DiffStats::from_hunks(&hunks);
+        assert_eq!(stats.insertions, 2);
+        assert_eq!(stats.deletions, 1);
+        assert_eq!(stats.files, 1);
+        assert_eq!(stats.net_change(), 1);
+    }
+
+    #[test]
+    fn diff_stats_aggregate() {
+        let s1 = DiffStats { files: 1, insertions: 10, deletions: 3 };
+        let s2 = DiffStats { files: 1, insertions: 5, deletions: 8 };
+        let total = DiffStats::aggregate(&[s1, s2]);
+        assert_eq!(total.files, 2);
+        assert_eq!(total.insertions, 15);
+        assert_eq!(total.deletions, 11);
+        assert_eq!(total.net_change(), 4);
+    }
+
+    #[test]
+    fn diff_stats_display_singular() {
+        let stats = DiffStats { files: 1, insertions: 1, deletions: 1 };
+        let s = stats.to_string();
+        assert_eq!(s, "1 file changed, 1 insertion (+), 1 deletion (-)");
+    }
+
+    #[test]
+    fn diff_stats_display_plural() {
+        let stats = DiffStats { files: 3, insertions: 10, deletions: 5 };
+        let s = stats.to_string();
+        assert_eq!(s, "3 files changed, 10 insertions (+), 5 deletions (-)");
+    }
+
+    // -- status_counts tests ----------------------------------------------
+
+    #[test]
+    fn status_counts_correct() {
+        let changes = vec![
+            ScmFileChange::new("a.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("b.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("c.rs", ScmFileStatus::Added),
+            ScmFileChange::new("d.rs", ScmFileStatus::Conflicted),
+        ];
+        let counts = status_counts(&changes);
+        assert_eq!(counts[&ScmFileStatus::Modified], 2);
+        assert_eq!(counts[&ScmFileStatus::Added], 1);
+        assert_eq!(counts[&ScmFileStatus::Conflicted], 1);
+        assert!(!counts.contains_key(&ScmFileStatus::Deleted));
+    }
+
+    // -- format_diffstat_line tests ---------------------------------------
+
+    #[test]
+    fn diffstat_line_basic() {
+        let line = format_diffstat_line(Path::new("src/lib.rs"), 3, 2, 50);
+        assert!(line.contains("src/lib.rs"));
+        assert!(line.contains("| 5"));
+        assert!(line.contains("+++--"));
+    }
+
+    #[test]
+    fn diffstat_line_zero_changes() {
+        let line = format_diffstat_line(Path::new("empty.rs"), 0, 0, 50);
+        assert!(line.contains("| 0"));
+    }
+
+    #[test]
+    fn diffstat_line_scales_down() {
+        // 80 insertions + 20 deletions = 100 total, max_width = 10
+        let line = format_diffstat_line(Path::new("big.rs"), 80, 20, 10);
+        assert!(line.contains("| 100"));
+        // Bar should be ≤ 10 chars total
+        let bar_part = line.rsplit("| 100 ").next().unwrap_or("");
+        assert!(bar_part.len() <= 12); // some rounding tolerance
+    }
+
+    // -- conflict detection tests -----------------------------------------
+
+    #[test]
+    fn has_conflicts_true() {
+        let changes = vec![
+            ScmFileChange::new("a.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("b.rs", ScmFileStatus::Conflicted),
+        ];
+        assert!(has_conflicts(&changes));
+    }
+
+    #[test]
+    fn has_conflicts_false() {
+        let changes = vec![
+            ScmFileChange::new("a.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("b.rs", ScmFileStatus::Added),
+        ];
+        assert!(!has_conflicts(&changes));
+    }
+
+    #[test]
+    fn conflicted_files_returns_only_conflicts() {
+        let changes = vec![
+            ScmFileChange::new("a.rs", ScmFileStatus::Conflicted),
+            ScmFileChange::new("b.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("c.rs", ScmFileStatus::Conflicted),
+        ];
+        let conflicts = conflicted_files(&changes);
+        assert_eq!(conflicts.len(), 2);
+        assert!(conflicts.iter().all(|c| c.status == ScmFileStatus::Conflicted));
+    }
+
+    // -- staging/unstaging view helpers -----------------------------------
+
+    #[test]
+    fn toggle_staged_selected() {
+        let mut view = ScmView::new();
+        populate_from_git(&mut view, &[
+            (PathBuf::from("a.rs"), FileStatus::Modified),
+            (PathBuf::from("b.rs"), FileStatus::Added),
+        ]);
+        // a.rs is index 0 (sorted), Modified → staged=false
+        assert!(!view.entries[0].staged);
+        view.toggle_staged_selected();
+        assert!(view.entries[0].staged);
+        view.toggle_staged_selected();
+        assert!(!view.entries[0].staged);
+    }
+
+    #[test]
+    fn stage_all_and_unstage_all() {
+        let mut view = ScmView::new();
+        populate_from_git(&mut view, &[
+            (PathBuf::from("a.rs"), FileStatus::Modified),
+            (PathBuf::from("b.rs"), FileStatus::Deleted),
+        ]);
+        view.stage_all();
+        assert!(view.entries.iter().all(|e| e.staged));
+        assert_eq!(view.staged_paths().len(), 2);
+        assert_eq!(view.unstaged_paths().len(), 0);
+
+        view.unstage_all();
+        assert!(view.entries.iter().all(|e| !e.staged));
+        assert_eq!(view.staged_paths().len(), 0);
+        assert_eq!(view.unstaged_paths().len(), 2);
+    }
+
+    // -- selection navigation tests ---------------------------------------
+
+    #[test]
+    fn select_next_wraps() {
+        let mut view = ScmView::new();
+        populate_from_git(&mut view, &[
+            (PathBuf::from("a.rs"), FileStatus::Modified),
+            (PathBuf::from("b.rs"), FileStatus::Modified),
+            (PathBuf::from("c.rs"), FileStatus::Modified),
+        ]);
+        assert_eq!(view.selected_index, 0);
+        view.select_next();
+        assert_eq!(view.selected_index, 1);
+        view.select_next();
+        assert_eq!(view.selected_index, 2);
+        view.select_next();
+        assert_eq!(view.selected_index, 0); // wrapped
+    }
+
+    #[test]
+    fn select_prev_wraps() {
+        let mut view = ScmView::new();
+        populate_from_git(&mut view, &[
+            (PathBuf::from("a.rs"), FileStatus::Modified),
+            (PathBuf::from("b.rs"), FileStatus::Modified),
+        ]);
+        assert_eq!(view.selected_index, 0);
+        view.select_prev();
+        assert_eq!(view.selected_index, 1); // wrapped to end
+        view.select_prev();
+        assert_eq!(view.selected_index, 0);
+    }
+
+    #[test]
+    fn select_on_empty_view_no_panic() {
+        let mut view = ScmView::new();
+        view.select_next();
+        view.select_prev();
+        assert_eq!(view.selected_index, 0);
+    }
+
+    // -- format_status_summary tests --------------------------------------
+
+    #[test]
+    fn status_summary_full() {
+        let changes = vec![
+            ScmFileChange::new("a.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("b.rs", ScmFileStatus::Modified),
+            ScmFileChange::new("c.rs", ScmFileStatus::Added),
+            ScmFileChange::new("d.rs", ScmFileStatus::Untracked),
+        ];
+        let summary = format_status_summary(Some("main"), 2, 1, &changes);
+        assert!(summary.contains("main"));
+        assert!(summary.contains("↑2"));
+        assert!(summary.contains("↓1"));
+        assert!(summary.contains("2M"));
+        assert!(summary.contains("1A"));
+        assert!(summary.contains("1?"));
+    }
+
+    #[test]
+    fn status_summary_detached_no_remote() {
+        let summary = format_status_summary(None, 0, 0, &[]);
+        assert_eq!(summary, "(detached)");
+    }
+
+    #[test]
+    fn status_summary_no_changes() {
+        let summary = format_status_summary(Some("develop"), 0, 0, &[]);
+        assert_eq!(summary, "develop");
     }
 }

@@ -4734,3 +4734,573 @@ mod state_management {
         assert!(!svc.get_by_scope(StateScope::Global).is_empty());
     }
 }
+
+// ─── Workbench Commands ─────────────────────────────────────────────────
+
+#[cfg(test)]
+mod workbench_commands {
+    use vsedit_wb_commands::{command_palette_search, CommandPaletteHistory,
+                             CommandPaletteItem, CommandBatch, CommandValidator};
+
+    #[test]
+    fn test_integration_palette_search_fuzzy_exact() {
+        let items = vec![
+            CommandPaletteItem { id: "editor.formatDocument".into(), label: "Format Document".into() },
+            CommandPaletteItem { id: "editor.formatSelection".into(), label: "Format Selection".into() },
+            CommandPaletteItem { id: "file.save".into(), label: "Save File".into() },
+        ];
+        let results = command_palette_search("format", &items);
+        assert!(results.len() >= 2);
+        assert!(results.iter().all(|r| r.item.label.to_lowercase().contains("format")));
+    }
+
+    #[test]
+    fn test_integration_palette_search_fuzzy_partial() {
+        let items = vec![
+            CommandPaletteItem { id: "workbench.action.toggleSidebar".into(), label: "Toggle Sidebar".into() },
+            CommandPaletteItem { id: "workbench.action.togglePanel".into(), label: "Toggle Panel".into() },
+            CommandPaletteItem { id: "editor.action.rename".into(), label: "Rename Symbol".into() },
+        ];
+        let results = command_palette_search("tgl", &items);
+        assert!(results.iter().any(|r| r.item.id.contains("toggle")));
+    }
+
+    #[test]
+    fn test_integration_palette_search_no_match() {
+        let items = vec![
+            CommandPaletteItem { id: "file.save".into(), label: "Save File".into() },
+        ];
+        let results = command_palette_search("zzzznotfound", &items);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_integration_palette_history_record_and_recent() {
+        let mut history = CommandPaletteHistory::new();
+        history.record("cmd.a");
+        history.record("cmd.b");
+        history.record("cmd.c");
+        history.record("cmd.a");
+        let recent = history.get_recent(3);
+        assert!(!recent.is_empty());
+        assert!(recent.len() <= 3);
+    }
+
+    #[test]
+    fn test_integration_command_batch_execute_all() {
+        let mut batch = CommandBatch::new();
+        batch.add("cmd.one");
+        batch.add("cmd.two");
+        batch.add("cmd.three");
+        assert_eq!(batch.len(), 3);
+        assert!(!batch.is_empty());
+    }
+}
+
+// ─── Theme Colors ───────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod theme_colors {
+    use vsedit_wb_themes::{ThemeColorMap, color_blend, theme_contrast_ratio,
+                           ColorValue, relative_luminance};
+
+    #[test]
+    fn test_integration_theme_color_map_set_get() {
+        let mut map = ThemeColorMap::new();
+        map.set("editor.background", ColorValue::hex("#1e1e1e"));
+        map.set("editor.foreground", ColorValue::hex("#d4d4d4"));
+        assert!(map.get("editor.background").is_some());
+        assert!(map.get("editor.foreground").is_some());
+        assert!(map.get("nonexistent.color").is_none());
+    }
+
+    #[test]
+    fn test_integration_theme_color_map_len() {
+        let mut map = ThemeColorMap::new();
+        assert_eq!(map.len(), 0);
+        map.set("color.a", ColorValue::hex("#ff0000"));
+        map.set("color.b", ColorValue::hex("#00ff00"));
+        assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn test_integration_color_blend_two_colors() {
+        let c1 = ColorValue::hex("#000000");
+        let c2 = ColorValue::hex("#ffffff");
+        let blended = color_blend(&c1, &c2, 0.5);
+        assert!(blended.r > 100 && blended.r < 200);
+    }
+
+    #[test]
+    fn test_integration_theme_contrast_ratio_black_white() {
+        let black = ColorValue::hex("#000000");
+        let white = ColorValue::hex("#ffffff");
+        let ratio = theme_contrast_ratio(&black, &white);
+        assert!(ratio > 20.0);
+    }
+
+    #[test]
+    fn test_integration_relative_luminance_extremes() {
+        let black = ColorValue::hex("#000000");
+        let white = ColorValue::hex("#ffffff");
+        let lum_black = relative_luminance(&black);
+        let lum_white = relative_luminance(&white);
+        assert!(lum_black < 0.01);
+        assert!(lum_white > 0.99);
+    }
+}
+
+// ─── Tab Bar ────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tab_bar {
+    use vsedit_tabbar::{Tab, TabKind, TabDragReorder, TabOverflow, TabBarConfig,
+                        TabOverflowStrategy, calculate_tab_widths};
+
+    #[test]
+    fn test_integration_tab_drag_reorder_swap() {
+        let tabs = vec![
+            Tab::new("file1.rs", TabKind::File),
+            Tab::new("file2.rs", TabKind::File),
+            Tab::new("file3.rs", TabKind::File),
+        ];
+        let mut reorder = TabDragReorder::new(tabs);
+        reorder.start_drag(0);
+        reorder.move_to(2);
+        let result = reorder.finish();
+        assert_eq!(result[2].label(), "file1.rs");
+    }
+
+    #[test]
+    fn test_integration_tab_drag_reorder_no_op() {
+        let tabs = vec![
+            Tab::new("a.rs", TabKind::File),
+            Tab::new("b.rs", TabKind::File),
+        ];
+        let mut reorder = TabDragReorder::new(tabs);
+        reorder.start_drag(0);
+        reorder.move_to(0);
+        let result = reorder.finish();
+        assert_eq!(result[0].label(), "a.rs");
+    }
+
+    #[test]
+    fn test_integration_tab_overflow_scroll_left() {
+        let mut overflow = TabOverflow::new(5, 200);
+        overflow.set_tab_count(10);
+        overflow.scroll_right();
+        overflow.scroll_right();
+        overflow.scroll_left();
+        assert!(overflow.scroll_offset() >= 0);
+    }
+
+    #[test]
+    fn test_integration_tab_overflow_strategy() {
+        let config = TabBarConfig {
+            overflow_strategy: TabOverflowStrategy::Scroll,
+            ..TabBarConfig::default()
+        };
+        assert!(matches!(config.overflow_strategy, TabOverflowStrategy::Scroll));
+    }
+
+    #[test]
+    fn test_integration_calculate_tab_widths_fits() {
+        let widths = calculate_tab_widths(3, 300, 50, 150);
+        assert_eq!(widths.len(), 3);
+        assert!(widths.iter().all(|&w| w >= 50));
+    }
+}
+
+// ─── Lifecycle ──────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod lifecycle {
+    use vsedit_lifecycle::{DisposableStore, lifecycle_phase_name, LifecyclePhase,
+                           Disposable, FnDisposable, DisposableMap};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[test]
+    fn test_integration_disposable_store_add_dispose() {
+        let disposed = Arc::new(AtomicBool::new(false));
+        let d = disposed.clone();
+        let mut store = DisposableStore::new();
+        store.add(FnDisposable::new(move || { d.store(true, Ordering::SeqCst); }));
+        assert!(!disposed.load(Ordering::SeqCst));
+        store.dispose();
+        assert!(disposed.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn test_integration_disposable_store_clear() {
+        let mut store = DisposableStore::new();
+        store.add(FnDisposable::new(|| {}));
+        store.add(FnDisposable::new(|| {}));
+        assert!(!store.is_empty());
+        store.clear();
+        assert!(store.is_empty());
+    }
+
+    #[test]
+    fn test_integration_lifecycle_phase_name_all() {
+        assert_eq!(lifecycle_phase_name(LifecyclePhase::Starting), "Starting");
+        assert_eq!(lifecycle_phase_name(LifecyclePhase::Ready), "Ready");
+        assert_eq!(lifecycle_phase_name(LifecyclePhase::Restored), "Restored");
+        assert_eq!(lifecycle_phase_name(LifecyclePhase::Eventually), "Eventually");
+    }
+
+    #[test]
+    fn test_integration_disposable_map_insert_remove() {
+        let mut map: DisposableMap<String> = DisposableMap::new();
+        map.insert("key1".to_string(), FnDisposable::new(|| {}));
+        map.insert("key2".to_string(), FnDisposable::new(|| {}));
+        assert!(map.contains_key("key1"));
+        map.remove("key1");
+        assert!(!map.contains_key("key1"));
+    }
+
+    #[test]
+    fn test_integration_fn_disposable_is_disposed() {
+        let d = FnDisposable::new(|| {});
+        assert!(!d.is_disposed());
+        d.dispose();
+        assert!(d.is_disposed());
+    }
+}
+
+// ─── Settings ───────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod settings {
+    use vsedit_settings_view::{SettingsSearchIndex, SettingEntry, SettingType,
+                               filter_modified, SettingsView};
+
+    #[test]
+    fn test_integration_settings_search_index_basic() {
+        let entries = vec![
+            SettingEntry::new("editor.tabSize", SettingType::Number, "4"),
+            SettingEntry::new("editor.fontSize", SettingType::Number, "14"),
+            SettingEntry::new("files.autoSave", SettingType::String, "afterDelay"),
+        ];
+        let index = SettingsSearchIndex::build(&entries);
+        let results = index.search("editor");
+        assert!(results.len() >= 2);
+    }
+
+    #[test]
+    fn test_integration_settings_search_index_no_match() {
+        let entries = vec![
+            SettingEntry::new("editor.tabSize", SettingType::Number, "4"),
+        ];
+        let index = SettingsSearchIndex::build(&entries);
+        let results = index.search("zzzznotfound");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_integration_filter_modified_only() {
+        let entries = vec![
+            SettingEntry::with_modified("editor.tabSize", SettingType::Number, "4", "2"),
+            SettingEntry::new("editor.fontSize", SettingType::Number, "14"),
+            SettingEntry::with_modified("files.autoSave", SettingType::String, "off", "afterDelay"),
+        ];
+        let modified = filter_modified(&entries);
+        assert_eq!(modified.len(), 2);
+    }
+
+    #[test]
+    fn test_integration_settings_view_empty() {
+        let view = SettingsView::new(vec![]);
+        assert!(view.entries().is_empty());
+        assert_eq!(view.count(), 0);
+    }
+
+    #[test]
+    fn test_integration_settings_view_with_entries() {
+        let entries = vec![
+            SettingEntry::new("editor.tabSize", SettingType::Number, "4"),
+            SettingEntry::new("editor.fontSize", SettingType::Number, "14"),
+        ];
+        let view = SettingsView::new(entries);
+        assert_eq!(view.count(), 2);
+        assert!(view.entries().iter().any(|e| e.key == "editor.tabSize"));
+    }
+}
+
+// ─── Type Hierarchy ─────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod type_hierarchy {
+    use vsedit_typehier::{TypeHierarchyTree, TypeHierarchyItem, SymbolKind,
+                          resolve_type_chain, type_hierarchy_flatten, type_hierarchy_roots};
+
+    #[test]
+    fn test_integration_type_hierarchy_tree_build() {
+        let items = vec![
+            TypeHierarchyItem::new("Animal", SymbolKind::Class),
+            TypeHierarchyItem::new("Dog", SymbolKind::Class),
+            TypeHierarchyItem::new("Cat", SymbolKind::Class),
+        ];
+        let mut tree = TypeHierarchyTree::new();
+        tree.add_root(items[0].clone());
+        tree.add_child("Animal", items[1].clone());
+        tree.add_child("Animal", items[2].clone());
+        assert_eq!(tree.root_count(), 1);
+        assert_eq!(tree.child_count("Animal"), 2);
+    }
+
+    #[test]
+    fn test_integration_resolve_type_chain_linear() {
+        let items = vec![
+            TypeHierarchyItem::new("Base", SymbolKind::Class),
+            TypeHierarchyItem::new("Middle", SymbolKind::Class),
+            TypeHierarchyItem::new("Derived", SymbolKind::Class),
+        ];
+        let chain = resolve_type_chain(&items, "Derived");
+        assert!(!chain.is_empty());
+    }
+
+    #[test]
+    fn test_integration_type_hierarchy_flatten_tree() {
+        let mut tree = TypeHierarchyTree::new();
+        tree.add_root(TypeHierarchyItem::new("Root", SymbolKind::Class));
+        tree.add_child("Root", TypeHierarchyItem::new("Child1", SymbolKind::Class));
+        tree.add_child("Root", TypeHierarchyItem::new("Child2", SymbolKind::Class));
+        let flat = type_hierarchy_flatten(&tree);
+        assert_eq!(flat.len(), 3);
+    }
+
+    #[test]
+    fn test_integration_type_hierarchy_roots() {
+        let mut tree = TypeHierarchyTree::new();
+        tree.add_root(TypeHierarchyItem::new("A", SymbolKind::Interface));
+        tree.add_root(TypeHierarchyItem::new("B", SymbolKind::Class));
+        let roots = type_hierarchy_roots(&tree);
+        assert_eq!(roots.len(), 2);
+    }
+
+    #[test]
+    fn test_integration_type_hierarchy_empty_tree() {
+        let tree = TypeHierarchyTree::new();
+        assert_eq!(tree.root_count(), 0);
+        let flat = type_hierarchy_flatten(&tree);
+        assert!(flat.is_empty());
+    }
+}
+
+// ─── Policy ─────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod policy {
+    use vsedit_policy::{PolicyEngine, PolicyValue, merge_scoped_policies,
+                        policy_report, ScopedPolicy, PolicyScope};
+
+    #[test]
+    fn test_integration_policy_engine_set_get() {
+        let mut engine = PolicyEngine::new();
+        engine.set("feature.copilot", PolicyValue::Bool(true));
+        engine.set("feature.terminal", PolicyValue::Bool(false));
+        assert_eq!(engine.get("feature.copilot"), Some(&PolicyValue::Bool(true)));
+        assert_eq!(engine.get("feature.terminal"), Some(&PolicyValue::Bool(false)));
+        assert!(engine.get("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_integration_policy_engine_count() {
+        let mut engine = PolicyEngine::new();
+        assert_eq!(engine.len(), 0);
+        engine.set("a", PolicyValue::Bool(true));
+        engine.set("b", PolicyValue::String("value".into()));
+        assert_eq!(engine.len(), 2);
+    }
+
+    #[test]
+    fn test_integration_policy_merge_override() {
+        let base = vec![
+            ScopedPolicy::new("feature.x", PolicyValue::Bool(false), PolicyScope::Default),
+        ];
+        let overrides = vec![
+            ScopedPolicy::new("feature.x", PolicyValue::Bool(true), PolicyScope::User),
+        ];
+        let merged = merge_scoped_policies(&base, &overrides);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].value, PolicyValue::Bool(true));
+    }
+
+    #[test]
+    fn test_integration_policy_report_output() {
+        let mut engine = PolicyEngine::new();
+        engine.set("feature.a", PolicyValue::Bool(true));
+        engine.set("feature.b", PolicyValue::Bool(false));
+        engine.set("setting.name", PolicyValue::String("test".into()));
+        let report = policy_report(&engine);
+        assert!(!report.is_empty());
+        assert!(report.iter().any(|r| r.key == "feature.a"));
+    }
+
+    #[test]
+    fn test_integration_policy_engine_remove() {
+        let mut engine = PolicyEngine::new();
+        engine.set("key", PolicyValue::Bool(true));
+        assert!(engine.get("key").is_some());
+        engine.remove("key");
+        assert!(engine.get("key").is_none());
+    }
+}
+
+// ─── Emmet ──────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod emmet {
+    use vsedit_emmet::{EmmetAbbreviationParser, tag_completion, expand_abbreviation,
+                       is_abbreviation, needs_closing_tag};
+
+    #[test]
+    fn test_integration_emmet_parser_simple_tag() {
+        let parser = EmmetAbbreviationParser::new();
+        let result = parser.parse("div");
+        assert!(result.is_ok());
+        let node = result.unwrap();
+        assert_eq!(node.tag_name(), "div");
+    }
+
+    #[test]
+    fn test_integration_emmet_parser_nested() {
+        let parser = EmmetAbbreviationParser::new();
+        let result = parser.parse("ul>li*3");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_integration_tag_completion_html() {
+        let completions = tag_completion("di");
+        assert!(completions.iter().any(|c| c == "div"));
+    }
+
+    #[test]
+    fn test_integration_expand_abbreviation_basic() {
+        let expanded = expand_abbreviation("p");
+        assert!(expanded.contains("<p>"));
+        assert!(expanded.contains("</p>"));
+    }
+
+    #[test]
+    fn test_integration_is_abbreviation_checks() {
+        assert!(is_abbreviation("div"));
+        assert!(is_abbreviation("ul>li"));
+        assert!(!is_abbreviation(""));
+    }
+}
+
+// ─── Outline ────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod outline {
+    use vsedit_outline_view::{DocumentSymbolTree, OutlineElement, OutlineKind,
+                              outline_breadcrumb, outline_sort_by_position,
+                              outline_sort_by_name};
+
+    #[test]
+    fn test_integration_document_symbol_tree_build() {
+        let mut tree = DocumentSymbolTree::new();
+        tree.add(OutlineElement::new("main", OutlineKind::Function, 1, 10));
+        tree.add(OutlineElement::new("MyStruct", OutlineKind::Struct, 12, 20));
+        assert_eq!(tree.len(), 2);
+    }
+
+    #[test]
+    fn test_integration_document_symbol_tree_find() {
+        let mut tree = DocumentSymbolTree::new();
+        tree.add(OutlineElement::new("foo", OutlineKind::Function, 1, 5));
+        tree.add(OutlineElement::new("bar", OutlineKind::Function, 6, 10));
+        let found = tree.find_by_name("foo");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().name, "foo");
+    }
+
+    #[test]
+    fn test_integration_outline_breadcrumb_path() {
+        let mut tree = DocumentSymbolTree::new();
+        let parent = OutlineElement::new("Module", OutlineKind::Module, 1, 50);
+        tree.add(parent);
+        tree.add_child("Module", OutlineElement::new("func", OutlineKind::Function, 5, 15));
+        let crumbs = outline_breadcrumb(&tree, 7);
+        assert!(!crumbs.is_empty());
+    }
+
+    #[test]
+    fn test_integration_outline_sort_by_position_order() {
+        let mut elements = vec![
+            OutlineElement::new("c", OutlineKind::Function, 20, 30),
+            OutlineElement::new("a", OutlineKind::Function, 1, 10),
+            OutlineElement::new("b", OutlineKind::Function, 11, 19),
+        ];
+        outline_sort_by_position(&mut elements);
+        assert_eq!(elements[0].name, "a");
+        assert_eq!(elements[1].name, "b");
+        assert_eq!(elements[2].name, "c");
+    }
+
+    #[test]
+    fn test_integration_outline_sort_by_name_order() {
+        let mut elements = vec![
+            OutlineElement::new("zebra", OutlineKind::Function, 1, 5),
+            OutlineElement::new("alpha", OutlineKind::Function, 6, 10),
+            OutlineElement::new("middle", OutlineKind::Function, 11, 15),
+        ];
+        outline_sort_by_name(&mut elements);
+        assert_eq!(elements[0].name, "alpha");
+        assert_eq!(elements[1].name, "middle");
+        assert_eq!(elements[2].name, "zebra");
+    }
+}
+
+// ─── Debug Adapter ──────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod debug_adapter {
+    use vsedit_debug::{DebugAdapterMessage, DebugSession, DebugSessionState,
+                       parse_stack_trace_line, format_variable_value};
+
+    #[test]
+    fn test_integration_debug_adapter_message_request() {
+        let msg = DebugAdapterMessage::request(1, "initialize", None);
+        assert_eq!(msg.seq(), 1);
+        assert_eq!(msg.command(), Some("initialize"));
+    }
+
+    #[test]
+    fn test_integration_debug_adapter_message_response() {
+        let msg = DebugAdapterMessage::response(1, 2, "initialize", true, None);
+        assert!(msg.is_success());
+    }
+
+    #[test]
+    fn test_integration_debug_session_lifecycle() {
+        let mut session = DebugSession::new("test-session", "node");
+        assert_eq!(session.state(), DebugSessionState::Inactive);
+        session.start();
+        assert_eq!(session.state(), DebugSessionState::Running);
+        session.pause();
+        assert_eq!(session.state(), DebugSessionState::Stopped);
+        session.resume();
+        assert_eq!(session.state(), DebugSessionState::Running);
+        session.terminate();
+        assert_eq!(session.state(), DebugSessionState::Inactive);
+    }
+
+    #[test]
+    fn test_integration_parse_stack_trace_line_valid() {
+        let frame = parse_stack_trace_line("    at main (src/main.rs:42:5)");
+        assert!(frame.is_some());
+        let f = frame.unwrap();
+        assert_eq!(f.function, "main");
+        assert!(f.source.contains("main.rs"));
+    }
+
+    #[test]
+    fn test_integration_format_variable_value_types() {
+        assert_eq!(format_variable_value("42", "i32"), "42: i32");
+        assert_eq!(format_variable_value("hello", "String"), "\"hello\": String");
+    }
+}

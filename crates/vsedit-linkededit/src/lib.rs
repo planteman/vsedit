@@ -932,6 +932,269 @@ pub fn bounding_range(ranges: &[LinkedEditingRange]) -> Option<LinkedEditingRang
     Some(LinkedEditingRange::new(min_line, min_col, max_line, max_col))
 }
 
+// ---------------------------------------------------------------------------
+// Edit propagation – compute new ranges after an edit is applied
+// ---------------------------------------------------------------------------
+
+/// After replacing every range with `new_text`, compute the updated range
+/// positions in the resulting document. This is essential for keeping the
+/// linked editing session alive after an edit: the ranges must be adjusted to
+/// reflect the new text lengths.
+///
+/// Returns `None` if any range is out of bounds in the original `text`.
+pub fn propagate_ranges(
+    text: &str,
+    ranges: &[LinkedEditingRange],
+    new_text: &str,
+) -> Option<Vec<LinkedEditingRange>> {
+    if ranges.is_empty() {
+        return Some(Vec::new());
+    }
+
+    // Convert to byte offsets and sort by start ascending.
+    let mut indexed: Vec<(usize, usize, usize)> = Vec::with_capacity(ranges.len());
+    for (i, r) in ranges.iter().enumerate() {
+        let start = offset_of(text, r.start_line, r.start_col)?;
+        let end = offset_of(text, r.end_line, r.end_col)?;
+        if end < start {
+            return None;
+        }
+        indexed.push((i, start, end));
+    }
+    indexed.sort_by_key(|&(_, s, _)| s);
+
+    let new_len = new_text.len();
+    let mut cumulative_delta: i64 = 0;
+    // We'll build the result text to derive line/col from byte offsets.
+    let result_text = apply_linked_edit(text, ranges, new_text)?;
+
+    let mut new_ranges = vec![LinkedEditingRange::new(0, 0, 0, 0); ranges.len()];
+    for &(orig_idx, start, end) in &indexed {
+        let old_len = end - start;
+        let new_start = (start as i64 + cumulative_delta) as usize;
+        let new_end = new_start + new_len;
+        let (sl, sc) = byte_offset_to_line_col(&result_text, new_start)?;
+        let (el, ec) = byte_offset_to_line_col(&result_text, new_end)?;
+        new_ranges[orig_idx] = LinkedEditingRange::new(sl, sc, el, ec);
+        cumulative_delta += new_len as i64 - old_len as i64;
+    }
+    Some(new_ranges)
+}
+
+// ---------------------------------------------------------------------------
+// Conflict detection – detect conflicting edits across multiple groups
+// ---------------------------------------------------------------------------
+
+/// Represents a conflict between two edit groups that share overlapping ranges.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EditConflict {
+    /// Index of the first group.
+    pub group_a: usize,
+    /// Index of the second group.
+    pub group_b: usize,
+    /// Indices of overlapping range pairs: (range in A, range in B).
+    pub overlapping_pairs: Vec<(usize, usize)>,
+}
+
+/// Detect conflicts between multiple `LinkedEditGroup`s. Two groups conflict
+/// when any of their byte-offset ranges overlap.
+pub fn detect_conflicts(groups: &[LinkedEditGroup]) -> Vec<EditConflict> {
+    let mut conflicts = Vec::new();
+    for (i, ga) in groups.iter().enumerate() {
+        for (j, gb) in groups.iter().enumerate().skip(i + 1) {
+            let mut pairs = Vec::new();
+            for (ai, &(a_start, a_end)) in ga.ranges.iter().enumerate() {
+                for (bi, &(b_start, b_end)) in gb.ranges.iter().enumerate() {
+                    if a_start < b_end && b_start < a_end {
+                        pairs.push((ai, bi));
+                    }
+                }
+            }
+            if !pairs.is_empty() {
+                conflicts.push(EditConflict {
+                    group_a: i,
+                    group_b: j,
+                    overlapping_pairs: pairs,
+                });
+            }
+        }
+    }
+    conflicts
+}
+
+// ---------------------------------------------------------------------------
+// Cursor tracking across linked ranges
+// ---------------------------------------------------------------------------
+
+/// Describes a cursor position relative to a linked editing range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CursorMapping {
+    /// Index of the source range that contains the cursor.
+    pub source_range: usize,
+    /// Offset of the cursor within the source range (in columns, single-line only).
+    pub offset_in_range: u32,
+}
+
+/// For a cursor at `(line, col)`, compute the equivalent cursor positions in
+/// all other linked ranges. Returns `None` if the cursor is not inside any
+/// range, or if any range is multi-line.
+pub fn map_cursor_to_linked_ranges(
+    ranges: &[LinkedEditingRange],
+    cursor_line: u32,
+    cursor_col: u32,
+) -> Option<Vec<(u32, u32)>> {
+    let source_idx = find_range_at(ranges, cursor_line, cursor_col)?;
+    let source = &ranges[source_idx];
+    if !source.is_single_line() {
+        return None;
+    }
+    let offset = cursor_col - source.start_col;
+
+    let mut positions = Vec::with_capacity(ranges.len());
+    for r in ranges {
+        if !r.is_single_line() {
+            return None;
+        }
+        positions.push((r.start_line, r.start_col + offset));
+    }
+    Some(positions)
+}
+
+/// Like `map_cursor_to_linked_ranges` but also returns the `CursorMapping`
+/// metadata for the source range.
+pub fn map_cursor_with_metadata(
+    ranges: &[LinkedEditingRange],
+    cursor_line: u32,
+    cursor_col: u32,
+) -> Option<(CursorMapping, Vec<(u32, u32)>)> {
+    let source_idx = find_range_at(ranges, cursor_line, cursor_col)?;
+    let source = &ranges[source_idx];
+    if !source.is_single_line() {
+        return None;
+    }
+    let offset = cursor_col - source.start_col;
+    let mapping = CursorMapping {
+        source_range: source_idx,
+        offset_in_range: offset,
+    };
+
+    let positions = map_cursor_to_linked_ranges(ranges, cursor_line, cursor_col)?;
+    Some((mapping, positions))
+}
+
+// ---------------------------------------------------------------------------
+// Range intersection and subtraction
+// ---------------------------------------------------------------------------
+
+/// Compute the intersection of two ranges, or `None` if they don't overlap.
+pub fn range_intersection(
+    a: &LinkedEditingRange,
+    b: &LinkedEditingRange,
+) -> Option<LinkedEditingRange> {
+    if !a.overlaps(b) {
+        return None;
+    }
+    let start_line;
+    let start_col;
+    if a.start_line > b.start_line || (a.start_line == b.start_line && a.start_col > b.start_col) {
+        start_line = a.start_line;
+        start_col = a.start_col;
+    } else {
+        start_line = b.start_line;
+        start_col = b.start_col;
+    }
+    let end_line;
+    let end_col;
+    if a.end_line < b.end_line || (a.end_line == b.end_line && a.end_col < b.end_col) {
+        end_line = a.end_line;
+        end_col = a.end_col;
+    } else {
+        end_line = b.end_line;
+        end_col = b.end_col;
+    }
+    Some(LinkedEditingRange::new(start_line, start_col, end_line, end_col))
+}
+
+/// Filter a set of ranges to only those that contain the given position.
+pub fn ranges_containing_position(
+    ranges: &[LinkedEditingRange],
+    line: u32,
+    col: u32,
+) -> Vec<(usize, LinkedEditingRange)> {
+    ranges
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.contains(line, col))
+        .map(|(i, r)| (i, *r))
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Multi-document linked editing coordinator
+// ---------------------------------------------------------------------------
+
+/// Tracks linked editing sessions across multiple documents.
+#[derive(Debug, Clone, Default)]
+pub struct LinkedEditingCoordinator {
+    sessions: Vec<LinkedEditingSession>,
+}
+
+impl LinkedEditingCoordinator {
+    pub fn new() -> Self {
+        Self {
+            sessions: Vec::new(),
+        }
+    }
+
+    /// Start a new linked editing session for the given URI. Replaces any
+    /// existing session for the same URI.
+    pub fn start_session(
+        &mut self,
+        uri: String,
+        text: String,
+        ranges: LinkedEditingRanges,
+    ) -> usize {
+        // Remove existing session for this URI if any.
+        self.sessions.retain(|s| s.uri != uri);
+        let idx = self.sessions.len();
+        self.sessions
+            .push(LinkedEditingSession::new(uri, text, ranges));
+        idx
+    }
+
+    /// End the session for the given URI. Returns `true` if a session was removed.
+    pub fn end_session(&mut self, uri: &str) -> bool {
+        let before = self.sessions.len();
+        self.sessions.retain(|s| s.uri != uri);
+        self.sessions.len() < before
+    }
+
+    /// Find the session for the given URI.
+    pub fn session_for(&self, uri: &str) -> Option<&LinkedEditingSession> {
+        self.sessions.iter().find(|s| s.uri == uri)
+    }
+
+    /// Find the session for the given URI (mutable).
+    pub fn session_for_mut(&mut self, uri: &str) -> Option<&mut LinkedEditingSession> {
+        self.sessions.iter_mut().find(|s| s.uri == uri)
+    }
+
+    /// Number of active sessions.
+    pub fn session_count(&self) -> usize {
+        self.sessions.len()
+    }
+
+    /// All URIs with active sessions.
+    pub fn active_uris(&self) -> Vec<&str> {
+        self.sessions.iter().map(|s| s.uri.as_str()).collect()
+    }
+
+    /// End all sessions.
+    pub fn clear(&mut self) {
+        self.sessions.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1813,5 +2076,219 @@ mod tests {
     #[test]
     fn bounding_range_empty() {
         assert!(bounding_range(&[]).is_none());
+    }
+
+    // ---- propagate_ranges tests ----
+
+    #[test]
+    fn propagate_ranges_updates_positions() {
+        let text = "<div>hello</div>";
+        let ranges = vec![
+            LinkedEditingRange::new(0, 1, 0, 4),   // "div" at byte 1..4
+            LinkedEditingRange::new(0, 12, 0, 15),  // "div" at byte 12..15
+        ];
+        let new_ranges = propagate_ranges(text, &ranges, "span").unwrap();
+        assert_eq!(new_ranges.len(), 2);
+        // After replacing "div" with "span", first range should be at 1..5
+        assert_eq!(new_ranges[0], LinkedEditingRange::new(0, 1, 0, 5));
+        // Second range shifts right by 1 (first replacement grew by 1 char)
+        // Original was 12..15, now "span" is 4 chars => 13..17
+        assert_eq!(new_ranges[1], LinkedEditingRange::new(0, 13, 0, 17));
+    }
+
+    #[test]
+    fn propagate_ranges_shrinking() {
+        let text = "<section></section>";
+        let ranges = vec![
+            LinkedEditingRange::new(0, 1, 0, 8),    // "section"
+            LinkedEditingRange::new(0, 11, 0, 18),   // "section"
+        ];
+        let new_ranges = propagate_ranges(text, &ranges, "p").unwrap();
+        // "section" (7) -> "p" (1), delta = -6
+        assert_eq!(new_ranges[0], LinkedEditingRange::new(0, 1, 0, 2));
+        assert_eq!(new_ranges[1], LinkedEditingRange::new(0, 5, 0, 6));
+    }
+
+    #[test]
+    fn propagate_ranges_empty_ranges() {
+        let result = propagate_ranges("text", &[], "x").unwrap();
+        assert!(result.is_empty());
+    }
+
+    // ---- detect_conflicts tests ----
+
+    #[test]
+    fn detect_conflicts_no_conflict() {
+        let groups = vec![
+            LinkedEditGroup::new(vec![(0, 3), (10, 13)], "foo"),
+            LinkedEditGroup::new(vec![(5, 8), (15, 18)], "bar"),
+        ];
+        let conflicts = detect_conflicts(&groups);
+        assert!(conflicts.is_empty());
+    }
+
+    #[test]
+    fn detect_conflicts_with_overlap() {
+        let groups = vec![
+            LinkedEditGroup::new(vec![(0, 5)], "hello"),
+            LinkedEditGroup::new(vec![(3, 8)], "world"),
+        ];
+        let conflicts = detect_conflicts(&groups);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].group_a, 0);
+        assert_eq!(conflicts[0].group_b, 1);
+        assert_eq!(conflicts[0].overlapping_pairs, vec![(0, 0)]);
+    }
+
+    // ---- cursor mapping tests ----
+
+    #[test]
+    fn map_cursor_to_linked_ranges_basic() {
+        let ranges = vec![
+            LinkedEditingRange::new(0, 1, 0, 4),   // first "div"
+            LinkedEditingRange::new(2, 2, 2, 5),   // second "div"
+        ];
+        // Cursor in first range at col 3 => offset 2 within range
+        let positions = map_cursor_to_linked_ranges(&ranges, 0, 3).unwrap();
+        assert_eq!(positions.len(), 2);
+        assert_eq!(positions[0], (0, 3));  // source stays same
+        assert_eq!(positions[1], (2, 4));  // offset 2 applied to second range
+    }
+
+    #[test]
+    fn map_cursor_outside_ranges_returns_none() {
+        let ranges = vec![LinkedEditingRange::new(0, 5, 0, 10)];
+        assert!(map_cursor_to_linked_ranges(&ranges, 0, 0).is_none());
+    }
+
+    #[test]
+    fn map_cursor_with_metadata_returns_info() {
+        let ranges = vec![
+            LinkedEditingRange::new(0, 1, 0, 4),
+            LinkedEditingRange::new(0, 10, 0, 13),
+        ];
+        let (mapping, positions) = map_cursor_with_metadata(&ranges, 0, 2).unwrap();
+        assert_eq!(mapping.source_range, 0);
+        assert_eq!(mapping.offset_in_range, 1);
+        assert_eq!(positions[1], (0, 11));
+    }
+
+    // ---- range_intersection tests ----
+
+    #[test]
+    fn range_intersection_overlapping() {
+        let a = LinkedEditingRange::new(0, 2, 0, 8);
+        let b = LinkedEditingRange::new(0, 5, 0, 12);
+        let inter = range_intersection(&a, &b).unwrap();
+        assert_eq!(inter, LinkedEditingRange::new(0, 5, 0, 8));
+    }
+
+    #[test]
+    fn range_intersection_no_overlap() {
+        let a = LinkedEditingRange::new(0, 0, 0, 3);
+        let b = LinkedEditingRange::new(0, 5, 0, 8);
+        assert!(range_intersection(&a, &b).is_none());
+    }
+
+    // ---- ranges_containing_position tests ----
+
+    #[test]
+    fn ranges_containing_position_multiple() {
+        let ranges = vec![
+            LinkedEditingRange::new(0, 0, 0, 10),
+            LinkedEditingRange::new(0, 5, 0, 15),
+        ];
+        let found = ranges_containing_position(&ranges, 0, 7);
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].0, 0);
+        assert_eq!(found[1].0, 1);
+    }
+
+    // ---- LinkedEditingCoordinator tests ----
+
+    #[test]
+    fn coordinator_start_and_find_session() {
+        let mut coord = LinkedEditingCoordinator::new();
+        let ranges = LinkedEditingRanges::new(
+            vec![LinkedEditingRange::new(0, 1, 0, 4)],
+            None,
+        );
+        coord.start_session("file:///a.html".into(), "<div>".into(), ranges);
+        assert_eq!(coord.session_count(), 1);
+        assert!(coord.session_for("file:///a.html").is_some());
+        assert!(coord.session_for("file:///b.html").is_none());
+    }
+
+    #[test]
+    fn coordinator_end_session() {
+        let mut coord = LinkedEditingCoordinator::new();
+        let ranges = LinkedEditingRanges::new(vec![], None);
+        coord.start_session("file:///a.html".into(), "".into(), ranges);
+        assert!(coord.end_session("file:///a.html"));
+        assert_eq!(coord.session_count(), 0);
+        assert!(!coord.end_session("file:///a.html"));
+    }
+
+    #[test]
+    fn coordinator_replaces_existing_session() {
+        let mut coord = LinkedEditingCoordinator::new();
+        let r1 = LinkedEditingRanges::new(
+            vec![LinkedEditingRange::new(0, 0, 0, 3)],
+            None,
+        );
+        let r2 = LinkedEditingRanges::new(
+            vec![
+                LinkedEditingRange::new(0, 0, 0, 4),
+                LinkedEditingRange::new(0, 6, 0, 10),
+            ],
+            None,
+        );
+        coord.start_session("file:///a.html".into(), "old".into(), r1);
+        coord.start_session("file:///a.html".into(), "new".into(), r2);
+        assert_eq!(coord.session_count(), 1);
+        let s = coord.session_for("file:///a.html").unwrap();
+        assert_eq!(s.range_count(), 2);
+        assert_eq!(s.original_text(), "new");
+    }
+
+    #[test]
+    fn coordinator_active_uris() {
+        let mut coord = LinkedEditingCoordinator::new();
+        let r = LinkedEditingRanges::new(vec![], None);
+        coord.start_session("file:///a.html".into(), "".into(), r.clone());
+        coord.start_session("file:///b.html".into(), "".into(), r);
+        let uris = coord.active_uris();
+        assert_eq!(uris.len(), 2);
+        assert!(uris.contains(&"file:///a.html"));
+        assert!(uris.contains(&"file:///b.html"));
+    }
+
+    #[test]
+    fn coordinator_clear() {
+        let mut coord = LinkedEditingCoordinator::new();
+        let r = LinkedEditingRanges::new(vec![], None);
+        coord.start_session("file:///a.html".into(), "".into(), r);
+        coord.clear();
+        assert_eq!(coord.session_count(), 0);
+    }
+
+    #[test]
+    fn coordinator_mutable_session_update() {
+        let mut coord = LinkedEditingCoordinator::new();
+        let ranges = LinkedEditingRanges::new(
+            vec![
+                LinkedEditingRange::new(0, 1, 0, 4),
+                LinkedEditingRange::new(0, 12, 0, 15),
+            ],
+            None,
+        );
+        coord.start_session(
+            "file:///a.html".into(),
+            "<div>hello</div>".into(),
+            ranges,
+        );
+        let session = coord.session_for_mut("file:///a.html").unwrap();
+        let result = session.update("span").unwrap();
+        assert_eq!(result, "<span>hello</span>");
     }
 }

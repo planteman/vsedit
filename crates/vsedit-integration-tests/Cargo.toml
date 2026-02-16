@@ -50,5 +50,14 @@ vsedit-whitespace = { path = "../vsedit-whitespace" }
 vsedit-input = { path = "../vsedit-input" }
 vsedit-storage = { path = "../vsedit-storage" }
 vsedit-state = { path = "../vsedit-state" }
+vsedit-wb-commands = { path = "../vsedit-wb-commands" }
+vsedit-wb-themes = { path = "../vsedit-wb-themes" }
+vsedit-tabbar = { path = "../vsedit-tabbar" }
+vsedit-lifecycle = { path = "../vsedit-lifecycle" }
+vsedit-settings-view = { path = "../vsedit-settings-view" }
+vsedit-typehier = { path = "../vsedit-typehier" }
+vsedit-policy = { path = "../vsedit-policy" }
+vsedit-emmet = { path = "../vsedit-emmet" }
+vsedit-outline-view = { path = "../vsedit-outline-view" }
 serde_json.workspace = true
 tempfile.workspace = true

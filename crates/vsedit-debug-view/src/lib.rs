@@ -1244,6 +1244,484 @@ impl VariableInspector {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DebugSessionStateMachine — state machine for debug session lifecycle
+// ---------------------------------------------------------------------------
+
+/// Tracks the debug session lifecycle with valid state transitions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionPhase {
+    /// No session active.
+    Idle,
+    /// Launch/attach request sent, waiting for initialized event.
+    Launching,
+    /// Session running, program executing.
+    Running,
+    /// Execution paused at a breakpoint, step, or exception.
+    Paused,
+    /// Session is terminating.
+    Stopping,
+}
+
+/// A debug session state machine that enforces valid transitions and tracks
+/// step operation history.
+#[derive(Debug, Clone)]
+pub struct DebugSessionStateMachine {
+    phase: SessionPhase,
+    /// Running count of step operations performed in this session.
+    step_count: u64,
+    /// The last step action taken (StepOver, StepIn, StepOut).
+    last_step_action: Option<DebugAction>,
+    /// Whether an exception breakpoint has been hit.
+    exception_hit: bool,
+    /// History of phase transitions for diagnostics.
+    transition_log: Vec<(SessionPhase, SessionPhase)>,
+    max_log_entries: usize,
+}
+
+impl DebugSessionStateMachine {
+    pub fn new() -> Self {
+        Self {
+            phase: SessionPhase::Idle,
+            step_count: 0,
+            last_step_action: None,
+            exception_hit: false,
+            transition_log: Vec::new(),
+            max_log_entries: 100,
+        }
+    }
+
+    pub fn phase(&self) -> SessionPhase {
+        self.phase
+    }
+
+    pub fn step_count(&self) -> u64 {
+        self.step_count
+    }
+
+    pub fn last_step_action(&self) -> Option<DebugAction> {
+        self.last_step_action
+    }
+
+    pub fn exception_hit(&self) -> bool {
+        self.exception_hit
+    }
+
+    /// Attempt a state transition. Returns `true` if the transition was valid.
+    pub fn transition(&mut self, target: SessionPhase) -> bool {
+        let valid = match (self.phase, target) {
+            (SessionPhase::Idle, SessionPhase::Launching) => true,
+            (SessionPhase::Launching, SessionPhase::Running) => true,
+            (SessionPhase::Launching, SessionPhase::Stopping) => true,
+            (SessionPhase::Running, SessionPhase::Paused) => true,
+            (SessionPhase::Running, SessionPhase::Stopping) => true,
+            (SessionPhase::Paused, SessionPhase::Running) => true,
+            (SessionPhase::Paused, SessionPhase::Stopping) => true,
+            (SessionPhase::Stopping, SessionPhase::Idle) => true,
+            _ => false,
+        };
+        if valid {
+            let from = self.phase;
+            self.phase = target;
+            if self.transition_log.len() >= self.max_log_entries {
+                self.transition_log.remove(0);
+            }
+            self.transition_log.push((from, target));
+            // Reset exception flag when resuming
+            if target == SessionPhase::Running {
+                self.exception_hit = false;
+            }
+        }
+        valid
+    }
+
+    /// Record a step action (only valid when paused → running).
+    pub fn record_step(&mut self, action: DebugAction) -> bool {
+        if self.phase != SessionPhase::Paused {
+            return false;
+        }
+        let is_step = matches!(
+            action,
+            DebugAction::StepOver | DebugAction::StepIn | DebugAction::StepOut
+        );
+        if !is_step {
+            return false;
+        }
+        self.last_step_action = Some(action);
+        self.step_count += 1;
+        self.transition(SessionPhase::Running)
+    }
+
+    /// Mark that an exception breakpoint has been hit.
+    pub fn mark_exception(&mut self) {
+        self.exception_hit = true;
+    }
+
+    /// Number of recorded transitions.
+    pub fn transition_count(&self) -> usize {
+        self.transition_log.len()
+    }
+
+    /// Reset the state machine to idle.
+    pub fn reset(&mut self) {
+        self.phase = SessionPhase::Idle;
+        self.step_count = 0;
+        self.last_step_action = None;
+        self.exception_hit = false;
+        self.transition_log.clear();
+    }
+
+    /// Returns `true` when the session is in an active state (not idle/stopping).
+    pub fn is_active(&self) -> bool {
+        matches!(
+            self.phase,
+            SessionPhase::Launching | SessionPhase::Running | SessionPhase::Paused
+        )
+    }
+
+    /// Returns `true` when step actions are possible (paused).
+    pub fn can_step(&self) -> bool {
+        self.phase == SessionPhase::Paused
+    }
+}
+
+impl Default for DebugSessionStateMachine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VariableFormatter — variable value formatting utilities
+// ---------------------------------------------------------------------------
+
+/// Utilities for formatting debug variable values for display.
+pub struct VariableFormatter;
+
+impl VariableFormatter {
+    /// Truncate a value string to `max_len` characters, appending `…` if truncated.
+    pub fn truncate_value(value: &str, max_len: usize) -> String {
+        if value.len() <= max_len {
+            value.to_string()
+        } else {
+            let mut s = value[..max_len].to_string();
+            s.push('…');
+            s
+        }
+    }
+
+    /// Format a variable as `name: type = value`, with optional truncation.
+    pub fn format_variable(var: &DebugVariable, max_value_len: Option<usize>) -> String {
+        let val = match max_value_len {
+            Some(max) => Self::truncate_value(&var.value, max),
+            None => var.value.clone(),
+        };
+        if var.var_type.is_empty() {
+            format!("{} = {}", var.name, val)
+        } else {
+            format!("{}: {} = {}", var.name, var.var_type, val)
+        }
+    }
+
+    /// Format a numeric value with thousands separators.
+    pub fn format_number(value: &str) -> String {
+        // Try to parse as integer for formatting
+        if let Ok(n) = value.parse::<i64>() {
+            let s = n.abs().to_string();
+            let mut result = String::new();
+            for (i, ch) in s.chars().rev().enumerate() {
+                if i > 0 && i % 3 == 0 {
+                    result.push('_');
+                }
+                result.push(ch);
+            }
+            let formatted: String = result.chars().rev().collect();
+            if n < 0 {
+                format!("-{}", formatted)
+            } else {
+                formatted
+            }
+        } else {
+            value.to_string()
+        }
+    }
+
+    /// Produce a one-line summary for a compound value (struct/array).
+    /// E.g., `MyStruct { 3 fields }` or `Vec<i32> [5 items]`.
+    pub fn summarize_compound(var: &DebugVariable) -> String {
+        let child_count = var.children.len();
+        if var.var_type.contains("Vec") || var.var_type.contains('[') {
+            format!("{} [{} items]", var.var_type, child_count)
+        } else if child_count > 0 {
+            format!("{} {{ {} fields }}", var.var_type, child_count)
+        } else if var.variables_reference > 0 {
+            format!("{} {{ … }}", var.var_type)
+        } else {
+            var.value.clone()
+        }
+    }
+
+    /// Format a string value with quotes and escape characters shown.
+    pub fn format_string_value(value: &str, max_len: Option<usize>) -> String {
+        let inner = value
+            .replace('\\', "\\\\")
+            .replace('\n', "\\n")
+            .replace('\t', "\\t")
+            .replace('\r', "\\r")
+            .replace('\"', "\\\"");
+        let quoted = format!("\"{}\"", inner);
+        match max_len {
+            Some(max) => Self::truncate_value(&quoted, max),
+            None => quoted,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ExceptionBreakpointConfig — exception breakpoint settings
+// ---------------------------------------------------------------------------
+
+/// Configures which exceptions cause the debugger to break.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExceptionBreakMode {
+    /// Never break on this exception category.
+    Never,
+    /// Break only on unhandled exceptions.
+    Unhandled,
+    /// Break on all exceptions in this category.
+    Always,
+}
+
+/// Configuration for exception breakpoints.
+#[derive(Debug, Clone)]
+pub struct ExceptionBreakpointConfig {
+    filters: Vec<ExceptionFilter>,
+}
+
+/// A single exception filter (e.g., "All Exceptions", "Uncaught Exceptions").
+#[derive(Debug, Clone)]
+pub struct ExceptionFilter {
+    pub id: String,
+    pub label: String,
+    pub mode: ExceptionBreakMode,
+    pub description: Option<String>,
+}
+
+impl ExceptionFilter {
+    pub fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            mode: ExceptionBreakMode::Never,
+            description: None,
+        }
+    }
+
+    pub fn with_mode(mut self, mode: ExceptionBreakMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.mode != ExceptionBreakMode::Never
+    }
+}
+
+impl ExceptionBreakpointConfig {
+    pub fn new() -> Self {
+        Self {
+            filters: Vec::new(),
+        }
+    }
+
+    /// Add a new exception filter.
+    pub fn add_filter(&mut self, filter: ExceptionFilter) {
+        self.filters.push(filter);
+    }
+
+    /// Set the mode for a filter by id. Returns `true` if found.
+    pub fn set_mode(&mut self, id: &str, mode: ExceptionBreakMode) -> bool {
+        if let Some(f) = self.filters.iter_mut().find(|f| f.id == id) {
+            f.mode = mode;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get all enabled filter ids (for sending to DAP).
+    pub fn enabled_filter_ids(&self) -> Vec<&str> {
+        self.filters
+            .iter()
+            .filter(|f| f.is_enabled())
+            .map(|f| f.id.as_str())
+            .collect()
+    }
+
+    /// Total number of configured filters.
+    pub fn filter_count(&self) -> usize {
+        self.filters.len()
+    }
+
+    /// Number of enabled filters.
+    pub fn enabled_count(&self) -> usize {
+        self.filters.iter().filter(|f| f.is_enabled()).count()
+    }
+
+    /// Get a filter by id.
+    pub fn get_filter(&self, id: &str) -> Option<&ExceptionFilter> {
+        self.filters.iter().find(|f| f.id == id)
+    }
+
+    /// Create a standard config with typical exception filters.
+    pub fn with_defaults() -> Self {
+        let mut config = Self::new();
+        config.add_filter(
+            ExceptionFilter::new("all", "All Exceptions")
+                .with_description("Break on all thrown exceptions"),
+        );
+        config.add_filter(
+            ExceptionFilter::new("uncaught", "Uncaught Exceptions")
+                .with_mode(ExceptionBreakMode::Unhandled)
+                .with_description("Break on exceptions not caught by user code"),
+        );
+        config
+    }
+}
+
+impl Default for ExceptionBreakpointConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DebugConsoleMessageFormatter — formats debug console output
+// ---------------------------------------------------------------------------
+
+/// Formats messages for the debug console panel.
+pub struct DebugConsoleMessageFormatter;
+
+impl DebugConsoleMessageFormatter {
+    /// Format a log-style message with timestamp prefix.
+    /// Produces `"[HH:MM:SS] message"` given hours, minutes, seconds.
+    pub fn format_timestamped(hours: u32, minutes: u32, seconds: u32, message: &str) -> String {
+        format!("[{:02}:{:02}:{:02}] {}", hours, minutes, seconds, message)
+    }
+
+    /// Format an evaluation result for display in the console.
+    pub fn format_eval_result(expression: &str, result: &str) -> String {
+        format!("> {} → {}", expression, result)
+    }
+
+    /// Format an error message with a prefix indicator.
+    pub fn format_error(message: &str) -> String {
+        format!("⚠ Error: {}", message)
+    }
+
+    /// Format a variable assignment for display.
+    pub fn format_assignment(name: &str, value: &str) -> String {
+        format!("{} = {}", name, value)
+    }
+
+    /// Word-wrap a message to a given width, returning wrapped lines.
+    pub fn word_wrap(message: &str, width: usize) -> Vec<String> {
+        if width == 0 {
+            return vec![message.to_string()];
+        }
+        let mut lines = Vec::new();
+        for line in message.lines() {
+            if line.len() <= width {
+                lines.push(line.to_string());
+            } else {
+                let mut remaining = line;
+                while remaining.len() > width {
+                    // Try to break at a space
+                    let break_pos = remaining[..width]
+                        .rfind(' ')
+                        .unwrap_or(width);
+                    let (left, right) = remaining.split_at(break_pos);
+                    lines.push(left.to_string());
+                    remaining = right.trim_start();
+                }
+                if !remaining.is_empty() {
+                    lines.push(remaining.to_string());
+                }
+            }
+        }
+        lines
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CallStackFormatter — renders call stack frames as display strings
+// ---------------------------------------------------------------------------
+
+/// Formats call stack frames for display in the sidebar.
+pub struct CallStackFormatter;
+
+impl CallStackFormatter {
+    /// Format a stack frame as a single display line.
+    /// E.g. `"main (src/main.rs:42)"`.
+    pub fn format_frame(frame: &StackFrame) -> String {
+        if frame.source_path.is_empty() {
+            format!("{} <no source>", frame.name)
+        } else {
+            format!("{} ({}:{})", frame.name, frame.source_path, frame.line)
+        }
+    }
+
+    /// Format a frame with just the file basename for compact display.
+    pub fn format_frame_compact(frame: &StackFrame) -> String {
+        let basename = frame
+            .source_path
+            .rsplit('/')
+            .next()
+            .unwrap_or(&frame.source_path);
+        if basename.is_empty() {
+            frame.name.clone()
+        } else {
+            format!("{} ({}:{})", frame.name, basename, frame.line)
+        }
+    }
+
+    /// Format an entire call stack as numbered lines.
+    pub fn format_call_stack(frames: &[StackFrame]) -> Vec<String> {
+        frames
+            .iter()
+            .enumerate()
+            .map(|(i, f)| format!("#{} {}", i, Self::format_frame(f)))
+            .collect()
+    }
+
+    /// Extract just the file basenames from a call stack (for breadcrumb display).
+    pub fn frame_basenames(frames: &[StackFrame]) -> Vec<&str> {
+        frames
+            .iter()
+            .map(|f| {
+                f.source_path
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(&f.source_path)
+            })
+            .collect()
+    }
+
+    /// Return the "depth" indicator for a frame index (indentation dots).
+    pub fn depth_indicator(index: usize) -> String {
+        if index == 0 {
+            "→".to_string()
+        } else {
+            format!("{} ", "·".repeat(index.min(4)))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1809,5 +2287,286 @@ mod tests {
         assert_eq!(results[0], "stats.count");
 
         assert_eq!(inspector.total_variable_count(), 3); // stats + count + name
+    }
+
+    // -----------------------------------------------------------------------
+    // DebugSessionStateMachine tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn session_state_machine_valid_transitions() {
+        let mut sm = DebugSessionStateMachine::new();
+        assert_eq!(sm.phase(), SessionPhase::Idle);
+        assert!(!sm.is_active());
+
+        assert!(sm.transition(SessionPhase::Launching));
+        assert!(sm.is_active());
+        assert!(sm.transition(SessionPhase::Running));
+        assert!(sm.transition(SessionPhase::Paused));
+        assert!(sm.can_step());
+        assert!(sm.transition(SessionPhase::Running));
+        assert!(!sm.can_step());
+        assert!(sm.transition(SessionPhase::Stopping));
+        assert!(!sm.is_active());
+        assert!(sm.transition(SessionPhase::Idle));
+
+        assert_eq!(sm.transition_count(), 6);
+    }
+
+    #[test]
+    fn session_state_machine_invalid_transitions() {
+        let mut sm = DebugSessionStateMachine::new();
+        // Can't go from Idle directly to Running
+        assert!(!sm.transition(SessionPhase::Running));
+        assert_eq!(sm.phase(), SessionPhase::Idle);
+        // Can't go from Idle to Paused
+        assert!(!sm.transition(SessionPhase::Paused));
+    }
+
+    #[test]
+    fn session_state_machine_step_tracking() {
+        let mut sm = DebugSessionStateMachine::new();
+        sm.transition(SessionPhase::Launching);
+        sm.transition(SessionPhase::Running);
+        sm.transition(SessionPhase::Paused);
+
+        assert!(sm.record_step(DebugAction::StepOver));
+        assert_eq!(sm.step_count(), 1);
+        assert_eq!(sm.last_step_action(), Some(DebugAction::StepOver));
+        // After step, phase should be Running
+        assert_eq!(sm.phase(), SessionPhase::Running);
+
+        // Can't step when running
+        assert!(!sm.record_step(DebugAction::StepIn));
+        assert_eq!(sm.step_count(), 1);
+
+        // Continue is not a step action
+        sm.transition(SessionPhase::Paused);
+        assert!(!sm.record_step(DebugAction::Continue));
+    }
+
+    #[test]
+    fn session_state_machine_exception_and_reset() {
+        let mut sm = DebugSessionStateMachine::new();
+        sm.transition(SessionPhase::Launching);
+        sm.transition(SessionPhase::Running);
+        sm.transition(SessionPhase::Paused);
+        sm.mark_exception();
+        assert!(sm.exception_hit());
+
+        // Resuming clears exception flag
+        sm.transition(SessionPhase::Running);
+        assert!(!sm.exception_hit());
+
+        sm.reset();
+        assert_eq!(sm.phase(), SessionPhase::Idle);
+        assert_eq!(sm.step_count(), 0);
+        assert_eq!(sm.transition_count(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // VariableFormatter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn variable_formatter_truncate() {
+        assert_eq!(VariableFormatter::truncate_value("hello", 10), "hello");
+        assert_eq!(VariableFormatter::truncate_value("hello world", 5), "hello…");
+        assert_eq!(VariableFormatter::truncate_value("", 5), "");
+    }
+
+    #[test]
+    fn variable_formatter_format_variable() {
+        let var = DebugVariable::new("count", "42", "i32");
+        assert_eq!(
+            VariableFormatter::format_variable(&var, None),
+            "count: i32 = 42"
+        );
+        assert_eq!(
+            VariableFormatter::format_variable(&var, Some(1)),
+            "count: i32 = 4…"
+        );
+
+        let untyped = DebugVariable::new("x", "hello", "");
+        assert_eq!(
+            VariableFormatter::format_variable(&untyped, None),
+            "x = hello"
+        );
+    }
+
+    #[test]
+    fn variable_formatter_format_number() {
+        assert_eq!(VariableFormatter::format_number("1234567"), "1_234_567");
+        assert_eq!(VariableFormatter::format_number("-42000"), "-42_000");
+        assert_eq!(VariableFormatter::format_number("42"), "42");
+        assert_eq!(VariableFormatter::format_number("abc"), "abc");
+    }
+
+    #[test]
+    fn variable_formatter_summarize_compound() {
+        let child = DebugVariable::new("x", "1", "i32");
+        let vec_var = DebugVariable::new("items", "[...]", "Vec<i32>")
+            .with_children(vec![child.clone(), child.clone()]);
+        assert_eq!(
+            VariableFormatter::summarize_compound(&vec_var),
+            "Vec<i32> [2 items]"
+        );
+
+        let struct_var = DebugVariable::new("obj", "{}", "MyStruct")
+            .with_children(vec![child]);
+        assert_eq!(
+            VariableFormatter::summarize_compound(&struct_var),
+            "MyStruct { 1 fields }"
+        );
+
+        let mut lazy = DebugVariable::new("ref", "{}", "Unknown");
+        lazy.variables_reference = 5;
+        assert_eq!(
+            VariableFormatter::summarize_compound(&lazy),
+            "Unknown { … }"
+        );
+    }
+
+    #[test]
+    fn variable_formatter_format_string_value() {
+        assert_eq!(
+            VariableFormatter::format_string_value("hello", None),
+            "\"hello\""
+        );
+        assert_eq!(
+            VariableFormatter::format_string_value("line\nnew", None),
+            "\"line\\nnew\""
+        );
+        assert_eq!(
+            VariableFormatter::format_string_value("long string", Some(8)),
+            "\"long st…"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // ExceptionBreakpointConfig tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn exception_breakpoint_config_defaults() {
+        let config = ExceptionBreakpointConfig::with_defaults();
+        assert_eq!(config.filter_count(), 2);
+        // "all" is disabled by default, "uncaught" is Unhandled
+        assert_eq!(config.enabled_count(), 1);
+        let ids = config.enabled_filter_ids();
+        assert_eq!(ids, vec!["uncaught"]);
+    }
+
+    #[test]
+    fn exception_breakpoint_config_set_mode() {
+        let mut config = ExceptionBreakpointConfig::with_defaults();
+        assert!(config.set_mode("all", ExceptionBreakMode::Always));
+        assert_eq!(config.enabled_count(), 2);
+        assert!(!config.set_mode("nonexistent", ExceptionBreakMode::Always));
+
+        let filter = config.get_filter("all").unwrap();
+        assert!(filter.is_enabled());
+        assert_eq!(filter.mode, ExceptionBreakMode::Always);
+        assert!(filter.description.is_some());
+    }
+
+    // -----------------------------------------------------------------------
+    // DebugConsoleMessageFormatter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn console_formatter_timestamped() {
+        assert_eq!(
+            DebugConsoleMessageFormatter::format_timestamped(14, 5, 9, "Hello"),
+            "[14:05:09] Hello"
+        );
+    }
+
+    #[test]
+    fn console_formatter_eval_and_error() {
+        assert_eq!(
+            DebugConsoleMessageFormatter::format_eval_result("x + 1", "42"),
+            "> x + 1 → 42"
+        );
+        assert_eq!(
+            DebugConsoleMessageFormatter::format_error("segfault"),
+            "⚠ Error: segfault"
+        );
+        assert_eq!(
+            DebugConsoleMessageFormatter::format_assignment("x", "10"),
+            "x = 10"
+        );
+    }
+
+    #[test]
+    fn console_formatter_word_wrap() {
+        let lines = DebugConsoleMessageFormatter::word_wrap("short", 80);
+        assert_eq!(lines, vec!["short"]);
+
+        let lines = DebugConsoleMessageFormatter::word_wrap("hello world foo", 11);
+        assert_eq!(lines, vec!["hello", "world foo"]);
+
+        let lines = DebugConsoleMessageFormatter::word_wrap("hello world foo bar", 20);
+        assert_eq!(lines, vec!["hello world foo bar"]);
+
+        let lines = DebugConsoleMessageFormatter::word_wrap("abcdef", 3);
+        assert_eq!(lines, vec!["abc", "def"]);
+
+        // Zero width returns original
+        let lines = DebugConsoleMessageFormatter::word_wrap("test", 0);
+        assert_eq!(lines, vec!["test"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // CallStackFormatter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn call_stack_formatter_format_frame() {
+        let frame = StackFrame::new(1, "main", "src/main.rs", 42, 1);
+        assert_eq!(
+            CallStackFormatter::format_frame(&frame),
+            "main (src/main.rs:42)"
+        );
+
+        let no_source = StackFrame::new(2, "unknown_fn", "", 0, 0);
+        assert_eq!(
+            CallStackFormatter::format_frame(&no_source),
+            "unknown_fn <no source>"
+        );
+    }
+
+    #[test]
+    fn call_stack_formatter_compact() {
+        let frame = StackFrame::new(1, "run", "/long/path/to/main.rs", 10, 1);
+        assert_eq!(
+            CallStackFormatter::format_frame_compact(&frame),
+            "run (main.rs:10)"
+        );
+    }
+
+    #[test]
+    fn call_stack_formatter_format_stack() {
+        let frames = vec![
+            StackFrame::new(1, "inner", "a.rs", 5, 1),
+            StackFrame::new(2, "outer", "b.rs", 10, 1),
+        ];
+        let formatted = CallStackFormatter::format_call_stack(&frames);
+        assert_eq!(formatted.len(), 2);
+        assert_eq!(formatted[0], "#0 inner (a.rs:5)");
+        assert_eq!(formatted[1], "#1 outer (b.rs:10)");
+    }
+
+    #[test]
+    fn call_stack_formatter_basenames_and_depth() {
+        let frames = vec![
+            StackFrame::new(1, "f", "/a/b/main.rs", 1, 1),
+            StackFrame::new(2, "g", "/x/lib.rs", 2, 1),
+        ];
+        let basenames = CallStackFormatter::frame_basenames(&frames);
+        assert_eq!(basenames, vec!["main.rs", "lib.rs"]);
+
+        assert_eq!(CallStackFormatter::depth_indicator(0), "→");
+        assert!(CallStackFormatter::depth_indicator(2).starts_with("··"));
     }
 }

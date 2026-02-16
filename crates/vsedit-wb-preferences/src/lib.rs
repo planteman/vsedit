@@ -998,6 +998,350 @@ impl PreferenceScope {
     pub fn is_resource_level(&self) -> bool {
         matches!(self, PreferenceScope::Resource | PreferenceScope::Language)
     }
+
+    /// Returns the numeric priority of this scope (higher = more specific).
+    pub fn priority(&self) -> u8 {
+        match self {
+            Self::Application => 0,
+            Self::Machine => 1,
+            Self::Window => 2,
+            Self::Resource => 3,
+            Self::Language => 4,
+        }
+    }
+
+    /// Returns all scopes in priority order (least to most specific).
+    pub fn all_ordered() -> &'static [PreferenceScope] {
+        &[
+            PreferenceScope::Application,
+            PreferenceScope::Machine,
+            PreferenceScope::Window,
+            PreferenceScope::Resource,
+            PreferenceScope::Language,
+        ]
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Settings schema validation
+// ---------------------------------------------------------------------------
+
+/// Schema definition for a preference, used for rich validation.
+#[derive(Debug, Clone)]
+pub struct PreferenceSchema {
+    pub key: String,
+    pub preference_type: PreferenceType,
+    pub required: bool,
+    pub min_value: Option<f64>,
+    pub max_value: Option<f64>,
+    pub pattern: Option<String>,
+    pub allowed_values: Vec<String>,
+    pub deprecated: bool,
+    pub deprecation_message: Option<String>,
+}
+
+impl PreferenceSchema {
+    pub fn new(key: impl Into<String>, preference_type: PreferenceType) -> Self {
+        Self {
+            key: key.into(),
+            preference_type,
+            required: false,
+            min_value: None,
+            max_value: None,
+            pattern: None,
+            allowed_values: Vec::new(),
+            deprecated: false,
+            deprecation_message: None,
+        }
+    }
+
+    pub fn required(mut self) -> Self {
+        self.required = true;
+        self
+    }
+
+    pub fn range(mut self, min: f64, max: f64) -> Self {
+        self.min_value = Some(min);
+        self.max_value = Some(max);
+        self
+    }
+
+    pub fn allowed(mut self, values: Vec<String>) -> Self {
+        self.allowed_values = values;
+        self
+    }
+
+    pub fn deprecated_with(mut self, message: impl Into<String>) -> Self {
+        self.deprecated = true;
+        self.deprecation_message = Some(message.into());
+        self
+    }
+
+    /// Validate a value against this schema.
+    pub fn validate_value(&self, value: &str) -> Vec<String> {
+        let mut errors = Vec::new();
+
+        if self.required && value.is_empty() {
+            errors.push(format!("{}: value is required", self.key));
+        }
+
+        if self.deprecated {
+            errors.push(format!(
+                "{}: deprecated – {}",
+                self.key,
+                self.deprecation_message.as_deref().unwrap_or("no longer supported")
+            ));
+        }
+
+        match self.preference_type {
+            PreferenceType::Number => {
+                if let Ok(n) = value.parse::<f64>() {
+                    if let Some(min) = self.min_value {
+                        if n < min {
+                            errors.push(format!("{}: value {} below minimum {}", self.key, n, min));
+                        }
+                    }
+                    if let Some(max) = self.max_value {
+                        if n > max {
+                            errors.push(format!("{}: value {} above maximum {}", self.key, n, max));
+                        }
+                    }
+                } else if !value.is_empty() {
+                    errors.push(format!("{}: expected a number, got '{}'", self.key, value));
+                }
+            }
+            PreferenceType::Boolean => {
+                if !value.is_empty() && value != "true" && value != "false" {
+                    errors.push(format!("{}: expected boolean, got '{}'", self.key, value));
+                }
+            }
+            PreferenceType::Enum => {
+                if !self.allowed_values.is_empty() && !self.allowed_values.iter().any(|v| v == value) {
+                    errors.push(format!(
+                        "{}: '{}' not in allowed values [{}]",
+                        self.key,
+                        value,
+                        self.allowed_values.join(", ")
+                    ));
+                }
+            }
+            _ => {}
+        }
+
+        errors
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Schema registry – validate entire service state
+// ---------------------------------------------------------------------------
+
+/// A registry that holds schemas and can validate a `PreferencesService` against them.
+#[derive(Debug, Clone, Default)]
+pub struct SchemaRegistry {
+    schemas: Vec<PreferenceSchema>,
+}
+
+impl SchemaRegistry {
+    pub fn new() -> Self {
+        Self { schemas: Vec::new() }
+    }
+
+    pub fn register(&mut self, schema: PreferenceSchema) {
+        self.schemas.push(schema);
+    }
+
+    pub fn len(&self) -> usize {
+        self.schemas.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.schemas.is_empty()
+    }
+
+    /// Validate all overrides in a service against registered schemas.
+    pub fn validate_service(&self, service: &PreferencesService) -> Vec<String> {
+        let mut all_errors = Vec::new();
+        for schema in &self.schemas {
+            if let Some(value) = service.overrides.get(&schema.key) {
+                all_errors.extend(schema.validate_value(value));
+            }
+        }
+        all_errors
+    }
+
+    /// Find deprecated settings that are currently overridden.
+    pub fn deprecated_overrides(&self, service: &PreferencesService) -> Vec<String> {
+        self.schemas
+            .iter()
+            .filter(|s| s.deprecated && service.has_override(&s.key))
+            .map(|s| s.key.clone())
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Type coercion helpers
+// ---------------------------------------------------------------------------
+
+/// Attempt to coerce a string value to a target `PreferenceType`.
+///
+/// Returns the coerced string representation or an error.
+pub fn coerce_value(value: &str, target: PreferenceType) -> Result<String, PreferenceError> {
+    match target {
+        PreferenceType::Boolean => match value.to_lowercase().as_str() {
+            "true" | "1" | "yes" | "on" => Ok("true".to_string()),
+            "false" | "0" | "no" | "off" => Ok("false".to_string()),
+            _ => Err(PreferenceError::TypeMismatch(format!(
+                "cannot coerce '{}' to boolean",
+                value
+            ))),
+        },
+        PreferenceType::Number => {
+            value
+                .parse::<f64>()
+                .map(|n| n.to_string())
+                .map_err(|_| PreferenceError::TypeMismatch(format!(
+                    "cannot coerce '{}' to number",
+                    value
+                )))
+        }
+        PreferenceType::String => Ok(value.to_string()),
+        _ => Ok(value.to_string()),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-layer settings merge
+// ---------------------------------------------------------------------------
+
+/// Represents a named settings layer (e.g. "default", "user", "workspace", "folder").
+#[derive(Debug, Clone)]
+pub struct SettingsLayer {
+    pub name: String,
+    pub values: HashMap<String, String>,
+}
+
+impl SettingsLayer {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            values: HashMap::new(),
+        }
+    }
+
+    pub fn set(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.values.insert(key.into(), value.into());
+    }
+
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.values.get(key).map(|s| s.as_str())
+    }
+}
+
+/// Merge multiple settings layers in priority order (last wins).
+///
+/// Returns a flat map of key → resolved value, plus a parallel map of
+/// key → originating layer name.
+pub fn merge_layers(layers: &[&SettingsLayer]) -> (HashMap<String, String>, HashMap<String, String>) {
+    let mut merged: HashMap<String, String> = HashMap::new();
+    let mut origins: HashMap<String, String> = HashMap::new();
+    for layer in layers {
+        for (k, v) in &layer.values {
+            merged.insert(k.clone(), v.clone());
+            origins.insert(k.clone(), layer.name.clone());
+        }
+    }
+    (merged, origins)
+}
+
+/// Determine which keys in the effective merged result are overridden
+/// (i.e. differ from the first layer that defines them).
+pub fn detect_overridden_keys(layers: &[&SettingsLayer]) -> Vec<String> {
+    let mut first_seen: HashMap<String, String> = HashMap::new();
+    let mut effective: HashMap<String, String> = HashMap::new();
+
+    for layer in layers {
+        for (k, v) in &layer.values {
+            first_seen.entry(k.clone()).or_insert_with(|| v.clone());
+            effective.insert(k.clone(), v.clone());
+        }
+    }
+
+    let mut overridden: Vec<String> = effective
+        .iter()
+        .filter(|(k, v)| first_seen.get(*k).map_or(false, |first| first != *v))
+        .map(|(k, _)| k.clone())
+        .collect();
+    overridden.sort();
+    overridden
+}
+
+// ---------------------------------------------------------------------------
+// Settings grouping / categorisation
+// ---------------------------------------------------------------------------
+
+impl PreferencesService {
+    /// Group all registered descriptors by their dotted key prefix.
+    ///
+    /// For a key like `"editor.fontSize"`, the group is `"editor"`.
+    /// Keys without a dot are placed under `""`.
+    pub fn group_by_prefix(&self) -> HashMap<String, Vec<&PreferenceDescriptor>> {
+        let mut groups: HashMap<String, Vec<&PreferenceDescriptor>> = HashMap::new();
+        for d in &self.descriptors {
+            let prefix = d.key.split('.').next().unwrap_or("").to_string();
+            groups.entry(prefix).or_default().push(d);
+        }
+        groups
+    }
+
+    /// Return all keys whose current effective value differs from the default.
+    pub fn modified_keys(&self) -> Vec<String> {
+        let mut keys = Vec::new();
+        for d in &self.descriptors {
+            let effective = self.overrides.get(&d.key).map(|s| s.as_str()).unwrap_or(&d.default_value);
+            if effective != d.default_value {
+                keys.push(d.key.clone());
+            }
+        }
+        keys.sort();
+        keys
+    }
+
+    /// Collect descriptors that have a description containing a search term (case-insensitive).
+    pub fn search_descriptions(&self, term: &str) -> Vec<&PreferenceDescriptor> {
+        let lower = term.to_lowercase();
+        self.descriptors
+            .iter()
+            .filter(|d| d.description.to_lowercase().contains(&lower))
+            .collect()
+    }
+
+    /// Apply a function to every override value in-place.
+    pub fn transform_overrides(&mut self, f: fn(&str) -> String) {
+        let keys: Vec<String> = self.overrides.keys().cloned().collect();
+        for key in keys {
+            if let Some(val) = self.overrides.get(&key) {
+                let new_val = f(val);
+                self.overrides.insert(key, new_val);
+            }
+        }
+    }
+
+    /// Remove overrides for keys that are no longer registered (stale keys).
+    pub fn prune_stale_overrides(&mut self) -> Vec<String> {
+        let registered: std::collections::HashSet<&str> = self.descriptors.iter().map(|d| d.key.as_str()).collect();
+        let stale: Vec<String> = self
+            .overrides
+            .keys()
+            .filter(|k| !registered.contains(k.as_str()))
+            .cloned()
+            .collect();
+        for k in &stale {
+            self.overrides.remove(k);
+        }
+        stale
+    }
 }
 
 #[cfg(test)]
@@ -1817,5 +2161,215 @@ mod tests {
         assert!(PreferenceScope::Language.is_resource_level());
         assert!(!PreferenceScope::Window.is_resource_level());
         assert!(!PreferenceScope::Application.is_resource_level());
+    }
+
+    // -------------------------------------------------------------------
+    // New tests for added functionality
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn scope_priority_ordering() {
+        assert!(PreferenceScope::Language.priority() > PreferenceScope::Application.priority());
+        assert!(PreferenceScope::Resource.priority() > PreferenceScope::Window.priority());
+        let ordered = PreferenceScope::all_ordered();
+        assert_eq!(ordered.len(), 5);
+        for w in ordered.windows(2) {
+            assert!(w[0].priority() < w[1].priority());
+        }
+    }
+
+    #[test]
+    fn schema_validates_number_range() {
+        let schema = PreferenceSchema::new("editor.fontSize", PreferenceType::Number)
+            .range(8.0, 72.0);
+        assert!(schema.validate_value("14").is_empty());
+        assert!(!schema.validate_value("4").is_empty());
+        assert!(!schema.validate_value("100").is_empty());
+        assert!(!schema.validate_value("abc").is_empty());
+    }
+
+    #[test]
+    fn schema_validates_boolean() {
+        let schema = PreferenceSchema::new("editor.wordWrap", PreferenceType::Boolean);
+        assert!(schema.validate_value("true").is_empty());
+        assert!(schema.validate_value("false").is_empty());
+        assert!(!schema.validate_value("maybe").is_empty());
+    }
+
+    #[test]
+    fn schema_validates_enum_allowed() {
+        let schema = PreferenceSchema::new("editor.cursorStyle", PreferenceType::Enum)
+            .allowed(vec!["line".into(), "block".into(), "underline".into()]);
+        assert!(schema.validate_value("line").is_empty());
+        assert!(!schema.validate_value("crosshair").is_empty());
+    }
+
+    #[test]
+    fn schema_required_rejects_empty() {
+        let schema = PreferenceSchema::new("x", PreferenceType::String).required();
+        let errs = schema.validate_value("");
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].contains("required"));
+    }
+
+    #[test]
+    fn schema_deprecated_emits_warning() {
+        let schema = PreferenceSchema::new("old.setting", PreferenceType::String)
+            .deprecated_with("use new.setting instead");
+        let errs = schema.validate_value("anything");
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].contains("deprecated"));
+        assert!(errs[0].contains("use new.setting instead"));
+    }
+
+    #[test]
+    fn schema_registry_validates_service() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("editor.fontSize", "14", PreferenceScope::Window));
+        svc.set_override("editor.fontSize", "999");
+
+        let mut registry = SchemaRegistry::new();
+        registry.register(
+            PreferenceSchema::new("editor.fontSize", PreferenceType::Number).range(8.0, 72.0),
+        );
+        let errs = registry.validate_service(&svc);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].contains("above maximum"));
+    }
+
+    #[test]
+    fn schema_registry_deprecated_overrides() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("old.key", "v", PreferenceScope::Window));
+        svc.set_override("old.key", "v2");
+
+        let mut registry = SchemaRegistry::new();
+        registry.register(
+            PreferenceSchema::new("old.key", PreferenceType::String)
+                .deprecated_with("removed"),
+        );
+        let dep = registry.deprecated_overrides(&svc);
+        assert_eq!(dep, vec!["old.key"]);
+    }
+
+    #[test]
+    fn coerce_boolean_values() {
+        assert_eq!(coerce_value("yes", PreferenceType::Boolean).unwrap(), "true");
+        assert_eq!(coerce_value("0", PreferenceType::Boolean).unwrap(), "false");
+        assert_eq!(coerce_value("on", PreferenceType::Boolean).unwrap(), "true");
+        assert_eq!(coerce_value("off", PreferenceType::Boolean).unwrap(), "false");
+        assert!(coerce_value("maybe", PreferenceType::Boolean).is_err());
+    }
+
+    #[test]
+    fn coerce_number_values() {
+        assert_eq!(coerce_value("42", PreferenceType::Number).unwrap(), "42");
+        assert!(coerce_value("abc", PreferenceType::Number).is_err());
+    }
+
+    #[test]
+    fn merge_layers_last_wins() {
+        let mut defaults = SettingsLayer::new("defaults");
+        defaults.set("editor.fontSize", "14");
+        defaults.set("editor.tabSize", "4");
+
+        let mut user = SettingsLayer::new("user");
+        user.set("editor.fontSize", "16");
+
+        let mut workspace = SettingsLayer::new("workspace");
+        workspace.set("editor.fontSize", "18");
+        workspace.set("editor.wordWrap", "on");
+
+        let (merged, origins) = merge_layers(&[&defaults, &user, &workspace]);
+        assert_eq!(merged["editor.fontSize"], "18");
+        assert_eq!(merged["editor.tabSize"], "4");
+        assert_eq!(merged["editor.wordWrap"], "on");
+        assert_eq!(origins["editor.fontSize"], "workspace");
+        assert_eq!(origins["editor.tabSize"], "defaults");
+    }
+
+    #[test]
+    fn detect_overridden_keys_works() {
+        let mut base = SettingsLayer::new("base");
+        base.set("a", "1");
+        base.set("b", "2");
+
+        let mut top = SettingsLayer::new("top");
+        top.set("a", "99");
+
+        let overridden = detect_overridden_keys(&[&base, &top]);
+        assert_eq!(overridden, vec!["a"]);
+    }
+
+    #[test]
+    fn group_by_prefix_groups_correctly() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("editor.fontSize", "14", PreferenceScope::Window));
+        svc.register(desc("editor.tabSize", "4", PreferenceScope::Window));
+        svc.register(desc("terminal.shell", "/bin/sh", PreferenceScope::Machine));
+        svc.register(desc("standalone", "x", PreferenceScope::Application));
+
+        let groups = svc.group_by_prefix();
+        assert_eq!(groups["editor"].len(), 2);
+        assert_eq!(groups["terminal"].len(), 1);
+        assert_eq!(groups["standalone"].len(), 1);
+    }
+
+    #[test]
+    fn modified_keys_detects_changes() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("a", "1", PreferenceScope::Window));
+        svc.register(desc("b", "2", PreferenceScope::Window));
+        svc.set_override("a", "99");
+        let modified = svc.modified_keys();
+        assert_eq!(modified, vec!["a"]);
+    }
+
+    #[test]
+    fn search_descriptions_finds_matches() {
+        let mut svc = PreferencesService::new();
+        let mut d = desc("editor.fontSize", "14", PreferenceScope::Window);
+        d.description = "Controls the font size in pixels".to_string();
+        svc.register(d);
+        let mut d2 = desc("editor.tabSize", "4", PreferenceScope::Window);
+        d2.description = "The number of spaces a tab is equal to".to_string();
+        svc.register(d2);
+
+        let results = svc.search_descriptions("font");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].key, "editor.fontSize");
+    }
+
+    #[test]
+    fn transform_overrides_applies_fn() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("a", "x", PreferenceScope::Window));
+        svc.set_override("a", "hello");
+        svc.transform_overrides(|v| v.to_uppercase());
+        assert_eq!(svc.get_value("a"), "HELLO");
+    }
+
+    #[test]
+    fn prune_stale_overrides_removes_unregistered() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("a", "1", PreferenceScope::Window));
+        svc.set_override("a", "2");
+        svc.set_override("ghost", "boo");
+        let stale = svc.prune_stale_overrides();
+        assert_eq!(stale, vec!["ghost"]);
+        assert!(!svc.has_override("ghost"));
+        assert!(svc.has_override("a"));
+    }
+
+    #[test]
+    fn schema_registry_is_empty() {
+        let reg = SchemaRegistry::new();
+        assert!(reg.is_empty());
+        assert_eq!(reg.len(), 0);
+    }
+
+    #[test]
+    fn coerce_string_is_identity() {
+        assert_eq!(coerce_value("anything", PreferenceType::String).unwrap(), "anything");
     }
 }

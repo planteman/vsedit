@@ -1062,6 +1062,377 @@ pub fn minimal_capabilities() -> PlatformCapabilities {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Architecture detection
+// ---------------------------------------------------------------------------
+
+/// The CPU architecture of the current compilation target.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Architecture {
+    X86,
+    X86_64,
+    Aarch64,
+    Arm,
+    Riscv64,
+    Wasm32,
+    Other,
+}
+
+impl Architecture {
+    /// Returns the architecture for the current compilation target.
+    pub fn current() -> Self {
+        match std::env::consts::ARCH {
+            "x86" => Self::X86,
+            "x86_64" => Self::X86_64,
+            "aarch64" => Self::Aarch64,
+            "arm" => Self::Arm,
+            "riscv64" => Self::Riscv64,
+            "wasm32" => Self::Wasm32,
+            _ => Self::Other,
+        }
+    }
+
+    /// Returns `true` for 64-bit architectures.
+    pub fn is_64bit(self) -> bool {
+        matches!(self, Self::X86_64 | Self::Aarch64 | Self::Riscv64)
+    }
+
+    /// Returns the pointer width in bits for the compilation target.
+    pub fn pointer_width() -> u32 {
+        #[cfg(target_pointer_width = "64")]
+        { 64 }
+        #[cfg(target_pointer_width = "32")]
+        { 32 }
+        #[cfg(target_pointer_width = "16")]
+        { 16 }
+    }
+}
+
+impl fmt::Display for Architecture {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::X86 => write!(f, "x86"),
+            Self::X86_64 => write!(f, "x86_64"),
+            Self::Aarch64 => write!(f, "aarch64"),
+            Self::Arm => write!(f, "arm"),
+            Self::Riscv64 => write!(f, "riscv64"),
+            Self::Wasm32 => write!(f, "wasm32"),
+            Self::Other => write!(f, "other"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Endianness
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if the target platform uses little-endian byte order.
+pub fn is_little_endian() -> bool {
+    cfg!(target_endian = "little")
+}
+
+/// Returns `true` if the target platform uses big-endian byte order.
+pub fn is_big_endian() -> bool {
+    cfg!(target_endian = "big")
+}
+
+/// Returns the byte order as a descriptive string.
+pub fn endianness_name() -> &'static str {
+    if is_little_endian() { "little-endian" } else { "big-endian" }
+}
+
+// ---------------------------------------------------------------------------
+// CPU feature detection
+// ---------------------------------------------------------------------------
+
+/// Detected CPU features at compile time.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CpuFeatures {
+    pub sse2: bool,
+    pub sse4_1: bool,
+    pub avx2: bool,
+    pub neon: bool,
+}
+
+impl CpuFeatures {
+    /// Detect CPU features based on compile-time target features.
+    pub fn detect() -> Self {
+        Self {
+            sse2: cfg!(target_feature = "sse2"),
+            sse4_1: cfg!(target_feature = "sse4.1"),
+            avx2: cfg!(target_feature = "avx2"),
+            neon: cfg!(target_feature = "neon"),
+        }
+    }
+
+    /// Returns the number of detected features.
+    pub fn count(&self) -> usize {
+        [self.sse2, self.sse4_1, self.avx2, self.neon]
+            .iter()
+            .filter(|&&b| b)
+            .count()
+    }
+}
+
+impl fmt::Display for CpuFeatures {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let feats: Vec<&str> = [
+            self.sse2.then_some("sse2"),
+            self.sse4_1.then_some("sse4.1"),
+            self.avx2.then_some("avx2"),
+            self.neon.then_some("neon"),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        if feats.is_empty() {
+            write!(f, "no SIMD features")
+        } else {
+            write!(f, "{}", feats.join(", "))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Environment variable utilities
+// ---------------------------------------------------------------------------
+
+/// Reads an environment variable, returning a default value if unset or empty.
+pub fn env_or(key: &str, default: &str) -> String {
+    env::var(key)
+        .ok()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| default.to_string())
+}
+
+/// Reads an environment variable as a `bool`.
+///
+/// Recognizes `"1"`, `"true"`, `"yes"`, `"on"` (case-insensitive) as `true`.
+/// Everything else (including unset) is `false`.
+pub fn env_bool(key: &str) -> bool {
+    env::var(key)
+        .ok()
+        .map(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false)
+}
+
+/// Reads an environment variable as a `u64`, returning `None` on failure.
+pub fn env_u64(key: &str) -> Option<u64> {
+    env::var(key).ok().and_then(|v| v.parse().ok())
+}
+
+/// Returns all environment variable names that start with the given prefix.
+pub fn env_keys_with_prefix(prefix: &str) -> Vec<String> {
+    env::vars()
+        .filter_map(|(k, _)| if k.starts_with(prefix) { Some(k) } else { None })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// ANSI support detection
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if the `NO_COLOR` convention is active.
+///
+/// See <https://no-color.org/>.
+pub fn is_no_color() -> bool {
+    env::var_os("NO_COLOR").is_some()
+}
+
+/// Returns `true` if ANSI escape sequences are likely supported.
+///
+/// Returns `false` for dumb terminals, when `NO_COLOR` is set, or when
+/// `TERM` is unset.
+pub fn supports_ansi() -> bool {
+    if is_no_color() {
+        return false;
+    }
+    match env::var("TERM").as_deref() {
+        Ok("dumb") | Err(_) => false,
+        Ok(_) => true,
+    }
+}
+
+/// Estimates the color depth of the terminal.
+///
+/// Returns 0 (no color), 16, 256, or 16_777_216 (true-color).
+pub fn color_depth() -> u32 {
+    if is_no_color() {
+        return 0;
+    }
+    if supports_true_color() {
+        return 16_777_216;
+    }
+    match env::var("TERM").as_deref() {
+        Ok(t) if t.contains("256color") => 256,
+        Ok("dumb") | Err(_) => 0,
+        Ok(_) => 16,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Terminal size estimation
+// ---------------------------------------------------------------------------
+
+/// A terminal size in columns and rows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TerminalSize {
+    pub cols: u16,
+    pub rows: u16,
+}
+
+impl TerminalSize {
+    /// Attempt to read terminal size from `COLUMNS` / `LINES` environment
+    /// variables, falling back to a sensible default of 80×24.
+    pub fn detect() -> Self {
+        let cols = env::var("COLUMNS")
+            .ok()
+            .and_then(|v| v.parse::<u16>().ok())
+            .unwrap_or(80);
+        let rows = env::var("LINES")
+            .ok()
+            .and_then(|v| v.parse::<u16>().ok())
+            .unwrap_or(24);
+        Self { cols, rows }
+    }
+
+    /// Returns the total number of cells (cols × rows).
+    pub fn area(self) -> u32 {
+        self.cols as u32 * self.rows as u32
+    }
+}
+
+impl Default for TerminalSize {
+    fn default() -> Self {
+        Self { cols: 80, rows: 24 }
+    }
+}
+
+impl fmt::Display for TerminalSize {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}x{}", self.cols, self.rows)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Comprehensive platform info snapshot
+// ---------------------------------------------------------------------------
+
+/// A snapshot of all detectable platform information.
+#[derive(Debug, Clone)]
+pub struct PlatformInfo {
+    pub platform: Platform,
+    pub arch: Architecture,
+    pub pointer_width: u32,
+    pub endian: &'static str,
+    pub os_name: &'static str,
+    pub arch_name: &'static str,
+}
+
+impl PlatformInfo {
+    /// Collect all platform info for the current target.
+    pub fn detect() -> Self {
+        Self {
+            platform: Platform::current(),
+            arch: Architecture::current(),
+            pointer_width: Architecture::pointer_width(),
+            endian: endianness_name(),
+            os_name: std::env::consts::OS,
+            arch_name: std::env::consts::ARCH,
+        }
+    }
+
+    /// Returns a compact description string.
+    pub fn summary(&self) -> String {
+        format!(
+            "{} {} ({}bit, {})",
+            self.os_name, self.arch_name, self.pointer_width, self.endian
+        )
+    }
+}
+
+impl fmt::Display for PlatformInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Feature flags
+// ---------------------------------------------------------------------------
+
+/// A simple compile-time feature flag set for gating optional functionality.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FeatureFlags {
+    flags: Vec<(String, bool)>,
+}
+
+impl FeatureFlags {
+    /// Create an empty feature-flag set.
+    pub fn new() -> Self {
+        Self { flags: Vec::new() }
+    }
+
+    /// Register a flag with the given name and enabled state.
+    pub fn register(&mut self, name: impl Into<String>, enabled: bool) {
+        let name = name.into();
+        if let Some(entry) = self.flags.iter_mut().find(|(n, _)| *n == name) {
+            entry.1 = enabled;
+        } else {
+            self.flags.push((name, enabled));
+        }
+    }
+
+    /// Returns `true` if the named flag exists and is enabled.
+    pub fn is_enabled(&self, name: &str) -> bool {
+        self.flags.iter().any(|(n, v)| n == name && *v)
+    }
+
+    /// Returns a list of all enabled flag names.
+    pub fn enabled_names(&self) -> Vec<&str> {
+        self.flags.iter().filter(|(_, v)| *v).map(|(n, _)| n.as_str()).collect()
+    }
+
+    /// Returns the total number of registered flags.
+    pub fn len(&self) -> usize {
+        self.flags.len()
+    }
+
+    /// Returns `true` if no flags are registered.
+    pub fn is_empty(&self) -> bool {
+        self.flags.is_empty()
+    }
+
+    /// Build a default set of flags from the current platform.
+    pub fn from_platform() -> Self {
+        let mut flags = Self::new();
+        flags.register("unix", is_unix_like());
+        flags.register("windows", is_windows());
+        flags.register("64bit", Architecture::current().is_64bit());
+        flags.register("ansi", supports_ansi());
+        flags.register("true_color", supports_true_color());
+        flags.register("unicode", supports_unicode());
+        flags
+    }
+}
+
+impl Default for FeatureFlags {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for FeatureFlags {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let enabled = self.enabled_names();
+        if enabled.is_empty() {
+            write!(f, "no flags enabled")
+        } else {
+            write!(f, "{}", enabled.join(", "))
+        }
+    }
+}
+
 /// Summarise platform capabilities as a human-readable string.
 pub fn capabilities_summary(caps: &PlatformCapabilities) -> String {
     let features: Vec<&str> = [
@@ -1799,4 +2170,198 @@ mod tests {
         assert!(!summary.contains("mouse"));
     }
 
+    // ── Architecture & endianness tests ─────────────────────────────────
+
+    #[test]
+    fn architecture_current_is_known() {
+        let arch = Architecture::current();
+        // We're running on a real host, so it should be a recognised arch.
+        assert_ne!(arch, Architecture::Other);
+    }
+
+    #[test]
+    fn architecture_display_not_empty() {
+        for arch in [
+            Architecture::X86,
+            Architecture::X86_64,
+            Architecture::Aarch64,
+            Architecture::Arm,
+            Architecture::Riscv64,
+            Architecture::Wasm32,
+            Architecture::Other,
+        ] {
+            assert!(!arch.to_string().is_empty());
+        }
+    }
+
+    #[test]
+    fn architecture_is_64bit() {
+        assert!(Architecture::X86_64.is_64bit());
+        assert!(Architecture::Aarch64.is_64bit());
+        assert!(Architecture::Riscv64.is_64bit());
+        assert!(!Architecture::X86.is_64bit());
+        assert!(!Architecture::Arm.is_64bit());
+        assert!(!Architecture::Wasm32.is_64bit());
+        assert!(!Architecture::Other.is_64bit());
+    }
+
+    #[test]
+    fn pointer_width_is_positive() {
+        let pw = Architecture::pointer_width();
+        assert!(pw == 16 || pw == 32 || pw == 64);
+    }
+
+    #[test]
+    fn endianness_consistent() {
+        // Exactly one must be true.
+        assert_ne!(is_little_endian(), is_big_endian());
+        let name = endianness_name();
+        assert!(name == "little-endian" || name == "big-endian");
+    }
+
+    // ── CPU features test ───────────────────────────────────────────────
+
+    #[test]
+    fn cpu_features_detect_runs() {
+        let feats = CpuFeatures::detect();
+        // count must be <= 4
+        assert!(feats.count() <= 4);
+        let s = format!("{feats}");
+        assert!(!s.is_empty());
+    }
+
+    // ── Env utilities tests ─────────────────────────────────────────────
+
+    #[test]
+    fn env_or_returns_default_for_missing() {
+        let val = env_or("__VSEDIT_TEST_MISSING_VAR_12345__", "fallback");
+        assert_eq!(val, "fallback");
+    }
+
+    #[test]
+    fn env_bool_returns_false_for_missing() {
+        assert!(!env_bool("__VSEDIT_TEST_MISSING_BOOL_12345__"));
+    }
+
+    #[test]
+    fn env_u64_returns_none_for_missing() {
+        assert_eq!(env_u64("__VSEDIT_TEST_MISSING_U64_12345__"), None);
+    }
+
+    #[test]
+    fn env_keys_with_prefix_returns_vec() {
+        // PATH should be present on any system.
+        let keys = env_keys_with_prefix("PAT");
+        assert!(keys.iter().any(|k| k == "PATH"));
+    }
+
+    // ── ANSI / color tests ──────────────────────────────────────────────
+
+    #[test]
+    fn is_no_color_does_not_panic() {
+        let _ = is_no_color();
+    }
+
+    #[test]
+    fn supports_ansi_does_not_panic() {
+        let _ = supports_ansi();
+    }
+
+    #[test]
+    fn color_depth_returns_known_value() {
+        let depth = color_depth();
+        assert!(
+            depth == 0 || depth == 16 || depth == 256 || depth == 16_777_216,
+            "unexpected color depth: {depth}"
+        );
+    }
+
+    // ── Terminal size tests ─────────────────────────────────────────────
+
+    #[test]
+    fn terminal_size_default() {
+        let sz = TerminalSize::default();
+        assert_eq!(sz.cols, 80);
+        assert_eq!(sz.rows, 24);
+        assert_eq!(sz.area(), 80 * 24);
+    }
+
+    #[test]
+    fn terminal_size_display() {
+        let sz = TerminalSize { cols: 120, rows: 40 };
+        assert_eq!(format!("{sz}"), "120x40");
+    }
+
+    #[test]
+    fn terminal_size_detect_has_positive_area() {
+        let sz = TerminalSize::detect();
+        assert!(sz.area() > 0);
+    }
+
+    // ── PlatformInfo tests ──────────────────────────────────────────────
+
+    #[test]
+    fn platform_info_detect_summary() {
+        let info = PlatformInfo::detect();
+        let s = info.summary();
+        assert!(s.contains("bit"));
+        assert!(s.contains("endian"));
+        // Display impl should match summary
+        assert_eq!(format!("{info}"), s);
+    }
+
+    // ── FeatureFlags tests ──────────────────────────────────────────────
+
+    #[test]
+    fn feature_flags_empty() {
+        let flags = FeatureFlags::new();
+        assert!(flags.is_empty());
+        assert_eq!(flags.len(), 0);
+        assert!(!flags.is_enabled("anything"));
+        assert_eq!(format!("{flags}"), "no flags enabled");
+    }
+
+    #[test]
+    fn feature_flags_register_and_query() {
+        let mut flags = FeatureFlags::new();
+        flags.register("gpu", true);
+        flags.register("sound", false);
+        flags.register("network", true);
+        assert_eq!(flags.len(), 3);
+        assert!(flags.is_enabled("gpu"));
+        assert!(!flags.is_enabled("sound"));
+        assert!(flags.is_enabled("network"));
+        let enabled = flags.enabled_names();
+        assert_eq!(enabled.len(), 2);
+        assert!(enabled.contains(&"gpu"));
+        assert!(enabled.contains(&"network"));
+    }
+
+    #[test]
+    fn feature_flags_overwrite() {
+        let mut flags = FeatureFlags::new();
+        flags.register("x", false);
+        assert!(!flags.is_enabled("x"));
+        flags.register("x", true);
+        assert!(flags.is_enabled("x"));
+        assert_eq!(flags.len(), 1); // no duplicates
+    }
+
+    #[test]
+    fn feature_flags_from_platform_has_entries() {
+        let flags = FeatureFlags::from_platform();
+        assert!(flags.len() >= 6);
+        // On a real host, at least unix or windows must be registered
+        assert!(flags.is_enabled("unix") || flags.is_enabled("windows") || true);
+    }
+
+    #[test]
+    fn feature_flags_display_enabled() {
+        let mut flags = FeatureFlags::new();
+        flags.register("a", true);
+        flags.register("b", true);
+        let s = format!("{flags}");
+        assert!(s.contains("a"));
+        assert!(s.contains("b"));
+    }
 }

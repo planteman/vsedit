@@ -1087,6 +1087,321 @@ pub fn sort_by_time(entries: &mut [LogEntry]) {
     entries.sort_by_key(|e| e.timestamp);
 }
 
+// ---------------------------------------------------------------------------
+// LogRateLimiter
+// ---------------------------------------------------------------------------
+
+/// Rate limiter that tracks per-key timestamps and suppresses messages that
+/// arrive faster than the configured interval (in milliseconds).
+pub struct LogRateLimiter {
+    interval_ms: u64,
+    last_seen: std::sync::Mutex<HashMap<String, u64>>,
+}
+
+impl LogRateLimiter {
+    pub fn new(interval_ms: u64) -> Self {
+        Self {
+            interval_ms,
+            last_seen: std::sync::Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Returns `true` if the message should be allowed through.
+    /// `key` is typically a deduplication key (e.g. message template or channel).
+    pub fn allow(&self, key: &str, now_ms: u64) -> bool {
+        let mut map = self.last_seen.lock().unwrap();
+        match map.get(key) {
+            Some(&last) if now_ms.saturating_sub(last) < self.interval_ms => false,
+            _ => {
+                map.insert(key.to_string(), now_ms);
+                true
+            }
+        }
+    }
+
+    /// Reset all rate-limit state.
+    pub fn reset(&self) {
+        self.last_seen.lock().unwrap().clear();
+    }
+
+    /// Number of distinct keys currently tracked.
+    pub fn tracked_key_count(&self) -> usize {
+        self.last_seen.lock().unwrap().len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LogBuffer – fixed-capacity ring buffer for log entries
+// ---------------------------------------------------------------------------
+
+/// A bounded ring buffer that evicts the oldest entry when full.
+pub struct LogBuffer {
+    entries: Vec<LogEntry>,
+    capacity: usize,
+    total_pushed: usize,
+}
+
+impl LogBuffer {
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0, "LogBuffer capacity must be > 0");
+        Self {
+            entries: Vec::with_capacity(capacity),
+            capacity,
+            total_pushed: 0,
+        }
+    }
+
+    /// Push an entry; if the buffer is full the oldest entry is dropped.
+    pub fn push(&mut self, entry: LogEntry) {
+        if self.entries.len() >= self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push(entry);
+        self.total_pushed += 1;
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    /// Total number of entries ever pushed (including evicted ones).
+    pub fn total_pushed(&self) -> usize {
+        self.total_pushed
+    }
+
+    /// Number of entries that were evicted due to capacity limits.
+    pub fn evicted_count(&self) -> usize {
+        self.total_pushed.saturating_sub(self.entries.len())
+    }
+
+    pub fn entries(&self) -> &[LogEntry] {
+        &self.entries
+    }
+
+    /// Drain all entries, returning them.
+    pub fn drain(&mut self) -> Vec<LogEntry> {
+        std::mem::take(&mut self.entries)
+    }
+
+    /// Clear the buffer without returning entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Return the newest entry (last pushed).
+    pub fn newest(&self) -> Option<&LogEntry> {
+        self.entries.last()
+    }
+
+    /// Return the oldest entry still in the buffer.
+    pub fn oldest(&self) -> Option<&LogEntry> {
+        self.entries.first()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LogEntry – additional helpers
+// ---------------------------------------------------------------------------
+
+impl LogEntry {
+    /// Attach a data field to this entry (builder style).
+    pub fn with_data(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.data
+            .get_or_insert_with(HashMap::new)
+            .insert(key.into(), value.into());
+        self
+    }
+
+    /// Attach a source to this entry (builder style).
+    pub fn with_source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    /// Returns true if this entry's message contains `needle` (case-insensitive).
+    pub fn message_contains_ci(&self, needle: &str) -> bool {
+        self.message.to_lowercase().contains(&needle.to_lowercase())
+    }
+
+    /// Get a data field value by key.
+    pub fn get_data(&self, key: &str) -> Option<&str> {
+        self.data.as_ref().and_then(|d| d.get(key).map(String::as_str))
+    }
+
+    /// Returns all data field keys, sorted.
+    pub fn data_keys(&self) -> Vec<&str> {
+        match &self.data {
+            Some(d) => {
+                let mut keys: Vec<&str> = d.keys().map(String::as_str).collect();
+                keys.sort();
+                keys
+            }
+            None => Vec::new(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CompactFormatter
+// ---------------------------------------------------------------------------
+
+/// Compact single-line formatter: "LEVEL channel msg" (no brackets, minimal).
+pub struct CompactFormatter;
+
+impl LogFormatter for CompactFormatter {
+    fn format(&self, entry: &LogEntry) -> String {
+        format!(
+            "{} {} {}",
+            entry.level.as_str().to_uppercase(),
+            entry.channel,
+            entry.message,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PrettyFormatter
+// ---------------------------------------------------------------------------
+
+/// Multi-line pretty formatter with optional data fields.
+pub struct PrettyFormatter;
+
+impl LogFormatter for PrettyFormatter {
+    fn format(&self, entry: &LogEntry) -> String {
+        let mut out = format!(
+            "--- {} ---\nchannel: {}\nmessage: {}",
+            entry.level.as_str().to_uppercase(),
+            entry.channel,
+            entry.message,
+        );
+        if let Some(ref src) = entry.source {
+            out.push_str(&format!("\nsource:  {src}"));
+        }
+        if let Some(ref data) = entry.data {
+            let mut keys: Vec<&String> = data.keys().collect();
+            keys.sort();
+            for k in keys {
+                out.push_str(&format!("\n  {k}: {}", data[k]));
+            }
+        }
+        out
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LogLevel – parse from string
+// ---------------------------------------------------------------------------
+
+impl LogLevel {
+    /// Parse a log level from a case-insensitive string.
+    /// Returns `None` for unrecognised values.
+    pub fn from_str_ci(s: &str) -> Option<LogLevel> {
+        match s.to_lowercase().as_str() {
+            "off" => Some(LogLevel::Off),
+            "trace" => Some(LogLevel::Trace),
+            "debug" => Some(LogLevel::Debug),
+            "info" => Some(LogLevel::Info),
+            "warning" | "warn" => Some(LogLevel::Warning),
+            "error" => Some(LogLevel::Error),
+            _ => None,
+        }
+    }
+
+    /// Iterator over loggable levels (excludes `Off`).
+    pub fn loggable() -> &'static [LogLevel] {
+        &[
+            LogLevel::Trace,
+            LogLevel::Debug,
+            LogLevel::Info,
+            LogLevel::Warning,
+            LogLevel::Error,
+        ]
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Free functions – advanced entry analysis
+// ---------------------------------------------------------------------------
+
+/// Deduplicate consecutive entries that have the same level and message,
+/// keeping only the first occurrence of each run.
+pub fn dedup_consecutive(entries: &[LogEntry]) -> Vec<&LogEntry> {
+    let mut result: Vec<&LogEntry> = Vec::new();
+    for entry in entries {
+        let dominated = result.last().map_or(false, |prev: &&LogEntry| {
+            prev.level == entry.level && prev.message == entry.message
+        });
+        if !dominated {
+            result.push(entry);
+        }
+    }
+    result
+}
+
+/// Return entries whose message matches any of the provided substrings.
+pub fn entries_matching_any<'a>(entries: &'a [LogEntry], patterns: &[&str]) -> Vec<&'a LogEntry> {
+    entries
+        .iter()
+        .filter(|e| patterns.iter().any(|p| e.message.contains(p)))
+        .collect()
+}
+
+/// Partition entries into two vecs: (matching, non_matching) based on a filter.
+pub fn partition_by_filter<'a>(entries: &'a [LogEntry], filter: &LogFilter) -> (Vec<&'a LogEntry>, Vec<&'a LogEntry>) {
+    let mut matching = Vec::new();
+    let mut rest = Vec::new();
+    for e in entries {
+        if filter.matches(e) {
+            matching.push(e);
+        } else {
+            rest.push(e);
+        }
+    }
+    (matching, rest)
+}
+
+/// Compute a histogram: how many entries exist per channel.
+pub fn channel_histogram(entries: &[LogEntry]) -> HashMap<String, usize> {
+    let mut map: HashMap<String, usize> = HashMap::new();
+    for e in entries {
+        *map.entry(e.channel.clone()).or_insert(0) += 1;
+    }
+    map
+}
+
+/// Find the earliest entry (lowest timestamp).
+pub fn earliest_entry(entries: &[LogEntry]) -> Option<&LogEntry> {
+    entries.iter().min_by_key(|e| e.timestamp)
+}
+
+/// Return the time span (min_ts, max_ts) covered by a set of entries.
+/// Returns `None` if the slice is empty.
+pub fn time_span(entries: &[LogEntry]) -> Option<(u64, u64)> {
+    let min = entries.iter().map(|e| e.timestamp).min()?;
+    let max = entries.iter().map(|e| e.timestamp).max()?;
+    Some((min, max))
+}
+
+/// Extract all unique data-field keys across a set of entries.
+pub fn all_data_keys(entries: &[LogEntry]) -> Vec<String> {
+    let mut keys: Vec<String> = entries
+        .iter()
+        .filter_map(|e| e.data.as_ref())
+        .flat_map(|d| d.keys().cloned())
+        .collect();
+    keys.sort();
+    keys.dedup();
+    keys
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1810,5 +2125,208 @@ mod tests {
     fn most_recent_entry_empty() {
         let entries: Vec<LogEntry> = vec![];
         assert!(most_recent_entry(&entries).is_none());
+    }
+
+    // ===== New tests for added functionality =====
+
+    #[test]
+    fn log_rate_limiter_allows_first_and_suppresses_fast() {
+        let limiter = LogRateLimiter::new(1000); // 1-second window
+        assert!(limiter.allow("key1", 100));
+        assert!(!limiter.allow("key1", 500)); // only 400ms later
+        assert!(limiter.allow("key1", 1200)); // 1100ms after first
+        assert_eq!(limiter.tracked_key_count(), 1);
+    }
+
+    #[test]
+    fn log_rate_limiter_independent_keys() {
+        let limiter = LogRateLimiter::new(500);
+        assert!(limiter.allow("a", 0));
+        assert!(limiter.allow("b", 0));
+        assert!(!limiter.allow("a", 100));
+        assert!(!limiter.allow("b", 100));
+        assert_eq!(limiter.tracked_key_count(), 2);
+        limiter.reset();
+        assert_eq!(limiter.tracked_key_count(), 0);
+        assert!(limiter.allow("a", 100)); // allowed again after reset
+    }
+
+    #[test]
+    fn log_buffer_respects_capacity() {
+        let mut buf = LogBuffer::new(3);
+        for i in 0..5 {
+            buf.push(LogEntry::new(LogLevel::Info, "ch", format!("m{i}")));
+        }
+        assert_eq!(buf.len(), 3);
+        assert_eq!(buf.capacity(), 3);
+        assert_eq!(buf.total_pushed(), 5);
+        assert_eq!(buf.evicted_count(), 2);
+        assert_eq!(buf.oldest().unwrap().message, "m2");
+        assert_eq!(buf.newest().unwrap().message, "m4");
+    }
+
+    #[test]
+    fn log_buffer_drain_and_clear() {
+        let mut buf = LogBuffer::new(10);
+        buf.push(LogEntry::new(LogLevel::Info, "ch", "a"));
+        buf.push(LogEntry::new(LogLevel::Info, "ch", "b"));
+        let drained = buf.drain();
+        assert_eq!(drained.len(), 2);
+        assert!(buf.is_empty());
+
+        buf.push(LogEntry::new(LogLevel::Info, "ch", "c"));
+        buf.clear();
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn log_entry_builder_with_data_and_source() {
+        let entry = LogEntry::new(LogLevel::Info, "app", "request")
+            .with_source("http_handler")
+            .with_data("method", "GET")
+            .with_data("path", "/health");
+
+        assert_eq!(entry.source.as_deref(), Some("http_handler"));
+        assert_eq!(entry.get_data("method"), Some("GET"));
+        assert_eq!(entry.get_data("path"), Some("/health"));
+        assert!(entry.get_data("missing").is_none());
+        assert_eq!(entry.data_keys(), vec!["method", "path"]);
+    }
+
+    #[test]
+    fn log_entry_message_contains_ci() {
+        let entry = LogEntry::new(LogLevel::Error, "ch", "Connection REFUSED");
+        assert!(entry.message_contains_ci("connection"));
+        assert!(entry.message_contains_ci("REFUSED"));
+        assert!(!entry.message_contains_ci("timeout"));
+    }
+
+    #[test]
+    fn compact_formatter_output() {
+        let fmt = CompactFormatter;
+        let entry = LogEntry::new(LogLevel::Warning, "net", "timeout");
+        assert_eq!(fmt.format(&entry), "WARNING net timeout");
+    }
+
+    #[test]
+    fn pretty_formatter_output() {
+        let fmt = PrettyFormatter;
+        let entry = LogEntry::new(LogLevel::Error, "db", "query failed")
+            .with_source("pg_pool")
+            .with_data("table", "users");
+        let output = fmt.format(&entry);
+        assert!(output.contains("--- ERROR ---"));
+        assert!(output.contains("channel: db"));
+        assert!(output.contains("message: query failed"));
+        assert!(output.contains("source:  pg_pool"));
+        assert!(output.contains("table: users"));
+    }
+
+    #[test]
+    fn log_level_from_str_ci() {
+        assert_eq!(LogLevel::from_str_ci("INFO"), Some(LogLevel::Info));
+        assert_eq!(LogLevel::from_str_ci("warn"), Some(LogLevel::Warning));
+        assert_eq!(LogLevel::from_str_ci("Warning"), Some(LogLevel::Warning));
+        assert_eq!(LogLevel::from_str_ci("ERROR"), Some(LogLevel::Error));
+        assert_eq!(LogLevel::from_str_ci("TRACE"), Some(LogLevel::Trace));
+        assert_eq!(LogLevel::from_str_ci("bogus"), None);
+    }
+
+    #[test]
+    fn log_level_loggable_excludes_off() {
+        let levels = LogLevel::loggable();
+        assert_eq!(levels.len(), 5);
+        assert!(!levels.contains(&LogLevel::Off));
+    }
+
+    #[test]
+    fn dedup_consecutive_entries() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "ch", "retry"),
+            LogEntry::new(LogLevel::Info, "ch", "retry"),
+            LogEntry::new(LogLevel::Info, "ch", "retry"),
+            LogEntry::new(LogLevel::Error, "ch", "failed"),
+            LogEntry::new(LogLevel::Info, "ch", "retry"),
+        ];
+        let deduped = dedup_consecutive(&entries);
+        assert_eq!(deduped.len(), 3);
+        assert_eq!(deduped[0].message, "retry");
+        assert_eq!(deduped[1].message, "failed");
+        assert_eq!(deduped[2].message, "retry");
+    }
+
+    #[test]
+    fn entries_matching_any_patterns() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "ch", "user login"),
+            LogEntry::new(LogLevel::Info, "ch", "file saved"),
+            LogEntry::new(LogLevel::Error, "ch", "disk full"),
+            LogEntry::new(LogLevel::Info, "ch", "user logout"),
+        ];
+        let found = entries_matching_any(&entries, &["user", "disk"]);
+        assert_eq!(found.len(), 3);
+    }
+
+    #[test]
+    fn partition_by_filter_splits() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "app", "ok"),
+            LogEntry::new(LogLevel::Error, "app", "fail"),
+            LogEntry::new(LogLevel::Warning, "db", "slow"),
+        ];
+        let filter = LogFilter::new().with_level(LogLevel::Warning);
+        let (matched, rest) = partition_by_filter(&entries, &filter);
+        assert_eq!(matched.len(), 2); // Error + Warning
+        assert_eq!(rest.len(), 1);    // Info
+    }
+
+    #[test]
+    fn channel_histogram_counts() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "app", "a"),
+            LogEntry::new(LogLevel::Info, "db", "b"),
+            LogEntry::new(LogLevel::Info, "app", "c"),
+            LogEntry::new(LogLevel::Info, "app", "d"),
+        ];
+        let hist = channel_histogram(&entries);
+        assert_eq!(hist["app"], 3);
+        assert_eq!(hist["db"], 1);
+    }
+
+    #[test]
+    fn earliest_entry_finds_oldest() {
+        let entries = vec![
+            LogEntry { level: LogLevel::Info, channel: "ch".into(), message: "b".into(), timestamp: 200, source: None, data: None },
+            LogEntry { level: LogLevel::Info, channel: "ch".into(), message: "a".into(), timestamp: 50, source: None, data: None },
+            LogEntry { level: LogLevel::Info, channel: "ch".into(), message: "c".into(), timestamp: 150, source: None, data: None },
+        ];
+        assert_eq!(earliest_entry(&entries).unwrap().message, "a");
+    }
+
+    #[test]
+    fn time_span_returns_range() {
+        let entries = vec![
+            LogEntry { level: LogLevel::Info, channel: "ch".into(), message: "x".into(), timestamp: 100, source: None, data: None },
+            LogEntry { level: LogLevel::Info, channel: "ch".into(), message: "y".into(), timestamp: 500, source: None, data: None },
+            LogEntry { level: LogLevel::Info, channel: "ch".into(), message: "z".into(), timestamp: 300, source: None, data: None },
+        ];
+        assert_eq!(time_span(&entries), Some((100, 500)));
+        let empty: Vec<LogEntry> = vec![];
+        assert_eq!(time_span(&empty), None);
+    }
+
+    #[test]
+    fn all_data_keys_extracts_and_deduplicates() {
+        let entries = vec![
+            LogEntry::new(LogLevel::Info, "ch", "a")
+                .with_data("method", "GET")
+                .with_data("path", "/"),
+            LogEntry::new(LogLevel::Info, "ch", "b")
+                .with_data("method", "POST")
+                .with_data("status", "200"),
+            LogEntry::new(LogLevel::Info, "ch", "c"), // no data
+        ];
+        let keys = all_data_keys(&entries);
+        assert_eq!(keys, vec!["method", "path", "status"]);
     }
 }

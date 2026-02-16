@@ -1004,6 +1004,446 @@ pub fn json_merge(base: &Value, patch: &Value) -> Value {
     }
 }
 
+// ---------------------------------------------------------------------------
+// JSON Pointer (RFC 6901)
+// ---------------------------------------------------------------------------
+
+/// Resolve a JSON Pointer (RFC 6901) string against a value.
+///
+/// The pointer must start with `/` or be empty (referring to the root).
+/// Segments are separated by `/`, with `~1` unescaped to `/` and `~0` to `~`.
+///
+/// ```
+/// use serde_json::json;
+/// use vsedit_json::json_pointer_get;
+///
+/// let v = json!({"a": {"b": [10, 20, 30]}});
+/// assert_eq!(json_pointer_get(&v, "/a/b/1"), Some(&json!(20)));
+/// assert_eq!(json_pointer_get(&v, ""), Some(&v));
+/// ```
+pub fn json_pointer_get<'a>(value: &'a Value, pointer: &str) -> Option<&'a Value> {
+    if pointer.is_empty() {
+        return Some(value);
+    }
+    if !pointer.starts_with('/') {
+        return None;
+    }
+    let mut current = value;
+    for token in pointer[1..].split('/') {
+        let unescaped = json_pointer_unescape(token);
+        match current {
+            Value::Object(map) => {
+                current = map.get(&unescaped)?;
+            }
+            Value::Array(arr) => {
+                let idx: usize = unescaped.parse().ok()?;
+                current = arr.get(idx)?;
+            }
+            _ => return None,
+        }
+    }
+    Some(current)
+}
+
+/// Set a value at the given JSON Pointer path, creating intermediate objects
+/// as needed. Array indices are not auto-extended.
+pub fn json_pointer_set(root: &mut Value, pointer: &str, val: Value) -> Result<(), String> {
+    if pointer.is_empty() {
+        *root = val;
+        return Ok(());
+    }
+    if !pointer.starts_with('/') {
+        return Err("JSON Pointer must start with '/'".into());
+    }
+    let tokens: Vec<String> = pointer[1..].split('/').map(json_pointer_unescape).collect();
+    let mut current = root;
+    for token in &tokens[..tokens.len() - 1] {
+        match current {
+            Value::Object(map) => {
+                current = map
+                    .entry(token.as_str())
+                    .or_insert_with(|| Value::Object(serde_json::Map::new()));
+            }
+            Value::Array(arr) => {
+                let idx: usize = token
+                    .parse()
+                    .map_err(|_| format!("invalid array index '{token}'"))?;
+                current = arr
+                    .get_mut(idx)
+                    .ok_or_else(|| format!("array index {idx} out of bounds"))?;
+            }
+            _ => {
+                return Err(format!("cannot traverse into non-container at '{token}'"));
+            }
+        }
+    }
+    let last = tokens.last().unwrap();
+    match current {
+        Value::Object(map) => {
+            map.insert(last.clone(), val);
+            Ok(())
+        }
+        Value::Array(arr) => {
+            if last == "-" {
+                arr.push(val);
+                Ok(())
+            } else {
+                let idx: usize = last
+                    .parse()
+                    .map_err(|_| format!("invalid array index '{last}'"))?;
+                if idx < arr.len() {
+                    arr[idx] = val;
+                    Ok(())
+                } else {
+                    Err(format!("array index {idx} out of bounds"))
+                }
+            }
+        }
+        _ => Err("cannot set value on a scalar".into()),
+    }
+}
+
+/// Escape a single token for use in a JSON Pointer string.
+pub fn json_pointer_escape(token: &str) -> String {
+    token.replace('~', "~0").replace('/', "~1")
+}
+
+/// Unescape a JSON Pointer token (`~1` → `/`, `~0` → `~`).
+fn json_pointer_unescape(token: &str) -> String {
+    token.replace("~1", "/").replace("~0", "~")
+}
+
+// ---------------------------------------------------------------------------
+// JSON value type helpers
+// ---------------------------------------------------------------------------
+
+/// Describes the type of a JSON value as a human-readable string.
+pub fn json_type_name(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
+}
+
+/// Coerce a JSON value to a boolean using JavaScript-like truthiness rules:
+/// - `null` → `false`
+/// - `false` → `false`
+/// - `0`, `0.0` → `false`
+/// - `""` → `false`
+/// - everything else → `true`
+pub fn json_to_bool(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                i != 0
+            } else if let Some(f) = n.as_f64() {
+                f != 0.0
+            } else {
+                true
+            }
+        }
+        Value::String(s) => !s.is_empty(),
+        Value::Array(_) | Value::Object(_) => true,
+    }
+}
+
+/// Coerce a JSON value to a string.
+/// - Strings are returned as-is.
+/// - Numbers and booleans are converted to their string representation.
+/// - Null returns an empty string.
+/// - Arrays and objects are serialized as compact JSON.
+pub fn json_to_string(value: &Value) -> String {
+    match value {
+        Value::Null => String::new(),
+        Value::Bool(b) => b.to_string(),
+        Value::Number(n) => n.to_string(),
+        Value::String(s) => s.clone(),
+        Value::Array(_) | Value::Object(_) => minify(value),
+    }
+}
+
+/// Try to coerce a JSON value to an `i64`.
+/// - Numbers are converted directly.
+/// - Strings are parsed.
+/// - Booleans: `true` → 1, `false` → 0.
+/// - Everything else returns `None`.
+pub fn json_to_i64(value: &Value) -> Option<i64> {
+    match value {
+        Value::Number(n) => n.as_i64(),
+        Value::Bool(b) => Some(if *b { 1 } else { 0 }),
+        Value::String(s) => s.parse::<i64>().ok(),
+        _ => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// JSON value walking / visitor
+// ---------------------------------------------------------------------------
+
+/// Callback result for `json_walk` — controls traversal.
+pub enum WalkAction {
+    /// Continue descending into children.
+    Continue,
+    /// Skip children of the current node (only meaningful for objects/arrays).
+    Skip,
+    /// Stop the entire walk immediately.
+    Stop,
+}
+
+/// Walk every node in a JSON value tree depth-first, calling `visitor` with
+/// the dot-separated path and a reference to each node.
+///
+/// The visitor returns a [`WalkAction`] to control traversal.
+pub fn json_walk<F>(value: &Value, mut visitor: F)
+where
+    F: FnMut(&str, &Value) -> WalkAction,
+{
+    json_walk_recursive(value, &String::new(), &mut visitor);
+}
+
+fn json_walk_recursive<F>(value: &Value, path: &str, visitor: &mut F) -> bool
+where
+    F: FnMut(&str, &Value) -> WalkAction,
+{
+    let display_path = if path.is_empty() { "$" } else { path };
+    match visitor(display_path, value) {
+        WalkAction::Stop => return false,
+        WalkAction::Skip => return true,
+        WalkAction::Continue => {}
+    }
+    match value {
+        Value::Object(map) => {
+            for (key, val) in map {
+                let child = if path.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{path}.{key}")
+                };
+                if !json_walk_recursive(val, &child, visitor) {
+                    return false;
+                }
+            }
+        }
+        Value::Array(arr) => {
+            for (i, val) in arr.iter().enumerate() {
+                let child = if path.is_empty() {
+                    format!("[{i}]")
+                } else {
+                    format!("{path}[{i}]")
+                };
+                if !json_walk_recursive(val, &child, visitor) {
+                    return false;
+                }
+            }
+        }
+        _ => {}
+    }
+    true
+}
+
+/// Count the total number of leaf nodes (non-object, non-array) in a value.
+pub fn json_count_leaves(value: &Value) -> usize {
+    let mut count = 0usize;
+    json_walk(value, |_, v| {
+        if !v.is_object() && !v.is_array() {
+            count += 1;
+        }
+        WalkAction::Continue
+    });
+    count
+}
+
+/// Collect all leaf values as `(path, &Value)` pairs.
+pub fn json_collect_leaves(value: &Value) -> Vec<(String, Value)> {
+    let mut leaves = Vec::new();
+    json_walk(value, |path, v| {
+        if !v.is_object() && !v.is_array() {
+            leaves.push((path.to_string(), v.clone()));
+        }
+        WalkAction::Continue
+    });
+    leaves
+}
+
+// ---------------------------------------------------------------------------
+// JSON schema-like validation helpers
+// ---------------------------------------------------------------------------
+
+/// Describes an expected shape for a JSON value.
+#[derive(Debug, Clone, PartialEq)]
+pub enum JsonSchema {
+    /// Any value is accepted.
+    Any,
+    /// Must be null.
+    Null,
+    /// Must be a boolean.
+    Bool,
+    /// Must be a number, optionally within [min, max].
+    Number { min: Option<f64>, max: Option<f64> },
+    /// Must be a string, optionally with a max length.
+    StringType { max_length: Option<usize> },
+    /// Must be a string equal to one of the given values.
+    Enum(Vec<String>),
+    /// Must be an array whose items match the inner schema.
+    Array(Box<JsonSchema>),
+    /// Must be an object with the specified required/optional fields.
+    Object {
+        required: Vec<(String, JsonSchema)>,
+        optional: Vec<(String, JsonSchema)>,
+    },
+}
+
+/// A validation error with the path and message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SchemaError {
+    pub path: String,
+    pub message: String,
+}
+
+impl fmt::Display for SchemaError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.path, self.message)
+    }
+}
+
+/// Validate a JSON value against a [`JsonSchema`], returning all errors found.
+pub fn json_validate(value: &Value, schema: &JsonSchema) -> Vec<SchemaError> {
+    let mut errors = Vec::new();
+    validate_recursive(value, schema, "$".to_string(), &mut errors);
+    errors
+}
+
+fn validate_recursive(
+    value: &Value,
+    schema: &JsonSchema,
+    path: String,
+    errors: &mut Vec<SchemaError>,
+) {
+    match schema {
+        JsonSchema::Any => {}
+        JsonSchema::Null => {
+            if !value.is_null() {
+                errors.push(SchemaError {
+                    path,
+                    message: format!("expected null, got {}", json_type_name(value)),
+                });
+            }
+        }
+        JsonSchema::Bool => {
+            if !value.is_boolean() {
+                errors.push(SchemaError {
+                    path,
+                    message: format!("expected boolean, got {}", json_type_name(value)),
+                });
+            }
+        }
+        JsonSchema::Number { min, max } => {
+            if let Some(n) = value.as_f64() {
+                if let Some(lo) = min {
+                    if n < *lo {
+                        errors.push(SchemaError {
+                            path: path.clone(),
+                            message: format!("value {n} is less than minimum {lo}"),
+                        });
+                    }
+                }
+                if let Some(hi) = max {
+                    if n > *hi {
+                        errors.push(SchemaError {
+                            path,
+                            message: format!("value {n} is greater than maximum {hi}"),
+                        });
+                    }
+                }
+            } else {
+                errors.push(SchemaError {
+                    path,
+                    message: format!("expected number, got {}", json_type_name(value)),
+                });
+            }
+        }
+        JsonSchema::StringType { max_length } => {
+            if let Some(s) = value.as_str() {
+                if let Some(max) = max_length {
+                    if s.len() > *max {
+                        errors.push(SchemaError {
+                            path,
+                            message: format!(
+                                "string length {} exceeds maximum {}",
+                                s.len(),
+                                max
+                            ),
+                        });
+                    }
+                }
+            } else {
+                errors.push(SchemaError {
+                    path,
+                    message: format!("expected string, got {}", json_type_name(value)),
+                });
+            }
+        }
+        JsonSchema::Enum(variants) => {
+            if let Some(s) = value.as_str() {
+                if !variants.iter().any(|v| v == s) {
+                    errors.push(SchemaError {
+                        path,
+                        message: format!("value '{}' is not one of {:?}", s, variants),
+                    });
+                }
+            } else {
+                errors.push(SchemaError {
+                    path,
+                    message: format!("expected string for enum, got {}", json_type_name(value)),
+                });
+            }
+        }
+        JsonSchema::Array(item_schema) => {
+            if let Some(arr) = value.as_array() {
+                for (i, item) in arr.iter().enumerate() {
+                    validate_recursive(item, item_schema, format!("{path}[{i}]"), errors);
+                }
+            } else {
+                errors.push(SchemaError {
+                    path,
+                    message: format!("expected array, got {}", json_type_name(value)),
+                });
+            }
+        }
+        JsonSchema::Object { required, optional } => {
+            if let Some(map) = value.as_object() {
+                for (key, field_schema) in required {
+                    let child_path = format!("{path}.{key}");
+                    match map.get(key) {
+                        Some(v) => validate_recursive(v, field_schema, child_path, errors),
+                        None => errors.push(SchemaError {
+                            path: child_path,
+                            message: "required field is missing".into(),
+                        }),
+                    }
+                }
+                for (key, field_schema) in optional {
+                    if let Some(v) = map.get(key) {
+                        let child_path = format!("{path}.{key}");
+                        validate_recursive(v, field_schema, child_path, errors);
+                    }
+                }
+            } else {
+                errors.push(SchemaError {
+                    path,
+                    message: format!("expected object, got {}", json_type_name(value)),
+                });
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1829,5 +2269,330 @@ mod tests {
         assert!(keys.contains(&"a.c.d".to_string()));
         assert!(keys.contains(&"e".to_string()));
         assert_eq!(keys.len(), 5);
+    }
+
+    // -- json_pointer_get ---------------------------------------------------
+
+    #[test]
+    fn pointer_get_root() {
+        let v = json!({"a": 1});
+        assert_eq!(json_pointer_get(&v, ""), Some(&v));
+    }
+
+    #[test]
+    fn pointer_get_nested_object() {
+        let v = json!({"a": {"b": {"c": 42}}});
+        assert_eq!(json_pointer_get(&v, "/a/b/c"), Some(&json!(42)));
+    }
+
+    #[test]
+    fn pointer_get_array_index() {
+        let v = json!({"items": [10, 20, 30]});
+        assert_eq!(json_pointer_get(&v, "/items/1"), Some(&json!(20)));
+    }
+
+    #[test]
+    fn pointer_get_escaped_slash() {
+        let v = json!({"a/b": 99});
+        assert_eq!(json_pointer_get(&v, "/a~1b"), Some(&json!(99)));
+    }
+
+    #[test]
+    fn pointer_get_escaped_tilde() {
+        let v = json!({"a~b": 77});
+        assert_eq!(json_pointer_get(&v, "/a~0b"), Some(&json!(77)));
+    }
+
+    #[test]
+    fn pointer_get_missing_returns_none() {
+        let v = json!({"a": 1});
+        assert_eq!(json_pointer_get(&v, "/z"), None);
+    }
+
+    #[test]
+    fn pointer_get_invalid_no_leading_slash() {
+        let v = json!({"a": 1});
+        assert_eq!(json_pointer_get(&v, "a"), None);
+    }
+
+    #[test]
+    fn pointer_set_simple() {
+        let mut v = json!({"a": 1});
+        json_pointer_set(&mut v, "/b", json!(2)).unwrap();
+        assert_eq!(v, json!({"a": 1, "b": 2}));
+    }
+
+    #[test]
+    fn pointer_set_nested_creates_intermediates() {
+        let mut v = json!({});
+        json_pointer_set(&mut v, "/x/y/z", json!(true)).unwrap();
+        assert_eq!(v, json!({"x": {"y": {"z": true}}}));
+    }
+
+    #[test]
+    fn pointer_set_array_element() {
+        let mut v = json!({"arr": [1, 2, 3]});
+        json_pointer_set(&mut v, "/arr/1", json!(99)).unwrap();
+        assert_eq!(v["arr"][1], json!(99));
+    }
+
+    #[test]
+    fn pointer_set_array_append() {
+        let mut v = json!({"arr": [1, 2]});
+        json_pointer_set(&mut v, "/arr/-", json!(3)).unwrap();
+        assert_eq!(v["arr"], json!([1, 2, 3]));
+    }
+
+    #[test]
+    fn pointer_set_root_replaces() {
+        let mut v = json!({"a": 1});
+        json_pointer_set(&mut v, "", json!(42)).unwrap();
+        assert_eq!(v, json!(42));
+    }
+
+    #[test]
+    fn pointer_escape_roundtrip() {
+        let token = "a/b~c";
+        let escaped = json_pointer_escape(token);
+        assert_eq!(escaped, "a~1b~0c");
+        let unescaped = json_pointer_unescape(&escaped);
+        assert_eq!(unescaped, token);
+    }
+
+    // -- json_type_name -----------------------------------------------------
+
+    #[test]
+    fn type_name_all_variants() {
+        assert_eq!(json_type_name(&json!(null)), "null");
+        assert_eq!(json_type_name(&json!(true)), "boolean");
+        assert_eq!(json_type_name(&json!(42)), "number");
+        assert_eq!(json_type_name(&json!("hi")), "string");
+        assert_eq!(json_type_name(&json!([1])), "array");
+        assert_eq!(json_type_name(&json!({})), "object");
+    }
+
+    // -- json_to_bool -------------------------------------------------------
+
+    #[test]
+    fn to_bool_falsy_values() {
+        assert!(!json_to_bool(&json!(null)));
+        assert!(!json_to_bool(&json!(false)));
+        assert!(!json_to_bool(&json!(0)));
+        assert!(!json_to_bool(&json!("")));
+    }
+
+    #[test]
+    fn to_bool_truthy_values() {
+        assert!(json_to_bool(&json!(true)));
+        assert!(json_to_bool(&json!(1)));
+        assert!(json_to_bool(&json!(-1)));
+        assert!(json_to_bool(&json!("hello")));
+        assert!(json_to_bool(&json!([1, 2])));
+        assert!(json_to_bool(&json!({"a": 1})));
+    }
+
+    // -- json_to_string -----------------------------------------------------
+
+    #[test]
+    fn to_string_conversions() {
+        assert_eq!(json_to_string(&json!(null)), "");
+        assert_eq!(json_to_string(&json!(true)), "true");
+        assert_eq!(json_to_string(&json!(42)), "42");
+        assert_eq!(json_to_string(&json!("hello")), "hello");
+        assert_eq!(json_to_string(&json!([1, 2])), "[1,2]");
+    }
+
+    // -- json_to_i64 --------------------------------------------------------
+
+    #[test]
+    fn to_i64_conversions() {
+        assert_eq!(json_to_i64(&json!(42)), Some(42));
+        assert_eq!(json_to_i64(&json!(true)), Some(1));
+        assert_eq!(json_to_i64(&json!(false)), Some(0));
+        assert_eq!(json_to_i64(&json!("123")), Some(123));
+        assert_eq!(json_to_i64(&json!("not a number")), None);
+        assert_eq!(json_to_i64(&json!(null)), None);
+        assert_eq!(json_to_i64(&json!([1])), None);
+    }
+
+    // -- json_walk / json_count_leaves / json_collect_leaves -----------------
+
+    #[test]
+    fn walk_visits_all_nodes() {
+        let v = json!({"a": 1, "b": {"c": 2}});
+        let mut visited = Vec::new();
+        json_walk(&v, |path, _val| {
+            visited.push(path.to_string());
+            WalkAction::Continue
+        });
+        assert!(visited.contains(&"$".to_string()));
+        assert!(visited.contains(&"a".to_string()));
+        assert!(visited.contains(&"b".to_string()));
+        assert!(visited.contains(&"b.c".to_string()));
+    }
+
+    #[test]
+    fn walk_skip_prevents_descent() {
+        let v = json!({"a": {"deep": 1}, "b": 2});
+        let mut visited = Vec::new();
+        json_walk(&v, |path, _val| {
+            visited.push(path.to_string());
+            if path == "a" {
+                WalkAction::Skip
+            } else {
+                WalkAction::Continue
+            }
+        });
+        assert!(visited.contains(&"a".to_string()));
+        assert!(!visited.contains(&"a.deep".to_string()));
+        assert!(visited.contains(&"b".to_string()));
+    }
+
+    #[test]
+    fn walk_stop_halts_traversal() {
+        let v = json!({"a": 1, "b": 2, "c": 3});
+        let mut count = 0usize;
+        json_walk(&v, |path, _val| {
+            count += 1;
+            if path == "a" {
+                WalkAction::Stop
+            } else {
+                WalkAction::Continue
+            }
+        });
+        // Should have visited "$" and then "a" (where it stopped)
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn count_leaves_simple() {
+        let v = json!({"a": 1, "b": {"c": 2, "d": 3}, "e": [4, 5]});
+        // Leaves: 1, 2, 3, 4, 5 = 5
+        assert_eq!(json_count_leaves(&v), 5);
+    }
+
+    #[test]
+    fn collect_leaves_returns_paths_and_values() {
+        let v = json!({"x": 10, "y": {"z": 20}});
+        let leaves = json_collect_leaves(&v);
+        assert_eq!(leaves.len(), 2);
+        assert!(leaves.iter().any(|(p, v)| p == "x" && *v == json!(10)));
+        assert!(leaves.iter().any(|(p, v)| p == "y.z" && *v == json!(20)));
+    }
+
+    // -- json_validate (schema) ---------------------------------------------
+
+    #[test]
+    fn schema_any_accepts_everything() {
+        assert!(json_validate(&json!(42), &JsonSchema::Any).is_empty());
+        assert!(json_validate(&json!("hi"), &JsonSchema::Any).is_empty());
+        assert!(json_validate(&json!(null), &JsonSchema::Any).is_empty());
+    }
+
+    #[test]
+    fn schema_bool_validation() {
+        assert!(json_validate(&json!(true), &JsonSchema::Bool).is_empty());
+        let errs = json_validate(&json!("yes"), &JsonSchema::Bool);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].message.contains("expected boolean"));
+    }
+
+    #[test]
+    fn schema_number_range_validation() {
+        let schema = JsonSchema::Number {
+            min: Some(0.0),
+            max: Some(100.0),
+        };
+        assert!(json_validate(&json!(50), &schema).is_empty());
+        let errs = json_validate(&json!(-1), &schema);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].message.contains("less than minimum"));
+        let errs = json_validate(&json!(200), &schema);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].message.contains("greater than maximum"));
+    }
+
+    #[test]
+    fn schema_string_max_length() {
+        let schema = JsonSchema::StringType {
+            max_length: Some(5),
+        };
+        assert!(json_validate(&json!("hi"), &schema).is_empty());
+        let errs = json_validate(&json!("toolong"), &schema);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].message.contains("exceeds maximum"));
+    }
+
+    #[test]
+    fn schema_enum_validation() {
+        let schema = JsonSchema::Enum(vec!["on".into(), "off".into(), "auto".into()]);
+        assert!(json_validate(&json!("on"), &schema).is_empty());
+        let errs = json_validate(&json!("maybe"), &schema);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].message.contains("not one of"));
+    }
+
+    #[test]
+    fn schema_array_validation() {
+        let schema = JsonSchema::Array(Box::new(JsonSchema::Number {
+            min: None,
+            max: None,
+        }));
+        assert!(json_validate(&json!([1, 2, 3]), &schema).is_empty());
+        let errs = json_validate(&json!([1, "two", 3]), &schema);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].path.contains("[1]"));
+    }
+
+    #[test]
+    fn schema_object_required_fields() {
+        let schema = JsonSchema::Object {
+            required: vec![
+                ("name".into(), JsonSchema::StringType { max_length: None }),
+                (
+                    "age".into(),
+                    JsonSchema::Number {
+                        min: Some(0.0),
+                        max: None,
+                    },
+                ),
+            ],
+            optional: vec![("email".into(), JsonSchema::StringType { max_length: None })],
+        };
+        let valid = json!({"name": "Alice", "age": 30});
+        assert!(json_validate(&valid, &schema).is_empty());
+
+        let missing_name = json!({"age": 30});
+        let errs = json_validate(&missing_name, &schema);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].message.contains("required field"));
+
+        let bad_age = json!({"name": "Bob", "age": -5});
+        let errs = json_validate(&bad_age, &schema);
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].message.contains("less than minimum"));
+    }
+
+    #[test]
+    fn schema_error_display() {
+        let e = SchemaError {
+            path: "$.name".into(),
+            message: "required field is missing".into(),
+        };
+        assert_eq!(e.to_string(), "$.name: required field is missing");
+    }
+
+    // -- json_walk with arrays ----------------------------------------------
+
+    #[test]
+    fn walk_array_paths() {
+        let v = json!({"items": [10, 20]});
+        let mut paths = Vec::new();
+        json_walk(&v, |path, _| {
+            paths.push(path.to_string());
+            WalkAction::Continue
+        });
+        assert!(paths.contains(&"items[0]".to_string()));
+        assert!(paths.contains(&"items[1]".to_string()));
     }
 }

@@ -1130,6 +1130,293 @@ impl PathComponents {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Path depth calculation
+// ---------------------------------------------------------------------------
+
+/// Return the depth of a path (number of non-empty segments).
+///
+/// Leading/trailing slashes and `.` segments are ignored.
+/// `..` segments count as negative depth adjustments.
+///
+/// ```
+/// assert_eq!(vsedit_path::path_depth("/usr/local/bin"), 3);
+/// assert_eq!(vsedit_path::path_depth("a/b/../c"), 2);
+/// ```
+pub fn path_depth(path: &str) -> usize {
+    let fwd = to_forward_slashes(path);
+    let mut depth: isize = 0;
+    for seg in fwd.split('/').filter(|s| !s.is_empty()) {
+        match seg {
+            "." => {}
+            ".." => {
+                if depth > 0 {
+                    depth -= 1;
+                }
+            }
+            _ => depth += 1,
+        }
+    }
+    depth as usize
+}
+
+// ---------------------------------------------------------------------------
+// File extension helpers
+// ---------------------------------------------------------------------------
+
+/// Return all extensions of a filename as a vector (without dots).
+///
+/// For `"archive.tar.gz"` this returns `["tar", "gz"]`.
+pub fn extensions(path: &str) -> Vec<String> {
+    let name = basename(path);
+    if name.is_empty() {
+        return Vec::new();
+    }
+    let parts: Vec<&str> = name.split('.').collect();
+    if parts.len() <= 1 {
+        return Vec::new();
+    }
+    // first part is the stem, rest are extensions
+    parts[1..].iter().map(|s| (*s).to_string()).collect()
+}
+
+/// Check if a path has a specific extension (case-insensitive).
+pub fn has_extension(path: &str, ext: &str) -> bool {
+    let path_ext = extname(path);
+    let want = if ext.starts_with('.') {
+        ext.to_lowercase()
+    } else {
+        format!(".{}", ext.to_lowercase())
+    };
+    path_ext.to_lowercase() == want
+}
+
+/// Remove all extensions from a path, leaving only the stem.
+///
+/// ```
+/// assert_eq!(vsedit_path::remove_all_extensions("a/b/file.tar.gz"), "a/b/file");
+/// ```
+pub fn remove_all_extensions(path: &str) -> String {
+    let p = Path::new(path);
+    let parent = p
+        .parent()
+        .map(|d| d.to_string_lossy().into_owned())
+        .unwrap_or_default();
+
+    let name = basename(path);
+    let first_stem = name.split('.').next().unwrap_or("");
+
+    if parent.is_empty() {
+        first_stem.to_string()
+    } else {
+        format!("{parent}/{first_stem}")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Path sanitization
+// ---------------------------------------------------------------------------
+
+/// Characters that are invalid in file names on Windows.
+const INVALID_FILENAME_CHARS: &[char] = &['<', '>', ':', '"', '|', '?', '*', '\0'];
+
+/// Sanitize a filename by replacing invalid characters with a replacement char.
+///
+/// This removes characters that are invalid on Windows (and control characters)
+/// to produce a cross-platform safe filename.
+pub fn sanitize_filename(name: &str, replacement: char) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_control() || INVALID_FILENAME_CHARS.contains(&c) {
+                replacement
+            } else {
+                c
+            }
+        })
+        .collect()
+}
+
+/// Sanitize an entire path, applying filename sanitization to each component
+/// while preserving separators and root.
+pub fn sanitize_path(path: &str, replacement: char) -> String {
+    let fwd = to_forward_slashes(path);
+    let leading_slash = fwd.starts_with('/');
+    let parts: Vec<String> = fwd
+        .split('/')
+        .enumerate()
+        .map(|(i, seg)| {
+            if seg.is_empty() {
+                String::new()
+            } else if i == 0 && (seg.ends_with(':') || seg == "\\\\") {
+                // Preserve drive letters and UNC roots
+                seg.to_string()
+            } else {
+                sanitize_filename(seg, replacement)
+            }
+        })
+        .collect();
+    let joined = parts
+        .into_iter()
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("/");
+    if leading_slash {
+        format!("/{joined}")
+    } else {
+        joined
+    }
+}
+
+// ---------------------------------------------------------------------------
+// URI ↔ path conversion
+// ---------------------------------------------------------------------------
+
+/// Convert a `file://` URI to a local path string.
+///
+/// Handles percent-decoding of common sequences (`%20` for space, `%23` for `#`).
+/// Returns `Err` if the URI doesn't start with `file://`.
+pub fn uri_to_path(uri: &str) -> Result<String, PathError> {
+    let stripped = if uri.starts_with("file:///") {
+        &uri[7..] // keep leading / for Unix absolute paths
+    } else if uri.starts_with("file://") {
+        &uri[7..]
+    } else {
+        return Err(PathError::InvalidPath(
+            "not a file:// URI".to_string(),
+        ));
+    };
+    Ok(percent_decode(stripped))
+}
+
+/// Convert a local path to a `file://` URI.
+///
+/// Percent-encodes spaces and `#` characters.
+pub fn path_to_uri(path: &str) -> String {
+    let fwd = to_forward_slashes(path);
+    let encoded = percent_encode(&fwd);
+    if encoded.starts_with('/') {
+        format!("file://{encoded}")
+    } else {
+        format!("file:///{encoded}")
+    }
+}
+
+/// Minimal percent-decoding for common URI characters.
+fn percent_decode(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(byte) = u8::from_str_radix(
+                &String::from_utf8_lossy(&bytes[i + 1..i + 3]),
+                16,
+            ) {
+                result.push(byte as char);
+                i += 3;
+                continue;
+            }
+        }
+        result.push(bytes[i] as char);
+        i += 1;
+    }
+    result
+}
+
+/// Minimal percent-encoding for spaces and `#`.
+fn percent_encode(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            ' ' => result.push_str("%20"),
+            '#' => result.push_str("%23"),
+            _ => result.push(c),
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Path comparison helpers
+// ---------------------------------------------------------------------------
+
+/// Case-insensitive path equality check (with slash normalization).
+pub fn paths_equal_ignore_case(a: &str, b: &str) -> bool {
+    normalize_case(a) == normalize_case(b)
+}
+
+/// Case-sensitive path equality check with slash normalization.
+pub fn paths_equal(a: &str, b: &str) -> bool {
+    to_forward_slashes(a) == to_forward_slashes(b)
+}
+
+// ---------------------------------------------------------------------------
+// PathBreadcrumbs – decompose a path into navigable breadcrumb entries
+// ---------------------------------------------------------------------------
+
+/// A single breadcrumb entry representing a navigable path segment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Breadcrumb {
+    /// Display label for this segment.
+    pub label: String,
+    /// Full path up to and including this segment.
+    pub path: String,
+}
+
+/// Decompose a path into breadcrumb entries for UI navigation.
+///
+/// Each breadcrumb contains the segment label and the full path up to that point.
+///
+/// ```
+/// let crumbs = vsedit_path::breadcrumbs("/usr/local/bin");
+/// assert_eq!(crumbs.len(), 3);
+/// assert_eq!(crumbs[0].label, "usr");
+/// assert_eq!(crumbs[2].path, "/usr/local/bin");
+/// ```
+pub fn breadcrumbs(path: &str) -> Vec<Breadcrumb> {
+    let fwd = to_forward_slashes(path);
+    let is_abs = fwd.starts_with('/');
+    let segments: Vec<&str> = fwd.split('/').filter(|s| !s.is_empty()).collect();
+    let mut result = Vec::with_capacity(segments.len());
+    let mut accumulated = if is_abs {
+        String::from("/")
+    } else {
+        String::new()
+    };
+    for (i, seg) in segments.iter().enumerate() {
+        if i > 0 || is_abs {
+            if !accumulated.ends_with('/') {
+                accumulated.push('/');
+            }
+        }
+        accumulated.push_str(seg);
+        result.push(Breadcrumb {
+            label: seg.to_string(),
+            path: accumulated.clone(),
+        });
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Tilde expansion helper
+// ---------------------------------------------------------------------------
+
+/// Expand a leading `~` to the provided home directory path.
+///
+/// If the path does not start with `~`, it is returned unchanged.
+pub fn expand_tilde(path: &str, home: &str) -> String {
+    if path == "~" {
+        home.to_string()
+    } else if let Some(rest) = path.strip_prefix("~/") {
+        format!("{}/{rest}", remove_trailing_separator(home))
+    } else if let Some(rest) = path.strip_prefix("~\\") {
+        format!("{}\\{rest}", remove_trailing_separator(home))
+    } else {
+        path.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1805,5 +2092,141 @@ mod tests {
         assert_eq!(truncated.dir_parts, vec!["a"]);
         let pushed = pc.push_dir("d");
         assert_eq!(pushed.dir_parts.last().unwrap(), "d");
+    }
+
+    // -- path_depth tests --------------------------------------------------
+
+    #[test]
+    fn test_path_depth_basic() {
+        assert_eq!(path_depth("a/b/c"), 3);
+        assert_eq!(path_depth("/usr/local/bin"), 3);
+        assert_eq!(path_depth("file.txt"), 1);
+        assert_eq!(path_depth(""), 0);
+    }
+
+    #[test]
+    fn test_path_depth_with_dots() {
+        assert_eq!(path_depth("a/b/../c"), 2);
+        assert_eq!(path_depth("a/./b/c"), 3);
+        assert_eq!(path_depth("../a"), 1);
+    }
+
+    // -- extensions tests --------------------------------------------------
+
+    #[test]
+    fn test_extensions_multiple() {
+        assert_eq!(extensions("archive.tar.gz"), vec!["tar", "gz"]);
+        assert_eq!(extensions("file.rs"), vec!["rs"]);
+        assert_eq!(extensions("noext"), Vec::<String>::new());
+        assert_eq!(extensions(""), Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_has_extension() {
+        assert!(has_extension("file.RS", "rs"));
+        assert!(has_extension("file.rs", ".rs"));
+        assert!(!has_extension("file.rs", "txt"));
+        assert!(!has_extension("noext", "rs"));
+    }
+
+    #[test]
+    fn test_remove_all_extensions() {
+        assert_eq!(remove_all_extensions("a/b/file.tar.gz"), "a/b/file");
+        assert_eq!(remove_all_extensions("file.txt"), "file");
+        assert_eq!(remove_all_extensions("noext"), "noext");
+    }
+
+    // -- sanitize tests ----------------------------------------------------
+
+    #[test]
+    fn test_sanitize_filename() {
+        assert_eq!(sanitize_filename("hello<world>.txt", '_'), "hello_world_.txt");
+        assert_eq!(sanitize_filename("normal.txt", '_'), "normal.txt");
+        assert_eq!(sanitize_filename("a:b|c", '-'), "a-b-c");
+    }
+
+    #[test]
+    fn test_sanitize_path() {
+        assert_eq!(sanitize_path("/a/b<c>/d", '_'), "/a/b_c_/d");
+        assert_eq!(sanitize_path("clean/path/file.txt", '_'), "clean/path/file.txt");
+    }
+
+    // -- URI conversion tests ----------------------------------------------
+
+    #[test]
+    fn test_uri_to_path() {
+        assert_eq!(uri_to_path("file:///home/user/file.txt").unwrap(), "/home/user/file.txt");
+        assert_eq!(uri_to_path("file:///path%20with%20spaces").unwrap(), "/path with spaces");
+        assert!(uri_to_path("http://example.com").is_err());
+    }
+
+    #[test]
+    fn test_path_to_uri() {
+        assert_eq!(path_to_uri("/home/user/file.txt"), "file:///home/user/file.txt");
+        assert_eq!(path_to_uri("/path with spaces"), "file:///path%20with%20spaces");
+        assert_eq!(path_to_uri("relative/path"), "file:///relative/path");
+    }
+
+    #[test]
+    fn test_uri_roundtrip() {
+        let original = "/home/user/my project/file#1.txt";
+        let uri = path_to_uri(original);
+        let back = uri_to_path(&uri).unwrap();
+        assert_eq!(back, original);
+    }
+
+    // -- path comparison tests ---------------------------------------------
+
+    #[test]
+    fn test_paths_equal_ignore_case() {
+        assert!(paths_equal_ignore_case("A/B/C.txt", "a/b/c.txt"));
+        assert!(paths_equal_ignore_case("a\\b\\c", "A/B/C"));
+        assert!(!paths_equal_ignore_case("a/b", "a/c"));
+    }
+
+    #[test]
+    fn test_paths_equal() {
+        assert!(paths_equal("a/b/c", "a/b/c"));
+        assert!(paths_equal("a\\b\\c", "a/b/c"));
+        assert!(!paths_equal("a/b/C", "a/b/c"));
+    }
+
+    // -- breadcrumbs tests -------------------------------------------------
+
+    #[test]
+    fn test_breadcrumbs_absolute() {
+        let crumbs = breadcrumbs("/usr/local/bin");
+        assert_eq!(crumbs.len(), 3);
+        assert_eq!(crumbs[0].label, "usr");
+        assert_eq!(crumbs[0].path, "/usr");
+        assert_eq!(crumbs[1].label, "local");
+        assert_eq!(crumbs[1].path, "/usr/local");
+        assert_eq!(crumbs[2].label, "bin");
+        assert_eq!(crumbs[2].path, "/usr/local/bin");
+    }
+
+    #[test]
+    fn test_breadcrumbs_relative() {
+        let crumbs = breadcrumbs("src/lib/parser.rs");
+        assert_eq!(crumbs.len(), 3);
+        assert_eq!(crumbs[0].label, "src");
+        assert_eq!(crumbs[0].path, "src");
+        assert_eq!(crumbs[2].label, "parser.rs");
+        assert_eq!(crumbs[2].path, "src/lib/parser.rs");
+    }
+
+    // -- expand_tilde tests ------------------------------------------------
+
+    #[test]
+    fn test_expand_tilde() {
+        assert_eq!(expand_tilde("~/docs/file.txt", "/home/user"), "/home/user/docs/file.txt");
+        assert_eq!(expand_tilde("~", "/home/user"), "/home/user");
+        assert_eq!(expand_tilde("/absolute/path", "/home/user"), "/absolute/path");
+        assert_eq!(expand_tilde("relative", "/home/user"), "relative");
+    }
+
+    #[test]
+    fn test_expand_tilde_trailing_slash_home() {
+        assert_eq!(expand_tilde("~/file", "/home/user/"), "/home/user/file");
     }
 }

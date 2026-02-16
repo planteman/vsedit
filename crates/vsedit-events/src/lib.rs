@@ -1105,6 +1105,263 @@ impl<T: Clone + Send + Sync + 'static> EventAggregator<T> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// WildcardMatcher — glob-style pattern matching for event channel names
+// ---------------------------------------------------------------------------
+
+/// Matches event names against glob-style patterns.
+///
+/// Supports `*` (match any sequence of non-`.` chars) and `**` (match
+/// any sequence including `.`).  For example, `"editor.*"` matches
+/// `"editor.change"` but not `"editor.cursor.move"`, while
+/// `"editor.**"` matches both.
+pub struct WildcardMatcher {
+    pattern: String,
+}
+
+impl WildcardMatcher {
+    /// Create a new matcher from a pattern string.
+    pub fn new(pattern: impl Into<String>) -> Self {
+        Self {
+            pattern: pattern.into(),
+        }
+    }
+
+    /// Return the pattern string.
+    pub fn pattern(&self) -> &str {
+        &self.pattern
+    }
+
+    /// Test whether `name` matches this pattern.
+    pub fn matches(&self, name: &str) -> bool {
+        Self::do_match(self.pattern.as_bytes(), name.as_bytes())
+    }
+
+    fn do_match(pat: &[u8], name: &[u8]) -> bool {
+        // Handle "**" (matches everything including dots)
+        if pat == b"**" {
+            return true;
+        }
+
+        let mut pi = 0;
+        let mut ni = 0;
+        let mut star_pi: Option<usize> = None;
+        let mut star_ni: Option<usize> = None;
+
+        while ni < name.len() {
+            if pi < pat.len() && (pat[pi] == name[ni] || pat[pi] == b'?') {
+                pi += 1;
+                ni += 1;
+            } else if pi + 1 < pat.len() && pat[pi] == b'*' && pat[pi + 1] == b'*' {
+                // "**" — match everything
+                star_pi = Some(pi);
+                star_ni = Some(ni);
+                pi += 2;
+                // skip trailing dot after **
+                if pi < pat.len() && pat[pi] == b'.' {
+                    pi += 1;
+                }
+            } else if pi < pat.len() && pat[pi] == b'*' {
+                // single "*" — match non-dot chars
+                star_pi = Some(pi);
+                star_ni = Some(ni);
+                pi += 1;
+            } else if let (Some(sp), Some(sn)) = (star_pi, star_ni) {
+                // Backtrack: check if the star was a double-star
+                let is_double = sp + 1 < pat.len()
+                    && pat.get(sp) == Some(&b'*')
+                    && pat.get(sp + 1) == Some(&b'*');
+                if !is_double && name[sn] == b'.' {
+                    return false;
+                }
+                let new_sn = sn + 1;
+                star_ni = Some(new_sn);
+                ni = new_sn;
+                pi = sp + if is_double { 2 } else { 1 };
+                if is_double && pi < pat.len() && pat[pi] == b'.' {
+                    pi += 1;
+                }
+            } else {
+                return false;
+            }
+        }
+
+        // Consume trailing stars in pattern
+        while pi < pat.len() && pat[pi] == b'*' {
+            pi += 1;
+        }
+
+        pi == pat.len()
+    }
+}
+
+impl fmt::Debug for WildcardMatcher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WildcardMatcher")
+            .field("pattern", &self.pattern)
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EventCorrelation — group related events by correlation id
+// ---------------------------------------------------------------------------
+
+/// Groups events by a string correlation ID.
+///
+/// Useful for tracking a sequence of related events (e.g. all events
+/// belonging to a single user action or transaction).
+pub struct EventCorrelation<T> {
+    groups: std::collections::HashMap<String, Vec<T>>,
+}
+
+impl<T: Clone> EventCorrelation<T> {
+    /// Create a new empty correlation tracker.
+    pub fn new() -> Self {
+        Self {
+            groups: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Add an event to the correlation group identified by `id`.
+    pub fn add(&mut self, id: &str, value: T) {
+        self.groups
+            .entry(id.to_string())
+            .or_default()
+            .push(value);
+    }
+
+    /// Get all events in a correlation group.
+    pub fn get(&self, id: &str) -> Option<&[T]> {
+        self.groups.get(id).map(|v| v.as_slice())
+    }
+
+    /// Number of events in a specific group, or 0 if unknown.
+    pub fn group_size(&self, id: &str) -> usize {
+        self.groups.get(id).map_or(0, |v| v.len())
+    }
+
+    /// Number of active correlation groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Remove a completed correlation group and return its events.
+    pub fn complete(&mut self, id: &str) -> Option<Vec<T>> {
+        self.groups.remove(id)
+    }
+
+    /// Return all correlation IDs.
+    pub fn ids(&self) -> Vec<&str> {
+        self.groups.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Clear all groups.
+    pub fn clear(&mut self) {
+        self.groups.clear();
+    }
+
+    /// Total number of events across all groups.
+    pub fn total_events(&self) -> usize {
+        self.groups.values().map(|v| v.len()).sum()
+    }
+}
+
+impl<T: Clone> Default for EventCorrelation<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T: Clone> fmt::Debug for EventCorrelation<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EventCorrelation")
+            .field("groups", &self.groups.len())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EventRouter — route events to named handlers based on predicates
+// ---------------------------------------------------------------------------
+
+/// Routes events to one or more named handlers based on predicates.
+///
+/// Each route has a name, a predicate, and a handler. When an event is
+/// dispatched, all matching routes fire their handlers.
+pub struct EventRouter<T> {
+    routes: Vec<Route<T>>,
+}
+
+struct Route<T> {
+    name: String,
+    predicate: Box<dyn Fn(&T) -> bool + Send + Sync>,
+    handler: Arc<dyn Fn(&T) + Send + Sync>,
+}
+
+impl<T> EventRouter<T> {
+    /// Create a new empty router.
+    pub fn new() -> Self {
+        Self { routes: Vec::new() }
+    }
+
+    /// Add a named route. Events matching `predicate` will be sent to
+    /// `handler`.
+    pub fn add_route<P, H>(&mut self, name: impl Into<String>, predicate: P, handler: H)
+    where
+        P: Fn(&T) -> bool + Send + Sync + 'static,
+        H: Fn(&T) + Send + Sync + 'static,
+    {
+        self.routes.push(Route {
+            name: name.into(),
+            predicate: Box::new(predicate),
+            handler: Arc::new(handler),
+        });
+    }
+
+    /// Dispatch a value through the router. Returns the names of routes
+    /// that matched.
+    pub fn dispatch(&self, value: &T) -> Vec<&str> {
+        let mut matched = Vec::new();
+        for route in &self.routes {
+            if (route.predicate)(value) {
+                (route.handler)(value);
+                matched.push(route.name.as_str());
+            }
+        }
+        matched
+    }
+
+    /// Number of registered routes.
+    pub fn route_count(&self) -> usize {
+        self.routes.len()
+    }
+
+    /// Remove all routes with the given name.
+    pub fn remove_route(&mut self, name: &str) {
+        self.routes.retain(|r| r.name != name);
+    }
+
+    /// List all route names.
+    pub fn route_names(&self) -> Vec<&str> {
+        self.routes.iter().map(|r| r.name.as_str()).collect()
+    }
+}
+
+impl<T> Default for EventRouter<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> fmt::Debug for EventRouter<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EventRouter")
+            .field("routes", &self.route_count())
+            .finish()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1820,5 +2077,149 @@ mod tests {
         });
         agg.flush(); // no-op
         assert!(received.lock().unwrap().is_empty());
+    }
+
+    // -- WildcardMatcher tests -----------------------------------------------
+
+    #[test]
+    fn wildcard_exact_match() {
+        let m = WildcardMatcher::new("editor.change");
+        assert!(m.matches("editor.change"));
+        assert!(!m.matches("editor.scroll"));
+        assert!(!m.matches("editor"));
+    }
+
+    #[test]
+    fn wildcard_single_star_matches_segment() {
+        let m = WildcardMatcher::new("editor.*");
+        assert!(m.matches("editor.change"));
+        assert!(m.matches("editor.scroll"));
+        // single star should NOT cross dot boundaries
+        assert!(!m.matches("editor.cursor.move"));
+    }
+
+    #[test]
+    fn wildcard_double_star_matches_all() {
+        let m = WildcardMatcher::new("editor.**");
+        assert!(m.matches("editor.change"));
+        assert!(m.matches("editor.cursor.move"));
+        assert!(m.matches("editor.cursor.selection.expand"));
+        assert!(!m.matches("window.resize"));
+    }
+
+    #[test]
+    fn wildcard_bare_double_star() {
+        let m = WildcardMatcher::new("**");
+        assert!(m.matches("anything"));
+        assert!(m.matches("a.b.c.d"));
+        assert!(m.matches(""));
+    }
+
+    #[test]
+    fn wildcard_pattern_accessor() {
+        let m = WildcardMatcher::new("foo.*");
+        assert_eq!(m.pattern(), "foo.*");
+    }
+
+    // -- EventCorrelation tests ----------------------------------------------
+
+    #[test]
+    fn correlation_add_and_get() {
+        let mut corr = EventCorrelation::<String>::new();
+        corr.add("tx-1", "start".into());
+        corr.add("tx-1", "step-a".into());
+        corr.add("tx-2", "start".into());
+
+        assert_eq!(corr.group_count(), 2);
+        assert_eq!(corr.group_size("tx-1"), 2);
+        assert_eq!(corr.group_size("tx-2"), 1);
+        assert_eq!(corr.group_size("tx-3"), 0);
+        assert_eq!(corr.total_events(), 3);
+
+        let events = corr.get("tx-1").unwrap();
+        assert_eq!(events, &["start", "step-a"]);
+    }
+
+    #[test]
+    fn correlation_complete_removes_group() {
+        let mut corr = EventCorrelation::<i32>::new();
+        corr.add("g1", 10);
+        corr.add("g1", 20);
+        let completed = corr.complete("g1").unwrap();
+        assert_eq!(completed, vec![10, 20]);
+        assert_eq!(corr.group_count(), 0);
+        assert!(corr.complete("g1").is_none());
+    }
+
+    #[test]
+    fn correlation_clear() {
+        let mut corr = EventCorrelation::<i32>::new();
+        corr.add("a", 1);
+        corr.add("b", 2);
+        assert_eq!(corr.group_count(), 2);
+        corr.clear();
+        assert_eq!(corr.group_count(), 0);
+        assert_eq!(corr.total_events(), 0);
+    }
+
+    // -- EventRouter tests ---------------------------------------------------
+
+    #[test]
+    fn router_dispatches_to_matching_routes() {
+        let mut router = EventRouter::<i32>::new();
+        let evens = Arc::new(Mutex::new(Vec::new()));
+        let odds = Arc::new(Mutex::new(Vec::new()));
+
+        let e = evens.clone();
+        router.add_route("evens", |v| v % 2 == 0, move |v| {
+            e.lock().unwrap().push(*v);
+        });
+        let o = odds.clone();
+        router.add_route("odds", |v| v % 2 != 0, move |v| {
+            o.lock().unwrap().push(*v);
+        });
+
+        assert_eq!(router.route_count(), 2);
+
+        let matched = router.dispatch(&4);
+        assert_eq!(matched, vec!["evens"]);
+        let matched = router.dispatch(&7);
+        assert_eq!(matched, vec!["odds"]);
+
+        assert_eq!(*evens.lock().unwrap(), vec![4]);
+        assert_eq!(*odds.lock().unwrap(), vec![7]);
+    }
+
+    #[test]
+    fn router_remove_route() {
+        let mut router = EventRouter::<i32>::new();
+        router.add_route("a", |_| true, |_| {});
+        router.add_route("b", |_| true, |_| {});
+        assert_eq!(router.route_count(), 2);
+        router.remove_route("a");
+        assert_eq!(router.route_count(), 1);
+        assert_eq!(router.route_names(), vec!["b"]);
+    }
+
+    #[test]
+    fn router_multiple_routes_match_same_event() {
+        let mut router = EventRouter::<i32>::new();
+        let log = Arc::new(Mutex::new(Vec::new()));
+
+        let l1 = log.clone();
+        router.add_route("positive", |v| *v > 0, move |v| {
+            l1.lock().unwrap().push(format!("pos:{v}"));
+        });
+        let l2 = log.clone();
+        router.add_route("small", |v| *v < 10, move |v| {
+            l2.lock().unwrap().push(format!("small:{v}"));
+        });
+
+        let matched = router.dispatch(&5);
+        assert_eq!(matched, vec!["positive", "small"]);
+        assert_eq!(
+            *log.lock().unwrap(),
+            vec!["pos:5".to_string(), "small:5".to_string()]
+        );
     }
 }

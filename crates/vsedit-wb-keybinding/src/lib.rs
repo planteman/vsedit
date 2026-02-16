@@ -998,6 +998,346 @@ pub fn resolve_with_context<'a>(
         .max_by_key(|b| priority(&b.source))
 }
 
+/// A keybinding override layer that tracks user/extension overrides on top of defaults.
+///
+/// Overrides are applied by matching key+modifiers: when an override exists for a
+/// given key combo, it replaces the default binding's command during resolution.
+#[derive(Debug, Clone, Default)]
+pub struct KeybindingOverrideLayer {
+    overrides: Vec<KeybindingOverride>,
+}
+
+/// A single override entry that remaps a key combo to a different command.
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeybindingOverride {
+    pub key: String,
+    pub modifiers: Vec<KeyMod>,
+    pub original_command: String,
+    pub new_command: String,
+    pub when: Option<String>,
+}
+
+impl KeybindingOverrideLayer {
+    pub fn new() -> Self {
+        Self {
+            overrides: Vec::new(),
+        }
+    }
+
+    /// Add an override that remaps `original_command` on key+mods to `new_command`.
+    pub fn add_override(
+        &mut self,
+        key: &str,
+        modifiers: Vec<KeyMod>,
+        original_command: &str,
+        new_command: &str,
+        when: Option<&str>,
+    ) {
+        self.overrides.push(KeybindingOverride {
+            key: key.to_string(),
+            modifiers,
+            original_command: original_command.to_string(),
+            new_command: new_command.to_string(),
+            when: when.map(|s| s.to_string()),
+        });
+    }
+
+    /// Remove all overrides for a given key+modifiers combination.
+    pub fn remove_overrides_for_key(&mut self, key: &str, modifiers: &[KeyMod]) {
+        self.overrides
+            .retain(|o| !(o.key == key && o.modifiers == modifiers));
+    }
+
+    /// Look up the override for a key+modifiers+original_command triple.
+    pub fn find_override(
+        &self,
+        key: &str,
+        modifiers: &[KeyMod],
+        original_command: &str,
+    ) -> Option<&KeybindingOverride> {
+        self.overrides.iter().find(|o| {
+            o.key == key && o.modifiers == modifiers && o.original_command == original_command
+        })
+    }
+
+    /// Apply all overrides to a service, mutating bindings in-place.
+    /// Returns the number of bindings that were overridden.
+    pub fn apply_to(&self, service: &mut KeybindingService) -> usize {
+        let mut count = 0;
+        for binding in &mut service.bindings {
+            if let Some(ov) = self.overrides.iter().find(|o| {
+                o.key == binding.key
+                    && o.modifiers == binding.modifiers
+                    && o.original_command == binding.command
+            }) {
+                binding.command = ov.new_command.clone();
+                if ov.when.is_some() {
+                    binding.when = ov.when.clone();
+                }
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Return the number of overrides registered.
+    pub fn len(&self) -> usize {
+        self.overrides.len()
+    }
+
+    /// Returns true if there are no overrides.
+    pub fn is_empty(&self) -> bool {
+        self.overrides.is_empty()
+    }
+
+    /// Clear all overrides.
+    pub fn clear(&mut self) {
+        self.overrides.clear();
+    }
+
+    /// List all overrides.
+    pub fn iter(&self) -> std::slice::Iter<'_, KeybindingOverride> {
+        self.overrides.iter()
+    }
+}
+
+impl fmt::Display for KeybindingOverride {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mods: Vec<&str> = self
+            .modifiers
+            .iter()
+            .map(|m| match m {
+                KeyMod::CtrlCmd => "Ctrl",
+                KeyMod::Shift => "Shift",
+                KeyMod::Alt => "Alt",
+                KeyMod::WinCtrl => "Win",
+            })
+            .collect();
+        let key_str = if mods.is_empty() {
+            self.key.clone()
+        } else {
+            format!("{}+{}", mods.join("+"), self.key)
+        };
+        write!(
+            f,
+            "{}: {} -> {}",
+            key_str, self.original_command, self.new_command
+        )
+    }
+}
+
+/// Generate human-readable documentation for a set of keybindings.
+///
+/// Groups bindings by command prefix (the part before the first `.`) and
+/// formats them as a structured text document.
+pub fn generate_keybinding_docs(bindings: &[ResolvedKeybinding]) -> String {
+    let mut groups: std::collections::BTreeMap<String, Vec<&ResolvedKeybinding>> =
+        std::collections::BTreeMap::new();
+
+    for binding in bindings {
+        let category = binding
+            .command
+            .split('.')
+            .next()
+            .unwrap_or("other")
+            .to_string();
+        groups.entry(category).or_default().push(binding);
+    }
+
+    let mut doc = String::from("# Keybinding Reference\n\n");
+    for (category, group) in &groups {
+        doc.push_str(&format!("## {}\n\n", category));
+        doc.push_str("| Shortcut | Command | When | Source |\n");
+        doc.push_str("|----------|---------|------|--------|\n");
+        for b in group {
+            let shortcut = KeybindingService::format_binding(b);
+            let when_str = b.when.as_deref().unwrap_or("—");
+            doc.push_str(&format!(
+                "| {} | {} | {} | {} |\n",
+                shortcut, b.command, when_str, b.source
+            ));
+        }
+        doc.push('\n');
+    }
+    doc
+}
+
+/// Normalize modifier order in a binding to the canonical order: Ctrl, Shift, Alt, Win.
+/// Returns a new Vec with modifiers sorted in canonical order, with duplicates removed.
+pub fn normalize_modifiers(modifiers: &[KeyMod]) -> Vec<KeyMod> {
+    fn canonical_order(m: &KeyMod) -> u8 {
+        match m {
+            KeyMod::CtrlCmd => 0,
+            KeyMod::Shift => 1,
+            KeyMod::Alt => 2,
+            KeyMod::WinCtrl => 3,
+        }
+    }
+    let mut sorted: Vec<KeyMod> = Vec::new();
+    for m in modifiers {
+        if !sorted.contains(m) {
+            sorted.push(m.clone());
+        }
+    }
+    sorted.sort_by_key(|m| canonical_order(m));
+    sorted
+}
+
+/// Search keybindings across multiple fields (key, command, when, source).
+/// Returns bindings where *any* field matches the query substring (case-insensitive).
+pub fn search_bindings<'a>(
+    bindings: &'a [ResolvedKeybinding],
+    query: &str,
+) -> Vec<&'a ResolvedKeybinding> {
+    let q = query.to_lowercase();
+    bindings.iter().filter(|b| b.matches_filter(&q)).collect()
+}
+
+/// Build a reverse index: command → list of formatted key strings.
+pub fn build_command_key_index(
+    bindings: &[ResolvedKeybinding],
+) -> std::collections::HashMap<String, Vec<String>> {
+    let mut index: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for b in bindings {
+        let formatted = KeybindingService::format_binding(b);
+        index
+            .entry(b.command.clone())
+            .or_default()
+            .push(formatted);
+    }
+    index
+}
+
+/// Parse a binding definition string in the format `"key_chord -> command [when: clause]"`.
+///
+/// Examples:
+/// - `"Ctrl+S -> save"`
+/// - `"Ctrl+Shift+P -> showCommands [when: editorFocus]"`
+///
+/// Returns `None` if the format is invalid.
+pub fn parse_binding_definition(s: &str) -> Option<ResolvedKeybinding> {
+    let s = s.trim();
+    let arrow_pos = s.find("->")?;
+    let chord_part = s[..arrow_pos].trim();
+    let rest = s[arrow_pos + 2..].trim();
+
+    let (key, modifiers) = parse_key_chord(chord_part)?;
+
+    // Extract optional [when: ...] clause
+    let (command, when) = if let Some(bracket_start) = rest.find('[') {
+        let cmd = rest[..bracket_start].trim();
+        let bracket_end = rest.find(']')?;
+        let clause = rest[bracket_start + 1..bracket_end].trim();
+        let when_val = clause.strip_prefix("when:")?.trim().to_string();
+        (cmd.to_string(), Some(when_val))
+    } else {
+        (rest.to_string(), None)
+    };
+
+    if command.is_empty() {
+        return None;
+    }
+
+    Some(ResolvedKeybinding {
+        key,
+        modifiers,
+        command,
+        when,
+        source: KeybindingSource::User,
+    })
+}
+
+/// Serialize a list of bindings into definition strings that can be parsed back
+/// with `parse_binding_definition`.
+pub fn serialize_bindings(bindings: &[ResolvedKeybinding]) -> Vec<String> {
+    bindings
+        .iter()
+        .map(|b| {
+            let chord = KeybindingService::format_binding(b);
+            match &b.when {
+                Some(w) => format!("{} -> {} [when: {}]", chord, b.command, w),
+                None => format!("{} -> {}", chord, b.command),
+            }
+        })
+        .collect()
+}
+
+impl KeybindingService {
+    /// Rebind a command from one key combo to another.
+    /// Removes the old binding and creates a new one with the same command/when/source.
+    /// Returns `Err` if the old binding is not found.
+    pub fn rebind(
+        &mut self,
+        command: &str,
+        old_key: &str,
+        old_modifiers: &[KeyMod],
+        new_key: &str,
+        new_modifiers: Vec<KeyMod>,
+    ) -> Result<(), KeybindingError> {
+        let pos = self.bindings.iter().position(|b| {
+            b.command == command && b.key == old_key && b.modifiers == old_modifiers
+        });
+        match pos {
+            Some(idx) => {
+                let mut binding = self.bindings.remove(idx);
+                binding.key = new_key.to_string();
+                binding.modifiers = new_modifiers;
+                self.bindings.push(binding);
+                Ok(())
+            }
+            None => Err(KeybindingError::BindingNotFound),
+        }
+    }
+
+    /// Return all unique key+modifier combinations that have bindings.
+    pub fn bound_keys(&self) -> Vec<(String, Vec<KeyMod>)> {
+        let mut seen: Vec<(String, Vec<KeyMod>)> = Vec::new();
+        for b in &self.bindings {
+            let entry = (b.key.clone(), b.modifiers.clone());
+            if !seen.contains(&entry) {
+                seen.push(entry);
+            }
+        }
+        seen
+    }
+
+    /// Merge all bindings from another service into this one.
+    /// Does not check for conflicts.
+    pub fn merge_from(&mut self, other: &KeybindingService) {
+        for b in &other.bindings {
+            self.bindings.push(b.clone());
+        }
+    }
+
+    /// Replace all bindings for a command with a single new binding.
+    /// Returns the number of old bindings removed.
+    pub fn replace_command_binding(
+        &mut self,
+        command: &str,
+        new_key: &str,
+        new_modifiers: Vec<KeyMod>,
+        source: KeybindingSource,
+    ) -> usize {
+        let before = self.bindings.len();
+        let when = self
+            .bindings
+            .iter()
+            .find(|b| b.command == command)
+            .and_then(|b| b.when.clone());
+        self.bindings.retain(|b| b.command != command);
+        let removed = before - self.bindings.len();
+        self.bindings.push(ResolvedKeybinding {
+            key: new_key.to_string(),
+            modifiers: new_modifiers,
+            command: command.to_string(),
+            when,
+            source,
+        });
+        removed
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1842,5 +2182,208 @@ mod tests {
         ctx.set("editorFocus", true);
         let result = resolve_with_context(&svc, "S", &[KeyMod::CtrlCmd], &ctx);
         assert_eq!(result.unwrap().command, "save");
+    }
+
+    #[test]
+    fn override_layer_apply() {
+        let mut svc = KeybindingService::new();
+        svc.register(sample_binding("S", "save", vec![KeyMod::CtrlCmd]));
+        svc.register(sample_binding("N", "new_file", vec![KeyMod::CtrlCmd]));
+
+        let mut layer = KeybindingOverrideLayer::new();
+        layer.add_override("S", vec![KeyMod::CtrlCmd], "save", "custom_save", None);
+
+        assert_eq!(layer.len(), 1);
+        assert!(!layer.is_empty());
+
+        let count = layer.apply_to(&mut svc);
+        assert_eq!(count, 1);
+        assert_eq!(svc.resolve("S", &[KeyMod::CtrlCmd])[0].command, "custom_save");
+        // Unrelated binding unchanged
+        assert_eq!(svc.resolve("N", &[KeyMod::CtrlCmd])[0].command, "new_file");
+    }
+
+    #[test]
+    fn override_layer_find_and_remove() {
+        let mut layer = KeybindingOverrideLayer::new();
+        layer.add_override("S", vec![KeyMod::CtrlCmd], "save", "custom_save", Some("editorFocus"));
+        layer.add_override("S", vec![KeyMod::CtrlCmd], "search", "custom_search", None);
+
+        let found = layer.find_override("S", &[KeyMod::CtrlCmd], "save");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().new_command, "custom_save");
+        assert!(found.unwrap().when.is_some());
+
+        assert!(layer.find_override("X", &[], "nope").is_none());
+
+        layer.remove_overrides_for_key("S", &[KeyMod::CtrlCmd]);
+        assert!(layer.is_empty());
+    }
+
+    #[test]
+    fn override_display() {
+        let mut layer = KeybindingOverrideLayer::new();
+        layer.add_override("S", vec![KeyMod::CtrlCmd], "save", "custom_save", None);
+        let display = format!("{}", layer.iter().next().unwrap());
+        assert!(display.contains("Ctrl+S"));
+        assert!(display.contains("save"));
+        assert!(display.contains("custom_save"));
+    }
+
+    #[test]
+    fn generate_docs_groups_by_prefix() {
+        let bindings = vec![
+            sample_binding("S", "editor.save", vec![KeyMod::CtrlCmd]),
+            sample_binding("Z", "editor.undo", vec![KeyMod::CtrlCmd]),
+            sample_binding("N", "workbench.newFile", vec![KeyMod::CtrlCmd]),
+        ];
+        let docs = generate_keybinding_docs(&bindings);
+        assert!(docs.contains("# Keybinding Reference"));
+        assert!(docs.contains("## editor"));
+        assert!(docs.contains("## workbench"));
+        assert!(docs.contains("Ctrl+S"));
+        assert!(docs.contains("editor.save"));
+    }
+
+    #[test]
+    fn normalize_modifiers_dedup_and_sort() {
+        let mods = vec![KeyMod::Alt, KeyMod::CtrlCmd, KeyMod::Alt, KeyMod::Shift];
+        let normalized = normalize_modifiers(&mods);
+        assert_eq!(normalized, vec![KeyMod::CtrlCmd, KeyMod::Shift, KeyMod::Alt]);
+
+        let empty: Vec<KeyMod> = vec![];
+        assert!(normalize_modifiers(&empty).is_empty());
+    }
+
+    #[test]
+    fn search_bindings_filters() {
+        let bindings = vec![
+            sample_binding("S", "editor.save", vec![KeyMod::CtrlCmd]),
+            sample_binding("N", "workbench.newFile", vec![KeyMod::CtrlCmd]),
+        ];
+        let found = search_bindings(&bindings, "save");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].command, "editor.save");
+
+        let all = search_bindings(&bindings, "ctrl");
+        assert_eq!(all.len(), 0); // "ctrl" not in key/command/when/source lowercase
+    }
+
+    #[test]
+    fn build_command_key_index_works() {
+        let bindings = vec![
+            sample_binding("S", "save", vec![KeyMod::CtrlCmd]),
+            sample_binding("S", "save", vec![KeyMod::CtrlCmd, KeyMod::Shift]),
+        ];
+        let index = build_command_key_index(&bindings);
+        assert_eq!(index.get("save").unwrap().len(), 2);
+        assert!(index.get("save").unwrap().contains(&"Ctrl+S".to_string()));
+        assert!(index.get("save").unwrap().contains(&"Ctrl+Shift+S".to_string()));
+    }
+
+    #[test]
+    fn parse_binding_definition_simple() {
+        let b = parse_binding_definition("Ctrl+S -> save").unwrap();
+        assert_eq!(b.key, "S");
+        assert_eq!(b.modifiers, vec![KeyMod::CtrlCmd]);
+        assert_eq!(b.command, "save");
+        assert_eq!(b.when, None);
+        assert_eq!(b.source, KeybindingSource::User);
+    }
+
+    #[test]
+    fn parse_binding_definition_with_when() {
+        let b = parse_binding_definition("Ctrl+Shift+P -> showCommands [when: editorFocus]").unwrap();
+        assert_eq!(b.key, "P");
+        assert_eq!(b.modifiers, vec![KeyMod::CtrlCmd, KeyMod::Shift]);
+        assert_eq!(b.command, "showCommands");
+        assert_eq!(b.when, Some("editorFocus".to_string()));
+    }
+
+    #[test]
+    fn parse_binding_definition_invalid() {
+        assert!(parse_binding_definition("").is_none());
+        assert!(parse_binding_definition("no arrow here").is_none());
+        assert!(parse_binding_definition("-> no key").is_none());
+    }
+
+    #[test]
+    fn serialize_and_parse_roundtrip() {
+        let bindings = vec![
+            KeybindingBuilder::new().key("S").modifier(KeyMod::CtrlCmd).command("save")
+                .source(KeybindingSource::User).build(),
+            KeybindingBuilder::new().key("P").modifier(KeyMod::CtrlCmd).modifier(KeyMod::Shift)
+                .command("showCommands").when("editorFocus")
+                .source(KeybindingSource::User).build(),
+        ];
+        let serialized = serialize_bindings(&bindings);
+        assert_eq!(serialized.len(), 2);
+        assert!(serialized[0].contains("Ctrl+S -> save"));
+        assert!(serialized[1].contains("[when: editorFocus]"));
+
+        // Roundtrip parse
+        for (i, s) in serialized.iter().enumerate() {
+            let parsed = parse_binding_definition(s).unwrap();
+            assert_eq!(parsed.key, bindings[i].key);
+            assert_eq!(parsed.modifiers, bindings[i].modifiers);
+            assert_eq!(parsed.command, bindings[i].command);
+            assert_eq!(parsed.when, bindings[i].when);
+        }
+    }
+
+    #[test]
+    fn rebind_command() {
+        let mut svc = KeybindingService::new();
+        svc.register(sample_binding("S", "save", vec![KeyMod::CtrlCmd]));
+
+        let result = svc.rebind("save", "S", &[KeyMod::CtrlCmd], "W", vec![KeyMod::CtrlCmd]);
+        assert!(result.is_ok());
+        assert!(svc.resolve("S", &[KeyMod::CtrlCmd]).is_empty());
+        assert_eq!(svc.resolve("W", &[KeyMod::CtrlCmd])[0].command, "save");
+
+        // Rebinding non-existent binding fails
+        let err = svc.rebind("nope", "X", &[], "Y", vec![]);
+        assert_eq!(err, Err(KeybindingError::BindingNotFound));
+    }
+
+    #[test]
+    fn bound_keys_unique() {
+        let mut svc = KeybindingService::new();
+        svc.register(sample_binding("S", "save", vec![KeyMod::CtrlCmd]));
+        svc.register(sample_binding("S", "search", vec![KeyMod::CtrlCmd]));
+        svc.register(sample_binding("N", "new", vec![KeyMod::CtrlCmd]));
+
+        let keys = svc.bound_keys();
+        assert_eq!(keys.len(), 2);
+    }
+
+    #[test]
+    fn merge_from_combines_services() {
+        let mut svc1 = KeybindingService::new();
+        svc1.register(sample_binding("S", "save", vec![KeyMod::CtrlCmd]));
+
+        let mut svc2 = KeybindingService::new();
+        svc2.register(sample_binding("N", "new", vec![KeyMod::CtrlCmd]));
+        svc2.register(sample_binding("Z", "undo", vec![KeyMod::CtrlCmd]));
+
+        svc1.merge_from(&svc2);
+        assert_eq!(svc1.binding_count(), 3);
+    }
+
+    #[test]
+    fn replace_command_binding_replaces() {
+        let mut svc = KeybindingService::new();
+        svc.register(sample_binding("S", "save", vec![KeyMod::CtrlCmd]));
+        svc.register(sample_binding("S", "save", vec![KeyMod::CtrlCmd, KeyMod::Shift]));
+
+        let removed = svc.replace_command_binding(
+            "save", "W", vec![KeyMod::CtrlCmd], KeybindingSource::User,
+        );
+        assert_eq!(removed, 2);
+        assert_eq!(svc.binding_count(), 1);
+        let b = &svc.bindings[0];
+        assert_eq!(b.key, "W");
+        assert_eq!(b.command, "save");
+        assert_eq!(b.source, KeybindingSource::User);
     }
 }

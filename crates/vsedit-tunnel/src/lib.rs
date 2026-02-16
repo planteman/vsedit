@@ -1148,6 +1148,263 @@ impl TunnelPortRouter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Port range validation
+// ---------------------------------------------------------------------------
+
+/// Well-known port range boundaries.
+pub const WELL_KNOWN_PORT_MAX: u16 = 1023;
+pub const REGISTERED_PORT_MIN: u16 = 1024;
+pub const REGISTERED_PORT_MAX: u16 = 49151;
+pub const DYNAMIC_PORT_MIN: u16 = 49152;
+
+/// Classifies a port number into its IANA range category.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PortCategory {
+    /// Ports 0 (invalid) — rejected elsewhere.
+    Invalid,
+    /// Ports 1–1023: well-known / system ports.
+    WellKnown,
+    /// Ports 1024–49151: registered / user ports.
+    Registered,
+    /// Ports 49152–65535: dynamic / ephemeral ports.
+    Dynamic,
+}
+
+impl fmt::Display for PortCategory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Invalid => write!(f, "invalid"),
+            Self::WellKnown => write!(f, "well-known"),
+            Self::Registered => write!(f, "registered"),
+            Self::Dynamic => write!(f, "dynamic"),
+        }
+    }
+}
+
+/// Classify a port number into its IANA category.
+pub fn classify_port(port: u16) -> PortCategory {
+    match port {
+        0 => PortCategory::Invalid,
+        1..=WELL_KNOWN_PORT_MAX => PortCategory::WellKnown,
+        REGISTERED_PORT_MIN..=REGISTERED_PORT_MAX => PortCategory::Registered,
+        _ => PortCategory::Dynamic,
+    }
+}
+
+/// Returns `true` if the port is in the privileged / well-known range (1–1023).
+pub fn is_privileged_port(port: u16) -> bool {
+    port >= 1 && port <= WELL_KNOWN_PORT_MAX
+}
+
+/// Returns `true` if `port` is a commonly used development port.
+pub fn is_common_dev_port(port: u16) -> bool {
+    matches!(
+        port,
+        3000 | 3001 | 4200 | 5000 | 5173 | 5174 | 8000 | 8080 | 8443 | 8888 | 9000
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Protocol detection from port number
+// ---------------------------------------------------------------------------
+
+/// Detect the most likely protocol for a given port number.
+pub fn detect_protocol(port: u16) -> &'static str {
+    match port {
+        22 => "ssh",
+        80 | 8080 | 8000 | 3000 | 5000 => "http",
+        443 | 8443 => "https",
+        3306 => "mysql",
+        5432 => "postgres",
+        6379 => "redis",
+        27017 => "mongodb",
+        _ => "tcp",
+    }
+}
+
+// ---------------------------------------------------------------------------
+// URL construction for forwarded ports
+// ---------------------------------------------------------------------------
+
+/// Build a forwarded-port URL from a tunnel's base URI and a port number.
+///
+/// If `base_uri` is `https://abc.devtunnels.ms` and `port` is 3000 the result
+/// is `https://abc-3000.devtunnels.ms`.  When the base URI has no recognisable
+/// host component we fall back to `{base_uri}:{port}`.
+pub fn forwarded_port_url(base_uri: &str, port: u16) -> String {
+    // Strip trailing slash
+    let base = base_uri.trim_end_matches('/');
+
+    // Try to split on "://" to get scheme + host
+    if let Some(idx) = base.find("://") {
+        let scheme = &base[..idx];
+        let host = &base[idx + 3..];
+        // Insert port as a sub-domain style label: host → host-PORT
+        if let Some(dot_idx) = host.find('.') {
+            let subdomain = &host[..dot_idx];
+            let rest = &host[dot_idx..];
+            return format!("{scheme}://{subdomain}-{port}{rest}");
+        }
+        return format!("{scheme}://{host}:{port}");
+    }
+    format!("{base}:{port}")
+}
+
+// ---------------------------------------------------------------------------
+// Tunnel label formatting
+// ---------------------------------------------------------------------------
+
+/// Format a human-readable label for a tunnel port entry.
+///
+/// Examples:
+/// - `format_port_label(8080, Some("Web UI"))` → `"Web UI (:8080)"`
+/// - `format_port_label(3000, None)`            → `"Port 3000"`
+pub fn format_port_label(port: u16, label: Option<&str>) -> String {
+    match label {
+        Some(lbl) => format!("{lbl} (:{port})"),
+        None => format!("Port {port}"),
+    }
+}
+
+/// Format a compact tunnel summary suitable for status-bar display.
+pub fn format_tunnel_badge(name: &str, status: &TunnelStatus, port_count: usize) -> String {
+    let icon = match status {
+        TunnelStatus::Connected => "●",
+        TunnelStatus::Connecting => "◌",
+        TunnelStatus::Disconnected => "○",
+        TunnelStatus::Error(_) => "✖",
+    };
+    if port_count == 0 {
+        format!("{icon} {name}")
+    } else {
+        format!("{icon} {name} [{port_count} port{s}]", s = if port_count == 1 { "" } else { "s" })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Port conflict detection
+// ---------------------------------------------------------------------------
+
+/// Given a set of existing allocated ports, find the first available port
+/// starting from `start` (inclusive).  Returns `None` if the entire range
+/// up to `u16::MAX` is exhausted.
+pub fn find_available_port(allocated: &[u16], start: u16) -> Option<u16> {
+    let mut candidate = start;
+    loop {
+        if candidate == 0 {
+            candidate = 1;
+        }
+        if !allocated.contains(&candidate) {
+            return Some(candidate);
+        }
+        if candidate == u16::MAX {
+            return None;
+        }
+        candidate += 1;
+    }
+}
+
+/// Check all tunnels in a `TunnelService` for port conflicts (same port
+/// forwarded on more than one tunnel).  Returns a vec of `(port, Vec<tunnel_id>)`.
+pub fn detect_port_conflicts(service: &TunnelService) -> Vec<(u16, Vec<String>)> {
+    let mut port_owners: std::collections::HashMap<u16, Vec<String>> =
+        std::collections::HashMap::new();
+
+    for tunnel in service.get_all_tunnels() {
+        for p in &tunnel.ports {
+            port_owners
+                .entry(p.port)
+                .or_default()
+                .push(tunnel.id.clone());
+        }
+    }
+
+    let mut conflicts: Vec<(u16, Vec<String>)> = port_owners
+        .into_iter()
+        .filter(|(_, owners)| owners.len() > 1)
+        .collect();
+    conflicts.sort_by_key(|(port, _)| *port);
+    conflicts
+}
+
+// ---------------------------------------------------------------------------
+// Connection pool
+// ---------------------------------------------------------------------------
+
+/// A simple bounded pool of reusable connection slots identified by ID.
+#[derive(Debug)]
+pub struct ConnectionPool {
+    capacity: usize,
+    active: Vec<String>,
+}
+
+impl ConnectionPool {
+    /// Create a pool with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            capacity,
+            active: Vec::new(),
+        }
+    }
+
+    /// Try to acquire a slot.  Returns `true` if the connection was accepted.
+    pub fn acquire(&mut self, id: impl Into<String>) -> bool {
+        if self.active.len() >= self.capacity {
+            return false;
+        }
+        let id = id.into();
+        if self.active.contains(&id) {
+            return false; // already acquired
+        }
+        self.active.push(id);
+        true
+    }
+
+    /// Release a previously acquired slot.
+    pub fn release(&mut self, id: &str) -> bool {
+        let before = self.active.len();
+        self.active.retain(|s| s != id);
+        self.active.len() < before
+    }
+
+    /// Returns `true` if the pool is at capacity.
+    pub fn is_full(&self) -> bool {
+        self.active.len() >= self.capacity
+    }
+
+    /// Number of active connections.
+    pub fn active_count(&self) -> usize {
+        self.active.len()
+    }
+
+    /// Number of remaining available slots.
+    pub fn available(&self) -> usize {
+        self.capacity.saturating_sub(self.active.len())
+    }
+
+    /// Check whether a specific ID is currently held.
+    pub fn contains(&self, id: &str) -> bool {
+        self.active.iter().any(|s| s == id)
+    }
+
+    /// Drain all active connections, returning them.
+    pub fn drain_all(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.active)
+    }
+}
+
+impl fmt::Display for ConnectionPool {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ConnectionPool({}/{} active)",
+            self.active.len(),
+            self.capacity
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1834,5 +2091,177 @@ mod tests {
         assert!(router.remove_by_local_port(3000));
         assert!(!router.has_local_port(3000));
         assert_eq!(router.count(), 0);
+    }
+
+    // ── Port classification & validation ──────────────────────────
+
+    #[test]
+    fn classify_port_ranges() {
+        assert_eq!(classify_port(0), PortCategory::Invalid);
+        assert_eq!(classify_port(1), PortCategory::WellKnown);
+        assert_eq!(classify_port(80), PortCategory::WellKnown);
+        assert_eq!(classify_port(443), PortCategory::WellKnown);
+        assert_eq!(classify_port(1023), PortCategory::WellKnown);
+        assert_eq!(classify_port(1024), PortCategory::Registered);
+        assert_eq!(classify_port(8080), PortCategory::Registered);
+        assert_eq!(classify_port(49151), PortCategory::Registered);
+        assert_eq!(classify_port(49152), PortCategory::Dynamic);
+        assert_eq!(classify_port(65535), PortCategory::Dynamic);
+    }
+
+    #[test]
+    fn privileged_and_dev_ports() {
+        assert!(is_privileged_port(22));
+        assert!(is_privileged_port(443));
+        assert!(!is_privileged_port(0));
+        assert!(!is_privileged_port(8080));
+
+        assert!(is_common_dev_port(3000));
+        assert!(is_common_dev_port(8080));
+        assert!(!is_common_dev_port(12345));
+    }
+
+    #[test]
+    fn port_category_display() {
+        assert_eq!(PortCategory::WellKnown.to_string(), "well-known");
+        assert_eq!(PortCategory::Registered.to_string(), "registered");
+        assert_eq!(PortCategory::Dynamic.to_string(), "dynamic");
+        assert_eq!(PortCategory::Invalid.to_string(), "invalid");
+    }
+
+    // ── Protocol detection ────────────────────────────────────────
+
+    #[test]
+    fn detect_protocol_known_ports() {
+        assert_eq!(detect_protocol(22), "ssh");
+        assert_eq!(detect_protocol(80), "http");
+        assert_eq!(detect_protocol(443), "https");
+        assert_eq!(detect_protocol(3306), "mysql");
+        assert_eq!(detect_protocol(5432), "postgres");
+        assert_eq!(detect_protocol(6379), "redis");
+        assert_eq!(detect_protocol(27017), "mongodb");
+        assert_eq!(detect_protocol(12345), "tcp");
+    }
+
+    // ── URL construction ──────────────────────────────────────────
+
+    #[test]
+    fn forwarded_port_url_with_subdomain() {
+        let url = forwarded_port_url("https://abc.devtunnels.ms", 3000);
+        assert_eq!(url, "https://abc-3000.devtunnels.ms");
+    }
+
+    #[test]
+    fn forwarded_port_url_no_dot() {
+        let url = forwarded_port_url("https://localhost", 8080);
+        assert_eq!(url, "https://localhost:8080");
+    }
+
+    #[test]
+    fn forwarded_port_url_no_scheme() {
+        let url = forwarded_port_url("myhost", 9000);
+        assert_eq!(url, "myhost:9000");
+    }
+
+    // ── Label formatting ──────────────────────────────────────────
+
+    #[test]
+    fn format_port_label_with_and_without() {
+        assert_eq!(format_port_label(8080, Some("Web UI")), "Web UI (:8080)");
+        assert_eq!(format_port_label(3000, None), "Port 3000");
+    }
+
+    #[test]
+    fn format_tunnel_badge_variants() {
+        assert_eq!(
+            format_tunnel_badge("dev", &TunnelStatus::Connected, 2),
+            "● dev [2 ports]"
+        );
+        assert_eq!(
+            format_tunnel_badge("dev", &TunnelStatus::Connected, 1),
+            "● dev [1 port]"
+        );
+        assert_eq!(
+            format_tunnel_badge("dev", &TunnelStatus::Disconnected, 0),
+            "○ dev"
+        );
+        assert_eq!(
+            format_tunnel_badge("dev", &TunnelStatus::Error("x".into()), 0),
+            "✖ dev"
+        );
+        assert_eq!(
+            format_tunnel_badge("dev", &TunnelStatus::Connecting, 3),
+            "◌ dev [3 ports]"
+        );
+    }
+
+    // ── Port conflict detection ───────────────────────────────────
+
+    #[test]
+    fn find_available_port_skips_allocated() {
+        let allocated = vec![3000, 3001, 3002];
+        assert_eq!(find_available_port(&allocated, 3000), Some(3003));
+        assert_eq!(find_available_port(&allocated, 3001), Some(3003));
+        assert_eq!(find_available_port(&[], 8080), Some(8080));
+    }
+
+    #[test]
+    fn detect_port_conflicts_across_tunnels() {
+        let mut svc = TunnelService::new();
+        let t1 = svc.create_tunnel("web", TunnelAccess::Private);
+        let t2 = svc.create_tunnel("api", TunnelAccess::Private);
+        svc.add_port(&t1, TunnelPort { port: 8080, protocol: "http".into(), label: None });
+        svc.add_port(&t2, TunnelPort { port: 8080, protocol: "http".into(), label: None });
+        svc.add_port(&t2, TunnelPort { port: 3000, protocol: "http".into(), label: None });
+
+        let conflicts = detect_port_conflicts(&svc);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].0, 8080);
+        assert_eq!(conflicts[0].1.len(), 2);
+    }
+
+    // ── Connection pool ───────────────────────────────────────────
+
+    #[test]
+    fn connection_pool_acquire_release() {
+        let mut pool = ConnectionPool::new(2);
+        assert_eq!(pool.available(), 2);
+        assert!(pool.acquire("conn-1"));
+        assert!(pool.acquire("conn-2"));
+        assert!(!pool.acquire("conn-3")); // full
+        assert!(pool.is_full());
+        assert!(pool.contains("conn-1"));
+
+        assert!(pool.release("conn-1"));
+        assert!(!pool.is_full());
+        assert_eq!(pool.active_count(), 1);
+        assert_eq!(pool.available(), 1);
+
+        assert!(pool.acquire("conn-3"));
+        assert_eq!(pool.to_string(), "ConnectionPool(2/2 active)");
+    }
+
+    #[test]
+    fn connection_pool_drain() {
+        let mut pool = ConnectionPool::new(3);
+        pool.acquire("a");
+        pool.acquire("b");
+        let drained = pool.drain_all();
+        assert_eq!(drained.len(), 2);
+        assert_eq!(pool.active_count(), 0);
+    }
+
+    #[test]
+    fn connection_pool_duplicate_rejected() {
+        let mut pool = ConnectionPool::new(5);
+        assert!(pool.acquire("x"));
+        assert!(!pool.acquire("x")); // already held
+        assert_eq!(pool.active_count(), 1);
+    }
+
+    #[test]
+    fn connection_pool_release_unknown() {
+        let mut pool = ConnectionPool::new(5);
+        assert!(!pool.release("nonexistent"));
     }
 }

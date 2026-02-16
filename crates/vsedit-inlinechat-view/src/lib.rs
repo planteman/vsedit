@@ -1066,6 +1066,256 @@ pub fn edits_in_selection(response: &InlineChatResponse, start_line: u32, end_li
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Code block extraction from chat messages
+// ---------------------------------------------------------------------------
+
+/// A code block extracted from a chat message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeBlock {
+    /// Optional language identifier (e.g. "rust", "python").
+    pub language: Option<String>,
+    /// The code content without the fence markers.
+    pub code: String,
+}
+
+/// Extract fenced code blocks (``` delimited) from a message string.
+pub fn extract_code_blocks(text: &str) -> Vec<CodeBlock> {
+    let mut blocks = Vec::new();
+    let mut lines = text.lines().peekable();
+
+    while let Some(line) = lines.next() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            let lang_tag = trimmed.trim_start_matches('`').trim();
+            let language = if lang_tag.is_empty() {
+                None
+            } else {
+                Some(lang_tag.to_string())
+            };
+
+            let mut code_lines: Vec<&str> = Vec::new();
+            for inner in lines.by_ref() {
+                if inner.trim().starts_with("```") {
+                    break;
+                }
+                code_lines.push(inner);
+            }
+            blocks.push(CodeBlock {
+                language,
+                code: code_lines.join("\n"),
+            });
+        }
+    }
+    blocks
+}
+
+// ---------------------------------------------------------------------------
+// Suggestion accept/reject tracking
+// ---------------------------------------------------------------------------
+
+/// Outcome of a suggestion review.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SuggestionOutcome {
+    Accepted,
+    Rejected,
+    Partial,
+}
+
+/// Tracks accept/reject statistics for inline chat suggestions.
+#[derive(Debug, Clone, Default)]
+pub struct SuggestionTracker {
+    outcomes: Vec<SuggestionOutcome>,
+}
+
+impl SuggestionTracker {
+    pub fn new() -> Self {
+        Self { outcomes: Vec::new() }
+    }
+
+    pub fn record(&mut self, outcome: SuggestionOutcome) {
+        self.outcomes.push(outcome);
+    }
+
+    pub fn total(&self) -> usize {
+        self.outcomes.len()
+    }
+
+    pub fn count(&self, outcome: SuggestionOutcome) -> usize {
+        self.outcomes.iter().filter(|o| **o == outcome).count()
+    }
+
+    /// Acceptance rate as a value between 0.0 and 1.0.
+    pub fn acceptance_rate(&self) -> f64 {
+        if self.outcomes.is_empty() {
+            return 0.0;
+        }
+        self.count(SuggestionOutcome::Accepted) as f64 / self.outcomes.len() as f64
+    }
+
+    pub fn clear(&mut self) {
+        self.outcomes.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Typing indicator state
+// ---------------------------------------------------------------------------
+
+/// State of a typing/thinking indicator shown while waiting for a response.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TypingIndicatorState {
+    Hidden,
+    Thinking,
+    Generating,
+}
+
+impl fmt::Display for TypingIndicatorState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Hidden => write!(f, ""),
+            Self::Thinking => write!(f, "Thinking..."),
+            Self::Generating => write!(f, "Generating..."),
+        }
+    }
+}
+
+/// Manages the typing indicator lifecycle.
+#[derive(Debug, Clone)]
+pub struct TypingIndicator {
+    state: TypingIndicatorState,
+    elapsed_ms: u64,
+}
+
+impl TypingIndicator {
+    pub fn new() -> Self {
+        Self {
+            state: TypingIndicatorState::Hidden,
+            elapsed_ms: 0,
+        }
+    }
+
+    pub fn show_thinking(&mut self) {
+        self.state = TypingIndicatorState::Thinking;
+        self.elapsed_ms = 0;
+    }
+
+    pub fn show_generating(&mut self) {
+        self.state = TypingIndicatorState::Generating;
+    }
+
+    pub fn hide(&mut self) {
+        self.state = TypingIndicatorState::Hidden;
+        self.elapsed_ms = 0;
+    }
+
+    pub fn tick(&mut self, delta_ms: u64) {
+        self.elapsed_ms += delta_ms;
+    }
+
+    pub fn state(&self) -> &TypingIndicatorState {
+        &self.state
+    }
+
+    pub fn elapsed_ms(&self) -> u64 {
+        self.elapsed_ms
+    }
+
+    pub fn is_visible(&self) -> bool {
+        self.state != TypingIndicatorState::Hidden
+    }
+
+    /// Render a simple animation frame based on elapsed time.
+    pub fn render_frame(&self) -> &str {
+        match self.state {
+            TypingIndicatorState::Hidden => "",
+            TypingIndicatorState::Thinking | TypingIndicatorState::Generating => {
+                let dots = (self.elapsed_ms / 500) % 4;
+                match dots {
+                    0 => "",
+                    1 => ".",
+                    2 => "..",
+                    _ => "...",
+                }
+            }
+        }
+    }
+}
+
+impl Default for TypingIndicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Message filtering
+// ---------------------------------------------------------------------------
+
+/// Filter criteria for searching chat messages.
+#[derive(Debug, Clone)]
+pub struct MessageFilter {
+    pub role: Option<ChatRole>,
+    pub keyword: Option<String>,
+    pub min_word_count: Option<usize>,
+}
+
+impl MessageFilter {
+    pub fn new() -> Self {
+        Self {
+            role: None,
+            keyword: None,
+            min_word_count: None,
+        }
+    }
+
+    pub fn with_role(mut self, role: ChatRole) -> Self {
+        self.role = Some(role);
+        self
+    }
+
+    pub fn with_keyword(mut self, keyword: impl Into<String>) -> Self {
+        self.keyword = Some(keyword.into());
+        self
+    }
+
+    pub fn with_min_words(mut self, min: usize) -> Self {
+        self.min_word_count = Some(min);
+        self
+    }
+
+    /// Test whether a message matches this filter.
+    pub fn matches(&self, msg: &ChatMessage) -> bool {
+        if let Some(ref role) = self.role {
+            if &msg.role != role {
+                return false;
+            }
+        }
+        if let Some(ref kw) = self.keyword {
+            if !msg.content.to_lowercase().contains(&kw.to_lowercase()) {
+                return false;
+            }
+        }
+        if let Some(min) = self.min_word_count {
+            if msg.word_count() < min {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+impl Default for MessageFilter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Apply a filter to a chat history and return matching messages.
+pub fn filter_messages<'a>(history: &'a ChatHistory, filter: &MessageFilter) -> Vec<&'a ChatMessage> {
+    history.messages().iter().filter(|m| filter.matches(m)).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1816,5 +2066,150 @@ mod tests {
         assert_eq!(edits_in_selection(&response, 4, 8).len(), 1);
         assert_eq!(edits_in_selection(&response, 0, 100).len(), 3);
         assert_eq!(edits_in_selection(&response, 13, 20).len(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Code block extraction tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn extract_code_blocks_single() {
+        let text = "Here is code:\n```rust\nfn main() {}\n```\nDone.";
+        let blocks = extract_code_blocks(text);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].language, Some("rust".to_string()));
+        assert_eq!(blocks[0].code, "fn main() {}");
+    }
+
+    #[test]
+    fn extract_code_blocks_multiple() {
+        let text = "```python\nprint('hi')\n```\ntext\n```\nplain\n```";
+        let blocks = extract_code_blocks(text);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0].language, Some("python".to_string()));
+        assert_eq!(blocks[0].code, "print('hi')");
+        assert_eq!(blocks[1].language, None);
+        assert_eq!(blocks[1].code, "plain");
+    }
+
+    #[test]
+    fn extract_code_blocks_none() {
+        let text = "No code blocks here.";
+        let blocks = extract_code_blocks(text);
+        assert!(blocks.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Suggestion tracker tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn suggestion_tracker_records_and_counts() {
+        let mut tracker = SuggestionTracker::new();
+        tracker.record(SuggestionOutcome::Accepted);
+        tracker.record(SuggestionOutcome::Rejected);
+        tracker.record(SuggestionOutcome::Accepted);
+        tracker.record(SuggestionOutcome::Partial);
+        assert_eq!(tracker.total(), 4);
+        assert_eq!(tracker.count(SuggestionOutcome::Accepted), 2);
+        assert_eq!(tracker.count(SuggestionOutcome::Rejected), 1);
+        assert_eq!(tracker.count(SuggestionOutcome::Partial), 1);
+        assert!((tracker.acceptance_rate() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn suggestion_tracker_empty_rate() {
+        let tracker = SuggestionTracker::new();
+        assert_eq!(tracker.acceptance_rate(), 0.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Typing indicator tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn typing_indicator_lifecycle() {
+        let mut indicator = TypingIndicator::new();
+        assert!(!indicator.is_visible());
+        assert_eq!(*indicator.state(), TypingIndicatorState::Hidden);
+
+        indicator.show_thinking();
+        assert!(indicator.is_visible());
+        assert_eq!(*indicator.state(), TypingIndicatorState::Thinking);
+        assert_eq!(indicator.elapsed_ms(), 0);
+
+        indicator.tick(600);
+        assert_eq!(indicator.elapsed_ms(), 600);
+
+        indicator.show_generating();
+        assert_eq!(*indicator.state(), TypingIndicatorState::Generating);
+
+        indicator.hide();
+        assert!(!indicator.is_visible());
+        assert_eq!(indicator.elapsed_ms(), 0);
+    }
+
+    #[test]
+    fn typing_indicator_render_frames() {
+        let mut indicator = TypingIndicator::new();
+        indicator.show_thinking();
+        assert_eq!(indicator.render_frame(), "");
+        indicator.tick(500);
+        assert_eq!(indicator.render_frame(), ".");
+        indicator.tick(500);
+        assert_eq!(indicator.render_frame(), "..");
+        indicator.tick(500);
+        assert_eq!(indicator.render_frame(), "...");
+    }
+
+    #[test]
+    fn typing_indicator_display() {
+        assert_eq!(TypingIndicatorState::Hidden.to_string(), "");
+        assert_eq!(TypingIndicatorState::Thinking.to_string(), "Thinking...");
+        assert_eq!(TypingIndicatorState::Generating.to_string(), "Generating...");
+    }
+
+    // -----------------------------------------------------------------------
+    // Message filter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn message_filter_by_role() {
+        let mut history = ChatHistory::new();
+        history.push(ChatMessage::new(ChatRole::User, "hello world", 100));
+        history.push(ChatMessage::new(ChatRole::Assistant, "hi there friend", 200));
+        history.push(ChatMessage::new(ChatRole::User, "goodbye world", 300));
+
+        let filter = MessageFilter::new().with_role(ChatRole::User);
+        let results = filter_messages(&history, &filter);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].content, "hello world");
+    }
+
+    #[test]
+    fn message_filter_by_keyword() {
+        let mut history = ChatHistory::new();
+        history.push(ChatMessage::new(ChatRole::User, "fix the bug", 100));
+        history.push(ChatMessage::new(ChatRole::Assistant, "done with feature", 200));
+        history.push(ChatMessage::new(ChatRole::User, "another bug report", 300));
+
+        let filter = MessageFilter::new().with_keyword("bug");
+        let results = filter_messages(&history, &filter);
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn message_filter_combined() {
+        let mut history = ChatHistory::new();
+        history.push(ChatMessage::new(ChatRole::User, "short", 100));
+        history.push(ChatMessage::new(ChatRole::User, "a longer message with many words", 200));
+        history.push(ChatMessage::new(ChatRole::Assistant, "a longer response with many words too", 300));
+
+        let filter = MessageFilter::new()
+            .with_role(ChatRole::User)
+            .with_min_words(4);
+        let results = filter_messages(&history, &filter);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].content, "a longer message with many words");
     }
 }

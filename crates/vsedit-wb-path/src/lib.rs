@@ -1077,6 +1077,426 @@ pub fn expand_tilde(path: &str, home_dir: &str) -> String {
     path.to_string()
 }
 
+// ---------------------------------------------------------------------------
+// PathLabelFormatter – compact and full path label formatting
+// ---------------------------------------------------------------------------
+
+/// Formats paths into human-readable labels for display in UI elements such as
+/// tabs, breadcrumbs, and status bars.
+#[derive(Debug, Clone)]
+pub struct PathLabelFormatter {
+    /// The workspace root against which paths are made relative.
+    workspace_root: String,
+    /// Home directory for tilde substitution.
+    home_dir: String,
+    separator: PathSeparator,
+}
+
+impl PathLabelFormatter {
+    /// Create a new formatter with the given workspace root and home directory.
+    pub fn new(workspace_root: &str, home_dir: &str, separator: PathSeparator) -> Self {
+        Self {
+            workspace_root: workspace_root.trim_end_matches(|c| c == '/' || c == '\\').to_string(),
+            home_dir: home_dir.trim_end_matches(|c| c == '/' || c == '\\').to_string(),
+            separator,
+        }
+    }
+
+    /// Produce a compact label: workspace-relative if possible, otherwise
+    /// tilde-shortened, otherwise the full path. The basename is always shown;
+    /// the parent directory is included when `show_parent` is true.
+    pub fn compact(&self, path: &str, show_parent: bool) -> String {
+        let svc = PathService::new(self.separator);
+        let rel = self.workspace_relative(path);
+        let display = rel.as_deref().unwrap_or(path);
+        if show_parent {
+            let dir = svc.dirname(display);
+            let base = svc.basename(display);
+            if dir == "." {
+                base.to_string()
+            } else {
+                let short_dir = svc.basename(dir);
+                let sep = self.separator.as_char();
+                format!("{short_dir}{sep}{base}")
+            }
+        } else {
+            svc.basename(display).to_string()
+        }
+    }
+
+    /// Produce a full label: workspace-relative with tilde fallback.
+    pub fn full(&self, path: &str) -> String {
+        if let Some(rel) = self.workspace_relative(path) {
+            return rel;
+        }
+        path_shorten(path, &self.home_dir)
+    }
+
+    /// Return the workspace-relative path, or `None` if the path is outside
+    /// the workspace.
+    pub fn workspace_relative(&self, path: &str) -> Option<String> {
+        let svc = PathService::new(self.separator);
+        let norm = svc.normalize(path);
+        let root_prefix = format!("{}{}", self.workspace_root, self.separator.as_char());
+        if norm == self.workspace_root {
+            return Some(".".to_string());
+        }
+        if let Some(rest) = norm.strip_prefix(&root_prefix) {
+            Some(rest.to_string())
+        } else {
+            None
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathIconResolver – file icon resolution by extension
+// ---------------------------------------------------------------------------
+
+/// Maps file extensions to icon identifiers for use in workbench tree views,
+/// tabs, and explorer panels.
+#[derive(Debug, Clone)]
+pub struct PathIconResolver {
+    mappings: Vec<(String, String)>,
+    default_file_icon: String,
+    default_folder_icon: String,
+}
+
+impl PathIconResolver {
+    /// Create a resolver pre-loaded with common language/file-type mappings.
+    pub fn new() -> Self {
+        let mut mappings = Vec::new();
+        let defaults: &[(&str, &str)] = &[
+            (".rs", "rust"),
+            (".toml", "toml"),
+            (".json", "json"),
+            (".yaml", "yaml"),
+            (".yml", "yaml"),
+            (".js", "javascript"),
+            (".ts", "typescript"),
+            (".tsx", "react"),
+            (".jsx", "react"),
+            (".py", "python"),
+            (".go", "go"),
+            (".md", "markdown"),
+            (".txt", "text"),
+            (".html", "html"),
+            (".css", "css"),
+            (".svg", "svg"),
+            (".png", "image"),
+            (".jpg", "image"),
+            (".gif", "image"),
+            (".lock", "lock"),
+            (".sh", "shell"),
+            (".bash", "shell"),
+            (".zsh", "shell"),
+            (".c", "c"),
+            (".cpp", "cpp"),
+            (".h", "c-header"),
+            (".java", "java"),
+            (".xml", "xml"),
+            (".sql", "database"),
+        ];
+        for (ext, icon) in defaults {
+            mappings.push((ext.to_string(), icon.to_string()));
+        }
+        Self {
+            mappings,
+            default_file_icon: "file".to_string(),
+            default_folder_icon: "folder".to_string(),
+        }
+    }
+
+    /// Register a custom extension-to-icon mapping (extension must include
+    /// the leading dot).
+    pub fn add_mapping(&mut self, extension: &str, icon: &str) {
+        self.mappings.push((extension.to_string(), icon.to_string()));
+    }
+
+    /// Resolve the icon identifier for a file path.
+    pub fn resolve(&self, path: &str) -> &str {
+        let svc = PathService::default();
+        if let Some(ext) = svc.extname(path) {
+            let ext_lower = ext.to_ascii_lowercase();
+            for (mapped_ext, icon) in self.mappings.iter().rev() {
+                if mapped_ext == &ext_lower {
+                    return icon;
+                }
+            }
+        }
+        // Special filenames
+        let base = svc.basename(path);
+        match base {
+            "Cargo.toml" | "Cargo.lock" => "rust",
+            "package.json" => "npm",
+            "Makefile" | "CMakeLists.txt" => "build",
+            "Dockerfile" => "docker",
+            ".gitignore" | ".gitattributes" => "git",
+            "LICENSE" | "LICENSE.md" => "certificate",
+            "README.md" | "README" => "info",
+            _ => &self.default_file_icon,
+        }
+    }
+
+    /// Resolve the icon for a directory.
+    pub fn resolve_folder(&self, name: &str) -> &str {
+        match name {
+            "src" | "lib" => "folder-src",
+            "test" | "tests" | "__tests__" => "folder-test",
+            "docs" | "doc" => "folder-docs",
+            "target" | "build" | "dist" | "out" => "folder-build",
+            ".git" => "folder-git",
+            "node_modules" => "folder-node",
+            ".github" => "folder-github",
+            "crates" => "folder-crate",
+            _ => &self.default_folder_icon,
+        }
+    }
+}
+
+impl Default for PathIconResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathBookmarkManager – bookmark management for paths
+// ---------------------------------------------------------------------------
+
+/// Manages a set of bookmarked paths with labels.
+#[derive(Debug, Clone)]
+pub struct PathBookmarkManager {
+    bookmarks: Vec<PathBookmark>,
+}
+
+/// A single bookmarked path entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PathBookmark {
+    /// User-visible label for the bookmark.
+    pub label: String,
+    /// The bookmarked path.
+    pub path: String,
+}
+
+impl PathBookmarkManager {
+    pub fn new() -> Self {
+        Self {
+            bookmarks: Vec::new(),
+        }
+    }
+
+    /// Add a bookmark. Returns `false` if the path is already bookmarked.
+    pub fn add(&mut self, label: &str, path: &str) -> bool {
+        if self.bookmarks.iter().any(|b| b.path == path) {
+            return false;
+        }
+        self.bookmarks.push(PathBookmark {
+            label: label.to_string(),
+            path: path.to_string(),
+        });
+        true
+    }
+
+    /// Remove a bookmark by path. Returns `true` if it was found and removed.
+    pub fn remove(&mut self, path: &str) -> bool {
+        let before = self.bookmarks.len();
+        self.bookmarks.retain(|b| b.path != path);
+        self.bookmarks.len() < before
+    }
+
+    /// Check whether a path is bookmarked.
+    pub fn contains(&self, path: &str) -> bool {
+        self.bookmarks.iter().any(|b| b.path == path)
+    }
+
+    /// Return all bookmarks.
+    pub fn list(&self) -> &[PathBookmark] {
+        &self.bookmarks
+    }
+
+    /// Find bookmarks whose label or path contains `query` (case-insensitive).
+    pub fn search(&self, query: &str) -> Vec<&PathBookmark> {
+        let q = query.to_ascii_lowercase();
+        self.bookmarks
+            .iter()
+            .filter(|b| {
+                b.label.to_ascii_lowercase().contains(&q)
+                    || b.path.to_ascii_lowercase().contains(&q)
+            })
+            .collect()
+    }
+
+    /// Return the number of bookmarks.
+    pub fn len(&self) -> usize {
+        self.bookmarks.len()
+    }
+
+    /// Return `true` if there are no bookmarks.
+    pub fn is_empty(&self) -> bool {
+        self.bookmarks.is_empty()
+    }
+}
+
+impl Default for PathBookmarkManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PathTemplateExpander – expand template variables in paths
+// ---------------------------------------------------------------------------
+
+/// Expands `${variable}` placeholders within path strings against a set of
+/// registered variables.
+#[derive(Debug, Clone)]
+pub struct PathTemplateExpander {
+    variables: Vec<(String, String)>,
+}
+
+impl PathTemplateExpander {
+    pub fn new() -> Self {
+        Self {
+            variables: Vec::new(),
+        }
+    }
+
+    /// Register a variable name and its value.
+    pub fn set(&mut self, name: &str, value: &str) {
+        // Update existing or insert new.
+        for (k, v) in &mut self.variables {
+            if k == name {
+                *v = value.to_string();
+                return;
+            }
+        }
+        self.variables.push((name.to_string(), value.to_string()));
+    }
+
+    /// Expand all `${name}` placeholders in `template`. Unknown variables are
+    /// left as-is.
+    pub fn expand(&self, template: &str) -> String {
+        let mut result = template.to_string();
+        for (name, value) in &self.variables {
+            let placeholder = format!("${{{name}}}");
+            result = result.replace(&placeholder, value);
+        }
+        result
+    }
+
+    /// Return the names of all registered variables.
+    pub fn variables(&self) -> Vec<&str> {
+        self.variables.iter().map(|(k, _)| k.as_str()).collect()
+    }
+
+    /// Return the value of a variable, if registered.
+    pub fn get(&self, name: &str) -> Option<&str> {
+        self.variables
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v.as_str())
+    }
+}
+
+impl Default for PathTemplateExpander {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OS-specific path validation
+// ---------------------------------------------------------------------------
+
+/// Characters forbidden in Windows file/directory names.
+const WINDOWS_FORBIDDEN_CHARS: &[char] = &['<', '>', ':', '"', '|', '?', '*'];
+
+/// Reserved device names on Windows (case-insensitive).
+const WINDOWS_RESERVED_NAMES: &[&str] = &[
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+];
+
+/// Validate that a filename is legal on Windows. Returns a list of problems
+/// (empty if valid).
+pub fn validate_filename_windows(name: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    if name.is_empty() {
+        problems.push("filename must not be empty".to_string());
+        return problems;
+    }
+    if name.len() > 255 {
+        problems.push(format!("filename length {} exceeds 255", name.len()));
+    }
+    for ch in WINDOWS_FORBIDDEN_CHARS {
+        if name.contains(*ch) {
+            problems.push(format!("contains forbidden character '{ch}'"));
+        }
+    }
+    if name.ends_with('.') || name.ends_with(' ') {
+        problems.push("must not end with a period or space".to_string());
+    }
+    // Check for control characters (0x00–0x1F).
+    if name.chars().any(|c| (c as u32) < 0x20) {
+        problems.push("contains control characters".to_string());
+    }
+    let upper = name.to_ascii_uppercase();
+    let stem = upper.split('.').next().unwrap_or(&upper);
+    if WINDOWS_RESERVED_NAMES.contains(&stem) {
+        problems.push(format!("'{stem}' is a reserved device name"));
+    }
+    problems
+}
+
+/// Validate that a filename is legal on Unix/Linux. Returns a list of problems
+/// (empty if valid).
+pub fn validate_filename_unix(name: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    if name.is_empty() {
+        problems.push("filename must not be empty".to_string());
+        return problems;
+    }
+    if name.len() > 255 {
+        problems.push(format!("filename length {} exceeds 255", name.len()));
+    }
+    if name.contains('/') {
+        problems.push("contains path separator '/'".to_string());
+    }
+    if name.contains('\0') {
+        problems.push("contains null byte".to_string());
+    }
+    problems
+}
+
+/// Validate a full path's segments for the given OS.
+pub fn validate_path_segments(path: &str, sep: PathSeparator) -> Vec<String> {
+    let parts: Vec<&str> = path
+        .split(|c: char| c == '/' || c == '\\')
+        .filter(|s| !s.is_empty())
+        .collect();
+    let mut problems = Vec::new();
+    for part in &parts {
+        // Skip drive letter segments like "C:".
+        if sep == PathSeparator::Windows
+            && part.len() == 2
+            && part.as_bytes()[0].is_ascii_alphabetic()
+            && part.as_bytes()[1] == b':'
+        {
+            continue;
+        }
+        let segment_problems = match sep {
+            PathSeparator::Windows => validate_filename_windows(part),
+            PathSeparator::Unix => validate_filename_unix(part),
+        };
+        for p in segment_problems {
+            problems.push(format!("segment '{}': {}", part, p));
+        }
+    }
+    problems
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1830,5 +2250,139 @@ mod tests {
     #[test]
     fn test_expand_tilde_trailing_slash() {
         assert_eq!(expand_tilde("~/a", "/home/user/"), "/home/user/a");
+    }
+
+    // -----------------------------------------------------------------------
+    // PathLabelFormatter tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn label_formatter_compact_workspace_relative() {
+        let fmt = PathLabelFormatter::new("/home/user/project", "/home/user", PathSeparator::Unix);
+        assert_eq!(fmt.compact("/home/user/project/src/main.rs", false), "main.rs");
+        assert_eq!(fmt.compact("/home/user/project/src/main.rs", true), "src/main.rs");
+    }
+
+    #[test]
+    fn label_formatter_full_workspace_relative() {
+        let fmt = PathLabelFormatter::new("/home/user/project", "/home/user", PathSeparator::Unix);
+        assert_eq!(fmt.full("/home/user/project/src/lib.rs"), "src/lib.rs");
+        assert_eq!(fmt.full("/home/user/project"), ".");
+        // Outside workspace falls back to tilde shortening.
+        assert_eq!(fmt.full("/home/user/other/file.rs"), "~/other/file.rs");
+    }
+
+    #[test]
+    fn label_formatter_workspace_relative_returns_none_outside() {
+        let fmt = PathLabelFormatter::new("/workspace", "/home", PathSeparator::Unix);
+        assert!(fmt.workspace_relative("/etc/hosts").is_none());
+        assert_eq!(fmt.workspace_relative("/workspace/a/b"), Some("a/b".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // PathIconResolver tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn icon_resolver_common_extensions() {
+        let r = PathIconResolver::new();
+        assert_eq!(r.resolve("main.rs"), "rust");
+        assert_eq!(r.resolve("app.ts"), "typescript");
+        assert_eq!(r.resolve("style.css"), "css");
+        assert_eq!(r.resolve("unknown"), "file");
+    }
+
+    #[test]
+    fn icon_resolver_special_filenames_and_folders() {
+        let r = PathIconResolver::new();
+        assert_eq!(r.resolve("Dockerfile"), "docker");
+        assert_eq!(r.resolve(".gitignore"), "git");
+        assert_eq!(r.resolve_folder("src"), "folder-src");
+        assert_eq!(r.resolve_folder("tests"), "folder-test");
+        assert_eq!(r.resolve_folder("random"), "folder");
+    }
+
+    #[test]
+    fn icon_resolver_custom_mapping() {
+        let mut r = PathIconResolver::new();
+        r.add_mapping(".vue", "vue");
+        assert_eq!(r.resolve("app.vue"), "vue");
+    }
+
+    // -----------------------------------------------------------------------
+    // PathBookmarkManager tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn bookmark_manager_add_remove_search() {
+        let mut bm = PathBookmarkManager::new();
+        assert!(bm.is_empty());
+        assert!(bm.add("Project", "/home/user/project"));
+        assert!(!bm.add("Dup", "/home/user/project")); // duplicate path
+        assert_eq!(bm.len(), 1);
+        assert!(bm.contains("/home/user/project"));
+
+        assert_eq!(bm.search("proj").len(), 1);
+        assert_eq!(bm.search("xyz").len(), 0);
+
+        assert!(bm.remove("/home/user/project"));
+        assert!(!bm.remove("/nonexistent"));
+        assert!(bm.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // PathTemplateExpander tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn template_expander_basic() {
+        let mut exp = PathTemplateExpander::new();
+        exp.set("workspaceFolder", "/home/user/project");
+        exp.set("file", "main.rs");
+        let result = exp.expand("${workspaceFolder}/src/${file}");
+        assert_eq!(result, "/home/user/project/src/main.rs");
+    }
+
+    #[test]
+    fn template_expander_unknown_variable_kept() {
+        let exp = PathTemplateExpander::new();
+        assert_eq!(exp.expand("${unknown}/path"), "${unknown}/path");
+    }
+
+    #[test]
+    fn template_expander_overwrite_variable() {
+        let mut exp = PathTemplateExpander::new();
+        exp.set("root", "/old");
+        exp.set("root", "/new");
+        assert_eq!(exp.get("root"), Some("/new"));
+        assert_eq!(exp.variables(), vec!["root"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // OS-specific path validation tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn validate_filename_windows_basic() {
+        assert!(validate_filename_windows("hello.txt").is_empty());
+        let probs = validate_filename_windows("file<>.txt");
+        assert!(!probs.is_empty());
+        let probs = validate_filename_windows("CON");
+        assert!(probs.iter().any(|p| p.contains("reserved")));
+    }
+
+    #[test]
+    fn validate_filename_unix_basic() {
+        assert!(validate_filename_unix("hello.txt").is_empty());
+        let probs = validate_filename_unix("bad/name");
+        assert!(probs.iter().any(|p| p.contains("separator")));
+    }
+
+    #[test]
+    fn validate_path_segments_mixed() {
+        let probs = validate_path_segments("/home/user/good", PathSeparator::Unix);
+        assert!(probs.is_empty());
+        let probs = validate_path_segments("C:\\Users\\CON\\file.txt", PathSeparator::Windows);
+        assert!(probs.iter().any(|p| p.contains("reserved")));
     }
 }

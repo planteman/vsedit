@@ -1197,6 +1197,568 @@ impl EditorSnapshotService {
         Some(snap_a.content == snap_b.content)
     }
 }
+// ---------------------------------------------------------------------------
+// CompletionItem – completion list filtering, sorting, and ranking
+// ---------------------------------------------------------------------------
+
+/// The kind of a completion item, modeled after LSP CompletionItemKind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum CompletionItemKind {
+    Text,
+    Method,
+    Function,
+    Constructor,
+    Field,
+    Variable,
+    Class,
+    Interface,
+    Module,
+    Property,
+    Keyword,
+    Snippet,
+    File,
+    Constant,
+    Enum,
+    EnumMember,
+    Struct,
+    TypeParameter,
+}
+
+impl fmt::Display for CompletionItemKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Text => "text",
+            Self::Method => "method",
+            Self::Function => "function",
+            Self::Constructor => "constructor",
+            Self::Field => "field",
+            Self::Variable => "variable",
+            Self::Class => "class",
+            Self::Interface => "interface",
+            Self::Module => "module",
+            Self::Property => "property",
+            Self::Keyword => "keyword",
+            Self::Snippet => "snippet",
+            Self::File => "file",
+            Self::Constant => "constant",
+            Self::Enum => "enum",
+            Self::EnumMember => "enum member",
+            Self::Struct => "struct",
+            Self::TypeParameter => "type parameter",
+        };
+        write!(f, "{s}")
+    }
+}
+
+/// A single completion item with label, detail, sort text, and filter text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletionItem {
+    pub label: String,
+    pub kind: CompletionItemKind,
+    pub detail: Option<String>,
+    pub sort_text: Option<String>,
+    pub filter_text: Option<String>,
+    pub insert_text: Option<String>,
+    pub deprecated: bool,
+    pub preselect: bool,
+}
+
+impl CompletionItem {
+    pub fn new(label: impl Into<String>, kind: CompletionItemKind) -> Self {
+        Self {
+            label: label.into(),
+            kind,
+            detail: None,
+            sort_text: None,
+            filter_text: None,
+            insert_text: None,
+            deprecated: false,
+            preselect: false,
+        }
+    }
+
+    pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    pub fn with_sort_text(mut self, sort_text: impl Into<String>) -> Self {
+        self.sort_text = Some(sort_text.into());
+        self
+    }
+
+    pub fn with_insert_text(mut self, text: impl Into<String>) -> Self {
+        self.insert_text = Some(text.into());
+        self
+    }
+
+    /// Returns the text used for filtering (filter_text if set, otherwise label).
+    pub fn effective_filter_text(&self) -> &str {
+        self.filter_text.as_deref().unwrap_or(&self.label)
+    }
+
+    /// Returns the text used for sorting (sort_text if set, otherwise label).
+    pub fn effective_sort_text(&self) -> &str {
+        self.sort_text.as_deref().unwrap_or(&self.label)
+    }
+}
+
+/// Service for managing and filtering completion lists.
+pub struct CompletionService;
+
+impl CompletionService {
+    /// Filter completion items by a prefix string (case-insensitive).
+    pub fn filter_by_prefix<'a>(items: &'a [CompletionItem], prefix: &str) -> Vec<&'a CompletionItem> {
+        let prefix_lower = prefix.to_lowercase();
+        items
+            .iter()
+            .filter(|item| {
+                item.effective_filter_text()
+                    .to_lowercase()
+                    .starts_with(&prefix_lower)
+            })
+            .collect()
+    }
+
+    /// Fuzzy-filter items: every character in the query must appear in order
+    /// within the filter text (case-insensitive).
+    pub fn fuzzy_filter<'a>(items: &'a [CompletionItem], query: &str) -> Vec<&'a CompletionItem> {
+        let query_lower: Vec<char> = query.to_lowercase().chars().collect();
+        items
+            .iter()
+            .filter(|item| {
+                let text: Vec<char> = item.effective_filter_text().to_lowercase().chars().collect();
+                let mut qi = 0;
+                for &ch in &text {
+                    if qi < query_lower.len() && ch == query_lower[qi] {
+                        qi += 1;
+                    }
+                }
+                qi == query_lower.len()
+            })
+            .collect()
+    }
+
+    /// Sort items by their effective sort text.
+    pub fn sort_by_sort_text(items: &mut [CompletionItem]) {
+        items.sort_by(|a, b| a.effective_sort_text().cmp(b.effective_sort_text()));
+    }
+
+    /// Sort items putting preselected first, then by sort text.
+    pub fn sort_with_preselect(items: &mut [CompletionItem]) {
+        items.sort_by(|a, b| {
+            b.preselect
+                .cmp(&a.preselect)
+                .then_with(|| a.effective_sort_text().cmp(b.effective_sort_text()))
+        });
+    }
+
+    /// Group items by their kind.
+    pub fn group_by_kind(items: &[CompletionItem]) -> std::collections::HashMap<CompletionItemKind, Vec<&CompletionItem>> {
+        let mut map = std::collections::HashMap::new();
+        for item in items {
+            map.entry(item.kind).or_insert_with(Vec::new).push(item);
+        }
+        map
+    }
+
+    /// Count items that are not deprecated.
+    pub fn count_non_deprecated(items: &[CompletionItem]) -> usize {
+        items.iter().filter(|i| !i.deprecated).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DiagnosticSeverity & DiagnosticService – severity aggregation
+// ---------------------------------------------------------------------------
+
+/// Severity levels modeled after LSP DiagnosticSeverity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DiagnosticSeverity {
+    Error,
+    Warning,
+    Information,
+    Hint,
+}
+
+impl fmt::Display for DiagnosticSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Error => write!(f, "error"),
+            Self::Warning => write!(f, "warning"),
+            Self::Information => write!(f, "info"),
+            Self::Hint => write!(f, "hint"),
+        }
+    }
+}
+
+/// A diagnostic message associated with a location in a document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Diagnostic {
+    pub uri: String,
+    pub line: u32,
+    pub col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub severity: DiagnosticSeverity,
+    pub message: String,
+    pub source: Option<String>,
+    pub code: Option<String>,
+}
+
+impl Diagnostic {
+    pub fn new(
+        uri: impl Into<String>,
+        line: u32,
+        col: u32,
+        severity: DiagnosticSeverity,
+        message: impl Into<String>,
+    ) -> Self {
+        Self {
+            uri: uri.into(),
+            line,
+            col,
+            end_line: line,
+            end_col: col,
+            severity,
+            message: message.into(),
+            source: None,
+            code: None,
+        }
+    }
+
+    pub fn with_source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    pub fn with_code(mut self, code: impl Into<String>) -> Self {
+        self.code = Some(code.into());
+        self
+    }
+
+    pub fn is_error(&self) -> bool {
+        self.severity == DiagnosticSeverity::Error
+    }
+}
+
+/// Service for collecting and querying diagnostics.
+pub struct DiagnosticService {
+    diagnostics: Vec<Diagnostic>,
+}
+
+impl DiagnosticService {
+    pub fn new() -> Self {
+        Self {
+            diagnostics: Vec::new(),
+        }
+    }
+
+    /// Push a new diagnostic.
+    pub fn push(&mut self, diag: Diagnostic) {
+        self.diagnostics.push(diag);
+    }
+
+    /// Replace all diagnostics for a given URI.
+    pub fn set_for_uri(&mut self, uri: &str, diags: Vec<Diagnostic>) {
+        self.diagnostics.retain(|d| d.uri != uri);
+        self.diagnostics.extend(diags);
+    }
+
+    /// Get diagnostics for a specific URI.
+    pub fn for_uri(&self, uri: &str) -> Vec<&Diagnostic> {
+        self.diagnostics.iter().filter(|d| d.uri == uri).collect()
+    }
+
+    /// Get diagnostics for a specific line within a URI.
+    pub fn for_line(&self, uri: &str, line: u32) -> Vec<&Diagnostic> {
+        self.diagnostics
+            .iter()
+            .filter(|d| d.uri == uri && d.line <= line && d.end_line >= line)
+            .collect()
+    }
+
+    /// Count diagnostics grouped by severity for a given URI.
+    pub fn severity_counts(&self, uri: &str) -> std::collections::HashMap<DiagnosticSeverity, usize> {
+        let mut counts = std::collections::HashMap::new();
+        for d in &self.diagnostics {
+            if d.uri == uri {
+                *counts.entry(d.severity).or_insert(0) += 1;
+            }
+        }
+        counts
+    }
+
+    /// Return the highest (most severe) severity found for a URI, if any.
+    pub fn max_severity(&self, uri: &str) -> Option<DiagnosticSeverity> {
+        self.diagnostics
+            .iter()
+            .filter(|d| d.uri == uri)
+            .map(|d| d.severity)
+            .min() // Error < Warning < Info < Hint in Ord
+    }
+
+    /// Return true if the URI has any error-level diagnostics.
+    pub fn has_errors(&self, uri: &str) -> bool {
+        self.diagnostics
+            .iter()
+            .any(|d| d.uri == uri && d.severity == DiagnosticSeverity::Error)
+    }
+
+    /// Total diagnostics count.
+    pub fn total_count(&self) -> usize {
+        self.diagnostics.len()
+    }
+
+    /// Clear all diagnostics.
+    pub fn clear(&mut self) {
+        self.diagnostics.clear();
+    }
+
+    /// List all distinct URIs that have diagnostics.
+    pub fn affected_uris(&self) -> Vec<&str> {
+        let mut uris: Vec<&str> = self.diagnostics.iter().map(|d| d.uri.as_str()).collect();
+        uris.sort();
+        uris.dedup();
+        uris
+    }
+}
+
+impl Default for DiagnosticService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DocumentHighlight – grouping highlights by kind
+// ---------------------------------------------------------------------------
+
+/// The kind of a document highlight (read, write, or text).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DocumentHighlightKind {
+    Text,
+    Read,
+    Write,
+}
+
+/// A highlighted range in a document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentHighlight {
+    pub line: u32,
+    pub col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub kind: DocumentHighlightKind,
+}
+
+/// Utilities for working with document highlights.
+pub struct DocumentHighlightService;
+
+impl DocumentHighlightService {
+    /// Group highlights by kind.
+    pub fn group_by_kind(
+        highlights: &[DocumentHighlight],
+    ) -> std::collections::HashMap<DocumentHighlightKind, Vec<&DocumentHighlight>> {
+        let mut map = std::collections::HashMap::new();
+        for h in highlights {
+            map.entry(h.kind).or_insert_with(Vec::new).push(h);
+        }
+        map
+    }
+
+    /// Count write references.
+    pub fn write_count(highlights: &[DocumentHighlight]) -> usize {
+        highlights
+            .iter()
+            .filter(|h| h.kind == DocumentHighlightKind::Write)
+            .count()
+    }
+
+    /// Count read references.
+    pub fn read_count(highlights: &[DocumentHighlight]) -> usize {
+        highlights
+            .iter()
+            .filter(|h| h.kind == DocumentHighlightKind::Read)
+            .count()
+    }
+
+    /// Return highlights sorted by position.
+    pub fn sorted_by_position(highlights: &mut [DocumentHighlight]) {
+        highlights.sort_by(|a, b| a.line.cmp(&b.line).then(a.col.cmp(&b.col)));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InlayHint – inlay hint management
+// ---------------------------------------------------------------------------
+
+/// The kind of an inlay hint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InlayHintKind {
+    Type,
+    Parameter,
+}
+
+/// An inlay hint rendered inline in the editor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InlayHint {
+    pub line: u32,
+    pub col: u32,
+    pub label: String,
+    pub kind: InlayHintKind,
+    pub padding_left: bool,
+    pub padding_right: bool,
+}
+
+impl InlayHint {
+    pub fn type_hint(line: u32, col: u32, label: impl Into<String>) -> Self {
+        Self {
+            line,
+            col,
+            label: label.into(),
+            kind: InlayHintKind::Type,
+            padding_left: true,
+            padding_right: false,
+        }
+    }
+
+    pub fn parameter_hint(line: u32, col: u32, label: impl Into<String>) -> Self {
+        Self {
+            line,
+            col,
+            label: label.into(),
+            kind: InlayHintKind::Parameter,
+            padding_left: false,
+            padding_right: true,
+        }
+    }
+}
+
+/// Service for managing inlay hints for a document.
+pub struct InlayHintService {
+    hints: Vec<InlayHint>,
+}
+
+impl InlayHintService {
+    pub fn new() -> Self {
+        Self { hints: Vec::new() }
+    }
+
+    /// Set all hints (replaces existing hints).
+    pub fn set_hints(&mut self, hints: Vec<InlayHint>) {
+        self.hints = hints;
+    }
+
+    /// Get hints within a line range (inclusive).
+    pub fn hints_in_range(&self, start_line: u32, end_line: u32) -> Vec<&InlayHint> {
+        self.hints
+            .iter()
+            .filter(|h| h.line >= start_line && h.line <= end_line)
+            .collect()
+    }
+
+    /// Get all hints on a specific line, sorted by column.
+    pub fn hints_on_line(&self, line: u32) -> Vec<&InlayHint> {
+        let mut result: Vec<_> = self.hints.iter().filter(|h| h.line == line).collect();
+        result.sort_by_key(|h| h.col);
+        result
+    }
+
+    /// Total number of hints.
+    pub fn count(&self) -> usize {
+        self.hints.len()
+    }
+
+    /// Clear all hints.
+    pub fn clear(&mut self) {
+        self.hints.clear();
+    }
+
+    /// Count hints by kind.
+    pub fn count_by_kind(&self, kind: InlayHintKind) -> usize {
+        self.hints.iter().filter(|h| h.kind == kind).count()
+    }
+}
+
+impl Default for InlayHintService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SignatureHelp – signature help with parameter highlighting
+// ---------------------------------------------------------------------------
+
+/// A single parameter in a function signature.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureParameter {
+    pub label: String,
+    pub documentation: Option<String>,
+}
+
+/// A function signature with its parameters.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureInfo {
+    pub label: String,
+    pub documentation: Option<String>,
+    pub parameters: Vec<SignatureParameter>,
+}
+
+impl SignatureInfo {
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            documentation: None,
+            parameters: Vec::new(),
+        }
+    }
+
+    pub fn with_doc(mut self, doc: impl Into<String>) -> Self {
+        self.documentation = Some(doc.into());
+        self
+    }
+
+    pub fn add_param(&mut self, label: impl Into<String>, doc: Option<String>) {
+        self.parameters.push(SignatureParameter {
+            label: label.into(),
+            documentation: doc,
+        });
+    }
+
+    /// Get the active parameter label at the given index.
+    pub fn active_parameter(&self, index: usize) -> Option<&SignatureParameter> {
+        self.parameters.get(index)
+    }
+
+    /// Format the signature with the active parameter highlighted using brackets.
+    pub fn format_with_highlight(&self, active_param_index: usize) -> String {
+        if self.parameters.is_empty() {
+            return self.label.clone();
+        }
+        let parts: Vec<String> = self
+            .parameters
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                if i == active_param_index {
+                    format!("[{}]", p.label)
+                } else {
+                    p.label.clone()
+                }
+            })
+            .collect();
+        // Find the function name (text before '(')
+        let fn_name = self.label.split('(').next().unwrap_or(&self.label);
+        format!("{}({})", fn_name, parts.join(", "))
+    }
+
+    /// Return the number of parameters.
+    pub fn param_count(&self) -> usize {
+        self.parameters.len()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1859,5 +2421,199 @@ mod tests {
         let id1 = svc.create_snapshot("file:///a.rs", "same content", 1);
         let id2 = svc.create_snapshot("file:///a.rs", "same content", 2);
         assert!(svc.snapshots_identical(id1, id2).unwrap());
+    }
+
+    // -- CompletionService tests -------------------------------------------
+
+    #[test]
+    fn completion_filter_by_prefix() {
+        let items = vec![
+            CompletionItem::new("println", CompletionItemKind::Function),
+            CompletionItem::new("print", CompletionItemKind::Function),
+            CompletionItem::new("format", CompletionItemKind::Function),
+            CompletionItem::new("Parse", CompletionItemKind::Method),
+        ];
+        let filtered = CompletionService::filter_by_prefix(&items, "pri");
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].label, "println");
+        assert_eq!(filtered[1].label, "print");
+        // case-insensitive
+        let filtered_upper = CompletionService::filter_by_prefix(&items, "Par");
+        assert_eq!(filtered_upper.len(), 1);
+        assert_eq!(filtered_upper[0].label, "Parse");
+    }
+
+    #[test]
+    fn completion_fuzzy_filter() {
+        let items = vec![
+            CompletionItem::new("HashMap", CompletionItemKind::Struct),
+            CompletionItem::new("HashSet", CompletionItemKind::Struct),
+            CompletionItem::new("Vec", CompletionItemKind::Struct),
+            CompletionItem::new("BTreeMap", CompletionItemKind::Struct),
+        ];
+        let fuzzy = CompletionService::fuzzy_filter(&items, "hm");
+        // "hm" case-insensitive: HashMap → h,a,s,h,m,a,p → matches h then m. HashSet → no 'm'.
+        assert_eq!(fuzzy.len(), 1);
+        assert_eq!(fuzzy[0].label, "HashMap");
+    }
+
+    #[test]
+    fn completion_sort_by_sort_text() {
+        let mut items = vec![
+            CompletionItem::new("zebra", CompletionItemKind::Variable)
+                .with_sort_text("0_zebra"),
+            CompletionItem::new("alpha", CompletionItemKind::Variable),
+            CompletionItem::new("beta", CompletionItemKind::Variable)
+                .with_sort_text("1_beta"),
+        ];
+        CompletionService::sort_by_sort_text(&mut items);
+        assert_eq!(items[0].label, "zebra"); // sort_text "0_zebra"
+        assert_eq!(items[1].label, "beta");  // sort_text "1_beta"
+        assert_eq!(items[2].label, "alpha"); // sort_text "alpha" (label)
+    }
+
+    #[test]
+    fn completion_sort_with_preselect() {
+        let mut items = vec![
+            CompletionItem::new("alpha", CompletionItemKind::Variable),
+            CompletionItem {
+                preselect: true,
+                ..CompletionItem::new("zeta", CompletionItemKind::Variable)
+            },
+            CompletionItem::new("beta", CompletionItemKind::Variable),
+        ];
+        CompletionService::sort_with_preselect(&mut items);
+        assert_eq!(items[0].label, "zeta"); // preselect comes first
+        assert_eq!(items[1].label, "alpha");
+        assert_eq!(items[2].label, "beta");
+    }
+
+    #[test]
+    fn completion_group_by_kind_and_deprecated() {
+        let items = vec![
+            CompletionItem::new("foo", CompletionItemKind::Function),
+            CompletionItem::new("bar", CompletionItemKind::Function),
+            CompletionItem::new("Baz", CompletionItemKind::Struct),
+            CompletionItem {
+                deprecated: true,
+                ..CompletionItem::new("old_fn", CompletionItemKind::Function)
+            },
+        ];
+        let groups = CompletionService::group_by_kind(&items);
+        assert_eq!(groups[&CompletionItemKind::Function].len(), 3);
+        assert_eq!(groups[&CompletionItemKind::Struct].len(), 1);
+        assert_eq!(CompletionService::count_non_deprecated(&items), 3);
+    }
+
+    // -- DiagnosticService tests -------------------------------------------
+
+    #[test]
+    fn diagnostic_severity_counts() {
+        let mut svc = DiagnosticService::new();
+        svc.push(Diagnostic::new("a.rs", 1, 0, DiagnosticSeverity::Error, "err1"));
+        svc.push(Diagnostic::new("a.rs", 2, 0, DiagnosticSeverity::Warning, "warn1"));
+        svc.push(Diagnostic::new("a.rs", 3, 0, DiagnosticSeverity::Error, "err2"));
+        svc.push(Diagnostic::new("b.rs", 1, 0, DiagnosticSeverity::Hint, "hint1"));
+
+        let counts = svc.severity_counts("a.rs");
+        assert_eq!(counts[&DiagnosticSeverity::Error], 2);
+        assert_eq!(counts[&DiagnosticSeverity::Warning], 1);
+        assert!(svc.has_errors("a.rs"));
+        assert!(!svc.has_errors("b.rs"));
+        assert_eq!(svc.max_severity("a.rs"), Some(DiagnosticSeverity::Error));
+        assert_eq!(svc.total_count(), 4);
+    }
+
+    #[test]
+    fn diagnostic_set_for_uri_replaces() {
+        let mut svc = DiagnosticService::new();
+        svc.push(Diagnostic::new("a.rs", 1, 0, DiagnosticSeverity::Error, "old"));
+        svc.push(Diagnostic::new("b.rs", 1, 0, DiagnosticSeverity::Warning, "keep"));
+        svc.set_for_uri("a.rs", vec![
+            Diagnostic::new("a.rs", 5, 0, DiagnosticSeverity::Hint, "new"),
+        ]);
+        assert_eq!(svc.for_uri("a.rs").len(), 1);
+        assert_eq!(svc.for_uri("a.rs")[0].message, "new");
+        assert_eq!(svc.for_uri("b.rs").len(), 1);
+
+        let affected = svc.affected_uris();
+        assert_eq!(affected.len(), 2);
+    }
+
+    #[test]
+    fn diagnostic_for_line() {
+        let mut svc = DiagnosticService::new();
+        svc.push(Diagnostic::new("a.rs", 5, 0, DiagnosticSeverity::Error, "msg"));
+        assert_eq!(svc.for_line("a.rs", 5).len(), 1);
+        assert!(svc.for_line("a.rs", 6).is_empty());
+    }
+
+    // -- DocumentHighlightService tests ------------------------------------
+
+    #[test]
+    fn document_highlight_grouping() {
+        let highlights = vec![
+            DocumentHighlight { line: 1, col: 0, end_line: 1, end_col: 5, kind: DocumentHighlightKind::Read },
+            DocumentHighlight { line: 3, col: 0, end_line: 3, end_col: 5, kind: DocumentHighlightKind::Write },
+            DocumentHighlight { line: 5, col: 0, end_line: 5, end_col: 5, kind: DocumentHighlightKind::Read },
+        ];
+        let groups = DocumentHighlightService::group_by_kind(&highlights);
+        assert_eq!(groups[&DocumentHighlightKind::Read].len(), 2);
+        assert_eq!(groups[&DocumentHighlightKind::Write].len(), 1);
+        assert_eq!(DocumentHighlightService::write_count(&highlights), 1);
+        assert_eq!(DocumentHighlightService::read_count(&highlights), 2);
+    }
+
+    // -- InlayHintService tests --------------------------------------------
+
+    #[test]
+    fn inlay_hint_service_basics() {
+        let mut svc = InlayHintService::new();
+        svc.set_hints(vec![
+            InlayHint::type_hint(1, 10, ": i32"),
+            InlayHint::type_hint(3, 5, ": String"),
+            InlayHint::parameter_hint(5, 0, "name:"),
+            InlayHint::parameter_hint(5, 10, "age:"),
+        ]);
+        assert_eq!(svc.count(), 4);
+        assert_eq!(svc.count_by_kind(InlayHintKind::Type), 2);
+        assert_eq!(svc.count_by_kind(InlayHintKind::Parameter), 2);
+
+        let range = svc.hints_in_range(1, 3);
+        assert_eq!(range.len(), 2);
+
+        let on_line = svc.hints_on_line(5);
+        assert_eq!(on_line.len(), 2);
+        assert_eq!(on_line[0].col, 0); // sorted by column
+        assert_eq!(on_line[1].col, 10);
+
+        svc.clear();
+        assert_eq!(svc.count(), 0);
+    }
+
+    // -- SignatureInfo tests -----------------------------------------------
+
+    #[test]
+    fn signature_format_with_highlight() {
+        let mut sig = SignatureInfo::new("foo(a: i32, b: String)")
+            .with_doc("Does stuff");
+        sig.add_param("a: i32", None);
+        sig.add_param("b: String", Some("the name".into()));
+
+        assert_eq!(sig.param_count(), 2);
+        assert_eq!(
+            sig.format_with_highlight(0),
+            "foo([a: i32], b: String)"
+        );
+        assert_eq!(
+            sig.format_with_highlight(1),
+            "foo(a: i32, [b: String])"
+        );
+        assert_eq!(sig.active_parameter(0).unwrap().label, "a: i32");
+        assert_eq!(
+            sig.active_parameter(1).unwrap().documentation.as_deref(),
+            Some("the name")
+        );
+        assert!(sig.active_parameter(5).is_none());
     }
 }

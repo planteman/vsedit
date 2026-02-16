@@ -1108,6 +1108,311 @@ impl PortForwardingManager {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Remote URI construction and parsing
+// ---------------------------------------------------------------------------
+
+/// A parsed remote URI of the form `scheme://[user@]host[:port]/path`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RemoteUri {
+    pub scheme: String,
+    pub user: Option<String>,
+    pub host: String,
+    pub port: Option<u16>,
+    pub path: String,
+}
+
+impl RemoteUri {
+    /// Parse a URI string into its components.
+    ///
+    /// Accepted formats:
+    /// - `ssh://user@host:22/home/user`
+    /// - `ssh://host/path`
+    /// - `wsl://distro/path`
+    pub fn parse(uri: &str) -> Result<Self, RemoteError> {
+        let (scheme, rest) = uri
+            .split_once("://")
+            .ok_or_else(|| RemoteError::InvalidHost("missing scheme".into()))?;
+        if scheme.is_empty() {
+            return Err(RemoteError::InvalidHost("empty scheme".into()));
+        }
+
+        let (authority, path) = match rest.find('/') {
+            Some(idx) => (&rest[..idx], &rest[idx..]),
+            None => (rest, "/"),
+        };
+
+        let (userhost, port) = if let Some(idx) = authority.rfind(':') {
+            if let Ok(p) = authority[idx + 1..].parse::<u16>() {
+                (&authority[..idx], Some(p))
+            } else {
+                (authority, None)
+            }
+        } else {
+            (authority, None)
+        };
+
+        let (user, host) = if let Some(idx) = userhost.find('@') {
+            (Some(userhost[..idx].to_string()), &userhost[idx + 1..])
+        } else {
+            (None, userhost)
+        };
+
+        if host.is_empty() {
+            return Err(RemoteError::InvalidHost("empty host".into()));
+        }
+
+        Ok(Self {
+            scheme: scheme.to_string(),
+            user,
+            host: host.to_string(),
+            port,
+            path: path.to_string(),
+        })
+    }
+
+    /// Reconstruct the URI string.
+    pub fn to_uri_string(&self) -> String {
+        let mut s = format!("{}://", self.scheme);
+        if let Some(ref user) = self.user {
+            s.push_str(user);
+            s.push('@');
+        }
+        s.push_str(&self.host);
+        if let Some(p) = self.port {
+            s.push(':');
+            s.push_str(&p.to_string());
+        }
+        s.push_str(&self.path);
+        s
+    }
+
+    /// Derive a `RemoteAuthority` from the scheme.
+    pub fn authority_type(&self) -> RemoteAuthority {
+        match self.scheme.to_lowercase().as_str() {
+            "ssh" => RemoteAuthority::SSH,
+            "wsl" => RemoteAuthority::WSL,
+            "container" | "docker" => RemoteAuthority::Container,
+            "tunnel" => RemoteAuthority::Tunnel,
+            other => RemoteAuthority::Custom(other.to_string()),
+        }
+    }
+
+    /// Build a `ConnectionConfig` from this URI using the path basename as label.
+    pub fn to_connection_config(&self) -> Result<ConnectionConfig, RemoteError> {
+        let label = self
+            .path
+            .rsplit('/')
+            .find(|s| !s.is_empty())
+            .unwrap_or(&self.host);
+        ConnectionConfig::new(&self.host, self.port, label, self.authority_type())
+    }
+}
+
+impl fmt::Display for RemoteUri {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_uri_string())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Reconnection strategy
+// ---------------------------------------------------------------------------
+
+/// Configurable reconnection strategy with exponential backoff.
+#[derive(Debug, Clone)]
+pub struct ReconnectionStrategy {
+    pub base_delay_ms: u64,
+    pub max_delay_ms: u64,
+    pub max_attempts: u32,
+    current_attempt: u32,
+}
+
+impl ReconnectionStrategy {
+    pub fn new(base_delay_ms: u64, max_delay_ms: u64, max_attempts: u32) -> Self {
+        Self {
+            base_delay_ms,
+            max_delay_ms,
+            max_attempts,
+            current_attempt: 0,
+        }
+    }
+
+    /// Returns the next delay in ms and increments the attempt counter,
+    /// or `None` if max attempts have been exhausted.
+    pub fn next_delay(&mut self) -> Option<u64> {
+        if self.current_attempt >= self.max_attempts {
+            return None;
+        }
+        let delay = compute_backoff(self.current_attempt, self.base_delay_ms, self.max_delay_ms);
+        self.current_attempt += 1;
+        Some(delay)
+    }
+
+    /// How many attempts have been made so far.
+    pub fn attempts_made(&self) -> u32 {
+        self.current_attempt
+    }
+
+    /// How many attempts remain.
+    pub fn attempts_remaining(&self) -> u32 {
+        self.max_attempts.saturating_sub(self.current_attempt)
+    }
+
+    /// Whether all attempts have been exhausted.
+    pub fn is_exhausted(&self) -> bool {
+        self.current_attempt >= self.max_attempts
+    }
+
+    /// Reset the attempt counter for a fresh reconnection cycle.
+    pub fn reset(&mut self) {
+        self.current_attempt = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Connection timeout configuration
+// ---------------------------------------------------------------------------
+
+/// Timeout settings for different phases of a remote connection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TimeoutConfig {
+    pub connect_ms: u64,
+    pub handshake_ms: u64,
+    pub idle_ms: u64,
+}
+
+impl TimeoutConfig {
+    pub fn new(connect_ms: u64, handshake_ms: u64, idle_ms: u64) -> Self {
+        Self {
+            connect_ms,
+            handshake_ms,
+            idle_ms,
+        }
+    }
+
+    /// Check whether a given duration exceeds the connect timeout.
+    pub fn is_connect_timeout(&self, elapsed_ms: u64) -> bool {
+        elapsed_ms > self.connect_ms
+    }
+
+    /// Check whether a given idle duration exceeds the idle timeout.
+    pub fn is_idle_timeout(&self, idle_ms: u64) -> bool {
+        idle_ms > self.idle_ms
+    }
+
+    /// Total maximum time allowed for establishing a connection
+    /// (connect + handshake).
+    pub fn total_setup_ms(&self) -> u64 {
+        self.connect_ms.saturating_add(self.handshake_ms)
+    }
+}
+
+impl Default for TimeoutConfig {
+    fn default() -> Self {
+        Self {
+            connect_ms: 10_000,
+            handshake_ms: 5_000,
+            idle_ms: 300_000,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SSH config host entry parsing
+// ---------------------------------------------------------------------------
+
+/// A single SSH config host entry with common fields.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SshHostEntry {
+    pub host_pattern: String,
+    pub hostname: Option<String>,
+    pub user: Option<String>,
+    pub port: Option<u16>,
+    pub identity_file: Option<String>,
+}
+
+impl SshHostEntry {
+    /// Parse a simplified SSH config block (lines of `Key Value`).
+    ///
+    /// The first line must be `Host <pattern>`. Subsequent indented lines
+    /// set fields like `HostName`, `User`, `Port`, `IdentityFile`.
+    pub fn parse_block(block: &str) -> Option<Self> {
+        let mut lines = block.lines();
+        let first = lines.next()?.trim();
+        let host_pattern = first.strip_prefix("Host ")?.trim().to_string();
+        if host_pattern.is_empty() {
+            return None;
+        }
+
+        let mut entry = SshHostEntry {
+            host_pattern,
+            hostname: None,
+            user: None,
+            port: None,
+            identity_file: None,
+        };
+
+        for line in lines {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            if let Some((key, value)) = line.split_once(char::is_whitespace) {
+                let value = value.trim();
+                match key {
+                    "HostName" | "Hostname" => entry.hostname = Some(value.to_string()),
+                    "User" => entry.user = Some(value.to_string()),
+                    "Port" => entry.port = value.parse().ok(),
+                    "IdentityFile" => entry.identity_file = Some(value.to_string()),
+                    _ => {}
+                }
+            }
+        }
+
+        Some(entry)
+    }
+
+    /// The effective hostname (falls back to host_pattern if HostName is unset).
+    pub fn effective_hostname(&self) -> &str {
+        self.hostname.as_deref().unwrap_or(&self.host_pattern)
+    }
+
+    /// Build a `ConnectionConfig` from this entry.
+    pub fn to_connection_config(&self) -> Result<ConnectionConfig, RemoteError> {
+        ConnectionConfig::new(
+            self.effective_hostname(),
+            self.port,
+            &self.host_pattern,
+            RemoteAuthority::SSH,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Remote environment detection helpers
+// ---------------------------------------------------------------------------
+
+/// Detect the `RemoteAuthority` type from well-known environment variable
+/// names that remote hosts typically set.
+pub fn detect_authority_from_env_vars(vars: &[(&str, &str)]) -> Option<RemoteAuthority> {
+    for &(key, _value) in vars {
+        match key {
+            "SSH_CONNECTION" | "SSH_CLIENT" | "SSH_TTY" => return Some(RemoteAuthority::SSH),
+            "WSL_DISTRO_NAME" | "WSL_INTEROP" => return Some(RemoteAuthority::WSL),
+            "container" | "DOCKER_CONTAINER_ID" => return Some(RemoteAuthority::Container),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Check whether the given environment variables suggest we are running
+/// inside a remote (non-local) environment.
+pub fn is_remote_environment(vars: &[(&str, &str)]) -> bool {
+    detect_authority_from_env_vars(vars).is_some()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1867,5 +2172,248 @@ mod tests {
         let m = PathMapping::new("/local", "/remote");
         assert_eq!(m.local_root(), "/local");
         assert_eq!(m.remote_root(), "/remote");
+    }
+
+    // ---------------------------------------------------------------
+    // Remote URI parsing and construction tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn remote_uri_parse_full() {
+        let uri = RemoteUri::parse("ssh://user@host.io:2222/home/user").unwrap();
+        assert_eq!(uri.scheme, "ssh");
+        assert_eq!(uri.user, Some("user".to_string()));
+        assert_eq!(uri.host, "host.io");
+        assert_eq!(uri.port, Some(2222));
+        assert_eq!(uri.path, "/home/user");
+    }
+
+    #[test]
+    fn remote_uri_parse_no_user_no_port() {
+        let uri = RemoteUri::parse("wsl://Ubuntu/home/dev").unwrap();
+        assert_eq!(uri.scheme, "wsl");
+        assert_eq!(uri.user, None);
+        assert_eq!(uri.host, "Ubuntu");
+        assert_eq!(uri.port, None);
+        assert_eq!(uri.path, "/home/dev");
+    }
+
+    #[test]
+    fn remote_uri_parse_no_path() {
+        let uri = RemoteUri::parse("ssh://host.io").unwrap();
+        assert_eq!(uri.host, "host.io");
+        assert_eq!(uri.path, "/");
+    }
+
+    #[test]
+    fn remote_uri_parse_missing_scheme() {
+        assert!(RemoteUri::parse("host.io/path").is_err());
+    }
+
+    #[test]
+    fn remote_uri_parse_empty_host() {
+        assert!(RemoteUri::parse("ssh:///path").is_err());
+    }
+
+    #[test]
+    fn remote_uri_roundtrip() {
+        let original = "ssh://admin@server.com:22/data";
+        let uri = RemoteUri::parse(original).unwrap();
+        assert_eq!(uri.to_uri_string(), original);
+        assert_eq!(format!("{uri}"), original);
+    }
+
+    #[test]
+    fn remote_uri_authority_type() {
+        assert_eq!(
+            RemoteUri::parse("ssh://h/p").unwrap().authority_type(),
+            RemoteAuthority::SSH
+        );
+        assert_eq!(
+            RemoteUri::parse("wsl://h/p").unwrap().authority_type(),
+            RemoteAuthority::WSL
+        );
+        assert_eq!(
+            RemoteUri::parse("docker://h/p").unwrap().authority_type(),
+            RemoteAuthority::Container
+        );
+        assert_eq!(
+            RemoteUri::parse("tunnel://h/p").unwrap().authority_type(),
+            RemoteAuthority::Tunnel
+        );
+        assert_eq!(
+            RemoteUri::parse("myproto://h/p").unwrap().authority_type(),
+            RemoteAuthority::Custom("myproto".into())
+        );
+    }
+
+    #[test]
+    fn remote_uri_to_connection_config() {
+        let uri = RemoteUri::parse("ssh://root@prod.io:22/opt/app").unwrap();
+        let cfg = uri.to_connection_config().unwrap();
+        assert_eq!(cfg.host, "prod.io");
+        assert_eq!(cfg.port, Some(22));
+        assert_eq!(cfg.label, "app");
+        assert_eq!(cfg.authority, RemoteAuthority::SSH);
+    }
+
+    // ---------------------------------------------------------------
+    // Reconnection strategy tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn reconnection_strategy_delays() {
+        let mut strat = ReconnectionStrategy::new(100, 5000, 4);
+        assert_eq!(strat.attempts_remaining(), 4);
+        assert!(!strat.is_exhausted());
+
+        assert_eq!(strat.next_delay(), Some(100));
+        assert_eq!(strat.next_delay(), Some(200));
+        assert_eq!(strat.next_delay(), Some(400));
+        assert_eq!(strat.next_delay(), Some(800));
+        assert_eq!(strat.attempts_made(), 4);
+        assert!(strat.is_exhausted());
+        assert_eq!(strat.next_delay(), None);
+
+        strat.reset();
+        assert_eq!(strat.attempts_made(), 0);
+        assert_eq!(strat.next_delay(), Some(100));
+    }
+
+    #[test]
+    fn reconnection_strategy_capped() {
+        let mut strat = ReconnectionStrategy::new(1000, 3000, 10);
+        strat.next_delay(); // 1000
+        strat.next_delay(); // 2000
+        assert_eq!(strat.next_delay(), Some(3000)); // capped
+        assert_eq!(strat.next_delay(), Some(3000)); // stays capped
+    }
+
+    // ---------------------------------------------------------------
+    // Timeout config tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn timeout_config_defaults_and_checks() {
+        let tc = TimeoutConfig::default();
+        assert_eq!(tc.connect_ms, 10_000);
+        assert_eq!(tc.handshake_ms, 5_000);
+        assert_eq!(tc.idle_ms, 300_000);
+        assert_eq!(tc.total_setup_ms(), 15_000);
+
+        assert!(!tc.is_connect_timeout(5_000));
+        assert!(tc.is_connect_timeout(15_000));
+
+        assert!(!tc.is_idle_timeout(100_000));
+        assert!(tc.is_idle_timeout(400_000));
+    }
+
+    #[test]
+    fn timeout_config_custom() {
+        let tc = TimeoutConfig::new(500, 200, 1000);
+        assert_eq!(tc.total_setup_ms(), 700);
+        assert!(tc.is_connect_timeout(501));
+        assert!(!tc.is_connect_timeout(500));
+    }
+
+    // ---------------------------------------------------------------
+    // SSH host entry parsing tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn ssh_host_entry_parse_full_block() {
+        let block = "\
+Host myserver
+    HostName 192.168.1.100
+    User deploy
+    Port 2222
+    IdentityFile ~/.ssh/deploy_key";
+        let entry = SshHostEntry::parse_block(block).unwrap();
+        assert_eq!(entry.host_pattern, "myserver");
+        assert_eq!(entry.hostname, Some("192.168.1.100".into()));
+        assert_eq!(entry.user, Some("deploy".into()));
+        assert_eq!(entry.port, Some(2222));
+        assert_eq!(entry.identity_file, Some("~/.ssh/deploy_key".into()));
+        assert_eq!(entry.effective_hostname(), "192.168.1.100");
+    }
+
+    #[test]
+    fn ssh_host_entry_minimal_block() {
+        let block = "Host devbox";
+        let entry = SshHostEntry::parse_block(block).unwrap();
+        assert_eq!(entry.host_pattern, "devbox");
+        assert_eq!(entry.hostname, None);
+        assert_eq!(entry.effective_hostname(), "devbox");
+    }
+
+    #[test]
+    fn ssh_host_entry_to_connection_config() {
+        let block = "\
+Host prod
+    HostName prod.example.com
+    Port 22";
+        let entry = SshHostEntry::parse_block(block).unwrap();
+        let cfg = entry.to_connection_config().unwrap();
+        assert_eq!(cfg.host, "prod.example.com");
+        assert_eq!(cfg.port, Some(22));
+        assert_eq!(cfg.label, "prod");
+        assert_eq!(cfg.authority, RemoteAuthority::SSH);
+    }
+
+    #[test]
+    fn ssh_host_entry_parse_invalid() {
+        assert!(SshHostEntry::parse_block("NotAHost line").is_none());
+        assert!(SshHostEntry::parse_block("Host ").is_none());
+        assert!(SshHostEntry::parse_block("").is_none());
+    }
+
+    #[test]
+    fn ssh_host_entry_skips_comments() {
+        let block = "\
+Host ci
+    # This is a comment
+    HostName ci.internal
+    # Another comment
+    User runner";
+        let entry = SshHostEntry::parse_block(block).unwrap();
+        assert_eq!(entry.hostname, Some("ci.internal".into()));
+        assert_eq!(entry.user, Some("runner".into()));
+    }
+
+    // ---------------------------------------------------------------
+    // Remote environment detection tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn detect_authority_ssh() {
+        let vars = vec![("SSH_CONNECTION", "1.2.3.4 5678 10.0.0.1 22")];
+        assert_eq!(detect_authority_from_env_vars(&vars), Some(RemoteAuthority::SSH));
+    }
+
+    #[test]
+    fn detect_authority_wsl() {
+        let vars = vec![("WSL_DISTRO_NAME", "Ubuntu")];
+        assert_eq!(detect_authority_from_env_vars(&vars), Some(RemoteAuthority::WSL));
+    }
+
+    #[test]
+    fn detect_authority_container() {
+        let vars = vec![("container", "podman")];
+        assert_eq!(
+            detect_authority_from_env_vars(&vars),
+            Some(RemoteAuthority::Container)
+        );
+    }
+
+    #[test]
+    fn detect_authority_none() {
+        let vars = vec![("HOME", "/home/user"), ("TERM", "xterm")];
+        assert_eq!(detect_authority_from_env_vars(&vars), None);
+    }
+
+    #[test]
+    fn is_remote_environment_true_and_false() {
+        assert!(is_remote_environment(&[("SSH_TTY", "/dev/pts/0")]));
+        assert!(!is_remote_environment(&[("PATH", "/usr/bin")]));
     }
 }

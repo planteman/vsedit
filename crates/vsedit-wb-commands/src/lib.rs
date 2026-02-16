@@ -1045,6 +1045,477 @@ impl CommandExecutionLog {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CommandAlias – map short names to canonical command ids
+// ---------------------------------------------------------------------------
+
+/// Maps alias names to canonical command ids, with reverse lookup support.
+#[derive(Debug, Clone)]
+pub struct CommandAliasMap {
+    /// alias → canonical command id
+    aliases: std::collections::HashMap<String, String>,
+}
+
+impl CommandAliasMap {
+    pub fn new() -> Self {
+        Self {
+            aliases: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Register an alias pointing to a canonical command id.
+    /// Returns the previous target if the alias was already defined.
+    pub fn set(&mut self, alias: &str, command_id: &str) -> Option<String> {
+        self.aliases
+            .insert(alias.to_string(), command_id.to_string())
+    }
+
+    /// Resolve an alias to its canonical command id.
+    /// If the input is not an alias, returns `None`.
+    pub fn resolve(&self, alias: &str) -> Option<&str> {
+        self.aliases.get(alias).map(|s| s.as_str())
+    }
+
+    /// Resolve an alias, or return the original string if it is not aliased.
+    pub fn resolve_or_identity<'a>(&'a self, id: &'a str) -> &'a str {
+        self.aliases.get(id).map(|s| s.as_str()).unwrap_or(id)
+    }
+
+    /// Remove an alias. Returns `true` if it existed.
+    pub fn remove(&mut self, alias: &str) -> bool {
+        self.aliases.remove(alias).is_some()
+    }
+
+    /// Return all aliases that point to the given command id.
+    pub fn aliases_for(&self, command_id: &str) -> Vec<&str> {
+        self.aliases
+            .iter()
+            .filter(|(_, v)| v.as_str() == command_id)
+            .map(|(k, _)| k.as_str())
+            .collect()
+    }
+
+    /// Number of defined aliases.
+    pub fn len(&self) -> usize {
+        self.aliases.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.aliases.is_empty()
+    }
+
+    /// Check whether an alias exists.
+    pub fn contains(&self, alias: &str) -> bool {
+        self.aliases.contains_key(alias)
+    }
+
+    /// Clear all aliases.
+    pub fn clear(&mut self) {
+        self.aliases.clear();
+    }
+}
+
+impl Default for CommandAliasMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeybindingResolver – resolve keybinding strings to command ids
+// ---------------------------------------------------------------------------
+
+/// A single keybinding entry mapping a key combination to a command.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeybindingEntry {
+    /// Normalised key string, e.g. `"ctrl+shift+p"`.
+    pub keys: String,
+    /// The command id this keybinding triggers.
+    pub command_id: String,
+    /// Optional "when" clause that must evaluate to true.
+    pub when: Option<String>,
+}
+
+/// Resolves key combinations to commands, respecting optional "when" conditions.
+#[derive(Debug, Clone)]
+pub struct KeybindingResolver {
+    bindings: Vec<KeybindingEntry>,
+}
+
+impl KeybindingResolver {
+    pub fn new() -> Self {
+        Self {
+            bindings: Vec::new(),
+        }
+    }
+
+    /// Normalise a key string to lowercase with modifiers sorted.
+    ///
+    /// `"Shift+Ctrl+P"` → `"ctrl+shift+p"`
+    pub fn normalise_keys(raw: &str) -> String {
+        let mut parts: Vec<&str> = raw.split('+').collect();
+        let key = parts.pop().unwrap_or("");
+        parts.sort_unstable();
+        parts.push(key);
+        parts
+            .iter()
+            .map(|p| p.to_lowercase())
+            .collect::<Vec<_>>()
+            .join("+")
+    }
+
+    /// Add a keybinding. The key string is normalised before storage.
+    pub fn add(&mut self, keys: &str, command_id: &str, when: Option<&str>) {
+        self.bindings.push(KeybindingEntry {
+            keys: Self::normalise_keys(keys),
+            command_id: command_id.to_string(),
+            when: when.map(|s| s.to_string()),
+        });
+    }
+
+    /// Remove all bindings for the given command id.
+    pub fn remove_command(&mut self, command_id: &str) -> usize {
+        let before = self.bindings.len();
+        self.bindings.retain(|b| b.command_id != command_id);
+        before - self.bindings.len()
+    }
+
+    /// Find all bindings that match the given key combination (normalised).
+    pub fn resolve(&self, keys: &str) -> Vec<&KeybindingEntry> {
+        let norm = Self::normalise_keys(keys);
+        self.bindings
+            .iter()
+            .filter(|b| b.keys == norm)
+            .collect()
+    }
+
+    /// Find the first binding matching the keys whose `when` clause is
+    /// satisfied by the provided context evaluator.
+    pub fn resolve_with_context<F>(&self, keys: &str, eval_when: F) -> Option<&KeybindingEntry>
+    where
+        F: Fn(&str) -> bool,
+    {
+        let norm = Self::normalise_keys(keys);
+        self.bindings.iter().find(|b| {
+            b.keys == norm
+                && match &b.when {
+                    Some(clause) => eval_when(clause),
+                    None => true,
+                }
+        })
+    }
+
+    /// Return all bindings for a given command id.
+    pub fn bindings_for(&self, command_id: &str) -> Vec<&KeybindingEntry> {
+        self.bindings
+            .iter()
+            .filter(|b| b.command_id == command_id)
+            .collect()
+    }
+
+    /// Total number of registered keybindings.
+    pub fn len(&self) -> usize {
+        self.bindings.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.bindings.is_empty()
+    }
+}
+
+impl Default for KeybindingResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandArgs – typed argument parsing for command invocations
+// ---------------------------------------------------------------------------
+
+/// A single argument value that can be passed to a command.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArgValue {
+    String(String),
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+    Null,
+}
+
+impl fmt::Display for ArgValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ArgValue::String(s) => write!(f, "{s}"),
+            ArgValue::Int(n) => write!(f, "{n}"),
+            ArgValue::Float(n) => write!(f, "{n}"),
+            ArgValue::Bool(b) => write!(f, "{b}"),
+            ArgValue::Null => write!(f, "null"),
+        }
+    }
+}
+
+/// Holds named arguments for a command invocation.
+#[derive(Debug, Clone)]
+pub struct CommandArgs {
+    args: std::collections::HashMap<String, ArgValue>,
+}
+
+impl CommandArgs {
+    pub fn new() -> Self {
+        Self {
+            args: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Insert a named argument, returning any previous value.
+    pub fn set(&mut self, key: &str, value: ArgValue) -> Option<ArgValue> {
+        self.args.insert(key.to_string(), value)
+    }
+
+    /// Retrieve an argument by name.
+    pub fn get(&self, key: &str) -> Option<&ArgValue> {
+        self.args.get(key)
+    }
+
+    /// Retrieve a string argument, returning `None` if missing or wrong type.
+    pub fn get_str(&self, key: &str) -> Option<&str> {
+        match self.args.get(key) {
+            Some(ArgValue::String(s)) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Retrieve an integer argument.
+    pub fn get_int(&self, key: &str) -> Option<i64> {
+        match self.args.get(key) {
+            Some(ArgValue::Int(n)) => Some(*n),
+            _ => None,
+        }
+    }
+
+    /// Retrieve a boolean argument.
+    pub fn get_bool(&self, key: &str) -> Option<bool> {
+        match self.args.get(key) {
+            Some(ArgValue::Bool(b)) => Some(*b),
+            _ => None,
+        }
+    }
+
+    /// Check whether the argument map contains a key.
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.args.contains_key(key)
+    }
+
+    /// Number of arguments.
+    pub fn len(&self) -> usize {
+        self.args.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.args.is_empty()
+    }
+
+    /// Parse a simple `key=value` argument string.
+    ///
+    /// Recognises booleans (`true`/`false`), integers, and falls back to
+    /// string. Returns `None` if the input contains no `=`.
+    pub fn parse_kv(input: &str) -> Option<(String, ArgValue)> {
+        let (key, raw_val) = input.split_once('=')?;
+        let key = key.trim().to_string();
+        let raw_val = raw_val.trim();
+        let value = match raw_val {
+            "true" => ArgValue::Bool(true),
+            "false" => ArgValue::Bool(false),
+            "null" => ArgValue::Null,
+            _ => {
+                if let Ok(n) = raw_val.parse::<i64>() {
+                    ArgValue::Int(n)
+                } else if let Ok(n) = raw_val.parse::<f64>() {
+                    ArgValue::Float(n)
+                } else {
+                    ArgValue::String(raw_val.to_string())
+                }
+            }
+        };
+        Some((key, value))
+    }
+
+    /// Parse multiple `key=value` pairs separated by whitespace.
+    pub fn parse_many(input: &str) -> Self {
+        let mut args = Self::new();
+        for token in input.split_whitespace() {
+            if let Some((key, value)) = Self::parse_kv(token) {
+                args.set(&key, value);
+            }
+        }
+        args
+    }
+}
+
+impl Default for CommandArgs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WhenClause – evaluate context conditions for command enablement
+// ---------------------------------------------------------------------------
+
+/// Evaluates "when" clause expressions against a set of boolean context keys.
+///
+/// Supported operators:
+/// - bare key: `editorFocus` → true if key is present and true
+/// - negation: `!editorFocus`
+/// - conjunction: `editorFocus && editorHasSelection`
+/// - disjunction: `editorFocus || terminalFocus`
+///
+/// `&&` binds tighter than `||` (standard precedence).
+#[derive(Debug, Clone)]
+pub struct WhenClauseContext {
+    keys: std::collections::HashMap<String, bool>,
+}
+
+impl WhenClauseContext {
+    pub fn new() -> Self {
+        Self {
+            keys: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Set a context key to a boolean value.
+    pub fn set(&mut self, key: &str, value: bool) {
+        self.keys.insert(key.to_string(), value);
+    }
+
+    /// Remove a context key.
+    pub fn remove(&mut self, key: &str) -> bool {
+        self.keys.remove(key).is_some()
+    }
+
+    /// Get the value of a context key (defaults to `false` if absent).
+    pub fn get(&self, key: &str) -> bool {
+        self.keys.get(key).copied().unwrap_or(false)
+    }
+
+    /// Evaluate a when-clause expression.
+    ///
+    /// Grammar (simplified):
+    ///   expr     = or_expr
+    ///   or_expr  = and_expr ( "||" and_expr )*
+    ///   and_expr = atom ( "&&" atom )*
+    ///   atom     = "!" atom | key
+    pub fn evaluate(&self, expr: &str) -> bool {
+        let expr = expr.trim();
+        if expr.is_empty() {
+            return true;
+        }
+        // Split on `||` first (lower precedence)
+        let or_parts: Vec<&str> = Self::split_top_level(expr, "||");
+        or_parts.iter().any(|part| self.eval_and(part.trim()))
+    }
+
+    fn eval_and(&self, expr: &str) -> bool {
+        let and_parts: Vec<&str> = Self::split_top_level(expr, "&&");
+        and_parts.iter().all(|part| self.eval_atom(part.trim()))
+    }
+
+    fn eval_atom(&self, expr: &str) -> bool {
+        let expr = expr.trim();
+        if let Some(rest) = expr.strip_prefix('!') {
+            !self.eval_atom(rest.trim())
+        } else {
+            self.get(expr)
+        }
+    }
+
+    /// Split a string on a delimiter, but only at the top level (no nesting
+    /// support needed for our simple grammar).
+    fn split_top_level<'a>(s: &'a str, delim: &str) -> Vec<&'a str> {
+        s.split(delim).collect()
+    }
+
+    /// Number of context keys set.
+    pub fn len(&self) -> usize {
+        self.keys.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.keys.is_empty()
+    }
+
+    /// Clear all context keys.
+    pub fn clear(&mut self) {
+        self.keys.clear();
+    }
+}
+
+impl Default for WhenClauseContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandInvocation – represents a parsed command invocation with args
+// ---------------------------------------------------------------------------
+
+/// A fully parsed command invocation: command id + arguments.
+#[derive(Debug, Clone)]
+pub struct CommandInvocation {
+    pub command_id: String,
+    pub args: CommandArgs,
+    pub source: CommandSource,
+}
+
+impl CommandInvocation {
+    pub fn new(command_id: &str, source: CommandSource) -> Self {
+        Self {
+            command_id: command_id.to_string(),
+            args: CommandArgs::new(),
+            source,
+        }
+    }
+
+    /// Parse a textual invocation of the form `"command.id arg1=val1 arg2=val2"`.
+    pub fn parse(input: &str, source: CommandSource) -> Option<Self> {
+        let mut parts = input.splitn(2, char::is_whitespace);
+        let command_id = parts.next()?.trim();
+        if command_id.is_empty() {
+            return None;
+        }
+        let args = match parts.next() {
+            Some(rest) => CommandArgs::parse_many(rest),
+            None => CommandArgs::new(),
+        };
+        Some(Self {
+            command_id: command_id.to_string(),
+            args,
+            source,
+        })
+    }
+
+    /// Validate the invocation against a registry, returning the descriptor
+    /// if the command exists and is enabled.
+    pub fn validate<'a>(
+        &self,
+        registry: &'a CommandRegistry,
+    ) -> CommandResult<&'a CommandDescriptor> {
+        match registry.get_command(&self.command_id) {
+            None => Err(CommandError::NotFound(self.command_id.clone())),
+            Some(cmd) if !cmd.enabled => Err(CommandError::Disabled(self.command_id.clone())),
+            Some(cmd) => Ok(cmd),
+        }
+    }
+}
+
+impl fmt::Display for CommandInvocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} (via {})", self.command_id, self.source)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1798,5 +2269,251 @@ mod tests {
         assert_eq!(ids.len(), 2);
         assert!(ids.contains(&"a".to_string()));
         assert!(ids.contains(&"b".to_string()));
+    }
+
+    // ── CommandAliasMap tests ──
+
+    #[test]
+    fn alias_set_resolve_and_identity() {
+        let mut aliases = CommandAliasMap::new();
+        assert!(aliases.set("fmt", "editor.action.formatDocument").is_none());
+        assert_eq!(
+            aliases.resolve("fmt"),
+            Some("editor.action.formatDocument")
+        );
+        assert_eq!(aliases.resolve("unknown"), None);
+        assert_eq!(
+            aliases.resolve_or_identity("fmt"),
+            "editor.action.formatDocument"
+        );
+        assert_eq!(aliases.resolve_or_identity("literal.id"), "literal.id");
+    }
+
+    #[test]
+    fn alias_overwrite_returns_previous() {
+        let mut aliases = CommandAliasMap::new();
+        aliases.set("fmt", "editor.format.v1");
+        let prev = aliases.set("fmt", "editor.format.v2");
+        assert_eq!(prev, Some("editor.format.v1".to_string()));
+        assert_eq!(aliases.resolve("fmt"), Some("editor.format.v2"));
+    }
+
+    #[test]
+    fn alias_remove_and_contains() {
+        let mut aliases = CommandAliasMap::new();
+        aliases.set("s", "editor.save");
+        assert!(aliases.contains("s"));
+        assert!(aliases.remove("s"));
+        assert!(!aliases.contains("s"));
+        assert!(!aliases.remove("s"));
+    }
+
+    #[test]
+    fn alias_reverse_lookup() {
+        let mut aliases = CommandAliasMap::new();
+        aliases.set("fmt", "editor.format");
+        aliases.set("format", "editor.format");
+        aliases.set("save", "editor.save");
+        let mut found = aliases.aliases_for("editor.format");
+        found.sort();
+        assert_eq!(found, vec!["fmt", "format"]);
+        assert!(aliases.aliases_for("nonexistent").is_empty());
+    }
+
+    // ── KeybindingResolver tests ──
+
+    #[test]
+    fn keybinding_normalise_sorts_modifiers() {
+        assert_eq!(
+            KeybindingResolver::normalise_keys("Shift+Ctrl+P"),
+            "ctrl+shift+p"
+        );
+        assert_eq!(
+            KeybindingResolver::normalise_keys("Alt+Shift+F"),
+            "alt+shift+f"
+        );
+        assert_eq!(KeybindingResolver::normalise_keys("A"), "a");
+    }
+
+    #[test]
+    fn keybinding_resolve_basic() {
+        let mut resolver = KeybindingResolver::new();
+        resolver.add("Ctrl+S", "editor.save", None);
+        resolver.add("Ctrl+Shift+P", "workbench.commandPalette", None);
+        let matches = resolver.resolve("ctrl+s");
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].command_id, "editor.save");
+        assert!(resolver.resolve("ctrl+z").is_empty());
+    }
+
+    #[test]
+    fn keybinding_resolve_with_context() {
+        let mut resolver = KeybindingResolver::new();
+        resolver.add("Ctrl+D", "editor.addSelection", Some("editorFocus"));
+        resolver.add("Ctrl+D", "terminal.sendSequence", Some("terminalFocus"));
+
+        // editorFocus is true
+        let entry = resolver
+            .resolve_with_context("Ctrl+D", |clause| clause == "editorFocus")
+            .unwrap();
+        assert_eq!(entry.command_id, "editor.addSelection");
+
+        // terminalFocus is true
+        let entry = resolver
+            .resolve_with_context("Ctrl+D", |clause| clause == "terminalFocus")
+            .unwrap();
+        assert_eq!(entry.command_id, "terminal.sendSequence");
+
+        // nothing matches
+        let entry = resolver.resolve_with_context("Ctrl+D", |_| false);
+        assert!(entry.is_none());
+    }
+
+    #[test]
+    fn keybinding_remove_command() {
+        let mut resolver = KeybindingResolver::new();
+        resolver.add("Ctrl+S", "editor.save", None);
+        resolver.add("Ctrl+Shift+S", "editor.save", None);
+        resolver.add("Ctrl+Z", "editor.undo", None);
+        let removed = resolver.remove_command("editor.save");
+        assert_eq!(removed, 2);
+        assert!(resolver.bindings_for("editor.save").is_empty());
+        assert_eq!(resolver.len(), 1);
+    }
+
+    // ── CommandArgs tests ──
+
+    #[test]
+    fn args_parse_kv_types() {
+        let (k, v) = CommandArgs::parse_kv("line=42").unwrap();
+        assert_eq!(k, "line");
+        assert_eq!(v, ArgValue::Int(42));
+
+        let (_, v) = CommandArgs::parse_kv("verbose=true").unwrap();
+        assert_eq!(v, ArgValue::Bool(true));
+
+        let (_, v) = CommandArgs::parse_kv("name=hello").unwrap();
+        assert_eq!(v, ArgValue::String("hello".to_string()));
+
+        let (_, v) = CommandArgs::parse_kv("ratio=3.14").unwrap();
+        assert_eq!(v, ArgValue::Float(3.14));
+
+        let (_, v) = CommandArgs::parse_kv("val=null").unwrap();
+        assert_eq!(v, ArgValue::Null);
+
+        assert!(CommandArgs::parse_kv("no-equals").is_none());
+    }
+
+    #[test]
+    fn args_parse_many_and_accessors() {
+        let args = CommandArgs::parse_many("file=main.rs line=10 force=true");
+        assert_eq!(args.len(), 3);
+        assert_eq!(args.get_str("file"), Some("main.rs"));
+        assert_eq!(args.get_int("line"), Some(10));
+        assert_eq!(args.get_bool("force"), Some(true));
+        assert_eq!(args.get_str("missing"), None);
+        assert!(args.contains_key("file"));
+        assert!(!args.contains_key("missing"));
+    }
+
+    // ── WhenClauseContext tests ──
+
+    #[test]
+    fn when_clause_simple_key() {
+        let mut ctx = WhenClauseContext::new();
+        ctx.set("editorFocus", true);
+        assert!(ctx.evaluate("editorFocus"));
+        assert!(!ctx.evaluate("terminalFocus"));
+    }
+
+    #[test]
+    fn when_clause_negation() {
+        let mut ctx = WhenClauseContext::new();
+        ctx.set("editorFocus", true);
+        assert!(!ctx.evaluate("!editorFocus"));
+        assert!(ctx.evaluate("!terminalFocus"));
+    }
+
+    #[test]
+    fn when_clause_and_or() {
+        let mut ctx = WhenClauseContext::new();
+        ctx.set("editorFocus", true);
+        ctx.set("editorHasSelection", true);
+        ctx.set("terminalFocus", false);
+
+        // AND: both true
+        assert!(ctx.evaluate("editorFocus && editorHasSelection"));
+        // AND: one false
+        assert!(!ctx.evaluate("editorFocus && terminalFocus"));
+        // OR: one true
+        assert!(ctx.evaluate("editorFocus || terminalFocus"));
+        // OR: both false
+        assert!(!ctx.evaluate("terminalFocus || nonexistent"));
+    }
+
+    #[test]
+    fn when_clause_empty_is_true() {
+        let ctx = WhenClauseContext::new();
+        assert!(ctx.evaluate(""));
+        assert!(ctx.evaluate("   "));
+    }
+
+    // ── CommandInvocation tests ──
+
+    #[test]
+    fn invocation_parse_with_args() {
+        let inv = CommandInvocation::parse(
+            "editor.goto line=42 col=10",
+            CommandSource::User,
+        )
+        .unwrap();
+        assert_eq!(inv.command_id, "editor.goto");
+        assert_eq!(inv.args.get_int("line"), Some(42));
+        assert_eq!(inv.args.get_int("col"), Some(10));
+        assert_eq!(inv.source, CommandSource::User);
+    }
+
+    #[test]
+    fn invocation_parse_no_args() {
+        let inv =
+            CommandInvocation::parse("editor.save", CommandSource::Keybinding).unwrap();
+        assert_eq!(inv.command_id, "editor.save");
+        assert!(inv.args.is_empty());
+    }
+
+    #[test]
+    fn invocation_parse_empty_returns_none() {
+        assert!(CommandInvocation::parse("", CommandSource::User).is_none());
+        assert!(CommandInvocation::parse("   ", CommandSource::User).is_none());
+    }
+
+    #[test]
+    fn invocation_validate_against_registry() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("editor.save", "Save"));
+        let mut disabled = make_cmd("editor.close", "Close");
+        disabled.enabled = false;
+        reg.register(disabled);
+
+        let ok = CommandInvocation::new("editor.save", CommandSource::User);
+        assert!(ok.validate(&reg).is_ok());
+
+        let missing = CommandInvocation::new("nope", CommandSource::User);
+        assert_eq!(
+            missing.validate(&reg),
+            Err(CommandError::NotFound("nope".into()))
+        );
+
+        let dis = CommandInvocation::new("editor.close", CommandSource::User);
+        assert_eq!(
+            dis.validate(&reg),
+            Err(CommandError::Disabled("editor.close".into()))
+        );
+    }
+
+    #[test]
+    fn invocation_display() {
+        let inv = CommandInvocation::new("editor.save", CommandSource::Keybinding);
+        assert_eq!(inv.to_string(), "editor.save (via Keybinding)");
     }
 }

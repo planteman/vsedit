@@ -1042,6 +1042,376 @@ pub fn format_diagnostics(highlights: &[UnicodeHighlight]) -> Vec<String> {
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Script mixing detection
+// ---------------------------------------------------------------------------
+
+/// The script of a character, for mixed-script detection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum UnicodeScript {
+    Common,
+    Latin,
+    Cyrillic,
+    Greek,
+    Arabic,
+    Hebrew,
+    Han,
+    Hiragana,
+    Katakana,
+    Hangul,
+    Unknown,
+}
+
+impl fmt::Display for UnicodeScript {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let label = match self {
+            UnicodeScript::Common => "Common",
+            UnicodeScript::Latin => "Latin",
+            UnicodeScript::Cyrillic => "Cyrillic",
+            UnicodeScript::Greek => "Greek",
+            UnicodeScript::Arabic => "Arabic",
+            UnicodeScript::Hebrew => "Hebrew",
+            UnicodeScript::Han => "Han",
+            UnicodeScript::Hiragana => "Hiragana",
+            UnicodeScript::Katakana => "Katakana",
+            UnicodeScript::Hangul => "Hangul",
+            UnicodeScript::Unknown => "Unknown",
+        };
+        write!(f, "{}", label)
+    }
+}
+
+/// Determine the script of a character based on its code point range.
+pub fn char_script(ch: char) -> UnicodeScript {
+    let cp = ch as u32;
+    match cp {
+        0x0000..=0x007F => UnicodeScript::Common,    // Basic ASCII (digits, punctuation, controls)
+        #[allow(unreachable_patterns)]
+        0x0041..=0x005A | 0x0061..=0x007A => UnicodeScript::Latin,
+        0x00C0..=0x024F | 0x1E00..=0x1EFF => UnicodeScript::Latin,
+        0x0370..=0x03FF | 0x1F00..=0x1FFF => UnicodeScript::Greek,
+        0x0400..=0x04FF | 0x0500..=0x052F => UnicodeScript::Cyrillic,
+        0x0590..=0x05FF => UnicodeScript::Hebrew,
+        0x0600..=0x06FF | 0x0750..=0x077F => UnicodeScript::Arabic,
+        0x3040..=0x309F => UnicodeScript::Hiragana,
+        0x30A0..=0x30FF => UnicodeScript::Katakana,
+        0xAC00..=0xD7AF => UnicodeScript::Hangul,
+        0x4E00..=0x9FFF | 0x3400..=0x4DBF => UnicodeScript::Han,
+        _ => UnicodeScript::Unknown,
+    }
+}
+
+/// A warning about mixed scripts in a single identifier or line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MixedScriptWarning {
+    pub scripts_found: Vec<UnicodeScript>,
+    pub text: String,
+}
+
+impl fmt::Display for MixedScriptWarning {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let names: Vec<String> = self.scripts_found.iter().map(|s| s.to_string()).collect();
+        write!(f, "mixed scripts [{}] in {:?}", names.join(", "), self.text)
+    }
+}
+
+/// Check a string for mixed scripts. Returns `None` if only one non-Common
+/// script is present or the string is empty.
+pub fn detect_mixed_scripts(s: &str) -> Option<MixedScriptWarning> {
+    let mut seen = Vec::new();
+    for ch in s.chars() {
+        let script = char_script(ch);
+        if script == UnicodeScript::Common || script == UnicodeScript::Unknown {
+            continue;
+        }
+        if !seen.contains(&script) {
+            seen.push(script);
+        }
+    }
+    if seen.len() > 1 {
+        Some(MixedScriptWarning {
+            scripts_found: seen,
+            text: s.to_string(),
+        })
+    } else {
+        None
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Zero-width and invisible character utilities
+// ---------------------------------------------------------------------------
+
+/// Describes an invisible character found in text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvisibleCharInfo {
+    pub position: usize,
+    pub character: char,
+    pub name: &'static str,
+}
+
+/// Return a human-readable name for known invisible characters.
+pub fn invisible_char_name(ch: char) -> Option<&'static str> {
+    match ch {
+        '\u{200B}' => Some("Zero Width Space"),
+        '\u{200C}' => Some("Zero Width Non-Joiner"),
+        '\u{200D}' => Some("Zero Width Joiner"),
+        '\u{2060}' => Some("Word Joiner"),
+        '\u{FEFF}' => Some("Zero Width No-Break Space / BOM"),
+        '\u{00AD}' => Some("Soft Hyphen"),
+        '\u{180E}' => Some("Mongolian Vowel Separator"),
+        '\u{2061}' => Some("Function Application"),
+        '\u{2062}' => Some("Invisible Times"),
+        '\u{2063}' => Some("Invisible Separator"),
+        '\u{2064}' => Some("Invisible Plus"),
+        _ => None,
+    }
+}
+
+/// Find all invisible / zero-width characters in a string with their positions.
+pub fn find_invisible_chars(s: &str) -> Vec<InvisibleCharInfo> {
+    s.chars()
+        .enumerate()
+        .filter_map(|(i, ch)| {
+            invisible_char_name(ch).map(|name| InvisibleCharInfo {
+                position: i,
+                character: ch,
+                name,
+            })
+        })
+        .collect()
+}
+
+/// Strip all zero-width and invisible characters from a string.
+pub fn strip_invisible(s: &str) -> String {
+    s.chars()
+        .filter(|&ch| invisible_char_name(ch).is_none())
+        .collect()
+}
+
+/// Returns `true` if the string contains any zero-width characters.
+pub fn contains_zero_width(s: &str) -> bool {
+    s.chars().any(|ch| {
+        matches!(
+            ch,
+            '\u{200B}' | '\u{200C}' | '\u{200D}' | '\u{2060}' | '\u{FEFF}'
+        )
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Combining character analysis
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if the character is a Unicode combining mark (U+0300..U+036F
+/// for the Combining Diacritical Marks block, plus U+20D0..U+20FF for
+/// Combining Diacritical Marks for Symbols).
+pub fn is_combining_mark(ch: char) -> bool {
+    let cp = ch as u32;
+    matches!(cp, 0x0300..=0x036F | 0x20D0..=0x20FF | 0x0483..=0x0489 | 0xFE20..=0xFE2F)
+}
+
+/// Count the number of combining marks in a string.
+pub fn count_combining_marks(s: &str) -> usize {
+    s.chars().filter(|&ch| is_combining_mark(ch)).count()
+}
+
+/// Detect "Zalgo text" — strings where combining marks are stacked excessively.
+/// Returns `true` if any base character has more than `threshold` consecutive
+/// combining marks following it.
+pub fn has_excessive_combining(s: &str, threshold: usize) -> bool {
+    let mut run = 0usize;
+    for ch in s.chars() {
+        if is_combining_mark(ch) {
+            run += 1;
+            if run > threshold {
+                return true;
+            }
+        } else {
+            run = 0;
+        }
+    }
+    false
+}
+
+// ---------------------------------------------------------------------------
+// Bidirectional text safety
+// ---------------------------------------------------------------------------
+
+/// All Unicode bidirectional control characters.
+pub fn is_bidi_control(ch: char) -> bool {
+    matches!(
+        ch,
+        '\u{200E}'   // Left-to-Right Mark
+        | '\u{200F}' // Right-to-Left Mark
+        | '\u{061C}' // Arabic Letter Mark
+        | '\u{202A}' // Left-to-Right Embedding
+        | '\u{202B}' // Right-to-Left Embedding
+        | '\u{202C}' // Pop Directional Formatting
+        | '\u{202D}' // Left-to-Right Override
+        | '\u{202E}' // Right-to-Left Override
+        | '\u{2066}' // Left-to-Right Isolate
+        | '\u{2067}' // Right-to-Left Isolate
+        | '\u{2068}' // First Strong Isolate
+        | '\u{2069}' // Pop Directional Isolate
+    )
+}
+
+/// Find all bidi control characters in a string with their positions.
+pub fn find_bidi_controls(s: &str) -> Vec<(usize, char)> {
+    s.chars()
+        .enumerate()
+        .filter(|&(_, ch)| is_bidi_control(ch))
+        .collect()
+}
+
+/// Check whether bidi control characters are properly balanced (each open has
+/// a matching close). Returns `true` if balanced or no bidi controls present.
+pub fn bidi_controls_balanced(s: &str) -> bool {
+    let mut depth: i32 = 0;
+    for ch in s.chars() {
+        match ch {
+            '\u{202A}' | '\u{202B}' | '\u{202D}' | '\u{202E}' => depth += 1,
+            '\u{202C}' => depth -= 1,
+            '\u{2066}' | '\u{2067}' | '\u{2068}' => depth += 1,
+            '\u{2069}' => depth -= 1,
+            _ => {}
+        }
+        if depth < 0 {
+            return false;
+        }
+    }
+    depth == 0
+}
+
+// ---------------------------------------------------------------------------
+// Unicode block identification
+// ---------------------------------------------------------------------------
+
+/// Identifies the Unicode block for a character.
+pub fn unicode_block_name(ch: char) -> &'static str {
+    let cp = ch as u32;
+    match cp {
+        0x0000..=0x007F => "Basic Latin",
+        0x0080..=0x00FF => "Latin-1 Supplement",
+        0x0100..=0x017F => "Latin Extended-A",
+        0x0180..=0x024F => "Latin Extended-B",
+        0x0250..=0x02AF => "IPA Extensions",
+        0x0300..=0x036F => "Combining Diacritical Marks",
+        0x0370..=0x03FF => "Greek and Coptic",
+        0x0400..=0x04FF => "Cyrillic",
+        0x0500..=0x052F => "Cyrillic Supplement",
+        0x0590..=0x05FF => "Hebrew",
+        0x0600..=0x06FF => "Arabic",
+        0x2000..=0x206F => "General Punctuation",
+        0x2070..=0x209F => "Superscripts and Subscripts",
+        0x20A0..=0x20CF => "Currency Symbols",
+        0x20D0..=0x20FF => "Combining Diacritical Marks for Symbols",
+        0x2100..=0x214F => "Letterlike Symbols",
+        0x2200..=0x22FF => "Mathematical Operators",
+        0x2300..=0x23FF => "Miscellaneous Technical",
+        0x2400..=0x243F => "Control Pictures",
+        0x2500..=0x257F => "Box Drawing",
+        0x2580..=0x259F => "Block Elements",
+        0x25A0..=0x25FF => "Geometric Shapes",
+        0x2600..=0x26FF => "Miscellaneous Symbols",
+        0x2700..=0x27BF => "Dingbats",
+        0x3000..=0x303F => "CJK Symbols and Punctuation",
+        0x3040..=0x309F => "Hiragana",
+        0x30A0..=0x30FF => "Katakana",
+        0x4E00..=0x9FFF => "CJK Unified Ideographs",
+        0xAC00..=0xD7AF => "Hangul Syllables",
+        0xFE00..=0xFE0F => "Variation Selectors",
+        0xFF00..=0xFFEF => "Halfwidth and Fullwidth Forms",
+        0x1F600..=0x1F64F => "Emoticons",
+        0x1F300..=0x1F5FF => "Miscellaneous Symbols and Pictographs",
+        0x1F680..=0x1F6FF => "Transport and Map Symbols",
+        0x1F900..=0x1F9FF => "Supplemental Symbols and Pictographs",
+        _ => "Unknown Block",
+    }
+}
+
+/// Summarize the Unicode blocks present in a string, returning each block name
+/// and how many characters belong to it.
+pub fn summarize_blocks(s: &str) -> Vec<(&'static str, usize)> {
+    let mut map: Vec<(&'static str, usize)> = Vec::new();
+    for ch in s.chars() {
+        let block = unicode_block_name(ch);
+        if let Some(entry) = map.iter_mut().find(|(b, _)| *b == block) {
+            entry.1 += 1;
+        } else {
+            map.push((block, 1));
+        }
+    }
+    map
+}
+
+// ---------------------------------------------------------------------------
+// Full-string security scan
+// ---------------------------------------------------------------------------
+
+/// A comprehensive security report for a string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SecurityReport {
+    pub invisible_chars: usize,
+    pub bidi_controls: usize,
+    pub confusables: usize,
+    pub mixed_scripts: bool,
+    pub bidi_balanced: bool,
+    pub excessive_combining: bool,
+}
+
+impl SecurityReport {
+    /// Run all security checks on the given string.
+    pub fn scan(s: &str) -> Self {
+        Self {
+            invisible_chars: find_invisible_chars(s).len(),
+            bidi_controls: find_bidi_controls(s).len(),
+            confusables: s.chars().filter(|&ch| is_confusable(ch).is_some()).count(),
+            mixed_scripts: detect_mixed_scripts(s).is_some(),
+            bidi_balanced: bidi_controls_balanced(s),
+            excessive_combining: has_excessive_combining(s, 3),
+        }
+    }
+
+    /// Returns `true` if no security issues were detected.
+    pub fn is_clean(&self) -> bool {
+        self.invisible_chars == 0
+            && self.bidi_controls == 0
+            && self.confusables == 0
+            && !self.mixed_scripts
+            && self.bidi_balanced
+            && !self.excessive_combining
+    }
+
+    /// Overall severity: the worst issue found.
+    pub fn overall_severity(&self) -> Severity {
+        if self.bidi_controls > 0 || self.invisible_chars > 0 || !self.bidi_balanced {
+            Severity::Error
+        } else if self.confusables > 0 || self.mixed_scripts || self.excessive_combining {
+            Severity::Warning
+        } else {
+            Severity::Info
+        }
+    }
+}
+
+impl fmt::Display for SecurityReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SecurityReport(invisible={}, bidi={}, confusables={}, mixed_scripts={}, \
+             bidi_balanced={}, excessive_combining={})",
+            self.invisible_chars,
+            self.bidi_controls,
+            self.confusables,
+            self.mixed_scripts,
+            self.bidi_balanced,
+            self.excessive_combining,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1805,5 +2175,189 @@ mod tests {
         assert_eq!(diags.len(), 1);
         assert!(diags[0].contains("U+0430"));
         assert!(diags[0].contains("5:10"));
+    }
+
+    // ---- Script mixing detection tests ----
+
+    #[test]
+    fn test_detect_mixed_scripts_latin_only() {
+        assert!(detect_mixed_scripts("hello world").is_none());
+    }
+
+    #[test]
+    fn test_detect_mixed_scripts_latin_cyrillic() {
+        // Mix Latin 'h' (Common/ASCII) with Cyrillic 'а' and Latin extended 'é'
+        let warning = detect_mixed_scripts("hа\u{00E9}llo");
+        assert!(warning.is_some());
+        let w = warning.unwrap();
+        assert!(w.scripts_found.contains(&UnicodeScript::Cyrillic));
+        assert!(w.scripts_found.contains(&UnicodeScript::Latin));
+        assert!(w.to_string().contains("mixed scripts"));
+    }
+
+    #[test]
+    fn test_char_script_ranges() {
+        assert_eq!(char_script('A'), UnicodeScript::Common); // ASCII range
+        assert_eq!(char_script('\u{00E9}'), UnicodeScript::Latin); // Latin-1
+        assert_eq!(char_script('\u{0430}'), UnicodeScript::Cyrillic);
+        assert_eq!(char_script('\u{03B1}'), UnicodeScript::Greek); // alpha
+        assert_eq!(char_script('\u{05D0}'), UnicodeScript::Hebrew); // alef
+        assert_eq!(char_script('\u{0627}'), UnicodeScript::Arabic); // alif
+        assert_eq!(char_script('\u{4E2D}'), UnicodeScript::Han);
+    }
+
+    // ---- Invisible character tests ----
+
+    #[test]
+    fn test_find_invisible_chars() {
+        let s = "abc\u{200B}def\u{200D}ghi";
+        let found = find_invisible_chars(s);
+        assert_eq!(found.len(), 2);
+        assert_eq!(found[0].character, '\u{200B}');
+        assert_eq!(found[0].name, "Zero Width Space");
+        assert_eq!(found[0].position, 3);
+        assert_eq!(found[1].character, '\u{200D}');
+        assert_eq!(found[1].name, "Zero Width Joiner");
+    }
+
+    #[test]
+    fn test_strip_invisible() {
+        assert_eq!(strip_invisible("a\u{200B}b\u{FEFF}c"), "abc");
+        assert_eq!(strip_invisible("hello"), "hello");
+    }
+
+    #[test]
+    fn test_contains_zero_width() {
+        assert!(contains_zero_width("a\u{200B}b"));
+        assert!(contains_zero_width("\u{FEFF}text"));
+        assert!(!contains_zero_width("normal text"));
+    }
+
+    #[test]
+    fn test_invisible_char_name_coverage() {
+        assert_eq!(invisible_char_name('\u{200B}'), Some("Zero Width Space"));
+        assert_eq!(invisible_char_name('\u{00AD}'), Some("Soft Hyphen"));
+        assert_eq!(invisible_char_name('\u{180E}'), Some("Mongolian Vowel Separator"));
+        assert_eq!(invisible_char_name('\u{2062}'), Some("Invisible Times"));
+        assert_eq!(invisible_char_name('a'), None);
+    }
+
+    // ---- Combining character tests ----
+
+    #[test]
+    fn test_is_combining_mark() {
+        assert!(is_combining_mark('\u{0300}')); // combining grave accent
+        assert!(is_combining_mark('\u{0301}')); // combining acute accent
+        assert!(!is_combining_mark('a'));
+        assert!(!is_combining_mark(' '));
+    }
+
+    #[test]
+    fn test_count_combining_marks() {
+        // "é" decomposed: 'e' + combining acute accent
+        let s = "e\u{0301}";
+        assert_eq!(count_combining_marks(s), 1);
+        assert_eq!(count_combining_marks("hello"), 0);
+    }
+
+    #[test]
+    fn test_has_excessive_combining_zalgo() {
+        // Zalgo-like text: 'a' followed by 5 combining marks
+        let zalgo = "a\u{0300}\u{0301}\u{0302}\u{0303}\u{0304}";
+        assert!(has_excessive_combining(zalgo, 3));
+        assert!(!has_excessive_combining(zalgo, 5));
+        assert!(!has_excessive_combining("normal text", 3));
+    }
+
+    // ---- Bidi control tests ----
+
+    #[test]
+    fn test_is_bidi_control() {
+        assert!(is_bidi_control('\u{200E}')); // LRM
+        assert!(is_bidi_control('\u{200F}')); // RLM
+        assert!(is_bidi_control('\u{061C}')); // Arabic Letter Mark
+        assert!(!is_bidi_control('a'));
+    }
+
+    #[test]
+    fn test_find_bidi_controls() {
+        let s = "abc\u{202A}def\u{202C}ghi";
+        let controls = find_bidi_controls(s);
+        assert_eq!(controls.len(), 2);
+        assert_eq!(controls[0], (3, '\u{202A}'));
+        assert_eq!(controls[1], (7, '\u{202C}'));
+    }
+
+    #[test]
+    fn test_bidi_controls_balanced() {
+        assert!(bidi_controls_balanced("no bidi here"));
+        // Balanced: LRE + PDF
+        assert!(bidi_controls_balanced("a\u{202A}b\u{202C}c"));
+        // Unbalanced: LRE without PDF
+        assert!(!bidi_controls_balanced("a\u{202A}b"));
+        // Unbalanced: PDF without opener
+        assert!(!bidi_controls_balanced("a\u{202C}b"));
+    }
+
+    // ---- Unicode block identification tests ----
+
+    #[test]
+    fn test_unicode_block_name() {
+        assert_eq!(unicode_block_name('A'), "Basic Latin");
+        assert_eq!(unicode_block_name('\u{00E9}'), "Latin-1 Supplement");
+        assert_eq!(unicode_block_name('\u{0430}'), "Cyrillic");
+        assert_eq!(unicode_block_name('\u{03B1}'), "Greek and Coptic");
+        assert_eq!(unicode_block_name('\u{4E2D}'), "CJK Unified Ideographs");
+        assert_eq!(unicode_block_name('\u{1F600}'), "Emoticons");
+        assert_eq!(unicode_block_name('\u{2500}'), "Box Drawing");
+    }
+
+    #[test]
+    fn test_summarize_blocks() {
+        let summary = summarize_blocks("ABCdef");
+        assert_eq!(summary.len(), 1);
+        assert_eq!(summary[0], ("Basic Latin", 6));
+
+        let summary2 = summarize_blocks("A\u{0430}\u{0431}");
+        assert_eq!(summary2.len(), 2);
+    }
+
+    // ---- SecurityReport tests ----
+
+    #[test]
+    fn test_security_report_clean() {
+        let report = SecurityReport::scan("hello world");
+        assert!(report.is_clean());
+        assert_eq!(report.overall_severity(), Severity::Info);
+        assert!(report.to_string().contains("invisible=0"));
+    }
+
+    #[test]
+    fn test_security_report_invisible() {
+        let report = SecurityReport::scan("a\u{200B}b");
+        assert!(!report.is_clean());
+        assert_eq!(report.invisible_chars, 1);
+        assert_eq!(report.overall_severity(), Severity::Error);
+    }
+
+    #[test]
+    fn test_security_report_confusable() {
+        let report = SecurityReport::scan("h\u{0435}llo");
+        assert!(!report.is_clean());
+        assert_eq!(report.confusables, 1);
+    }
+
+    #[test]
+    fn test_security_report_mixed_scripts() {
+        let report = SecurityReport::scan("h\u{00E9}llo\u{0430}");
+        assert!(report.mixed_scripts);
+        assert!(!report.is_clean());
+    }
+
+    #[test]
+    fn test_security_report_unbalanced_bidi() {
+        let report = SecurityReport::scan("abc\u{202A}def");
+        assert!(!report.bidi_balanced);
+        assert_eq!(report.overall_severity(), Severity::Error);
     }
 }

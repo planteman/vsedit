@@ -1139,6 +1139,600 @@ impl fmt::Display for EditorEditBatch {
         write!(f, "EditBatch({} edits, {} chars)", self.len(), self.total_new_chars())
     }
 }
+
+// ---------------------------------------------------------------------------
+// EditorGroupManager - manages split editor groups
+// ---------------------------------------------------------------------------
+
+/// Identifies an editor group's layout direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum GroupDirection {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+impl fmt::Display for GroupDirection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GroupDirection::Left => write!(f, "left"),
+            GroupDirection::Right => write!(f, "right"),
+            GroupDirection::Up => write!(f, "up"),
+            GroupDirection::Down => write!(f, "down"),
+        }
+    }
+}
+
+/// A single editor group containing ordered editor tab URIs.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EditorGroup {
+    pub id: String,
+    pub tabs: Vec<String>,
+    pub active_tab: Option<usize>,
+    pub size_fraction: f64,
+}
+
+impl EditorGroup {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            tabs: Vec::new(),
+            active_tab: None,
+            size_fraction: 1.0,
+        }
+    }
+
+    /// Open a URI in this group. If already present, activates it.
+    /// Returns the tab index.
+    pub fn open(&mut self, uri: impl Into<String>) -> usize {
+        let uri = uri.into();
+        if let Some(idx) = self.tabs.iter().position(|t| *t == uri) {
+            self.active_tab = Some(idx);
+            idx
+        } else {
+            let idx = self.tabs.len();
+            self.tabs.push(uri);
+            self.active_tab = Some(idx);
+            idx
+        }
+    }
+
+    /// Close a tab by index. Returns the closed URI if valid.
+    pub fn close(&mut self, index: usize) -> Option<String> {
+        if index >= self.tabs.len() {
+            return None;
+        }
+        let uri = self.tabs.remove(index);
+        if self.tabs.is_empty() {
+            self.active_tab = None;
+        } else if let Some(active) = self.active_tab {
+            if active == index {
+                self.active_tab = Some(active.min(self.tabs.len() - 1));
+            } else if active > index {
+                self.active_tab = Some(active - 1);
+            }
+        }
+        Some(uri)
+    }
+
+    /// Number of tabs in this group.
+    pub fn tab_count(&self) -> usize {
+        self.tabs.len()
+    }
+
+    /// Whether the group is empty.
+    pub fn is_empty(&self) -> bool {
+        self.tabs.is_empty()
+    }
+
+    /// The currently active URI, if any.
+    pub fn active_uri(&self) -> Option<&str> {
+        self.active_tab.and_then(|i| self.tabs.get(i).map(|s| s.as_str()))
+    }
+}
+
+impl fmt::Display for EditorGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Group({}, {} tabs, size={:.0}%)",
+            self.id,
+            self.tabs.len(),
+            self.size_fraction * 100.0
+        )
+    }
+}
+
+/// Manages multiple editor groups for split-view layouts.
+#[derive(Debug, Clone, Default)]
+pub struct EditorGroupManager {
+    groups: Vec<EditorGroup>,
+    active_group: Option<usize>,
+}
+
+impl EditorGroupManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a new group. Returns its index.
+    pub fn add_group(&mut self, id: impl Into<String>) -> usize {
+        let idx = self.groups.len();
+        self.groups.push(EditorGroup::new(id));
+        if self.active_group.is_none() {
+            self.active_group = Some(idx);
+        }
+        self.rebalance();
+        idx
+    }
+
+    /// Remove a group by index. Returns the removed group if valid.
+    pub fn remove_group(&mut self, index: usize) -> Option<EditorGroup> {
+        if index >= self.groups.len() {
+            return None;
+        }
+        let group = self.groups.remove(index);
+        if self.groups.is_empty() {
+            self.active_group = None;
+        } else if let Some(active) = self.active_group {
+            if active == index {
+                self.active_group = Some(active.min(self.groups.len() - 1));
+            } else if active > index {
+                self.active_group = Some(active - 1);
+            }
+        }
+        self.rebalance();
+        Some(group)
+    }
+
+    /// Set the active group by index.
+    pub fn set_active_group(&mut self, index: usize) -> bool {
+        if index < self.groups.len() {
+            self.active_group = Some(index);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get the active group.
+    pub fn active_group(&self) -> Option<&EditorGroup> {
+        self.active_group.and_then(|i| self.groups.get(i))
+    }
+
+    /// Get a mutable reference to the active group.
+    pub fn active_group_mut(&mut self) -> Option<&mut EditorGroup> {
+        self.active_group.and_then(|i| self.groups.get_mut(i))
+    }
+
+    /// Get a group by index.
+    pub fn group(&self, index: usize) -> Option<&EditorGroup> {
+        self.groups.get(index)
+    }
+
+    /// Number of groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Total number of open tabs across all groups.
+    pub fn total_tab_count(&self) -> usize {
+        self.groups.iter().map(|g| g.tab_count()).sum()
+    }
+
+    /// Move a tab from one group to another. Returns true on success.
+    pub fn move_tab(
+        &mut self,
+        from_group: usize,
+        tab_index: usize,
+        to_group: usize,
+    ) -> bool {
+        if from_group == to_group
+            || from_group >= self.groups.len()
+            || to_group >= self.groups.len()
+        {
+            return false;
+        }
+        // Take the URI out of the source group
+        let uri = match self.groups[from_group].close(tab_index) {
+            Some(u) => u,
+            None => return false,
+        };
+        self.groups[to_group].open(uri);
+        true
+    }
+
+    /// Rebalance group sizes to equal fractions.
+    fn rebalance(&mut self) {
+        let count = self.groups.len();
+        if count > 0 {
+            let fraction = 1.0 / count as f64;
+            for g in &mut self.groups {
+                g.size_fraction = fraction;
+            }
+        }
+    }
+}
+
+impl fmt::Display for EditorGroupManager {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "GroupManager({} groups, {} total tabs, active={:?})",
+            self.groups.len(),
+            self.total_tab_count(),
+            self.active_group,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorCloseOrder - MRU-based close ordering
+// ---------------------------------------------------------------------------
+
+/// Tracks most-recently-used order for editor close operations.
+#[derive(Debug, Clone, Default)]
+pub struct EditorCloseOrder {
+    /// Editor IDs in MRU order (most recent first).
+    order: Vec<String>,
+}
+
+impl EditorCloseOrder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record that an editor was accessed (moves it to front).
+    pub fn touch(&mut self, editor_id: impl Into<String>) {
+        let id = editor_id.into();
+        self.order.retain(|e| e != &id);
+        self.order.insert(0, id);
+    }
+
+    /// Remove an editor from the tracking.
+    pub fn remove(&mut self, editor_id: &str) {
+        self.order.retain(|e| e != editor_id);
+    }
+
+    /// The most recently used editor ID.
+    pub fn most_recent(&self) -> Option<&str> {
+        self.order.first().map(|s| s.as_str())
+    }
+
+    /// The least recently used editor ID (next to close on LRU policy).
+    pub fn least_recent(&self) -> Option<&str> {
+        self.order.last().map(|s| s.as_str())
+    }
+
+    /// Return the close order as a slice (most recent first).
+    pub fn as_slice(&self) -> &[String] {
+        &self.order
+    }
+
+    /// Number of tracked editors.
+    pub fn len(&self) -> usize {
+        self.order.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.order.is_empty()
+    }
+
+    /// Get the MRU rank of an editor (0 = most recent). None if not tracked.
+    pub fn rank(&self, editor_id: &str) -> Option<usize> {
+        self.order.iter().position(|e| e == editor_id)
+    }
+}
+
+impl fmt::Display for EditorCloseOrder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CloseOrder({} editors)", self.order.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorTitleResolver - computes display titles from URIs
+// ---------------------------------------------------------------------------
+
+/// Resolves display titles for editor tabs from their URIs.
+#[derive(Debug, Clone, Default)]
+pub struct EditorTitleResolver {
+    /// Custom overrides: URI -> display title
+    overrides: HashMap<String, String>,
+}
+
+impl EditorTitleResolver {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set a custom title for a specific URI.
+    pub fn set_override(&mut self, uri: impl Into<String>, title: impl Into<String>) {
+        self.overrides.insert(uri.into(), title.into());
+    }
+
+    /// Remove a custom title override.
+    pub fn remove_override(&mut self, uri: &str) -> bool {
+        self.overrides.remove(uri).is_some()
+    }
+
+    /// Resolve the display title for a URI.
+    /// Uses override if present, otherwise extracts the filename from the path.
+    pub fn resolve(&self, uri: &str) -> String {
+        if let Some(title) = self.overrides.get(uri) {
+            return title.clone();
+        }
+        Self::filename_from_uri(uri)
+    }
+
+    /// Resolve a short title suitable for narrow tab bars.
+    /// Truncates to `max_len` characters with ellipsis if needed.
+    pub fn resolve_short(&self, uri: &str, max_len: usize) -> String {
+        let title = self.resolve(uri);
+        if title.len() <= max_len {
+            title
+        } else if max_len <= 3 {
+            title[..max_len].to_string()
+        } else {
+            format!("{}...", &title[..max_len - 3])
+        }
+    }
+
+    /// Resolve a disambiguated title when multiple editors share the same filename.
+    /// Includes the parent directory to differentiate.
+    pub fn resolve_disambiguated(&self, uri: &str) -> String {
+        if let Some(title) = self.overrides.get(uri) {
+            return title.clone();
+        }
+        let path = Self::path_from_uri(uri);
+        let parts: Vec<&str> = path.rsplitn(3, '/').collect();
+        if parts.len() >= 2 {
+            format!("{}/{}", parts[1], parts[0])
+        } else {
+            Self::filename_from_uri(uri)
+        }
+    }
+
+    /// Extract the filename portion from a URI.
+    fn filename_from_uri(uri: &str) -> String {
+        let path = Self::path_from_uri(uri);
+        path.rsplit('/').next().unwrap_or(uri).to_string()
+    }
+
+    /// Strip the scheme from a URI to get the path portion.
+    fn path_from_uri(uri: &str) -> &str {
+        if let Some(idx) = uri.find("://") {
+            &uri[idx + 3..]
+        } else {
+            uri
+        }
+    }
+
+    /// Number of active overrides.
+    pub fn override_count(&self) -> usize {
+        self.overrides.len()
+    }
+}
+
+impl fmt::Display for EditorTitleResolver {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TitleResolver({} overrides)", self.overrides.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorIconResolver - resolves file type icons by extension
+// ---------------------------------------------------------------------------
+
+/// Resolves icon identifiers for editor tabs based on file extensions.
+#[derive(Debug, Clone, Default)]
+pub struct EditorIconResolver {
+    /// Extension (without dot) -> icon identifier
+    extension_map: HashMap<String, String>,
+    /// Exact filename -> icon identifier
+    filename_map: HashMap<String, String>,
+    /// Default icon when no match is found
+    default_icon: String,
+}
+
+impl EditorIconResolver {
+    /// Create a resolver with sensible defaults for common file types.
+    pub fn with_defaults() -> Self {
+        let mut resolver = Self {
+            extension_map: HashMap::new(),
+            filename_map: HashMap::new(),
+            default_icon: "file".to_string(),
+        };
+        // Common language icons
+        resolver.add_extension("rs", "rust");
+        resolver.add_extension("ts", "typescript");
+        resolver.add_extension("tsx", "react");
+        resolver.add_extension("js", "javascript");
+        resolver.add_extension("jsx", "react");
+        resolver.add_extension("py", "python");
+        resolver.add_extension("go", "go");
+        resolver.add_extension("java", "java");
+        resolver.add_extension("c", "c");
+        resolver.add_extension("cpp", "cpp");
+        resolver.add_extension("h", "c-header");
+        resolver.add_extension("md", "markdown");
+        resolver.add_extension("json", "json");
+        resolver.add_extension("toml", "toml");
+        resolver.add_extension("yaml", "yaml");
+        resolver.add_extension("yml", "yaml");
+        resolver.add_extension("html", "html");
+        resolver.add_extension("css", "css");
+        // Common filenames
+        resolver.add_filename("Cargo.toml", "cargo");
+        resolver.add_filename("Cargo.lock", "cargo");
+        resolver.add_filename("package.json", "npm");
+        resolver.add_filename("Makefile", "makefile");
+        resolver.add_filename("Dockerfile", "docker");
+        resolver
+    }
+
+    /// Register an icon for a file extension.
+    pub fn add_extension(&mut self, ext: impl Into<String>, icon: impl Into<String>) {
+        self.extension_map.insert(ext.into(), icon.into());
+    }
+
+    /// Register an icon for an exact filename.
+    pub fn add_filename(&mut self, name: impl Into<String>, icon: impl Into<String>) {
+        self.filename_map.insert(name.into(), icon.into());
+    }
+
+    /// Set the default icon for unrecognized files.
+    pub fn set_default_icon(&mut self, icon: impl Into<String>) {
+        self.default_icon = icon.into();
+    }
+
+    /// Resolve the icon identifier for a URI.
+    /// Priority: exact filename match > extension match > default.
+    pub fn resolve(&self, uri: &str) -> &str {
+        let filename = uri.rsplit('/').next().unwrap_or(uri);
+        if let Some(icon) = self.filename_map.get(filename) {
+            return icon.as_str();
+        }
+        if let Some(dot_pos) = filename.rfind('.') {
+            let ext = &filename[dot_pos + 1..];
+            if let Some(icon) = self.extension_map.get(ext) {
+                return icon.as_str();
+            }
+        }
+        &self.default_icon
+    }
+
+    /// Number of registered extension mappings.
+    pub fn extension_count(&self) -> usize {
+        self.extension_map.len()
+    }
+
+    /// Number of registered filename mappings.
+    pub fn filename_count(&self) -> usize {
+        self.filename_map.len()
+    }
+}
+
+impl fmt::Display for EditorIconResolver {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "IconResolver({} ext, {} filename, default={})",
+            self.extension_map.len(),
+            self.filename_map.len(),
+            self.default_icon,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorTabSerializer extensions for pinning and preview
+// ---------------------------------------------------------------------------
+
+impl EditorTabSerializer {
+    /// Pin a tab by index. Returns false if index is out of bounds.
+    pub fn pin_tab(&mut self, index: usize) -> bool {
+        if let Some(tab) = self.tabs.get_mut(index) {
+            tab.is_pinned = true;
+            tab.is_preview = false; // pinned tabs cannot be previews
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Unpin a tab by index.
+    pub fn unpin_tab(&mut self, index: usize) -> bool {
+        if let Some(tab) = self.tabs.get_mut(index) {
+            tab.is_pinned = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Promote a preview tab to a normal (non-preview) tab.
+    /// Returns false if index is out of bounds or tab is not a preview.
+    pub fn promote_preview(&mut self, index: usize) -> bool {
+        if let Some(tab) = self.tabs.get_mut(index) {
+            if tab.is_preview {
+                tab.is_preview = false;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Find the current preview tab index, if any.
+    /// By convention, at most one tab should be in preview mode.
+    pub fn preview_tab_index(&self) -> Option<usize> {
+        self.tabs.iter().position(|t| t.is_preview)
+    }
+
+    /// Open a URI in preview mode. If a preview tab already exists, it is
+    /// replaced. Returns the index of the preview tab.
+    pub fn open_preview(&mut self, uri: impl Into<String>, cursor_line: u32, cursor_col: u32) -> usize {
+        let uri = uri.into();
+        // Replace existing preview tab if present
+        if let Some(idx) = self.preview_tab_index() {
+            self.tabs[idx].uri = uri;
+            self.tabs[idx].cursor_line = cursor_line;
+            self.tabs[idx].cursor_col = cursor_col;
+            self.tabs[idx].scroll_top = 0;
+            self.tabs[idx].is_dirty = false;
+            self.active_tab_index = Some(idx);
+            idx
+        } else {
+            let mut tab = EditorTabState::new(uri, cursor_line, cursor_col);
+            tab.is_preview = true;
+            let idx = self.tabs.len();
+            self.tabs.push(tab);
+            self.active_tab_index = Some(idx);
+            idx
+        }
+    }
+
+    /// Move all pinned tabs to the front, preserving relative order.
+    pub fn sort_pinned_first(&mut self) {
+        let active_uri = self.active_tab().map(|t| t.uri.clone());
+        self.tabs.sort_by_key(|t| !t.is_pinned);
+        // Restore active_tab_index based on URI
+        if let Some(uri) = active_uri {
+            self.active_tab_index = self.find_tab_by_uri(&uri);
+        }
+    }
+
+    /// Close all tabs that are not pinned and not dirty. Returns count closed.
+    pub fn close_saved_unpinned(&mut self) -> usize {
+        let before = self.tabs.len();
+        self.tabs.retain(|t| t.is_pinned || t.is_dirty);
+        let closed = before - self.tabs.len();
+        if closed > 0 {
+            // Fix active index
+            if self.tabs.is_empty() {
+                self.active_tab_index = None;
+            } else if let Some(active) = self.active_tab_index {
+                if active >= self.tabs.len() {
+                    self.active_tab_index = Some(self.tabs.len() - 1);
+                }
+            }
+        }
+        closed
+    }
+
+    /// Return URIs of all dirty tabs.
+    pub fn dirty_uris(&self) -> Vec<&str> {
+        self.tabs.iter().filter(|t| t.is_dirty).map(|t| t.uri.as_str()).collect()
+    }
+
+    /// Return URIs of all pinned tabs.
+    pub fn pinned_uris(&self) -> Vec<&str> {
+        self.tabs.iter().filter(|t| t.is_pinned).map(|t| t.uri.as_str()).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1854,5 +2448,276 @@ mod tests {
         assert_eq!(edits[0].range.start_line, 5);
         assert_eq!(edits[1].range.start_line, 1);
         assert!(batch.is_empty());
+    }
+
+    // ── Editor group management tests ──
+
+    #[test]
+    fn editor_group_open_close() {
+        let mut group = EditorGroup::new("g1");
+        assert!(group.is_empty());
+
+        let idx = group.open("file:///a.rs");
+        assert_eq!(idx, 0);
+        assert_eq!(group.tab_count(), 1);
+        assert_eq!(group.active_uri(), Some("file:///a.rs"));
+
+        group.open("file:///b.rs");
+        assert_eq!(group.tab_count(), 2);
+        assert_eq!(group.active_uri(), Some("file:///b.rs"));
+
+        // Opening same URI again just activates it
+        let idx2 = group.open("file:///a.rs");
+        assert_eq!(idx2, 0);
+        assert_eq!(group.tab_count(), 2);
+        assert_eq!(group.active_uri(), Some("file:///a.rs"));
+
+        let closed = group.close(0).unwrap();
+        assert_eq!(closed, "file:///a.rs");
+        assert_eq!(group.tab_count(), 1);
+        assert_eq!(group.active_uri(), Some("file:///b.rs"));
+
+        let s = format!("{group}");
+        assert!(s.contains("g1"));
+    }
+
+    #[test]
+    fn editor_group_manager_split_and_move() {
+        let mut mgr = EditorGroupManager::new();
+        assert_eq!(mgr.group_count(), 0);
+
+        let g0 = mgr.add_group("left");
+        let g1 = mgr.add_group("right");
+        assert_eq!(mgr.group_count(), 2);
+
+        // Open files in group 0
+        mgr.active_group_mut().unwrap().open("file:///a.rs");
+        mgr.active_group_mut().unwrap().open("file:///b.rs");
+        assert_eq!(mgr.total_tab_count(), 2);
+
+        // Move tab from group 0 to group 1
+        assert!(mgr.move_tab(g0, 0, g1));
+        assert_eq!(mgr.group(g0).unwrap().tab_count(), 1);
+        assert_eq!(mgr.group(g1).unwrap().tab_count(), 1);
+        assert_eq!(mgr.group(g1).unwrap().active_uri(), Some("file:///a.rs"));
+
+        // Can't move to same group
+        assert!(!mgr.move_tab(g0, 0, g0));
+
+        // Remove a group
+        let removed = mgr.remove_group(g1).unwrap();
+        assert_eq!(removed.tabs.len(), 1);
+        assert_eq!(mgr.group_count(), 1);
+
+        let s = format!("{mgr}");
+        assert!(s.contains("1 groups"));
+    }
+
+    #[test]
+    fn editor_group_manager_active_tracking() {
+        let mut mgr = EditorGroupManager::new();
+        mgr.add_group("a");
+        mgr.add_group("b");
+        mgr.add_group("c");
+
+        assert!(mgr.set_active_group(2));
+        assert_eq!(mgr.active_group().unwrap().id, "c");
+
+        assert!(!mgr.set_active_group(5)); // out of bounds
+
+        // Remove active group
+        mgr.remove_group(2);
+        assert_eq!(mgr.active_group().unwrap().id, "b");
+    }
+
+    // ── Close order tests ──
+
+    #[test]
+    fn close_order_mru_tracking() {
+        let mut order = EditorCloseOrder::new();
+        assert!(order.is_empty());
+
+        order.touch("e1");
+        order.touch("e2");
+        order.touch("e3");
+        assert_eq!(order.len(), 3);
+        assert_eq!(order.most_recent(), Some("e3"));
+        assert_eq!(order.least_recent(), Some("e1"));
+        assert_eq!(order.rank("e3"), Some(0));
+        assert_eq!(order.rank("e1"), Some(2));
+
+        // Touching e1 moves it to front
+        order.touch("e1");
+        assert_eq!(order.most_recent(), Some("e1"));
+        assert_eq!(order.least_recent(), Some("e2"));
+
+        order.remove("e3");
+        assert_eq!(order.len(), 2);
+        assert!(order.rank("e3").is_none());
+
+        let s = format!("{order}");
+        assert!(s.contains("2 editors"));
+    }
+
+    // ── Title resolver tests ──
+
+    #[test]
+    fn title_resolver_filename_extraction() {
+        let resolver = EditorTitleResolver::new();
+        assert_eq!(resolver.resolve("file:///home/user/src/main.rs"), "main.rs");
+        assert_eq!(resolver.resolve("file:///a.txt"), "a.txt");
+        assert_eq!(resolver.resolve("untitled"), "untitled");
+    }
+
+    #[test]
+    fn title_resolver_overrides_and_disambiguation() {
+        let mut resolver = EditorTitleResolver::new();
+        resolver.set_override("file:///special", "My Special File");
+        assert_eq!(resolver.resolve("file:///special"), "My Special File");
+        assert_eq!(resolver.override_count(), 1);
+
+        resolver.remove_override("file:///special");
+        assert_eq!(resolver.override_count(), 0);
+
+        // Disambiguated includes parent dir
+        let title = resolver.resolve_disambiguated("file:///src/utils/helpers.rs");
+        assert_eq!(title, "utils/helpers.rs");
+
+        // Short title truncation
+        let short = resolver.resolve_short("file:///very_long_filename.rs", 10);
+        assert_eq!(short, "very_lo...");
+        let exact = resolver.resolve_short("file:///a.rs", 4);
+        assert_eq!(exact, "a.rs");
+
+        let s = format!("{resolver}");
+        assert!(s.contains("0 overrides"));
+    }
+
+    // ── Icon resolver tests ──
+
+    #[test]
+    fn icon_resolver_defaults() {
+        let resolver = EditorIconResolver::with_defaults();
+        assert_eq!(resolver.resolve("file:///src/main.rs"), "rust");
+        assert_eq!(resolver.resolve("file:///index.ts"), "typescript");
+        assert_eq!(resolver.resolve("file:///app.jsx"), "react");
+        assert_eq!(resolver.resolve("file:///Cargo.toml"), "cargo");
+        assert_eq!(resolver.resolve("file:///Dockerfile"), "docker");
+        assert_eq!(resolver.resolve("file:///unknown.xyz"), "file");
+        assert!(resolver.extension_count() > 10);
+        assert!(resolver.filename_count() > 0);
+    }
+
+    #[test]
+    fn icon_resolver_custom() {
+        let mut resolver = EditorIconResolver::with_defaults();
+        resolver.add_extension("vue", "vue");
+        resolver.set_default_icon("document");
+        assert_eq!(resolver.resolve("file:///app.vue"), "vue");
+        assert_eq!(resolver.resolve("file:///noext"), "document");
+
+        let s = format!("{resolver}");
+        assert!(s.contains("ext"));
+    }
+
+    // ── Tab pinning/preview tests ──
+
+    #[test]
+    fn tab_serializer_pin_unpin() {
+        let mut ser = EditorTabSerializer::new();
+        ser.add_tab(EditorTabState::new("file:///a.rs", 0, 0));
+        ser.add_tab(EditorTabState::new("file:///b.rs", 0, 0));
+
+        assert!(ser.pin_tab(0));
+        assert!(ser.tabs[0].is_pinned);
+        assert!(!ser.tabs[1].is_pinned);
+        assert_eq!(ser.pinned_count(), 1);
+
+        assert!(ser.unpin_tab(0));
+        assert!(!ser.tabs[0].is_pinned);
+
+        // Out of bounds
+        assert!(!ser.pin_tab(5));
+        assert!(!ser.unpin_tab(5));
+    }
+
+    #[test]
+    fn tab_serializer_preview_lifecycle() {
+        let mut ser = EditorTabSerializer::new();
+        ser.add_tab(EditorTabState::new("file:///a.rs", 0, 0));
+
+        // Open preview
+        let idx = ser.open_preview("file:///preview.rs", 10, 5);
+        assert_eq!(ser.tab_count(), 2);
+        assert!(ser.tabs[idx].is_preview);
+        assert_eq!(ser.active_tab_index, Some(idx));
+
+        // Opening another preview replaces the existing one
+        let idx2 = ser.open_preview("file:///preview2.rs", 20, 0);
+        assert_eq!(idx2, idx); // same slot reused
+        assert_eq!(ser.tab_count(), 2);
+        assert_eq!(ser.tabs[idx].uri, "file:///preview2.rs");
+
+        // Promote preview to normal
+        assert!(ser.promote_preview(idx));
+        assert!(!ser.tabs[idx].is_preview);
+        assert!(ser.preview_tab_index().is_none());
+
+        // Can't promote non-preview
+        assert!(!ser.promote_preview(0));
+    }
+
+    #[test]
+    fn tab_serializer_sort_pinned_first() {
+        let mut ser = EditorTabSerializer::new();
+        ser.add_tab(EditorTabState::new("file:///a.rs", 0, 0));
+        ser.add_tab(EditorTabState::new("file:///b.rs", 0, 0));
+        ser.add_tab(EditorTabState::new("file:///c.rs", 0, 0));
+        ser.set_active(2);
+        ser.pin_tab(2); // pin c.rs
+
+        ser.sort_pinned_first();
+        assert_eq!(ser.tabs[0].uri, "file:///c.rs");
+        assert!(ser.tabs[0].is_pinned);
+        // Active should still track c.rs
+        assert_eq!(ser.active_tab().unwrap().uri, "file:///c.rs");
+    }
+
+    #[test]
+    fn tab_serializer_close_saved_unpinned() {
+        let mut ser = EditorTabSerializer::new();
+        let mut dirty = EditorTabState::new("file:///dirty.rs", 0, 0);
+        dirty.is_dirty = true;
+        ser.add_tab(dirty);
+        ser.add_tab(EditorTabState::new("file:///clean.rs", 0, 0));
+        ser.pin_tab(0); // pin the dirty one too
+
+        let mut pinned_clean = EditorTabState::new("file:///pinned.rs", 0, 0);
+        pinned_clean.is_pinned = true;
+        ser.add_tab(pinned_clean);
+        ser.add_tab(EditorTabState::new("file:///other_clean.rs", 0, 0));
+
+        let closed = ser.close_saved_unpinned();
+        assert_eq!(closed, 2); // clean.rs and other_clean.rs
+        assert_eq!(ser.tab_count(), 2);
+
+        let dirty_uris = ser.dirty_uris();
+        assert!(dirty_uris.contains(&"file:///dirty.rs"));
+        let pinned_uris = ser.pinned_uris();
+        assert!(pinned_uris.contains(&"file:///dirty.rs"));
+        assert!(pinned_uris.contains(&"file:///pinned.rs"));
+    }
+
+    #[test]
+    fn group_direction_display() {
+        assert_eq!(format!("{}", GroupDirection::Left), "left");
+        assert_eq!(format!("{}", GroupDirection::Right), "right");
+        assert_eq!(format!("{}", GroupDirection::Up), "up");
+        assert_eq!(format!("{}", GroupDirection::Down), "down");
+
+        // Serde round-trip
+        let json = serde_json::to_string(&GroupDirection::Right).unwrap();
+        let parsed: GroupDirection = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, GroupDirection::Right);
     }
 }

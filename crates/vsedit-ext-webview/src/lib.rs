@@ -1133,6 +1133,305 @@ impl PanelLayoutTracker {
     }
 }
 
+// ── Webview Lifecycle Management ──
+
+/// Lifecycle states a webview panel can be in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LifecycleState {
+    /// Webview has been created but not yet rendered.
+    Created,
+    /// Webview has completed initial render and is ready.
+    Ready,
+    /// Webview is the focused/active panel.
+    Active,
+    /// Webview is backgrounded or hidden to save resources.
+    Suspended,
+    /// Webview has been disposed and cannot be reused.
+    Disposed,
+}
+
+impl LifecycleState {
+    /// Returns the set of states that are valid transitions from `self`.
+    pub fn valid_transitions(self) -> &'static [LifecycleState] {
+        match self {
+            Self::Created => &[Self::Ready, Self::Disposed],
+            Self::Ready => &[Self::Active, Self::Suspended, Self::Disposed],
+            Self::Active => &[Self::Ready, Self::Suspended, Self::Disposed],
+            Self::Suspended => &[Self::Ready, Self::Active, Self::Disposed],
+            Self::Disposed => &[],
+        }
+    }
+
+    /// Returns `true` if transitioning from `self` to `target` is valid.
+    pub fn can_transition_to(self, target: LifecycleState) -> bool {
+        self.valid_transitions().contains(&target)
+    }
+}
+
+impl fmt::Display for LifecycleState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Created => "created",
+            Self::Ready => "ready",
+            Self::Active => "active",
+            Self::Suspended => "suspended",
+            Self::Disposed => "disposed",
+        };
+        f.write_str(s)
+    }
+}
+
+/// Tracks the lifecycle state of multiple webview panels and enforces valid
+/// state transitions.
+#[derive(Debug, Clone, Default)]
+pub struct WebviewLifecycleManager {
+    states: HashMap<u64, LifecycleState>,
+}
+
+impl WebviewLifecycleManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a new webview in the `Created` state.
+    pub fn register(&mut self, handle: u64) -> Result<(), WebviewError> {
+        if self.states.contains_key(&handle) {
+            return Err(WebviewError::DuplicateHandle(handle));
+        }
+        self.states.insert(handle, LifecycleState::Created);
+        Ok(())
+    }
+
+    /// Transition a webview to a new lifecycle state.
+    pub fn transition(
+        &mut self,
+        handle: u64,
+        target: LifecycleState,
+    ) -> Result<LifecycleState, WebviewError> {
+        let current = self
+            .states
+            .get(&handle)
+            .copied()
+            .ok_or(WebviewError::NotFound(handle))?;
+        if !current.can_transition_to(target) {
+            return Err(WebviewError::InvalidContent(format!(
+                "invalid transition from {} to {}",
+                current, target
+            )));
+        }
+        self.states.insert(handle, target);
+        Ok(target)
+    }
+
+    /// Get the current state of a webview.
+    pub fn state_of(&self, handle: u64) -> Option<LifecycleState> {
+        self.states.get(&handle).copied()
+    }
+
+    /// Return all handles currently in the given state.
+    pub fn handles_in_state(&self, state: LifecycleState) -> Vec<u64> {
+        self.states
+            .iter()
+            .filter(|&(_, s)| *s == state)
+            .map(|(&h, _)| h)
+            .collect()
+    }
+
+    /// Dispose all webviews that are not already disposed.
+    /// Returns the number of webviews that were transitioned.
+    pub fn dispose_all(&mut self) -> usize {
+        let mut count = 0;
+        for (_, state) in self.states.iter_mut() {
+            if *state != LifecycleState::Disposed {
+                *state = LifecycleState::Disposed;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Return the total number of tracked webviews (including disposed).
+    pub fn tracked_count(&self) -> usize {
+        self.states.len()
+    }
+}
+
+// ── HTML Content Sanitizer ──
+
+/// Tags considered dangerous for webview rendering.
+const DANGEROUS_TAGS: &[&str] = &[
+    "script", "iframe", "object", "embed", "applet", "form", "input",
+    "textarea", "button", "select",
+];
+
+/// Sanitize HTML by removing dangerous tags and their contents.
+///
+/// This performs a simple tag-level scan — it is not a full HTML parser.
+/// Tags listed in [`DANGEROUS_TAGS`] are removed along with everything
+/// between their opening and closing tags.
+pub fn sanitize_html(html: &str) -> String {
+    let mut result = html.to_string();
+    for tag in DANGEROUS_TAGS {
+        // Remove paired tags and their content: <script>...</script>
+        loop {
+            let open = format!("<{}", tag);
+            let close = format!("</{}>", tag);
+            let start = result.to_lowercase().find(&open);
+            let end = result.to_lowercase().find(&close);
+            match (start, end) {
+                (Some(s), Some(e)) if s <= e => {
+                    result.replace_range(s..e + close.len(), "");
+                }
+                _ => break,
+            }
+        }
+        // Remove self-closing variants: <script/>, <script />
+        loop {
+            let lower = result.to_lowercase();
+            if let Some(s) = lower.find(&format!("<{}", tag)) {
+                if let Some(e) = result[s..].find('>') {
+                    let tag_content = &result[s..s + e + 1];
+                    if tag_content.contains('/') || DANGEROUS_TAGS.contains(&tag) {
+                        result.replace_range(s..s + e + 1, "");
+                        continue;
+                    }
+                }
+            }
+            break;
+        }
+    }
+    result
+}
+
+/// Returns `true` if the HTML string contains any dangerous tags.
+pub fn html_has_dangerous_content(html: &str) -> bool {
+    let lower = html.to_lowercase();
+    DANGEROUS_TAGS
+        .iter()
+        .any(|tag| lower.contains(&format!("<{}", tag)))
+}
+
+// ── Webview Message Protocol ──
+
+/// A typed message envelope for extension↔webview communication with
+/// sequence numbering for request/response correlation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MessageEnvelope {
+    /// Monotonically increasing sequence number.
+    pub seq: u64,
+    /// If this is a response, the sequence number of the original request.
+    pub request_seq: Option<u64>,
+    /// The webview handle this message is associated with.
+    pub handle: u64,
+    /// Message channel/topic.
+    pub channel: String,
+    /// The message payload.
+    pub payload: serde_json::Value,
+}
+
+/// Generates sequenced message envelopes for a single webview handle.
+#[derive(Debug, Clone)]
+pub struct MessageEnvelopeFactory {
+    handle: u64,
+    next_seq: u64,
+}
+
+impl MessageEnvelopeFactory {
+    pub fn new(handle: u64) -> Self {
+        Self {
+            handle,
+            next_seq: 1,
+        }
+    }
+
+    /// Create a new request envelope.
+    pub fn request(&mut self, channel: impl Into<String>, payload: serde_json::Value) -> MessageEnvelope {
+        let seq = self.next_seq;
+        self.next_seq += 1;
+        MessageEnvelope {
+            seq,
+            request_seq: None,
+            handle: self.handle,
+            channel: channel.into(),
+            payload,
+        }
+    }
+
+    /// Create a response envelope correlated to a request.
+    pub fn response(
+        &mut self,
+        request_seq: u64,
+        channel: impl Into<String>,
+        payload: serde_json::Value,
+    ) -> MessageEnvelope {
+        let seq = self.next_seq;
+        self.next_seq += 1;
+        MessageEnvelope {
+            seq,
+            request_seq: Some(request_seq),
+            handle: self.handle,
+            channel: channel.into(),
+            payload,
+        }
+    }
+
+    /// Return the next sequence number that will be assigned.
+    pub fn peek_next_seq(&self) -> u64 {
+        self.next_seq
+    }
+}
+
+// ── Extended Bridge: Bulk Operations & Search ──
+
+impl WebviewBridge {
+    /// Dispose multiple webviews at once. Returns the count of actually removed webviews.
+    pub fn bulk_dispose(&mut self, handles: &[u64]) -> usize {
+        let before = self.webviews.len();
+        self.webviews.retain(|w| !handles.contains(&w.handle));
+        self.messages.retain(|(h, _)| !handles.contains(h));
+        before - self.webviews.len()
+    }
+
+    /// Find all webview handles whose HTML content contains the given substring.
+    pub fn find_by_html_contains(&self, needle: &str) -> Vec<u64> {
+        self.webviews
+            .iter()
+            .filter(|w| w.html.contains(needle))
+            .map(|w| w.handle)
+            .collect()
+    }
+
+    /// Return a summary map of handle → html length for diagnostics.
+    pub fn content_size_map(&self) -> HashMap<u64, usize> {
+        self.webviews
+            .iter()
+            .map(|w| (w.handle, w.html.len()))
+            .collect()
+    }
+
+    /// Clone the options from one webview to another.
+    pub fn clone_options(
+        &mut self,
+        source: u64,
+        target: u64,
+    ) -> Result<(), WebviewError> {
+        let opts = self
+            .webviews
+            .iter()
+            .find(|w| w.handle == source)
+            .map(|w| w.options.clone())
+            .ok_or(WebviewError::NotFound(source))?;
+        let tw = self
+            .webviews
+            .iter_mut()
+            .find(|w| w.handle == target)
+            .ok_or(WebviewError::NotFound(target))?;
+        tw.options = opts;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1847,5 +2146,246 @@ mod tests {
         assert_eq!(json, "\"sidebar\"");
         let back: ViewColumn = serde_json::from_str(&json).unwrap();
         assert_eq!(back, ViewColumn::Sidebar);
+    }
+
+    // ── Lifecycle Management tests ──
+
+    #[test]
+    fn lifecycle_valid_transitions() {
+        let mut mgr = WebviewLifecycleManager::new();
+        mgr.register(1).unwrap();
+        assert_eq!(mgr.state_of(1), Some(LifecycleState::Created));
+
+        // Created → Ready
+        mgr.transition(1, LifecycleState::Ready).unwrap();
+        assert_eq!(mgr.state_of(1), Some(LifecycleState::Ready));
+
+        // Ready → Active
+        mgr.transition(1, LifecycleState::Active).unwrap();
+        assert_eq!(mgr.state_of(1), Some(LifecycleState::Active));
+
+        // Active → Suspended
+        mgr.transition(1, LifecycleState::Suspended).unwrap();
+        assert_eq!(mgr.state_of(1), Some(LifecycleState::Suspended));
+
+        // Suspended → Disposed
+        mgr.transition(1, LifecycleState::Disposed).unwrap();
+        assert_eq!(mgr.state_of(1), Some(LifecycleState::Disposed));
+    }
+
+    #[test]
+    fn lifecycle_invalid_transition_rejected() {
+        let mut mgr = WebviewLifecycleManager::new();
+        mgr.register(1).unwrap();
+
+        // Created → Active is not valid (must go through Ready first)
+        let result = mgr.transition(1, LifecycleState::Active);
+        assert!(matches!(result, Err(WebviewError::InvalidContent(_))));
+        assert_eq!(mgr.state_of(1), Some(LifecycleState::Created));
+
+        // Disposed is a terminal state
+        mgr.transition(1, LifecycleState::Disposed).unwrap();
+        let result = mgr.transition(1, LifecycleState::Ready);
+        assert!(matches!(result, Err(WebviewError::InvalidContent(_))));
+    }
+
+    #[test]
+    fn lifecycle_dispose_all() {
+        let mut mgr = WebviewLifecycleManager::new();
+        mgr.register(1).unwrap();
+        mgr.register(2).unwrap();
+        mgr.transition(1, LifecycleState::Ready).unwrap();
+        mgr.transition(2, LifecycleState::Ready).unwrap();
+        mgr.transition(2, LifecycleState::Active).unwrap();
+
+        let count = mgr.dispose_all();
+        assert_eq!(count, 2);
+        assert_eq!(mgr.state_of(1), Some(LifecycleState::Disposed));
+        assert_eq!(mgr.state_of(2), Some(LifecycleState::Disposed));
+
+        // Calling again disposes none
+        assert_eq!(mgr.dispose_all(), 0);
+    }
+
+    #[test]
+    fn lifecycle_handles_in_state() {
+        let mut mgr = WebviewLifecycleManager::new();
+        mgr.register(10).unwrap();
+        mgr.register(20).unwrap();
+        mgr.register(30).unwrap();
+        mgr.transition(10, LifecycleState::Ready).unwrap();
+        mgr.transition(20, LifecycleState::Ready).unwrap();
+
+        let mut created = mgr.handles_in_state(LifecycleState::Created);
+        created.sort();
+        assert_eq!(created, vec![30]);
+
+        let mut ready = mgr.handles_in_state(LifecycleState::Ready);
+        ready.sort();
+        assert_eq!(ready, vec![10, 20]);
+    }
+
+    #[test]
+    fn lifecycle_state_display() {
+        assert_eq!(LifecycleState::Created.to_string(), "created");
+        assert_eq!(LifecycleState::Disposed.to_string(), "disposed");
+        assert_eq!(LifecycleState::Active.to_string(), "active");
+    }
+
+    #[test]
+    fn lifecycle_state_serde_roundtrip() {
+        let state = LifecycleState::Suspended;
+        let json = serde_json::to_string(&state).unwrap();
+        assert_eq!(json, "\"suspended\"");
+        let back: LifecycleState = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, LifecycleState::Suspended);
+    }
+
+    // ── HTML Sanitizer tests ──
+
+    #[test]
+    fn sanitize_html_removes_script_tags() {
+        let input = "<p>Hello</p><script>alert('xss')</script><p>World</p>";
+        let output = sanitize_html(input);
+        assert_eq!(output, "<p>Hello</p><p>World</p>");
+        assert!(!html_has_dangerous_content(&output));
+    }
+
+    #[test]
+    fn sanitize_html_removes_iframe_and_object() {
+        let input = "<div><iframe src='evil.com'></iframe><object data='x'></object>safe</div>";
+        let output = sanitize_html(input);
+        assert!(!output.contains("<iframe"));
+        assert!(!output.contains("<object"));
+        assert!(output.contains("safe"));
+    }
+
+    #[test]
+    fn sanitize_html_preserves_safe_content() {
+        let input = "<h1>Title</h1><p>Paragraph with <b>bold</b> text.</p>";
+        let output = sanitize_html(input);
+        assert_eq!(output, input);
+    }
+
+    #[test]
+    fn html_has_dangerous_content_detects_tags() {
+        assert!(html_has_dangerous_content("<script>x</script>"));
+        assert!(html_has_dangerous_content("<IFRAME src='x'>"));
+        assert!(html_has_dangerous_content("<embed type='x'>"));
+        assert!(!html_has_dangerous_content("<p>safe</p>"));
+        assert!(!html_has_dangerous_content("plain text"));
+    }
+
+    // ── Message Protocol tests ──
+
+    #[test]
+    fn message_envelope_roundtrip() {
+        let mut factory = MessageEnvelopeFactory::new(42);
+        let req = factory.request("getData", serde_json::json!({"key": "value"}));
+        assert_eq!(req.seq, 1);
+        assert_eq!(req.request_seq, None);
+        assert_eq!(req.handle, 42);
+        assert_eq!(req.channel, "getData");
+
+        let json = serde_json::to_string(&req).unwrap();
+        let back: MessageEnvelope = serde_json::from_str(&json).unwrap();
+        assert_eq!(req, back);
+    }
+
+    #[test]
+    fn message_envelope_response_correlation() {
+        let mut factory = MessageEnvelopeFactory::new(1);
+        let req = factory.request("query", serde_json::json!(null));
+        let resp = factory.response(req.seq, "query", serde_json::json!({"result": 42}));
+
+        assert_eq!(resp.seq, 2);
+        assert_eq!(resp.request_seq, Some(1));
+        assert_eq!(resp.channel, "query");
+    }
+
+    #[test]
+    fn message_envelope_factory_seq_increments() {
+        let mut factory = MessageEnvelopeFactory::new(1);
+        assert_eq!(factory.peek_next_seq(), 1);
+        factory.request("a", serde_json::json!(null));
+        assert_eq!(factory.peek_next_seq(), 2);
+        factory.request("b", serde_json::json!(null));
+        assert_eq!(factory.peek_next_seq(), 3);
+    }
+
+    // ── Bulk Operations & Search tests ──
+
+    #[test]
+    fn bulk_dispose_removes_multiple() {
+        let mut bridge = WebviewBridge::new();
+        bridge.create_webview(1);
+        bridge.create_webview(2);
+        bridge.create_webview(3);
+        bridge.handle_message(&WebviewMessage::PostMessage {
+            handle: 1,
+            message: serde_json::json!("msg"),
+        });
+
+        let removed = bridge.bulk_dispose(&[1, 3]);
+        assert_eq!(removed, 2);
+        assert_eq!(bridge.webview_count(), 1);
+        assert!(bridge.get_webview(2).is_some());
+        // Messages for disposed handles are also cleaned up
+        assert_eq!(bridge.total_pending_messages(), 0);
+    }
+
+    #[test]
+    fn find_by_html_contains_matches() {
+        let mut bridge = WebviewBridge::new();
+        bridge.create_webview(1);
+        bridge.create_webview(2);
+        bridge.create_webview(3);
+        bridge.set_html_checked(1, "<p>alpha beta</p>".into()).unwrap();
+        bridge.set_html_checked(2, "<p>gamma</p>".into()).unwrap();
+        bridge.set_html_checked(3, "<p>alpha delta</p>".into()).unwrap();
+
+        let mut found = bridge.find_by_html_contains("alpha");
+        found.sort();
+        assert_eq!(found, vec![1, 3]);
+        assert!(bridge.find_by_html_contains("missing").is_empty());
+    }
+
+    #[test]
+    fn content_size_map_reports_lengths() {
+        let mut bridge = WebviewBridge::new();
+        bridge.create_webview(1);
+        bridge.create_webview(2);
+        bridge.set_html_checked(1, "<p>hi</p>".into()).unwrap();
+
+        let map = bridge.content_size_map();
+        assert_eq!(map[&1], 9); // "<p>hi</p>" is 9 chars
+        assert_eq!(map[&2], 0); // empty html
+    }
+
+    #[test]
+    fn clone_options_copies_between_webviews() {
+        let mut bridge = WebviewBridge::new();
+        let opts = WebviewOptionsBuilder::new()
+            .enable_scripts(true)
+            .enable_forms(true)
+            .add_resource_root("/ext/media")
+            .build()
+            .unwrap();
+        bridge.create_webview_checked(1, opts).unwrap();
+        bridge.create_webview(2);
+
+        bridge.clone_options(1, 2).unwrap();
+        let w2 = bridge.get_webview(2).unwrap();
+        assert!(w2.options.enable_scripts);
+        assert!(w2.options.enable_forms);
+        assert_eq!(w2.options.local_resource_roots, vec!["/ext/media"]);
+    }
+
+    #[test]
+    fn clone_options_errors_on_missing_handle() {
+        let mut bridge = WebviewBridge::new();
+        bridge.create_webview(1);
+        assert_eq!(bridge.clone_options(99, 1), Err(WebviewError::NotFound(99)));
+        assert_eq!(bridge.clone_options(1, 99), Err(WebviewError::NotFound(99)));
     }
 }

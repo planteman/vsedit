@@ -1177,6 +1177,319 @@ impl DocCommentGenerator {
     }
 }
 
+// ── comment conversion ─────────────────────────────────────────────────
+
+/// Convert line comments to a block comment.
+///
+/// Takes lines with a `prefix` (e.g. `//`) and produces a single block
+/// comment string using `open`/`close` markers. Only the comment text is
+/// kept; code-only lines are passed through unchanged.
+pub fn line_comments_to_block(
+    lines: &[&str],
+    prefix: &str,
+    open: &str,
+    close: &str,
+) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut comment_buf: Vec<String> = Vec::new();
+
+    let flush = |buf: &mut Vec<String>, out: &mut Vec<String>, open: &str, close: &str| {
+        if !buf.is_empty() {
+            let body = buf.join(" ");
+            out.push(format!("{open} {body} {close}"));
+            buf.clear();
+        }
+    };
+
+    for line in lines {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with(prefix) {
+            let content = trimmed[prefix.len()..].trim();
+            if !content.is_empty() {
+                comment_buf.push(content.to_string());
+            }
+        } else {
+            flush(&mut comment_buf, &mut result, open, close);
+            result.push(line.to_string());
+        }
+    }
+    flush(&mut comment_buf, &mut result, open, close);
+    result
+}
+
+/// Convert a block comment back to line comments.
+///
+/// Splits the inner text of a block comment (delimited by `open`/`close`)
+/// into individual line comments using `prefix`.
+pub fn block_comment_to_lines(text: &str, prefix: &str, open: &str, close: &str) -> Vec<String> {
+    let trimmed = text.trim();
+    if trimmed.starts_with(open) && trimmed.ends_with(close) {
+        let inner = &trimmed[open.len()..trimmed.len() - close.len()];
+        let inner = inner.trim();
+        if inner.is_empty() {
+            return vec![format!("{prefix}")];
+        }
+        inner
+            .split('\n')
+            .map(|l| {
+                let t = l.trim();
+                // Strip optional continuation markers like " * "
+                let t = t.strip_prefix("* ").unwrap_or(t);
+                let t = t.strip_prefix('*').unwrap_or(t).trim();
+                if t.is_empty() {
+                    format!("{prefix}")
+                } else {
+                    format!("{prefix} {t}")
+                }
+            })
+            .collect()
+    } else {
+        vec![text.to_string()]
+    }
+}
+
+// ── comment indentation helpers ───────────────────────────────────────
+
+/// Compute the minimum indentation (in spaces) across all non-blank lines.
+pub fn min_indentation(lines: &[&str]) -> usize {
+    lines
+        .iter()
+        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.len() - l.trim_start().len())
+        .min()
+        .unwrap_or(0)
+}
+
+/// Re-indent commented lines so the comment prefix sits at `target_col`.
+///
+/// Only lines that start with `prefix` (after whitespace) are adjusted.
+/// Non-commented and blank lines are returned unchanged.
+pub fn reindent_comments(lines: &[&str], prefix: &str, target_col: usize) -> Vec<String> {
+    lines
+        .iter()
+        .map(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with(prefix) {
+                let pad: String = " ".repeat(target_col);
+                format!("{pad}{trimmed}")
+            } else {
+                line.to_string()
+            }
+        })
+        .collect()
+}
+
+/// Dedent commented lines by removing up to `n` leading spaces from each
+/// commented line.
+pub fn dedent_comments(lines: &[&str], prefix: &str, n: usize) -> Vec<String> {
+    lines
+        .iter()
+        .map(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with(prefix) {
+                let current_indent = line.len() - trimmed.len();
+                let new_indent = current_indent.saturating_sub(n);
+                let pad: String = " ".repeat(new_indent);
+                format!("{pad}{trimmed}")
+            } else {
+                line.to_string()
+            }
+        })
+        .collect()
+}
+
+// ── Rustdoc / JSDoc parser ────────────────────────────────────────────
+
+/// A parsed section from a Rustdoc or JSDoc comment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocSection {
+    /// Section heading (e.g. "Arguments", "Returns", "Examples").
+    /// `None` for the leading summary.
+    pub heading: Option<String>,
+    /// Body lines of this section (trimmed of comment markers).
+    pub body: Vec<String>,
+}
+
+/// Parse a Rustdoc comment (lines starting with `///`) into sections.
+///
+/// Sections are delimited by `# Heading` markers. The initial text before
+/// any heading becomes a section with `heading: None`.
+pub fn parse_rustdoc_sections(lines: &[&str]) -> Vec<DocSection> {
+    let mut sections: Vec<DocSection> = Vec::new();
+    let mut current_heading: Option<String> = None;
+    let mut current_body: Vec<String> = Vec::new();
+
+    for line in lines {
+        let trimmed = line.trim_start();
+        let content = if let Some(rest) = trimmed.strip_prefix("///") {
+            rest.strip_prefix(' ').unwrap_or(rest)
+        } else {
+            continue;
+        };
+
+        if let Some(heading_text) = content.strip_prefix("# ") {
+            // Flush previous section.
+            sections.push(DocSection {
+                heading: current_heading.take(),
+                body: std::mem::take(&mut current_body),
+            });
+            current_heading = Some(heading_text.trim().to_string());
+        } else {
+            current_body.push(content.to_string());
+        }
+    }
+
+    // Flush trailing section.
+    if current_heading.is_some() || !current_body.is_empty() {
+        sections.push(DocSection {
+            heading: current_heading,
+            body: current_body,
+        });
+    }
+    sections
+}
+
+/// Parse a JSDoc block comment into sections.
+///
+/// Recognises `@param`, `@returns`, `@throws`, `@example`, etc.
+pub fn parse_jsdoc_sections(text: &str) -> Vec<DocSection> {
+    let mut sections: Vec<DocSection> = Vec::new();
+    let mut current_heading: Option<String> = None;
+    let mut current_body: Vec<String> = Vec::new();
+
+    for raw_line in text.lines() {
+        let line = raw_line.trim();
+        // Strip block comment markers and continuation stars.
+        let line = line.strip_prefix("/**").unwrap_or(line);
+        let line = line.strip_prefix("*/").unwrap_or(line);
+        let line = line.strip_suffix("*/").unwrap_or(line);
+        let line = line.strip_prefix("* ").or_else(|| line.strip_prefix('*')).unwrap_or(line);
+        let line = line.trim();
+
+        if line.starts_with('@') {
+            // Flush previous.
+            if current_heading.is_some() || !current_body.is_empty() {
+                sections.push(DocSection {
+                    heading: current_heading.take(),
+                    body: std::mem::take(&mut current_body),
+                });
+            }
+            let tag_end = line.find(' ').unwrap_or(line.len());
+            current_heading = Some(line[..tag_end].to_string());
+            let rest = line[tag_end..].trim();
+            if !rest.is_empty() {
+                current_body.push(rest.to_string());
+            }
+        } else if !line.is_empty() {
+            current_body.push(line.to_string());
+        }
+    }
+
+    if current_heading.is_some() || !current_body.is_empty() {
+        sections.push(DocSection {
+            heading: current_heading,
+            body: current_body,
+        });
+    }
+    sections
+}
+
+// ── comment line classifier ───────────────────────────────────────────
+
+/// Classification of a single line with respect to comments.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineKind {
+    /// A blank (empty / whitespace-only) line.
+    Blank,
+    /// A line that is entirely a comment (possibly with leading whitespace).
+    FullComment,
+    /// A code line with a trailing inline comment.
+    CodeWithTrailingComment,
+    /// A line of pure code (no comment marker found).
+    Code,
+}
+
+/// Classify a line with respect to a given line-comment `prefix`.
+pub fn classify_line(line: &str, prefix: &str) -> LineKind {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        LineKind::Blank
+    } else if trimmed.starts_with(prefix) {
+        LineKind::FullComment
+    } else if let Some(idx) = line.find(prefix) {
+        // Make sure the prefix is not inside a string literal (simple
+        // heuristic: prefix must be preceded by whitespace).
+        if idx > 0 && line.as_bytes()[idx - 1].is_ascii_whitespace() {
+            LineKind::CodeWithTrailingComment
+        } else {
+            LineKind::Code
+        }
+    } else {
+        LineKind::Code
+    }
+}
+
+/// Classify every line, returning a vec of `(line_index, LineKind)`.
+pub fn classify_lines(lines: &[&str], prefix: &str) -> Vec<(usize, LineKind)> {
+    lines
+        .iter()
+        .enumerate()
+        .map(|(i, l)| (i, classify_line(l, prefix)))
+        .collect()
+}
+
+// ── strip trailing comments ───────────────────────────────────────────
+
+/// Remove trailing inline comments from lines, keeping only the code part.
+///
+/// Lines that are entirely a comment or blank are returned unchanged.
+pub fn strip_trailing_comments(lines: &[&str], prefix: &str) -> Vec<String> {
+    lines
+        .iter()
+        .map(|line| {
+            let kind = classify_line(line, prefix);
+            match kind {
+                LineKind::CodeWithTrailingComment => {
+                    if let Some(idx) = line.find(prefix) {
+                        line[..idx].trim_end().to_string()
+                    } else {
+                        line.to_string()
+                    }
+                }
+                _ => line.to_string(),
+            }
+        })
+        .collect()
+}
+
+// ── comment region builder ────────────────────────────────────────────
+
+/// Builds a banner-style comment region with optional surrounding blank
+/// comment lines and a title.
+pub fn build_comment_region(
+    title: &str,
+    prefix: &str,
+    width: usize,
+) -> Vec<String> {
+    let fill_char = '─';
+    let inner_width = width.saturating_sub(prefix.len() + 2); // +2 for space after prefix + space before suffix
+    let title_len = title.len() + 2; // spaces around title
+    if title_len >= inner_width {
+        return vec![format!("{prefix} {title}")];
+    }
+    let left = (inner_width - title_len) / 2;
+    let right = inner_width - title_len - left;
+    let bar_left: String = std::iter::repeat(fill_char).take(left).collect();
+    let bar_right: String = std::iter::repeat(fill_char).take(right).collect();
+    let separator: String = std::iter::repeat(fill_char).take(inner_width).collect();
+
+    vec![
+        format!("{prefix} {separator}"),
+        format!("{prefix} {bar_left} {title} {bar_right}"),
+        format!("{prefix} {separator}"),
+    ]
+}
+
 // ── tests ──────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -1827,5 +2140,244 @@ mod tests {
         assert!(doc.iter().any(|l| l.contains("`label`")));
         assert!(!doc.iter().any(|l| l.contains("`self`") || l.contains("`&self`")));
         assert!(doc.iter().any(|l| l.contains("# Returns")));
+    }
+
+    // ── line/block comment conversion tests ───────────────────────────
+
+    #[test]
+    fn line_comments_to_block_basic() {
+        let lines = vec!["// first line", "// second line"];
+        let result = line_comments_to_block(&lines, "//", "/*", "*/");
+        assert_eq!(result, vec!["/* first line second line */"]);
+    }
+
+    #[test]
+    fn line_comments_to_block_mixed_with_code() {
+        let lines = vec!["// comment", "let x = 1;", "// another"];
+        let result = line_comments_to_block(&lines, "//", "/*", "*/");
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], "/* comment */");
+        assert_eq!(result[1], "let x = 1;");
+        assert_eq!(result[2], "/* another */");
+    }
+
+    #[test]
+    fn block_comment_to_lines_basic() {
+        let text = "/* hello world */";
+        let result = block_comment_to_lines(text, "//", "/*", "*/");
+        assert_eq!(result, vec!["// hello world"]);
+    }
+
+    #[test]
+    fn block_comment_to_lines_multiline() {
+        let text = "/* line one\n * line two\n * line three */";
+        let result = block_comment_to_lines(text, "//", "/*", "*/");
+        assert_eq!(result, vec!["// line one", "// line two", "// line three"]);
+    }
+
+    #[test]
+    fn block_comment_to_lines_not_a_block() {
+        let text = "just plain text";
+        let result = block_comment_to_lines(text, "//", "/*", "*/");
+        assert_eq!(result, vec!["just plain text"]);
+    }
+
+    // ── indentation helper tests ──────────────────────────────────────
+
+    #[test]
+    fn min_indentation_basic() {
+        let lines = vec!["    fn foo() {", "        bar();", "    }"];
+        assert_eq!(min_indentation(&lines), 4);
+    }
+
+    #[test]
+    fn min_indentation_with_blanks() {
+        let lines = vec!["  a", "", "    b", "   "];
+        assert_eq!(min_indentation(&lines), 2);
+    }
+
+    #[test]
+    fn min_indentation_empty() {
+        let lines: Vec<&str> = vec![];
+        assert_eq!(min_indentation(&lines), 0);
+    }
+
+    #[test]
+    fn reindent_comments_moves_to_target() {
+        let lines = vec!["// hello", "  // world", "code"];
+        let result = reindent_comments(&lines, "//", 4);
+        assert_eq!(result[0], "    // hello");
+        assert_eq!(result[1], "    // world");
+        assert_eq!(result[2], "code");
+    }
+
+    #[test]
+    fn dedent_comments_basic() {
+        let lines = vec!["    // hello", "        // world", "code"];
+        let result = dedent_comments(&lines, "//", 4);
+        assert_eq!(result[0], "// hello");
+        assert_eq!(result[1], "    // world");
+        assert_eq!(result[2], "code");
+    }
+
+    #[test]
+    fn dedent_comments_saturates_at_zero() {
+        let lines = vec!["// already at col 0"];
+        let result = dedent_comments(&lines, "//", 10);
+        assert_eq!(result[0], "// already at col 0");
+    }
+
+    // ── Rustdoc parser tests ──────────────────────────────────────────
+
+    #[test]
+    fn parse_rustdoc_sections_basic() {
+        let lines = vec![
+            "/// A summary line.",
+            "///",
+            "/// # Arguments",
+            "///",
+            "/// * `x` - the input",
+            "/// # Returns",
+            "///",
+            "/// The output value.",
+        ];
+        let sections = parse_rustdoc_sections(&lines);
+        assert_eq!(sections.len(), 3);
+
+        assert_eq!(sections[0].heading, None);
+        assert!(sections[0].body.iter().any(|l| l.contains("summary")));
+
+        assert_eq!(sections[1].heading.as_deref(), Some("Arguments"));
+        assert!(sections[1].body.iter().any(|l| l.contains("`x`")));
+
+        assert_eq!(sections[2].heading.as_deref(), Some("Returns"));
+        assert!(sections[2].body.iter().any(|l| l.contains("output")));
+    }
+
+    #[test]
+    fn parse_rustdoc_sections_no_headings() {
+        let lines = vec!["/// Just a simple doc comment.", "/// Second line."];
+        let sections = parse_rustdoc_sections(&lines);
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].heading, None);
+        assert_eq!(sections[0].body.len(), 2);
+    }
+
+    #[test]
+    fn parse_rustdoc_ignores_non_doc_lines() {
+        let lines = vec!["fn foo() {", "/// doc line", "let x = 1;"];
+        let sections = parse_rustdoc_sections(&lines);
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].body.len(), 1);
+        assert!(sections[0].body[0].contains("doc line"));
+    }
+
+    // ── JSDoc parser tests ────────────────────────────────────────────
+
+    #[test]
+    fn parse_jsdoc_sections_basic() {
+        let text = "/**\n * Computes a value.\n * @param x The input.\n * @returns The output.\n */";
+        let sections = parse_jsdoc_sections(text);
+        assert!(sections.len() >= 3);
+
+        assert_eq!(sections[0].heading, None);
+        assert!(sections[0].body.iter().any(|l| l.contains("Computes")));
+
+        assert_eq!(sections[1].heading.as_deref(), Some("@param"));
+        assert!(sections[1].body.iter().any(|l| l.contains("input")));
+
+        assert_eq!(sections[2].heading.as_deref(), Some("@returns"));
+    }
+
+    #[test]
+    fn parse_jsdoc_empty_block() {
+        let text = "/** */";
+        let sections = parse_jsdoc_sections(text);
+        assert!(sections.is_empty());
+    }
+
+    // ── line classifier tests ─────────────────────────────────────────
+
+    #[test]
+    fn classify_line_blank() {
+        assert_eq!(classify_line("", "//"), LineKind::Blank);
+        assert_eq!(classify_line("   ", "//"), LineKind::Blank);
+    }
+
+    #[test]
+    fn classify_line_full_comment() {
+        assert_eq!(classify_line("// hello", "//"), LineKind::FullComment);
+        assert_eq!(classify_line("  // indented", "//"), LineKind::FullComment);
+    }
+
+    #[test]
+    fn classify_line_code_with_trailing() {
+        assert_eq!(
+            classify_line("let x = 1; // value", "//"),
+            LineKind::CodeWithTrailingComment
+        );
+    }
+
+    #[test]
+    fn classify_line_pure_code() {
+        assert_eq!(classify_line("let x = 1;", "//"), LineKind::Code);
+    }
+
+    #[test]
+    fn classify_lines_returns_all() {
+        let lines = vec!["// comment", "code", "", "x // trailing"];
+        let classified = classify_lines(&lines, "//");
+        assert_eq!(classified.len(), 4);
+        assert_eq!(classified[0], (0, LineKind::FullComment));
+        assert_eq!(classified[1], (1, LineKind::Code));
+        assert_eq!(classified[2], (2, LineKind::Blank));
+        assert_eq!(classified[3], (3, LineKind::CodeWithTrailingComment));
+    }
+
+    // ── strip trailing comments tests ─────────────────────────────────
+
+    #[test]
+    fn strip_trailing_comments_removes_inline() {
+        let lines = vec!["let x = 1; // value", "// full comment", "code", ""];
+        let result = strip_trailing_comments(&lines, "//");
+        assert_eq!(result[0], "let x = 1;");
+        assert_eq!(result[1], "// full comment");
+        assert_eq!(result[2], "code");
+        assert_eq!(result[3], "");
+    }
+
+    #[test]
+    fn strip_trailing_comments_no_change_needed() {
+        let lines = vec!["no comments here", "// full line comment"];
+        let result = strip_trailing_comments(&lines, "//");
+        assert_eq!(result[0], "no comments here");
+        assert_eq!(result[1], "// full line comment");
+    }
+
+    // ── comment region builder tests ──────────────────────────────────
+
+    #[test]
+    fn build_comment_region_basic() {
+        let result = build_comment_region("Section", "//", 40);
+        assert_eq!(result.len(), 3);
+        assert!(result[0].starts_with("// "));
+        assert!(result[1].contains("Section"));
+        assert!(result[1].starts_with("// "));
+        assert!(result[2].starts_with("// "));
+    }
+
+    #[test]
+    fn build_comment_region_narrow_fallback() {
+        let result = build_comment_region("Very Long Title That Exceeds Width", "//", 10);
+        assert_eq!(result.len(), 1);
+        assert!(result[0].contains("Very Long Title"));
+    }
+
+    #[test]
+    fn build_comment_region_hash_prefix() {
+        let result = build_comment_region("test", "#", 30);
+        assert_eq!(result.len(), 3);
+        assert!(result[0].starts_with("# "));
+        assert!(result[1].contains("test"));
     }
 }

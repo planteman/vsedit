@@ -1150,6 +1150,472 @@ impl CommitMessageValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Merge conflict detection helpers
+// ---------------------------------------------------------------------------
+
+/// Markers used by typical three-way merge tools.
+const CONFLICT_START: &str = "<<<<<<<";
+const CONFLICT_MID: &str = "=======";
+const CONFLICT_END: &str = ">>>>>>>";
+
+/// A single merge conflict region found in a file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MergeConflict {
+    /// 1-based line number where the conflict starts (`<<<<<<<`).
+    pub start_line: usize,
+    /// 1-based line number of the separator (`=======`).
+    pub separator_line: usize,
+    /// 1-based line number where the conflict ends (`>>>>>>>`).
+    pub end_line: usize,
+    /// The "ours" side of the conflict (lines between start and separator).
+    pub ours: Vec<String>,
+    /// The "theirs" side of the conflict (lines between separator and end).
+    pub theirs: Vec<String>,
+}
+
+impl MergeConflict {
+    /// Total number of conflicting lines (ours + theirs).
+    pub fn total_lines(&self) -> usize {
+        self.ours.len() + self.theirs.len()
+    }
+
+    /// Whether either side of the conflict is empty (trivial conflict).
+    pub fn is_trivial(&self) -> bool {
+        self.ours.is_empty() || self.theirs.is_empty()
+    }
+}
+
+impl fmt::Display for MergeConflict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "conflict at lines {}-{} ({} ours, {} theirs)",
+            self.start_line,
+            self.end_line,
+            self.ours.len(),
+            self.theirs.len()
+        )
+    }
+}
+
+/// Detect merge conflict regions in file content.
+///
+/// Returns all conflict blocks found, each with line numbers and the two sides.
+pub fn detect_merge_conflicts(content: &str) -> Vec<MergeConflict> {
+    let mut conflicts = Vec::new();
+    let mut start_line: Option<usize> = None;
+    let mut separator_line: Option<usize> = None;
+    let mut ours: Vec<String> = Vec::new();
+    let mut theirs: Vec<String> = Vec::new();
+    let mut in_ours = false;
+    let mut in_theirs = false;
+
+    for (idx, line) in content.lines().enumerate() {
+        let lineno = idx + 1;
+        let trimmed = line.trim();
+
+        if trimmed.starts_with(CONFLICT_START) {
+            start_line = Some(lineno);
+            ours.clear();
+            theirs.clear();
+            in_ours = true;
+            in_theirs = false;
+        } else if trimmed.starts_with(CONFLICT_MID) && in_ours {
+            separator_line = Some(lineno);
+            in_ours = false;
+            in_theirs = true;
+        } else if trimmed.starts_with(CONFLICT_END) && in_theirs {
+            if let (Some(sl), Some(sep)) = (start_line, separator_line) {
+                conflicts.push(MergeConflict {
+                    start_line: sl,
+                    separator_line: sep,
+                    end_line: lineno,
+                    ours: ours.clone(),
+                    theirs: theirs.clone(),
+                });
+            }
+            start_line = None;
+            separator_line = None;
+            ours.clear();
+            theirs.clear();
+            in_ours = false;
+            in_theirs = false;
+        } else if in_ours {
+            ours.push(line.to_string());
+        } else if in_theirs {
+            theirs.push(line.to_string());
+        }
+    }
+    conflicts
+}
+
+/// Returns `true` if the content contains any merge conflict markers.
+pub fn has_merge_conflicts(content: &str) -> bool {
+    content.lines().any(|l| {
+        let t = l.trim();
+        t.starts_with(CONFLICT_START) || t.starts_with(CONFLICT_END)
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Staged / unstaged change tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks staged and unstaged resources for a provider, enabling move
+/// operations between the two sets.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ChangeTracker {
+    staged: Vec<ScmResource>,
+    unstaged: Vec<ScmResource>,
+}
+
+impl ChangeTracker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Add a resource to the unstaged set.
+    pub fn add_unstaged(&mut self, resource: ScmResource) {
+        if !self.unstaged.iter().any(|r| r.uri == resource.uri) {
+            self.unstaged.push(resource);
+        }
+    }
+
+    /// Stage a resource by URI, moving it from unstaged to staged.
+    /// Returns `true` if the resource was found and staged.
+    pub fn stage(&mut self, uri: &str) -> bool {
+        if let Some(pos) = self.unstaged.iter().position(|r| r.uri == uri) {
+            let resource = self.unstaged.remove(pos);
+            if !self.staged.iter().any(|r| r.uri == uri) {
+                self.staged.push(resource);
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Unstage a resource by URI, moving it from staged back to unstaged.
+    /// Returns `true` if the resource was found and unstaged.
+    pub fn unstage(&mut self, uri: &str) -> bool {
+        if let Some(pos) = self.staged.iter().position(|r| r.uri == uri) {
+            let resource = self.staged.remove(pos);
+            if !self.unstaged.iter().any(|r| r.uri == uri) {
+                self.unstaged.push(resource);
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Stage all unstaged resources.
+    pub fn stage_all(&mut self) {
+        let moved: Vec<ScmResource> = self.unstaged.drain(..).collect();
+        for r in moved {
+            if !self.staged.iter().any(|s| s.uri == r.uri) {
+                self.staged.push(r);
+            }
+        }
+    }
+
+    /// Unstage all staged resources.
+    pub fn unstage_all(&mut self) {
+        let moved: Vec<ScmResource> = self.staged.drain(..).collect();
+        for r in moved {
+            if !self.unstaged.iter().any(|u| u.uri == r.uri) {
+                self.unstaged.push(r);
+            }
+        }
+    }
+
+    /// Discard a resource from unstaged changes by URI.
+    pub fn discard(&mut self, uri: &str) -> bool {
+        let before = self.unstaged.len();
+        self.unstaged.retain(|r| r.uri != uri);
+        self.unstaged.len() < before
+    }
+
+    pub fn staged(&self) -> &[ScmResource] {
+        &self.staged
+    }
+
+    pub fn unstaged(&self) -> &[ScmResource] {
+        &self.unstaged
+    }
+
+    pub fn staged_count(&self) -> usize {
+        self.staged.len()
+    }
+
+    pub fn unstaged_count(&self) -> usize {
+        self.unstaged.len()
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.staged.len() + self.unstaged.len()
+    }
+
+    pub fn is_clean(&self) -> bool {
+        self.staged.is_empty() && self.unstaged.is_empty()
+    }
+
+    /// Produce `SourceControlGroup` entries for staged and unstaged.
+    pub fn to_groups(&self) -> Vec<SourceControlGroup> {
+        vec![
+            SourceControlGroup {
+                id: "staged".to_string(),
+                label: "Staged Changes".to_string(),
+                resources: self.staged.clone(),
+            },
+            SourceControlGroup {
+                id: "changes".to_string(),
+                label: "Changes".to_string(),
+                resources: self.unstaged.clone(),
+            },
+        ]
+    }
+}
+
+impl fmt::Display for ChangeTracker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} staged, {} unstaged",
+            self.staged.len(),
+            self.unstaged.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Commit message templates
+// ---------------------------------------------------------------------------
+
+/// A reusable commit message template with placeholder substitution.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CommitTemplate {
+    /// Human-readable name of the template.
+    pub name: String,
+    /// Template body, may contain `{placeholders}`.
+    pub body: String,
+}
+
+impl CommitTemplate {
+    pub fn new(name: impl Into<String>, body: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            body: body.into(),
+        }
+    }
+
+    /// Substitute `{key}` placeholders with provided values.
+    pub fn render(&self, vars: &HashMap<String, String>) -> String {
+        let mut result = self.body.clone();
+        for (key, value) in vars {
+            let placeholder = format!("{{{key}}}");
+            result = result.replace(&placeholder, value);
+        }
+        result
+    }
+
+    /// Return the set of placeholder names found in the template body.
+    pub fn placeholders(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        let bytes = self.body.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] == b'{' {
+                if let Some(end) = self.body[i + 1..].find('}') {
+                    let name = &self.body[i + 1..i + 1 + end];
+                    if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                        let s = name.to_string();
+                        if !out.contains(&s) {
+                            out.push(s);
+                        }
+                    }
+                    i += end + 2;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+        out
+    }
+}
+
+impl fmt::Display for CommitTemplate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}", self.name, self.body)
+    }
+}
+
+/// A collection of commit templates.
+#[derive(Debug, Clone, Default)]
+pub struct TemplateRegistry {
+    templates: Vec<CommitTemplate>,
+}
+
+impl TemplateRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a template. Replaces any existing template with the same name.
+    pub fn register(&mut self, template: CommitTemplate) {
+        self.templates.retain(|t| t.name != template.name);
+        self.templates.push(template);
+    }
+
+    pub fn get(&self, name: &str) -> Option<&CommitTemplate> {
+        self.templates.iter().find(|t| t.name == name)
+    }
+
+    pub fn names(&self) -> Vec<&str> {
+        self.templates.iter().map(|t| t.name.as_str()).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.templates.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.templates.is_empty()
+    }
+
+    pub fn remove(&mut self, name: &str) -> bool {
+        let before = self.templates.len();
+        self.templates.retain(|t| t.name != name);
+        self.templates.len() < before
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SCM input-box validation
+// ---------------------------------------------------------------------------
+
+/// Result of validating an SCM input-box value (e.g. commit message draft).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InputBoxSeverity {
+    Info,
+    Warning,
+    Error,
+}
+
+/// A single validation diagnostic for the input box.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InputBoxDiagnostic {
+    pub severity: InputBoxSeverity,
+    pub message: String,
+}
+
+/// Validate an SCM input-box value, returning diagnostics.
+///
+/// Checks: non-empty, max length, subject-line length.
+pub fn validate_input_box(value: &str, max_length: usize) -> Vec<InputBoxDiagnostic> {
+    let mut diags = Vec::new();
+    if value.is_empty() {
+        return diags; // empty is fine—not yet typed
+    }
+    if value.len() > max_length {
+        diags.push(InputBoxDiagnostic {
+            severity: InputBoxSeverity::Error,
+            message: format!("message exceeds {} characters", max_length),
+        });
+    }
+    if let Some(subject) = value.lines().next() {
+        if subject.len() > 72 {
+            diags.push(InputBoxDiagnostic {
+                severity: InputBoxSeverity::Warning,
+                message: format!(
+                    "subject line is {} chars; convention is ≤72",
+                    subject.len()
+                ),
+            });
+        }
+    }
+    // Warn on trailing whitespace in any line.
+    for (idx, line) in value.lines().enumerate() {
+        if line != line.trim_end() {
+            diags.push(InputBoxDiagnostic {
+                severity: InputBoxSeverity::Info,
+                message: format!("trailing whitespace on line {}", idx + 1),
+            });
+            break; // report once
+        }
+    }
+    diags
+}
+
+// ---------------------------------------------------------------------------
+// Provider registry snapshot
+// ---------------------------------------------------------------------------
+
+/// A point-in-time snapshot of the SCM provider registry, useful for diffing
+/// state between ticks or serialising to the extension host.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RegistrySnapshot {
+    pub providers: Vec<SourceControl>,
+    /// Monotonic sequence number at the time of capture.
+    pub seq: u64,
+}
+
+impl ScmBridge {
+    /// Capture a snapshot of the current provider state.
+    pub fn snapshot(&self, seq: u64) -> RegistrySnapshot {
+        RegistrySnapshot {
+            providers: self.providers.clone(),
+            seq,
+        }
+    }
+
+    /// Compute which provider IDs were added or removed between two snapshots.
+    pub fn diff_snapshots(
+        old: &RegistrySnapshot,
+        new: &RegistrySnapshot,
+    ) -> (Vec<String>, Vec<String>) {
+        let old_ids: std::collections::HashSet<&str> =
+            old.providers.iter().map(|p| p.id.as_str()).collect();
+        let new_ids: std::collections::HashSet<&str> =
+            new.providers.iter().map(|p| p.id.as_str()).collect();
+
+        let added: Vec<String> = new_ids
+            .difference(&old_ids)
+            .map(|s| s.to_string())
+            .collect();
+        let removed: Vec<String> = old_ids
+            .difference(&new_ids)
+            .map(|s| s.to_string())
+            .collect();
+        (added, removed)
+    }
+
+    /// Compute resource-level changes between two snapshots for a given
+    /// provider, returning `(added_uris, removed_uris)`.
+    pub fn diff_provider_resources(
+        old: &RegistrySnapshot,
+        new: &RegistrySnapshot,
+        provider_id: &str,
+    ) -> (Vec<String>, Vec<String>) {
+        let collect_uris = |snap: &RegistrySnapshot| -> std::collections::HashSet<String> {
+            snap.providers
+                .iter()
+                .filter(|p| p.id == provider_id)
+                .flat_map(|p| &p.groups)
+                .flat_map(|g| &g.resources)
+                .map(|r| r.uri.clone())
+                .collect()
+        };
+        let old_uris = collect_uris(old);
+        let new_uris = collect_uris(new);
+
+        let added: Vec<String> = new_uris.difference(&old_uris).cloned().collect();
+        let removed: Vec<String> = old_uris.difference(&new_uris).cloned().collect();
+        (added, removed)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1861,5 +2327,286 @@ mod tests {
         assert!(warnings.is_empty());
         let warnings = v.validate("This subject is way too long for the limit");
         assert!(!warnings.is_empty());
+    }
+
+    // -- Merge conflict detection ------------------------------------------
+
+    #[test]
+    fn detect_merge_conflicts_finds_single_conflict() {
+        let content = "\
+before
+<<<<<<< HEAD
+our line
+=======
+their line
+>>>>>>> branch
+after
+";
+        let conflicts = detect_merge_conflicts(content);
+        assert_eq!(conflicts.len(), 1);
+        let c = &conflicts[0];
+        assert_eq!(c.start_line, 2);
+        assert_eq!(c.separator_line, 4);
+        assert_eq!(c.end_line, 6);
+        assert_eq!(c.ours, vec!["our line"]);
+        assert_eq!(c.theirs, vec!["their line"]);
+        assert_eq!(c.total_lines(), 2);
+        assert!(!c.is_trivial());
+        // Display
+        let s = format!("{c}");
+        assert!(s.contains("conflict at lines 2-6"));
+    }
+
+    #[test]
+    fn detect_merge_conflicts_multiple() {
+        let content = "\
+<<<<<<< HEAD
+a
+=======
+b
+>>>>>>> x
+middle
+<<<<<<< HEAD
+c
+d
+=======
+e
+>>>>>>> y
+";
+        let conflicts = detect_merge_conflicts(content);
+        assert_eq!(conflicts.len(), 2);
+        assert_eq!(conflicts[0].ours, vec!["a"]);
+        assert_eq!(conflicts[1].ours, vec!["c", "d"]);
+        assert_eq!(conflicts[1].theirs, vec!["e"]);
+    }
+
+    #[test]
+    fn detect_merge_conflicts_none() {
+        assert!(detect_merge_conflicts("normal file\nno conflicts\n").is_empty());
+    }
+
+    #[test]
+    fn has_merge_conflicts_flag() {
+        assert!(has_merge_conflicts("<<<<<<< HEAD\nfoo\n=======\nbar\n>>>>>>> b\n"));
+        assert!(!has_merge_conflicts("clean file"));
+    }
+
+    #[test]
+    fn merge_conflict_trivial() {
+        let content = "\
+<<<<<<< HEAD
+=======
+their stuff
+>>>>>>> b
+";
+        let conflicts = detect_merge_conflicts(content);
+        assert_eq!(conflicts.len(), 1);
+        assert!(conflicts[0].is_trivial()); // ours is empty
+    }
+
+    // -- Change tracker (staged/unstaged) ----------------------------------
+
+    #[test]
+    fn change_tracker_stage_unstage_lifecycle() {
+        let mut ct = ChangeTracker::new();
+        assert!(ct.is_clean());
+
+        ct.add_unstaged(ScmResource::plain("file:///a.rs"));
+        ct.add_unstaged(ScmResource::plain("file:///b.rs"));
+        assert_eq!(ct.unstaged_count(), 2);
+        assert_eq!(ct.staged_count(), 0);
+        assert_eq!(ct.total_count(), 2);
+
+        // Stage one
+        assert!(ct.stage("file:///a.rs"));
+        assert_eq!(ct.staged_count(), 1);
+        assert_eq!(ct.unstaged_count(), 1);
+
+        // Unstage it back
+        assert!(ct.unstage("file:///a.rs"));
+        assert_eq!(ct.staged_count(), 0);
+        assert_eq!(ct.unstaged_count(), 2);
+
+        // Stage all
+        ct.stage_all();
+        assert_eq!(ct.staged_count(), 2);
+        assert_eq!(ct.unstaged_count(), 0);
+
+        // Unstage all
+        ct.unstage_all();
+        assert_eq!(ct.staged_count(), 0);
+        assert_eq!(ct.unstaged_count(), 2);
+    }
+
+    #[test]
+    fn change_tracker_discard() {
+        let mut ct = ChangeTracker::new();
+        ct.add_unstaged(ScmResource::plain("file:///a.rs"));
+        assert!(ct.discard("file:///a.rs"));
+        assert!(ct.is_clean());
+        assert!(!ct.discard("file:///nonexistent"));
+    }
+
+    #[test]
+    fn change_tracker_to_groups() {
+        let mut ct = ChangeTracker::new();
+        ct.add_unstaged(ScmResource::plain("file:///a.rs"));
+        ct.stage("file:///a.rs");
+        ct.add_unstaged(ScmResource::plain("file:///b.rs"));
+        let groups = ct.to_groups();
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].id, "staged");
+        assert_eq!(groups[0].resources.len(), 1);
+        assert_eq!(groups[1].id, "changes");
+        assert_eq!(groups[1].resources.len(), 1);
+    }
+
+    #[test]
+    fn change_tracker_display() {
+        let mut ct = ChangeTracker::new();
+        ct.add_unstaged(ScmResource::plain("file:///a.rs"));
+        ct.stage("file:///a.rs");
+        let s = format!("{ct}");
+        assert!(s.contains("1 staged"));
+    }
+
+    #[test]
+    fn change_tracker_no_duplicate_add() {
+        let mut ct = ChangeTracker::new();
+        ct.add_unstaged(ScmResource::plain("file:///a.rs"));
+        ct.add_unstaged(ScmResource::plain("file:///a.rs"));
+        assert_eq!(ct.unstaged_count(), 1);
+    }
+
+    // -- Commit templates --------------------------------------------------
+
+    #[test]
+    fn commit_template_render_and_placeholders() {
+        let tpl = CommitTemplate::new("feat", "feat({scope}): {description}");
+        let placeholders = tpl.placeholders();
+        assert_eq!(placeholders, vec!["scope", "description"]);
+
+        let mut vars = HashMap::new();
+        vars.insert("scope".to_string(), "auth".to_string());
+        vars.insert("description".to_string(), "add login".to_string());
+        let rendered = tpl.render(&vars);
+        assert_eq!(rendered, "feat(auth): add login");
+    }
+
+    #[test]
+    fn commit_template_no_placeholders() {
+        let tpl = CommitTemplate::new("simple", "just a message");
+        assert!(tpl.placeholders().is_empty());
+        let rendered = tpl.render(&HashMap::new());
+        assert_eq!(rendered, "just a message");
+    }
+
+    #[test]
+    fn commit_template_display() {
+        let tpl = CommitTemplate::new("fix", "fix: {msg}");
+        let s = format!("{tpl}");
+        assert!(s.contains("[fix]"));
+    }
+
+    #[test]
+    fn template_registry_operations() {
+        let mut reg = TemplateRegistry::new();
+        assert!(reg.is_empty());
+
+        reg.register(CommitTemplate::new("feat", "feat: {msg}"));
+        reg.register(CommitTemplate::new("fix", "fix: {msg}"));
+        assert_eq!(reg.len(), 2);
+        assert!(reg.names().contains(&"feat"));
+        assert!(reg.get("feat").is_some());
+
+        // Replace existing
+        reg.register(CommitTemplate::new("feat", "feat({scope}): {msg}"));
+        assert_eq!(reg.len(), 2);
+        assert!(reg.get("feat").unwrap().body.contains("{scope}"));
+
+        assert!(reg.remove("fix"));
+        assert_eq!(reg.len(), 1);
+        assert!(!reg.remove("nonexistent"));
+    }
+
+    // -- Input-box validation ----------------------------------------------
+
+    #[test]
+    fn validate_input_box_empty_ok() {
+        let diags = validate_input_box("", 1000);
+        assert!(diags.is_empty());
+    }
+
+    #[test]
+    fn validate_input_box_too_long() {
+        let diags = validate_input_box(&"x".repeat(200), 100);
+        assert!(diags.iter().any(|d| d.severity == InputBoxSeverity::Error));
+    }
+
+    #[test]
+    fn validate_input_box_long_subject() {
+        let long_subject = "a".repeat(80);
+        let diags = validate_input_box(&long_subject, 1000);
+        assert!(diags
+            .iter()
+            .any(|d| d.severity == InputBoxSeverity::Warning));
+    }
+
+    #[test]
+    fn validate_input_box_trailing_whitespace() {
+        let diags = validate_input_box("hello   \nworld", 1000);
+        assert!(diags
+            .iter()
+            .any(|d| d.severity == InputBoxSeverity::Info));
+    }
+
+    // -- Registry snapshot -------------------------------------------------
+
+    #[test]
+    fn snapshot_and_diff() {
+        let mut bridge = ScmBridge::new();
+        bridge.register_provider("git", "Git", None);
+        let snap1 = bridge.snapshot(1);
+
+        bridge.register_provider("svn", "SVN", None);
+        bridge.unregister_provider("git");
+        let snap2 = bridge.snapshot(2);
+
+        let (added, removed) = ScmBridge::diff_snapshots(&snap1, &snap2);
+        assert_eq!(added, vec!["svn"]);
+        assert_eq!(removed, vec!["git"]);
+        assert_eq!(snap1.seq, 1);
+        assert_eq!(snap2.seq, 2);
+    }
+
+    #[test]
+    fn diff_provider_resources_between_snapshots() {
+        let mut bridge = ScmBridge::new();
+        bridge.register_provider("git", "Git", None);
+        bridge.create_group("git", "changes", "Changes");
+        bridge.handle_message(&ScmMessage::UpdateResources {
+            provider_id: "git".into(),
+            group_id: "changes".into(),
+            resources: vec![
+                ScmResource::plain("file:///a.rs"),
+                ScmResource::plain("file:///b.rs"),
+            ],
+        });
+        let snap1 = bridge.snapshot(1);
+
+        bridge.handle_message(&ScmMessage::UpdateResources {
+            provider_id: "git".into(),
+            group_id: "changes".into(),
+            resources: vec![
+                ScmResource::plain("file:///b.rs"),
+                ScmResource::plain("file:///c.rs"),
+            ],
+        });
+        let snap2 = bridge.snapshot(2);
+
+        let (added, removed) =
+            ScmBridge::diff_provider_resources(&snap1, &snap2, "git");
+        assert_eq!(added, vec!["file:///c.rs"]);
+        assert_eq!(removed, vec!["file:///a.rs"]);
     }
 }

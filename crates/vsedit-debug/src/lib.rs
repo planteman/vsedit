@@ -1139,6 +1139,633 @@ impl DebugSessionState {
 }
 
 // ---------------------------------------------------------------------------
+// Stepping granularity
+// ---------------------------------------------------------------------------
+
+/// DAP stepping granularity for step-in/step-out/step-over requests.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SteppingGranularity {
+    Statement,
+    Line,
+    Instruction,
+}
+
+impl fmt::Display for SteppingGranularity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Statement => write!(f, "statement"),
+            Self::Line => write!(f, "line"),
+            Self::Instruction => write!(f, "instruction"),
+        }
+    }
+}
+
+impl SteppingGranularity {
+    /// Parse a granularity string from a DAP message.
+    pub fn from_dap_str(s: &str) -> Option<Self> {
+        match s {
+            "statement" => Some(Self::Statement),
+            "line" => Some(Self::Line),
+            "instruction" => Some(Self::Instruction),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Exception filter configuration
+// ---------------------------------------------------------------------------
+
+/// Configuration for a single exception filter (e.g. "uncaught", "raised").
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ExceptionFilterConfig {
+    pub filter_id: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub enabled: bool,
+    pub condition: Option<String>,
+}
+
+impl ExceptionFilterConfig {
+    pub fn new(filter_id: impl Into<String>, label: impl Into<String>) -> Self {
+        Self {
+            filter_id: filter_id.into(),
+            label: label.into(),
+            description: None,
+            enabled: true,
+            condition: None,
+        }
+    }
+
+    /// Create from a DAP `ExceptionBreakpointsFilter` JSON value.
+    pub fn from_dap(value: &serde_json::Value) -> Option<Self> {
+        let filter_id = value.get("filter")?.as_str()?.to_string();
+        let label = value.get("label")?.as_str()?.to_string();
+        let description = value
+            .get("description")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let default_enabled = value
+            .get("default")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let condition = value
+            .get("conditionDescription")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        Some(Self {
+            filter_id,
+            label,
+            description,
+            enabled: default_enabled,
+            condition,
+        })
+    }
+}
+
+/// Manages a set of exception filter configurations.
+#[derive(Debug, Clone, Default)]
+pub struct ExceptionFilterStore {
+    filters: Vec<ExceptionFilterConfig>,
+}
+
+impl ExceptionFilterStore {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Populate from the `exceptionBreakpointFilters` array in the DAP
+    /// `initialize` response body.
+    pub fn load_from_dap(&mut self, body: &serde_json::Value) {
+        if let Some(arr) = body.get("exceptionBreakpointFilters").and_then(|v| v.as_array()) {
+            self.filters.clear();
+            for item in arr {
+                if let Some(f) = ExceptionFilterConfig::from_dap(item) {
+                    self.filters.push(f);
+                }
+            }
+        }
+    }
+
+    /// Toggle the enabled state of a filter by its ID. Returns the new state,
+    /// or `None` if the filter was not found.
+    pub fn toggle(&mut self, filter_id: &str) -> Option<bool> {
+        let f = self.filters.iter_mut().find(|f| f.filter_id == filter_id)?;
+        f.enabled = !f.enabled;
+        Some(f.enabled)
+    }
+
+    /// Set a condition string on an exception filter.
+    pub fn set_condition(&mut self, filter_id: &str, condition: Option<String>) -> bool {
+        if let Some(f) = self.filters.iter_mut().find(|f| f.filter_id == filter_id) {
+            f.condition = condition;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Returns the list of currently enabled filter IDs (for the
+    /// `setExceptionBreakpoints` request).
+    pub fn enabled_ids(&self) -> Vec<&str> {
+        self.filters
+            .iter()
+            .filter(|f| f.enabled)
+            .map(|f| f.filter_id.as_str())
+            .collect()
+    }
+
+    pub fn filters(&self) -> &[ExceptionFilterConfig] {
+        &self.filters
+    }
+
+    pub fn len(&self) -> usize {
+        self.filters.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.filters.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Data breakpoint tracking
+// ---------------------------------------------------------------------------
+
+/// Access type for data breakpoints.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DataBreakpointAccessType {
+    Read,
+    Write,
+    ReadWrite,
+}
+
+impl fmt::Display for DataBreakpointAccessType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Read => write!(f, "read"),
+            Self::Write => write!(f, "write"),
+            Self::ReadWrite => write!(f, "readWrite"),
+        }
+    }
+}
+
+/// A data breakpoint that fires on memory/variable access.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct DataBreakpoint {
+    pub data_id: String,
+    pub access_type: DataBreakpointAccessType,
+    pub condition: Option<String>,
+    pub hit_condition: Option<String>,
+}
+
+impl DataBreakpoint {
+    pub fn new(data_id: impl Into<String>, access_type: DataBreakpointAccessType) -> Self {
+        Self {
+            data_id: data_id.into(),
+            access_type,
+            condition: None,
+            hit_condition: None,
+        }
+    }
+
+    /// Serialise to the JSON body expected by `setDataBreakpoints`.
+    pub fn to_dap_json(&self) -> serde_json::Value {
+        let mut obj = serde_json::json!({
+            "dataId": self.data_id,
+            "accessType": self.access_type,
+        });
+        if let Some(c) = &self.condition {
+            obj["condition"] = serde_json::Value::String(c.clone());
+        }
+        if let Some(h) = &self.hit_condition {
+            obj["hitCondition"] = serde_json::Value::String(h.clone());
+        }
+        obj
+    }
+}
+
+/// Manages a collection of data breakpoints.
+#[derive(Debug, Clone, Default)]
+pub struct DataBreakpointStore {
+    breakpoints: Vec<DataBreakpoint>,
+}
+
+impl DataBreakpointStore {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, bp: DataBreakpoint) {
+        if !self.breakpoints.iter().any(|b| b.data_id == bp.data_id) {
+            self.breakpoints.push(bp);
+        }
+    }
+
+    pub fn remove(&mut self, data_id: &str) -> bool {
+        let before = self.breakpoints.len();
+        self.breakpoints.retain(|b| b.data_id != data_id);
+        self.breakpoints.len() < before
+    }
+
+    pub fn clear(&mut self) {
+        self.breakpoints.clear();
+    }
+
+    pub fn breakpoints(&self) -> &[DataBreakpoint] {
+        &self.breakpoints
+    }
+
+    pub fn len(&self) -> usize {
+        self.breakpoints.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.breakpoints.is_empty()
+    }
+
+    /// Build the JSON array for the `setDataBreakpoints` request body.
+    pub fn to_dap_json(&self) -> serde_json::Value {
+        serde_json::Value::Array(self.breakpoints.iter().map(|b| b.to_dap_json()).collect())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Source reference management
+// ---------------------------------------------------------------------------
+
+/// A source reference returned by the debug adapter for decompiled or
+/// generated sources that don't exist on disk.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceReference {
+    pub reference_id: i64,
+    pub name: String,
+    pub origin: Option<String>,
+    pub content: Option<String>,
+}
+
+impl SourceReference {
+    pub fn new(reference_id: i64, name: impl Into<String>) -> Self {
+        Self {
+            reference_id,
+            name: name.into(),
+            origin: None,
+            content: None,
+        }
+    }
+
+    /// Returns true if the source content has been fetched.
+    pub fn is_loaded(&self) -> bool {
+        self.content.is_some()
+    }
+
+    /// Set the source content after a `source` request.
+    pub fn set_content(&mut self, content: impl Into<String>) {
+        self.content = Some(content.into());
+    }
+
+    /// Line count of loaded content.
+    pub fn line_count(&self) -> usize {
+        self.content.as_ref().map_or(0, |c| c.lines().count())
+    }
+}
+
+/// Cache for source references returned by the debug adapter.
+#[derive(Debug, Clone, Default)]
+pub struct SourceReferenceCache {
+    refs: std::collections::HashMap<i64, SourceReference>,
+}
+
+impl SourceReferenceCache {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a source reference (without content). Returns `true` if newly inserted.
+    pub fn register(&mut self, reference_id: i64, name: impl Into<String>) -> bool {
+        use std::collections::hash_map::Entry;
+        match self.refs.entry(reference_id) {
+            Entry::Occupied(_) => false,
+            Entry::Vacant(e) => {
+                e.insert(SourceReference::new(reference_id, name));
+                true
+            }
+        }
+    }
+
+    /// Store content for a previously registered source reference.
+    pub fn set_content(&mut self, reference_id: i64, content: impl Into<String>) -> bool {
+        if let Some(sr) = self.refs.get_mut(&reference_id) {
+            sr.set_content(content);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get(&self, reference_id: i64) -> Option<&SourceReference> {
+        self.refs.get(&reference_id)
+    }
+
+    /// Returns IDs of references whose content has not been loaded yet.
+    pub fn unloaded_ids(&self) -> Vec<i64> {
+        self.refs
+            .iter()
+            .filter(|(_, sr)| !sr.is_loaded())
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.refs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.refs.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Debug console command parsing
+// ---------------------------------------------------------------------------
+
+/// Parsed debug console input — either a meta-command or an expression to evaluate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DebugConsoleCommand {
+    /// An expression to evaluate in the current scope.
+    Evaluate(String),
+    /// `.bp <file> <line>` — toggle a breakpoint.
+    ToggleBreakpoint { file: String, line: u32 },
+    /// `.bt` — print backtrace.
+    Backtrace,
+    /// `.vars` — list local variables.
+    ListVariables,
+    /// `.threads` — list threads.
+    ListThreads,
+    /// `.set <var> <value>` — set variable value.
+    SetVariable { name: String, value: String },
+    /// Unknown dot-command.
+    UnknownCommand(String),
+}
+
+/// Parse user input from the debug console into a command.
+pub fn parse_debug_console_input(input: &str) -> DebugConsoleCommand {
+    let input = input.trim();
+    if !input.starts_with('.') {
+        return DebugConsoleCommand::Evaluate(input.to_string());
+    }
+
+    let mut parts = input.splitn(3, char::is_whitespace);
+    let cmd = parts.next().unwrap_or("");
+    match cmd {
+        ".bp" => {
+            let file = parts.next().unwrap_or("").to_string();
+            let line: u32 = parts
+                .next()
+                .and_then(|s| s.trim().parse().ok())
+                .unwrap_or(0);
+            if file.is_empty() || line == 0 {
+                DebugConsoleCommand::UnknownCommand(input.to_string())
+            } else {
+                DebugConsoleCommand::ToggleBreakpoint { file, line }
+            }
+        }
+        ".bt" => DebugConsoleCommand::Backtrace,
+        ".vars" => DebugConsoleCommand::ListVariables,
+        ".threads" => DebugConsoleCommand::ListThreads,
+        ".set" => {
+            let name = parts.next().unwrap_or("").to_string();
+            let value = parts.next().unwrap_or("").to_string();
+            if name.is_empty() {
+                DebugConsoleCommand::UnknownCommand(input.to_string())
+            } else {
+                DebugConsoleCommand::SetVariable { name, value }
+            }
+        }
+        _ => DebugConsoleCommand::UnknownCommand(input.to_string()),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Breakpoint condition evaluation
+// ---------------------------------------------------------------------------
+
+/// A conditional breakpoint descriptor.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ConditionalBreakpoint {
+    pub file: String,
+    pub line: u32,
+    pub condition: Option<String>,
+    pub hit_condition: Option<String>,
+    pub log_message: Option<String>,
+}
+
+impl ConditionalBreakpoint {
+    pub fn new(file: impl Into<String>, line: u32) -> Self {
+        Self {
+            file: file.into(),
+            line,
+            condition: None,
+            hit_condition: None,
+            log_message: None,
+        }
+    }
+
+    /// Returns `true` if this breakpoint has any condition or log message.
+    pub fn is_conditional(&self) -> bool {
+        self.condition.is_some() || self.hit_condition.is_some()
+    }
+
+    /// Returns `true` if this is a logpoint (has a log message template).
+    pub fn is_logpoint(&self) -> bool {
+        self.log_message.is_some()
+    }
+
+    /// Serialise to the DAP `SourceBreakpoint` JSON format.
+    pub fn to_dap_source_breakpoint(&self) -> serde_json::Value {
+        let mut obj = serde_json::json!({ "line": self.line });
+        if let Some(c) = &self.condition {
+            obj["condition"] = serde_json::Value::String(c.clone());
+        }
+        if let Some(h) = &self.hit_condition {
+            obj["hitCondition"] = serde_json::Value::String(h.clone());
+        }
+        if let Some(l) = &self.log_message {
+            obj["logMessage"] = serde_json::Value::String(l.clone());
+        }
+        obj
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DAP request builder helpers
+// ---------------------------------------------------------------------------
+
+/// Sequence number allocator for outgoing DAP requests.
+#[derive(Debug)]
+pub struct DapSeqAllocator {
+    next: u64,
+}
+
+impl DapSeqAllocator {
+    pub fn new() -> Self {
+        Self { next: 1 }
+    }
+
+    /// Allocate the next sequence number.
+    pub fn next(&mut self) -> u64 {
+        let seq = self.next;
+        self.next += 1;
+        seq
+    }
+
+    /// Build a DAP request message with the next sequence number.
+    pub fn build_request(
+        &mut self,
+        command: impl Into<String>,
+        arguments: Option<serde_json::Value>,
+    ) -> DebugAdapterMessage {
+        DebugAdapterMessage::Request {
+            seq: self.next(),
+            command: command.into(),
+            arguments,
+        }
+    }
+}
+
+impl Default for DapSeqAllocator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Build a DAP `initialize` request body with standard client info.
+pub fn build_initialize_args(
+    client_id: &str,
+    client_name: &str,
+    supports_variable_type: bool,
+) -> serde_json::Value {
+    serde_json::json!({
+        "clientID": client_id,
+        "clientName": client_name,
+        "adapterID": "",
+        "linesStartAt1": true,
+        "columnsStartAt1": true,
+        "pathFormat": "path",
+        "supportsVariableType": supports_variable_type,
+        "supportsRunInTerminalRequest": false,
+    })
+}
+
+/// Build a `setBreakpoints` request body from conditional breakpoints for a
+/// single source file.
+pub fn build_set_breakpoints_body(
+    file_path: &str,
+    breakpoints: &[ConditionalBreakpoint],
+) -> serde_json::Value {
+    let bps: Vec<serde_json::Value> = breakpoints
+        .iter()
+        .map(|b| b.to_dap_source_breakpoint())
+        .collect();
+    serde_json::json!({
+        "source": { "path": file_path },
+        "breakpoints": bps,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Instruction breakpoint management
+// ---------------------------------------------------------------------------
+
+/// An instruction breakpoint identified by a memory address.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct InstructionBreakpoint {
+    pub instruction_reference: String,
+    pub offset: Option<i64>,
+    pub condition: Option<String>,
+    pub hit_condition: Option<String>,
+}
+
+impl InstructionBreakpoint {
+    pub fn new(instruction_reference: impl Into<String>) -> Self {
+        Self {
+            instruction_reference: instruction_reference.into(),
+            offset: None,
+            condition: None,
+            hit_condition: None,
+        }
+    }
+
+    pub fn to_dap_json(&self) -> serde_json::Value {
+        let mut obj = serde_json::json!({
+            "instructionReference": self.instruction_reference,
+        });
+        if let Some(o) = self.offset {
+            obj["offset"] = serde_json::json!(o);
+        }
+        if let Some(c) = &self.condition {
+            obj["condition"] = serde_json::Value::String(c.clone());
+        }
+        if let Some(h) = &self.hit_condition {
+            obj["hitCondition"] = serde_json::Value::String(h.clone());
+        }
+        obj
+    }
+}
+
+/// Manages a set of instruction breakpoints.
+#[derive(Debug, Clone, Default)]
+pub struct InstructionBreakpointStore {
+    breakpoints: Vec<InstructionBreakpoint>,
+}
+
+impl InstructionBreakpointStore {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, bp: InstructionBreakpoint) {
+        if !self
+            .breakpoints
+            .iter()
+            .any(|b| b.instruction_reference == bp.instruction_reference && b.offset == bp.offset)
+        {
+            self.breakpoints.push(bp);
+        }
+    }
+
+    pub fn remove(&mut self, instruction_reference: &str) -> bool {
+        let before = self.breakpoints.len();
+        self.breakpoints
+            .retain(|b| b.instruction_reference != instruction_reference);
+        self.breakpoints.len() < before
+    }
+
+    pub fn clear(&mut self) {
+        self.breakpoints.clear();
+    }
+
+    pub fn breakpoints(&self) -> &[InstructionBreakpoint] {
+        &self.breakpoints
+    }
+
+    pub fn len(&self) -> usize {
+        self.breakpoints.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.breakpoints.is_empty()
+    }
+
+    /// Build the JSON array for the `setInstructionBreakpoints` request body.
+    pub fn to_dap_json(&self) -> serde_json::Value {
+        serde_json::Value::Array(self.breakpoints.iter().map(|b| b.to_dap_json()).collect())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1860,5 +2487,276 @@ mod tests {
         assert!(DebugSessionState::Paused.can_step());
         assert!(!DebugSessionState::Running.can_step());
         assert!(!DebugSessionState::NotStarted.can_step());
+    }
+
+    // -- Stepping granularity ------------------------------------------------
+
+    #[test]
+    fn stepping_granularity_display_and_parse() {
+        assert_eq!(SteppingGranularity::Statement.to_string(), "statement");
+        assert_eq!(SteppingGranularity::Line.to_string(), "line");
+        assert_eq!(SteppingGranularity::Instruction.to_string(), "instruction");
+
+        assert_eq!(
+            SteppingGranularity::from_dap_str("statement"),
+            Some(SteppingGranularity::Statement)
+        );
+        assert_eq!(
+            SteppingGranularity::from_dap_str("line"),
+            Some(SteppingGranularity::Line)
+        );
+        assert_eq!(
+            SteppingGranularity::from_dap_str("instruction"),
+            Some(SteppingGranularity::Instruction)
+        );
+        assert_eq!(SteppingGranularity::from_dap_str("unknown"), None);
+    }
+
+    #[test]
+    fn stepping_granularity_serde_roundtrip() {
+        let g = SteppingGranularity::Instruction;
+        let json = serde_json::to_string(&g).unwrap();
+        assert_eq!(json, r#""instruction""#);
+        let parsed: SteppingGranularity = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, g);
+    }
+
+    // -- Exception filter store ----------------------------------------------
+
+    #[test]
+    fn exception_filter_from_dap_and_store() {
+        let body = serde_json::json!({
+            "exceptionBreakpointFilters": [
+                { "filter": "uncaught", "label": "Uncaught Exceptions", "default": true },
+                { "filter": "raised", "label": "All Exceptions", "default": false,
+                  "description": "Break on all", "conditionDescription": "module == 'x'" }
+            ]
+        });
+        let mut store = ExceptionFilterStore::new();
+        assert!(store.is_empty());
+        store.load_from_dap(&body);
+        assert_eq!(store.len(), 2);
+        assert_eq!(store.enabled_ids(), vec!["uncaught"]);
+
+        // Toggle
+        assert_eq!(store.toggle("raised"), Some(true));
+        assert_eq!(store.enabled_ids().len(), 2);
+        assert_eq!(store.toggle("raised"), Some(false));
+        assert_eq!(store.toggle("nonexistent"), None);
+
+        // Condition
+        assert!(store.set_condition("uncaught", Some("mymod".into())));
+        assert_eq!(
+            store.filters().iter().find(|f| f.filter_id == "uncaught").unwrap().condition,
+            Some("mymod".to_string())
+        );
+        assert!(!store.set_condition("nonexistent", None));
+    }
+
+    // -- Data breakpoint store -----------------------------------------------
+
+    #[test]
+    fn data_breakpoint_store_add_remove() {
+        let mut store = DataBreakpointStore::new();
+        assert!(store.is_empty());
+
+        let bp = DataBreakpoint::new("var.x", DataBreakpointAccessType::Write);
+        store.add(bp.clone());
+        assert_eq!(store.len(), 1);
+
+        // Duplicate data_id is ignored
+        store.add(bp);
+        assert_eq!(store.len(), 1);
+
+        store.add(DataBreakpoint::new("var.y", DataBreakpointAccessType::ReadWrite));
+        assert_eq!(store.len(), 2);
+
+        assert!(store.remove("var.x"));
+        assert!(!store.remove("var.x"));
+        assert_eq!(store.len(), 1);
+
+        let json = store.to_dap_json();
+        assert!(json.is_array());
+        assert_eq!(json.as_array().unwrap().len(), 1);
+        assert_eq!(json[0]["dataId"], "var.y");
+    }
+
+    #[test]
+    fn data_breakpoint_access_type_display() {
+        assert_eq!(DataBreakpointAccessType::Read.to_string(), "read");
+        assert_eq!(DataBreakpointAccessType::Write.to_string(), "write");
+        assert_eq!(DataBreakpointAccessType::ReadWrite.to_string(), "readWrite");
+    }
+
+    // -- Source reference cache -----------------------------------------------
+
+    #[test]
+    fn source_reference_cache_register_and_load() {
+        let mut cache = SourceReferenceCache::new();
+        assert!(cache.is_empty());
+
+        assert!(cache.register(100, "decompiled.cs"));
+        assert!(!cache.register(100, "decompiled.cs")); // duplicate
+        assert_eq!(cache.len(), 1);
+
+        assert_eq!(cache.unloaded_ids(), vec![100]);
+
+        assert!(cache.set_content(100, "line1\nline2\nline3"));
+        assert!(cache.unloaded_ids().is_empty());
+
+        let sr = cache.get(100).unwrap();
+        assert!(sr.is_loaded());
+        assert_eq!(sr.line_count(), 3);
+        assert_eq!(sr.name, "decompiled.cs");
+
+        // set_content for unregistered returns false
+        assert!(!cache.set_content(999, "nope"));
+    }
+
+    // -- Debug console command parsing ----------------------------------------
+
+    #[test]
+    fn parse_debug_console_commands() {
+        // Expression evaluation
+        assert_eq!(
+            parse_debug_console_input("x + 1"),
+            DebugConsoleCommand::Evaluate("x + 1".into())
+        );
+
+        // Breakpoint toggle
+        assert_eq!(
+            parse_debug_console_input(".bp main.rs 42"),
+            DebugConsoleCommand::ToggleBreakpoint {
+                file: "main.rs".into(),
+                line: 42,
+            }
+        );
+
+        // Backtrace
+        assert_eq!(
+            parse_debug_console_input(".bt"),
+            DebugConsoleCommand::Backtrace
+        );
+
+        // Vars
+        assert_eq!(
+            parse_debug_console_input(".vars"),
+            DebugConsoleCommand::ListVariables
+        );
+
+        // Threads
+        assert_eq!(
+            parse_debug_console_input(".threads"),
+            DebugConsoleCommand::ListThreads
+        );
+
+        // Set variable
+        assert_eq!(
+            parse_debug_console_input(".set count 99"),
+            DebugConsoleCommand::SetVariable {
+                name: "count".into(),
+                value: "99".into(),
+            }
+        );
+
+        // Unknown dot-command
+        match parse_debug_console_input(".foo bar") {
+            DebugConsoleCommand::UnknownCommand(s) => assert_eq!(s, ".foo bar"),
+            other => panic!("expected UnknownCommand, got {:?}", other),
+        }
+
+        // Invalid .bp (missing line)
+        match parse_debug_console_input(".bp main.rs") {
+            DebugConsoleCommand::UnknownCommand(_) => {}
+            other => panic!("expected UnknownCommand, got {:?}", other),
+        }
+    }
+
+    // -- Conditional breakpoint -----------------------------------------------
+
+    #[test]
+    fn conditional_breakpoint_properties() {
+        let mut bp = ConditionalBreakpoint::new("main.rs", 10);
+        assert!(!bp.is_conditional());
+        assert!(!bp.is_logpoint());
+
+        bp.condition = Some("x > 5".into());
+        assert!(bp.is_conditional());
+
+        bp.log_message = Some("value of x: {x}".into());
+        assert!(bp.is_logpoint());
+
+        let json = bp.to_dap_source_breakpoint();
+        assert_eq!(json["line"], 10);
+        assert_eq!(json["condition"], "x > 5");
+        assert_eq!(json["logMessage"], "value of x: {x}");
+    }
+
+    // -- Seq allocator and request builder ------------------------------------
+
+    #[test]
+    fn dap_seq_allocator_and_request_builder() {
+        let mut alloc = DapSeqAllocator::new();
+        assert_eq!(alloc.next(), 1);
+        assert_eq!(alloc.next(), 2);
+
+        let msg = alloc.build_request("initialize", Some(serde_json::json!({"a": 1})));
+        assert!(msg.is_request());
+        assert_eq!(msg.seq(), 3);
+        assert_eq!(msg.command_or_event(), "initialize");
+    }
+
+    #[test]
+    fn build_initialize_args_structure() {
+        let args = build_initialize_args("vsedit", "VS Edit", true);
+        assert_eq!(args["clientID"], "vsedit");
+        assert_eq!(args["clientName"], "VS Edit");
+        assert_eq!(args["linesStartAt1"], true);
+        assert_eq!(args["supportsVariableType"], true);
+    }
+
+    #[test]
+    fn build_set_breakpoints_body_structure() {
+        let mut bp = ConditionalBreakpoint::new("src/main.rs", 5);
+        bp.hit_condition = Some(">= 3".into());
+        let body = build_set_breakpoints_body("src/main.rs", &[bp]);
+        assert_eq!(body["source"]["path"], "src/main.rs");
+        let bps = body["breakpoints"].as_array().unwrap();
+        assert_eq!(bps.len(), 1);
+        assert_eq!(bps[0]["line"], 5);
+        assert_eq!(bps[0]["hitCondition"], ">= 3");
+    }
+
+    // -- Instruction breakpoint store -----------------------------------------
+
+    #[test]
+    fn instruction_breakpoint_store_operations() {
+        let mut store = InstructionBreakpointStore::new();
+        assert!(store.is_empty());
+
+        let mut ibp = InstructionBreakpoint::new("0x00401000");
+        ibp.offset = Some(4);
+        ibp.condition = Some("rax == 0".into());
+        store.add(ibp);
+        assert_eq!(store.len(), 1);
+
+        // Duplicate same ref + offset is ignored
+        let mut ibp2 = InstructionBreakpoint::new("0x00401000");
+        ibp2.offset = Some(4);
+        store.add(ibp2);
+        assert_eq!(store.len(), 1);
+
+        // Different offset is allowed
+        store.add(InstructionBreakpoint::new("0x00401000"));
+        assert_eq!(store.len(), 2);
+
+        let json = store.to_dap_json();
+        assert_eq!(json.as_array().unwrap().len(), 2);
+        assert_eq!(json[0]["instructionReference"], "0x00401000");
+        assert_eq!(json[0]["offset"], 4);
+        assert_eq!(json[0]["condition"], "rax == 0");
+
+        assert!(store.remove("0x00401000"));
+        assert!(store.is_empty()); // removes all with that ref
     }
 }

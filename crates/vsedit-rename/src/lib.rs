@@ -1062,6 +1062,303 @@ impl std::fmt::Display for RenameRefactorPlan {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Case transformation helpers
+// ---------------------------------------------------------------------------
+
+/// Convert a name to `snake_case`.
+pub fn to_snake_case(name: &str) -> String {
+    let mut result = String::with_capacity(name.len() + 4);
+    for (i, ch) in name.chars().enumerate() {
+        if ch.is_ascii_uppercase() && i > 0 {
+            let prev = name.as_bytes()[i - 1] as char;
+            if prev != '_' && !prev.is_ascii_uppercase() {
+                result.push('_');
+            } else if prev.is_ascii_uppercase() {
+                // Handle sequences like "HTMLParser" -> "html_parser"
+                if let Some(&next) = name.as_bytes().get(i + 1) {
+                    if (next as char).is_ascii_lowercase() {
+                        result.push('_');
+                    }
+                }
+            }
+        }
+        result.push(ch.to_ascii_lowercase());
+    }
+    result
+}
+
+/// Convert a name to `camelCase`.
+pub fn to_camel_case(name: &str) -> String {
+    let mut result = String::with_capacity(name.len());
+    let mut capitalize_next = false;
+    for (i, ch) in name.chars().enumerate() {
+        if ch == '_' || ch == '-' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            result.push(ch.to_ascii_uppercase());
+            capitalize_next = false;
+        } else if i == 0 {
+            result.push(ch.to_ascii_lowercase());
+        } else {
+            result.push(ch);
+        }
+    }
+    result
+}
+
+/// Convert a name to `PascalCase`.
+pub fn to_pascal_case(name: &str) -> String {
+    let mut result = String::with_capacity(name.len());
+    let mut capitalize_next = true;
+    for ch in name.chars() {
+        if ch == '_' || ch == '-' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            result.push(ch.to_ascii_uppercase());
+            capitalize_next = false;
+        } else {
+            result.push(ch);
+        }
+    }
+    result
+}
+
+/// Convert a name to `SCREAMING_SNAKE_CASE`.
+pub fn to_screaming_snake_case(name: &str) -> String {
+    to_snake_case(name).to_ascii_uppercase()
+}
+
+/// Convert a name to `kebab-case`.
+pub fn to_kebab_case(name: &str) -> String {
+    to_snake_case(name).replace('_', "-")
+}
+
+// ---------------------------------------------------------------------------
+// Batch rename with pattern matching
+// ---------------------------------------------------------------------------
+
+/// A batch rename operation that applies a find/replace pattern across files.
+#[derive(Debug, Clone)]
+pub struct BatchRename {
+    /// The pattern to search for (literal substring).
+    pub pattern: String,
+    /// The replacement string.
+    pub replacement: String,
+}
+
+impl BatchRename {
+    pub fn new(pattern: impl Into<String>, replacement: impl Into<String>) -> Self {
+        Self {
+            pattern: pattern.into(),
+            replacement: replacement.into(),
+        }
+    }
+
+    /// Scan file contents and produce a `WorkspaceEdit` for all occurrences.
+    /// `files` maps URI → file content.
+    pub fn compute_edits(&self, files: &HashMap<String, String>) -> WorkspaceEdit {
+        let mut we = WorkspaceEdit::new();
+        for (uri, content) in files {
+            for (line_idx, line) in content.lines().enumerate() {
+                let mut search_start = 0;
+                while let Some(col) = line[search_start..].find(&self.pattern) {
+                    let abs_col = search_start + col;
+                    we.edits.push(RenameEdit {
+                        uri: uri.clone(),
+                        line: line_idx as u32,
+                        start_column: abs_col as u32,
+                        end_column: (abs_col + self.pattern.len()) as u32,
+                        new_text: self.replacement.clone(),
+                    });
+                    search_start = abs_col + self.pattern.len();
+                }
+            }
+        }
+        we.sort_edits();
+        we
+    }
+
+    /// Count total occurrences across all files without building edits.
+    pub fn count_occurrences(&self, files: &HashMap<String, String>) -> usize {
+        files
+            .values()
+            .map(|content| content.matches(&self.pattern).count())
+            .sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Rename undo preparation
+// ---------------------------------------------------------------------------
+
+/// Captures the state needed to undo a rename operation.
+#[derive(Debug, Clone)]
+pub struct RenameUndoInfo {
+    /// The original file contents before the rename, keyed by URI.
+    pub original_contents: HashMap<String, String>,
+    /// The old symbol name.
+    pub old_name: String,
+    /// The new symbol name that was applied.
+    pub new_name: String,
+}
+
+impl RenameUndoInfo {
+    /// Prepare undo info by snapshotting the files that will be affected.
+    pub fn prepare(
+        files: &HashMap<String, String>,
+        edit: &WorkspaceEdit,
+        old_name: &str,
+        new_name: &str,
+    ) -> Self {
+        let affected = edit.affected_uris();
+        let original_contents = files
+            .iter()
+            .filter(|(uri, _)| affected.contains(uri))
+            .map(|(uri, content)| (uri.clone(), content.clone()))
+            .collect();
+        Self {
+            original_contents,
+            old_name: old_name.to_string(),
+            new_name: new_name.to_string(),
+        }
+    }
+
+    /// Number of files captured for undo.
+    pub fn file_count(&self) -> usize {
+        self.original_contents.len()
+    }
+
+    /// Restore original contents into the provided mutable file map.
+    pub fn restore_into(&self, files: &mut HashMap<String, String>) {
+        for (uri, content) in &self.original_contents {
+            files.insert(uri.clone(), content.clone());
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-file rename tracker
+// ---------------------------------------------------------------------------
+
+/// Tracks the progress of a rename operation across multiple files.
+#[derive(Debug, Clone)]
+pub struct RenameProgress {
+    /// Files that still need processing.
+    pub pending: Vec<String>,
+    /// Files that have been successfully renamed.
+    pub completed: Vec<String>,
+    /// Files that failed with an error message.
+    pub failed: Vec<(String, String)>,
+}
+
+impl RenameProgress {
+    /// Create a new tracker from a list of file URIs.
+    pub fn new(files: Vec<String>) -> Self {
+        Self {
+            pending: files,
+            completed: Vec::new(),
+            failed: Vec::new(),
+        }
+    }
+
+    /// Mark a file as successfully processed.
+    pub fn mark_completed(&mut self, uri: &str) {
+        self.pending.retain(|f| f != uri);
+        self.completed.push(uri.to_string());
+    }
+
+    /// Mark a file as failed.
+    pub fn mark_failed(&mut self, uri: &str, reason: &str) {
+        self.pending.retain(|f| f != uri);
+        self.failed.push((uri.to_string(), reason.to_string()));
+    }
+
+    /// Whether all files have been processed (completed or failed).
+    pub fn is_done(&self) -> bool {
+        self.pending.is_empty()
+    }
+
+    /// Whether any files failed.
+    pub fn has_failures(&self) -> bool {
+        !self.failed.is_empty()
+    }
+
+    /// Fraction of work completed (0.0 to 1.0).
+    pub fn progress_fraction(&self) -> f64 {
+        let total = self.pending.len() + self.completed.len() + self.failed.len();
+        if total == 0 {
+            return 1.0;
+        }
+        (self.completed.len() + self.failed.len()) as f64 / total as f64
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Rename validation for common language identifiers
+// ---------------------------------------------------------------------------
+
+/// Detailed validation result for a proposed rename.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenameValidation {
+    pub is_valid: bool,
+    pub warnings: Vec<String>,
+    pub errors: Vec<String>,
+}
+
+/// Validate a rename with detailed diagnostics including warnings.
+pub fn validate_rename_detailed(old_name: &str, new_name: &str) -> RenameValidation {
+    let mut errors = Vec::new();
+    let mut warnings = Vec::new();
+
+    if new_name.is_empty() {
+        errors.push("new name must not be empty".to_string());
+    }
+    if new_name == old_name {
+        errors.push("new name is identical to old name".to_string());
+    }
+    if !new_name.is_empty() && !is_valid_identifier(new_name) {
+        errors.push("new name is not a valid identifier".to_string());
+    }
+
+    // Warnings (non-blocking)
+    if new_name.starts_with('_') && !old_name.starts_with('_') {
+        warnings.push("new name starts with underscore (convention for unused)".to_string());
+    }
+    if new_name.len() == 1 {
+        warnings.push("single-character names reduce readability".to_string());
+    }
+    if new_name.len() > 64 {
+        warnings.push("name is unusually long (>64 chars)".to_string());
+    }
+
+    // Check for mixed naming conventions
+    let has_underscore = new_name.contains('_');
+    let has_uppercase = new_name.chars().any(|c| c.is_ascii_uppercase());
+    if has_underscore && has_uppercase && !new_name.chars().all(|c| c.is_ascii_uppercase() || c == '_' || c.is_ascii_digit()) {
+        warnings.push("name mixes snake_case and camelCase conventions".to_string());
+    }
+
+    RenameValidation {
+        is_valid: errors.is_empty(),
+        warnings,
+        errors,
+    }
+}
+
+/// Check if a set of reserved/keyword names would conflict with the new name.
+pub fn is_reserved_name(name: &str, reserved: &[&str]) -> bool {
+    reserved.iter().any(|&r| r == name)
+}
+
+/// Common Rust keywords that should not be used as identifier names.
+pub const RUST_KEYWORDS: &[&str] = &[
+    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum",
+    "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod",
+    "move", "mut", "pub", "ref", "return", "self", "Self", "static", "struct", "super",
+    "trait", "true", "type", "unsafe", "use", "where", "while", "yield",
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1832,5 +2129,211 @@ mod tests {
             priority: 5,
         };
         assert_eq!(format!("{}", step), "old → new (priority 5)");
+    }
+
+    // ---- Case transformation tests ----
+
+    #[test]
+    fn test_to_snake_case_from_camel() {
+        assert_eq!(to_snake_case("myVariableName"), "my_variable_name");
+        assert_eq!(to_snake_case("HTMLParser"), "html_parser");
+        assert_eq!(to_snake_case("simpleXMLReader"), "simple_xml_reader");
+        assert_eq!(to_snake_case("already_snake"), "already_snake");
+        assert_eq!(to_snake_case("A"), "a");
+        assert_eq!(to_snake_case(""), "");
+    }
+
+    #[test]
+    fn test_to_camel_case_from_snake() {
+        assert_eq!(to_camel_case("my_variable_name"), "myVariableName");
+        assert_eq!(to_camel_case("get_http_response"), "getHttpResponse");
+        assert_eq!(to_camel_case("already"), "already");
+        assert_eq!(to_camel_case("PascalCase"), "pascalCase");
+        assert_eq!(to_camel_case("kebab-case"), "kebabCase");
+    }
+
+    #[test]
+    fn test_to_pascal_case() {
+        assert_eq!(to_pascal_case("my_struct"), "MyStruct");
+        assert_eq!(to_pascal_case("some_type_name"), "SomeTypeName");
+        assert_eq!(to_pascal_case("already"), "Already");
+        assert_eq!(to_pascal_case("kebab-case"), "KebabCase");
+    }
+
+    #[test]
+    fn test_to_screaming_snake_case() {
+        assert_eq!(to_screaming_snake_case("myConstant"), "MY_CONSTANT");
+        assert_eq!(to_screaming_snake_case("max_size"), "MAX_SIZE");
+    }
+
+    #[test]
+    fn test_to_kebab_case() {
+        assert_eq!(to_kebab_case("myComponent"), "my-component");
+        assert_eq!(to_kebab_case("some_name"), "some-name");
+    }
+
+    // ---- BatchRename tests ----
+
+    #[test]
+    fn test_batch_rename_compute_edits() {
+        let mut files = HashMap::new();
+        files.insert("a.rs".to_string(), "let foo = foo + 1;\nfoo".to_string());
+        files.insert("b.rs".to_string(), "fn bar() {}".to_string());
+
+        let batch = BatchRename::new("foo", "baz");
+        let we = batch.compute_edits(&files);
+
+        // "foo" appears 3 times in a.rs, 0 in b.rs
+        let a_edits: Vec<_> = we.edits.iter().filter(|e| e.uri == "a.rs").collect();
+        assert_eq!(a_edits.len(), 3);
+        assert!(we.edits.iter().all(|e| e.new_text == "baz"));
+    }
+
+    #[test]
+    fn test_batch_rename_count_occurrences() {
+        let mut files = HashMap::new();
+        files.insert("a.rs".to_string(), "foo foo foo".to_string());
+        files.insert("b.rs".to_string(), "bar".to_string());
+
+        let batch = BatchRename::new("foo", "baz");
+        assert_eq!(batch.count_occurrences(&files), 3);
+    }
+
+    #[test]
+    fn test_batch_rename_no_matches() {
+        let mut files = HashMap::new();
+        files.insert("a.rs".to_string(), "let x = 1;".to_string());
+
+        let batch = BatchRename::new("nonexistent", "replacement");
+        let we = batch.compute_edits(&files);
+        assert!(we.edits.is_empty());
+        assert_eq!(batch.count_occurrences(&files), 0);
+    }
+
+    // ---- RenameUndoInfo tests ----
+
+    #[test]
+    fn test_undo_info_prepare_and_restore() {
+        let mut files = HashMap::new();
+        files.insert("a.rs".to_string(), "let foo = 1;".to_string());
+        files.insert("b.rs".to_string(), "let bar = 2;".to_string());
+        files.insert("c.rs".to_string(), "unrelated".to_string());
+
+        let mut we = WorkspaceEdit::new();
+        we.edits.push(RenameEdit {
+            uri: "a.rs".into(), line: 0, start_column: 4, end_column: 7,
+            new_text: "baz".into(),
+        });
+
+        let undo = RenameUndoInfo::prepare(&files, &we, "foo", "baz");
+        assert_eq!(undo.file_count(), 1);
+        assert_eq!(undo.old_name, "foo");
+        assert_eq!(undo.new_name, "baz");
+
+        // Simulate applying the edit then restoring
+        let mut modified = files.clone();
+        modified.insert("a.rs".to_string(), "let baz = 1;".to_string());
+        undo.restore_into(&mut modified);
+        assert_eq!(modified["a.rs"], "let foo = 1;");
+    }
+
+    // ---- RenameProgress tests ----
+
+    #[test]
+    fn test_rename_progress_tracking() {
+        let mut progress = RenameProgress::new(vec![
+            "a.rs".to_string(),
+            "b.rs".to_string(),
+            "c.rs".to_string(),
+        ]);
+
+        assert!(!progress.is_done());
+        assert!(!progress.has_failures());
+        assert!((progress.progress_fraction() - 0.0).abs() < f64::EPSILON);
+
+        progress.mark_completed("a.rs");
+        assert!(!progress.is_done());
+        assert!((progress.progress_fraction() - 1.0 / 3.0).abs() < 0.01);
+
+        progress.mark_failed("b.rs", "permission denied");
+        assert!(progress.has_failures());
+
+        progress.mark_completed("c.rs");
+        assert!(progress.is_done());
+        assert!((progress.progress_fraction() - 1.0).abs() < f64::EPSILON);
+        assert_eq!(progress.completed.len(), 2);
+        assert_eq!(progress.failed.len(), 1);
+        assert_eq!(progress.failed[0].1, "permission denied");
+    }
+
+    #[test]
+    fn test_rename_progress_empty() {
+        let progress = RenameProgress::new(vec![]);
+        assert!(progress.is_done());
+        assert!((progress.progress_fraction() - 1.0).abs() < f64::EPSILON);
+    }
+
+    // ---- validate_rename_detailed tests ----
+
+    #[test]
+    fn test_validate_rename_detailed_valid() {
+        let result = validate_rename_detailed("foo", "bar");
+        assert!(result.is_valid);
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+    }
+
+    #[test]
+    fn test_validate_rename_detailed_errors() {
+        let result = validate_rename_detailed("foo", "");
+        assert!(!result.is_valid);
+        assert!(result.errors.iter().any(|e| e.contains("empty")));
+
+        let result = validate_rename_detailed("foo", "foo");
+        assert!(!result.is_valid);
+        assert!(result.errors.iter().any(|e| e.contains("identical")));
+
+        let result = validate_rename_detailed("foo", "not-valid");
+        assert!(!result.is_valid);
+        assert!(result.errors.iter().any(|e| e.contains("valid identifier")));
+    }
+
+    #[test]
+    fn test_validate_rename_detailed_warnings() {
+        let result = validate_rename_detailed("foo", "_bar");
+        assert!(result.is_valid);
+        assert!(result.warnings.iter().any(|w| w.contains("underscore")));
+
+        let result = validate_rename_detailed("foo", "x");
+        assert!(result.is_valid);
+        assert!(result.warnings.iter().any(|w| w.contains("single-character")));
+
+        let long_name = "a".repeat(65);
+        let result = validate_rename_detailed("foo", &long_name);
+        assert!(result.is_valid);
+        assert!(result.warnings.iter().any(|w| w.contains("long")));
+    }
+
+    #[test]
+    fn test_validate_rename_mixed_convention_warning() {
+        let result = validate_rename_detailed("foo", "my_camelCase");
+        assert!(result.is_valid);
+        assert!(result.warnings.iter().any(|w| w.contains("mixes")));
+
+        // SCREAMING_SNAKE should NOT trigger mixed warning
+        let result = validate_rename_detailed("foo", "MAX_SIZE");
+        assert!(result.is_valid);
+        assert!(!result.warnings.iter().any(|w| w.contains("mixes")));
+    }
+
+    // ---- Reserved name / keyword tests ----
+
+    #[test]
+    fn test_is_reserved_name() {
+        assert!(is_reserved_name("fn", RUST_KEYWORDS));
+        assert!(is_reserved_name("let", RUST_KEYWORDS));
+        assert!(is_reserved_name("struct", RUST_KEYWORDS));
+        assert!(!is_reserved_name("my_func", RUST_KEYWORDS));
+        assert!(!is_reserved_name("FN", RUST_KEYWORDS)); // case-sensitive
     }
 }

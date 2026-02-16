@@ -1179,6 +1179,826 @@ impl From<&str> for WidgetId {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TextInput – state management for a single-line text input widget
+// ---------------------------------------------------------------------------
+
+/// State for a single-line text input widget.
+#[derive(Debug, Clone)]
+pub struct TextInput {
+    content: String,
+    cursor: usize,
+    selection: Option<(usize, usize)>,
+    max_length: Option<usize>,
+    placeholder: String,
+    focused: bool,
+}
+
+impl TextInput {
+    pub fn new() -> Self {
+        Self {
+            content: String::new(),
+            cursor: 0,
+            selection: None,
+            max_length: None,
+            placeholder: String::new(),
+            focused: false,
+        }
+    }
+
+    pub fn with_placeholder(mut self, placeholder: impl Into<String>) -> Self {
+        self.placeholder = placeholder.into();
+        self
+    }
+
+    pub fn with_max_length(mut self, max: usize) -> Self {
+        self.max_length = Some(max);
+        self
+    }
+
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+
+    pub fn display_text(&self) -> &str {
+        if self.content.is_empty() {
+            &self.placeholder
+        } else {
+            &self.content
+        }
+    }
+
+    pub fn cursor_position(&self) -> usize {
+        self.cursor
+    }
+
+    pub fn insert_char(&mut self, ch: char) {
+        if let Some(max) = self.max_length {
+            if self.content.len() >= max {
+                return;
+            }
+        }
+        self.delete_selection();
+        let byte_pos = self.byte_offset(self.cursor);
+        self.content.insert(byte_pos, ch);
+        self.cursor += 1;
+    }
+
+    pub fn insert_str(&mut self, s: &str) {
+        for ch in s.chars() {
+            self.insert_char(ch);
+        }
+    }
+
+    pub fn delete_back(&mut self) {
+        if self.selection.is_some() {
+            self.delete_selection();
+            return;
+        }
+        if self.cursor == 0 {
+            return;
+        }
+        let byte_pos = self.byte_offset(self.cursor - 1);
+        let end = self.byte_offset(self.cursor);
+        self.content.drain(byte_pos..end);
+        self.cursor -= 1;
+    }
+
+    pub fn delete_forward(&mut self) {
+        if self.selection.is_some() {
+            self.delete_selection();
+            return;
+        }
+        let len = self.content.chars().count();
+        if self.cursor >= len {
+            return;
+        }
+        let byte_pos = self.byte_offset(self.cursor);
+        let end = self.byte_offset(self.cursor + 1);
+        self.content.drain(byte_pos..end);
+    }
+
+    pub fn move_cursor_left(&mut self) {
+        self.selection = None;
+        if self.cursor > 0 {
+            self.cursor -= 1;
+        }
+    }
+
+    pub fn move_cursor_right(&mut self) {
+        self.selection = None;
+        let len = self.content.chars().count();
+        if self.cursor < len {
+            self.cursor += 1;
+        }
+    }
+
+    pub fn move_cursor_home(&mut self) {
+        self.selection = None;
+        self.cursor = 0;
+    }
+
+    pub fn move_cursor_end(&mut self) {
+        self.selection = None;
+        self.cursor = self.content.chars().count();
+    }
+
+    pub fn select_all(&mut self) {
+        let len = self.content.chars().count();
+        if len > 0 {
+            self.selection = Some((0, len));
+            self.cursor = len;
+        }
+    }
+
+    pub fn selection(&self) -> Option<(usize, usize)> {
+        self.selection
+    }
+
+    pub fn selected_text(&self) -> Option<&str> {
+        self.selection.map(|(start, end)| {
+            let s = self.byte_offset(start);
+            let e = self.byte_offset(end);
+            &self.content[s..e]
+        })
+    }
+
+    pub fn clear(&mut self) {
+        self.content.clear();
+        self.cursor = 0;
+        self.selection = None;
+    }
+
+    pub fn set_content(&mut self, s: impl Into<String>) {
+        self.content = s.into();
+        if let Some(max) = self.max_length {
+            self.content.truncate(max);
+        }
+        let len = self.content.chars().count();
+        self.cursor = len;
+        self.selection = None;
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.content.is_empty()
+    }
+
+    pub fn char_count(&self) -> usize {
+        self.content.chars().count()
+    }
+
+    fn delete_selection(&mut self) {
+        if let Some((start, end)) = self.selection.take() {
+            let s = self.byte_offset(start);
+            let e = self.byte_offset(end);
+            self.content.drain(s..e);
+            self.cursor = start;
+        }
+    }
+
+    fn byte_offset(&self, char_idx: usize) -> usize {
+        self.content
+            .char_indices()
+            .nth(char_idx)
+            .map(|(i, _)| i)
+            .unwrap_or(self.content.len())
+    }
+}
+
+impl Default for TextInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for TextInput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TextInput(\"{}\" cursor={})", self.content, self.cursor)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProgressBar – computation helper for progress bar rendering
+// ---------------------------------------------------------------------------
+
+/// Progress bar computation helper.
+#[derive(Debug, Clone)]
+pub struct ProgressBar {
+    current: u64,
+    total: u64,
+    label: Option<String>,
+}
+
+impl ProgressBar {
+    pub fn new(total: u64) -> Self {
+        Self {
+            current: 0,
+            total: total.max(1),
+            label: None,
+        }
+    }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    pub fn set_progress(&mut self, current: u64) {
+        self.current = current.min(self.total);
+    }
+
+    pub fn increment(&mut self, amount: u64) {
+        self.current = (self.current + amount).min(self.total);
+    }
+
+    pub fn fraction(&self) -> f64 {
+        self.current as f64 / self.total as f64
+    }
+
+    pub fn percentage(&self) -> u8 {
+        (self.fraction() * 100.0).round() as u8
+    }
+
+    /// Returns the filled width in columns for a given total bar width.
+    pub fn filled_width(&self, bar_width: u16) -> u16 {
+        (self.fraction() * bar_width as f64).round() as u16
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.current >= self.total
+    }
+
+    pub fn remaining(&self) -> u64 {
+        self.total.saturating_sub(self.current)
+    }
+
+    pub fn current(&self) -> u64 {
+        self.current
+    }
+
+    pub fn total(&self) -> u64 {
+        self.total
+    }
+
+    pub fn label(&self) -> Option<&str> {
+        self.label.as_deref()
+    }
+
+    pub fn reset(&mut self) {
+        self.current = 0;
+    }
+
+    /// Render a simple text-based progress bar: `[####----] 50%`
+    pub fn render_text(&self, width: usize) -> String {
+        let inner = width.saturating_sub(2); // account for [ ]
+        let filled = (self.fraction() * inner as f64).round() as usize;
+        let empty = inner.saturating_sub(filled);
+        format!(
+            "[{}{}] {}%",
+            "#".repeat(filled),
+            "-".repeat(empty),
+            self.percentage()
+        )
+    }
+}
+
+impl fmt::Display for ProgressBar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(ref label) = self.label {
+            write!(f, "{}: {}%", label, self.percentage())
+        } else {
+            write!(f, "{}%", self.percentage())
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Checkbox – toggle / checkbox widget state
+// ---------------------------------------------------------------------------
+
+/// State for a checkbox / toggle widget.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Checkbox {
+    checked: bool,
+    label: String,
+    enabled: bool,
+}
+
+impl Checkbox {
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            checked: false,
+            label: label.into(),
+            enabled: true,
+        }
+    }
+
+    pub fn with_checked(mut self, checked: bool) -> Self {
+        self.checked = checked;
+        self
+    }
+
+    pub fn toggle(&mut self) {
+        if self.enabled {
+            self.checked = !self.checked;
+        }
+    }
+
+    pub fn set_checked(&mut self, checked: bool) {
+        self.checked = checked;
+    }
+
+    pub fn is_checked(&self) -> bool {
+        self.checked
+    }
+
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Returns the display string like `[x] Label` or `[ ] Label`.
+    pub fn display(&self) -> String {
+        let mark = if self.checked { "x" } else { " " };
+        format!("[{}] {}", mark, self.label)
+    }
+}
+
+impl fmt::Display for Checkbox {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.display())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dropdown – select / dropdown widget state
+// ---------------------------------------------------------------------------
+
+/// State for a dropdown / select widget.
+#[derive(Debug, Clone)]
+pub struct Dropdown {
+    items: Vec<String>,
+    selected: Option<usize>,
+    open: bool,
+    max_visible: usize,
+    scroll_offset: usize,
+}
+
+impl Dropdown {
+    pub fn new(items: Vec<String>) -> Self {
+        Self {
+            items,
+            selected: None,
+            open: false,
+            max_visible: 8,
+            scroll_offset: 0,
+        }
+    }
+
+    pub fn with_max_visible(mut self, max: usize) -> Self {
+        self.max_visible = max.max(1);
+        self
+    }
+
+    pub fn toggle_open(&mut self) {
+        self.open = !self.open;
+    }
+
+    pub fn is_open(&self) -> bool {
+        self.open
+    }
+
+    pub fn close(&mut self) {
+        self.open = false;
+    }
+
+    pub fn select(&mut self, index: usize) {
+        if index < self.items.len() {
+            self.selected = Some(index);
+            self.open = false;
+        }
+    }
+
+    pub fn select_next(&mut self) {
+        if self.items.is_empty() {
+            return;
+        }
+        let next = match self.selected {
+            Some(i) => (i + 1).min(self.items.len() - 1),
+            None => 0,
+        };
+        self.selected = Some(next);
+        self.ensure_visible(next);
+    }
+
+    pub fn select_previous(&mut self) {
+        if self.items.is_empty() {
+            return;
+        }
+        let prev = match self.selected {
+            Some(i) => i.saturating_sub(1),
+            None => 0,
+        };
+        self.selected = Some(prev);
+        self.ensure_visible(prev);
+    }
+
+    pub fn selected_index(&self) -> Option<usize> {
+        self.selected
+    }
+
+    pub fn selected_item(&self) -> Option<&str> {
+        self.selected.and_then(|i| self.items.get(i).map(|s| s.as_str()))
+    }
+
+    pub fn items(&self) -> &[String] {
+        &self.items
+    }
+
+    /// Returns the slice of items visible in the dropdown viewport.
+    pub fn visible_items(&self) -> &[String] {
+        let end = (self.scroll_offset + self.max_visible).min(self.items.len());
+        &self.items[self.scroll_offset..end]
+    }
+
+    pub fn scroll_offset(&self) -> usize {
+        self.scroll_offset
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+
+    fn ensure_visible(&mut self, index: usize) {
+        if index < self.scroll_offset {
+            self.scroll_offset = index;
+        } else if index >= self.scroll_offset + self.max_visible {
+            self.scroll_offset = index + 1 - self.max_visible;
+        }
+    }
+}
+
+impl fmt::Display for Dropdown {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.selected_item() {
+            Some(item) => write!(f, "Dropdown(\"{}\")", item),
+            None => write!(f, "Dropdown(none)"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Notification – transient notification widget
+// ---------------------------------------------------------------------------
+
+/// Severity level for notifications.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NotificationLevel {
+    Info,
+    Warning,
+    Error,
+}
+
+impl fmt::Display for NotificationLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NotificationLevel::Info => write!(f, "INFO"),
+            NotificationLevel::Warning => write!(f, "WARN"),
+            NotificationLevel::Error => write!(f, "ERROR"),
+        }
+    }
+}
+
+/// A notification message with level and optional auto-dismiss duration.
+#[derive(Debug, Clone)]
+pub struct Notification {
+    message: String,
+    level: NotificationLevel,
+    dismiss_after_ms: Option<u64>,
+    dismissed: bool,
+}
+
+impl Notification {
+    pub fn info(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            level: NotificationLevel::Info,
+            dismiss_after_ms: Some(5000),
+            dismissed: false,
+        }
+    }
+
+    pub fn warning(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            level: NotificationLevel::Warning,
+            dismiss_after_ms: Some(8000),
+            dismissed: false,
+        }
+    }
+
+    pub fn error(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            level: NotificationLevel::Error,
+            dismiss_after_ms: None,
+            dismissed: false,
+        }
+    }
+
+    pub fn with_duration_ms(mut self, ms: u64) -> Self {
+        self.dismiss_after_ms = Some(ms);
+        self
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    pub fn level(&self) -> NotificationLevel {
+        self.level
+    }
+
+    pub fn dismiss_after_ms(&self) -> Option<u64> {
+        self.dismiss_after_ms
+    }
+
+    pub fn dismiss(&mut self) {
+        self.dismissed = true;
+    }
+
+    pub fn is_dismissed(&self) -> bool {
+        self.dismissed
+    }
+
+    pub fn is_persistent(&self) -> bool {
+        self.dismiss_after_ms.is_none()
+    }
+}
+
+impl fmt::Display for Notification {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}", self.level, self.message)
+    }
+}
+
+/// Queue that manages multiple notifications.
+#[derive(Debug, Clone, Default)]
+pub struct NotificationQueue {
+    notifications: Vec<Notification>,
+}
+
+impl NotificationQueue {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn push(&mut self, notification: Notification) {
+        self.notifications.push(notification);
+    }
+
+    pub fn dismiss_all(&mut self) {
+        for n in &mut self.notifications {
+            n.dismiss();
+        }
+    }
+
+    pub fn remove_dismissed(&mut self) {
+        self.notifications.retain(|n| !n.dismissed);
+    }
+
+    pub fn active(&self) -> Vec<&Notification> {
+        self.notifications.iter().filter(|n| !n.dismissed).collect()
+    }
+
+    pub fn active_count(&self) -> usize {
+        self.notifications.iter().filter(|n| !n.dismissed).count()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.active_count() == 0
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.notifications.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Breadcrumb – path-style breadcrumb widget
+// ---------------------------------------------------------------------------
+
+/// A breadcrumb trail (e.g. `File > src > main.rs`).
+#[derive(Debug, Clone)]
+pub struct Breadcrumb {
+    segments: Vec<String>,
+    separator: String,
+}
+
+impl Breadcrumb {
+    pub fn new() -> Self {
+        Self {
+            segments: Vec::new(),
+            separator: " > ".to_string(),
+        }
+    }
+
+    pub fn with_separator(mut self, sep: impl Into<String>) -> Self {
+        self.separator = sep.into();
+        self
+    }
+
+    pub fn push(&mut self, segment: impl Into<String>) {
+        self.segments.push(segment.into());
+    }
+
+    pub fn pop(&mut self) -> Option<String> {
+        self.segments.pop()
+    }
+
+    pub fn segments(&self) -> &[String] {
+        &self.segments
+    }
+
+    pub fn depth(&self) -> usize {
+        self.segments.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+
+    /// Navigate to a specific depth, truncating everything after.
+    pub fn navigate_to(&mut self, depth: usize) {
+        self.segments.truncate(depth);
+    }
+
+    /// Returns the last segment (current location).
+    pub fn current(&self) -> Option<&str> {
+        self.segments.last().map(|s| s.as_str())
+    }
+
+    /// Render the breadcrumb trail as a single string.
+    pub fn render(&self) -> String {
+        self.segments.join(&self.separator)
+    }
+}
+
+impl Default for Breadcrumb {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for Breadcrumb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.render())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScrollState – scrollbar / viewport position tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks scroll position for a scrollable viewport.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScrollState {
+    offset: usize,
+    viewport_size: usize,
+    content_size: usize,
+}
+
+impl ScrollState {
+    pub fn new(viewport_size: usize, content_size: usize) -> Self {
+        Self {
+            offset: 0,
+            viewport_size: viewport_size.max(1),
+            content_size,
+        }
+    }
+
+    pub fn scroll_down(&mut self, lines: usize) {
+        let max = self.max_offset();
+        self.offset = (self.offset + lines).min(max);
+    }
+
+    pub fn scroll_up(&mut self, lines: usize) {
+        self.offset = self.offset.saturating_sub(lines);
+    }
+
+    pub fn scroll_to(&mut self, offset: usize) {
+        self.offset = offset.min(self.max_offset());
+    }
+
+    pub fn scroll_to_top(&mut self) {
+        self.offset = 0;
+    }
+
+    pub fn scroll_to_bottom(&mut self) {
+        self.offset = self.max_offset();
+    }
+
+    pub fn page_down(&mut self) {
+        self.scroll_down(self.viewport_size);
+    }
+
+    pub fn page_up(&mut self) {
+        self.scroll_up(self.viewport_size);
+    }
+
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    pub fn viewport_size(&self) -> usize {
+        self.viewport_size
+    }
+
+    pub fn content_size(&self) -> usize {
+        self.content_size
+    }
+
+    pub fn set_content_size(&mut self, size: usize) {
+        self.content_size = size;
+        self.offset = self.offset.min(self.max_offset());
+    }
+
+    pub fn max_offset(&self) -> usize {
+        self.content_size.saturating_sub(self.viewport_size)
+    }
+
+    pub fn is_at_top(&self) -> bool {
+        self.offset == 0
+    }
+
+    pub fn is_at_bottom(&self) -> bool {
+        self.offset >= self.max_offset()
+    }
+
+    pub fn needs_scrollbar(&self) -> bool {
+        self.content_size > self.viewport_size
+    }
+
+    /// Fraction of the content scrolled (0.0 = top, 1.0 = bottom).
+    pub fn scroll_fraction(&self) -> f64 {
+        let max = self.max_offset();
+        if max == 0 {
+            0.0
+        } else {
+            self.offset as f64 / max as f64
+        }
+    }
+
+    /// Size of the scrollbar thumb relative to the viewport.
+    pub fn thumb_size(&self, track_height: u16) -> u16 {
+        if self.content_size == 0 {
+            return track_height;
+        }
+        let ratio = self.viewport_size as f64 / self.content_size as f64;
+        let size = (ratio * track_height as f64).round() as u16;
+        size.max(1).min(track_height)
+    }
+
+    /// Offset of the scrollbar thumb within the track.
+    pub fn thumb_offset(&self, track_height: u16) -> u16 {
+        let thumb = self.thumb_size(track_height);
+        let available = track_height.saturating_sub(thumb);
+        (self.scroll_fraction() * available as f64).round() as u16
+    }
+
+    /// Ensure a particular content line is visible, scrolling if needed.
+    pub fn ensure_visible(&mut self, line: usize) {
+        if line < self.offset {
+            self.offset = line;
+        } else if line >= self.offset + self.viewport_size {
+            self.offset = line + 1 - self.viewport_size;
+        }
+    }
+
+    /// Returns the range of visible content indices.
+    pub fn visible_range(&self) -> std::ops::Range<usize> {
+        let end = (self.offset + self.viewport_size).min(self.content_size);
+        self.offset..end
+    }
+}
+
+impl fmt::Display for ScrollState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Scroll({}/{} viewport={})",
+            self.offset, self.content_size, self.viewport_size
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1854,5 +2674,404 @@ mod tests {
         tree.add_root(WidgetNode::new("r3"));
         let sibs = tree.siblings("r2");
         assert_eq!(sibs.len(), 2);
+    }
+
+    // -- TextInput tests ------------------------------------------------------
+
+    #[test]
+    fn text_input_insert_and_cursor() {
+        let mut ti = TextInput::new();
+        ti.insert_char('H');
+        ti.insert_char('i');
+        assert_eq!(ti.content(), "Hi");
+        assert_eq!(ti.cursor_position(), 2);
+        assert_eq!(ti.char_count(), 2);
+    }
+
+    #[test]
+    fn text_input_delete_back() {
+        let mut ti = TextInput::new();
+        ti.insert_str("abc");
+        ti.delete_back();
+        assert_eq!(ti.content(), "ab");
+        assert_eq!(ti.cursor_position(), 2);
+    }
+
+    #[test]
+    fn text_input_delete_forward() {
+        let mut ti = TextInput::new();
+        ti.insert_str("abc");
+        ti.move_cursor_home();
+        ti.delete_forward();
+        assert_eq!(ti.content(), "bc");
+        assert_eq!(ti.cursor_position(), 0);
+    }
+
+    #[test]
+    fn text_input_max_length() {
+        let mut ti = TextInput::new().with_max_length(3);
+        ti.insert_str("abcdef");
+        assert_eq!(ti.content(), "abc");
+    }
+
+    #[test]
+    fn text_input_select_all_and_delete() {
+        let mut ti = TextInput::new();
+        ti.insert_str("hello");
+        ti.select_all();
+        assert_eq!(ti.selected_text(), Some("hello"));
+        ti.delete_back();
+        assert!(ti.is_empty());
+    }
+
+    #[test]
+    fn text_input_placeholder_display() {
+        let ti = TextInput::new().with_placeholder("Type here...");
+        assert_eq!(ti.display_text(), "Type here...");
+        let mut ti2 = TextInput::new().with_placeholder("hint");
+        ti2.insert_char('x');
+        assert_eq!(ti2.display_text(), "x");
+    }
+
+    #[test]
+    fn text_input_cursor_movement() {
+        let mut ti = TextInput::new();
+        ti.insert_str("abcd");
+        ti.move_cursor_home();
+        assert_eq!(ti.cursor_position(), 0);
+        ti.move_cursor_right();
+        assert_eq!(ti.cursor_position(), 1);
+        ti.move_cursor_end();
+        assert_eq!(ti.cursor_position(), 4);
+        ti.move_cursor_left();
+        assert_eq!(ti.cursor_position(), 3);
+    }
+
+    #[test]
+    fn text_input_set_content() {
+        let mut ti = TextInput::new().with_max_length(5);
+        ti.set_content("toolong");
+        assert_eq!(ti.content(), "toolo");
+        assert_eq!(ti.cursor_position(), 5);
+    }
+
+    #[test]
+    fn text_input_clear() {
+        let mut ti = TextInput::new();
+        ti.insert_str("data");
+        ti.clear();
+        assert!(ti.is_empty());
+        assert_eq!(ti.cursor_position(), 0);
+    }
+
+    #[test]
+    fn text_input_display() {
+        let mut ti = TextInput::new();
+        ti.insert_str("yo");
+        let s = format!("{ti}");
+        assert!(s.contains("yo"));
+        assert!(s.contains("cursor=2"));
+    }
+
+    // -- ProgressBar tests ----------------------------------------------------
+
+    #[test]
+    fn progress_bar_basic() {
+        let mut pb = ProgressBar::new(100);
+        assert_eq!(pb.percentage(), 0);
+        assert!(!pb.is_complete());
+        pb.set_progress(50);
+        assert_eq!(pb.percentage(), 50);
+        assert_eq!(pb.remaining(), 50);
+        pb.set_progress(100);
+        assert!(pb.is_complete());
+    }
+
+    #[test]
+    fn progress_bar_increment() {
+        let mut pb = ProgressBar::new(10);
+        pb.increment(3);
+        pb.increment(3);
+        assert_eq!(pb.current(), 6);
+        pb.increment(100);
+        assert_eq!(pb.current(), 10); // clamped
+    }
+
+    #[test]
+    fn progress_bar_filled_width() {
+        let mut pb = ProgressBar::new(100);
+        pb.set_progress(50);
+        assert_eq!(pb.filled_width(80), 40);
+    }
+
+    #[test]
+    fn progress_bar_render_text() {
+        let mut pb = ProgressBar::new(4);
+        pb.set_progress(2);
+        let rendered = pb.render_text(10);
+        assert!(rendered.contains("50%"));
+        assert!(rendered.starts_with('['));
+        assert!(rendered.contains(']'));
+    }
+
+    #[test]
+    fn progress_bar_display_with_label() {
+        let mut pb = ProgressBar::new(200).with_label("Loading");
+        pb.set_progress(100);
+        let s = format!("{pb}");
+        assert_eq!(s, "Loading: 50%");
+    }
+
+    #[test]
+    fn progress_bar_reset() {
+        let mut pb = ProgressBar::new(50);
+        pb.set_progress(25);
+        pb.reset();
+        assert_eq!(pb.current(), 0);
+        assert_eq!(pb.percentage(), 0);
+    }
+
+    // -- Checkbox tests -------------------------------------------------------
+
+    #[test]
+    fn checkbox_toggle() {
+        let mut cb = Checkbox::new("Accept terms");
+        assert!(!cb.is_checked());
+        cb.toggle();
+        assert!(cb.is_checked());
+        assert_eq!(cb.display(), "[x] Accept terms");
+        cb.toggle();
+        assert_eq!(cb.display(), "[ ] Accept terms");
+    }
+
+    #[test]
+    fn checkbox_disabled_no_toggle() {
+        let mut cb = Checkbox::new("Read-only");
+        cb.set_enabled(false);
+        cb.toggle();
+        assert!(!cb.is_checked());
+    }
+
+    #[test]
+    fn checkbox_with_checked() {
+        let cb = Checkbox::new("On").with_checked(true);
+        assert!(cb.is_checked());
+        assert_eq!(cb.label(), "On");
+    }
+
+    // -- Dropdown tests -------------------------------------------------------
+
+    #[test]
+    fn dropdown_select_and_navigate() {
+        let items = vec!["Red".into(), "Green".into(), "Blue".into()];
+        let mut dd = Dropdown::new(items);
+        assert!(dd.selected_item().is_none());
+        dd.select(1);
+        assert_eq!(dd.selected_item(), Some("Green"));
+        assert!(!dd.is_open()); // select closes dropdown
+        dd.select_next();
+        assert_eq!(dd.selected_item(), Some("Blue"));
+        dd.select_next();
+        assert_eq!(dd.selected_item(), Some("Blue")); // stays at end
+        dd.select_previous();
+        assert_eq!(dd.selected_item(), Some("Green"));
+    }
+
+    #[test]
+    fn dropdown_toggle_open() {
+        let dd_items: Vec<String> = (0..5).map(|i| format!("Item {i}")).collect();
+        let mut dd = Dropdown::new(dd_items);
+        assert!(!dd.is_open());
+        dd.toggle_open();
+        assert!(dd.is_open());
+        dd.close();
+        assert!(!dd.is_open());
+    }
+
+    #[test]
+    fn dropdown_scroll_and_visible() {
+        let items: Vec<String> = (0..20).map(|i| format!("Item {i}")).collect();
+        let mut dd = Dropdown::new(items).with_max_visible(5);
+        assert_eq!(dd.visible_items().len(), 5);
+        assert_eq!(dd.visible_items()[0], "Item 0");
+        // Select item 10 to scroll
+        dd.select(0);
+        for _ in 0..10 {
+            dd.select_next();
+        }
+        assert_eq!(dd.selected_index(), Some(10));
+        let vis = dd.visible_items();
+        assert!(vis.contains(&"Item 10".to_string()));
+    }
+
+    #[test]
+    fn dropdown_display() {
+        let mut dd = Dropdown::new(vec!["A".into(), "B".into()]);
+        assert_eq!(format!("{dd}"), "Dropdown(none)");
+        dd.select(0);
+        assert_eq!(format!("{dd}"), "Dropdown(\"A\")");
+    }
+
+    // -- Notification tests ---------------------------------------------------
+
+    #[test]
+    fn notification_levels_and_dismiss() {
+        let n = Notification::info("Saved");
+        assert_eq!(n.level(), NotificationLevel::Info);
+        assert!(!n.is_persistent());
+        assert_eq!(n.dismiss_after_ms(), Some(5000));
+
+        let n2 = Notification::error("Crash");
+        assert!(n2.is_persistent());
+        assert!(!n2.is_dismissed());
+
+        let mut n3 = Notification::warning("Low disk");
+        n3.dismiss();
+        assert!(n3.is_dismissed());
+    }
+
+    #[test]
+    fn notification_queue_management() {
+        let mut q = NotificationQueue::new();
+        assert!(q.is_empty());
+        q.push(Notification::info("A"));
+        q.push(Notification::error("B"));
+        assert_eq!(q.active_count(), 2);
+        q.dismiss_all();
+        assert_eq!(q.active_count(), 0);
+        assert_eq!(q.total_count(), 2);
+        q.remove_dismissed();
+        assert_eq!(q.total_count(), 0);
+    }
+
+    #[test]
+    fn notification_display() {
+        let n = Notification::warning("Disk full");
+        assert_eq!(format!("{n}"), "[WARN] Disk full");
+    }
+
+    // -- Breadcrumb tests -----------------------------------------------------
+
+    #[test]
+    fn breadcrumb_navigation() {
+        let mut bc = Breadcrumb::new();
+        bc.push("root");
+        bc.push("src");
+        bc.push("main.rs");
+        assert_eq!(bc.depth(), 3);
+        assert_eq!(bc.current(), Some("main.rs"));
+        assert_eq!(bc.render(), "root > src > main.rs");
+
+        bc.navigate_to(2);
+        assert_eq!(bc.current(), Some("src"));
+        assert_eq!(bc.depth(), 2);
+
+        bc.pop();
+        assert_eq!(bc.current(), Some("root"));
+    }
+
+    #[test]
+    fn breadcrumb_custom_separator() {
+        let mut bc = Breadcrumb::new().with_separator(" / ");
+        bc.push("a");
+        bc.push("b");
+        assert_eq!(bc.render(), "a / b");
+    }
+
+    #[test]
+    fn breadcrumb_empty() {
+        let bc = Breadcrumb::new();
+        assert!(bc.is_empty());
+        assert_eq!(bc.current(), None);
+        assert_eq!(bc.render(), "");
+    }
+
+    // -- ScrollState tests ----------------------------------------------------
+
+    #[test]
+    fn scroll_state_basic() {
+        let mut ss = ScrollState::new(10, 100);
+        assert!(ss.is_at_top());
+        assert!(!ss.is_at_bottom());
+        assert!(ss.needs_scrollbar());
+        assert_eq!(ss.max_offset(), 90);
+
+        ss.scroll_down(5);
+        assert_eq!(ss.offset(), 5);
+        assert!(!ss.is_at_top());
+
+        ss.scroll_to_bottom();
+        assert!(ss.is_at_bottom());
+        assert_eq!(ss.offset(), 90);
+    }
+
+    #[test]
+    fn scroll_state_page_navigation() {
+        let mut ss = ScrollState::new(10, 50);
+        ss.page_down();
+        assert_eq!(ss.offset(), 10);
+        ss.page_down();
+        assert_eq!(ss.offset(), 20);
+        ss.page_up();
+        assert_eq!(ss.offset(), 10);
+    }
+
+    #[test]
+    fn scroll_state_ensure_visible() {
+        let mut ss = ScrollState::new(10, 100);
+        ss.ensure_visible(15);
+        assert_eq!(ss.offset(), 6);
+        ss.ensure_visible(3);
+        assert_eq!(ss.offset(), 3);
+    }
+
+    #[test]
+    fn scroll_state_visible_range() {
+        let mut ss = ScrollState::new(5, 20);
+        assert_eq!(ss.visible_range(), 0..5);
+        ss.scroll_down(3);
+        assert_eq!(ss.visible_range(), 3..8);
+        ss.scroll_to_bottom();
+        assert_eq!(ss.visible_range(), 15..20);
+    }
+
+    #[test]
+    fn scroll_state_thumb_calculation() {
+        let ss = ScrollState::new(10, 100);
+        let thumb = ss.thumb_size(50);
+        assert_eq!(thumb, 5); // 10/100 * 50
+        assert_eq!(ss.thumb_offset(50), 0); // at top
+    }
+
+    #[test]
+    fn scroll_state_no_scrollbar_needed() {
+        let ss = ScrollState::new(20, 10);
+        assert!(!ss.needs_scrollbar());
+        assert_eq!(ss.max_offset(), 0);
+        assert!(ss.is_at_top());
+        assert!(ss.is_at_bottom()); // content fits
+    }
+
+    #[test]
+    fn scroll_state_content_resize() {
+        let mut ss = ScrollState::new(10, 100);
+        ss.scroll_to(90);
+        ss.set_content_size(50);
+        assert_eq!(ss.offset(), 40); // clamped to new max
+    }
+
+    #[test]
+    fn scroll_state_fraction() {
+        let mut ss = ScrollState::new(10, 110);
+        ss.scroll_to(50);
+        let frac = ss.scroll_fraction();
+        assert!((frac - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn scroll_state_display() {
+        let ss = ScrollState::new(10, 100);
+        let s = format!("{ss}");
+        assert!(s.contains("0/100"));
     }
 }

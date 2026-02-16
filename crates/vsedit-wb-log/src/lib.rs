@@ -939,6 +939,485 @@ pub fn count_by_source(entries: &[LogEntry]) -> Vec<(String, usize)> {
     result
 }
 
+// ---------------------------------------------------------------------------
+// Output Channel Management
+// ---------------------------------------------------------------------------
+
+/// Represents a named output channel that collects log entries independently.
+#[derive(Debug, Clone)]
+pub struct OutputChannel {
+    pub name: String,
+    pub entries: Vec<LogEntry>,
+    pub min_level: LogLevel,
+    pub visible: bool,
+}
+
+impl OutputChannel {
+    pub fn new(name: impl Into<String>, min_level: LogLevel) -> Self {
+        Self {
+            name: name.into(),
+            entries: Vec::new(),
+            min_level,
+            visible: true,
+        }
+    }
+
+    /// Append a log entry if it meets the channel's minimum level.
+    pub fn append(&mut self, entry: LogEntry) {
+        if entry.level >= self.min_level {
+            self.entries.push(entry);
+        }
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn set_visible(&mut self, visible: bool) {
+        self.visible = visible;
+    }
+}
+
+impl fmt::Display for OutputChannel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Channel({}, {} entries, {})",
+            self.name,
+            self.entries.len(),
+            if self.visible { "visible" } else { "hidden" },
+        )
+    }
+}
+
+/// Manages multiple named output channels.
+#[derive(Debug, Default)]
+pub struct ChannelManager {
+    channels: Vec<OutputChannel>,
+}
+
+impl ChannelManager {
+    pub fn new() -> Self {
+        Self { channels: Vec::new() }
+    }
+
+    /// Create a new channel and return its index.
+    pub fn create_channel(&mut self, name: impl Into<String>, min_level: LogLevel) -> usize {
+        let idx = self.channels.len();
+        self.channels.push(OutputChannel::new(name, min_level));
+        idx
+    }
+
+    /// Get a channel by index.
+    pub fn get_channel(&self, index: usize) -> Option<&OutputChannel> {
+        self.channels.get(index)
+    }
+
+    /// Get a mutable channel by index.
+    pub fn get_channel_mut(&mut self, index: usize) -> Option<&mut OutputChannel> {
+        self.channels.get_mut(index)
+    }
+
+    /// Find a channel by name.
+    pub fn find_by_name(&self, name: &str) -> Option<(usize, &OutputChannel)> {
+        self.channels
+            .iter()
+            .enumerate()
+            .find(|(_, ch)| ch.name == name)
+    }
+
+    /// Broadcast a log entry to all channels.
+    pub fn broadcast(&mut self, entry: &LogEntry) {
+        for ch in &mut self.channels {
+            ch.append(entry.clone());
+        }
+    }
+
+    /// Return names of all visible channels.
+    pub fn visible_channels(&self) -> Vec<&str> {
+        self.channels
+            .iter()
+            .filter(|ch| ch.visible)
+            .map(|ch| ch.name.as_str())
+            .collect()
+    }
+
+    /// Total entry count across all channels.
+    pub fn total_entries(&self) -> usize {
+        self.channels.iter().map(|ch| ch.entry_count()).sum()
+    }
+
+    pub fn channel_count(&self) -> usize {
+        self.channels.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Ring Buffer for bounded log storage
+// ---------------------------------------------------------------------------
+
+/// A fixed-capacity ring buffer for log entries.
+///
+/// When full, the oldest entry is overwritten. Entries are returned in
+/// insertion order (oldest first) via [`Self::entries`].
+#[derive(Debug)]
+pub struct LogRingBuffer {
+    buf: Vec<Option<LogEntry>>,
+    capacity: usize,
+    head: usize,
+    len: usize,
+}
+
+impl LogRingBuffer {
+    pub fn new(capacity: usize) -> Self {
+        assert!(capacity > 0, "ring buffer capacity must be > 0");
+        Self {
+            buf: (0..capacity).map(|_| None).collect(),
+            capacity,
+            head: 0,
+            len: 0,
+        }
+    }
+
+    /// Push an entry, overwriting the oldest if at capacity.
+    pub fn push(&mut self, entry: LogEntry) {
+        self.buf[self.head] = Some(entry);
+        self.head = (self.head + 1) % self.capacity;
+        if self.len < self.capacity {
+            self.len += 1;
+        }
+    }
+
+    /// Return all entries in insertion order (oldest first).
+    pub fn entries(&self) -> Vec<&LogEntry> {
+        let mut result = Vec::with_capacity(self.len);
+        if self.len < self.capacity {
+            // haven't wrapped yet
+            for slot in &self.buf[..self.len] {
+                if let Some(e) = slot {
+                    result.push(e);
+                }
+            }
+        } else {
+            // wrapped: oldest is at head, read head..cap then 0..head
+            for i in 0..self.capacity {
+                let idx = (self.head + i) % self.capacity;
+                if let Some(ref e) = self.buf[idx] {
+                    result.push(e);
+                }
+            }
+        }
+        result
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.len == self.capacity
+    }
+
+    /// Clear all entries.
+    pub fn clear(&mut self) {
+        for slot in &mut self.buf {
+            *slot = None;
+        }
+        self.head = 0;
+        self.len = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Search with context lines
+// ---------------------------------------------------------------------------
+
+/// Result of a contextual search: the matching entry index plus surrounding
+/// context entries.
+#[derive(Debug, Clone)]
+pub struct SearchHit {
+    /// Index of the matching entry in the original slice.
+    pub index: usize,
+    /// Indices of context entries (before and after) included with this hit.
+    pub context_indices: Vec<usize>,
+}
+
+/// Search entries for `query` (case-insensitive in message) and return hits
+/// with up to `context` entries before and after each match.
+pub fn search_with_context(
+    entries: &[LogEntry],
+    query: &str,
+    context: usize,
+) -> Vec<SearchHit> {
+    let lower = query.to_lowercase();
+    let mut hits = Vec::new();
+
+    for (i, entry) in entries.iter().enumerate() {
+        if entry.message.to_lowercase().contains(&lower) {
+            let start = i.saturating_sub(context);
+            let end = (i + context + 1).min(entries.len());
+            let context_indices: Vec<usize> = (start..end).filter(|&idx| idx != i).collect();
+            hits.push(SearchHit {
+                index: i,
+                context_indices,
+            });
+        }
+    }
+    hits
+}
+
+// ---------------------------------------------------------------------------
+// Log entry grouping by source
+// ---------------------------------------------------------------------------
+
+/// Group entries by their source, preserving insertion order within each group.
+pub fn group_by_source(entries: &[LogEntry]) -> Vec<(String, Vec<&LogEntry>)> {
+    let mut map: std::collections::HashMap<String, Vec<&LogEntry>> =
+        std::collections::HashMap::new();
+    let mut order: Vec<String> = Vec::new();
+
+    for entry in entries {
+        let key = entry.source.clone().unwrap_or_else(|| "<none>".to_string());
+        if !map.contains_key(&key) {
+            order.push(key.clone());
+        }
+        map.entry(key).or_default().push(entry);
+    }
+
+    order.into_iter().map(|k| {
+        let v = map.remove(&k).unwrap();
+        (k, v)
+    }).collect()
+}
+
+// ---------------------------------------------------------------------------
+// Timestamp formatting helpers
+// ---------------------------------------------------------------------------
+
+/// Format a raw u64 timestamp as `HH:MM:SS` assuming the value represents
+/// seconds since midnight.
+pub fn format_timestamp_hms(ts: u64) -> String {
+    let h = (ts / 3600) % 24;
+    let m = (ts % 3600) / 60;
+    let s = ts % 60;
+    format!("{h:02}:{m:02}:{s:02}")
+}
+
+/// Format a raw u64 timestamp as `HH:MM:SS.mmm` assuming the value represents
+/// milliseconds since midnight.
+pub fn format_timestamp_hms_millis(ts_millis: u64) -> String {
+    let total_secs = ts_millis / 1000;
+    let millis = ts_millis % 1000;
+    let h = (total_secs / 3600) % 24;
+    let m = (total_secs % 3600) / 60;
+    let s = total_secs % 60;
+    format!("{h:02}:{m:02}:{s:02}.{millis:03}")
+}
+
+// ---------------------------------------------------------------------------
+// Performance log tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks named operations with start/end timestamps to compute durations.
+#[derive(Debug, Default)]
+pub struct PerfTracker {
+    records: Vec<PerfRecord>,
+}
+
+/// A single performance measurement.
+#[derive(Debug, Clone)]
+pub struct PerfRecord {
+    pub name: String,
+    pub start_ms: u64,
+    pub end_ms: u64,
+}
+
+impl PerfRecord {
+    pub fn duration_ms(&self) -> u64 {
+        self.end_ms.saturating_sub(self.start_ms)
+    }
+}
+
+impl fmt::Display for PerfRecord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}ms", self.name, self.duration_ms())
+    }
+}
+
+impl PerfTracker {
+    pub fn new() -> Self {
+        Self { records: Vec::new() }
+    }
+
+    /// Record a completed operation.
+    pub fn record(&mut self, name: impl Into<String>, start_ms: u64, end_ms: u64) {
+        self.records.push(PerfRecord {
+            name: name.into(),
+            start_ms,
+            end_ms,
+        });
+    }
+
+    /// Return all records.
+    pub fn records(&self) -> &[PerfRecord] {
+        &self.records
+    }
+
+    /// Return the slowest recorded operation, if any.
+    pub fn slowest(&self) -> Option<&PerfRecord> {
+        self.records.iter().max_by_key(|r| r.duration_ms())
+    }
+
+    /// Return the fastest recorded operation, if any.
+    pub fn fastest(&self) -> Option<&PerfRecord> {
+        self.records.iter().min_by_key(|r| r.duration_ms())
+    }
+
+    /// Average duration across all records, in milliseconds.
+    pub fn average_ms(&self) -> u64 {
+        if self.records.is_empty() {
+            return 0;
+        }
+        let total: u64 = self.records.iter().map(|r| r.duration_ms()).sum();
+        total / self.records.len() as u64
+    }
+
+    /// Return records whose duration exceeds the given threshold.
+    pub fn slower_than(&self, threshold_ms: u64) -> Vec<&PerfRecord> {
+        self.records
+            .iter()
+            .filter(|r| r.duration_ms() > threshold_ms)
+            .collect()
+    }
+
+    /// Total number of recorded operations.
+    pub fn count(&self) -> usize {
+        self.records.len()
+    }
+
+    /// Format all records as a summary report string.
+    pub fn summary_report(&self) -> String {
+        if self.records.is_empty() {
+            return "No performance records.".to_string();
+        }
+        let mut lines = Vec::new();
+        lines.push(format!("Performance: {} operations", self.records.len()));
+        lines.push(format!("  avg: {}ms", self.average_ms()));
+        if let Some(s) = self.slowest() {
+            lines.push(format!("  slowest: {} ({}ms)", s.name, s.duration_ms()));
+        }
+        if let Some(f) = self.fastest() {
+            lines.push(format!("  fastest: {} ({}ms)", f.name, f.duration_ms()));
+        }
+        lines.join("\n")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Log export formatting
+// ---------------------------------------------------------------------------
+
+/// Export entries as CSV (level,source,timestamp,message).
+pub fn export_csv(entries: &[LogEntry]) -> String {
+    let mut out = String::from("level,source,timestamp,message\n");
+    for e in entries {
+        let src = e.source.as_deref().unwrap_or("");
+        // Escape quotes in message for CSV
+        let msg = e.message.replace('"', "\"\"");
+        out.push_str(&format!(
+            "{},{},{},\"{}\"\n",
+            e.level, src, e.timestamp, msg
+        ));
+    }
+    out
+}
+
+/// Export entries as a plain-text table with aligned columns.
+pub fn export_table(entries: &[LogEntry]) -> String {
+    if entries.is_empty() {
+        return String::new();
+    }
+    let header = format!(
+        "{:<10} {:<15} {:<12} {}",
+        "LEVEL", "SOURCE", "TIMESTAMP", "MESSAGE"
+    );
+    let mut lines = vec![header];
+    lines.push("-".repeat(60));
+    for e in entries {
+        let src = e.source.as_deref().unwrap_or("-");
+        lines.push(format!(
+            "{:<10} {:<15} {:<12} {}",
+            e.level.to_string(),
+            src,
+            e.timestamp,
+            e.message,
+        ));
+    }
+    lines.join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// Log level aggregation across time windows
+// ---------------------------------------------------------------------------
+
+/// Aggregate entry counts into fixed-width timestamp windows.
+///
+/// Each bucket covers `window_size` timestamp units. Returns a sorted vec of
+/// `(window_start, count)` pairs.
+pub fn aggregate_by_time_window(
+    entries: &[LogEntry],
+    window_size: u64,
+) -> Vec<(u64, usize)> {
+    if window_size == 0 || entries.is_empty() {
+        return Vec::new();
+    }
+    let mut map: std::collections::HashMap<u64, usize> = std::collections::HashMap::new();
+    for e in entries {
+        let bucket = (e.timestamp / window_size) * window_size;
+        *map.entry(bucket).or_insert(0) += 1;
+    }
+    let mut result: Vec<_> = map.into_iter().collect();
+    result.sort_by_key(|&(k, _)| k);
+    result
+}
+
+/// Compute a per-level breakdown within each time window.
+pub fn aggregate_levels_by_window(
+    entries: &[LogEntry],
+    window_size: u64,
+) -> Vec<(u64, LogStats)> {
+    if window_size == 0 || entries.is_empty() {
+        return Vec::new();
+    }
+    let mut buckets: std::collections::HashMap<u64, Vec<&LogEntry>> =
+        std::collections::HashMap::new();
+    for e in entries {
+        let bucket = (e.timestamp / window_size) * window_size;
+        buckets.entry(bucket).or_default().push(e);
+    }
+    let mut result: Vec<_> = buckets
+        .into_iter()
+        .map(|(bucket, refs)| {
+            let owned: Vec<LogEntry> = refs.into_iter().cloned().collect();
+            (bucket, LogStats::from_entries(&owned))
+        })
+        .collect();
+    result.sort_by_key(|&(k, _)| k);
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1817,5 +2296,266 @@ mod tests {
     fn count_by_source_empty() {
         let counts = count_by_source(&[]);
         assert!(counts.is_empty());
+    }
+
+    // ── Output Channel Management ──
+
+    #[test]
+    fn output_channel_filters_by_min_level() {
+        let mut ch = OutputChannel::new("test-ch", LogLevel::Warning);
+        ch.append(LogEntry {
+            level: LogLevel::Info,
+            message: "below threshold".into(),
+            source: None,
+            timestamp: 0,
+        });
+        ch.append(LogEntry {
+            level: LogLevel::Error,
+            message: "above threshold".into(),
+            source: None,
+            timestamp: 1,
+        });
+        assert_eq!(ch.entry_count(), 1);
+        assert_eq!(ch.entries[0].message, "above threshold");
+    }
+
+    #[test]
+    fn channel_manager_broadcast_and_visibility() {
+        let mut mgr = ChannelManager::new();
+        let a = mgr.create_channel("alpha", LogLevel::Trace);
+        let b = mgr.create_channel("beta", LogLevel::Error);
+
+        let entry = LogEntry {
+            level: LogLevel::Info,
+            message: "hello".into(),
+            source: None,
+            timestamp: 0,
+        };
+        mgr.broadcast(&entry);
+
+        // alpha accepts Info, beta requires Error
+        assert_eq!(mgr.get_channel(a).unwrap().entry_count(), 1);
+        assert_eq!(mgr.get_channel(b).unwrap().entry_count(), 0);
+        assert_eq!(mgr.channel_count(), 2);
+        assert_eq!(mgr.total_entries(), 1);
+
+        mgr.get_channel_mut(a).unwrap().set_visible(false);
+        assert_eq!(mgr.visible_channels(), vec!["beta"]);
+    }
+
+    #[test]
+    fn channel_manager_find_by_name() {
+        let mut mgr = ChannelManager::new();
+        mgr.create_channel("output", LogLevel::Info);
+        mgr.create_channel("debug", LogLevel::Debug);
+        let (idx, ch) = mgr.find_by_name("debug").unwrap();
+        assert_eq!(idx, 1);
+        assert_eq!(ch.name, "debug");
+        assert!(mgr.find_by_name("missing").is_none());
+    }
+
+    // ── Ring Buffer ──
+
+    #[test]
+    fn ring_buffer_overwrites_oldest() {
+        let mut ring = LogRingBuffer::new(3);
+        for i in 0..5u64 {
+            ring.push(LogEntry {
+                level: LogLevel::Info,
+                message: format!("msg{i}"),
+                source: None,
+                timestamp: i,
+            });
+        }
+        assert_eq!(ring.len(), 3);
+        assert!(ring.is_full());
+        let entries = ring.entries();
+        // oldest surviving should be msg2
+        assert_eq!(entries[0].message, "msg2");
+        assert_eq!(entries[1].message, "msg3");
+        assert_eq!(entries[2].message, "msg4");
+    }
+
+    #[test]
+    fn ring_buffer_clear() {
+        let mut ring = LogRingBuffer::new(5);
+        ring.push(LogEntry {
+            level: LogLevel::Info,
+            message: "a".into(),
+            source: None,
+            timestamp: 0,
+        });
+        assert!(!ring.is_empty());
+        ring.clear();
+        assert!(ring.is_empty());
+        assert_eq!(ring.len(), 0);
+        assert_eq!(ring.capacity(), 5);
+    }
+
+    // ── Search with context ──
+
+    #[test]
+    fn search_with_context_returns_surrounding_indices() {
+        let entries: Vec<LogEntry> = (0..10)
+            .map(|i| LogEntry {
+                level: LogLevel::Info,
+                message: if i == 5 { "TARGET".into() } else { format!("line{i}") },
+                source: None,
+                timestamp: i,
+            })
+            .collect();
+
+        let hits = search_with_context(&entries, "target", 2);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].index, 5);
+        assert_eq!(hits[0].context_indices, vec![3, 4, 6, 7]);
+    }
+
+    // ── Group by source ──
+
+    #[test]
+    fn group_by_source_preserves_order() {
+        let entries = vec![
+            LogEntry { level: LogLevel::Info, message: "a".into(), source: Some("db".into()), timestamp: 0 },
+            LogEntry { level: LogLevel::Info, message: "b".into(), source: Some("api".into()), timestamp: 1 },
+            LogEntry { level: LogLevel::Info, message: "c".into(), source: Some("db".into()), timestamp: 2 },
+            LogEntry { level: LogLevel::Info, message: "d".into(), source: None, timestamp: 3 },
+        ];
+        let groups = group_by_source(&entries);
+        assert_eq!(groups.len(), 3);
+        assert_eq!(groups[0].0, "db");
+        assert_eq!(groups[0].1.len(), 2);
+        assert_eq!(groups[1].0, "api");
+        assert_eq!(groups[2].0, "<none>");
+    }
+
+    // ── Timestamp formatting ──
+
+    #[test]
+    fn format_timestamp_hms_basic() {
+        assert_eq!(format_timestamp_hms(0), "00:00:00");
+        assert_eq!(format_timestamp_hms(3661), "01:01:01");
+        assert_eq!(format_timestamp_hms(86399), "23:59:59");
+    }
+
+    #[test]
+    fn format_timestamp_hms_millis_basic() {
+        assert_eq!(format_timestamp_hms_millis(0), "00:00:00.000");
+        assert_eq!(format_timestamp_hms_millis(3_661_123), "01:01:01.123");
+    }
+
+    // ── Performance tracker ──
+
+    #[test]
+    fn perf_tracker_stats() {
+        let mut pt = PerfTracker::new();
+        pt.record("fast_op", 100, 110);
+        pt.record("slow_op", 200, 350);
+        pt.record("mid_op", 300, 370);
+
+        assert_eq!(pt.count(), 3);
+        assert_eq!(pt.fastest().unwrap().name, "fast_op");
+        assert_eq!(pt.slowest().unwrap().name, "slow_op"); // 150ms
+        assert_eq!(pt.average_ms(), (10 + 150 + 70) / 3);
+
+        let slow = pt.slower_than(50);
+        assert_eq!(slow.len(), 2);
+
+        let report = pt.summary_report();
+        assert!(report.contains("3 operations"));
+        assert!(report.contains("slowest: slow_op"));
+    }
+
+    #[test]
+    fn perf_record_display() {
+        let r = PerfRecord { name: "compile".into(), start_ms: 0, end_ms: 42 };
+        assert_eq!(r.to_string(), "compile: 42ms");
+    }
+
+    // ── Export CSV ──
+
+    #[test]
+    fn export_csv_format() {
+        let entries = vec![
+            LogEntry { level: LogLevel::Info, message: "hello".into(), source: Some("app".into()), timestamp: 100 },
+            LogEntry { level: LogLevel::Error, message: "fail".into(), source: None, timestamp: 200 },
+        ];
+        let csv = export_csv(&entries);
+        assert!(csv.starts_with("level,source,timestamp,message\n"));
+        assert!(csv.contains("INFO,app,100,\"hello\""));
+        assert!(csv.contains("ERROR,,200,\"fail\""));
+    }
+
+    // ── Export table ──
+
+    #[test]
+    fn export_table_includes_header() {
+        let entries = vec![
+            LogEntry { level: LogLevel::Info, message: "test".into(), source: Some("src".into()), timestamp: 0 },
+        ];
+        let table = export_table(&entries);
+        assert!(table.contains("LEVEL"));
+        assert!(table.contains("SOURCE"));
+        assert!(table.contains("MESSAGE"));
+        assert!(table.contains("test"));
+    }
+
+    #[test]
+    fn export_table_empty() {
+        assert!(export_table(&[]).is_empty());
+    }
+
+    // ── Time window aggregation ──
+
+    #[test]
+    fn aggregate_by_time_window_groups() {
+        let entries: Vec<LogEntry> = vec![0, 1, 2, 5, 6, 10]
+            .into_iter()
+            .map(|ts| LogEntry {
+                level: LogLevel::Info,
+                message: "x".into(),
+                source: None,
+                timestamp: ts,
+            })
+            .collect();
+
+        let buckets = aggregate_by_time_window(&entries, 5);
+        assert_eq!(buckets, vec![(0, 3), (5, 2), (10, 1)]);
+    }
+
+    #[test]
+    fn aggregate_levels_by_window_counts() {
+        let entries = vec![
+            LogEntry { level: LogLevel::Info, message: "a".into(), source: None, timestamp: 0 },
+            LogEntry { level: LogLevel::Error, message: "b".into(), source: None, timestamp: 1 },
+            LogEntry { level: LogLevel::Info, message: "c".into(), source: None, timestamp: 10 },
+        ];
+        let result = aggregate_levels_by_window(&entries, 5);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].0, 0);
+        assert_eq!(result[0].1.info_count, 1);
+        assert_eq!(result[0].1.error_count, 1);
+        assert_eq!(result[1].0, 10);
+        assert_eq!(result[1].1.info_count, 1);
+    }
+
+    #[test]
+    fn aggregate_by_time_window_empty_and_zero() {
+        assert!(aggregate_by_time_window(&[], 5).is_empty());
+        let entries = vec![
+            LogEntry { level: LogLevel::Info, message: "a".into(), source: None, timestamp: 0 },
+        ];
+        assert!(aggregate_by_time_window(&entries, 0).is_empty());
+    }
+
+    // ── OutputChannel display ──
+
+    #[test]
+    fn output_channel_display_format() {
+        let ch = OutputChannel::new("logs", LogLevel::Info);
+        let s = ch.to_string();
+        assert!(s.contains("logs"));
+        assert!(s.contains("0 entries"));
+        assert!(s.contains("visible"));
     }
 }

@@ -1269,6 +1269,364 @@ impl fmt::Display for ShortcutRegistry {
 }
 
 // ---------------------------------------------------------------------------
+// 8. Tab stop management
+// ---------------------------------------------------------------------------
+
+/// Represents a focusable element within a container (e.g., a toolbar or list).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TabStop {
+    pub id: String,
+    pub label: String,
+    pub role: AccessibilityRole,
+    pub disabled: bool,
+}
+
+impl TabStop {
+    pub fn new(
+        id: impl Into<String>,
+        label: impl Into<String>,
+        role: AccessibilityRole,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            role,
+            disabled: false,
+        }
+    }
+
+    /// Create a disabled tab stop that is skipped during navigation.
+    pub fn disabled(
+        id: impl Into<String>,
+        label: impl Into<String>,
+        role: AccessibilityRole,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            role,
+            disabled: true,
+        }
+    }
+
+    /// Screen reader announcement for this tab stop.
+    pub fn announce(&self) -> String {
+        if self.disabled {
+            format!("{}, {}, disabled", self.label, self.role)
+        } else {
+            format!("{}, {}", self.label, self.role)
+        }
+    }
+}
+
+impl fmt::Display for TabStop {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.announce())
+    }
+}
+
+/// Manages a linear sequence of tab stops with keyboard navigation.
+#[derive(Debug, Clone)]
+pub struct TabStopManager {
+    stops: Vec<TabStop>,
+    current: usize,
+}
+
+impl TabStopManager {
+    pub fn new(stops: Vec<TabStop>) -> Self {
+        Self { stops, current: 0 }
+    }
+
+    /// Current focused tab stop, if any.
+    pub fn current(&self) -> Option<&TabStop> {
+        self.stops.get(self.current)
+    }
+
+    /// Move to the next enabled tab stop, wrapping around.
+    /// Returns the newly focused stop, or `None` if all stops are disabled.
+    pub fn next(&mut self) -> Option<&TabStop> {
+        if self.stops.is_empty() {
+            return None;
+        }
+        let len = self.stops.len();
+        for i in 1..=len {
+            let idx = (self.current + i) % len;
+            if !self.stops[idx].disabled {
+                self.current = idx;
+                return self.stops.get(self.current);
+            }
+        }
+        None
+    }
+
+    /// Move to the previous enabled tab stop, wrapping around.
+    pub fn prev(&mut self) -> Option<&TabStop> {
+        if self.stops.is_empty() {
+            return None;
+        }
+        let len = self.stops.len();
+        for i in 1..=len {
+            let idx = (self.current + len - i) % len;
+            if !self.stops[idx].disabled {
+                self.current = idx;
+                return self.stops.get(self.current);
+            }
+        }
+        None
+    }
+
+    /// Jump to a tab stop by id. Returns `true` if found and enabled.
+    pub fn focus_by_id(&mut self, id: &str) -> bool {
+        if let Some(idx) = self.stops.iter().position(|s| s.id == id && !s.disabled) {
+            self.current = idx;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return the number of enabled tab stops.
+    pub fn enabled_count(&self) -> usize {
+        self.stops.iter().filter(|s| !s.disabled).count()
+    }
+
+    pub fn len(&self) -> usize {
+        self.stops.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.stops.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 9. Accessible name computation
+// ---------------------------------------------------------------------------
+
+/// Computes the accessible name for a UI element following a simplified
+/// version of the WAI-ARIA accessible name computation algorithm.
+///
+/// Priority order:
+/// 1. Explicit `aria-labelledby` (joined labels)
+/// 2. Explicit `aria-label`
+/// 3. Element content / `title`
+/// 4. Fallback to role name
+#[derive(Debug, Clone)]
+pub struct AccessibleNameResolver {
+    labels: HashMap<String, String>,
+}
+
+impl AccessibleNameResolver {
+    pub fn new() -> Self {
+        Self {
+            labels: HashMap::new(),
+        }
+    }
+
+    /// Register a label source by id.
+    pub fn register_label(&mut self, id: impl Into<String>, text: impl Into<String>) {
+        self.labels.insert(id.into(), text.into());
+    }
+
+    /// Compute the accessible name given the available sources.
+    ///
+    /// - `labelledby_ids`: ordered list of ids whose text should be concatenated.
+    /// - `aria_label`: explicit aria-label attribute.
+    /// - `content`: visible text content of the element.
+    /// - `role`: the ARIA role, used as ultimate fallback.
+    pub fn compute(
+        &self,
+        labelledby_ids: &[&str],
+        aria_label: Option<&str>,
+        content: Option<&str>,
+        role: AccessibilityRole,
+    ) -> String {
+        // 1. aria-labelledby
+        if !labelledby_ids.is_empty() {
+            let parts: Vec<&str> = labelledby_ids
+                .iter()
+                .filter_map(|id| self.labels.get(*id).map(|s| s.as_str()))
+                .collect();
+            if !parts.is_empty() {
+                return parts.join(" ");
+            }
+        }
+        // 2. aria-label
+        if let Some(label) = aria_label {
+            if !label.is_empty() {
+                return label.to_string();
+            }
+        }
+        // 3. content
+        if let Some(text) = content {
+            if !text.is_empty() {
+                return text.to_string();
+            }
+        }
+        // 4. role fallback
+        role.aria_name().to_string()
+    }
+}
+
+impl Default for AccessibleNameResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 10. Reduced motion support
+// ---------------------------------------------------------------------------
+
+/// Manages reduced motion preferences for users who are sensitive to
+/// motion or animations.
+#[derive(Debug, Clone)]
+pub struct ReducedMotionSupport {
+    mode: ReducedMotionMode,
+}
+
+impl ReducedMotionSupport {
+    pub fn new() -> Self {
+        Self {
+            mode: ReducedMotionMode::NoPreference,
+        }
+    }
+
+    /// Detect reduced motion preference from environment.
+    pub fn detect() -> Self {
+        let mode = if std::env::var("REDUCE_MOTION")
+            .map(|v| v == "1" || v == "true")
+            .unwrap_or(false)
+        {
+            ReducedMotionMode::Reduce
+        } else {
+            ReducedMotionMode::NoPreference
+        };
+        Self { mode }
+    }
+
+    pub fn mode(&self) -> ReducedMotionMode {
+        self.mode
+    }
+
+    pub fn set_mode(&mut self, mode: ReducedMotionMode) {
+        self.mode = mode;
+    }
+
+    /// Returns `true` if animations should be suppressed.
+    pub fn should_reduce(&self) -> bool {
+        self.mode != ReducedMotionMode::NoPreference
+    }
+
+    /// Returns the recommended animation duration in milliseconds.
+    /// When reduced motion is active, returns 0 (instant transition).
+    pub fn animation_duration_ms(&self, default_ms: u64) -> u64 {
+        if self.should_reduce() { 0 } else { default_ms }
+    }
+
+    /// Returns the recommended scroll behavior string.
+    pub fn scroll_behavior(&self) -> &'static str {
+        if self.should_reduce() { "auto" } else { "smooth" }
+    }
+}
+
+impl Default for ReducedMotionSupport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 11. Live region for dynamic content updates
+// ---------------------------------------------------------------------------
+
+/// Politeness level for live region announcements, matching ARIA `aria-live`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LiveRegionPoliteness {
+    /// Updates are not announced unless the region is focused.
+    Off,
+    /// Updates are announced when the user is idle.
+    Polite,
+    /// Updates are announced immediately, interrupting current speech.
+    Assertive,
+}
+
+impl fmt::Display for LiveRegionPoliteness {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Off => write!(f, "off"),
+            Self::Polite => write!(f, "polite"),
+            Self::Assertive => write!(f, "assertive"),
+        }
+    }
+}
+
+/// A live region that tracks content changes and queues announcements
+/// for screen readers with the appropriate politeness level.
+#[derive(Debug, Clone)]
+pub struct LiveRegion {
+    id: String,
+    politeness: LiveRegionPoliteness,
+    content: String,
+    pending_announcements: Vec<String>,
+}
+
+impl LiveRegion {
+    pub fn new(id: impl Into<String>, politeness: LiveRegionPoliteness) -> Self {
+        Self {
+            id: id.into(),
+            politeness,
+            content: String::new(),
+            pending_announcements: Vec::new(),
+        }
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn politeness(&self) -> LiveRegionPoliteness {
+        self.politeness
+    }
+
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+
+    /// Update the content of the live region. If the content changed and
+    /// the politeness is not `Off`, an announcement is queued.
+    pub fn update(&mut self, new_content: impl Into<String>) {
+        let new = new_content.into();
+        if new != self.content {
+            self.content = new.clone();
+            if self.politeness != LiveRegionPoliteness::Off {
+                self.pending_announcements.push(new);
+            }
+        }
+    }
+
+    /// Take all pending announcements.
+    pub fn take_announcements(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.pending_announcements)
+    }
+
+    /// Number of pending announcements.
+    pub fn pending_count(&self) -> usize {
+        self.pending_announcements.len()
+    }
+
+    /// Returns `true` if this region should interrupt current speech.
+    pub fn is_assertive(&self) -> bool {
+        self.politeness == LiveRegionPoliteness::Assertive
+    }
+
+    /// Format an announcement with the region id for debugging/logging.
+    pub fn format_announcement(&self, message: &str) -> String {
+        format!("[{}:{}] {}", self.id, self.politeness, message)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1868,5 +2226,192 @@ mod tests {
         assert!(text.contains("Ctrl+Z"));
         assert!(text.contains("undo"));
         assert!(text.contains("Edit"));
+    }
+
+    // -- Tab stop management --
+
+    #[test]
+    fn tab_stop_announce() {
+        let stop = TabStop::new("btn", "Save", AccessibilityRole::Button);
+        assert_eq!(stop.announce(), "Save, button");
+        assert_eq!(format!("{stop}"), "Save, button");
+
+        let disabled = TabStop::disabled("btn2", "Delete", AccessibilityRole::Button);
+        assert!(disabled.announce().contains("disabled"));
+    }
+
+    #[test]
+    fn tab_stop_manager_navigation() {
+        let stops = vec![
+            TabStop::new("a", "First", AccessibilityRole::Button),
+            TabStop::disabled("b", "Disabled", AccessibilityRole::Button),
+            TabStop::new("c", "Third", AccessibilityRole::Button),
+        ];
+        let mut mgr = TabStopManager::new(stops);
+        assert_eq!(mgr.current().unwrap().id, "a");
+        assert_eq!(mgr.enabled_count(), 2);
+        assert_eq!(mgr.len(), 3);
+
+        // Next should skip disabled stop
+        let next = mgr.next().unwrap();
+        assert_eq!(next.id, "c");
+
+        // Next wraps to first
+        let next = mgr.next().unwrap();
+        assert_eq!(next.id, "a");
+
+        // Prev from first wraps to third (skipping disabled)
+        let prev = mgr.prev().unwrap();
+        assert_eq!(prev.id, "c");
+    }
+
+    #[test]
+    fn tab_stop_manager_focus_by_id() {
+        let stops = vec![
+            TabStop::new("x", "X", AccessibilityRole::Tab),
+            TabStop::new("y", "Y", AccessibilityRole::Tab),
+            TabStop::disabled("z", "Z", AccessibilityRole::Tab),
+        ];
+        let mut mgr = TabStopManager::new(stops);
+        assert!(mgr.focus_by_id("y"));
+        assert_eq!(mgr.current().unwrap().id, "y");
+        // Can't focus a disabled stop
+        assert!(!mgr.focus_by_id("z"));
+        // Can't focus a nonexistent stop
+        assert!(!mgr.focus_by_id("missing"));
+    }
+
+    #[test]
+    fn tab_stop_manager_all_disabled() {
+        let stops = vec![
+            TabStop::disabled("a", "A", AccessibilityRole::Button),
+            TabStop::disabled("b", "B", AccessibilityRole::Button),
+        ];
+        let mut mgr = TabStopManager::new(stops);
+        assert!(mgr.next().is_none());
+        assert!(mgr.prev().is_none());
+        assert_eq!(mgr.enabled_count(), 0);
+    }
+
+    #[test]
+    fn tab_stop_manager_empty() {
+        let mut mgr = TabStopManager::new(vec![]);
+        assert!(mgr.is_empty());
+        assert!(mgr.current().is_none());
+        assert!(mgr.next().is_none());
+        assert!(mgr.prev().is_none());
+    }
+
+    // -- Accessible name computation --
+
+    #[test]
+    fn accessible_name_labelledby() {
+        let mut resolver = AccessibleNameResolver::new();
+        resolver.register_label("lbl1", "First Name");
+        resolver.register_label("lbl2", "Required");
+        let name = resolver.compute(
+            &["lbl1", "lbl2"],
+            Some("fallback"),
+            Some("content"),
+            AccessibilityRole::TextBox,
+        );
+        assert_eq!(name, "First Name Required");
+    }
+
+    #[test]
+    fn accessible_name_aria_label_fallback() {
+        let resolver = AccessibleNameResolver::new();
+        let name = resolver.compute(&[], Some("Search files"), None, AccessibilityRole::TextBox);
+        assert_eq!(name, "Search files");
+    }
+
+    #[test]
+    fn accessible_name_content_fallback() {
+        let resolver = AccessibleNameResolver::new();
+        let name = resolver.compute(&[], None, Some("Submit"), AccessibilityRole::Button);
+        assert_eq!(name, "Submit");
+    }
+
+    #[test]
+    fn accessible_name_role_fallback() {
+        let resolver = AccessibleNameResolver::new();
+        let name = resolver.compute(&[], None, None, AccessibilityRole::Button);
+        assert_eq!(name, "button");
+    }
+
+    // -- Reduced motion support --
+
+    #[test]
+    fn reduced_motion_defaults() {
+        let rm = ReducedMotionSupport::new();
+        assert!(!rm.should_reduce());
+        assert_eq!(rm.animation_duration_ms(300), 300);
+        assert_eq!(rm.scroll_behavior(), "smooth");
+    }
+
+    #[test]
+    fn reduced_motion_enabled() {
+        let mut rm = ReducedMotionSupport::new();
+        rm.set_mode(ReducedMotionMode::Reduce);
+        assert!(rm.should_reduce());
+        assert_eq!(rm.animation_duration_ms(300), 0);
+        assert_eq!(rm.scroll_behavior(), "auto");
+    }
+
+    // -- Live region --
+
+    #[test]
+    fn live_region_polite_update() {
+        let mut region = LiveRegion::new("status", LiveRegionPoliteness::Polite);
+        assert_eq!(region.id(), "status");
+        assert!(!region.is_assertive());
+        assert_eq!(region.pending_count(), 0);
+
+        region.update("3 errors found");
+        assert_eq!(region.content(), "3 errors found");
+        assert_eq!(region.pending_count(), 1);
+
+        // Same content does not re-queue
+        region.update("3 errors found");
+        assert_eq!(region.pending_count(), 1);
+
+        // Different content queues again
+        region.update("2 errors found");
+        assert_eq!(region.pending_count(), 2);
+
+        let announcements = region.take_announcements();
+        assert_eq!(announcements.len(), 2);
+        assert_eq!(announcements[0], "3 errors found");
+        assert_eq!(announcements[1], "2 errors found");
+        assert_eq!(region.pending_count(), 0);
+    }
+
+    #[test]
+    fn live_region_off_no_announcements() {
+        let mut region = LiveRegion::new("silent", LiveRegionPoliteness::Off);
+        region.update("something changed");
+        assert_eq!(region.content(), "something changed");
+        assert_eq!(region.pending_count(), 0);
+    }
+
+    #[test]
+    fn live_region_assertive() {
+        let region = LiveRegion::new("alert", LiveRegionPoliteness::Assertive);
+        assert!(region.is_assertive());
+        assert_eq!(format!("{}", region.politeness()), "assertive");
+    }
+
+    #[test]
+    fn live_region_format_announcement() {
+        let region = LiveRegion::new("errors", LiveRegionPoliteness::Polite);
+        let formatted = region.format_announcement("5 problems");
+        assert_eq!(formatted, "[errors:polite] 5 problems");
+    }
+
+    #[test]
+    fn live_region_politeness_display() {
+        assert_eq!(format!("{}", LiveRegionPoliteness::Off), "off");
+        assert_eq!(format!("{}", LiveRegionPoliteness::Polite), "polite");
+        assert_eq!(format!("{}", LiveRegionPoliteness::Assertive), "assertive");
     }
 }

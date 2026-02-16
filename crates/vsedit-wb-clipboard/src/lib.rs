@@ -1125,6 +1125,460 @@ impl std::hash::Hash for SourceMode {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Content type detection
+// ---------------------------------------------------------------------------
+
+/// Detected content type of clipboard text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentType {
+    /// Plain prose or unknown text.
+    PlainText,
+    /// Looks like source code (contains braces, semicolons, keywords).
+    Code,
+    /// Looks like a URL.
+    Url,
+    /// Looks like a file path (Unix or Windows).
+    FilePath,
+    /// Looks like a numeric value.
+    Numeric,
+    /// Looks like whitespace-only or empty.
+    Empty,
+}
+
+impl ContentType {
+    /// Heuristic detection of the content type of a string.
+    pub fn detect(text: &str) -> Self {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return ContentType::Empty;
+        }
+        // Numeric check (integer or float, optionally negative)
+        if trimmed
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.' || c == '-' || c == '+' || c == '_')
+            && trimmed.parse::<f64>().is_ok()
+        {
+            return ContentType::Numeric;
+        }
+        // URL check
+        if trimmed.starts_with("http://")
+            || trimmed.starts_with("https://")
+            || trimmed.starts_with("ftp://")
+            || trimmed.starts_with("ssh://")
+        {
+            return ContentType::Url;
+        }
+        // File path check
+        if trimmed.starts_with('/')
+            || trimmed.starts_with("~/")
+            || trimmed.starts_with("./")
+            || trimmed.starts_with("../")
+            || (trimmed.len() >= 3
+                && trimmed.as_bytes()[0].is_ascii_alphabetic()
+                && trimmed.as_bytes()[1] == b':'
+                && (trimmed.as_bytes()[2] == b'\\' || trimmed.as_bytes()[2] == b'/'))
+        {
+            return ContentType::FilePath;
+        }
+        // Code heuristic: look for common programming patterns
+        let has_code_chars = trimmed.contains('{')
+            || trimmed.contains('}')
+            || trimmed.contains(';')
+            || trimmed.contains("fn ")
+            || trimmed.contains("let ")
+            || trimmed.contains("if ")
+            || trimmed.contains("def ")
+            || trimmed.contains("class ")
+            || trimmed.contains("import ");
+        if has_code_chars {
+            return ContentType::Code;
+        }
+        ContentType::PlainText
+    }
+
+    /// A short human-readable label for the content type.
+    pub fn label(&self) -> &'static str {
+        match self {
+            ContentType::PlainText => "text",
+            ContentType::Code => "code",
+            ContentType::Url => "url",
+            ContentType::FilePath => "path",
+            ContentType::Numeric => "number",
+            ContentType::Empty => "empty",
+        }
+    }
+}
+
+impl fmt::Display for ContentType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard text normalization & transformation utilities
+// ---------------------------------------------------------------------------
+
+impl ClipboardTransform {
+    /// Normalize all line endings to Unix-style `\n`.
+    pub fn normalize_newlines(text: &str) -> String {
+        text.replace("\r\n", "\n").replace('\r', "\n")
+    }
+
+    /// Collapse runs of multiple blank lines into a single blank line.
+    pub fn collapse_blank_lines(text: &str) -> String {
+        let mut result = String::with_capacity(text.len());
+        let mut prev_blank = false;
+        for line in text.split('\n') {
+            let blank = line.trim().is_empty();
+            if blank && prev_blank {
+                continue;
+            }
+            if !result.is_empty() {
+                result.push('\n');
+            }
+            result.push_str(line);
+            prev_blank = blank;
+        }
+        result
+    }
+
+    /// Remove leading common indentation from all lines (dedent).
+    pub fn dedent(text: &str) -> String {
+        let lines: Vec<&str> = text.split('\n').collect();
+        let min_indent = lines
+            .iter()
+            .filter(|l| !l.trim().is_empty())
+            .map(|l| l.len() - l.trim_start().len())
+            .min()
+            .unwrap_or(0);
+        lines
+            .iter()
+            .map(|l| {
+                if l.len() >= min_indent {
+                    &l[min_indent..]
+                } else {
+                    l.trim()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Re-indent text to use the given indentation string per level.
+    /// Replaces leading whitespace proportionally based on the smallest
+    /// non-zero indent found in the original text.
+    pub fn reindent(text: &str, indent_str: &str) -> String {
+        let lines: Vec<&str> = text.split('\n').collect();
+        let base = lines
+            .iter()
+            .filter(|l| !l.trim().is_empty())
+            .map(|l| l.len() - l.trim_start().len())
+            .filter(|&n| n > 0)
+            .min()
+            .unwrap_or(1);
+        lines
+            .iter()
+            .map(|l| {
+                let spaces = l.len() - l.trim_start().len();
+                let level = spaces / base;
+                let new_indent = indent_str.repeat(level);
+                format!("{}{}", new_indent, l.trim_start())
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Convert tabs to spaces using the given tab width.
+    pub fn tabs_to_spaces(text: &str, tab_width: usize) -> String {
+        text.replace('\t', &" ".repeat(tab_width))
+    }
+
+    /// Convert leading spaces to tabs using the given tab width.
+    pub fn spaces_to_tabs(text: &str, tab_width: usize) -> String {
+        if tab_width == 0 {
+            return text.to_string();
+        }
+        text.split('\n')
+            .map(|line| {
+                let spaces = line.len() - line.trim_start_matches(' ').len();
+                let tabs = spaces / tab_width;
+                let remaining = spaces % tab_width;
+                let mut s = String::with_capacity(line.len());
+                for _ in 0..tabs {
+                    s.push('\t');
+                }
+                for _ in 0..remaining {
+                    s.push(' ');
+                }
+                s.push_str(&line[spaces..]);
+                s
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Wrap text at the specified column width, breaking at word boundaries.
+    pub fn word_wrap(text: &str, width: usize) -> String {
+        if width == 0 {
+            return text.to_string();
+        }
+        let mut result = String::with_capacity(text.len() + text.len() / width);
+        for paragraph in text.split('\n') {
+            if !result.is_empty() {
+                result.push('\n');
+            }
+            let mut col = 0usize;
+            for (i, word) in paragraph.split_whitespace().enumerate() {
+                if i > 0 && col + 1 + word.len() > width {
+                    result.push('\n');
+                    col = 0;
+                } else if i > 0 {
+                    result.push(' ');
+                    col += 1;
+                }
+                result.push_str(word);
+                col += word.len();
+            }
+        }
+        result
+    }
+
+    /// Extract only lines matching a substring.
+    pub fn grep_lines(text: &str, pattern: &str) -> String {
+        text.split('\n')
+            .filter(|l| l.contains(pattern))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Remove lines matching a substring (inverse grep).
+    pub fn grep_v_lines(text: &str, pattern: &str) -> String {
+        text.split('\n')
+            .filter(|l| !l.contains(pattern))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Join all lines into a single line with the given separator.
+    pub fn join_lines(text: &str, sep: &str) -> String {
+        text.split('\n')
+            .map(|l| l.trim_end_matches('\r'))
+            .collect::<Vec<_>>()
+            .join(sep)
+    }
+
+    /// Convert text to upper case.
+    pub fn to_upper(text: &str) -> String {
+        text.to_uppercase()
+    }
+
+    /// Convert text to lower case.
+    pub fn to_lower(text: &str) -> String {
+        text.to_lowercase()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard size limiter
+// ---------------------------------------------------------------------------
+
+/// Enforces size limits on clipboard content.
+pub struct ClipboardSizeLimiter {
+    max_bytes: usize,
+    max_lines: usize,
+}
+
+impl ClipboardSizeLimiter {
+    pub fn new(max_bytes: usize, max_lines: usize) -> Self {
+        Self {
+            max_bytes,
+            max_lines,
+        }
+    }
+
+    /// Check whether the text exceeds configured limits.
+    pub fn exceeds_limit(&self, text: &str) -> bool {
+        text.len() > self.max_bytes || text.split('\n').count() > self.max_lines
+    }
+
+    /// Truncate text to fit within byte and line limits.
+    /// Returns the truncated text and whether truncation occurred.
+    pub fn truncate(&self, text: &str) -> (String, bool) {
+        let mut lines: Vec<&str> = text.split('\n').collect();
+        let mut truncated = false;
+        if lines.len() > self.max_lines {
+            lines.truncate(self.max_lines);
+            truncated = true;
+        }
+        let mut result = lines.join("\n");
+        if result.len() > self.max_bytes {
+            // Truncate at a char boundary
+            let mut end = self.max_bytes;
+            while end > 0 && !result.is_char_boundary(end) {
+                end -= 1;
+            }
+            result.truncate(end);
+            truncated = true;
+        }
+        (result, truncated)
+    }
+
+    pub fn max_bytes(&self) -> usize {
+        self.max_bytes
+    }
+
+    pub fn max_lines(&self) -> usize {
+        self.max_lines
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Paste indentation adjuster
+// ---------------------------------------------------------------------------
+
+/// Adjusts indentation when pasting text into an editor context.
+pub struct PasteIndenter;
+
+impl PasteIndenter {
+    /// Adjust the indentation of pasted text so that its first line aligns
+    /// with `target_indent`, and subsequent lines are shifted by the same
+    /// amount.
+    pub fn adjust(text: &str, target_indent: &str) -> String {
+        let lines: Vec<&str> = text.split('\n').collect();
+        if lines.is_empty() {
+            return String::new();
+        }
+        let first_indent_len = lines[0].len() - lines[0].trim_start().len();
+        lines
+            .iter()
+            .enumerate()
+            .map(|(i, line)| {
+                if i == 0 {
+                    format!("{}{}", target_indent, line.trim_start())
+                } else {
+                    let cur_indent = line.len() - line.trim_start().len();
+                    let extra = cur_indent.saturating_sub(first_indent_len);
+                    let extra_spaces = " ".repeat(extra);
+                    format!("{}{}{}", target_indent, extra_spaces, line.trim_start())
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Strip all leading indentation from every line.
+    pub fn flatten(text: &str) -> String {
+        text.split('\n')
+            .map(|l| l.trim_start())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard metadata
+// ---------------------------------------------------------------------------
+
+/// Rich metadata about a clipboard entry, computed lazily.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClipboardMetadata {
+    pub content_type: ContentType,
+    pub byte_count: usize,
+    pub char_count: usize,
+    pub line_count: usize,
+    pub word_count: usize,
+    pub is_multiline: bool,
+    pub has_trailing_newline: bool,
+}
+
+impl ClipboardMetadata {
+    /// Compute metadata from raw text.
+    pub fn from_text(text: &str) -> Self {
+        Self {
+            content_type: ContentType::detect(text),
+            byte_count: text.len(),
+            char_count: text.chars().count(),
+            line_count: if text.is_empty() {
+                0
+            } else {
+                text.split('\n').count()
+            },
+            word_count: text.split_whitespace().count(),
+            is_multiline: text.contains('\n'),
+            has_trailing_newline: text.ends_with('\n'),
+        }
+    }
+
+    /// Compute metadata from a clipboard entry.
+    pub fn from_entry(entry: &ClipboardEntry) -> Self {
+        Self::from_text(&entry.text)
+    }
+}
+
+impl fmt::Display for ClipboardMetadata {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: {}B, {} chars, {} lines, {} words",
+            self.content_type, self.byte_count, self.char_count, self.line_count, self.word_count
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Clipboard batch operations on ClipboardService
+// ---------------------------------------------------------------------------
+
+impl ClipboardService {
+    /// Write multiple texts at once, assigning sequential timestamps starting
+    /// from `base_timestamp`.
+    pub fn write_batch(
+        &mut self,
+        texts: &[&str],
+        base_timestamp: u64,
+        source_mode: SourceMode,
+    ) {
+        for (i, text) in texts.iter().enumerate() {
+            self.write_entry((*text).to_string(), base_timestamp + i as u64, source_mode);
+        }
+    }
+
+    /// Keep only entries whose text satisfies a predicate.
+    pub fn retain<F: Fn(&ClipboardEntry) -> bool>(&mut self, pred: F) {
+        self.history.retain(|e| pred(e));
+    }
+
+    /// Replace all occurrences of `from` with `to` across the entire history.
+    /// Returns the number of entries that were modified.
+    pub fn replace_in_history(&mut self, from: &str, to: &str) -> usize {
+        let mut count = 0;
+        for entry in &mut self.history {
+            if entry.text.contains(from) {
+                entry.text = entry.text.replace(from, to);
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Return the n most recent entries (newest first).
+    pub fn recent(&self, n: usize) -> Vec<&ClipboardEntry> {
+        self.history.iter().rev().take(n).collect()
+    }
+
+    /// Merge the text of all history entries into a single string, separated
+    /// by the given separator.
+    pub fn merge_history(&self, separator: &str) -> String {
+        self.history
+            .iter()
+            .map(|e| e.text.as_str())
+            .collect::<Vec<_>>()
+            .join(separator)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1850,5 +2304,216 @@ mod tests {
         assert_eq!(mode, SourceMode::Visual);
         let mode2: SourceMode = "unknown".into();
         assert_eq!(mode2, SourceMode::Normal);
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests for new functionality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn content_type_detection() {
+        assert_eq!(ContentType::detect(""), ContentType::Empty);
+        assert_eq!(ContentType::detect("   "), ContentType::Empty);
+        assert_eq!(ContentType::detect("42"), ContentType::Numeric);
+        assert_eq!(ContentType::detect("-3.14"), ContentType::Numeric);
+        assert_eq!(ContentType::detect("https://example.com"), ContentType::Url);
+        assert_eq!(ContentType::detect("ftp://files.example.com"), ContentType::Url);
+        assert_eq!(ContentType::detect("/usr/bin/ls"), ContentType::FilePath);
+        assert_eq!(ContentType::detect("~/Documents/file.txt"), ContentType::FilePath);
+        assert_eq!(ContentType::detect("fn main() { }"), ContentType::Code);
+        assert_eq!(ContentType::detect("let x = 5;"), ContentType::Code);
+        assert_eq!(ContentType::detect("hello world"), ContentType::PlainText);
+        // Display
+        assert_eq!(ContentType::Code.label(), "code");
+        assert_eq!(format!("{}", ContentType::Url), "url");
+    }
+
+    #[test]
+    fn normalize_newlines() {
+        assert_eq!(
+            ClipboardTransform::normalize_newlines("a\r\nb\rc\nd"),
+            "a\nb\nc\nd"
+        );
+    }
+
+    #[test]
+    fn collapse_blank_lines() {
+        let input = "a\n\n\n\nb\n\nc";
+        assert_eq!(
+            ClipboardTransform::collapse_blank_lines(input),
+            "a\n\nb\n\nc"
+        );
+    }
+
+    #[test]
+    fn dedent_text() {
+        let input = "    fn foo() {\n        bar();\n    }";
+        assert_eq!(
+            ClipboardTransform::dedent(input),
+            "fn foo() {\n    bar();\n}"
+        );
+    }
+
+    #[test]
+    fn reindent_with_tabs() {
+        let input = "fn foo() {\n    bar();\n}";
+        let result = ClipboardTransform::reindent(input, "\t");
+        assert_eq!(result, "fn foo() {\n\tbar();\n}");
+    }
+
+    #[test]
+    fn tabs_to_spaces_and_back() {
+        let input = "\tif true {\n\t\treturn;\n\t}";
+        let spaces = ClipboardTransform::tabs_to_spaces(input, 4);
+        assert!(spaces.starts_with("    if true"));
+        assert!(spaces.contains("        return;"));
+        let back = ClipboardTransform::spaces_to_tabs(&spaces, 4);
+        assert_eq!(back, input);
+    }
+
+    #[test]
+    fn word_wrap_at_boundary() {
+        let input = "the quick brown fox jumps over the lazy dog";
+        let wrapped = ClipboardTransform::word_wrap(input, 20);
+        for line in wrapped.split('\n') {
+            assert!(line.len() <= 20, "line too long: '{line}'");
+        }
+        // All words are preserved
+        assert_eq!(
+            wrapped.split_whitespace().count(),
+            input.split_whitespace().count()
+        );
+    }
+
+    #[test]
+    fn grep_and_grep_v_lines() {
+        let input = "apple\nbanana\napricot\ncherry";
+        assert_eq!(ClipboardTransform::grep_lines(input, "ap"), "apple\napricot");
+        assert_eq!(
+            ClipboardTransform::grep_v_lines(input, "ap"),
+            "banana\ncherry"
+        );
+    }
+
+    #[test]
+    fn join_lines_with_separator() {
+        assert_eq!(
+            ClipboardTransform::join_lines("a\nb\nc", " | "),
+            "a | b | c"
+        );
+    }
+
+    #[test]
+    fn to_upper_and_lower() {
+        assert_eq!(ClipboardTransform::to_upper("Hello"), "HELLO");
+        assert_eq!(ClipboardTransform::to_lower("Hello"), "hello");
+    }
+
+    #[test]
+    fn size_limiter_truncation() {
+        let limiter = ClipboardSizeLimiter::new(10, 100);
+        assert!(!limiter.exceeds_limit("short"));
+        assert!(limiter.exceeds_limit("this is a long string"));
+        let (truncated, did_truncate) = limiter.truncate("this is a long string");
+        assert!(did_truncate);
+        assert!(truncated.len() <= 10);
+        // Line limit
+        let line_limiter = ClipboardSizeLimiter::new(10000, 3);
+        let many_lines = "a\nb\nc\nd\ne";
+        assert!(line_limiter.exceeds_limit(many_lines));
+        let (truncated, did_truncate) = line_limiter.truncate(many_lines);
+        assert!(did_truncate);
+        assert_eq!(truncated.split('\n').count(), 3);
+    }
+
+    #[test]
+    fn paste_indenter_adjust() {
+        let code = "if true {\n    return 1;\n}";
+        let adjusted = PasteIndenter::adjust(code, "        ");
+        let lines: Vec<&str> = adjusted.split('\n').collect();
+        assert!(lines[0].starts_with("        if true"));
+        assert!(lines[1].starts_with("        "));
+        assert!(lines[1].contains("return 1;"));
+        // Extra indentation of line 2 (4 spaces relative to line 1) is preserved
+        let indent1 = lines[0].len() - lines[0].trim_start().len();
+        let indent2 = lines[1].len() - lines[1].trim_start().len();
+        assert!(indent2 > indent1);
+    }
+
+    #[test]
+    fn paste_indenter_flatten() {
+        let indented = "    a\n        b\n    c";
+        assert_eq!(PasteIndenter::flatten(indented), "a\nb\nc");
+    }
+
+    #[test]
+    fn clipboard_metadata_from_text() {
+        let meta = ClipboardMetadata::from_text("fn main() {\n    println!(\"hi\");\n}\n");
+        assert_eq!(meta.content_type, ContentType::Code);
+        assert_eq!(meta.line_count, 4);
+        assert!(meta.is_multiline);
+        assert!(meta.has_trailing_newline);
+        assert!(meta.word_count > 0);
+        let display = format!("{meta}");
+        assert!(display.contains("code"));
+    }
+
+    #[test]
+    fn clipboard_metadata_from_entry() {
+        let entry = ClipboardEntry::new("https://example.com");
+        let meta = ClipboardMetadata::from_entry(&entry);
+        assert_eq!(meta.content_type, ContentType::Url);
+        assert!(!meta.is_multiline);
+    }
+
+    #[test]
+    fn service_write_batch() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_batch(&["a", "b", "c"], 100, SourceMode::Visual);
+        assert_eq!(svc.history_count(), 3);
+        assert_eq!(svc.get_history()[0].timestamp, 100);
+        assert_eq!(svc.get_history()[1].timestamp, 101);
+        assert_eq!(svc.get_history()[2].timestamp, 102);
+        assert!(svc.get_history().iter().all(|e| e.source_mode == SourceMode::Visual));
+    }
+
+    #[test]
+    fn service_retain_entries() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_batch(&["short", "a very long string here", "hi"], 1, SourceMode::Normal);
+        svc.retain(|e| e.text.len() <= 10);
+        assert_eq!(svc.history_count(), 2);
+        assert!(svc.get_history().iter().all(|e| e.text.len() <= 10));
+    }
+
+    #[test]
+    fn service_replace_in_history() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_text("hello world".into(), 1);
+        svc.write_text("world peace".into(), 2);
+        svc.write_text("nothing".into(), 3);
+        let count = svc.replace_in_history("world", "earth");
+        assert_eq!(count, 2);
+        assert_eq!(svc.get_history()[0].text, "hello earth");
+        assert_eq!(svc.get_history()[1].text, "earth peace");
+        assert_eq!(svc.get_history()[2].text, "nothing");
+    }
+
+    #[test]
+    fn service_recent_entries() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_batch(&["a", "b", "c", "d"], 1, SourceMode::Normal);
+        let recent = svc.recent(2);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].text, "d");
+        assert_eq!(recent[1].text, "c");
+    }
+
+    #[test]
+    fn service_merge_history() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_batch(&["alpha", "beta", "gamma"], 1, SourceMode::Normal);
+        assert_eq!(svc.merge_history(", "), "alpha, beta, gamma");
+        assert_eq!(svc.merge_history("\n"), "alpha\nbeta\ngamma");
     }
 }

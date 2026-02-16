@@ -1130,6 +1130,369 @@ pub fn collect_keybindings(items: &[MenuItem]) -> Vec<(&str, &str)> {
     bindings
 }
 
+// ---------------------------------------------------------------------------
+// When-clause filtering
+// ---------------------------------------------------------------------------
+
+/// A when-clause context used to evaluate conditional menu visibility.
+/// Maps context keys (e.g. "editorFocus", "resourceScheme") to string values.
+#[derive(Debug, Clone, Default)]
+pub struct WhenContext {
+    values: HashMap<String, String>,
+}
+
+impl WhenContext {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set a context key to "true".
+    pub fn set_flag(&mut self, key: impl Into<String>) {
+        self.values.insert(key.into(), "true".to_string());
+    }
+
+    /// Remove a context key.
+    pub fn unset(&mut self, key: &str) {
+        self.values.remove(key);
+    }
+
+    /// Set a context key to a string value.
+    pub fn set_value(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.values.insert(key.into(), value.into());
+    }
+
+    /// Check if a key is set (any value).
+    pub fn has(&self, key: &str) -> bool {
+        self.values.contains_key(key)
+    }
+
+    /// Get the value of a context key.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.values.get(key).map(|s| s.as_str())
+    }
+
+    /// Evaluate a simple when-clause expression.
+    ///
+    /// Supports:
+    /// - `key` — true if key is set
+    /// - `!key` — true if key is NOT set
+    /// - `key == value` — true if key equals value
+    /// - `key != value` — true if key does not equal value
+    /// - `expr1 && expr2` — logical AND (only one level, no nesting)
+    pub fn evaluate(&self, expr: &str) -> bool {
+        let expr = expr.trim();
+        if expr.is_empty() {
+            return true;
+        }
+        // Handle && by splitting and requiring all parts to be true
+        if expr.contains("&&") {
+            return expr.split("&&").all(|part| self.evaluate_single(part.trim()));
+        }
+        self.evaluate_single(expr)
+    }
+
+    fn evaluate_single(&self, expr: &str) -> bool {
+        let expr = expr.trim();
+        if let Some(rest) = expr.strip_prefix('!') {
+            let key = rest.trim();
+            return !self.has(key);
+        }
+        if let Some((key, value)) = expr.split_once("!=") {
+            let key = key.trim();
+            let value = value.trim();
+            return self.get(key) != Some(value);
+        }
+        if let Some((key, value)) = expr.split_once("==") {
+            let key = key.trim();
+            let value = value.trim();
+            return self.get(key) == Some(value);
+        }
+        // Simple key presence check
+        self.has(expr)
+    }
+}
+
+/// A menu item with an associated when-clause for conditional visibility.
+#[derive(Debug, Clone)]
+pub struct ConditionalMenuItem {
+    pub item: MenuItem,
+    pub when: Option<String>,
+}
+
+impl ConditionalMenuItem {
+    pub fn new(item: MenuItem) -> Self {
+        Self { item, when: None }
+    }
+
+    pub fn with_when(mut self, expr: impl Into<String>) -> Self {
+        self.when = Some(expr.into());
+        self
+    }
+
+    /// Returns true if this item should be visible given the context.
+    pub fn is_visible(&self, ctx: &WhenContext) -> bool {
+        match &self.when {
+            None => true,
+            Some(expr) => ctx.evaluate(expr),
+        }
+    }
+}
+
+/// Filter a list of conditional menu items by the current context.
+pub fn filter_by_when(items: &[ConditionalMenuItem], ctx: &WhenContext) -> Vec<MenuItem> {
+    items
+        .iter()
+        .filter(|ci| ci.is_visible(ctx))
+        .map(|ci| ci.item.clone())
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Menu item deduplication
+// ---------------------------------------------------------------------------
+
+/// Remove duplicate menu items (by id), keeping the first occurrence.
+/// Separators (empty id) are never considered duplicates of each other.
+pub fn deduplicate_menu_items(items: &[MenuItem]) -> Vec<MenuItem> {
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::with_capacity(items.len());
+    for item in items {
+        if item.id.is_empty() {
+            // Separators pass through
+            result.push(item.clone());
+        } else if seen.insert(item.id.clone()) {
+            result.push(item.clone());
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Consecutive separator collapsing
+// ---------------------------------------------------------------------------
+
+/// Remove leading, trailing, and consecutive separators from a menu item list.
+pub fn collapse_separators(items: &[MenuItem]) -> Vec<MenuItem> {
+    let mut result = Vec::with_capacity(items.len());
+    let mut last_was_sep = true; // treat start as separator to strip leading
+    for item in items {
+        if item.kind == MenuItemKind::Separator {
+            if !last_was_sep {
+                result.push(item.clone());
+                last_was_sep = true;
+            }
+        } else {
+            result.push(item.clone());
+            last_was_sep = false;
+        }
+    }
+    // Remove trailing separator
+    if result.last().map_or(false, |i| i.kind == MenuItemKind::Separator) {
+        result.pop();
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic menu builder
+// ---------------------------------------------------------------------------
+
+/// Builder for constructing menus programmatically with groups and ordering.
+#[derive(Debug, Clone)]
+pub struct MenuBuilder {
+    groups: Vec<MenuItemGroup>,
+}
+
+impl MenuBuilder {
+    pub fn new() -> Self {
+        Self { groups: Vec::new() }
+    }
+
+    /// Add an item to a named group. Creates the group if it doesn't exist.
+    pub fn add_to_group(
+        &mut self,
+        group_id: impl Into<String>,
+        order: i32,
+        item: MenuItem,
+    ) -> &mut Self {
+        let gid = group_id.into();
+        if let Some(group) = self.groups.iter_mut().find(|g| g.group_id == gid) {
+            group.add_item(item);
+        } else {
+            let mut group = MenuItemGroup::new(gid, order);
+            group.add_item(item);
+            self.groups.push(group);
+        }
+        self
+    }
+
+    /// Build the final flat list of menu items with separators between groups.
+    pub fn build(&self) -> Vec<MenuItem> {
+        MenuItemGroup::flatten_groups(&self.groups)
+    }
+
+    /// Build the final list and wrap it in a submenu.
+    pub fn build_submenu(&self, id: impl Into<String>, label: impl Into<String>) -> MenuItem {
+        let mut submenu = MenuItem::submenu(id, label);
+        submenu.children = self.build();
+        submenu
+    }
+
+    /// Return the number of groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Return the total number of items across all groups.
+    pub fn total_items(&self) -> usize {
+        self.groups.iter().map(|g| g.item_count()).sum()
+    }
+}
+
+impl Default for MenuBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Menu item path tracking
+// ---------------------------------------------------------------------------
+
+impl MenuItem {
+    /// Set the checked flag using builder style.
+    pub fn with_checked(mut self, checked: bool) -> Self {
+        self.checked = checked;
+        self
+    }
+
+    /// Add a child item using builder style.
+    pub fn with_child(mut self, child: MenuItem) -> Self {
+        self.children.push(child);
+        self
+    }
+
+    /// Count total items in this subtree (including self).
+    pub fn subtree_size(&self) -> usize {
+        1 + self.children.iter().map(|c| c.subtree_size()).sum::<usize>()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MenuBar — merge and contribution-point management
+// ---------------------------------------------------------------------------
+
+impl MenuBar {
+    /// Merge another menu bar into this one. Top-level menus with matching ids
+    /// have their children appended; new menus are added at the end.
+    pub fn merge(&mut self, other: &MenuBar) {
+        for other_menu in &other.menus {
+            if let Some(existing) = self.menus.iter_mut().find(|m| m.id == other_menu.id) {
+                existing.children.extend(other_menu.children.iter().cloned());
+            } else {
+                self.menus.push(other_menu.clone());
+            }
+        }
+    }
+
+    /// Return the total number of items in the entire menu tree.
+    pub fn total_item_count(&self) -> usize {
+        self.menus.iter().map(|m| m.subtree_size()).sum()
+    }
+
+    /// Disable all actions that do NOT have a keybinding set.
+    pub fn disable_unbound_actions(&mut self) {
+        fn walk(items: &mut [MenuItem]) {
+            for item in items {
+                if item.kind == MenuItemKind::Action && item.keybinding.is_none() {
+                    item.enabled = false;
+                }
+                walk(&mut item.children);
+            }
+        }
+        walk(&mut self.menus);
+    }
+
+    /// Collect all duplicate item ids (ids that appear more than once).
+    pub fn find_duplicate_ids(&self) -> Vec<String> {
+        let mut counts: HashMap<&str, usize> = HashMap::new();
+        fn walk<'a>(items: &'a [MenuItem], counts: &mut HashMap<&'a str, usize>) {
+            for item in items {
+                if !item.id.is_empty() {
+                    *counts.entry(&item.id).or_insert(0) += 1;
+                }
+                walk(&item.children, counts);
+            }
+        }
+        walk(&self.menus, &mut counts);
+        counts
+            .into_iter()
+            .filter(|(_, c)| *c > 1)
+            .map(|(id, _)| id.to_string())
+            .collect()
+    }
+
+    /// Set the keybinding on a menu item found by id. Returns true if found.
+    pub fn set_keybinding(&mut self, id: &str, keybinding: Option<String>) -> bool {
+        if let Some(item) = self.find_item_mut(id) {
+            item.keybinding = keybinding;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MenuRegistry — additional helpers
+// ---------------------------------------------------------------------------
+
+impl MenuRegistry {
+    /// Return all registered location keys.
+    pub fn locations(&self) -> Vec<&str> {
+        self.contributions.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Remove all contributions for a given location.
+    pub fn clear_location(&mut self, location: &str) {
+        self.contributions.remove(location);
+    }
+
+    /// Total number of contributions across all locations.
+    pub fn total_contributions(&self) -> usize {
+        self.contributions.values().map(|v| v.len()).sum()
+    }
+
+    /// Build a flat list of menu items for a location, grouped by group_id
+    /// with separators between groups (sorted by order).
+    pub fn build_menu_for_location(&self, location: &str) -> Vec<MenuItem> {
+        let sorted = self.get_sorted(location);
+        if sorted.is_empty() {
+            return Vec::new();
+        }
+
+        let mut groups: Vec<(&str, Vec<&MenuItem>)> = Vec::new();
+        for contrib in &sorted {
+            if let Some(group) = groups.iter_mut().find(|(gid, _)| *gid == contrib.group_id) {
+                group.1.push(&contrib.item);
+            } else {
+                groups.push((&contrib.group_id, vec![&contrib.item]));
+            }
+        }
+
+        let mut result = Vec::new();
+        for (i, (_gid, items)) in groups.iter().enumerate() {
+            if i > 0 {
+                result.push(MenuItem::separator());
+            }
+            for item in items {
+                result.push((*item).clone());
+            }
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1847,5 +2210,295 @@ mod tests {
         let bindings = collect_keybindings(&items);
         assert_eq!(bindings.len(), 1);
         assert_eq!(bindings[0], ("open", "Ctrl+O"));
+    }
+
+    // ── When-clause filtering ─────────────────────────────────────
+
+    #[test]
+    fn when_context_flag_and_has() {
+        let mut ctx = WhenContext::new();
+        assert!(!ctx.has("editorFocus"));
+        ctx.set_flag("editorFocus");
+        assert!(ctx.has("editorFocus"));
+        ctx.unset("editorFocus");
+        assert!(!ctx.has("editorFocus"));
+    }
+
+    #[test]
+    fn when_context_evaluate_simple_key() {
+        let mut ctx = WhenContext::new();
+        ctx.set_flag("editorFocus");
+        assert!(ctx.evaluate("editorFocus"));
+        assert!(!ctx.evaluate("terminalFocus"));
+    }
+
+    #[test]
+    fn when_context_evaluate_negation() {
+        let mut ctx = WhenContext::new();
+        ctx.set_flag("editorFocus");
+        assert!(!ctx.evaluate("!editorFocus"));
+        assert!(ctx.evaluate("!terminalFocus"));
+    }
+
+    #[test]
+    fn when_context_evaluate_equality() {
+        let mut ctx = WhenContext::new();
+        ctx.set_value("resourceScheme", "file");
+        assert!(ctx.evaluate("resourceScheme == file"));
+        assert!(!ctx.evaluate("resourceScheme == untitled"));
+        assert!(ctx.evaluate("resourceScheme != untitled"));
+    }
+
+    #[test]
+    fn when_context_evaluate_and() {
+        let mut ctx = WhenContext::new();
+        ctx.set_flag("editorFocus");
+        ctx.set_value("resourceScheme", "file");
+        assert!(ctx.evaluate("editorFocus && resourceScheme == file"));
+        assert!(!ctx.evaluate("editorFocus && terminalFocus"));
+    }
+
+    #[test]
+    fn when_context_evaluate_empty() {
+        let ctx = WhenContext::new();
+        assert!(ctx.evaluate(""));
+        assert!(ctx.evaluate("  "));
+    }
+
+    #[test]
+    fn conditional_menu_item_visibility() {
+        let mut ctx = WhenContext::new();
+        ctx.set_flag("editorFocus");
+
+        let ci = ConditionalMenuItem::new(MenuItem::action("cut", "Cut"))
+            .with_when("editorFocus");
+        assert!(ci.is_visible(&ctx));
+
+        let ci_hidden = ConditionalMenuItem::new(MenuItem::action("paste_terminal", "Paste"))
+            .with_when("terminalFocus");
+        assert!(!ci_hidden.is_visible(&ctx));
+
+        let ci_always = ConditionalMenuItem::new(MenuItem::action("help", "Help"));
+        assert!(ci_always.is_visible(&ctx));
+    }
+
+    #[test]
+    fn filter_by_when_filters_correctly() {
+        let mut ctx = WhenContext::new();
+        ctx.set_flag("editorFocus");
+
+        let items = vec![
+            ConditionalMenuItem::new(MenuItem::action("cut", "Cut")).with_when("editorFocus"),
+            ConditionalMenuItem::new(MenuItem::action("paste_term", "Paste")).with_when("terminalFocus"),
+            ConditionalMenuItem::new(MenuItem::action("help", "Help")),
+        ];
+        let visible = filter_by_when(&items, &ctx);
+        assert_eq!(visible.len(), 2);
+        assert_eq!(visible[0].id, "cut");
+        assert_eq!(visible[1].id, "help");
+    }
+
+    // ── Deduplication ─────────────────────────────────────────────
+
+    #[test]
+    fn deduplicate_menu_items_removes_dupes() {
+        let items = vec![
+            MenuItem::action("open", "Open"),
+            MenuItem::action("save", "Save"),
+            MenuItem::action("open", "Open File"),
+            MenuItem::separator(),
+            MenuItem::separator(),
+        ];
+        let deduped = deduplicate_menu_items(&items);
+        assert_eq!(deduped.len(), 4); // open, save, sep, sep (seps kept)
+        assert_eq!(deduped[0].label, "Open"); // first wins
+    }
+
+    // ── Separator collapsing ──────────────────────────────────────
+
+    #[test]
+    fn collapse_separators_removes_consecutive() {
+        let items = vec![
+            MenuItem::separator(),
+            MenuItem::action("a", "A"),
+            MenuItem::separator(),
+            MenuItem::separator(),
+            MenuItem::action("b", "B"),
+            MenuItem::separator(),
+        ];
+        let collapsed = collapse_separators(&items);
+        assert_eq!(collapsed.len(), 3); // A, sep, B
+        assert_eq!(collapsed[0].id, "a");
+        assert_eq!(collapsed[1].kind, MenuItemKind::Separator);
+        assert_eq!(collapsed[2].id, "b");
+    }
+
+    #[test]
+    fn collapse_separators_empty_input() {
+        assert!(collapse_separators(&[]).is_empty());
+    }
+
+    // ── MenuBuilder ───────────────────────────────────────────────
+
+    #[test]
+    fn menu_builder_groups_and_build() {
+        let mut builder = MenuBuilder::new();
+        builder
+            .add_to_group("navigation", 1, MenuItem::action("go_back", "Go Back"))
+            .add_to_group("navigation", 1, MenuItem::action("go_fwd", "Go Forward"))
+            .add_to_group("edit", 0, MenuItem::action("undo", "Undo"));
+
+        assert_eq!(builder.group_count(), 2);
+        assert_eq!(builder.total_items(), 3);
+
+        let items = builder.build();
+        // edit group (order 0) first, then separator, then navigation (order 1)
+        assert_eq!(items[0].id, "undo");
+        assert_eq!(items[1].kind, MenuItemKind::Separator);
+        assert_eq!(items[2].id, "go_back");
+        assert_eq!(items[3].id, "go_fwd");
+    }
+
+    #[test]
+    fn menu_builder_build_submenu() {
+        let mut builder = MenuBuilder::new();
+        builder.add_to_group("main", 0, MenuItem::action("a", "A"));
+        let submenu = builder.build_submenu("edit", "Edit");
+        assert_eq!(submenu.kind, MenuItemKind::Submenu);
+        assert_eq!(submenu.children.len(), 1);
+        assert_eq!(submenu.children[0].id, "a");
+    }
+
+    // ── MenuItem builder methods ──────────────────────────────────
+
+    #[test]
+    fn menu_item_with_checked_and_child() {
+        let item = MenuItem::submenu("view", "View")
+            .with_checked(true)
+            .with_child(MenuItem::action("minimap", "Toggle Minimap"));
+        assert!(item.checked);
+        assert_eq!(item.children.len(), 1);
+        assert_eq!(item.children[0].id, "minimap");
+    }
+
+    #[test]
+    fn menu_item_subtree_size() {
+        let item = MenuItem::submenu("file", "File")
+            .with_child(MenuItem::action("open", "Open"))
+            .with_child(
+                MenuItem::submenu("recent", "Recent")
+                    .with_child(MenuItem::action("r1", "File 1"))
+                    .with_child(MenuItem::action("r2", "File 2")),
+            );
+        assert_eq!(item.subtree_size(), 5); // file + open + recent + r1 + r2
+    }
+
+    // ── MenuBar merge ─────────────────────────────────────────────
+
+    #[test]
+    fn menu_bar_merge_combines_menus() {
+        let mut bar1 = MenuBar::new();
+        let file1 = MenuItem::submenu("file", "File")
+            .with_child(MenuItem::action("open", "Open"));
+        bar1.add_menu(file1);
+
+        let mut bar2 = MenuBar::new();
+        let file2 = MenuItem::submenu("file", "File")
+            .with_child(MenuItem::action("save", "Save"));
+        bar2.add_menu(file2);
+        bar2.add_menu(MenuItem::submenu("edit", "Edit"));
+
+        bar1.merge(&bar2);
+        // file menu should now have both children
+        let file = bar1.find_item("file").unwrap();
+        assert_eq!(file.children.len(), 2);
+        // edit menu should be added
+        assert!(bar1.find_item("edit").is_some());
+    }
+
+    #[test]
+    fn menu_bar_total_item_count() {
+        let bar = make_bar();
+        // file(submenu) + open + save + help = 4
+        assert_eq!(bar.total_item_count(), 4);
+    }
+
+    #[test]
+    fn menu_bar_disable_unbound_actions() {
+        let mut bar = MenuBar::new();
+        bar.add_menu(MenuItem::action("save", "Save").with_keybinding("Ctrl+S"));
+        bar.add_menu(MenuItem::action("help", "Help"));
+        bar.disable_unbound_actions();
+        assert!(bar.find_item("save").unwrap().enabled);
+        assert!(!bar.find_item("help").unwrap().enabled);
+    }
+
+    #[test]
+    fn menu_bar_find_duplicate_ids() {
+        let mut bar = MenuBar::new();
+        bar.add_menu(MenuItem::action("open", "Open"));
+        let sub = MenuItem::submenu("sub", "Sub")
+            .with_child(MenuItem::action("open", "Open Again"));
+        bar.add_menu(sub);
+        let dupes = bar.find_duplicate_ids();
+        assert!(dupes.contains(&"open".to_string()));
+    }
+
+    #[test]
+    fn menu_bar_set_keybinding() {
+        let mut bar = make_bar();
+        assert!(bar.set_keybinding("open", Some("Ctrl+O".into())));
+        assert_eq!(bar.find_item("open").unwrap().keybinding.as_deref(), Some("Ctrl+O"));
+        assert!(bar.set_keybinding("open", None));
+        assert!(bar.find_item("open").unwrap().keybinding.is_none());
+        assert!(!bar.set_keybinding("nonexistent", Some("X".into())));
+    }
+
+    // ── MenuRegistry additional helpers ───────────────────────────
+
+    #[test]
+    fn menu_registry_locations_and_clear() {
+        let mut reg = MenuRegistry::new();
+        reg.add("editor/context", MenuContribution {
+            group_id: "nav".into(), order: 1, item: MenuItem::action("a", "A"),
+        });
+        reg.add("editor/title", MenuContribution {
+            group_id: "nav".into(), order: 1, item: MenuItem::action("b", "B"),
+        });
+        assert_eq!(reg.total_contributions(), 2);
+        let locs = reg.locations();
+        assert!(locs.contains(&"editor/context"));
+        assert!(locs.contains(&"editor/title"));
+
+        reg.clear_location("editor/context");
+        assert!(reg.get("editor/context").is_none());
+        assert_eq!(reg.total_contributions(), 1);
+    }
+
+    #[test]
+    fn menu_registry_build_menu_for_location() {
+        let mut reg = MenuRegistry::new();
+        reg.add("ctx", MenuContribution {
+            group_id: "edit".into(), order: 2, item: MenuItem::action("paste", "Paste"),
+        });
+        reg.add("ctx", MenuContribution {
+            group_id: "nav".into(), order: 1, item: MenuItem::action("go_def", "Go to Definition"),
+        });
+        reg.add("ctx", MenuContribution {
+            group_id: "edit".into(), order: 3, item: MenuItem::action("cut", "Cut"),
+        });
+
+        let items = reg.build_menu_for_location("ctx");
+        // nav group first (order 1), then separator, then edit group (order 2, 3)
+        assert_eq!(items[0].id, "go_def");
+        assert_eq!(items[1].kind, MenuItemKind::Separator);
+        assert_eq!(items[2].id, "paste");
+        assert_eq!(items[3].id, "cut");
+    }
+
+    #[test]
+    fn menu_registry_build_empty_location() {
+        let reg = MenuRegistry::new();
+        assert!(reg.build_menu_for_location("nonexistent").is_empty());
     }
 }

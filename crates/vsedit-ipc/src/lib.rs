@@ -1070,6 +1070,407 @@ impl IpcConnectionPool {
     }
 }
 
+// ---------------------------------------------------------------------------
+// IpcFrameCodec – length-delimited message framing for stream protocols
+// ---------------------------------------------------------------------------
+
+/// Codec for framing/deframing messages on a byte stream using a 4-byte
+/// big-endian length prefix. Handles incremental parsing of partial reads.
+#[derive(Debug)]
+pub struct IpcFrameCodec {
+    buf: Vec<u8>,
+}
+
+impl IpcFrameCodec {
+    pub fn new() -> Self {
+        Self { buf: Vec::new() }
+    }
+
+    /// Encode a single message into a length-prefixed frame.
+    pub fn encode(payload: &[u8]) -> Vec<u8> {
+        let len = payload.len() as u32;
+        let mut frame = Vec::with_capacity(4 + payload.len());
+        frame.extend_from_slice(&len.to_be_bytes());
+        frame.extend_from_slice(payload);
+        frame
+    }
+
+    /// Feed incoming bytes into the internal buffer.
+    pub fn feed(&mut self, data: &[u8]) {
+        self.buf.extend_from_slice(data);
+    }
+
+    /// Try to extract the next complete frame from the buffer.
+    /// Returns `None` if not enough data is available yet.
+    pub fn decode_next(&mut self) -> Option<Vec<u8>> {
+        if self.buf.len() < 4 {
+            return None;
+        }
+        let len = u32::from_be_bytes([self.buf[0], self.buf[1], self.buf[2], self.buf[3]]) as usize;
+        if self.buf.len() < 4 + len {
+            return None;
+        }
+        let payload = self.buf[4..4 + len].to_vec();
+        self.buf.drain(..4 + len);
+        Some(payload)
+    }
+
+    /// Decode all complete frames currently available in the buffer.
+    pub fn decode_all(&mut self) -> Vec<Vec<u8>> {
+        let mut frames = Vec::new();
+        while let Some(frame) = self.decode_next() {
+            frames.push(frame);
+        }
+        frames
+    }
+
+    /// Number of buffered bytes not yet consumed.
+    pub fn buffered(&self) -> usize {
+        self.buf.len()
+    }
+
+    /// Discard all buffered data.
+    pub fn reset(&mut self) {
+        self.buf.clear();
+    }
+}
+
+impl Default for IpcFrameCodec {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IpcPendingRequests – request-response correlation tracker
+// ---------------------------------------------------------------------------
+
+/// Tracks in-flight requests so responses can be correlated back to them.
+#[derive(Debug)]
+pub struct IpcPendingRequests {
+    pending: Vec<PendingEntry>,
+}
+
+#[derive(Debug, Clone)]
+struct PendingEntry {
+    id: u64,
+    method: String,
+    sent_tick: u64,
+}
+
+impl IpcPendingRequests {
+    pub fn new() -> Self {
+        Self { pending: Vec::new() }
+    }
+
+    /// Register a request as pending. `tick` is an opaque monotonic counter
+    /// used for timeout detection.
+    pub fn register(&mut self, id: u64, method: &str, tick: u64) {
+        self.pending.push(PendingEntry {
+            id,
+            method: method.to_string(),
+            sent_tick: tick,
+        });
+    }
+
+    /// Complete a pending request, returning the method name if found.
+    pub fn complete(&mut self, id: u64) -> Option<String> {
+        let pos = self.pending.iter().position(|e| e.id == id)?;
+        Some(self.pending.remove(pos).method)
+    }
+
+    /// Return the number of in-flight requests.
+    pub fn count(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// Return IDs of all requests whose `sent_tick` is older than `deadline`.
+    pub fn timed_out(&self, deadline: u64) -> Vec<u64> {
+        self.pending
+            .iter()
+            .filter(|e| e.sent_tick < deadline)
+            .map(|e| e.id)
+            .collect()
+    }
+
+    /// Expire (remove) all requests older than `deadline`, returning their IDs.
+    pub fn expire(&mut self, deadline: u64) -> Vec<u64> {
+        let mut expired = Vec::new();
+        self.pending.retain(|e| {
+            if e.sent_tick < deadline {
+                expired.push(e.id);
+                false
+            } else {
+                true
+            }
+        });
+        expired
+    }
+
+    /// Check whether a specific request ID is still pending.
+    pub fn is_pending(&self, id: u64) -> bool {
+        self.pending.iter().any(|e| e.id == id)
+    }
+}
+
+impl Default for IpcPendingRequests {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IpcProtocolNegotiator – version negotiation for IPC handshake
+// ---------------------------------------------------------------------------
+
+/// Negotiates protocol version between two peers during handshake.
+#[derive(Debug, Clone)]
+pub struct IpcProtocolNegotiator {
+    supported: Vec<(u16, u16)>,
+}
+
+impl IpcProtocolNegotiator {
+    /// Create a negotiator that supports the given `(major, minor)` versions.
+    /// Versions should be added in order of preference (most preferred first).
+    pub fn new(supported: &[(u16, u16)]) -> Self {
+        Self {
+            supported: supported.to_vec(),
+        }
+    }
+
+    /// Given a remote peer's list of supported versions, pick the best common
+    /// version. Preference follows the local ordering.
+    pub fn negotiate(&self, remote: &[(u16, u16)]) -> Option<(u16, u16)> {
+        for &local_ver in &self.supported {
+            if remote.contains(&local_ver) {
+                return Some(local_ver);
+            }
+        }
+        None
+    }
+
+    /// Encode the supported version list into a compact byte representation.
+    /// Format: `[u16 count][major1 minor1][major2 minor2]...` all big-endian.
+    pub fn encode_versions(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(2 + self.supported.len() * 4);
+        buf.extend_from_slice(&(self.supported.len() as u16).to_be_bytes());
+        for &(major, minor) in &self.supported {
+            buf.extend_from_slice(&major.to_be_bytes());
+            buf.extend_from_slice(&minor.to_be_bytes());
+        }
+        buf
+    }
+
+    /// Decode a version list produced by [`encode_versions`].
+    pub fn decode_versions(data: &[u8]) -> Option<Vec<(u16, u16)>> {
+        if data.len() < 2 {
+            return None;
+        }
+        let count = u16::from_be_bytes([data[0], data[1]]) as usize;
+        if data.len() < 2 + count * 4 {
+            return None;
+        }
+        let mut versions = Vec::with_capacity(count);
+        for i in 0..count {
+            let off = 2 + i * 4;
+            let major = u16::from_be_bytes([data[off], data[off + 1]]);
+            let minor = u16::from_be_bytes([data[off + 2], data[off + 3]]);
+            versions.push((major, minor));
+        }
+        Some(versions)
+    }
+
+    /// Check whether a specific version is supported locally.
+    pub fn supports(&self, version: (u16, u16)) -> bool {
+        self.supported.contains(&version)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IpcConnectionState – finite state machine for connection lifecycle
+// ---------------------------------------------------------------------------
+
+/// States a connection can be in during its lifecycle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConnectionState {
+    Idle,
+    Connecting,
+    Handshaking,
+    Ready,
+    Draining,
+    Disconnected,
+    Failed,
+}
+
+impl fmt::Display for ConnectionState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConnectionState::Idle => write!(f, "Idle"),
+            ConnectionState::Connecting => write!(f, "Connecting"),
+            ConnectionState::Handshaking => write!(f, "Handshaking"),
+            ConnectionState::Ready => write!(f, "Ready"),
+            ConnectionState::Draining => write!(f, "Draining"),
+            ConnectionState::Disconnected => write!(f, "Disconnected"),
+            ConnectionState::Failed => write!(f, "Failed"),
+        }
+    }
+}
+
+/// Manages connection state transitions with validation.
+#[derive(Debug, Clone)]
+pub struct IpcConnectionStateMachine {
+    state: ConnectionState,
+    transition_count: u64,
+}
+
+impl IpcConnectionStateMachine {
+    pub fn new() -> Self {
+        Self {
+            state: ConnectionState::Idle,
+            transition_count: 0,
+        }
+    }
+
+    pub fn state(&self) -> ConnectionState {
+        self.state
+    }
+
+    pub fn transitions(&self) -> u64 {
+        self.transition_count
+    }
+
+    /// Attempt a state transition. Returns `Err` with a description if the
+    /// transition is invalid.
+    pub fn transition(&mut self, to: ConnectionState) -> Result<(), String> {
+        if !Self::valid_transition(self.state, to) {
+            return Err(format!(
+                "invalid transition: {} -> {}",
+                self.state, to
+            ));
+        }
+        self.state = to;
+        self.transition_count += 1;
+        Ok(())
+    }
+
+    /// Whether a transition from `from` to `to` is allowed.
+    pub fn valid_transition(from: ConnectionState, to: ConnectionState) -> bool {
+        matches!(
+            (from, to),
+            (ConnectionState::Idle, ConnectionState::Connecting)
+                | (ConnectionState::Connecting, ConnectionState::Handshaking)
+                | (ConnectionState::Connecting, ConnectionState::Failed)
+                | (ConnectionState::Handshaking, ConnectionState::Ready)
+                | (ConnectionState::Handshaking, ConnectionState::Failed)
+                | (ConnectionState::Ready, ConnectionState::Draining)
+                | (ConnectionState::Ready, ConnectionState::Disconnected)
+                | (ConnectionState::Ready, ConnectionState::Failed)
+                | (ConnectionState::Draining, ConnectionState::Disconnected)
+                | (ConnectionState::Draining, ConnectionState::Failed)
+                | (ConnectionState::Disconnected, ConnectionState::Connecting)
+                | (ConnectionState::Failed, ConnectionState::Connecting)
+        )
+    }
+
+    /// Whether the connection is in a terminal state (Disconnected or Failed).
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self.state,
+            ConnectionState::Disconnected | ConnectionState::Failed
+        )
+    }
+
+    /// Whether the connection is active and can send/receive messages.
+    pub fn is_active(&self) -> bool {
+        self.state == ConnectionState::Ready
+    }
+
+    /// Reset to Idle.
+    pub fn reset(&mut self) {
+        self.state = ConnectionState::Idle;
+        self.transition_count = 0;
+    }
+}
+
+impl Default for IpcConnectionStateMachine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IpcMultiplexer – multiplex multiple logical channels over a single stream
+// ---------------------------------------------------------------------------
+
+/// Multiplexes multiple logical channels over a single transport, tagging
+/// each frame with a channel ID.
+#[derive(Debug)]
+pub struct IpcMultiplexer {
+    channels: Vec<String>,
+}
+
+impl IpcMultiplexer {
+    pub fn new() -> Self {
+        Self {
+            channels: Vec::new(),
+        }
+    }
+
+    /// Register a logical channel, returning its numeric ID.
+    pub fn open_channel(&mut self, name: &str) -> Result<u16, IpcError> {
+        if self.channels.iter().any(|n| n == name) {
+            return Err(IpcError::DuplicateChannel(name.to_string()));
+        }
+        if self.channels.len() >= u16::MAX as usize {
+            return Err(IpcError::MessageTooLarge {
+                size: self.channels.len() + 1,
+                max: u16::MAX as usize,
+            });
+        }
+        let id = self.channels.len() as u16;
+        self.channels.push(name.to_string());
+        Ok(id)
+    }
+
+    /// Look up the numeric ID for a channel name.
+    pub fn channel_id(&self, name: &str) -> Option<u16> {
+        self.channels.iter().position(|n| n == name).map(|p| p as u16)
+    }
+
+    /// Look up the channel name for a numeric ID.
+    pub fn channel_name(&self, id: u16) -> Option<&str> {
+        self.channels.get(id as usize).map(|s| s.as_str())
+    }
+
+    /// Wrap a payload with a 2-byte channel ID header for multiplexing.
+    pub fn wrap(&self, channel_id: u16, payload: &[u8]) -> Vec<u8> {
+        let mut frame = Vec::with_capacity(2 + payload.len());
+        frame.extend_from_slice(&channel_id.to_be_bytes());
+        frame.extend_from_slice(payload);
+        frame
+    }
+
+    /// Unwrap a multiplexed frame, returning `(channel_id, payload)`.
+    pub fn unwrap(data: &[u8]) -> Option<(u16, &[u8])> {
+        if data.len() < 2 {
+            return None;
+        }
+        let ch = u16::from_be_bytes([data[0], data[1]]);
+        Some((ch, &data[2..]))
+    }
+
+    /// Number of open channels.
+    pub fn channel_count(&self) -> usize {
+        self.channels.len()
+    }
+}
+
+impl Default for IpcMultiplexer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1851,5 +2252,252 @@ mod tests {
         pool.add(IpcConnection::new("c2", "ch2")).unwrap();
         pool.disconnect_all();
         assert_eq!(pool.active_connections().len(), 0);
+    }
+
+    // ---- IpcFrameCodec tests ----
+
+    #[test]
+    fn frame_codec_encode_decode_single() {
+        let payload = b"hello world";
+        let frame = IpcFrameCodec::encode(payload);
+        assert_eq!(frame.len(), 4 + payload.len());
+
+        let mut codec = IpcFrameCodec::new();
+        codec.feed(&frame);
+        let decoded = codec.decode_next().unwrap();
+        assert_eq!(decoded, payload);
+        assert_eq!(codec.buffered(), 0);
+    }
+
+    #[test]
+    fn frame_codec_partial_feed() {
+        let payload = b"partial test";
+        let frame = IpcFrameCodec::encode(payload);
+
+        let mut codec = IpcFrameCodec::new();
+        // Feed only the length prefix first
+        codec.feed(&frame[..4]);
+        assert!(codec.decode_next().is_none());
+        // Feed the rest
+        codec.feed(&frame[4..]);
+        let decoded = codec.decode_next().unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn frame_codec_multiple_frames() {
+        let mut codec = IpcFrameCodec::new();
+        let f1 = IpcFrameCodec::encode(b"one");
+        let f2 = IpcFrameCodec::encode(b"two");
+        let f3 = IpcFrameCodec::encode(b"three");
+
+        // Feed all three at once (simulating a large read)
+        let mut combined = Vec::new();
+        combined.extend_from_slice(&f1);
+        combined.extend_from_slice(&f2);
+        combined.extend_from_slice(&f3);
+        codec.feed(&combined);
+
+        let frames = codec.decode_all();
+        assert_eq!(frames.len(), 3);
+        assert_eq!(frames[0], b"one");
+        assert_eq!(frames[1], b"two");
+        assert_eq!(frames[2], b"three");
+        assert_eq!(codec.buffered(), 0);
+    }
+
+    #[test]
+    fn frame_codec_empty_payload() {
+        let frame = IpcFrameCodec::encode(b"");
+        let mut codec = IpcFrameCodec::new();
+        codec.feed(&frame);
+        let decoded = codec.decode_next().unwrap();
+        assert!(decoded.is_empty());
+    }
+
+    #[test]
+    fn frame_codec_reset() {
+        let mut codec = IpcFrameCodec::new();
+        codec.feed(b"garbage");
+        assert_eq!(codec.buffered(), 7);
+        codec.reset();
+        assert_eq!(codec.buffered(), 0);
+    }
+
+    // ---- IpcPendingRequests tests ----
+
+    #[test]
+    fn pending_requests_register_and_complete() {
+        let mut pr = IpcPendingRequests::new();
+        pr.register(1, "textDocument/completion", 100);
+        pr.register(2, "textDocument/hover", 110);
+        assert_eq!(pr.count(), 2);
+        assert!(pr.is_pending(1));
+
+        let method = pr.complete(1).unwrap();
+        assert_eq!(method, "textDocument/completion");
+        assert!(!pr.is_pending(1));
+        assert_eq!(pr.count(), 1);
+
+        assert!(pr.complete(999).is_none());
+    }
+
+    #[test]
+    fn pending_requests_timeout_detection() {
+        let mut pr = IpcPendingRequests::new();
+        pr.register(1, "a", 10);
+        pr.register(2, "b", 20);
+        pr.register(3, "c", 30);
+
+        let timed_out = pr.timed_out(25);
+        assert_eq!(timed_out, vec![1, 2]);
+        // timed_out doesn't remove them
+        assert_eq!(pr.count(), 3);
+    }
+
+    #[test]
+    fn pending_requests_expire() {
+        let mut pr = IpcPendingRequests::new();
+        pr.register(1, "a", 10);
+        pr.register(2, "b", 20);
+        pr.register(3, "c", 30);
+
+        let expired = pr.expire(25);
+        assert_eq!(expired, vec![1, 2]);
+        assert_eq!(pr.count(), 1);
+        assert!(pr.is_pending(3));
+    }
+
+    // ---- IpcProtocolNegotiator tests ----
+
+    #[test]
+    fn protocol_negotiator_picks_best_common() {
+        let local = IpcProtocolNegotiator::new(&[(2, 0), (1, 1), (1, 0)]);
+        let remote = &[(1, 0), (1, 1)];
+        // Local prefers (2,0) but remote doesn't have it, so (1,1) wins
+        assert_eq!(local.negotiate(remote), Some((1, 1)));
+    }
+
+    #[test]
+    fn protocol_negotiator_no_common_version() {
+        let local = IpcProtocolNegotiator::new(&[(3, 0)]);
+        let remote = &[(1, 0), (2, 0)];
+        assert_eq!(local.negotiate(remote), None);
+    }
+
+    #[test]
+    fn protocol_negotiator_encode_decode_roundtrip() {
+        let versions = vec![(1, 0), (1, 1), (2, 0)];
+        let neg = IpcProtocolNegotiator::new(&versions);
+        let encoded = neg.encode_versions();
+        let decoded = IpcProtocolNegotiator::decode_versions(&encoded).unwrap();
+        assert_eq!(decoded, versions);
+    }
+
+    #[test]
+    fn protocol_negotiator_decode_too_short() {
+        assert!(IpcProtocolNegotiator::decode_versions(&[]).is_none());
+        assert!(IpcProtocolNegotiator::decode_versions(&[0, 2, 0, 1]).is_none());
+    }
+
+    #[test]
+    fn protocol_negotiator_supports() {
+        let neg = IpcProtocolNegotiator::new(&[(1, 0), (2, 0)]);
+        assert!(neg.supports((1, 0)));
+        assert!(!neg.supports((3, 0)));
+    }
+
+    // ---- IpcConnectionStateMachine tests ----
+
+    #[test]
+    fn state_machine_happy_path() {
+        let mut sm = IpcConnectionStateMachine::new();
+        assert_eq!(sm.state(), ConnectionState::Idle);
+        assert!(!sm.is_active());
+        assert!(!sm.is_terminal());
+
+        sm.transition(ConnectionState::Connecting).unwrap();
+        sm.transition(ConnectionState::Handshaking).unwrap();
+        sm.transition(ConnectionState::Ready).unwrap();
+        assert!(sm.is_active());
+        assert_eq!(sm.transitions(), 3);
+
+        sm.transition(ConnectionState::Draining).unwrap();
+        assert!(!sm.is_active());
+        sm.transition(ConnectionState::Disconnected).unwrap();
+        assert!(sm.is_terminal());
+    }
+
+    #[test]
+    fn state_machine_invalid_transition() {
+        let mut sm = IpcConnectionStateMachine::new();
+        let err = sm.transition(ConnectionState::Ready).unwrap_err();
+        assert!(err.contains("invalid transition"));
+    }
+
+    #[test]
+    fn state_machine_reconnect_after_failure() {
+        let mut sm = IpcConnectionStateMachine::new();
+        sm.transition(ConnectionState::Connecting).unwrap();
+        sm.transition(ConnectionState::Failed).unwrap();
+        assert!(sm.is_terminal());
+        // Can reconnect from Failed
+        sm.transition(ConnectionState::Connecting).unwrap();
+        assert!(!sm.is_terminal());
+    }
+
+    #[test]
+    fn state_machine_reset() {
+        let mut sm = IpcConnectionStateMachine::new();
+        sm.transition(ConnectionState::Connecting).unwrap();
+        sm.transition(ConnectionState::Handshaking).unwrap();
+        sm.reset();
+        assert_eq!(sm.state(), ConnectionState::Idle);
+        assert_eq!(sm.transitions(), 0);
+    }
+
+    #[test]
+    fn connection_state_display() {
+        assert_eq!(ConnectionState::Idle.to_string(), "Idle");
+        assert_eq!(ConnectionState::Ready.to_string(), "Ready");
+        assert_eq!(ConnectionState::Failed.to_string(), "Failed");
+    }
+
+    // ---- IpcMultiplexer tests ----
+
+    #[test]
+    fn multiplexer_open_and_wrap_unwrap() {
+        let mut mux = IpcMultiplexer::new();
+        let ch0 = mux.open_channel("editor").unwrap();
+        let ch1 = mux.open_channel("lsp").unwrap();
+        assert_eq!(ch0, 0);
+        assert_eq!(ch1, 1);
+        assert_eq!(mux.channel_count(), 2);
+
+        assert_eq!(mux.channel_id("editor"), Some(0));
+        assert_eq!(mux.channel_name(1), Some("lsp"));
+        assert_eq!(mux.channel_id("unknown"), None);
+
+        let frame = mux.wrap(ch0, b"payload");
+        let (ch, payload) = IpcMultiplexer::unwrap(&frame).unwrap();
+        assert_eq!(ch, ch0);
+        assert_eq!(payload, b"payload");
+    }
+
+    #[test]
+    fn multiplexer_duplicate_channel_error() {
+        let mut mux = IpcMultiplexer::new();
+        mux.open_channel("ch").unwrap();
+        let err = mux.open_channel("ch").unwrap_err();
+        assert!(matches!(err, IpcError::DuplicateChannel(_)));
+    }
+
+    #[test]
+    fn multiplexer_unwrap_too_short() {
+        assert!(IpcMultiplexer::unwrap(&[0]).is_none());
+        assert!(IpcMultiplexer::unwrap(&[]).is_none());
+        // Exactly 2 bytes = channel ID with empty payload
+        let result = IpcMultiplexer::unwrap(&[0, 0]).unwrap();
+        assert_eq!(result, (0, &[][..]));
     }
 }
