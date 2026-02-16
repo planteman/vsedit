@@ -9,6 +9,22 @@ pub enum CompletionItemKind {
     EnumMember, Constant, Struct, Event, Operator, TypeParameter,
 }
 
+/// A text edit to apply alongside completion.
+#[derive(Debug, Clone)]
+pub struct TextEdit {
+    pub range_start: (u32, u32),
+    pub range_end: (u32, u32),
+    pub new_text: String,
+}
+
+/// A command to execute after completion.
+#[derive(Debug, Clone)]
+pub struct Command {
+    pub title: String,
+    pub command: String,
+    pub arguments: Vec<String>,
+}
+
 /// A completion item.
 #[derive(Debug, Clone)]
 pub struct CompletionItem {
@@ -21,6 +37,8 @@ pub struct CompletionItem {
     pub filter_text: Option<String>,
     pub preselect: bool,
     pub deprecated: bool,
+    pub additional_text_edits: Vec<TextEdit>,
+    pub command: Option<Command>,
 }
 
 impl CompletionItem {
@@ -29,6 +47,8 @@ impl CompletionItem {
             label: label.into(), kind, detail: None, documentation: None,
             insert_text: None, sort_text: None, filter_text: None,
             preselect: false, deprecated: false,
+            additional_text_edits: Vec::new(),
+            command: None,
         }
     }
 
@@ -417,6 +437,95 @@ impl CompletionList {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Word-based completion provider
+// ---------------------------------------------------------------------------
+
+use std::collections::HashMap;
+
+/// Extracts words from document text for fallback completions.
+pub struct WordCompletionProvider;
+
+impl WordCompletionProvider {
+    /// Extract completion items from document text.
+    ///
+    /// Words are scored by frequency and proximity to `cursor_offset`.
+    /// The `current_word` being typed is excluded from results.
+    pub fn provide(text: &str, cursor_offset: usize, current_word: &str) -> CompletionList {
+        let mut word_freq: HashMap<&str, (usize, usize)> = HashMap::new();
+        let mut last_end = 0;
+        for word in text.split(|c: char| !c.is_alphanumeric() && c != '_') {
+            if word.len() < 2 || word == current_word {
+                last_end += word.len() + 1;
+                continue;
+            }
+            let distance = cursor_offset.abs_diff(last_end);
+            let entry = word_freq.entry(word).or_insert((0, usize::MAX));
+            entry.0 += 1;
+            entry.1 = entry.1.min(distance);
+            last_end += word.len() + 1;
+        }
+
+        let mut scored: Vec<(&str, i64)> = word_freq
+            .iter()
+            .map(|(word, (freq, dist))| {
+                let score = (*freq as i64) * 10 - (*dist as i64 / 100);
+                (*word, score)
+            })
+            .collect();
+        scored.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+
+        let items = scored
+            .into_iter()
+            .take(50)
+            .map(|(word, _)| CompletionItem::new(word, CompletionItemKind::Text))
+            .collect();
+        CompletionList::new(items)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snippet completion provider
+// ---------------------------------------------------------------------------
+
+/// A snippet entry for completion integration.
+#[derive(Debug, Clone)]
+pub struct SnippetEntry {
+    pub name: String,
+    pub prefix: String,
+    pub body: String,
+    pub description: Option<String>,
+}
+
+/// Converts snippet entries into completion items.
+pub struct SnippetCompletionProvider;
+
+impl SnippetCompletionProvider {
+    /// Convert snippets into completion items for display in the completion widget.
+    pub fn provide(snippets: &[SnippetEntry]) -> CompletionList {
+        let items = snippets
+            .iter()
+            .map(|s| {
+                let mut item = CompletionItem::new(&s.prefix, CompletionItemKind::Snippet)
+                    .with_insert_text(&s.body)
+                    .with_detail(format!("Snippet: {}", s.name));
+                if let Some(ref desc) = s.description {
+                    item = item.with_documentation(desc);
+                }
+                item = item.with_sort_text(format!("zz_{}", s.prefix));
+                item
+            })
+            .collect();
+        CompletionList::new(items)
+    }
+
+    /// Merge snippet completions into an existing completion list.
+    pub fn merge_into(list: &mut CompletionList, snippets: &[SnippetEntry]) {
+        let snippet_list = Self::provide(snippets);
+        list.merge(&snippet_list);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -728,5 +837,117 @@ mod tests {
         ]);
         list1.merge(&list2);
         assert!(list1.is_incomplete);
+    }
+
+    // -----------------------------------------------------------------------
+    // Word completion tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn word_completion_extracts_words() {
+        let text = "fn main() { let value = 42; println!(value); }";
+        let list = WordCompletionProvider::provide(text, 20, "");
+        assert!(!list.is_empty());
+        let labels: Vec<&str> = list.items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"value"));
+        assert!(labels.contains(&"main"));
+        assert!(labels.contains(&"println"));
+    }
+
+    #[test]
+    fn word_completion_excludes_current_word() {
+        let text = "hello world hello";
+        let list = WordCompletionProvider::provide(text, 5, "hello");
+        let labels: Vec<&str> = list.items.iter().map(|i| i.label.as_str()).collect();
+        assert!(!labels.contains(&"hello"));
+        assert!(labels.contains(&"world"));
+    }
+
+    #[test]
+    fn word_completion_skips_short_words() {
+        let text = "a b cd efg";
+        let list = WordCompletionProvider::provide(text, 0, "");
+        let labels: Vec<&str> = list.items.iter().map(|i| i.label.as_str()).collect();
+        assert!(!labels.contains(&"a"));
+        assert!(!labels.contains(&"b"));
+        assert!(labels.contains(&"cd"));
+        assert!(labels.contains(&"efg"));
+    }
+
+    #[test]
+    fn word_completion_frequency_scoring() {
+        let text = "foo bar foo foo baz bar";
+        let list = WordCompletionProvider::provide(text, 0, "");
+        // foo appears 3 times, should be first
+        assert_eq!(list.items[0].label, "foo");
+    }
+
+    // -----------------------------------------------------------------------
+    // Snippet completion tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn snippet_completion_items() {
+        let snippets = vec![
+            SnippetEntry {
+                name: "For Loop".to_string(),
+                prefix: "for".to_string(),
+                body: "for ${1:i} in ${2:iter} { $0 }".to_string(),
+                description: Some("A for loop".to_string()),
+            },
+        ];
+        let list = SnippetCompletionProvider::provide(&snippets);
+        assert_eq!(list.len(), 1);
+        assert_eq!(list.items[0].kind, CompletionItemKind::Snippet);
+        assert_eq!(list.items[0].label, "for");
+        assert!(list.items[0].documentation.is_some());
+    }
+
+    #[test]
+    fn snippet_completion_merge() {
+        let mut word_list = CompletionList::new(vec![
+            CompletionItem::new("format", CompletionItemKind::Function),
+        ]);
+        let snippets = vec![
+            SnippetEntry {
+                name: "fn".to_string(),
+                prefix: "fn".to_string(),
+                body: "fn $1() {}".to_string(),
+                description: None,
+            },
+        ];
+        SnippetCompletionProvider::merge_into(&mut word_list, &snippets);
+        assert_eq!(word_list.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional text edits and command tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn completion_item_additional_edits() {
+        let item = CompletionItem::new("import_foo", CompletionItemKind::Module);
+        assert!(item.additional_text_edits.is_empty());
+        assert!(item.command.is_none());
+    }
+
+    #[test]
+    fn text_edit_struct() {
+        let edit = TextEdit {
+            range_start: (0, 0),
+            range_end: (0, 5),
+            new_text: "hello".to_string(),
+        };
+        assert_eq!(edit.new_text, "hello");
+    }
+
+    #[test]
+    fn command_struct() {
+        let cmd = Command {
+            title: "Trigger suggest".to_string(),
+            command: "editor.action.triggerSuggest".to_string(),
+            arguments: vec![],
+        };
+        assert_eq!(cmd.command, "editor.action.triggerSuggest");
     }
 }

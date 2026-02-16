@@ -250,6 +250,196 @@ pub trait CompletionProvider {
     fn provide_completions(&self, prefix: &str) -> Vec<CompletionItem>;
 }
 
+// ---------------------------------------------------------------------------
+// Completion widget
+// ---------------------------------------------------------------------------
+
+/// A completion widget for rendering in the terminal.
+#[derive(Debug)]
+pub struct CompletionWidget {
+    pub items: Vec<CompletionItem>,
+    pub selected_idx: usize,
+    pub visible_range: (usize, usize),
+    pub is_active: bool,
+    pub filter_text: String,
+    pub max_visible: usize,
+}
+
+impl CompletionWidget {
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            selected_idx: 0,
+            visible_range: (0, 0),
+            is_active: false,
+            filter_text: String::new(),
+            max_visible: 10,
+        }
+    }
+
+    /// Open the widget with items.
+    pub fn open(&mut self, items: Vec<CompletionItem>) {
+        let visible_end = items.len().min(self.max_visible);
+        self.items = items;
+        self.selected_idx = 0;
+        self.visible_range = (0, visible_end);
+        self.is_active = true;
+        self.filter_text.clear();
+    }
+
+    /// Dismiss the widget.
+    pub fn dismiss(&mut self) {
+        self.is_active = false;
+        self.items.clear();
+        self.filter_text.clear();
+    }
+
+    /// Navigate down.
+    pub fn select_next(&mut self) {
+        if self.items.is_empty() {
+            return;
+        }
+        if self.selected_idx + 1 < self.items.len() {
+            self.selected_idx += 1;
+            if self.selected_idx >= self.visible_range.1 {
+                self.visible_range.0 += 1;
+                self.visible_range.1 += 1;
+            }
+        }
+    }
+
+    /// Navigate up.
+    pub fn select_prev(&mut self) {
+        if self.selected_idx > 0 {
+            self.selected_idx -= 1;
+            if self.selected_idx < self.visible_range.0 {
+                self.visible_range.0 = self.selected_idx;
+                self.visible_range.1 = self.visible_range.0 + self.max_visible.min(self.items.len());
+            }
+        }
+    }
+
+    /// Accept the current selection. Returns the selected item, if any.
+    pub fn accept(&mut self) -> Option<CompletionItem> {
+        if !self.is_active || self.items.is_empty() {
+            return None;
+        }
+        let item = self.items.get(self.selected_idx).cloned();
+        self.dismiss();
+        item
+    }
+
+    /// Accept the top item (Tab behavior).
+    pub fn accept_top(&mut self) -> Option<CompletionItem> {
+        if !self.is_active || self.items.is_empty() {
+            return None;
+        }
+        let item = self.items.first().cloned();
+        self.dismiss();
+        item
+    }
+
+    /// Type-ahead filtering: update filter text and re-filter items.
+    pub fn update_filter(&mut self, filter: &str, all_items: &[CompletionItem]) {
+        self.filter_text = filter.to_string();
+        let lower = filter.to_lowercase();
+        self.items = all_items
+            .iter()
+            .filter(|item| {
+                let text = item
+                    .filter_text
+                    .as_deref()
+                    .unwrap_or(&item.label);
+                text.to_lowercase().contains(&lower)
+            })
+            .cloned()
+            .collect();
+        self.selected_idx = 0;
+        let visible_end = self.items.len().min(self.max_visible);
+        self.visible_range = (0, visible_end);
+    }
+
+    /// Get the currently selected item.
+    pub fn selected_item(&self) -> Option<&CompletionItem> {
+        self.items.get(self.selected_idx)
+    }
+
+    /// Get items in the visible range for rendering.
+    pub fn visible_items(&self) -> &[CompletionItem] {
+        let start = self.visible_range.0.min(self.items.len());
+        let end = self.visible_range.1.min(self.items.len());
+        &self.items[start..end]
+    }
+}
+
+impl Default for CompletionWidget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Auto-trigger configuration
+// ---------------------------------------------------------------------------
+
+/// Configuration for auto-triggering completions.
+#[derive(Debug, Clone)]
+pub struct AutoTriggerConfig {
+    /// Characters that trigger completions (e.g., `.`, `:`, `/`).
+    pub trigger_characters: Vec<char>,
+    /// Debounce time in milliseconds for word-based completions.
+    pub word_debounce_ms: u64,
+    /// Whether auto-trigger is enabled.
+    pub enabled: bool,
+}
+
+impl AutoTriggerConfig {
+    pub fn new() -> Self {
+        Self {
+            trigger_characters: vec!['.'],
+            word_debounce_ms: 500,
+            enabled: true,
+        }
+    }
+
+    /// Add Rust-specific trigger characters.
+    pub fn with_rust_triggers(mut self) -> Self {
+        if !self.trigger_characters.contains(&':') {
+            self.trigger_characters.push(':');
+        }
+        self
+    }
+
+    /// Add file path trigger character.
+    pub fn with_path_triggers(mut self) -> Self {
+        if !self.trigger_characters.contains(&'/') {
+            self.trigger_characters.push('/');
+        }
+        self
+    }
+
+    /// Add custom trigger characters from language configuration.
+    pub fn with_custom_triggers(mut self, chars: &[char]) -> Self {
+        for &c in chars {
+            if !self.trigger_characters.contains(&c) {
+                self.trigger_characters.push(c);
+            }
+        }
+        self
+    }
+
+    /// Check if a character should trigger completions.
+    pub fn should_trigger(&self, ch: char) -> bool {
+        self.enabled && self.trigger_characters.contains(&ch)
+    }
+}
+
+impl Default for AutoTriggerConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -482,6 +672,151 @@ mod tests {
     #[test]
     fn ne_completionitemkind_diff() {
         assert_ne!(CompletionItemKind::Method, CompletionItemKind::Function);
+    }
+
+    // -----------------------------------------------------------------------
+    // CompletionWidget tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn completion_widget_open_and_dismiss() {
+        let mut w = CompletionWidget::new();
+        assert!(!w.is_active);
+        w.open(vec![
+            make_item("foo", CompletionItemKind::Function),
+            make_item("bar", CompletionItemKind::Variable),
+        ]);
+        assert!(w.is_active);
+        assert_eq!(w.items.len(), 2);
+        assert_eq!(w.selected_idx, 0);
+        w.dismiss();
+        assert!(!w.is_active);
+        assert!(w.items.is_empty());
+    }
+
+    #[test]
+    fn completion_widget_navigation() {
+        let mut w = CompletionWidget::new();
+        w.open(vec![
+            make_item("a", CompletionItemKind::Text),
+            make_item("b", CompletionItemKind::Text),
+            make_item("c", CompletionItemKind::Text),
+        ]);
+        assert_eq!(w.selected_idx, 0);
+        w.select_next();
+        assert_eq!(w.selected_idx, 1);
+        w.select_next();
+        assert_eq!(w.selected_idx, 2);
+        w.select_next(); // at end
+        assert_eq!(w.selected_idx, 2);
+        w.select_prev();
+        assert_eq!(w.selected_idx, 1);
+        w.select_prev();
+        assert_eq!(w.selected_idx, 0);
+        w.select_prev(); // at start
+        assert_eq!(w.selected_idx, 0);
+    }
+
+    #[test]
+    fn completion_widget_accept() {
+        let mut w = CompletionWidget::new();
+        w.open(vec![
+            make_item("foo", CompletionItemKind::Function),
+            make_item("bar", CompletionItemKind::Variable),
+        ]);
+        w.select_next();
+        let accepted = w.accept();
+        assert!(accepted.is_some());
+        assert_eq!(accepted.unwrap().label, "bar");
+        assert!(!w.is_active);
+    }
+
+    #[test]
+    fn completion_widget_accept_top() {
+        let mut w = CompletionWidget::new();
+        w.open(vec![
+            make_item("first", CompletionItemKind::Text),
+            make_item("second", CompletionItemKind::Text),
+        ]);
+        w.select_next(); // select second
+        let accepted = w.accept_top(); // should still return first
+        assert_eq!(accepted.unwrap().label, "first");
+    }
+
+    #[test]
+    fn completion_widget_filter() {
+        let all_items = vec![
+            make_item("forEach", CompletionItemKind::Method),
+            make_item("format", CompletionItemKind::Function),
+            make_item("bar", CompletionItemKind::Variable),
+        ];
+        let mut w = CompletionWidget::new();
+        w.open(all_items.clone());
+        w.update_filter("for", &all_items);
+        assert_eq!(w.items.len(), 2);
+        assert_eq!(w.selected_idx, 0);
+    }
+
+    #[test]
+    fn completion_widget_visible_items() {
+        let mut w = CompletionWidget::new();
+        w.max_visible = 2;
+        w.open(vec![
+            make_item("a", CompletionItemKind::Text),
+            make_item("b", CompletionItemKind::Text),
+            make_item("c", CompletionItemKind::Text),
+        ]);
+        assert_eq!(w.visible_items().len(), 2);
+        w.select_next();
+        w.select_next(); // scroll
+        assert_eq!(w.visible_items().len(), 2);
+    }
+
+    #[test]
+    fn completion_widget_selected_item() {
+        let mut w = CompletionWidget::new();
+        w.open(vec![make_item("test", CompletionItemKind::Text)]);
+        assert_eq!(w.selected_item().unwrap().label, "test");
+    }
+
+    // -----------------------------------------------------------------------
+    // Auto-trigger tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn auto_trigger_default() {
+        let cfg = AutoTriggerConfig::new();
+        assert!(cfg.should_trigger('.'));
+        assert!(!cfg.should_trigger(':'));
+        assert_eq!(cfg.word_debounce_ms, 500);
+    }
+
+    #[test]
+    fn auto_trigger_rust() {
+        let cfg = AutoTriggerConfig::new().with_rust_triggers();
+        assert!(cfg.should_trigger('.'));
+        assert!(cfg.should_trigger(':'));
+    }
+
+    #[test]
+    fn auto_trigger_path() {
+        let cfg = AutoTriggerConfig::new().with_path_triggers();
+        assert!(cfg.should_trigger('/'));
+    }
+
+    #[test]
+    fn auto_trigger_custom() {
+        let cfg = AutoTriggerConfig::new().with_custom_triggers(&['@', '#']);
+        assert!(cfg.should_trigger('@'));
+        assert!(cfg.should_trigger('#'));
+        assert!(cfg.should_trigger('.')); // default still there
+    }
+
+    #[test]
+    fn auto_trigger_disabled() {
+        let mut cfg = AutoTriggerConfig::new();
+        cfg.enabled = false;
+        assert!(!cfg.should_trigger('.'));
     }
 
     #[test]

@@ -273,6 +273,119 @@ pub trait SnippetProvider {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Language-scoped snippet registry
+// ---------------------------------------------------------------------------
+
+/// A registry that organizes snippets by language ID for fast lookup.
+pub struct LanguageScopedRegistry {
+    by_language: HashMap<String, Vec<Snippet>>,
+    global: Vec<Snippet>,
+}
+
+impl LanguageScopedRegistry {
+    pub fn new() -> Self {
+        Self {
+            by_language: HashMap::new(),
+            global: Vec::new(),
+        }
+    }
+
+    /// Register snippets for a specific language.
+    pub fn register_snippets(&mut self, language: &str, snippets: Vec<Snippet>) {
+        self.by_language
+            .entry(language.to_string())
+            .or_default()
+            .extend(snippets);
+    }
+
+    /// Register a snippet that applies to all languages.
+    pub fn register_global(&mut self, snippet: Snippet) {
+        self.global.push(snippet);
+    }
+
+    /// Get all snippets available for a language (language-specific + global).
+    pub fn get_snippets(&self, language: &str) -> Vec<&Snippet> {
+        let mut result: Vec<&Snippet> = self.global.iter().collect();
+        if let Some(lang_snippets) = self.by_language.get(language) {
+            result.extend(lang_snippets.iter());
+        }
+        result
+    }
+
+    /// Get snippet count for a specific language (excluding globals).
+    pub fn language_snippet_count(&self, language: &str) -> usize {
+        self.by_language
+            .get(language)
+            .map(|v| v.len())
+            .unwrap_or(0)
+    }
+
+    /// Get all registered language IDs.
+    pub fn languages(&self) -> Vec<&str> {
+        self.by_language.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Total snippet count across all languages + globals.
+    pub fn total_count(&self) -> usize {
+        self.global.len() + self.by_language.values().map(|v| v.len()).sum::<usize>()
+    }
+}
+
+impl Default for LanguageScopedRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Load snippets from a VS Code JSON snippet string into a vector.
+pub fn load_vscode_snippets(json: &str, source: SnippetSource) -> Result<Vec<Snippet>, String> {
+    let value: serde_json::Value =
+        serde_json::from_str(json).map_err(|e| format!("invalid JSON: {e}"))?;
+    let obj = value
+        .as_object()
+        .ok_or_else(|| "expected JSON object".to_string())?;
+    let mut snippets = Vec::new();
+    for (name, entry) in obj {
+        let entry_obj = entry
+            .as_object()
+            .ok_or_else(|| format!("expected object for {name}"))?;
+        let prefix = match entry_obj.get("prefix") {
+            Some(serde_json::Value::String(s)) => vec![s.clone()],
+            Some(serde_json::Value::Array(arr)) => arr
+                .iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect(),
+            _ => vec![name.clone()],
+        };
+        let body = match entry_obj.get("body") {
+            Some(serde_json::Value::String(s)) => vec![s.clone()],
+            Some(serde_json::Value::Array(arr)) => arr
+                .iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect(),
+            _ => vec![],
+        };
+        let description = entry_obj
+            .get("description")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let scope = entry_obj
+            .get("scope")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        snippets.push(Snippet {
+            name: name.clone(),
+            prefix,
+            body,
+            description,
+            scope,
+            source: source.clone(),
+        });
+    }
+    Ok(snippets)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -428,6 +541,80 @@ mod tests {
     #[test]
     fn ne_snippetsource_diff() {
         assert_ne!(SnippetSource::User, SnippetSource::Workspace);
+    }
+
+    // -----------------------------------------------------------------------
+    // Language-scoped registry tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn language_registry_register_and_get() {
+        let mut reg = LanguageScopedRegistry::new();
+        reg.register_snippets(
+            "rust",
+            vec![sample_snippet("for-loop", "for", Some("rust"))],
+        );
+        reg.register_snippets(
+            "python",
+            vec![sample_snippet("def-func", "def", Some("python"))],
+        );
+        let rust = reg.get_snippets("rust");
+        assert_eq!(rust.len(), 1);
+        assert_eq!(rust[0].name, "for-loop");
+    }
+
+    #[test]
+    fn language_registry_global_snippets() {
+        let mut reg = LanguageScopedRegistry::new();
+        reg.register_global(sample_snippet("todo", "todo", None));
+        reg.register_snippets("rust", vec![sample_snippet("fn", "fn", Some("rust"))]);
+        // Rust should see global + rust-specific
+        let rust = reg.get_snippets("rust");
+        assert_eq!(rust.len(), 2);
+        // Python should see only global
+        let py = reg.get_snippets("python");
+        assert_eq!(py.len(), 1);
+        assert_eq!(py[0].name, "todo");
+    }
+
+    #[test]
+    fn language_registry_count() {
+        let mut reg = LanguageScopedRegistry::new();
+        reg.register_snippets("rust", vec![sample_snippet("a", "a", None)]);
+        reg.register_global(sample_snippet("b", "b", None));
+        assert_eq!(reg.language_snippet_count("rust"), 1);
+        assert_eq!(reg.total_count(), 2);
+    }
+
+    #[test]
+    fn language_registry_languages() {
+        let mut reg = LanguageScopedRegistry::new();
+        reg.register_snippets("rust", vec![sample_snippet("a", "a", None)]);
+        reg.register_snippets("python", vec![sample_snippet("b", "b", None)]);
+        let mut langs = reg.languages();
+        langs.sort();
+        assert_eq!(langs, vec!["python", "rust"]);
+    }
+
+    #[test]
+    fn load_vscode_snippets_json() {
+        let json = r#"{
+            "Print": {
+                "prefix": "print",
+                "body": ["println!(\"$1\");"],
+                "description": "Print line"
+            }
+        }"#;
+        let snippets = load_vscode_snippets(json, SnippetSource::Extension).unwrap();
+        assert_eq!(snippets.len(), 1);
+        assert_eq!(snippets[0].name, "Print");
+        assert_eq!(snippets[0].source, SnippetSource::Extension);
+        assert_eq!(snippets[0].description.as_deref(), Some("Print line"));
+    }
+
+    #[test]
+    fn load_vscode_snippets_invalid() {
+        assert!(load_vscode_snippets("not json", SnippetSource::User).is_err());
     }
 
     #[test]

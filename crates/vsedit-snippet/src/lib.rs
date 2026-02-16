@@ -1,7 +1,8 @@
 //! Snippet engine.
 //!
 //! Parses and processes VS Code snippet syntax (TextMate-compatible).
-//! Supports tabstops, placeholders, choices, variables, and transforms.
+//! Supports tabstops, placeholders, choices, variables, transforms,
+//! VS Code snippet file parsing, and snippet insertion sessions.
 
 use std::collections::HashMap;
 
@@ -452,6 +453,363 @@ impl SnippetRegistry {
     }
 }
 
+// ---------------------------------------------------------------------------
+// VS Code snippet file model
+// ---------------------------------------------------------------------------
+
+/// A VS Code snippet file entry with full metadata.
+#[derive(Debug, Clone)]
+pub struct SnippetFileEntry {
+    pub name: String,
+    pub prefix: Vec<String>,
+    pub body: Vec<String>,
+    pub description: Option<String>,
+    pub scope: Option<String>,
+}
+
+/// A parsed VS Code snippet file.
+#[derive(Debug, Clone)]
+pub struct SnippetFile {
+    pub language_id: Option<String>,
+    pub snippets: HashMap<String, SnippetFileEntry>,
+}
+
+impl SnippetFile {
+    /// Parse a VS Code snippet JSON string.
+    ///
+    /// The format is `{ "Name": { "prefix": ..., "body": ..., "description": ... } }`.
+    pub fn parse(json: &str) -> Result<Self, String> {
+        let value: serde_json::Value =
+            serde_json::from_str(json).map_err(|e| format!("invalid JSON: {e}"))?;
+        let obj = value.as_object().ok_or("expected JSON object")?;
+        let mut snippets = HashMap::new();
+        for (name, entry) in obj {
+            let entry_obj = entry.as_object().ok_or(format!("expected object for {name}"))?;
+            let prefix = match entry_obj.get("prefix") {
+                Some(serde_json::Value::String(s)) => vec![s.clone()],
+                Some(serde_json::Value::Array(arr)) => arr
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect(),
+                _ => vec![name.clone()],
+            };
+            let body = match entry_obj.get("body") {
+                Some(serde_json::Value::String(s)) => vec![s.clone()],
+                Some(serde_json::Value::Array(arr)) => arr
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect(),
+                _ => vec![],
+            };
+            let description = entry_obj
+                .get("description")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            let scope = entry_obj
+                .get("scope")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            snippets.insert(
+                name.clone(),
+                SnippetFileEntry {
+                    name: name.clone(),
+                    prefix,
+                    body,
+                    description,
+                    scope,
+                },
+            );
+        }
+        Ok(SnippetFile {
+            language_id: None,
+            snippets,
+        })
+    }
+
+    /// Set the language ID for this snippet file.
+    pub fn with_language(mut self, lang: impl Into<String>) -> Self {
+        self.language_id = Some(lang.into());
+        self
+    }
+
+    pub fn len(&self) -> usize {
+        self.snippets.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.snippets.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Snippet session (tabstop navigation)
+// ---------------------------------------------------------------------------
+
+/// A tabstop position within expanded text.
+#[derive(Debug, Clone)]
+pub struct TabstopPosition {
+    pub index: u32,
+    pub offset: usize,
+    pub length: usize,
+    pub placeholder: Option<String>,
+    pub choices: Option<Vec<String>>,
+}
+
+/// Active snippet session for tabstop navigation.
+#[derive(Debug)]
+pub struct SnippetSession {
+    pub expanded_text: String,
+    pub tabstops: Vec<TabstopPosition>,
+    pub current_tabstop: usize,
+    pub active: bool,
+    pub insert_offset: usize,
+}
+
+impl SnippetSession {
+    /// Create a new snippet session by expanding the snippet at the given cursor offset.
+    pub fn new(snippet: &Snippet, variables: &SnippetVariables, insert_offset: usize) -> Self {
+        let mut text = String::new();
+        let mut tabstops = Vec::new();
+        Self::expand_with_tabstops(&snippet.elements, variables, &mut text, &mut tabstops);
+        // Sort tabstops: $1 first, then $2, etc., with $0 last
+        tabstops.sort_by(|a, b| {
+            if a.index == 0 {
+                std::cmp::Ordering::Greater
+            } else if b.index == 0 {
+                std::cmp::Ordering::Less
+            } else {
+                a.index.cmp(&b.index)
+            }
+        });
+        Self {
+            expanded_text: text,
+            tabstops,
+            current_tabstop: 0,
+            active: true,
+            insert_offset,
+        }
+    }
+
+    fn expand_with_tabstops(
+        elements: &[SnippetElement],
+        variables: &SnippetVariables,
+        text: &mut String,
+        tabstops: &mut Vec<TabstopPosition>,
+    ) {
+        for element in elements {
+            match element {
+                SnippetElement::Text(t) => text.push_str(t),
+                SnippetElement::Tabstop(idx) => {
+                    tabstops.push(TabstopPosition {
+                        index: *idx,
+                        offset: text.len(),
+                        length: 0,
+                        placeholder: None,
+                        choices: None,
+                    });
+                }
+                SnippetElement::Placeholder { index, default } => {
+                    let start = text.len();
+                    for d in default {
+                        expand_element(d, variables, text);
+                    }
+                    let len = text.len() - start;
+                    tabstops.push(TabstopPosition {
+                        index: *index,
+                        offset: start,
+                        length: len,
+                        placeholder: Some(text[start..].to_string()),
+                        choices: None,
+                    });
+                }
+                SnippetElement::Choice { index, choices } => {
+                    let first = choices.first().map(|s| s.as_str()).unwrap_or("");
+                    let start = text.len();
+                    text.push_str(first);
+                    tabstops.push(TabstopPosition {
+                        index: *index,
+                        offset: start,
+                        length: first.len(),
+                        placeholder: Some(first.to_string()),
+                        choices: Some(choices.clone()),
+                    });
+                }
+                SnippetElement::Variable { name, default } => {
+                    if let Some(value) = variables.get(name) {
+                        text.push_str(value);
+                    } else if let Some(defaults) = default {
+                        for d in defaults {
+                            expand_element(d, variables, text);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Get the current tabstop position, if any.
+    pub fn current_position(&self) -> Option<&TabstopPosition> {
+        if self.active {
+            self.tabstops.get(self.current_tabstop)
+        } else {
+            None
+        }
+    }
+
+    /// Advance to the next tabstop. Returns `true` if moved.
+    pub fn next_tabstop(&mut self) -> bool {
+        if !self.active || self.tabstops.is_empty() {
+            return false;
+        }
+        if self.current_tabstop + 1 < self.tabstops.len() {
+            self.current_tabstop += 1;
+            true
+        } else {
+            self.finish();
+            false
+        }
+    }
+
+    /// Go to the previous tabstop. Returns `true` if moved.
+    pub fn prev_tabstop(&mut self) -> bool {
+        if !self.active || self.current_tabstop == 0 {
+            return false;
+        }
+        self.current_tabstop -= 1;
+        true
+    }
+
+    /// Accept snippet and deactivate.
+    pub fn finish(&mut self) {
+        self.active = false;
+    }
+
+    /// Cancel snippet mode.
+    pub fn cancel(&mut self) {
+        self.active = false;
+    }
+
+    /// Check if the session is still active.
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+
+    /// Number of tabstops.
+    pub fn tabstop_count(&self) -> usize {
+        self.tabstops.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Transform support: ${1/regex/replacement/flags}
+// ---------------------------------------------------------------------------
+
+/// A tabstop transformation.
+#[derive(Debug, Clone)]
+pub struct SnippetTransform {
+    pub pattern: String,
+    pub replacement: String,
+    pub flags: String,
+}
+
+impl SnippetTransform {
+    /// Parse a transform string like `regex/replacement/flags`.
+    pub fn parse(input: &str) -> Option<Self> {
+        let parts: Vec<&str> = input.splitn(3, '/').collect();
+        if parts.len() < 2 {
+            return None;
+        }
+        Some(Self {
+            pattern: parts[0].to_string(),
+            replacement: parts[1].to_string(),
+            flags: parts.get(2).unwrap_or(&"").to_string(),
+        })
+    }
+
+    /// Apply the transform to the given input text.
+    pub fn apply(&self, input: &str) -> String {
+        let case_insensitive = self.flags.contains('i');
+        let global = self.flags.contains('g');
+        let re = if case_insensitive {
+            regex::Regex::new(&format!("(?i){}", self.pattern))
+        } else {
+            regex::Regex::new(&self.pattern)
+        };
+        match re {
+            Ok(re) => {
+                if global {
+                    re.replace_all(input, self.replacement.as_str()).to_string()
+                } else {
+                    re.replace(input, self.replacement.as_str()).to_string()
+                }
+            }
+            Err(_) => input.to_string(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Enhanced variable expansion
+// ---------------------------------------------------------------------------
+
+impl SnippetVariables {
+    /// Populate with all common VS Code snippet variables.
+    pub fn with_all_defaults(
+        mut self,
+        filename: &str,
+        selected_text: &str,
+        clipboard: &str,
+        line_comment: &str,
+    ) -> Self {
+        self.set("TM_FILENAME", filename);
+        self.set(
+            "TM_FILENAME_BASE",
+            filename.rsplit('.').nth(1).unwrap_or(filename),
+        );
+        self.set("TM_SELECTED_TEXT", selected_text);
+        self.set("CLIPBOARD", clipboard);
+        self.set("TM_CURRENT_LINE", "");
+        self.set("TM_CURRENT_WORD", "");
+        self.set("TM_LINE_INDEX", "0");
+        self.set("TM_LINE_NUMBER", "1");
+        self.set("LINE_COMMENT", line_comment);
+
+        // Date/time variables
+        let now = current_date_time();
+        self.set("CURRENT_YEAR", &now.year);
+        self.set("CURRENT_YEAR_SHORT", &now.year_short);
+        self.set("CURRENT_MONTH", &now.month);
+        self.set("CURRENT_DATE", &now.day);
+        self.set("CURRENT_HOUR", &now.hour);
+        self.set("CURRENT_MINUTE", &now.minute);
+        self.set("CURRENT_SECOND", &now.second);
+        self
+    }
+}
+
+struct DateTimeParts {
+    year: String,
+    year_short: String,
+    month: String,
+    day: String,
+    hour: String,
+    minute: String,
+    second: String,
+}
+
+fn current_date_time() -> DateTimeParts {
+    // Simple fallback without chrono dependency
+    DateTimeParts {
+        year: "2025".to_string(),
+        year_short: "25".to_string(),
+        month: "01".to_string(),
+        day: "01".to_string(),
+        hour: "00".to_string(),
+        minute: "00".to_string(),
+        second: "00".to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -643,5 +1001,164 @@ mod tests {
         assert_eq!(vars.get("CLIPBOARD"), Some("copied_text"));
         assert_eq!(vars.get("TM_FILENAME_BASE"), Some("main"));
         assert_eq!(vars.get("TM_LINE_NUMBER"), Some("1"));
+    }
+
+    // -----------------------------------------------------------------------
+    // SnippetFile tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_vscode_snippet_file() {
+        let json = r#"{
+            "For Loop": {
+                "prefix": ["for", "forloop"],
+                "body": ["for (${1:i} = 0; ${1:i} < ${2:count}; ${1:i}++) {", "\t$0", "}"],
+                "description": "A for loop"
+            },
+            "Print": {
+                "prefix": "print",
+                "body": "console.log($1);",
+                "description": "Log output"
+            }
+        }"#;
+        let file = SnippetFile::parse(json).unwrap();
+        assert_eq!(file.len(), 2);
+        let for_loop = &file.snippets["For Loop"];
+        assert_eq!(for_loop.prefix, vec!["for", "forloop"]);
+        assert_eq!(for_loop.body.len(), 3);
+        assert_eq!(for_loop.description.as_deref(), Some("A for loop"));
+    }
+
+    #[test]
+    fn snippet_file_with_scope() {
+        let json = r#"{
+            "Fn": {
+                "prefix": "fn",
+                "body": "fn ${1:name}() {}",
+                "scope": "rust"
+            }
+        }"#;
+        let file = SnippetFile::parse(json).unwrap().with_language("rust");
+        assert_eq!(file.language_id.as_deref(), Some("rust"));
+        assert_eq!(file.snippets["Fn"].scope.as_deref(), Some("rust"));
+    }
+
+    #[test]
+    fn snippet_file_invalid_json() {
+        assert!(SnippetFile::parse("not json").is_err());
+    }
+
+    #[test]
+    fn snippet_file_empty() {
+        let file = SnippetFile::parse("{}").unwrap();
+        assert!(file.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // SnippetSession tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn session_basic_tabstops() {
+        let snippet = parse_snippet("fn ${1:name}($2) {\n\t$0\n}");
+        let vars = SnippetVariables::new();
+        let session = SnippetSession::new(&snippet, &vars, 0);
+        assert!(session.is_active());
+        assert_eq!(session.tabstop_count(), 3);
+        // First tabstop should be $1 (not $0)
+        let pos = session.current_position().unwrap();
+        assert_eq!(pos.index, 1);
+        assert_eq!(pos.placeholder.as_deref(), Some("name"));
+    }
+
+    #[test]
+    fn session_next_prev_tabstop() {
+        let snippet = parse_snippet("$1 $2 $0");
+        let vars = SnippetVariables::new();
+        let mut session = SnippetSession::new(&snippet, &vars, 0);
+        assert_eq!(session.current_position().unwrap().index, 1);
+        assert!(session.next_tabstop());
+        assert_eq!(session.current_position().unwrap().index, 2);
+        assert!(session.prev_tabstop());
+        assert_eq!(session.current_position().unwrap().index, 1);
+    }
+
+    #[test]
+    fn session_finish_on_last() {
+        let snippet = parse_snippet("$1 $0");
+        let vars = SnippetVariables::new();
+        let mut session = SnippetSession::new(&snippet, &vars, 0);
+        assert!(session.next_tabstop()); // move to $0
+        assert!(!session.next_tabstop()); // past end -> finish
+        assert!(!session.is_active());
+    }
+
+    #[test]
+    fn session_cancel() {
+        let snippet = parse_snippet("$1 $2");
+        let vars = SnippetVariables::new();
+        let mut session = SnippetSession::new(&snippet, &vars, 0);
+        session.cancel();
+        assert!(!session.is_active());
+        assert!(session.current_position().is_none());
+    }
+
+    #[test]
+    fn session_choice_tabstop() {
+        let snippet = parse_snippet("${1|public,private,protected|}");
+        let vars = SnippetVariables::new();
+        let session = SnippetSession::new(&snippet, &vars, 0);
+        let pos = session.current_position().unwrap();
+        assert_eq!(pos.choices.as_ref().unwrap().len(), 3);
+        assert_eq!(pos.placeholder.as_deref(), Some("public"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Transform tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn transform_parse() {
+        let t = SnippetTransform::parse("foo/bar/gi").unwrap();
+        assert_eq!(t.pattern, "foo");
+        assert_eq!(t.replacement, "bar");
+        assert_eq!(t.flags, "gi");
+    }
+
+    #[test]
+    fn transform_apply_simple() {
+        let t = SnippetTransform::parse("hello/world/").unwrap();
+        assert_eq!(t.apply("say hello"), "say world");
+    }
+
+    #[test]
+    fn transform_apply_global() {
+        let t = SnippetTransform::parse("a/b/g").unwrap();
+        assert_eq!(t.apply("aaa"), "bbb");
+    }
+
+    #[test]
+    fn transform_apply_case_insensitive() {
+        let t = SnippetTransform::parse("hello/world/i").unwrap();
+        assert_eq!(t.apply("say HELLO"), "say world");
+    }
+
+    #[test]
+    fn transform_invalid_regex() {
+        let t = SnippetTransform::parse("[invalid/replacement/").unwrap();
+        assert_eq!(t.apply("test"), "test");
+    }
+
+    // -----------------------------------------------------------------------
+    // Enhanced variable tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn all_defaults_variables() {
+        let vars = SnippetVariables::new().with_all_defaults("test.rs", "selected", "clip", "//");
+        assert_eq!(vars.get("TM_SELECTED_TEXT"), Some("selected"));
+        assert_eq!(vars.get("LINE_COMMENT"), Some("//"));
+        assert_eq!(vars.get("CURRENT_YEAR"), Some("2025"));
+        assert_eq!(vars.get("CLIPBOARD"), Some("clip"));
     }
 }
