@@ -60,6 +60,170 @@ pub struct MarkerData {
 }
 
 // ---------------------------------------------------------------------------
+// DiagnosticEntry & DiagnosticCollection (high-level API)
+// ---------------------------------------------------------------------------
+
+/// Severity of a diagnostic entry (mirrors VS Code DiagnosticSeverity).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum DiagnosticSeverity {
+    Error,
+    Warning,
+    Info,
+    Hint,
+}
+
+impl DiagnosticSeverity {
+    /// Convert to the lower-level `MarkerSeverity`.
+    pub fn to_marker_severity(self) -> MarkerSeverity {
+        match self {
+            DiagnosticSeverity::Error => MarkerSeverity::Error,
+            DiagnosticSeverity::Warning => MarkerSeverity::Warning,
+            DiagnosticSeverity::Info => MarkerSeverity::Info,
+            DiagnosticSeverity::Hint => MarkerSeverity::Hint,
+        }
+    }
+}
+
+/// A single diagnostic entry attached to a resource.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticEntry {
+    pub uri: VsUri,
+    pub start_line: u32,
+    pub start_col: u32,
+    pub end_line: u32,
+    pub end_col: u32,
+    pub message: String,
+    pub severity: DiagnosticSeverity,
+    pub source: Option<String>,
+    pub code: Option<String>,
+}
+
+impl DiagnosticEntry {
+    pub fn new(uri: &VsUri, line: u32, col: u32, severity: DiagnosticSeverity, message: impl Into<String>) -> Self {
+        Self {
+            uri: uri.clone(),
+            start_line: line,
+            start_col: col,
+            end_line: line,
+            end_col: col,
+            message: message.into(),
+            severity,
+            source: None,
+            code: None,
+        }
+    }
+
+    pub fn with_source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    pub fn with_code(mut self, code: impl Into<String>) -> Self {
+        self.code = Some(code.into());
+        self
+    }
+
+    pub fn with_range(mut self, start_line: u32, start_col: u32, end_line: u32, end_col: u32) -> Self {
+        self.start_line = start_line;
+        self.start_col = start_col;
+        self.end_line = end_line;
+        self.end_col = end_col;
+        self
+    }
+
+    /// Convert to a `MarkerData` for storage in the `MarkerService`.
+    pub fn to_marker_data(&self) -> MarkerData {
+        MarkerData {
+            severity: self.severity.to_marker_severity(),
+            message: self.message.clone(),
+            source: self.source.clone(),
+            code: self.code.as_ref().map(|c| MarkerCode::String(c.clone())),
+            start_line: self.start_line,
+            start_column: self.start_col,
+            end_line: self.end_line,
+            end_column: self.end_col,
+            related_information: vec![],
+            tags: vec![],
+        }
+    }
+}
+
+/// A named collection of diagnostics, analogous to VS Code's `DiagnosticCollection`.
+///
+/// Each collection has a `name` (the source/owner) and stores diagnostics keyed by URI.
+#[derive(Debug, Clone)]
+pub struct DiagnosticCollection {
+    name: String,
+    entries: HashMap<VsUri, Vec<DiagnosticEntry>>,
+}
+
+impl DiagnosticCollection {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            entries: HashMap::new(),
+        }
+    }
+
+    /// The source/owner name of this collection.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Set diagnostics for a URI, replacing any previously stored.
+    pub fn set(&mut self, uri: &VsUri, diagnostics: Vec<DiagnosticEntry>) {
+        if diagnostics.is_empty() {
+            self.entries.remove(uri);
+        } else {
+            self.entries.insert(uri.clone(), diagnostics);
+        }
+    }
+
+    /// Delete all diagnostics for a URI.
+    pub fn delete(&mut self, uri: &VsUri) {
+        self.entries.remove(uri);
+    }
+
+    /// Clear all diagnostics from this collection.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Get diagnostics for a specific URI.
+    pub fn get(&self, uri: &VsUri) -> Option<&[DiagnosticEntry]> {
+        self.entries.get(uri).map(|v| v.as_slice())
+    }
+
+    /// Iterate over all `(uri, diagnostics)` pairs.
+    pub fn entries(&self) -> impl Iterator<Item = (&VsUri, &[DiagnosticEntry])> {
+        self.entries.iter().map(|(k, v)| (k, v.as_slice()))
+    }
+
+    /// Total number of diagnostics across all URIs.
+    pub fn total_count(&self) -> usize {
+        self.entries.values().map(|v| v.len()).sum()
+    }
+
+    /// Number of URIs with diagnostics.
+    pub fn uri_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Push all diagnostics into a `MarkerService` under this collection's name.
+    pub fn sync_to_marker_service(&self, service: &MarkerService) {
+        let pairs: Vec<(VsUri, Vec<MarkerData>)> = self
+            .entries
+            .iter()
+            .map(|(uri, diags)| {
+                let markers = diags.iter().map(|d| d.to_marker_data()).collect();
+                (uri.clone(), markers)
+            })
+            .collect();
+        service.change_all(&self.name, pairs);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Filter & Statistics
 // ---------------------------------------------------------------------------
 
@@ -425,191 +589,255 @@ mod tests {
         assert_eq!(svc.get_statistics().errors, 0);
     }
 
+    // -- DiagnosticSeverity tests --
+
     #[test]
-    fn eq_markerseverity_same() {
-        assert_eq!(MarkerSeverity::Hint, MarkerSeverity::Hint);
+    fn diagnostic_severity_to_marker_severity() {
+        assert_eq!(DiagnosticSeverity::Error.to_marker_severity(), MarkerSeverity::Error);
+        assert_eq!(DiagnosticSeverity::Warning.to_marker_severity(), MarkerSeverity::Warning);
+        assert_eq!(DiagnosticSeverity::Info.to_marker_severity(), MarkerSeverity::Info);
+        assert_eq!(DiagnosticSeverity::Hint.to_marker_severity(), MarkerSeverity::Hint);
     }
 
     #[test]
-    fn ne_markerseverity_diff() {
-        assert_ne!(MarkerSeverity::Hint, MarkerSeverity::Info);
+    fn diagnostic_severity_ordering() {
+        assert!(DiagnosticSeverity::Error < DiagnosticSeverity::Warning);
+        assert!(DiagnosticSeverity::Warning < DiagnosticSeverity::Info);
+        assert!(DiagnosticSeverity::Info < DiagnosticSeverity::Hint);
+    }
+
+    // -- DiagnosticEntry tests --
+
+    #[test]
+    fn diagnostic_entry_new() {
+        let uri = VsUri::file("/src/main.rs");
+        let entry = DiagnosticEntry::new(&uri, 10, 5, DiagnosticSeverity::Error, "type mismatch");
+        assert_eq!(entry.uri, uri);
+        assert_eq!(entry.start_line, 10);
+        assert_eq!(entry.start_col, 5);
+        assert_eq!(entry.message, "type mismatch");
+        assert_eq!(entry.severity, DiagnosticSeverity::Error);
+        assert!(entry.source.is_none());
+        assert!(entry.code.is_none());
     }
 
     #[test]
-    fn eq_markertag_same() {
-        assert_eq!(MarkerTag::Unnecessary, MarkerTag::Unnecessary);
+    fn diagnostic_entry_builders() {
+        let uri = VsUri::file("/foo.rs");
+        let entry = DiagnosticEntry::new(&uri, 1, 1, DiagnosticSeverity::Warning, "unused")
+            .with_source("clippy")
+            .with_code("W0001")
+            .with_range(1, 1, 3, 10);
+        assert_eq!(entry.source.as_deref(), Some("clippy"));
+        assert_eq!(entry.code.as_deref(), Some("W0001"));
+        assert_eq!(entry.end_line, 3);
+        assert_eq!(entry.end_col, 10);
     }
 
     #[test]
-    fn ne_markertag_diff() {
-        assert_ne!(MarkerTag::Unnecessary, MarkerTag::Deprecated);
+    fn diagnostic_entry_to_marker_data() {
+        let uri = VsUri::file("/foo.rs");
+        let entry = DiagnosticEntry::new(&uri, 5, 3, DiagnosticSeverity::Error, "oops")
+            .with_source("rustc")
+            .with_code("E0001");
+        let marker = entry.to_marker_data();
+        assert_eq!(marker.severity, MarkerSeverity::Error);
+        assert_eq!(marker.message, "oops");
+        assert_eq!(marker.source, Some("rustc".into()));
+        assert_eq!(marker.code, Some(MarkerCode::String("E0001".into())));
+        assert_eq!(marker.start_line, 5);
+        assert_eq!(marker.start_column, 3);
+    }
+
+    // -- DiagnosticCollection tests --
+
+    #[test]
+    fn collection_set_and_get() {
+        let mut coll = DiagnosticCollection::new("rustc");
+        assert_eq!(coll.name(), "rustc");
+        let uri = VsUri::file("/a.rs");
+        let d1 = DiagnosticEntry::new(&uri, 1, 0, DiagnosticSeverity::Error, "e1");
+        let d2 = DiagnosticEntry::new(&uri, 2, 0, DiagnosticSeverity::Warning, "w1");
+        coll.set(&uri, vec![d1, d2]);
+        let got = coll.get(&uri).unwrap();
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0].message, "e1");
     }
 
     #[test]
-    fn behavior_check_0() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn collection_set_empty_removes() {
+        let mut coll = DiagnosticCollection::new("test");
+        let uri = VsUri::file("/b.rs");
+        coll.set(&uri, vec![DiagnosticEntry::new(&uri, 1, 0, DiagnosticSeverity::Info, "i")]);
+        assert_eq!(coll.total_count(), 1);
+        coll.set(&uri, vec![]);
+        assert!(coll.get(&uri).is_none());
+        assert_eq!(coll.total_count(), 0);
     }
 
     #[test]
-    fn behavior_check_1() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn collection_delete() {
+        let mut coll = DiagnosticCollection::new("test");
+        let uri = VsUri::file("/c.rs");
+        coll.set(&uri, vec![DiagnosticEntry::new(&uri, 1, 0, DiagnosticSeverity::Error, "e")]);
+        coll.delete(&uri);
+        assert!(coll.get(&uri).is_none());
     }
 
     #[test]
-    fn behavior_check_2() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn collection_clear() {
+        let mut coll = DiagnosticCollection::new("test");
+        let u1 = VsUri::file("/d.rs");
+        let u2 = VsUri::file("/e.rs");
+        coll.set(&u1, vec![DiagnosticEntry::new(&u1, 1, 0, DiagnosticSeverity::Error, "e")]);
+        coll.set(&u2, vec![DiagnosticEntry::new(&u2, 1, 0, DiagnosticSeverity::Warning, "w")]);
+        assert_eq!(coll.uri_count(), 2);
+        coll.clear();
+        assert_eq!(coll.uri_count(), 0);
+        assert_eq!(coll.total_count(), 0);
     }
 
     #[test]
-    fn behavior_check_3() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn collection_entries_iteration() {
+        let mut coll = DiagnosticCollection::new("test");
+        let u1 = VsUri::file("/f.rs");
+        let u2 = VsUri::file("/g.rs");
+        coll.set(&u1, vec![DiagnosticEntry::new(&u1, 1, 0, DiagnosticSeverity::Error, "e")]);
+        coll.set(&u2, vec![
+            DiagnosticEntry::new(&u2, 1, 0, DiagnosticSeverity::Warning, "w1"),
+            DiagnosticEntry::new(&u2, 2, 0, DiagnosticSeverity::Warning, "w2"),
+        ]);
+        let all: Vec<_> = coll.entries().collect();
+        assert_eq!(all.len(), 2);
+        assert_eq!(coll.total_count(), 3);
     }
 
     #[test]
-    fn behavior_check_4() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn collection_sync_to_marker_service() {
+        let svc = MarkerService::new();
+        let mut coll = DiagnosticCollection::new("rustc");
+        let u1 = VsUri::file("/sync.rs");
+        coll.set(&u1, vec![
+            DiagnosticEntry::new(&u1, 1, 0, DiagnosticSeverity::Error, "e1"),
+            DiagnosticEntry::new(&u1, 5, 0, DiagnosticSeverity::Warning, "w1"),
+        ]);
+        coll.sync_to_marker_service(&svc);
+
+        let results = svc.read(&MarkerFilter {
+            owner: Some("rustc".into()),
+            uri: Some(u1.clone()),
+            severities: None,
+            take: None,
+        });
+        assert_eq!(results.len(), 2);
+        assert_eq!(svc.get_statistics().errors, 1);
+        assert_eq!(svc.get_statistics().warnings, 1);
     }
 
     #[test]
-    fn behavior_check_5() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn collection_sync_clears_old_markers() {
+        let svc = MarkerService::new();
+        let mut coll = DiagnosticCollection::new("lint");
+        let uri = VsUri::file("/clear.rs");
+
+        coll.set(&uri, vec![DiagnosticEntry::new(&uri, 1, 0, DiagnosticSeverity::Error, "old")]);
+        coll.sync_to_marker_service(&svc);
+        assert_eq!(svc.get_statistics().errors, 1);
+
+        // Update collection to have only a warning, sync again
+        coll.set(&uri, vec![DiagnosticEntry::new(&uri, 2, 0, DiagnosticSeverity::Warning, "new")]);
+        coll.sync_to_marker_service(&svc);
+        assert_eq!(svc.get_statistics().errors, 0);
+        assert_eq!(svc.get_statistics().warnings, 1);
     }
 
     #[test]
-    fn behavior_check_6() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn multiple_collections_same_service() {
+        let svc = MarkerService::new();
+        let uri = VsUri::file("/multi.rs");
+
+        let mut coll_rustc = DiagnosticCollection::new("rustc");
+        coll_rustc.set(&uri, vec![DiagnosticEntry::new(&uri, 1, 0, DiagnosticSeverity::Error, "e")]);
+        coll_rustc.sync_to_marker_service(&svc);
+
+        let mut coll_clippy = DiagnosticCollection::new("clippy");
+        coll_clippy.set(&uri, vec![DiagnosticEntry::new(&uri, 2, 0, DiagnosticSeverity::Warning, "w")]);
+        coll_clippy.sync_to_marker_service(&svc);
+
+        // Both owners contribute to statistics
+        let stats = svc.get_statistics();
+        assert_eq!(stats.errors, 1);
+        assert_eq!(stats.warnings, 1);
+
+        // Read all for URI
+        let all = svc.read(&MarkerFilter {
+            owner: None,
+            uri: Some(uri),
+            severities: None,
+            take: None,
+        });
+        assert_eq!(all.len(), 2);
     }
 
     #[test]
-    fn behavior_check_7() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn marker_code_variants() {
+        let str_code = MarkerCode::String("E0001".into());
+        let num_code = MarkerCode::Number(42);
+        assert_ne!(str_code, num_code);
+        assert_eq!(str_code, MarkerCode::String("E0001".into()));
     }
 
     #[test]
-    fn behavior_check_8() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn marker_data_with_related_info_and_tags() {
+        let related = RelatedInformation {
+            uri: VsUri::file("/related.rs"),
+            message: "defined here".into(),
+            start_line: 10,
+            start_column: 5,
+            end_line: 10,
+            end_column: 15,
+        };
+        let marker = MarkerData {
+            severity: MarkerSeverity::Error,
+            message: "type mismatch".into(),
+            source: Some("rustc".into()),
+            code: Some(MarkerCode::String("E0308".into())),
+            start_line: 20,
+            start_column: 1,
+            end_line: 20,
+            end_column: 10,
+            related_information: vec![related],
+            tags: vec![MarkerTag::Deprecated],
+        };
+        assert_eq!(marker.related_information.len(), 1);
+        assert_eq!(marker.related_information[0].message, "defined here");
+        assert_eq!(marker.tags, vec![MarkerTag::Deprecated]);
     }
 
     #[test]
-    fn behavior_check_9() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn marker_filter_owner_only() {
+        let svc = MarkerService::new();
+        let uri = VsUri::file("/filter_owner.rs");
+        svc.change_one("rustc", &uri, vec![error_marker("e1", 1)]);
+        svc.change_one("clippy", &uri, vec![warning_marker("w1", 2)]);
+
+        let rustc_only = svc.read(&MarkerFilter {
+            owner: Some("rustc".into()),
+            uri: None,
+            severities: None,
+            take: None,
+        });
+        assert_eq!(rustc_only.len(), 1);
+        assert_eq!(rustc_only[0].1.message, "e1");
     }
 
     #[test]
-    fn behavior_check_10() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_11() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_12() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_13() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_14() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_15() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_16() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_17() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_18() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_19() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_20() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_21() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_22() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_23() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_24() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_25() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_26() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
-    }
-
-    #[test]
-    fn behavior_check_27() {
-        let _svc = MarkerService::new();
-        assert!(std::mem::size_of::<usize>() > 0);
+    fn marker_service_default_is_empty() {
+        let svc = MarkerService::default();
+        let stats = svc.get_statistics();
+        assert_eq!(stats.errors, 0);
+        assert_eq!(stats.warnings, 0);
+        assert_eq!(stats.infos, 0);
+        assert_eq!(stats.hints, 0);
     }
 }

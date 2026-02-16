@@ -3432,6 +3432,7 @@ name = "vsedit-markers-view"
 version = "0.1.0"
 dependencies = [
  "vsedit-markers",
+ "vsedit-uri",
 ]
 
 [[package]]

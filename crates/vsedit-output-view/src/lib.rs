@@ -252,6 +252,105 @@ impl fmt::Display for LogEntry {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LogOutputChannel — structured logging output channel
+// ---------------------------------------------------------------------------
+
+/// An output channel that formats entries with timestamps and log levels.
+///
+/// Wraps an `OutputChannel` and provides `info()`, `warn()`, `error()`,
+/// `debug()`, and `trace()` convenience methods.
+pub struct LogOutputChannel {
+    pub channel: OutputChannel,
+    pub log_level: LogLevel,
+    timestamp_counter: u64,
+}
+
+impl LogOutputChannel {
+    pub fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            channel: OutputChannel::new(id, name),
+            log_level: LogLevel::Info,
+            timestamp_counter: 0,
+        }
+    }
+
+    /// Set the minimum log level; messages below this level are discarded.
+    pub fn set_log_level(&mut self, level: LogLevel) {
+        self.log_level = level;
+    }
+
+    /// Advance the internal timestamp counter and return the new value.
+    fn next_timestamp(&mut self) -> u64 {
+        self.timestamp_counter += 1;
+        self.timestamp_counter
+    }
+
+    /// Log a message at the given level, if it meets the threshold.
+    /// Returns `true` if the message was appended.
+    pub fn log(&mut self, level: LogLevel, message: &str) -> bool {
+        if level < self.log_level {
+            return false;
+        }
+        let ts = self.next_timestamp();
+        let formatted = format!("[{ts} {level}] {message}");
+        self.channel.append_line(&formatted);
+        true
+    }
+
+    pub fn trace(&mut self, message: &str) -> bool {
+        self.log(LogLevel::Trace, message)
+    }
+
+    pub fn debug(&mut self, message: &str) -> bool {
+        self.log(LogLevel::Debug, message)
+    }
+
+    pub fn info(&mut self, message: &str) -> bool {
+        self.log(LogLevel::Info, message)
+    }
+
+    pub fn warn(&mut self, message: &str) -> bool {
+        self.log(LogLevel::Warn, message)
+    }
+
+    pub fn error(&mut self, message: &str) -> bool {
+        self.log(LogLevel::Error, message)
+    }
+
+    /// Clear all log output.
+    pub fn clear(&mut self) {
+        self.channel.clear();
+    }
+
+    /// Return the underlying channel's line count.
+    pub fn line_count(&self) -> usize {
+        self.channel.line_count()
+    }
+
+    /// Return the full content.
+    pub fn get_content(&self) -> String {
+        self.channel.get_content()
+    }
+
+    /// Show the channel.
+    pub fn show(&mut self) {
+        self.channel.show();
+    }
+
+    /// Hide the channel.
+    pub fn hide(&mut self) {
+        self.channel.hide();
+    }
+}
+
+impl fmt::Display for LogOutputChannel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "LogOutputChannel({}, level={}, {} lines)",
+            self.channel.name, self.log_level, self.channel.line_count())
+    }
+}
+
 /// Statistics for an output channel.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutputChannelStats {
@@ -682,5 +781,92 @@ mod tests {
         svc.create_channel("Build");
         svc.create_channel("Tests");
         assert_eq!(svc.channel_names(), vec!["Build", "Tests"]);
+    }
+
+    // -- LogOutputChannel tests --
+
+    #[test]
+    fn log_channel_creation() {
+        let log_ch = LogOutputChannel::new("log1", "Server Log");
+        assert_eq!(log_ch.channel.name, "Server Log");
+        assert_eq!(log_ch.log_level, LogLevel::Info);
+        assert_eq!(log_ch.line_count(), 0);
+    }
+
+    #[test]
+    fn log_channel_info_warn_error() {
+        let mut log_ch = LogOutputChannel::new("log1", "Build");
+        log_ch.info("started");
+        log_ch.warn("deprecated API");
+        log_ch.error("compilation failed");
+        assert_eq!(log_ch.line_count(), 3);
+        let content = log_ch.get_content();
+        assert!(content.contains("INFO"));
+        assert!(content.contains("WARN"));
+        assert!(content.contains("ERROR"));
+        assert!(content.contains("started"));
+        assert!(content.contains("compilation failed"));
+    }
+
+    #[test]
+    fn log_channel_filters_below_threshold() {
+        let mut log_ch = LogOutputChannel::new("log1", "Build");
+        log_ch.set_log_level(LogLevel::Warn);
+        assert!(!log_ch.debug("should be filtered"));
+        assert!(!log_ch.info("should be filtered"));
+        assert!(log_ch.warn("should appear"));
+        assert!(log_ch.error("should appear"));
+        assert_eq!(log_ch.line_count(), 2);
+    }
+
+    #[test]
+    fn log_channel_trace_and_debug() {
+        let mut log_ch = LogOutputChannel::new("log1", "Debug");
+        log_ch.set_log_level(LogLevel::Trace);
+        assert!(log_ch.trace("tracing something"));
+        assert!(log_ch.debug("debugging something"));
+        assert_eq!(log_ch.line_count(), 2);
+        let content = log_ch.get_content();
+        assert!(content.contains("TRACE"));
+        assert!(content.contains("DEBUG"));
+    }
+
+    #[test]
+    fn log_channel_clear() {
+        let mut log_ch = LogOutputChannel::new("log1", "Test");
+        log_ch.info("msg");
+        log_ch.clear();
+        assert_eq!(log_ch.line_count(), 0);
+    }
+
+    #[test]
+    fn log_channel_show_hide() {
+        let mut log_ch = LogOutputChannel::new("log1", "Test");
+        assert!(!log_ch.channel.visible);
+        log_ch.show();
+        assert!(log_ch.channel.visible);
+        log_ch.hide();
+        assert!(!log_ch.channel.visible);
+    }
+
+    #[test]
+    fn log_channel_display() {
+        let mut log_ch = LogOutputChannel::new("log1", "Server");
+        log_ch.info("hi");
+        let display = log_ch.to_string();
+        assert!(display.contains("LogOutputChannel"));
+        assert!(display.contains("Server"));
+        assert!(display.contains("1 lines"));
+    }
+
+    #[test]
+    fn log_channel_timestamps_increment() {
+        let mut log_ch = LogOutputChannel::new("log1", "Test");
+        log_ch.info("first");
+        log_ch.info("second");
+        let content = log_ch.get_content();
+        // First log should have timestamp 1, second should have 2
+        assert!(content.contains("[1 INFO]"));
+        assert!(content.contains("[2 INFO]"));
     }
 }

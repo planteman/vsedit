@@ -221,6 +221,94 @@ impl MarkersService {
 }
 
 // ---------------------------------------------------------------------------
+// Integration with vsedit-markers MarkerService
+// ---------------------------------------------------------------------------
+
+impl MarkersService {
+    /// Import diagnostics from the core `vsedit_markers::MarkerService`.
+    ///
+    /// Reads all markers (no filter) and replaces the local store.
+    pub fn import_from_marker_service(&mut self, service: &vsedit_markers::MarkerService) {
+        let filter = vsedit_markers::MarkerFilter {
+            owner: None,
+            uri: None,
+            severities: None,
+            take: None,
+        };
+        let results = service.read(&filter);
+        self.markers.clear();
+        for (uri, data) in results {
+            self.markers.push(Marker {
+                uri: uri.to_string(),
+                message: data.message,
+                severity: convert_severity(data.severity),
+                start_line: data.start_line,
+                start_col: data.start_column,
+                end_line: data.end_line,
+                end_col: data.end_column,
+                source: data.source,
+                code: data.code.map(|c| match c {
+                    vsedit_markers::MarkerCode::String(s) => s,
+                    vsedit_markers::MarkerCode::Number(n) => n.to_string(),
+                }),
+                tags: data.tags.iter().map(|t| match t {
+                    vsedit_markers::MarkerTag::Unnecessary => MarkerTag::Unnecessary,
+                    vsedit_markers::MarkerTag::Deprecated => MarkerTag::Deprecated,
+                }).collect(),
+                related_information: data.related_information.iter().map(|r| {
+                    RelatedInformation {
+                        uri: r.uri.to_string(),
+                        message: r.message.clone(),
+                        line: r.start_line,
+                        col: r.start_column,
+                    }
+                }).collect(),
+            });
+        }
+    }
+
+    /// Format a statusbar summary string like "✖ 2 ⚠ 3".
+    pub fn statusbar_summary(&self) -> String {
+        let stats = self.get_stats();
+        format!("✖ {} ⚠ {} ℹ {} 💡 {}", stats.errors, stats.warnings, stats.infos, stats.hints)
+    }
+
+    /// Return the (uri, line, col) for the marker at the given index (for click-to-navigate).
+    pub fn navigate_to(&self, index: usize) -> Option<(&str, u32, u32)> {
+        self.markers.get(index).map(|m| (m.uri.as_str(), m.start_line, m.start_col))
+    }
+
+    /// Return all unique URIs that have markers.
+    pub fn affected_uris(&self) -> Vec<&str> {
+        let mut uris: Vec<&str> = self.markers.iter().map(|m| m.uri.as_str()).collect();
+        uris.sort();
+        uris.dedup();
+        uris
+    }
+
+    /// Group markers by URI, sorting within each group by severity then line.
+    pub fn grouped_by_uri(&self) -> Vec<(&str, Vec<&Marker>)> {
+        let mut map: std::collections::BTreeMap<&str, Vec<&Marker>> = std::collections::BTreeMap::new();
+        for m in &self.markers {
+            map.entry(m.uri.as_str()).or_default().push(m);
+        }
+        for group in map.values_mut() {
+            group.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.start_line.cmp(&b.start_line)));
+        }
+        map.into_iter().collect()
+    }
+}
+
+fn convert_severity(s: vsedit_markers::MarkerSeverity) -> MarkerSeverity {
+    match s {
+        vsedit_markers::MarkerSeverity::Error => MarkerSeverity::Error,
+        vsedit_markers::MarkerSeverity::Warning => MarkerSeverity::Warning,
+        vsedit_markers::MarkerSeverity::Info => MarkerSeverity::Info,
+        vsedit_markers::MarkerSeverity::Hint => MarkerSeverity::Hint,
+    }
+}
+
+// ---------------------------------------------------------------------------
 // MarkerProvider trait
 // ---------------------------------------------------------------------------
 
@@ -536,5 +624,95 @@ mod tests {
         assert!(p.provide_markers_for("z.rs").is_empty());
         let uris = p.known_uris();
         assert_eq!(uris, vec!["x.rs", "y.rs"]);
+    }
+
+    // -- Integration with vsedit-markers --
+
+    #[test]
+    fn import_from_marker_service() {
+        use vsedit_markers::{MarkerService, MarkerData, MarkerSeverity as CoreSeverity};
+        use vsedit_uri::VsUri;
+
+        let core_svc = MarkerService::new();
+        let uri = VsUri::file("/import.rs");
+        core_svc.change_one("rustc", &uri, vec![
+            MarkerData {
+                severity: CoreSeverity::Error,
+                message: "type error".into(),
+                source: Some("rustc".into()),
+                code: None,
+                start_line: 10,
+                start_column: 5,
+                end_line: 10,
+                end_column: 15,
+                related_information: vec![],
+                tags: vec![],
+            },
+            MarkerData {
+                severity: CoreSeverity::Warning,
+                message: "unused var".into(),
+                source: Some("rustc".into()),
+                code: Some(vsedit_markers::MarkerCode::String("W001".into())),
+                start_line: 20,
+                start_column: 1,
+                end_line: 20,
+                end_column: 5,
+                related_information: vec![],
+                tags: vec![vsedit_markers::MarkerTag::Unnecessary],
+            },
+        ]);
+
+        let mut view_svc = MarkersService::new();
+        view_svc.import_from_marker_service(&core_svc);
+
+        assert_eq!(view_svc.error_count(), 1);
+        assert_eq!(view_svc.warning_count(), 1);
+        let stats = view_svc.get_stats();
+        assert_eq!(stats.errors, 1);
+        assert_eq!(stats.warnings, 1);
+    }
+
+    #[test]
+    fn statusbar_summary_format() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "e"));
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "e2"));
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Warning, "w"));
+        let summary = svc.statusbar_summary();
+        assert!(summary.contains("✖ 2"));
+        assert!(summary.contains("⚠ 1"));
+    }
+
+    #[test]
+    fn navigate_to_returns_location() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker_ext("src/main.rs", MarkerSeverity::Error, "e", 42, Some("rustc")));
+        let loc = svc.navigate_to(0).unwrap();
+        assert_eq!(loc, ("src/main.rs", 42, 0));
+        assert!(svc.navigate_to(99).is_none());
+    }
+
+    #[test]
+    fn affected_uris_deduplicates() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "e1"));
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "e2"));
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Warning, "w1"));
+        let uris = svc.affected_uris();
+        assert_eq!(uris, vec!["a.rs", "b.rs"]);
+    }
+
+    #[test]
+    fn grouped_by_uri_sorts_by_severity() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker_ext("a.rs", MarkerSeverity::Warning, "w", 5, None));
+        svc.add_marker(make_marker_ext("a.rs", MarkerSeverity::Error, "e", 1, None));
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Info, "i"));
+        let groups = svc.grouped_by_uri();
+        assert_eq!(groups.len(), 2);
+        // Within a.rs, error should come before warning
+        assert_eq!(groups[0].0, "a.rs");
+        assert_eq!(groups[0].1[0].severity, MarkerSeverity::Error);
+        assert_eq!(groups[0].1[1].severity, MarkerSeverity::Warning);
     }
 }

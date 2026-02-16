@@ -8,3 +8,6 @@ license.workspace = true
 [dependencies]
 vsedit-markers = { path = "../vsedit-markers" }
 
+[dev-dependencies]
+vsedit-uri = { path = "../vsedit-uri" }
+

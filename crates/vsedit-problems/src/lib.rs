@@ -467,6 +467,51 @@ impl ProblemsPanel {
         self.selected_index = 0;
         self.scroll_offset = 0;
     }
+
+    /// Return the file path, line, and column for the currently selected problem.
+    /// Used for click-to-navigate functionality.
+    pub fn navigate_to_selected(&self) -> Option<(&str, u32, u32)> {
+        let filtered = self.filtered_problems();
+        filtered.get(self.selected_index).map(|p| (p.file_path.as_str(), p.line, p.column))
+    }
+
+    /// Format a statusbar summary string showing error/warning counts.
+    pub fn statusbar_summary(&self) -> String {
+        let errors = self.count_by_severity(ProblemSeverity::Error);
+        let warnings = self.count_by_severity(ProblemSeverity::Warning);
+        format!("✖ {errors}  ⚠ {warnings}")
+    }
+
+    /// Replace all problems from a list of diagnostic-like tuples.
+    ///
+    /// Each tuple is `(severity, message, source, file_path, line, column, code)`.
+    pub fn set_problems_from_diagnostics(
+        &mut self,
+        diagnostics: Vec<(ProblemSeverity, String, String, String, u32, u32, Option<String>)>,
+    ) {
+        self.problems.clear();
+        for (sev, msg, src, file, line, col, code) in diagnostics {
+            let mut p = Problem::new(sev, msg, src, file, line, col);
+            if let Some(c) = code {
+                p = p.with_code(c);
+            }
+            self.problems.push(p);
+        }
+        self.sort_problems();
+        self.reset_selection();
+    }
+
+    /// Adjust scroll offset to keep the selected item visible within a viewport.
+    pub fn ensure_visible(&mut self, viewport_height: usize) {
+        if viewport_height == 0 {
+            return;
+        }
+        if self.selected_index < self.scroll_offset {
+            self.scroll_offset = self.selected_index;
+        } else if self.selected_index >= self.scroll_offset + viewport_height {
+            self.scroll_offset = self.selected_index - viewport_height + 1;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -726,5 +771,87 @@ mod tests {
         p.reset_selection();
         assert_eq!(p.selected_index, 0);
         assert_eq!(p.scroll_offset, 0);
+    }
+
+    // -- Navigation and statusbar tests --
+
+    #[test]
+    fn navigate_to_selected_returns_location() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        let loc = p.navigate_to_selected().unwrap();
+        assert_eq!(loc.0, "src/main.rs");
+        assert_eq!(loc.1, 10); // line
+        assert_eq!(loc.2, 5);  // column
+    }
+
+    #[test]
+    fn navigate_to_selected_with_filter() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        p.filter.show_errors = false;
+        p.filter.show_info = false;
+        // Only warnings visible, first one is "deprecated fn" at src/lib.rs:20
+        let loc = p.navigate_to_selected().unwrap();
+        assert_eq!(loc.0, "src/lib.rs");
+        assert_eq!(loc.1, 20);
+    }
+
+    #[test]
+    fn navigate_to_selected_empty() {
+        let p = ProblemsPanel::new();
+        assert!(p.navigate_to_selected().is_none());
+    }
+
+    #[test]
+    fn statusbar_summary_format() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        let summary = p.statusbar_summary();
+        assert!(summary.contains("✖ 2"));
+        assert!(summary.contains("⚠ 1"));
+    }
+
+    #[test]
+    fn set_problems_from_diagnostics() {
+        let mut p = ProblemsPanel::new();
+        p.set_problems_from_diagnostics(vec![
+            (ProblemSeverity::Error, "err1".into(), "rustc".into(), "a.rs".into(), 1, 0, Some("E001".into())),
+            (ProblemSeverity::Warning, "warn1".into(), "clippy".into(), "b.rs".into(), 5, 0, None),
+        ]);
+        assert_eq!(p.total_count(), 2);
+        assert_eq!(p.count_by_severity(ProblemSeverity::Error), 1);
+        assert_eq!(p.problems[0].code, Some("E001".into()));
+        // Should be sorted and selection reset
+        assert_eq!(p.selected_index, 0);
+    }
+
+    #[test]
+    fn ensure_visible_scrolls_down() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        p.selected_index = 4;
+        p.scroll_offset = 0;
+        p.ensure_visible(3);
+        assert_eq!(p.scroll_offset, 2); // 4 - 3 + 1
+    }
+
+    #[test]
+    fn ensure_visible_scrolls_up() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        p.selected_index = 1;
+        p.scroll_offset = 3;
+        p.ensure_visible(3);
+        assert_eq!(p.scroll_offset, 1);
+    }
+
+    #[test]
+    fn ensure_visible_zero_viewport() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        p.scroll_offset = 5;
+        p.ensure_visible(0);
+        assert_eq!(p.scroll_offset, 5); // unchanged
     }
 }
