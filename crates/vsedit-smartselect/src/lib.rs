@@ -1,5 +1,7 @@
 //! Expand/shrink selection.
 
+use std::fmt;
+
 /// A hierarchical selection range with an optional parent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectionRange {
@@ -8,6 +10,64 @@ pub struct SelectionRange {
     pub end_line: u32,
     pub end_col: u32,
     pub parent: Option<Box<SelectionRange>>,
+}
+
+impl SelectionRange {
+    /// Create a new range with no parent.
+    pub fn new(start_line: u32, start_col: u32, end_line: u32, end_col: u32) -> Self {
+        Self { start_line, start_col, end_line, end_col, parent: None }
+    }
+
+    /// Builder method to attach a parent range.
+    pub fn with_parent(mut self, parent: SelectionRange) -> Self {
+        self.parent = Some(Box::new(parent));
+        self
+    }
+
+    /// Returns `true` when start equals end.
+    pub fn is_empty(&self) -> bool {
+        self.start_line == self.end_line && self.start_col == self.end_col
+    }
+
+    /// Number of lines spanned by this range.
+    pub fn line_count(&self) -> u32 {
+        self.end_line - self.start_line + 1
+    }
+
+    /// Returns `true` when the range is on a single line.
+    pub fn is_single_line(&self) -> bool {
+        self.start_line == self.end_line
+    }
+
+    /// Counts the depth of the parent chain (0 if no parent).
+    pub fn depth(&self) -> usize {
+        let mut d = 0;
+        let mut cur = self;
+        while let Some(ref p) = cur.parent {
+            d += 1;
+            cur = p;
+        }
+        d
+    }
+
+    /// Walks to the outermost parent, returning a reference to it.
+    pub fn outermost(&self) -> &SelectionRange {
+        let mut cur = self;
+        while let Some(ref p) = cur.parent {
+            cur = p;
+        }
+        cur
+    }
+}
+
+impl fmt::Display for SelectionRange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[{}:{} - {}:{}]",
+            self.start_line, self.start_col, self.end_line, self.end_col
+        )
+    }
 }
 
 /// Trait for language-aware selection range providers.
@@ -54,6 +114,29 @@ pub fn selection_contains(outer: &SelectionRange, inner: &SelectionRange) -> boo
     let inner_start = (inner.start_line, inner.start_col);
     let inner_end = (inner.end_line, inner.end_col);
     outer_start <= inner_start && inner_end <= outer_end
+}
+
+/// Check whether two ranges overlap (share at least one position).
+pub fn selection_intersects(a: &SelectionRange, b: &SelectionRange) -> bool {
+    let a_start = (a.start_line, a.start_col);
+    let a_end = (a.end_line, a.end_col);
+    let b_start = (b.start_line, b.start_col);
+    let b_end = (b.end_line, b.end_col);
+    a_start < b_end && b_start < a_end
+}
+
+/// Build a parent chain from a vec of `(start_line, start_col, end_line, end_col)`.
+///
+/// The first element becomes the innermost range; each subsequent element
+/// becomes the parent of the previous one (i.e. outermost is last).
+pub fn build_selection_chain(ranges: Vec<(u32, u32, u32, u32)>) -> SelectionRange {
+    let mut iter = ranges.into_iter().rev();
+    let (sl, sc, el, ec) = iter.next().expect("ranges must not be empty");
+    let mut current = SelectionRange::new(sl, sc, el, ec);
+    for (sl, sc, el, ec) in iter {
+        current = SelectionRange::new(sl, sc, el, ec).with_parent(current);
+    }
+    current
 }
 
 #[cfg(test)]
@@ -117,5 +200,86 @@ mod tests {
         };
         assert!(selection_contains(&outer, &inner));
         assert!(!selection_contains(&inner, &outer));
+    }
+
+    #[test]
+    fn new_constructor() {
+        let r = SelectionRange::new(1, 2, 3, 4);
+        assert_eq!(r.start_line, 1);
+        assert_eq!(r.start_col, 2);
+        assert_eq!(r.end_line, 3);
+        assert_eq!(r.end_col, 4);
+        assert!(r.parent.is_none());
+    }
+
+    #[test]
+    fn with_parent_builder() {
+        let parent = SelectionRange::new(0, 0, 10, 0);
+        let child = SelectionRange::new(2, 5, 4, 10).with_parent(parent.clone());
+        assert_eq!(child.parent.as_deref(), Some(&parent));
+    }
+
+    #[test]
+    fn is_empty_range() {
+        assert!(SelectionRange::new(5, 3, 5, 3).is_empty());
+        assert!(!SelectionRange::new(5, 3, 5, 4).is_empty());
+    }
+
+    #[test]
+    fn line_count_and_single_line() {
+        let single = SelectionRange::new(3, 0, 3, 20);
+        assert_eq!(single.line_count(), 1);
+        assert!(single.is_single_line());
+
+        let multi = SelectionRange::new(3, 0, 8, 0);
+        assert_eq!(multi.line_count(), 6);
+        assert!(!multi.is_single_line());
+    }
+
+    #[test]
+    fn depth_and_outermost() {
+        let chain = sample_chain(); // depth: word -> line -> block
+        assert_eq!(chain.depth(), 2);
+        let outer = chain.outermost();
+        assert_eq!(outer.start_line, 3);
+        assert_eq!(outer.end_line, 8);
+
+        let flat = SelectionRange::new(0, 0, 1, 0);
+        assert_eq!(flat.depth(), 0);
+        assert!(std::ptr::eq(flat.outermost(), &flat));
+    }
+
+    #[test]
+    fn intersects() {
+        let a = SelectionRange::new(1, 0, 5, 0);
+        let b = SelectionRange::new(4, 0, 8, 0);
+        assert!(selection_intersects(&a, &b));
+        assert!(selection_intersects(&b, &a));
+
+        let c = SelectionRange::new(5, 0, 8, 0);
+        // a ends at (5,0) and c starts at (5,0) — not overlapping (half-open).
+        assert!(!selection_intersects(&a, &c));
+
+        let d = SelectionRange::new(10, 0, 12, 0);
+        assert!(!selection_intersects(&a, &d));
+    }
+
+    #[test]
+    fn build_chain() {
+        let chain = build_selection_chain(vec![
+            (5, 10, 5, 15),
+            (5, 0, 5, 40),
+            (3, 0, 8, 0),
+        ]);
+        assert_eq!(chain.start_col, 10);
+        assert_eq!(chain.depth(), 2);
+        let outer = chain.outermost();
+        assert_eq!(outer.start_line, 3);
+    }
+
+    #[test]
+    fn display_format() {
+        let r = SelectionRange::new(1, 5, 3, 10);
+        assert_eq!(format!("{r}"), "[1:5 - 3:10]");
     }
 }
