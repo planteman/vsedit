@@ -744,6 +744,210 @@ pub fn rename_validate(old_name: &str, new_name: &str) -> Result<(), Vec<String>
     }
 }
 
+// ---------------------------------------------------------------------------
+// RenameConflictDetector – detect naming conflicts
+// ---------------------------------------------------------------------------
+
+/// A detected naming conflict.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenameConflict {
+    /// File where the conflict exists.
+    pub file_path: String,
+    /// Line number of the conflicting symbol.
+    pub line: u32,
+    /// The existing name that conflicts.
+    pub existing_name: String,
+}
+
+/// Detects naming conflicts when renaming a symbol.
+pub struct RenameConflictDetector;
+
+impl RenameConflictDetector {
+    /// Check whether `new_name` already exists in any of the provided symbol lists.
+    /// `symbols_by_file` maps file path → list of (line, name) pairs.
+    pub fn detect(
+        new_name: &str,
+        symbols_by_file: &HashMap<String, Vec<(u32, String)>>,
+    ) -> Vec<RenameConflict> {
+        let mut conflicts = Vec::new();
+        for (file, symbols) in symbols_by_file {
+            for (line, name) in symbols {
+                if name == new_name {
+                    conflicts.push(RenameConflict {
+                        file_path: file.clone(),
+                        line: *line,
+                        existing_name: name.clone(),
+                    });
+                }
+            }
+        }
+        conflicts.sort_by(|a, b| (&a.file_path, a.line).cmp(&(&b.file_path, b.line)));
+        conflicts
+    }
+
+    /// Quick check if there is at least one conflict.
+    pub fn has_conflict(
+        new_name: &str,
+        symbols_by_file: &HashMap<String, Vec<(u32, String)>>,
+    ) -> bool {
+        symbols_by_file
+            .values()
+            .any(|syms| syms.iter().any(|(_, n)| n == new_name))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenameSuggestions – suggest new names based on patterns
+// ---------------------------------------------------------------------------
+
+/// Generates name suggestions based on common patterns.
+pub struct RenameSuggestions;
+
+impl RenameSuggestions {
+    /// Suggest variations of `name` using common naming conventions.
+    pub fn suggest(name: &str) -> Vec<String> {
+        let mut suggestions = Vec::new();
+
+        // camelCase → snake_case
+        let snake = Self::to_snake_case(name);
+        if snake != name {
+            suggestions.push(snake);
+        }
+
+        // snake_case → camelCase
+        let camel = Self::to_camel_case(name);
+        if camel != name {
+            suggestions.push(camel);
+        }
+
+        // UPPER_CASE
+        let upper = name.to_ascii_uppercase();
+        if upper != name {
+            suggestions.push(upper);
+        }
+
+        // Prefix with underscore (private convention)
+        if !name.starts_with('_') {
+            suggestions.push(format!("_{name}"));
+        }
+
+        suggestions
+    }
+
+    fn to_snake_case(name: &str) -> String {
+        let mut result = String::new();
+        for (i, ch) in name.chars().enumerate() {
+            if ch.is_ascii_uppercase() && i > 0 {
+                result.push('_');
+            }
+            result.push(ch.to_ascii_lowercase());
+        }
+        result
+    }
+
+    fn to_camel_case(name: &str) -> String {
+        let mut result = String::new();
+        let mut capitalize_next = false;
+        for ch in name.chars() {
+            if ch == '_' {
+                capitalize_next = true;
+            } else if capitalize_next {
+                result.push(ch.to_ascii_uppercase());
+                capitalize_next = false;
+            } else {
+                result.push(ch);
+            }
+        }
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenameScope – limit rename to specific scopes
+// ---------------------------------------------------------------------------
+
+/// Defines the scope for a rename operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RenameScope {
+    /// Rename in the entire workspace.
+    Workspace,
+    /// Rename only in a single file.
+    SingleFile(String),
+    /// Rename in specific files.
+    Files(Vec<String>),
+    /// Rename only within a line range in a single file.
+    Range {
+        file: String,
+        start_line: u32,
+        end_line: u32,
+    },
+}
+
+impl RenameScope {
+    /// Check if a given file URI is within scope.
+    pub fn includes_file(&self, uri: &str) -> bool {
+        match self {
+            RenameScope::Workspace => true,
+            RenameScope::SingleFile(f) => f == uri,
+            RenameScope::Files(files) => files.iter().any(|f| f == uri),
+            RenameScope::Range { file, .. } => file == uri,
+        }
+    }
+
+    /// Filter a workspace edit to only include edits within scope.
+    pub fn filter_edit(&self, edit: &WorkspaceEdit) -> WorkspaceEdit {
+        let filtered_edits: Vec<RenameEdit> = edit
+            .edits
+            .iter()
+            .filter(|e| self.includes_edit(e))
+            .cloned()
+            .collect();
+        let filtered_changes: HashMap<String, Vec<TextEdit>> = edit
+            .changes
+            .iter()
+            .filter(|(uri, _)| self.includes_file(uri))
+            .map(|(uri, edits)| (uri.clone(), edits.clone()))
+            .collect();
+        WorkspaceEdit {
+            edits: filtered_edits,
+            changes: filtered_changes,
+        }
+    }
+
+    fn includes_edit(&self, edit: &RenameEdit) -> bool {
+        if !self.includes_file(&edit.uri) {
+            return false;
+        }
+        if let RenameScope::Range { start_line, end_line, .. } = self {
+            edit.line >= *start_line && edit.line <= *end_line
+        } else {
+            true
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenameHistory diff/comparison extension
+// ---------------------------------------------------------------------------
+
+impl RenameHistory {
+    /// Return a summary of all renames performed, in order.
+    pub fn summary(&self) -> Vec<String> {
+        self.entries
+            .iter()
+            .map(|e| format!("{} → {}", e.old_name, e.new_name))
+            .collect()
+    }
+
+    /// Find all rename entries that touched a specific file.
+    pub fn entries_for_file(&self, uri: &str) -> Vec<&RenameHistoryEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.edit.edits.iter().any(|ed| ed.uri == uri))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1314,5 +1518,129 @@ mod tests {
         assert!(err.len() >= 2);
         assert!(err.iter().any(|e| e.contains("differ")));
         assert!(err.iter().any(|e| e.contains("path separator")));
+    }
+
+    // ---- RenameConflictDetector tests ----
+
+    #[test]
+    fn conflict_detector_finds_conflicts() {
+        let mut symbols = HashMap::new();
+        symbols.insert("file.rs".to_string(), vec![
+            (1, "foo".to_string()),
+            (5, "bar".to_string()),
+        ]);
+        let conflicts = RenameConflictDetector::detect("foo", &symbols);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].line, 1);
+    }
+
+    #[test]
+    fn conflict_detector_no_conflicts() {
+        let mut symbols = HashMap::new();
+        symbols.insert("file.rs".to_string(), vec![
+            (1, "foo".to_string()),
+        ]);
+        assert!(!RenameConflictDetector::has_conflict("baz", &symbols));
+    }
+
+    #[test]
+    fn conflict_detector_has_conflict() {
+        let mut symbols = HashMap::new();
+        symbols.insert("file.rs".to_string(), vec![
+            (1, "foo".to_string()),
+        ]);
+        assert!(RenameConflictDetector::has_conflict("foo", &symbols));
+    }
+
+    // ---- RenameSuggestions tests ----
+
+    #[test]
+    fn suggestions_from_camel_case() {
+        let suggestions = RenameSuggestions::suggest("myVariable");
+        assert!(suggestions.contains(&"my_variable".to_string()));
+        assert!(suggestions.contains(&"MYVARIABLE".to_string()));
+        assert!(suggestions.contains(&"_myVariable".to_string()));
+    }
+
+    #[test]
+    fn suggestions_from_snake_case() {
+        let suggestions = RenameSuggestions::suggest("my_var");
+        assert!(suggestions.contains(&"myVar".to_string()));
+        assert!(suggestions.contains(&"MY_VAR".to_string()));
+    }
+
+    // ---- RenameScope tests ----
+
+    #[test]
+    fn scope_workspace_includes_all() {
+        let scope = RenameScope::Workspace;
+        assert!(scope.includes_file("any_file.rs"));
+    }
+
+    #[test]
+    fn scope_single_file() {
+        let scope = RenameScope::SingleFile("a.rs".to_string());
+        assert!(scope.includes_file("a.rs"));
+        assert!(!scope.includes_file("b.rs"));
+    }
+
+    #[test]
+    fn scope_filter_edit() {
+        let mut edit = WorkspaceEdit::new();
+        edit.edits.push(RenameEdit {
+            uri: "a.rs".into(), line: 1, start_column: 0, end_column: 3, new_text: "bar".into(),
+        });
+        edit.edits.push(RenameEdit {
+            uri: "b.rs".into(), line: 2, start_column: 0, end_column: 3, new_text: "bar".into(),
+        });
+        let scope = RenameScope::SingleFile("a.rs".to_string());
+        let filtered = scope.filter_edit(&edit);
+        assert_eq!(filtered.edits.len(), 1);
+        assert_eq!(filtered.edits[0].uri, "a.rs");
+    }
+
+    #[test]
+    fn scope_range_filter() {
+        let mut edit = WorkspaceEdit::new();
+        edit.edits.push(RenameEdit {
+            uri: "a.rs".into(), line: 5, start_column: 0, end_column: 3, new_text: "x".into(),
+        });
+        edit.edits.push(RenameEdit {
+            uri: "a.rs".into(), line: 15, start_column: 0, end_column: 3, new_text: "x".into(),
+        });
+        let scope = RenameScope::Range { file: "a.rs".to_string(), start_line: 0, end_line: 10 };
+        let filtered = scope.filter_edit(&edit);
+        assert_eq!(filtered.edits.len(), 1);
+        assert_eq!(filtered.edits[0].line, 5);
+    }
+
+    // ---- RenameHistory extensions ----
+
+    #[test]
+    fn history_summary() {
+        let mut history = RenameHistory::new(10);
+        history.push(RenameHistoryEntry {
+            old_name: "foo".into(),
+            new_name: "bar".into(),
+            edit: WorkspaceEdit::new(),
+        });
+        let summary = history.summary();
+        assert_eq!(summary, vec!["foo → bar"]);
+    }
+
+    #[test]
+    fn history_entries_for_file() {
+        let mut history = RenameHistory::new(10);
+        let mut edit = WorkspaceEdit::new();
+        edit.edits.push(RenameEdit {
+            uri: "main.rs".into(), line: 1, start_column: 0, end_column: 3, new_text: "bar".into(),
+        });
+        history.push(RenameHistoryEntry {
+            old_name: "foo".into(),
+            new_name: "bar".into(),
+            edit,
+        });
+        assert_eq!(history.entries_for_file("main.rs").len(), 1);
+        assert_eq!(history.entries_for_file("other.rs").len(), 0);
     }
 }

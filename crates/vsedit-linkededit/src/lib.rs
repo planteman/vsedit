@@ -658,6 +658,204 @@ fn byte_offset_to_line_col(text: &str, offset: usize) -> Option<(u32, u32)> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LinkedEditingUndoStack – undo/redo for linked edits
+// ---------------------------------------------------------------------------
+
+/// Undo/redo stack for linked editing operations.
+#[derive(Debug, Clone)]
+pub struct LinkedEditingUndoStack {
+    undo_stack: Vec<String>,
+    redo_stack: Vec<String>,
+    capacity: usize,
+}
+
+impl LinkedEditingUndoStack {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            capacity,
+        }
+    }
+
+    /// Push a new state snapshot. Clears the redo stack.
+    pub fn push(&mut self, snapshot: String) {
+        if self.undo_stack.len() >= self.capacity {
+            self.undo_stack.remove(0);
+        }
+        self.undo_stack.push(snapshot);
+        self.redo_stack.clear();
+    }
+
+    /// Undo: pop from undo stack and push current state to redo.
+    /// Returns the previous state, or `None` if nothing to undo.
+    pub fn undo(&mut self, current_state: &str) -> Option<String> {
+        let prev = self.undo_stack.pop()?;
+        self.redo_stack.push(current_state.to_string());
+        Some(prev)
+    }
+
+    /// Redo: pop from redo stack and push current state to undo.
+    /// Returns the next state, or `None` if nothing to redo.
+    pub fn redo(&mut self, current_state: &str) -> Option<String> {
+        let next = self.redo_stack.pop()?;
+        self.undo_stack.push(current_state.to_string());
+        Some(next)
+    }
+
+    /// Whether undo is available.
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    /// Whether redo is available.
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    /// Number of undo entries.
+    pub fn undo_depth(&self) -> usize {
+        self.undo_stack.len()
+    }
+
+    /// Number of redo entries.
+    pub fn redo_depth(&self) -> usize {
+        self.redo_stack.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RangeHighlighter – highlight active linked ranges
+// ---------------------------------------------------------------------------
+
+/// Style for highlighting a range.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HighlightStyle {
+    Primary,
+    Secondary,
+    Inactive,
+}
+
+/// A highlighted range with style information.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HighlightedRange {
+    pub range: LinkedEditingRange,
+    pub style: HighlightStyle,
+}
+
+/// Produces highlight decorations for linked editing ranges.
+pub struct RangeHighlighter;
+
+impl RangeHighlighter {
+    /// Highlight all ranges: the one containing the cursor gets `Primary`,
+    /// all others get `Secondary`.
+    pub fn highlight(
+        ranges: &[LinkedEditingRange],
+        cursor_line: u32,
+        cursor_col: u32,
+    ) -> Vec<HighlightedRange> {
+        let active_idx = find_range_at(ranges, cursor_line, cursor_col);
+        ranges
+            .iter()
+            .enumerate()
+            .map(|(i, r)| HighlightedRange {
+                range: *r,
+                style: if Some(i) == active_idx {
+                    HighlightStyle::Primary
+                } else {
+                    HighlightStyle::Secondary
+                },
+            })
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LinkedEditValidator – validate edit operations before applying
+// ---------------------------------------------------------------------------
+
+/// Validation error for linked edit operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LinkedEditValidationError {
+    EmptyNewText,
+    OverlappingRanges,
+    OutOfBounds,
+    PatternMismatch,
+}
+
+/// Validates linked edit operations before they are applied.
+pub struct LinkedEditValidator;
+
+impl LinkedEditValidator {
+    /// Validate that a linked edit can be applied.
+    pub fn validate(
+        text: &str,
+        ranges: &[LinkedEditingRange],
+        new_text: &str,
+        word_pattern: Option<&str>,
+    ) -> Result<(), Vec<LinkedEditValidationError>> {
+        let mut errors = Vec::new();
+
+        if new_text.is_empty() {
+            errors.push(LinkedEditValidationError::EmptyNewText);
+        }
+
+        if !validate_ranges(ranges) {
+            errors.push(LinkedEditValidationError::OverlappingRanges);
+        }
+
+        // Check all ranges are within text bounds.
+        for r in ranges {
+            if offset_of(text, r.start_line, r.start_col).is_none()
+                || offset_of(text, r.end_line, r.end_col).is_none()
+            {
+                errors.push(LinkedEditValidationError::OutOfBounds);
+                break;
+            }
+        }
+
+        // Pattern check.
+        if let Some(pat) = word_pattern {
+            if !pat.is_empty()
+                && !new_text.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+            {
+                errors.push(LinkedEditValidationError::PatternMismatch);
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Extensions on LinkedEditGroup
+// ---------------------------------------------------------------------------
+
+impl LinkedEditGroup {
+    /// Create a deep copy of this group with an optional new current_text.
+    pub fn clone_group(&self, new_text: Option<&str>) -> LinkedEditGroup {
+        LinkedEditGroup {
+            ranges: self.ranges.clone(),
+            current_text: new_text.unwrap_or(&self.current_text).to_string(),
+        }
+    }
+
+    /// Split this group into two groups at the given range index.
+    /// The first group contains ranges `[0, at)`, the second `[at, len)`.
+    pub fn split_at(&self, at: usize) -> (LinkedEditGroup, LinkedEditGroup) {
+        let (left, right) = self.ranges.split_at(at.min(self.ranges.len()));
+        (
+            LinkedEditGroup::new(left.to_vec(), &self.current_text),
+            LinkedEditGroup::new(right.to_vec(), &self.current_text),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1314,5 +1512,120 @@ mod tests {
         assert_eq!(range.start_col, 0);
         assert_eq!(range.end_line, 1);
         assert_eq!(range.end_col, 5);
+    }
+
+    // ---- LinkedEditingUndoStack tests ----
+
+    #[test]
+    fn undo_stack_push_and_undo() {
+        let mut stack = LinkedEditingUndoStack::new(10);
+        stack.push("state1".to_string());
+        stack.push("state2".to_string());
+        assert!(stack.can_undo());
+        let prev = stack.undo("state3").unwrap();
+        assert_eq!(prev, "state2");
+        let prev2 = stack.undo("state2").unwrap();
+        assert_eq!(prev2, "state1");
+        assert!(!stack.can_undo());
+    }
+
+    #[test]
+    fn undo_stack_redo() {
+        let mut stack = LinkedEditingUndoStack::new(10);
+        stack.push("state1".to_string());
+        let prev = stack.undo("state2").unwrap();
+        assert_eq!(prev, "state1");
+        assert!(stack.can_redo());
+        let next = stack.redo("state1").unwrap();
+        assert_eq!(next, "state2");
+        assert!(!stack.can_redo());
+    }
+
+    #[test]
+    fn undo_stack_push_clears_redo() {
+        let mut stack = LinkedEditingUndoStack::new(10);
+        stack.push("a".to_string());
+        stack.undo("b");
+        assert!(stack.can_redo());
+        stack.push("c".to_string());
+        assert!(!stack.can_redo());
+    }
+
+    #[test]
+    fn undo_stack_capacity() {
+        let mut stack = LinkedEditingUndoStack::new(2);
+        stack.push("a".to_string());
+        stack.push("b".to_string());
+        stack.push("c".to_string());
+        assert_eq!(stack.undo_depth(), 2);
+        let prev = stack.undo("d").unwrap();
+        assert_eq!(prev, "c");
+    }
+
+    // ---- RangeHighlighter tests ----
+
+    #[test]
+    fn highlighter_primary_and_secondary() {
+        let ranges = vec![
+            LinkedEditingRange::new(0, 1, 0, 4),
+            LinkedEditingRange::new(0, 10, 0, 13),
+        ];
+        let highlights = RangeHighlighter::highlight(&ranges, 0, 2);
+        assert_eq!(highlights[0].style, HighlightStyle::Primary);
+        assert_eq!(highlights[1].style, HighlightStyle::Secondary);
+    }
+
+    #[test]
+    fn highlighter_no_active_cursor() {
+        let ranges = vec![LinkedEditingRange::new(0, 5, 0, 8)];
+        let highlights = RangeHighlighter::highlight(&ranges, 0, 0);
+        assert_eq!(highlights[0].style, HighlightStyle::Secondary);
+    }
+
+    // ---- LinkedEditValidator tests ----
+
+    #[test]
+    fn validator_accepts_valid_edit() {
+        let text = "<div>hello</div>";
+        let ranges = vec![
+            LinkedEditingRange::new(0, 1, 0, 4),
+            LinkedEditingRange::new(0, 12, 0, 15),
+        ];
+        assert!(LinkedEditValidator::validate(text, &ranges, "span", None).is_ok());
+    }
+
+    #[test]
+    fn validator_rejects_empty_text() {
+        let text = "test";
+        let ranges = vec![LinkedEditingRange::new(0, 0, 0, 4)];
+        let errs = LinkedEditValidator::validate(text, &ranges, "", None).unwrap_err();
+        assert!(errs.contains(&LinkedEditValidationError::EmptyNewText));
+    }
+
+    #[test]
+    fn validator_rejects_pattern_mismatch() {
+        let text = "test";
+        let ranges = vec![LinkedEditingRange::new(0, 0, 0, 4)];
+        let errs = LinkedEditValidator::validate(text, &ranges, "a b", Some("[a-z]+")).unwrap_err();
+        assert!(errs.contains(&LinkedEditValidationError::PatternMismatch));
+    }
+
+    // ---- LinkedEditGroup extensions ----
+
+    #[test]
+    fn group_clone_with_new_text() {
+        let group = LinkedEditGroup::new(vec![(0, 3), (5, 8)], "foo");
+        let cloned = group.clone_group(Some("bar"));
+        assert_eq!(cloned.current_text, "bar");
+        assert_eq!(cloned.ranges, group.ranges);
+    }
+
+    #[test]
+    fn group_split_at() {
+        let group = LinkedEditGroup::new(vec![(0, 3), (5, 8), (10, 13)], "foo");
+        let (left, right) = group.split_at(1);
+        assert_eq!(left.len(), 1);
+        assert_eq!(right.len(), 2);
+        assert_eq!(left.current_text, "foo");
     }
 }

@@ -840,6 +840,202 @@ pub fn visible_char_count(text: &str, tab_size: u32) -> usize {
     count
 }
 
+// ---------------------------------------------------------------------------
+// TextLayoutEngine – lay out text within a bounding box with wrapping
+// ---------------------------------------------------------------------------
+
+/// A laid-out line within a bounding box.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LayoutLine {
+    /// The text content of this visual line.
+    pub text: String,
+    /// Display width of this line.
+    pub width: usize,
+    /// Index of the source line this visual line originated from.
+    pub source_line: usize,
+    /// Whether this line is a continuation (wrapped) from the previous.
+    pub is_wrapped: bool,
+}
+
+/// Engine that lays out text within a bounding box.
+#[derive(Debug, Clone)]
+pub struct TextLayoutEngine {
+    /// Maximum display width for wrapping.
+    pub max_width: usize,
+    /// Tab size for expansion.
+    pub tab_size: u32,
+}
+
+impl TextLayoutEngine {
+    pub fn new(max_width: usize, tab_size: u32) -> Self {
+        Self { max_width, tab_size }
+    }
+
+    /// Lay out the given text, wrapping lines that exceed `max_width`.
+    pub fn layout(&self, text: &str) -> Vec<LayoutLine> {
+        let mut result = Vec::new();
+        for (line_idx, raw_line) in text.lines().enumerate() {
+            let rendered = render_line(raw_line, self.tab_size);
+            if self.max_width == 0 || rendered.display_width <= self.max_width {
+                result.push(LayoutLine {
+                    text: rendered.text,
+                    width: rendered.display_width,
+                    source_line: line_idx,
+                    is_wrapped: false,
+                });
+            } else {
+                let chars: Vec<char> = rendered.text.chars().collect();
+                let mut pos = 0;
+                let mut first = true;
+                while pos < chars.len() {
+                    let end = (pos + self.max_width).min(chars.len());
+                    let segment: String = chars[pos..end].iter().collect();
+                    let w = UnicodeWidthStr::width(segment.as_str());
+                    result.push(LayoutLine {
+                        text: segment,
+                        width: w,
+                        source_line: line_idx,
+                        is_wrapped: !first,
+                    });
+                    pos = end;
+                    first = false;
+                }
+            }
+        }
+        result
+    }
+
+    /// Total number of visual lines after layout.
+    pub fn visual_line_count(&self, text: &str) -> usize {
+        self.layout(text).len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IndentationDetector – detect indent style from text
+// ---------------------------------------------------------------------------
+
+/// Detected indentation style.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IndentStyle {
+    Tabs,
+    Spaces(u32),
+    Mixed,
+    Unknown,
+}
+
+/// Analyze text to detect the predominant indentation style.
+pub struct IndentationDetector;
+
+impl IndentationDetector {
+    /// Detect the indentation style from a block of text.
+    pub fn detect(text: &str) -> IndentStyle {
+        let mut tab_lines = 0u32;
+        let mut space_lines = 0u32;
+        let mut space_widths: Vec<u32> = Vec::new();
+
+        for line in text.lines() {
+            if line.is_empty() {
+                continue;
+            }
+            let first = line.chars().next().unwrap_or(' ');
+            if first == '\t' {
+                tab_lines += 1;
+            } else if first == ' ' {
+                let count = line.chars().take_while(|c| *c == ' ').count() as u32;
+                if count > 0 {
+                    space_lines += 1;
+                    space_widths.push(count);
+                }
+            }
+        }
+
+        if tab_lines == 0 && space_lines == 0 {
+            return IndentStyle::Unknown;
+        }
+        if tab_lines > 0 && space_lines > 0 {
+            return IndentStyle::Mixed;
+        }
+        if tab_lines > 0 {
+            return IndentStyle::Tabs;
+        }
+
+        // Determine most common space width via GCD of indentation widths.
+        let gcd = space_widths.iter().copied().fold(0u32, gcd_u32);
+        if gcd == 0 { IndentStyle::Spaces(4) } else { IndentStyle::Spaces(gcd) }
+    }
+}
+
+fn gcd_u32(a: u32, b: u32) -> u32 {
+    if b == 0 { a } else { gcd_u32(b, a % b) }
+}
+
+// ---------------------------------------------------------------------------
+// SyntaxHighlightRegion – mark regions for highlighting
+// ---------------------------------------------------------------------------
+
+/// A region in a text line that should receive syntax highlighting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SyntaxHighlightRegion {
+    /// 0-based start column (display column).
+    pub start: usize,
+    /// 0-based end column (exclusive).
+    pub end: usize,
+    /// Token kind, e.g. "keyword", "string", "comment".
+    pub kind: String,
+}
+
+impl SyntaxHighlightRegion {
+    pub fn new(start: usize, end: usize, kind: &str) -> Self {
+        Self { start, end, kind: kind.to_string() }
+    }
+
+    /// Length of this region in display columns.
+    pub fn len(&self) -> usize {
+        self.end.saturating_sub(self.start)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Whether two regions overlap.
+    pub fn overlaps(&self, other: &SyntaxHighlightRegion) -> bool {
+        self.start < other.end && other.start < self.end
+    }
+}
+
+// ---------------------------------------------------------------------------
+// text_to_grid – render text to a 2D char grid
+// ---------------------------------------------------------------------------
+
+/// Render text into a 2D grid of characters with the given width and height.
+/// Cells beyond the text content are filled with spaces.
+pub fn text_to_grid(text: &str, width: usize, height: usize, tab_size: u32) -> Vec<Vec<char>> {
+    let mut grid = vec![vec![' '; width]; height];
+    for (row, line) in text.lines().enumerate() {
+        if row >= height {
+            break;
+        }
+        let rendered = render_line(line, tab_size);
+        for (col, ch) in rendered.text.chars().enumerate() {
+            if col >= width {
+                break;
+            }
+            grid[row][col] = ch;
+        }
+    }
+    grid
+}
+
+/// Convert a grid back to a string, trimming trailing spaces on each row.
+pub fn grid_to_string(grid: &[Vec<char>]) -> String {
+    grid.iter()
+        .map(|row| row.iter().collect::<String>().trim_end().to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1313,5 +1509,101 @@ mod tests {
         assert_eq!(visible_char_count("你好", 4), 4);
         assert_eq!(visible_char_count("\t", 4), 4);
         assert_eq!(visible_char_count("ab\r\n", 4), 2);
+    }
+
+    // ---- TextLayoutEngine tests ----
+
+    #[test]
+    fn layout_no_wrap() {
+        let engine = TextLayoutEngine::new(80, 4);
+        let lines = engine.layout("hello\nworld");
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0].text, "hello");
+        assert_eq!(lines[1].text, "world");
+        assert!(!lines[0].is_wrapped);
+    }
+
+    #[test]
+    fn layout_with_wrap() {
+        let engine = TextLayoutEngine::new(5, 4);
+        let lines = engine.layout("abcdefghij");
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0].text, "abcde");
+        assert!(lines[1].is_wrapped);
+        assert_eq!(lines[1].text, "fghij");
+    }
+
+    #[test]
+    fn layout_visual_line_count() {
+        let engine = TextLayoutEngine::new(3, 4);
+        assert_eq!(engine.visual_line_count("abcdef"), 2);
+        assert_eq!(engine.visual_line_count("ab"), 1);
+    }
+
+    // ---- IndentationDetector tests ----
+
+    #[test]
+    fn detect_spaces() {
+        let text = "  line1\n  line2\n    nested\n";
+        assert_eq!(IndentationDetector::detect(text), IndentStyle::Spaces(2));
+    }
+
+    #[test]
+    fn detect_tabs() {
+        let text = "\tline1\n\tline2\n";
+        assert_eq!(IndentationDetector::detect(text), IndentStyle::Tabs);
+    }
+
+    #[test]
+    fn detect_mixed() {
+        let text = "\tline1\n  line2\n";
+        assert_eq!(IndentationDetector::detect(text), IndentStyle::Mixed);
+    }
+
+    #[test]
+    fn detect_unknown() {
+        assert_eq!(IndentationDetector::detect(""), IndentStyle::Unknown);
+        assert_eq!(IndentationDetector::detect("no indent"), IndentStyle::Unknown);
+    }
+
+    // ---- SyntaxHighlightRegion tests ----
+
+    #[test]
+    fn highlight_region_overlap() {
+        let a = SyntaxHighlightRegion::new(0, 5, "keyword");
+        let b = SyntaxHighlightRegion::new(3, 8, "string");
+        assert!(a.overlaps(&b));
+        let c = SyntaxHighlightRegion::new(5, 8, "comment");
+        assert!(!a.overlaps(&c));
+    }
+
+    #[test]
+    fn highlight_region_len() {
+        let r = SyntaxHighlightRegion::new(2, 7, "keyword");
+        assert_eq!(r.len(), 5);
+        assert!(!r.is_empty());
+        let empty = SyntaxHighlightRegion::new(3, 3, "x");
+        assert!(empty.is_empty());
+    }
+
+    // ---- text_to_grid tests ----
+
+    #[test]
+    fn text_to_grid_basic() {
+        let grid = text_to_grid("ab\ncd", 4, 3, 4);
+        assert_eq!(grid.len(), 3);
+        assert_eq!(grid[0][0], 'a');
+        assert_eq!(grid[0][1], 'b');
+        assert_eq!(grid[1][0], 'c');
+        assert_eq!(grid[2][0], ' '); // empty row
+    }
+
+    #[test]
+    fn grid_to_string_trims() {
+        let grid = vec![
+            vec!['a', 'b', ' ', ' '],
+            vec!['c', ' ', ' ', ' '],
+        ];
+        assert_eq!(grid_to_string(&grid), "ab\nc");
     }
 }

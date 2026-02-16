@@ -737,6 +737,223 @@ pub fn ipc_deserialize_envelope(data: &[u8]) -> Result<(MessageKind, u64, Vec<u8
     Ok((kind, id, payload))
 }
 
+// ---------------------------------------------------------------------------
+// IpcRouter – route messages to handlers by channel pattern
+// ---------------------------------------------------------------------------
+
+/// A route entry mapping a channel pattern to a handler name.
+#[derive(Debug, Clone)]
+pub struct IpcRoute {
+    /// Glob-like pattern, e.g. "textDocument/*" or exact "shutdown".
+    pub pattern: String,
+    /// Logical handler name this pattern routes to.
+    pub handler: String,
+}
+
+/// Routes incoming IPC messages to named handlers based on channel patterns.
+#[derive(Debug, Clone)]
+pub struct IpcRouter {
+    routes: Vec<IpcRoute>,
+}
+
+impl IpcRouter {
+    pub fn new() -> Self {
+        Self { routes: Vec::new() }
+    }
+
+    /// Register a route. `pattern` may end with `/*` to match any suffix.
+    pub fn add_route(&mut self, pattern: &str, handler: &str) {
+        self.routes.push(IpcRoute {
+            pattern: pattern.to_string(),
+            handler: handler.to_string(),
+        });
+    }
+
+    /// Remove all routes targeting the given handler.
+    pub fn remove_handler(&mut self, handler: &str) -> usize {
+        let before = self.routes.len();
+        self.routes.retain(|r| r.handler != handler);
+        before - self.routes.len()
+    }
+
+    /// Find the handler name for a given channel. Returns the first match.
+    pub fn resolve(&self, channel: &str) -> Option<&str> {
+        for route in &self.routes {
+            if route_matches(&route.pattern, channel) {
+                return Some(&route.handler);
+            }
+        }
+        None
+    }
+
+    /// Return all handler names that match the given channel.
+    pub fn resolve_all(&self, channel: &str) -> Vec<&str> {
+        self.routes
+            .iter()
+            .filter(|r| route_matches(&r.pattern, channel))
+            .map(|r| r.handler.as_str())
+            .collect()
+    }
+
+    /// Number of registered routes.
+    pub fn route_count(&self) -> usize {
+        self.routes.len()
+    }
+}
+
+impl Default for IpcRouter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Simple pattern matching: exact match or prefix/* glob.
+fn route_matches(pattern: &str, channel: &str) -> bool {
+    if pattern == channel {
+        return true;
+    }
+    if let Some(prefix) = pattern.strip_suffix("/*") {
+        channel.starts_with(prefix) && channel.as_bytes().get(prefix.len()) == Some(&b'/')
+    } else {
+        false
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IpcRateLimiter – token-bucket rate limiter
+// ---------------------------------------------------------------------------
+
+/// Token-bucket rate limiter for IPC message sending.
+#[derive(Debug, Clone)]
+pub struct IpcRateLimiter {
+    /// Maximum number of tokens (burst size).
+    capacity: u64,
+    /// Current number of available tokens.
+    tokens: u64,
+    /// Total number of messages that were denied.
+    denied_count: u64,
+}
+
+impl IpcRateLimiter {
+    /// Create a new rate limiter with the given bucket capacity.
+    pub fn new(capacity: u64) -> Self {
+        Self {
+            capacity,
+            tokens: capacity,
+            denied_count: 0,
+        }
+    }
+
+    /// Try to consume one token. Returns `true` if allowed.
+    pub fn try_acquire(&mut self) -> bool {
+        if self.tokens > 0 {
+            self.tokens -= 1;
+            true
+        } else {
+            self.denied_count += 1;
+            false
+        }
+    }
+
+    /// Try to consume `n` tokens at once. All-or-nothing.
+    pub fn try_acquire_n(&mut self, n: u64) -> bool {
+        if self.tokens >= n {
+            self.tokens -= n;
+            true
+        } else {
+            self.denied_count += 1;
+            false
+        }
+    }
+
+    /// Refill tokens (simulating elapsed time). Capped at capacity.
+    pub fn refill(&mut self, amount: u64) {
+        self.tokens = (self.tokens + amount).min(self.capacity);
+    }
+
+    /// Current available tokens.
+    pub fn available(&self) -> u64 {
+        self.tokens
+    }
+
+    /// Total number of denied requests.
+    pub fn denied(&self) -> u64 {
+        self.denied_count
+    }
+
+    /// Reset limiter to full capacity.
+    pub fn reset(&mut self) {
+        self.tokens = self.capacity;
+        self.denied_count = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IpcMessageBatch – batch multiple messages for efficient sending
+// ---------------------------------------------------------------------------
+
+/// A batch of IPC messages to be sent together.
+#[derive(Debug, Clone)]
+pub struct IpcMessageBatch {
+    messages: Vec<IpcMessage>,
+    max_size: usize,
+}
+
+impl IpcMessageBatch {
+    /// Create a new batch with the given maximum number of messages.
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            messages: Vec::new(),
+            max_size,
+        }
+    }
+
+    /// Add a message to the batch. Returns `Err` if the batch is full.
+    pub fn add(&mut self, msg: IpcMessage) -> Result<(), IpcError> {
+        if self.messages.len() >= self.max_size {
+            return Err(IpcError::MessageTooLarge {
+                size: self.messages.len() + 1,
+                max: self.max_size,
+            });
+        }
+        self.messages.push(msg);
+        Ok(())
+    }
+
+    /// Number of messages in the batch.
+    pub fn len(&self) -> usize {
+        self.messages.len()
+    }
+
+    /// Whether the batch is empty.
+    pub fn is_empty(&self) -> bool {
+        self.messages.is_empty()
+    }
+
+    /// Whether the batch is at capacity.
+    pub fn is_full(&self) -> bool {
+        self.messages.len() >= self.max_size
+    }
+
+    /// Total payload bytes across all messages.
+    pub fn total_payload_bytes(&self) -> usize {
+        self.messages.iter().map(|m| m.payload.len()).sum()
+    }
+
+    /// Drain all messages from the batch, returning them.
+    pub fn drain(&mut self) -> Vec<IpcMessage> {
+        std::mem::take(&mut self.messages)
+    }
+
+    /// Get distinct channels referenced by messages in this batch.
+    pub fn channels(&self) -> Vec<&str> {
+        let mut chs: Vec<&str> = self.messages.iter().map(|m| m.channel.as_str()).collect();
+        chs.sort_unstable();
+        chs.dedup();
+        chs
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1311,5 +1528,126 @@ mod tests {
     fn ipc_is_ascii_printable() {
         assert!(IpcValidator::is_ascii_printable("Hello World 123"));
         assert!(!IpcValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // ---- IpcRouter tests ----
+
+    #[test]
+    fn router_exact_match() {
+        let mut router = IpcRouter::new();
+        router.add_route("shutdown", "lifecycle");
+        assert_eq!(router.resolve("shutdown"), Some("lifecycle"));
+        assert_eq!(router.resolve("exit"), None);
+    }
+
+    #[test]
+    fn router_glob_pattern() {
+        let mut router = IpcRouter::new();
+        router.add_route("textDocument/*", "editor");
+        router.add_route("workspace/*", "workspace");
+        assert_eq!(router.resolve("textDocument/completion"), Some("editor"));
+        assert_eq!(router.resolve("workspace/symbol"), Some("workspace"));
+        assert_eq!(router.resolve("textDocument"), None);
+    }
+
+    #[test]
+    fn router_remove_handler() {
+        let mut router = IpcRouter::new();
+        router.add_route("a", "h1");
+        router.add_route("b", "h1");
+        router.add_route("c", "h2");
+        assert_eq!(router.remove_handler("h1"), 2);
+        assert_eq!(router.route_count(), 1);
+    }
+
+    #[test]
+    fn router_resolve_all() {
+        let mut router = IpcRouter::new();
+        router.add_route("textDocument/*", "editor");
+        router.add_route("textDocument/*", "logger");
+        let handlers = router.resolve_all("textDocument/hover");
+        assert_eq!(handlers.len(), 2);
+        assert!(handlers.contains(&"editor"));
+        assert!(handlers.contains(&"logger"));
+    }
+
+    // ---- IpcRateLimiter tests ----
+
+    #[test]
+    fn rate_limiter_basic() {
+        let mut rl = IpcRateLimiter::new(3);
+        assert!(rl.try_acquire());
+        assert!(rl.try_acquire());
+        assert!(rl.try_acquire());
+        assert!(!rl.try_acquire());
+        assert_eq!(rl.denied(), 1);
+        rl.refill(2);
+        assert_eq!(rl.available(), 2);
+        assert!(rl.try_acquire());
+    }
+
+    #[test]
+    fn rate_limiter_acquire_n() {
+        let mut rl = IpcRateLimiter::new(10);
+        assert!(rl.try_acquire_n(5));
+        assert_eq!(rl.available(), 5);
+        assert!(!rl.try_acquire_n(6));
+        assert!(rl.try_acquire_n(5));
+        assert_eq!(rl.available(), 0);
+    }
+
+    #[test]
+    fn rate_limiter_refill_caps_at_capacity() {
+        let mut rl = IpcRateLimiter::new(5);
+        rl.try_acquire();
+        rl.refill(100);
+        assert_eq!(rl.available(), 5);
+    }
+
+    #[test]
+    fn rate_limiter_reset() {
+        let mut rl = IpcRateLimiter::new(5);
+        rl.try_acquire();
+        rl.try_acquire();
+        rl.reset();
+        assert_eq!(rl.available(), 5);
+        assert_eq!(rl.denied(), 0);
+    }
+
+    // ---- IpcMessageBatch tests ----
+
+    #[test]
+    fn batch_add_and_drain() {
+        let mut batch = IpcMessageBatch::new(3);
+        assert!(batch.is_empty());
+        let msg = IpcMessageBuilder::new().id(1).channel("ch").payload(b"hi".to_vec()).build();
+        batch.add(msg).unwrap();
+        assert_eq!(batch.len(), 1);
+        let msg2 = IpcMessageBuilder::new().id(2).channel("ch").payload(b"there".to_vec()).build();
+        batch.add(msg2).unwrap();
+        assert_eq!(batch.total_payload_bytes(), 7); // "hi" + "there"
+        let drained = batch.drain();
+        assert_eq!(drained.len(), 2);
+        assert!(batch.is_empty());
+    }
+
+    #[test]
+    fn batch_full_error() {
+        let mut batch = IpcMessageBatch::new(1);
+        let msg = IpcMessageBuilder::new().id(1).channel("ch").build();
+        batch.add(msg).unwrap();
+        assert!(batch.is_full());
+        let msg2 = IpcMessageBuilder::new().id(2).channel("ch").build();
+        assert!(batch.add(msg2).is_err());
+    }
+
+    #[test]
+    fn batch_channels() {
+        let mut batch = IpcMessageBatch::new(10);
+        batch.add(IpcMessageBuilder::new().id(1).channel("a").build()).unwrap();
+        batch.add(IpcMessageBuilder::new().id(2).channel("b").build()).unwrap();
+        batch.add(IpcMessageBuilder::new().id(3).channel("a").build()).unwrap();
+        let chs = batch.channels();
+        assert_eq!(chs, vec!["a", "b"]);
     }
 }

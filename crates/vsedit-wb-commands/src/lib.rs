@@ -760,6 +760,212 @@ impl Default for CommandPaletteHistory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CommandChain – chain multiple commands sequentially with error handling
+// ---------------------------------------------------------------------------
+
+/// Result of executing a single step in a command chain.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChainStepResult {
+    Success,
+    Skipped,
+    Failed(String),
+}
+
+/// A step in a command chain.
+#[derive(Debug, Clone)]
+pub struct ChainStep {
+    /// Command id to execute.
+    pub command_id: String,
+    /// Whether to continue the chain if this step fails.
+    pub continue_on_error: bool,
+    /// Result after execution.
+    pub result: Option<ChainStepResult>,
+}
+
+/// Chain multiple commands to execute sequentially.
+#[derive(Debug, Clone)]
+pub struct CommandChain {
+    pub name: String,
+    steps: Vec<ChainStep>,
+}
+
+impl CommandChain {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            steps: Vec::new(),
+        }
+    }
+
+    /// Append a step that halts the chain on failure.
+    pub fn then(&mut self, command_id: &str) -> &mut Self {
+        self.steps.push(ChainStep {
+            command_id: command_id.to_string(),
+            continue_on_error: false,
+            result: None,
+        });
+        self
+    }
+
+    /// Append a step that allows the chain to continue even on failure.
+    pub fn then_optional(&mut self, command_id: &str) -> &mut Self {
+        self.steps.push(ChainStep {
+            command_id: command_id.to_string(),
+            continue_on_error: true,
+            result: None,
+        });
+        self
+    }
+
+    /// Simulate execution against a registry, marking steps as success/failed.
+    pub fn execute(&mut self, registry: &CommandRegistry) -> bool {
+        for step in &mut self.steps {
+            match registry.get_command(&step.command_id) {
+                Some(cmd) if cmd.enabled => {
+                    step.result = Some(ChainStepResult::Success);
+                }
+                Some(_) => {
+                    step.result = Some(ChainStepResult::Failed("disabled".to_string()));
+                    if !step.continue_on_error {
+                        return false;
+                    }
+                }
+                None => {
+                    step.result = Some(ChainStepResult::Failed("not found".to_string()));
+                    if !step.continue_on_error {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    /// Number of steps.
+    pub fn step_count(&self) -> usize {
+        self.steps.len()
+    }
+
+    /// Count of successfully executed steps.
+    pub fn success_count(&self) -> usize {
+        self.steps.iter().filter(|s| s.result == Some(ChainStepResult::Success)).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandThrottle – throttle command execution
+// ---------------------------------------------------------------------------
+
+/// Tracks command execution timestamps for throttling.
+#[derive(Debug, Clone)]
+pub struct CommandThrottle {
+    /// Minimum interval in milliseconds between executions of the same command.
+    pub interval_ms: u64,
+    /// Map of command_id → last execution timestamp (ms since epoch).
+    last_exec: std::collections::HashMap<String, u64>,
+}
+
+impl CommandThrottle {
+    pub fn new(interval_ms: u64) -> Self {
+        Self {
+            interval_ms,
+            last_exec: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Check whether the command is allowed to execute at the given timestamp.
+    pub fn is_allowed(&self, command_id: &str, now_ms: u64) -> bool {
+        match self.last_exec.get(command_id) {
+            Some(&last) => now_ms.saturating_sub(last) >= self.interval_ms,
+            None => true,
+        }
+    }
+
+    /// Record an execution of the command at the given timestamp.
+    pub fn record(&mut self, command_id: &str, now_ms: u64) {
+        self.last_exec.insert(command_id.to_string(), now_ms);
+    }
+
+    /// Try to execute: returns true and records if allowed, false otherwise.
+    pub fn try_execute(&mut self, command_id: &str, now_ms: u64) -> bool {
+        if self.is_allowed(command_id, now_ms) {
+            self.record(command_id, now_ms);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Clear throttle state for all commands.
+    pub fn clear(&mut self) {
+        self.last_exec.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CommandGroup – group related commands
+// ---------------------------------------------------------------------------
+
+/// A named group of related commands.
+#[derive(Debug, Clone)]
+pub struct CommandGroup {
+    pub name: String,
+    pub description: String,
+    command_ids: Vec<String>,
+}
+
+impl CommandGroup {
+    pub fn new(name: &str, description: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            description: description.to_string(),
+            command_ids: Vec::new(),
+        }
+    }
+
+    /// Add a command id to the group.
+    pub fn add(&mut self, command_id: &str) {
+        if !self.command_ids.iter().any(|id| id == command_id) {
+            self.command_ids.push(command_id.to_string());
+        }
+    }
+
+    /// Remove a command id from the group.
+    pub fn remove(&mut self, command_id: &str) -> bool {
+        let before = self.command_ids.len();
+        self.command_ids.retain(|id| id != command_id);
+        self.command_ids.len() != before
+    }
+
+    /// All command ids in this group.
+    pub fn commands(&self) -> &[String] {
+        &self.command_ids
+    }
+
+    /// Number of commands in the group.
+    pub fn len(&self) -> usize {
+        self.command_ids.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.command_ids.is_empty()
+    }
+
+    /// Check if a command is in this group.
+    pub fn contains(&self, command_id: &str) -> bool {
+        self.command_ids.iter().any(|id| id == command_id)
+    }
+
+    /// Resolve group commands against a registry, returning descriptors found.
+    pub fn resolve<'a>(&self, registry: &'a CommandRegistry) -> Vec<&'a CommandDescriptor> {
+        self.command_ids
+            .iter()
+            .filter_map(|id| registry.get_command(id))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1313,5 +1519,98 @@ mod tests {
         history.record("x");
         history.clear();
         assert!(history.is_empty());
+    }
+
+    // ---- CommandChain tests ----
+
+    #[test]
+    fn chain_execute_all_success() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("save", "Save"));
+        reg.register(make_cmd("format", "Format"));
+        let mut chain = CommandChain::new("save-format");
+        chain.then("format").then("save");
+        assert!(chain.execute(&reg));
+        assert_eq!(chain.success_count(), 2);
+    }
+
+    #[test]
+    fn chain_stops_on_missing_command() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("save", "Save"));
+        let mut chain = CommandChain::new("test");
+        chain.then("missing").then("save");
+        assert!(!chain.execute(&reg));
+        assert_eq!(chain.success_count(), 0);
+    }
+
+    #[test]
+    fn chain_continue_on_error() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("save", "Save"));
+        let mut chain = CommandChain::new("test");
+        chain.then_optional("missing").then("save");
+        assert!(chain.execute(&reg));
+        assert_eq!(chain.success_count(), 1);
+        assert_eq!(chain.step_count(), 2);
+    }
+
+    // ---- CommandThrottle tests ----
+
+    #[test]
+    fn throttle_allows_first_call() {
+        let mut throttle = CommandThrottle::new(100);
+        assert!(throttle.try_execute("save", 0));
+    }
+
+    #[test]
+    fn throttle_blocks_rapid_calls() {
+        let mut throttle = CommandThrottle::new(100);
+        assert!(throttle.try_execute("save", 0));
+        assert!(!throttle.try_execute("save", 50));
+        assert!(throttle.try_execute("save", 100));
+    }
+
+    #[test]
+    fn throttle_independent_commands() {
+        let mut throttle = CommandThrottle::new(100);
+        assert!(throttle.try_execute("save", 0));
+        assert!(throttle.try_execute("format", 0));
+    }
+
+    // ---- CommandGroup tests ----
+
+    #[test]
+    fn group_add_and_contains() {
+        let mut group = CommandGroup::new("edit", "Editing commands");
+        group.add("copy");
+        group.add("paste");
+        group.add("copy"); // duplicate ignored
+        assert_eq!(group.len(), 2);
+        assert!(group.contains("copy"));
+        assert!(!group.contains("cut"));
+    }
+
+    #[test]
+    fn group_remove() {
+        let mut group = CommandGroup::new("edit", "Editing");
+        group.add("copy");
+        group.add("paste");
+        assert!(group.remove("copy"));
+        assert!(!group.contains("copy"));
+        assert!(!group.remove("nonexistent"));
+    }
+
+    #[test]
+    fn group_resolve_against_registry() {
+        let mut reg = CommandRegistry::new();
+        reg.register(make_cmd("copy", "Copy"));
+        reg.register(make_cmd("paste", "Paste"));
+        let mut group = CommandGroup::new("edit", "Edit");
+        group.add("copy");
+        group.add("paste");
+        group.add("missing");
+        let resolved = group.resolve(&reg);
+        assert_eq!(resolved.len(), 2);
     }
 }
