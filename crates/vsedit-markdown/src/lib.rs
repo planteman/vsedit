@@ -875,6 +875,137 @@ pub fn markdown_word_count(text: &str) -> MarkdownDocStats {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// MarkdownToken helpers
+// ---------------------------------------------------------------------------
+
+impl MarkdownToken {
+    /// Returns the inner text content of this token.
+    pub fn text_content(&self) -> &str {
+        match self {
+            MarkdownToken::Text(s) => s,
+            MarkdownToken::Bold(s) => s,
+            MarkdownToken::Italic(s) => s,
+            MarkdownToken::Code(s) => s,
+            MarkdownToken::CodeBlock(s, _) => s,
+            MarkdownToken::Link(text, _) => text,
+            MarkdownToken::Heading(_, text) => text,
+            MarkdownToken::ListItemMd(s) => s,
+            MarkdownToken::Paragraph => "",
+            MarkdownToken::LineBreak => "",
+        }
+    }
+
+    /// Returns true if this is a block-level token.
+    pub fn is_block(&self) -> bool {
+        matches!(
+            self,
+            MarkdownToken::Heading(_, _)
+                | MarkdownToken::CodeBlock(_, _)
+                | MarkdownToken::ListItemMd(_)
+                | MarkdownToken::Paragraph
+        )
+    }
+
+    /// Returns true if this is an inline formatting token.
+    pub fn is_inline(&self) -> bool {
+        matches!(
+            self,
+            MarkdownToken::Text(_)
+                | MarkdownToken::Bold(_)
+                | MarkdownToken::Italic(_)
+                | MarkdownToken::Code(_)
+                | MarkdownToken::Link(_, _)
+        )
+    }
+
+    /// Returns the token kind as a static string.
+    pub fn kind_name(&self) -> &'static str {
+        match self {
+            MarkdownToken::Text(_) => "text",
+            MarkdownToken::Bold(_) => "bold",
+            MarkdownToken::Italic(_) => "italic",
+            MarkdownToken::Code(_) => "code",
+            MarkdownToken::CodeBlock(_, _) => "code_block",
+            MarkdownToken::Link(_, _) => "link",
+            MarkdownToken::Heading(_, _) => "heading",
+            MarkdownToken::ListItemMd(_) => "list_item",
+            MarkdownToken::Paragraph => "paragraph",
+            MarkdownToken::LineBreak => "line_break",
+        }
+    }
+}
+
+impl fmt::Display for MarkdownToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MarkdownToken::Text(s) => write!(f, "{s}"),
+            MarkdownToken::Bold(s) => write!(f, "**{s}**"),
+            MarkdownToken::Italic(s) => write!(f, "*{s}*"),
+            MarkdownToken::Code(s) => write!(f, "`{s}`"),
+            MarkdownToken::CodeBlock(s, lang) => {
+                let l = lang.as_deref().unwrap_or("");
+                write!(f, "```{l}\n{s}\n```")
+            }
+            MarkdownToken::Link(text, url) => write!(f, "[{text}]({url})"),
+            MarkdownToken::Heading(level, text) => {
+                let hashes = "#".repeat(*level as usize);
+                write!(f, "{hashes} {text}")
+            }
+            MarkdownToken::ListItemMd(s) => write!(f, "- {s}"),
+            MarkdownToken::Paragraph => write!(f, ""),
+            MarkdownToken::LineBreak => writeln!(f),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Token counting
+// ---------------------------------------------------------------------------
+
+use std::fmt;
+
+/// Count tokens by kind.
+pub fn count_tokens_by_kind(tokens: &[MarkdownToken]) -> std::collections::HashMap<&'static str, usize> {
+    let mut counts = std::collections::HashMap::new();
+    for token in tokens {
+        *counts.entry(token.kind_name()).or_insert(0) += 1;
+    }
+    counts
+}
+
+/// Total character count across all tokens.
+pub fn total_text_length(tokens: &[MarkdownToken]) -> usize {
+    tokens.iter().map(|t| t.text_content().len()).sum()
+}
+
+/// Extract all URLs from link tokens.
+pub fn extract_urls(tokens: &[MarkdownToken]) -> Vec<String> {
+    tokens.iter()
+        .filter_map(|t| match t {
+            MarkdownToken::Link(_, url) => Some(url.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Extract all code snippets (inline and block).
+pub fn extract_all_code(tokens: &[MarkdownToken]) -> Vec<String> {
+    tokens.iter()
+        .filter_map(|t| match t {
+            MarkdownToken::Code(s) | MarkdownToken::CodeBlock(s, _) => Some(s.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Estimates reading time in minutes (assuming 200 words/min).
+pub fn estimated_reading_time(text: &str) -> f64 {
+    let word_count = text.split_whitespace().count();
+    word_count as f64 / 200.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1234,5 +1365,85 @@ mod tests {
         let doc = "---\ntitle: Test\n---\nHello world.";
         let stats = markdown_word_count(doc);
         assert_eq!(stats.words, 2);
+    }
+
+    #[test]
+    fn test_token_text_content() {
+        assert_eq!(MarkdownToken::Bold("hello".into()).text_content(), "hello");
+        assert_eq!(MarkdownToken::Paragraph.text_content(), "");
+        assert_eq!(MarkdownToken::Link("text".into(), "url".into()).text_content(), "text");
+    }
+
+    #[test]
+    fn test_token_is_block_and_inline() {
+        assert!(MarkdownToken::Heading(1, "H1".into()).is_block());
+        assert!(!MarkdownToken::Heading(1, "H1".into()).is_inline());
+        assert!(MarkdownToken::Bold("b".into()).is_inline());
+        assert!(!MarkdownToken::Bold("b".into()).is_block());
+    }
+
+    #[test]
+    fn test_token_kind_name() {
+        assert_eq!(MarkdownToken::Bold("b".into()).kind_name(), "bold");
+        assert_eq!(MarkdownToken::Code("c".into()).kind_name(), "code");
+        assert_eq!(MarkdownToken::Paragraph.kind_name(), "paragraph");
+    }
+
+    #[test]
+    fn test_token_display() {
+        assert_eq!(format!("{}", MarkdownToken::Bold("hello".into())), "**hello**");
+        assert_eq!(format!("{}", MarkdownToken::Code("x".into())), "`x`");
+        assert_eq!(format!("{}", MarkdownToken::Heading(2, "Title".into())), "## Title");
+        assert_eq!(format!("{}", MarkdownToken::Link("text".into(), "url".into())), "[text](url)");
+        assert_eq!(format!("{}", MarkdownToken::ListItemMd("item".into())), "- item");
+    }
+
+    #[test]
+    fn test_count_tokens_by_kind() {
+        let tokens = vec![
+            MarkdownToken::Text("a".into()),
+            MarkdownToken::Bold("b".into()),
+            MarkdownToken::Text("c".into()),
+        ];
+        let counts = count_tokens_by_kind(&tokens);
+        assert_eq!(counts["text"], 2);
+        assert_eq!(counts["bold"], 1);
+    }
+
+    #[test]
+    fn test_total_text_length() {
+        let tokens = vec![
+            MarkdownToken::Text("hello".into()),
+            MarkdownToken::Bold("world".into()),
+        ];
+        assert_eq!(total_text_length(&tokens), 10);
+    }
+
+    #[test]
+    fn test_extract_urls() {
+        let tokens = vec![
+            MarkdownToken::Link("a".into(), "https://a.com".into()),
+            MarkdownToken::Text("x".into()),
+            MarkdownToken::Link("b".into(), "https://b.com".into()),
+        ];
+        let urls = extract_urls(&tokens);
+        assert_eq!(urls, vec!["https://a.com", "https://b.com"]);
+    }
+
+    #[test]
+    fn test_extract_all_code() {
+        let tokens = vec![
+            MarkdownToken::Code("inline".into()),
+            MarkdownToken::CodeBlock("block".into(), None),
+        ];
+        let code = extract_all_code(&tokens);
+        assert_eq!(code, vec!["inline", "block"]);
+    }
+
+    #[test]
+    fn test_estimated_reading_time() {
+        let text = (0..400).map(|_| "word").collect::<Vec<_>>().join(" ");
+        let time = estimated_reading_time(&text);
+        assert!((time - 2.0).abs() < 0.1);
     }
 }

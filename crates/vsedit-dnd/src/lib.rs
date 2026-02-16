@@ -714,6 +714,203 @@ impl DragGesture {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DragData extensions
+// ---------------------------------------------------------------------------
+
+impl DragData {
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
+    pub fn has_files(&self) -> bool {
+        self.mime_type == "text/uri-list"
+    }
+
+    pub fn file_count(&self) -> usize {
+        if !self.has_files() {
+            return 0;
+        }
+        let text = match std::str::from_utf8(&self.data) {
+            Ok(s) => s,
+            Err(_) => return 0,
+        };
+        text.split("\r\n").filter(|s| !s.is_empty()).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DragEvent extensions
+// ---------------------------------------------------------------------------
+
+impl DragEvent {
+    pub fn has_data(&self) -> bool {
+        !self.data.is_empty()
+    }
+
+    pub fn data_count(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn mime_types(&self) -> Vec<&str> {
+        self.data.iter().map(|d| d.mime_type.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DropResult extensions
+// ---------------------------------------------------------------------------
+
+impl DropResult {
+    pub fn is_success(&self) -> bool {
+        *self == DropResult::Accepted
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        *self == DropResult::Cancelled
+    }
+
+    pub fn is_rejected(&self) -> bool {
+        *self == DropResult::Rejected
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DragEffect extensions
+// ---------------------------------------------------------------------------
+
+impl DragEffect {
+    pub fn is_move(&self) -> bool {
+        *self == DragEffect::Move
+    }
+
+    pub fn is_copy(&self) -> bool {
+        *self == DragEffect::Copy
+    }
+
+    pub fn is_link(&self) -> bool {
+        *self == DragEffect::Link
+    }
+
+    pub fn is_none(&self) -> bool {
+        *self == DragEffect::None
+    }
+
+    pub fn label(&self) -> &str {
+        match self {
+            DragEffect::Copy => "Copy",
+            DragEffect::Move => "Move",
+            DragEffect::Link => "Link",
+            DragEffect::None => "None",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DragHistory extensions
+// ---------------------------------------------------------------------------
+
+impl DragHistory {
+    pub fn most_recent(&self) -> Option<&HistoryEntry> {
+        self.entries.last()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, HistoryEntry> {
+        self.entries.iter()
+    }
+
+    pub fn accepted_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.result.is_success()).count()
+    }
+
+    pub fn rejected_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.result.is_rejected()).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DropZoneRegistry extensions
+// ---------------------------------------------------------------------------
+
+impl DropZoneRegistry {
+    pub fn zone_count(&self) -> usize {
+        self.zones.len()
+    }
+
+    pub fn zone_ids(&self) -> Vec<&str> {
+        self.zones.keys().map(|k| k.as_str()).collect()
+    }
+
+    pub fn clear(&mut self) {
+        self.zones.clear();
+    }
+
+    pub fn enabled_count(&self) -> usize {
+        self.zones.values().filter(|z| z.enabled).count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DragMetrics extensions
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for DragMetrics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} drops ({:.0}% success, {:.1} items/drop)",
+            self.total_drops,
+            self.success_rate * 100.0,
+            self.avg_items_per_drop,
+        )
+    }
+}
+
+impl DragMetrics {
+    pub fn is_empty(&self) -> bool {
+        self.total_drops == 0
+    }
+
+    pub fn failure_rate(&self) -> f64 {
+        1.0 - self.success_rate
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DragDataTransfer extensions
+// ---------------------------------------------------------------------------
+
+impl DragDataTransfer {
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn mime_types(&self) -> Vec<&str> {
+        let mut types: Vec<&str> = self.items.iter().map(|i| i.mime_type.as_str()).collect();
+        types.sort_unstable();
+        types.dedup();
+        types
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DragAndDropService extensions
+// ---------------------------------------------------------------------------
+
+impl DragAndDropService {
+    pub fn history_count(&self) -> usize {
+        self.history.len()
+    }
+
+    pub fn active_source(&self) -> Option<&str> {
+        self.active_drag.as_ref().and_then(|e| e.source.as_deref())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1207,5 +1404,187 @@ mod tests {
         let mut g = DragGesture::new(0.0, 0.0);
         assert!(g.complete().is_none());
         assert!(!g.is_active);
+    }
+
+    // --- extension tests ---
+
+    #[test]
+    fn drag_data_is_empty_and_file_helpers() {
+        let empty = DragData::new("text/plain", vec![]);
+        assert!(empty.is_empty());
+        assert!(!empty.has_files());
+        assert_eq!(empty.file_count(), 0);
+
+        let files = DragData::files(&["file:///a.txt", "file:///b.txt", "file:///c.txt"]);
+        assert!(!files.is_empty());
+        assert!(files.has_files());
+        assert_eq!(files.file_count(), 3);
+
+        let single = DragData::files(&["file:///only.txt"]);
+        assert_eq!(single.file_count(), 1);
+
+        let text = DragData::text("hello");
+        assert_eq!(text.file_count(), 0);
+        assert!(!text.has_files());
+    }
+
+    #[test]
+    fn drag_event_extensions() {
+        let event = DragEvent {
+            data: vec![DragData::text("a"), DragData::files(&["file:///x"])],
+            source: Some("tab-1".into()),
+        };
+        assert!(event.has_data());
+        assert_eq!(event.data_count(), 2);
+        let mimes = event.mime_types();
+        assert!(mimes.contains(&"text/plain"));
+        assert!(mimes.contains(&"text/uri-list"));
+
+        let empty_event = DragEvent { data: vec![], source: None };
+        assert!(!empty_event.has_data());
+        assert_eq!(empty_event.data_count(), 0);
+    }
+
+    #[test]
+    fn drop_result_extensions() {
+        assert!(DropResult::Accepted.is_success());
+        assert!(!DropResult::Rejected.is_success());
+        assert!(!DropResult::Cancelled.is_success());
+
+        assert!(DropResult::Cancelled.is_cancelled());
+        assert!(!DropResult::Accepted.is_cancelled());
+
+        assert!(DropResult::Rejected.is_rejected());
+        assert!(!DropResult::Accepted.is_rejected());
+    }
+
+    #[test]
+    fn drag_effect_extensions() {
+        assert!(DragEffect::Move.is_move());
+        assert!(!DragEffect::Move.is_copy());
+        assert!(DragEffect::Copy.is_copy());
+        assert!(DragEffect::Link.is_link());
+        assert!(DragEffect::None.is_none());
+
+        assert_eq!(DragEffect::Copy.label(), "Copy");
+        assert_eq!(DragEffect::Move.label(), "Move");
+        assert_eq!(DragEffect::Link.label(), "Link");
+        assert_eq!(DragEffect::None.label(), "None");
+    }
+
+    #[test]
+    fn drag_history_extensions() {
+        let mut history = DragHistory::default();
+        assert!(history.most_recent().is_none());
+        assert_eq!(history.accepted_count(), 0);
+        assert_eq!(history.rejected_count(), 0);
+        assert_eq!(history.iter().count(), 0);
+
+        let target = DropTarget::from_position("file:///a.rs", 0, 0);
+        history.record(HistoryEntry {
+            data: vec![DragData::text("first")],
+            target: target.clone(),
+            result: DropResult::Accepted,
+        });
+        history.record(HistoryEntry {
+            data: vec![DragData::text("second")],
+            target: target.clone(),
+            result: DropResult::Rejected,
+        });
+        history.record(HistoryEntry {
+            data: vec![DragData::text("third")],
+            target: target.clone(),
+            result: DropResult::Accepted,
+        });
+
+        assert_eq!(history.most_recent().unwrap().result, DropResult::Accepted);
+        assert_eq!(history.accepted_count(), 2);
+        assert_eq!(history.rejected_count(), 1);
+        assert_eq!(history.iter().count(), 3);
+    }
+
+    #[test]
+    fn drag_metrics_display_and_extensions() {
+        let mut history = DragHistory::default();
+        let m = DragMetrics::from_history(&history);
+        assert!(m.is_empty());
+        assert_eq!(m.failure_rate(), 1.0);
+        assert_eq!(format!("{m}"), "0 drops (0% success, 0.0 items/drop)");
+
+        let target = DropTarget::from_position("file:///a.rs", 0, 0);
+        history.record(HistoryEntry {
+            data: vec![DragData::text("x"), DragData::text("y")],
+            target: target.clone(),
+            result: DropResult::Accepted,
+        });
+        history.record(HistoryEntry {
+            data: vec![DragData::text("z")],
+            target: target.clone(),
+            result: DropResult::Rejected,
+        });
+
+        let m = DragMetrics::from_history(&history);
+        assert!(!m.is_empty());
+        assert!((m.failure_rate() - 0.5).abs() < f64::EPSILON);
+        let display = format!("{m}");
+        assert!(display.contains("2 drops"));
+        assert!(display.contains("50%"));
+    }
+
+    #[test]
+    fn drop_zone_registry_extensions() {
+        let mut registry = DropZoneRegistry::new();
+        assert_eq!(registry.zone_count(), 0);
+        assert_eq!(registry.enabled_count(), 0);
+
+        let mimes: HashSet<String> = ["text/plain"].iter().map(|s| s.to_string()).collect();
+        registry.register(DropZone::new("a", mimes.clone()));
+        registry.register(DropZone::new("b", mimes.clone()));
+        let mut zone_c = DropZone::new("c", mimes);
+        zone_c.enabled = false;
+        registry.register(zone_c);
+
+        assert_eq!(registry.zone_count(), 3);
+        assert_eq!(registry.enabled_count(), 2);
+
+        let mut ids = registry.zone_ids();
+        ids.sort();
+        assert_eq!(ids, vec!["a", "b", "c"]);
+
+        registry.clear();
+        assert_eq!(registry.zone_count(), 0);
+        assert!(registry.is_empty());
+    }
+
+    #[test]
+    fn drag_data_transfer_extensions() {
+        let mut transfer = DragDataTransfer::new();
+        assert!(transfer.is_empty());
+        assert_eq!(transfer.item_count(), 0);
+
+        transfer.add_item(DragData::text("hello"));
+        transfer.add_item(DragData::new("image/png", vec![0x89]));
+        transfer.add_item(DragData::text("world"));
+
+        assert!(!transfer.is_empty());
+        assert_eq!(transfer.item_count(), 3);
+
+        let mimes = transfer.mime_types();
+        assert_eq!(mimes, vec!["image/png", "text/plain"]);
+    }
+
+    #[test]
+    fn service_history_count_and_active_source() {
+        let mut svc = DragAndDropService::new();
+        assert_eq!(svc.history_count(), 0);
+        assert!(svc.active_source().is_none());
+
+        svc.start_drag_from("editor", vec![DragData::text("x")]).unwrap();
+        assert_eq!(svc.active_source(), Some("editor"));
+
+        let target = DropTarget::from_position("file:///a.rs", 0, 0);
+        svc.try_drop_on(&target).unwrap();
+        assert_eq!(svc.history_count(), 1);
+        assert!(svc.active_source().is_none());
     }
 }

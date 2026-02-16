@@ -647,6 +647,96 @@ pub fn preference_count_modified(service: &PreferencesService) -> usize {
         .len()
 }
 
+// ---------------------------------------------------------------------------
+// Additional helpers
+// ---------------------------------------------------------------------------
+
+impl PreferencesService {
+    /// Returns the number of active overrides.
+    pub fn override_count(&self) -> usize {
+        self.overrides.len()
+    }
+
+    /// Returns the keys of all registered preference descriptors.
+    pub fn keys(&self) -> Vec<&str> {
+        self.descriptors.iter().map(|d| d.key.as_str()).collect()
+    }
+
+    /// Returns a human-readable summary of the service state.
+    pub fn summary(&self) -> String {
+        let total = self.descriptors.len();
+        let overridden = self.overrides.len();
+        let scopes: Vec<PreferenceScope> = vec![
+            PreferenceScope::Application,
+            PreferenceScope::Machine,
+            PreferenceScope::Window,
+            PreferenceScope::Resource,
+            PreferenceScope::Language,
+        ];
+        let mut scope_counts = Vec::new();
+        for scope in &scopes {
+            let count = self.descriptors.iter().filter(|d| d.scope == *scope).count();
+            if count > 0 {
+                scope_counts.push(format!("{scope}: {count}"));
+            }
+        }
+        format!(
+            "{total} preferences ({overridden} overridden) [{}]",
+            scope_counts.join(", ")
+        )
+    }
+}
+
+impl fmt::Display for PreferencesService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "PreferencesService({} descriptors, {} overrides)",
+            self.descriptors.len(),
+            self.overrides.len(),
+        )
+    }
+}
+
+impl PreferenceDescriptor {
+    /// Returns `true` if this preference is of type `Boolean`.
+    pub fn is_boolean(&self) -> bool {
+        self.preference_type == PreferenceType::Boolean
+    }
+
+    /// Returns `true` if this preference has enum values defined.
+    pub fn is_enum(&self) -> bool {
+        !self.enum_values.is_empty()
+    }
+}
+
+impl PreferenceScope {
+    /// Returns `true` for user-level scopes (Application or Window).
+    pub fn is_user_scope(&self) -> bool {
+        matches!(self, Self::Application | Self::Window)
+    }
+}
+
+impl PreferenceType {
+    /// Returns `true` if this type is numeric (`Number`).
+    pub fn is_numeric(&self) -> bool {
+        matches!(self, Self::Number)
+    }
+}
+
+impl ValidationRule {
+    /// Returns a human-readable description of this rule.
+    pub fn description(&self) -> &str {
+        match self {
+            Self::NonEmpty => "value must not be empty",
+            Self::MinLength(_) => "value must meet minimum length",
+            Self::MaxLength(_) => "value must not exceed maximum length",
+            Self::OneOf(_) => "value must be one of the allowed options",
+            Self::NumericRange(_, _) => "value must be within the numeric range",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1220,5 +1310,87 @@ mod tests {
             was_already_default: true,
         };
         assert!(format!("{r}").contains("already at default"));
+    }
+
+    #[test]
+    fn override_count_tracks_overrides() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("a", "1", PreferenceScope::Window));
+        svc.register(desc("b", "2", PreferenceScope::Window));
+        assert_eq!(svc.override_count(), 0);
+        svc.set_override("a", "10");
+        assert_eq!(svc.override_count(), 1);
+        svc.set_override("b", "20");
+        assert_eq!(svc.override_count(), 2);
+    }
+
+    #[test]
+    fn keys_returns_all_registered_keys() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("editor.fontSize", "14", PreferenceScope::Window));
+        svc.register(desc("editor.tabSize", "4", PreferenceScope::Resource));
+        let keys = svc.keys();
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains(&"editor.fontSize"));
+        assert!(keys.contains(&"editor.tabSize"));
+    }
+
+    #[test]
+    fn summary_includes_counts() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("a", "1", PreferenceScope::Window));
+        svc.register(desc("b", "2", PreferenceScope::Application));
+        svc.set_override("a", "10");
+        let s = svc.summary();
+        assert!(s.contains("2 preferences"));
+        assert!(s.contains("1 overridden"));
+    }
+
+    #[test]
+    fn preferences_service_display() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("x", "1", PreferenceScope::Window));
+        let s = format!("{svc}");
+        assert!(s.contains("1 descriptors"));
+        assert!(s.contains("0 overrides"));
+    }
+
+    #[test]
+    fn descriptor_is_boolean_and_is_enum() {
+        let mut d = desc("flag", "true", PreferenceScope::Window);
+        d.preference_type = PreferenceType::Boolean;
+        assert!(d.is_boolean());
+        assert!(!d.is_enum());
+        d.enum_values = vec!["a".into(), "b".into()];
+        assert!(d.is_enum());
+    }
+
+    #[test]
+    fn preference_scope_is_user_scope() {
+        assert!(PreferenceScope::Application.is_user_scope());
+        assert!(PreferenceScope::Window.is_user_scope());
+        assert!(!PreferenceScope::Machine.is_user_scope());
+        assert!(!PreferenceScope::Resource.is_user_scope());
+        assert!(!PreferenceScope::Language.is_user_scope());
+    }
+
+    #[test]
+    fn preference_type_is_numeric() {
+        assert!(PreferenceType::Number.is_numeric());
+        assert!(!PreferenceType::String.is_numeric());
+        assert!(!PreferenceType::Boolean.is_numeric());
+    }
+
+    #[test]
+    fn validation_rule_description() {
+        assert_eq!(ValidationRule::NonEmpty.description(), "value must not be empty");
+        assert_eq!(
+            ValidationRule::MinLength(3).description(),
+            "value must meet minimum length"
+        );
+        assert_eq!(
+            ValidationRule::NumericRange(0.0, 100.0).description(),
+            "value must be within the numeric range"
+        );
     }
 }

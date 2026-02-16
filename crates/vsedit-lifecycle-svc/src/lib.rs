@@ -715,6 +715,162 @@ pub fn lifecycle_health_check(svc: &LifecycleService) -> HealthStatus {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Phase iteration
+// ---------------------------------------------------------------------------
+
+/// Iterator over lifecycle phases in order.
+pub struct PhaseIter {
+    current: Option<LifecyclePhase>,
+}
+
+impl PhaseIter {
+    pub fn new() -> Self {
+        Self { current: Some(LifecyclePhase::Starting) }
+    }
+}
+
+impl Default for PhaseIter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Iterator for PhaseIter {
+    type Item = LifecyclePhase;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let phase = self.current?;
+        self.current = phase.next();
+        Some(phase)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = match self.current {
+            Some(LifecyclePhase::Starting) => 4,
+            Some(LifecyclePhase::Ready) => 3,
+            Some(LifecyclePhase::Restored) => 2,
+            Some(LifecyclePhase::Eventually) => 1,
+            None => 0,
+        };
+        (remaining, Some(remaining))
+    }
+}
+
+impl ExactSizeIterator for PhaseIter {}
+
+// ---------------------------------------------------------------------------
+// LifecyclePhase helpers
+// ---------------------------------------------------------------------------
+
+impl LifecyclePhase {
+    /// Returns the zero-based index of this phase.
+    pub fn index(&self) -> usize {
+        *self as usize
+    }
+
+    /// Returns all phases in order.
+    pub fn all() -> &'static [LifecyclePhase] {
+        &[
+            LifecyclePhase::Starting,
+            LifecyclePhase::Ready,
+            LifecyclePhase::Restored,
+            LifecyclePhase::Eventually,
+        ]
+    }
+
+    /// Parse from a string name.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().as_str() {
+            "starting" => Some(Self::Starting),
+            "ready" => Some(Self::Ready),
+            "restored" => Some(Self::Restored),
+            "eventually" => Some(Self::Eventually),
+            _ => None,
+        }
+    }
+
+    /// Returns the phase name as a static string.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Starting => "starting",
+            Self::Ready => "ready",
+            Self::Restored => "restored",
+            Self::Eventually => "eventually",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StartupPhase helpers
+// ---------------------------------------------------------------------------
+
+impl StartupPhase {
+    /// Returns all startup phase variants.
+    pub fn all() -> Vec<Self> {
+        vec![
+            Self::EarlyInit,
+            Self::ServiceInit,
+            Self::ExtensionLoad,
+            Self::Ready,
+        ]
+    }
+
+    /// Returns the ordinal position of this phase.
+    pub fn ordinal(&self) -> usize {
+        match self {
+            Self::EarlyInit => 0,
+            Self::ServiceInit => 1,
+            Self::ExtensionLoad => 2,
+            Self::Ready => 3,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Timeline helpers
+// ---------------------------------------------------------------------------
+
+impl LifecycleTimeline {
+    /// Returns a slice of all recorded entries.
+    pub fn entries(&self) -> &[TimelineEntry] {
+        &self.entries
+    }
+
+    /// Returns the total span from first to last entry duration.
+    pub fn total_span_ms(&self) -> Option<u64> {
+        let entries = self.entries();
+        if entries.len() < 2 {
+            return None;
+        }
+        let first = entries.first().unwrap().duration_ms;
+        let last = entries.last().unwrap().duration_ms;
+        Some(last.saturating_sub(first))
+    }
+
+    /// Returns entry labels as a comma-separated string.
+    pub fn summary(&self) -> String {
+        self.entries()
+            .iter()
+            .map(|e| e.label.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
+/// Format a duration in milliseconds as a human-readable string.
+pub fn format_duration_ms(ms: u64) -> String {
+    if ms < 1000 {
+        format!("{ms}ms")
+    } else if ms < 60_000 {
+        format!("{:.1}s", ms as f64 / 1000.0)
+    } else {
+        let mins = ms / 60_000;
+        let secs = (ms % 60_000) / 1000;
+        format!("{mins}m {secs}s")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1231,5 +1387,79 @@ mod tests {
         assert!(status.is_healthy);
         assert_eq!(status.barrier_count, 2);
         assert_eq!(status.uptime_events, 1);
+    }
+
+    #[test]
+    fn test_phase_iter() {
+        let phases: Vec<LifecyclePhase> = PhaseIter::new().collect();
+        assert_eq!(phases.len(), 4);
+        assert_eq!(phases[0], LifecyclePhase::Starting);
+        assert_eq!(phases[3], LifecyclePhase::Eventually);
+    }
+
+    #[test]
+    fn test_phase_iter_exact_size() {
+        let iter = PhaseIter::new();
+        assert_eq!(iter.len(), 4);
+    }
+
+    #[test]
+    fn test_lifecycle_phase_index() {
+        assert_eq!(LifecyclePhase::Starting.index(), 0);
+        assert_eq!(LifecyclePhase::Eventually.index(), 3);
+    }
+
+    #[test]
+    fn test_lifecycle_phase_all() {
+        assert_eq!(LifecyclePhase::all().len(), 4);
+    }
+
+    #[test]
+    fn test_lifecycle_phase_from_name() {
+        assert_eq!(LifecyclePhase::from_name("ready"), Some(LifecyclePhase::Ready));
+        assert_eq!(LifecyclePhase::from_name("STARTING"), Some(LifecyclePhase::Starting));
+        assert_eq!(LifecyclePhase::from_name("bogus"), None);
+    }
+
+    #[test]
+    fn test_lifecycle_phase_name() {
+        assert_eq!(LifecyclePhase::Ready.name(), "ready");
+        assert_eq!(LifecyclePhase::Eventually.name(), "eventually");
+    }
+
+    #[test]
+    fn test_startup_phase_all() {
+        assert_eq!(StartupPhase::all().len(), 4);
+    }
+
+    #[test]
+    fn test_startup_phase_ordinal() {
+        assert_eq!(StartupPhase::EarlyInit.ordinal(), 0);
+        assert_eq!(StartupPhase::Ready.ordinal(), 3);
+    }
+
+    #[test]
+    fn test_format_duration_ms() {
+        assert_eq!(format_duration_ms(500), "500ms");
+        assert_eq!(format_duration_ms(2500), "2.5s");
+        assert_eq!(format_duration_ms(90000), "1m 30s");
+    }
+
+    #[test]
+    fn test_lifecycle_timeline_total_duration() {
+        let mut tl = LifecycleTimeline::default();
+        tl.record(StartupPhase::EarlyInit, "start", 100);
+        tl.record(StartupPhase::EarlyInit, "end", 350);
+        assert_eq!(tl.total_span_ms(), Some(250));
+    }
+
+    #[test]
+    fn test_lifecycle_timeline_summary() {
+        let mut tl = LifecycleTimeline::default();
+        tl.record(StartupPhase::EarlyInit, "alpha", 0);
+        tl.record(StartupPhase::EarlyInit, "beta", 100);
+        let s = tl.summary();
+        assert!(s.contains("alpha"));
+        assert!(s.contains("beta"));
     }
 }

@@ -582,6 +582,117 @@ pub fn context_key_deserialize(s: &str) -> ContextKeyValue {
 }
 
 // ---------------------------------------------------------------------------
+// ContextKeyValue helpers
+// ---------------------------------------------------------------------------
+
+impl ContextKeyValue {
+    /// Return a human-readable type name.
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Self::Bool(_) => "bool",
+            Self::String(_) => "string",
+            Self::Number(_) => "number",
+            Self::Null => "null",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContextKeyExpr helpers
+// ---------------------------------------------------------------------------
+
+impl ContextKeyExpr {
+    /// Collect all key names referenced by this expression.
+    pub fn referenced_keys(&self) -> Vec<String> {
+        let mut keys = Vec::new();
+        self.collect_referenced_keys(&mut keys);
+        keys.sort();
+        keys.dedup();
+        keys
+    }
+
+    fn collect_referenced_keys(&self, keys: &mut Vec<String>) {
+        match self {
+            Self::Defined(k) | Self::Equals(k, _) | Self::NotEquals(k, _)
+            | Self::Regex(k, _) | Self::Greater(k, _) | Self::GreaterEquals(k, _)
+            | Self::Less(k, _) | Self::LessEquals(k, _) => {
+                keys.push(k.clone());
+            }
+            Self::In(k, s) | Self::NotIn(k, s) => {
+                keys.push(k.clone());
+                keys.push(s.clone());
+            }
+            Self::Not(inner) => inner.collect_referenced_keys(keys),
+            Self::And(exprs) | Self::Or(exprs) => {
+                for e in exprs {
+                    e.collect_referenced_keys(keys);
+                }
+            }
+            Self::True | Self::False => {}
+        }
+    }
+
+    /// Returns true if this is a simple single-key check (Defined or Equals).
+    pub fn is_simple(&self) -> bool {
+        matches!(self, Self::Defined(_) | Self::Equals(_, _) | Self::True | Self::False)
+    }
+
+    /// Return the number of leaf nodes in the expression tree.
+    pub fn leaf_count(&self) -> usize {
+        match self {
+            Self::Not(inner) => inner.leaf_count(),
+            Self::And(exprs) | Self::Or(exprs) => exprs.iter().map(|e| e.leaf_count()).sum(),
+            _ => 1,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContextKeyService helpers
+// ---------------------------------------------------------------------------
+
+impl ContextKeyService {
+    /// Number of keys stored in this context (local only, not parents).
+    pub fn key_count(&self) -> usize {
+        self.values.read().unwrap().len()
+    }
+
+    /// Return all key names in this context (local only).
+    pub fn all_keys(&self) -> Vec<String> {
+        let guard = self.values.read().unwrap();
+        let mut keys: Vec<String> = guard.keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+
+    /// Whether a key is set in this context (local only).
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.values.read().unwrap().contains_key(key)
+    }
+
+    /// Remove all keys from this context.
+    pub fn clear(&self) {
+        self.values.write().unwrap().clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContextKeyExpression helpers
+// ---------------------------------------------------------------------------
+
+impl ContextKeyExpression {
+    /// Returns true if the underlying expression is a simple single-key check.
+    pub fn is_simple(&self) -> bool {
+        self.parsed.is_simple()
+    }
+
+    /// Return the number of leaf nodes in the expression tree.
+    pub fn leaf_count(&self) -> usize {
+        self.parsed.leaf_count()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1218,5 +1329,97 @@ mod tests {
     fn evaluate_expression_parse_error_returns_false() {
         let ctx = TestContext::new();
         assert!(!evaluate_expression("&&", &ctx));
+    }
+
+    // -- ContextKeyValue::type_name ----------------------------------------
+
+    #[test]
+    fn value_type_name() {
+        assert_eq!(ContextKeyValue::Bool(true).type_name(), "bool");
+        assert_eq!(ContextKeyValue::String("x".into()).type_name(), "string");
+        assert_eq!(ContextKeyValue::Number(1.0).type_name(), "number");
+        assert_eq!(ContextKeyValue::Null.type_name(), "null");
+    }
+
+    // -- ContextKeyExpr::referenced_keys -----------------------------------
+
+    #[test]
+    fn expr_referenced_keys_simple() {
+        let expr = ContextKeyExpr::parse("editorFocus").unwrap();
+        assert_eq!(expr.referenced_keys(), vec!["editorFocus".to_string()]);
+    }
+
+    #[test]
+    fn expr_referenced_keys_compound() {
+        let expr = ContextKeyExpr::parse("a && b == 'x' && !c").unwrap();
+        let keys = expr.referenced_keys();
+        assert_eq!(keys, vec!["a", "b", "c"]);
+    }
+
+    // -- ContextKeyExpr::is_simple -----------------------------------------
+
+    #[test]
+    fn expr_is_simple() {
+        assert!(ContextKeyExpr::parse("editorFocus").unwrap().is_simple());
+        assert!(ContextKeyExpr::parse("key == 'val'").unwrap().is_simple());
+        assert!(!ContextKeyExpr::parse("a && b").unwrap().is_simple());
+        assert!(!ContextKeyExpr::parse("!x").unwrap().is_simple());
+    }
+
+    // -- ContextKeyExpr::leaf_count ----------------------------------------
+
+    #[test]
+    fn expr_leaf_count() {
+        let simple = ContextKeyExpr::parse("editorFocus").unwrap();
+        assert_eq!(simple.leaf_count(), 1);
+        let compound = ContextKeyExpr::parse("a && b && c").unwrap();
+        assert_eq!(compound.leaf_count(), 3);
+    }
+
+    // -- ContextKeyService helpers -----------------------------------------
+
+    #[test]
+    fn service_key_count_and_all_keys() {
+        let svc = ContextKeyService::new();
+        assert_eq!(svc.key_count(), 0);
+        svc.set_context("alpha", ContextKeyValue::Bool(true));
+        svc.set_context("beta", ContextKeyValue::Number(42.0));
+        assert_eq!(svc.key_count(), 2);
+        let keys = svc.all_keys();
+        assert_eq!(keys, vec!["alpha", "beta"]);
+    }
+
+    #[test]
+    fn service_contains_key() {
+        let svc = ContextKeyService::new();
+        assert!(!svc.contains_key("missing"));
+        svc.set_context("present", ContextKeyValue::Null);
+        assert!(svc.contains_key("present"));
+    }
+
+    #[test]
+    fn service_clear() {
+        let svc = ContextKeyService::new();
+        svc.set_context("a", ContextKeyValue::Bool(true));
+        svc.set_context("b", ContextKeyValue::Bool(false));
+        assert_eq!(svc.key_count(), 2);
+        svc.clear();
+        assert_eq!(svc.key_count(), 0);
+    }
+
+    // -- ContextKeyExpression helpers --------------------------------------
+
+    #[test]
+    fn expression_is_simple() {
+        let simple = ContextKeyExpression::parse("editorFocus").unwrap();
+        assert!(simple.is_simple());
+        let compound = ContextKeyExpression::parse("a && b").unwrap();
+        assert!(!compound.is_simple());
+    }
+
+    #[test]
+    fn expression_leaf_count() {
+        let expr = ContextKeyExpression::parse("a && b || c").unwrap();
+        assert!(expr.leaf_count() >= 2);
     }
 }

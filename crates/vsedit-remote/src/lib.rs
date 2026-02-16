@@ -693,6 +693,93 @@ impl SessionDuration {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Connection summary & iteration helpers
+// ---------------------------------------------------------------------------
+
+impl RemoteService {
+    /// Returns a summary of the service state.
+    pub fn service_summary(&self) -> String {
+        let total = self.connection_count();
+        let connected = self.connected_count();
+        let active = if self.is_remote() { "yes" } else { "no" };
+        format!(
+            "RemoteService: {} connections ({} connected), remote={}",
+            total, connected, active,
+        )
+    }
+
+    /// Iterate over all connections.
+    pub fn iter(&self) -> std::slice::Iter<'_, RemoteConnection> {
+        self.connections.iter()
+    }
+
+    /// Get a mutable reference to a connection by index.
+    pub fn get_connection_mut(&mut self, index: usize) -> Option<&mut RemoteConnection> {
+        self.connections.get_mut(index)
+    }
+
+    /// Returns all hosts as strings.
+    pub fn all_hosts(&self) -> Vec<&str> {
+        self.connections.iter().map(|c| c.host.as_str()).collect()
+    }
+
+    /// Returns the index of the active connection, if any.
+    pub fn active_index(&self) -> Option<usize> {
+        self.active
+    }
+}
+
+impl fmt::Display for RemoteConnection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({}, {})", self.label, self.host, self.status)
+    }
+}
+
+impl RemoteAuthority {
+    /// Returns true if this authority type supports port forwarding.
+    pub fn supports_port_forwarding(&self) -> bool {
+        matches!(self, RemoteAuthority::SSH | RemoteAuthority::Tunnel)
+    }
+
+    /// Returns the default port for this authority type, if applicable.
+    pub fn default_port(&self) -> Option<u16> {
+        match self {
+            RemoteAuthority::SSH => Some(22),
+            _ => None,
+        }
+    }
+}
+
+impl SessionDuration {
+    /// Return a human-readable elapsed time string.
+    pub fn display_elapsed(&self, now: u64) -> String {
+        let secs = self.elapsed(now);
+        if secs < 60 {
+            format!("{}s", secs)
+        } else if secs < 3600 {
+            format!("{}m {}s", secs / 60, secs % 60)
+        } else {
+            format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
+        }
+    }
+}
+
+impl ConnectionHistory {
+    /// Success rate as a percentage (0.0 to 100.0).
+    pub fn success_rate(&self) -> f64 {
+        if self.total() == 0 {
+            return 0.0;
+        }
+        (self.successes() as f64 / self.total() as f64) * 100.0
+    }
+
+    /// Returns attempts in reverse chronological order.
+    pub fn recent_first(&self) -> Vec<&ConnectionAttempt> {
+        self.attempts.iter().rev().collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1213,5 +1300,59 @@ mod tests {
     fn connection_manager_default() {
         let mgr = RemoteConnectionManager::default();
         assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn remote_service_summary() {
+        let svc = RemoteService::new();
+        let summary = svc.service_summary();
+        assert!(summary.contains("0 connections"));
+        assert!(summary.contains("remote=no"));
+    }
+
+    #[test]
+    fn remote_connection_display() {
+        let conn = sample_conn();
+        let s = conn.to_string();
+        assert!(s.contains("dev-server"));
+        assert!(s.contains("example.com"));
+    }
+
+    #[test]
+    fn remote_authority_port_forwarding() {
+        assert!(RemoteAuthority::SSH.supports_port_forwarding());
+        assert!(RemoteAuthority::Tunnel.supports_port_forwarding());
+        assert!(!RemoteAuthority::WSL.supports_port_forwarding());
+        assert!(!RemoteAuthority::Container.supports_port_forwarding());
+    }
+
+    #[test]
+    fn remote_authority_default_port() {
+        assert_eq!(RemoteAuthority::SSH.default_port(), Some(22));
+        assert_eq!(RemoteAuthority::WSL.default_port(), None);
+    }
+
+    #[test]
+    fn session_duration_display_elapsed() {
+        let s = SessionDuration::start(0);
+        assert_eq!(s.display_elapsed(45), "45s");
+        assert_eq!(s.display_elapsed(125), "2m 5s");
+        assert_eq!(s.display_elapsed(3661), "1h 1m");
+    }
+
+    #[test]
+    fn connection_history_success_rate() {
+        let mut h = ConnectionHistory::new();
+        h.record("host1", true, "ok");
+        h.record("host2", false, "err");
+        assert!((h.success_rate() - 50.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn remote_all_hosts() {
+        let mut svc = RemoteService::new();
+        svc.add_connection(sample_conn());
+        let hosts = svc.all_hosts();
+        assert_eq!(hosts, vec!["example.com"]);
     }
 }

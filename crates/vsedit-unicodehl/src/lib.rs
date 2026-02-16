@@ -686,6 +686,141 @@ pub fn unicode_unescape(s: &str) -> String {
     out
 }
 
+
+// ---------------------------------------------------------------------------
+// Severity helpers
+// ---------------------------------------------------------------------------
+
+impl Severity {
+    /// Returns all severity variants in decreasing severity order.
+    pub fn all() -> &'static [Severity] {
+        &[Severity::Error, Severity::Warning, Severity::Info]
+    }
+
+    /// Returns a numeric level (0=info, 1=warning, 2=error).
+    pub fn level(&self) -> u8 {
+        match self {
+            Severity::Info => 0,
+            Severity::Warning => 1,
+            Severity::Error => 2,
+        }
+    }
+
+    /// Parse from a string.
+    pub fn from_str_opt(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "error" | "err" => Some(Self::Error),
+            "warning" | "warn" => Some(Self::Warning),
+            "info" | "information" => Some(Self::Info),
+            _ => None,
+        }
+    }
+
+    /// Returns an icon character.
+    pub fn icon(&self) -> char {
+        match self {
+            Severity::Error => '✖',
+            Severity::Warning => '⚠',
+            Severity::Info => 'ℹ',
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UnicodeCharCategory helpers
+// ---------------------------------------------------------------------------
+
+impl UnicodeCharCategory {
+    /// Returns true if the category is potentially dangerous.
+    pub fn is_suspicious(&self) -> bool {
+        matches!(
+            self,
+            UnicodeCharCategory::Cyrillic
+                | UnicodeCharCategory::Greek
+                | UnicodeCharCategory::Invisible
+                | UnicodeCharCategory::Bidi
+        )
+    }
+
+    /// Suggested severity for this category.
+    pub fn severity(&self) -> Severity {
+        match self {
+            UnicodeCharCategory::Bidi | UnicodeCharCategory::Invisible => Severity::Error,
+            UnicodeCharCategory::Cyrillic | UnicodeCharCategory::Greek => Severity::Warning,
+            UnicodeCharCategory::Latin => Severity::Info,
+            _ => Severity::Info,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Unicode analysis helpers
+// ---------------------------------------------------------------------------
+
+/// Summary of unicode analysis for a string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnicodeAnalysis {
+    pub total_chars: usize,
+    pub ascii_count: usize,
+    pub non_ascii_count: usize,
+    pub confusable_count: usize,
+    pub bidi_count: usize,
+}
+
+impl UnicodeAnalysis {
+    /// Analyze a string for unicode characteristics.
+    pub fn analyze(s: &str) -> Self {
+        let chars: Vec<(char, UnicodeCharCategory)> = classify_string(s);
+        Self {
+            total_chars: chars.len(),
+            ascii_count: chars.iter().filter(|(_, c)| matches!(c, UnicodeCharCategory::Ascii)).count(),
+            non_ascii_count: chars.iter().filter(|(_, c)| !matches!(c, UnicodeCharCategory::Ascii)).count(),
+            confusable_count: chars.iter().filter(|(_, c)| matches!(c, UnicodeCharCategory::Cyrillic | UnicodeCharCategory::Greek)).count(),
+            bidi_count: chars.iter().filter(|(_, c)| matches!(c, UnicodeCharCategory::Bidi)).count(),
+        }
+    }
+
+    /// Returns true if no suspicious characters were found.
+    pub fn is_safe(&self) -> bool {
+        self.confusable_count == 0 && self.bidi_count == 0
+    }
+
+    /// Returns the percentage of ASCII characters.
+    pub fn ascii_percentage(&self) -> f64 {
+        if self.total_chars == 0 {
+            100.0
+        } else {
+            self.ascii_count as f64 / self.total_chars as f64 * 100.0
+        }
+    }
+}
+
+impl std::fmt::Display for UnicodeAnalysis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} chars ({} ASCII, {} non-ASCII, {} confusable, {} bidi)",
+            self.total_chars, self.ascii_count, self.non_ascii_count,
+            self.confusable_count, self.bidi_count
+        )
+    }
+}
+
+/// Strip all non-ASCII characters from a string.
+pub fn strip_non_ascii(s: &str) -> String {
+    s.chars().filter(|c| c.is_ascii()).collect()
+}
+
+/// Returns codepoint info for a character as "U+XXXX".
+pub fn char_codepoint(c: char) -> String {
+    format!("U+{:04X}", c as u32)
+}
+
+/// Returns codepoint info for all characters in a string.
+pub fn string_codepoints(s: &str) -> Vec<(char, String)> {
+    s.chars().map(|c| (c, char_codepoint(c))).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1236,5 +1371,71 @@ mod tests {
     fn unicodehl_is_ascii_printable() {
         assert!(UnicodehlValidator::is_ascii_printable("Hello World 123"));
         assert!(!UnicodehlValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn test_severity_all() {
+        assert_eq!(Severity::all().len(), 3);
+    }
+
+    #[test]
+    fn test_severity_level() {
+        assert!(Severity::Error.level() > Severity::Warning.level());
+        assert!(Severity::Warning.level() > Severity::Info.level());
+    }
+
+    #[test]
+    fn test_severity_from_str_opt() {
+        assert_eq!(Severity::from_str_opt("error"), Some(Severity::Error));
+        assert_eq!(Severity::from_str_opt("WARN"), Some(Severity::Warning));
+        assert_eq!(Severity::from_str_opt("bogus"), None);
+    }
+
+    #[test]
+    fn test_severity_icon() {
+        assert_eq!(Severity::Error.icon(), '✖');
+        assert_eq!(Severity::Info.icon(), 'ℹ');
+    }
+
+    #[test]
+    fn test_char_category_suspicious() {
+        assert!(UnicodeCharCategory::Cyrillic.is_suspicious());
+        assert!(UnicodeCharCategory::Bidi.is_suspicious());
+        assert!(!UnicodeCharCategory::Ascii.is_suspicious());
+    }
+
+    #[test]
+    fn test_unicode_analysis_ascii() {
+        let analysis = UnicodeAnalysis::analyze("hello world");
+        assert_eq!(analysis.ascii_count, 11);
+        assert_eq!(analysis.non_ascii_count, 0);
+        assert!(analysis.is_safe());
+        assert!((analysis.ascii_percentage() - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_unicode_analysis_display() {
+        let a = UnicodeAnalysis::analyze("abc");
+        let s = format!("{a}");
+        assert!(s.contains("3 chars"));
+    }
+
+    #[test]
+    fn test_strip_non_ascii() {
+        assert_eq!(strip_non_ascii("hëllo"), "hllo");
+        assert_eq!(strip_non_ascii("ascii"), "ascii");
+    }
+
+    #[test]
+    fn test_char_codepoint() {
+        assert_eq!(char_codepoint('A'), "U+0041");
+        assert_eq!(char_codepoint('€'), "U+20AC");
+    }
+
+    #[test]
+    fn test_string_codepoints() {
+        let cps = string_codepoints("AB");
+        assert_eq!(cps.len(), 2);
+        assert_eq!(cps[0], ('A', "U+0041".to_string()));
     }
 }

@@ -608,6 +608,167 @@ pub fn scroll_to_line(
     viewport.scroll_top = new_scroll;
 }
 
+// --- ViewLayout extensions ---
+
+impl ViewLayout {
+    pub fn view_count(&self) -> usize {
+        self.views.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.views.is_empty()
+    }
+
+    pub fn find_view(&self, query: &str) -> Vec<&ViewDescriptor> {
+        let q = query.to_lowercase();
+        self.views
+            .iter()
+            .filter(|v| v.id.to_lowercase().contains(&q) || v.name.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, ViewDescriptor> {
+        self.views.iter()
+    }
+
+    pub fn visible_views(&self) -> Vec<&ViewDescriptor> {
+        self.views.iter().filter(|v| v.visible).collect()
+    }
+}
+
+impl<'a> IntoIterator for &'a ViewLayout {
+    type Item = &'a ViewDescriptor;
+    type IntoIter = std::slice::Iter<'a, ViewDescriptor>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.views.iter()
+    }
+}
+
+// --- ViewDescriptor extensions ---
+
+impl ViewDescriptor {
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    pub fn matches_filter(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.id.to_lowercase().contains(&q) || self.name.to_lowercase().contains(&q)
+    }
+}
+
+// --- PanelPosition extensions ---
+
+impl PanelPosition {
+    pub fn is_horizontal(&self) -> bool {
+        matches!(self, Self::Bottom)
+    }
+
+    pub fn is_vertical(&self) -> bool {
+        matches!(self, Self::Left | Self::Right)
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Bottom => "bottom",
+            Self::Left => "left",
+            Self::Right => "right",
+        }
+    }
+}
+
+// --- LayoutOrientation extensions ---
+
+impl LayoutOrientation {
+    pub fn toggle(&self) -> Self {
+        match self {
+            Self::Horizontal => Self::Vertical,
+            Self::Vertical => Self::Horizontal,
+        }
+    }
+}
+
+impl fmt::Display for LayoutOrientation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Horizontal => write!(f, "Horizontal"),
+            Self::Vertical => write!(f, "Vertical"),
+        }
+    }
+}
+
+// --- ViewContainerLocation extensions ---
+
+impl ViewContainerLocation {
+    pub fn is_sidebar(&self) -> bool {
+        matches!(self, Self::Sidebar)
+    }
+
+    pub fn is_panel(&self) -> bool {
+        matches!(self, Self::Panel)
+    }
+}
+
+// --- ViewportMetrics extensions ---
+
+impl ViewportMetrics {
+    pub fn center_line(&self, calc: &LineHeightCalculator) -> usize {
+        calc.line_at_y(self.center_y())
+    }
+
+    pub fn is_line_visible(&self, line: usize, calc: &LineHeightCalculator) -> bool {
+        let top = calc.line_top(line);
+        let bottom = top + calc.line_height();
+        bottom > self.scroll_top && top < self.scroll_bottom()
+    }
+
+    pub fn visible_line_count(&self, calc: &LineHeightCalculator) -> usize {
+        calc.lines_per_page(self.visible_height())
+    }
+
+    pub fn visible_percentage(&self, calc: &LineHeightCalculator, total_lines: usize) -> f64 {
+        if total_lines == 0 {
+            return 100.0;
+        }
+        let visible = self.visible_line_count(calc) as f64;
+        (visible / total_lines as f64 * 100.0).min(100.0)
+    }
+}
+
+// --- LineHeightCalculator extensions ---
+
+impl LineHeightCalculator {
+    pub fn line_at_offset(&self, offset: u32) -> u32 {
+        if self.base_line_height <= 0.0 {
+            return 0;
+        }
+        (offset as f64 / self.base_line_height) as u32
+    }
+
+    pub fn line_bottom(&self, line_number: usize) -> f64 {
+        (line_number as f64 + 1.0) * self.base_line_height
+    }
+}
+
+// --- ViewlayoutStats extensions ---
+
+impl ViewlayoutStats {
+    pub fn summary(&self) -> String {
+        format!(
+            "ops={} ok={} err={} rate={:.1}%",
+            self.total_operations,
+            self.successful_operations,
+            self.failed_operations,
+            self.success_rate() * 100.0,
+        )
+    }
+
+    pub fn is_healthy(&self) -> bool {
+        self.success_rate() >= 0.95
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1204,5 +1365,134 @@ mod tests {
     fn viewlayout_is_ascii_printable() {
         assert!(ViewlayoutValidator::is_ascii_printable("Hello World 123"));
         assert!(!ViewlayoutValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // --- New extension tests ---
+
+    #[test]
+    fn view_count_and_is_empty() {
+        let mut layout = ViewLayout::new();
+        assert!(layout.is_empty());
+        assert_eq!(layout.view_count(), 0);
+        layout.add_view(sample_view("a", ViewContainerLocation::Sidebar));
+        assert!(!layout.is_empty());
+        assert_eq!(layout.view_count(), 1);
+    }
+
+    #[test]
+    fn find_view_by_query() {
+        let mut layout = ViewLayout::new();
+        layout.add_view(ViewDescriptor {
+            id: "explorer".to_string(),
+            name: "File Explorer".to_string(),
+            container: ViewContainerLocation::Sidebar,
+            order: 0,
+            visible: true,
+        });
+        layout.add_view(sample_view("terminal", ViewContainerLocation::Panel));
+        assert_eq!(layout.find_view("explor").len(), 1);
+        assert_eq!(layout.find_view("TERMINAL").len(), 1);
+        assert_eq!(layout.find_view("File").len(), 1);
+        assert!(layout.find_view("nonexistent").is_empty());
+    }
+
+    #[test]
+    fn into_iterator_for_layout() {
+        let mut layout = ViewLayout::new();
+        layout.add_view(sample_view("a", ViewContainerLocation::Sidebar));
+        layout.add_view(sample_view("b", ViewContainerLocation::Panel));
+        let ids: Vec<&str> = (&layout).into_iter().map(|v| v.id.as_str()).collect();
+        assert_eq!(ids, vec!["a", "b"]);
+        let ids2: Vec<&str> = layout.iter().map(|v| v.id.as_str()).collect();
+        assert_eq!(ids2, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn panel_position_extensions() {
+        assert!(PanelPosition::Bottom.is_horizontal());
+        assert!(!PanelPosition::Bottom.is_vertical());
+        assert!(!PanelPosition::Left.is_horizontal());
+        assert!(PanelPosition::Left.is_vertical());
+        assert!(PanelPosition::Right.is_vertical());
+        assert_eq!(PanelPosition::Bottom.label(), "bottom");
+        assert_eq!(PanelPosition::Left.label(), "left");
+        assert_eq!(PanelPosition::Right.label(), "right");
+    }
+
+    #[test]
+    fn layout_orientation_toggle_and_display() {
+        let h = LayoutOrientation::Horizontal;
+        let v = h.toggle();
+        assert_eq!(v, LayoutOrientation::Vertical);
+        assert_eq!(v.toggle(), LayoutOrientation::Horizontal);
+        assert_eq!(h.to_string(), "Horizontal");
+        assert_eq!(v.to_string(), "Vertical");
+    }
+
+    #[test]
+    fn view_container_location_extensions() {
+        assert!(ViewContainerLocation::Sidebar.is_sidebar());
+        assert!(!ViewContainerLocation::Panel.is_sidebar());
+        assert!(ViewContainerLocation::Panel.is_panel());
+        assert!(!ViewContainerLocation::AuxiliaryBar.is_panel());
+    }
+
+    #[test]
+    fn view_descriptor_extensions() {
+        let v = sample_view("explorer", ViewContainerLocation::Sidebar);
+        assert!(v.is_visible());
+        assert!(v.matches_filter("explor"));
+        assert!(v.matches_filter("EXPLORER"));
+        assert!(!v.matches_filter("terminal"));
+    }
+
+    #[test]
+    fn viewport_center_line_and_line_visible() {
+        let mut vp = ViewportMetrics::new(800.0, 200.0);
+        let calc = LineHeightCalculator::new(10.0, 2.0);
+        assert_eq!(vp.center_line(&calc), 5);
+        assert!(vp.is_line_visible(0, &calc));
+        assert!(vp.is_line_visible(9, &calc));
+        assert!(!vp.is_line_visible(11, &calc));
+        vp.scroll_top = 100.0;
+        assert!(!vp.is_line_visible(0, &calc));
+        assert!(vp.is_line_visible(5, &calc));
+    }
+
+    #[test]
+    fn viewport_visible_percentage() {
+        let vp = ViewportMetrics::new(800.0, 200.0);
+        let calc = LineHeightCalculator::new(10.0, 2.0);
+        let pct = vp.visible_percentage(&calc, 100);
+        assert!((pct - 10.0).abs() < f64::EPSILON);
+        let pct_small = vp.visible_percentage(&calc, 5);
+        assert!((pct_small - 100.0).abs() < f64::EPSILON);
+        let pct_zero = vp.visible_percentage(&calc, 0);
+        assert!((pct_zero - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn line_height_calc_extensions() {
+        let calc = LineHeightCalculator::new(10.0, 2.0);
+        assert_eq!(calc.line_at_offset(0), 0);
+        assert_eq!(calc.line_at_offset(20), 1);
+        assert_eq!(calc.line_at_offset(59), 2);
+        assert!((calc.line_bottom(0) - 20.0).abs() < f64::EPSILON);
+        assert!((calc.line_bottom(4) - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn viewlayout_stats_summary_and_healthy() {
+        let mut stats = ViewlayoutStats::new();
+        stats.record_success(100);
+        stats.record_success(200);
+        let s = stats.summary();
+        assert!(s.contains("ops=2"));
+        assert!(s.contains("rate=100.0%"));
+        assert!(stats.is_healthy());
+        for _ in 0..19 {
+            stats.record_failure(50);
+        }
+        assert!(!stats.is_healthy());
     }
 }

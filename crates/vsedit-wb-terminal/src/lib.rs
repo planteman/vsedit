@@ -710,6 +710,123 @@ pub fn search_terminals(service: &TerminalWorkbenchService, query: &str) -> Vec<
     results
 }
 
+// ---------------------------------------------------------------------------
+// TerminalShellType helpers
+// ---------------------------------------------------------------------------
+
+impl TerminalShellType {
+    /// Returns all built-in (non-custom) shell types.
+    pub fn builtins() -> &'static [TerminalShellType] {
+        &[
+            TerminalShellType::Bash,
+            TerminalShellType::Zsh,
+            TerminalShellType::Fish,
+            TerminalShellType::PowerShell,
+            TerminalShellType::Cmd,
+        ]
+    }
+
+    /// Parse a shell type from a path or name string.
+    pub fn from_path(path: &str) -> Self {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        let name = name.rsplit('\\').next().unwrap_or(name);
+        match name.to_lowercase().as_str() {
+            "bash" | "bash.exe" => Self::Bash,
+            "zsh" => Self::Zsh,
+            "fish" => Self::Fish,
+            "powershell" | "pwsh" | "powershell.exe" | "pwsh.exe" => Self::PowerShell,
+            "cmd" | "cmd.exe" => Self::Cmd,
+            _ => Self::Custom(name.to_string()),
+        }
+    }
+
+    /// Returns the default prompt character for this shell.
+    pub fn prompt_char(&self) -> &str {
+        match self {
+            Self::Bash | Self::Zsh => "$",
+            Self::Fish => ">",
+            Self::PowerShell => "PS>",
+            Self::Cmd => ">",
+            Self::Custom(_) => "$",
+        }
+    }
+
+    /// Returns true if this is a Unix shell.
+    pub fn is_unix(&self) -> bool {
+        matches!(self, Self::Bash | Self::Zsh | Self::Fish)
+    }
+
+    /// Returns true if this is a Windows shell.
+    pub fn is_windows(&self) -> bool {
+        matches!(self, Self::PowerShell | Self::Cmd)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalDimensions helpers
+// ---------------------------------------------------------------------------
+
+impl TerminalDimensions {
+    /// Standard 80x24 terminal size.
+    pub fn standard() -> Self {
+        Self { columns: 80, rows: 24 }
+    }
+
+    /// Wide terminal (120x40).
+    pub fn wide() -> Self {
+        Self { columns: 120, rows: 40 }
+    }
+
+    /// Returns true if the terminal is wider than it is tall (in cells).
+    pub fn is_landscape(&self) -> bool {
+        self.columns > self.rows
+    }
+
+    /// Returns (columns, rows) as a tuple.
+    pub fn as_tuple(&self) -> (u32, u32) {
+        (self.columns, self.rows)
+    }
+
+    /// Scale dimensions by a factor (rounded).
+    pub fn scale(&self, factor: f64) -> Self {
+        Self {
+            columns: (self.columns as f64 * factor).round() as u32,
+            rows: (self.rows as f64 * factor).round() as u32,
+        }
+    }
+}
+
+impl Default for TerminalDimensions {
+    fn default() -> Self {
+        Self::standard()
+    }
+}
+
+impl From<(u32, u32)> for TerminalDimensions {
+    fn from((columns, rows): (u32, u32)) -> Self {
+        Self { columns, rows }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Terminal escape sequence helpers
+// ---------------------------------------------------------------------------
+
+/// Generate an ANSI escape sequence to set the terminal title.
+pub fn ansi_set_title(title: &str) -> String {
+    format!("\x1b]0;{title}\x07")
+}
+
+/// Generate an ANSI escape to clear the screen.
+pub fn ansi_clear_screen() -> &'static str {
+    "\x1b[2J\x1b[H"
+}
+
+/// Generate an ANSI escape to move the cursor.
+pub fn ansi_cursor_move(row: u32, col: u32) -> String {
+    format!("\x1b[{};{}H", row, col)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1232,5 +1349,71 @@ mod tests {
         svc.create_instance();
         let results = search_terminals(&svc, "nonexistent");
         assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_shell_type_builtins() {
+        assert_eq!(TerminalShellType::builtins().len(), 5);
+    }
+
+    #[test]
+    fn test_shell_type_from_path() {
+        assert_eq!(TerminalShellType::from_path("/usr/bin/bash"), TerminalShellType::Bash);
+        assert_eq!(TerminalShellType::from_path("/usr/bin/zsh"), TerminalShellType::Zsh);
+        assert_eq!(TerminalShellType::from_path("C:\\Windows\\cmd.exe"), TerminalShellType::Cmd);
+        assert_eq!(TerminalShellType::from_path("pwsh"), TerminalShellType::PowerShell);
+        assert!(matches!(TerminalShellType::from_path("myshell"), TerminalShellType::Custom(_)));
+    }
+
+    #[test]
+    fn test_shell_type_prompt_and_unix_windows() {
+        assert_eq!(TerminalShellType::Bash.prompt_char(), "$");
+        assert_eq!(TerminalShellType::Cmd.prompt_char(), ">");
+        assert!(TerminalShellType::Zsh.is_unix());
+        assert!(!TerminalShellType::Zsh.is_windows());
+        assert!(TerminalShellType::Cmd.is_windows());
+    }
+
+    #[test]
+    fn test_terminal_dimensions_standard() {
+        let std = TerminalDimensions::standard();
+        assert_eq!(std.columns, 80);
+        assert_eq!(std.rows, 24);
+        assert_eq!(std.area(), 1920);
+        assert!(std.is_landscape());
+    }
+
+    #[test]
+    fn test_terminal_dimensions_display_and_default() {
+        let d = TerminalDimensions::default();
+        assert_eq!(format!("{d}"), "80x24");
+    }
+
+    #[test]
+    fn test_terminal_dimensions_from_tuple() {
+        let d: TerminalDimensions = (100u32, 50u32).into();
+        assert_eq!(d.columns, 100);
+        assert_eq!(d.rows, 50);
+        assert_eq!(d.as_tuple(), (100, 50));
+    }
+
+    #[test]
+    fn test_terminal_dimensions_scale() {
+        let d = TerminalDimensions::standard().scale(2.0);
+        assert_eq!(d.columns, 160);
+        assert_eq!(d.rows, 48);
+    }
+
+    #[test]
+    fn test_ansi_set_title() {
+        let seq = ansi_set_title("Test");
+        assert!(seq.contains("Test"));
+        assert!(seq.starts_with("\x1b]0;"));
+    }
+
+    #[test]
+    fn test_ansi_cursor_move() {
+        let seq = ansi_cursor_move(5, 10);
+        assert_eq!(seq, "\x1b[5;10H");
     }
 }

@@ -1,5 +1,6 @@
 //! Account/login management.
 
+use std::collections::HashMap;
 use std::fmt;
 
 /// Information about an authenticated account.
@@ -625,6 +626,136 @@ impl fmt::Display for AccountSession {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct AccountsSummary {
+    pub total_sessions: usize,
+    pub providers_count: usize,
+    pub sessions_per_provider: Vec<(String, usize)>,
+    pub total_scopes: usize,
+    pub sessions_with_email: usize,
+}
+
+impl AccountsSummary {
+    pub fn has_provider(&self, provider_id: &str) -> bool {
+        self.sessions_per_provider.iter().any(|(p, _)| p == provider_id)
+    }
+
+    pub fn count_for_provider(&self, provider_id: &str) -> usize {
+        self.sessions_per_provider
+            .iter()
+            .find(|(p, _)| p == provider_id)
+            .map(|(_, c)| *c)
+            .unwrap_or(0)
+    }
+
+    pub fn average_sessions_per_provider(&self) -> f64 {
+        if self.providers_count == 0 {
+            return 0.0;
+        }
+        self.total_sessions as f64 / self.providers_count as f64
+    }
+
+    pub fn max_sessions_provider(&self) -> Option<(&str, usize)> {
+        self.sessions_per_provider
+            .iter()
+            .max_by_key(|(_, c)| *c)
+            .map(|(p, c)| (p.as_str(), *c))
+    }
+
+    pub fn min_sessions_provider(&self) -> Option<(&str, usize)> {
+        self.sessions_per_provider
+            .iter()
+            .min_by_key(|(_, c)| *c)
+            .map(|(p, c)| (p.as_str(), *c))
+    }
+}
+
+impl fmt::Display for AccountsSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "AccountsSummary(sessions={}, providers={}, scopes={}, with_email={})",
+            self.total_sessions, self.providers_count, self.total_scopes, self.sessions_with_email,
+        )
+    }
+}
+
+impl AccountInfo {
+    pub fn matches_filter(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.id.to_lowercase().contains(&q)
+            || self.label.to_lowercase().contains(&q)
+            || self.provider_id.to_lowercase().contains(&q)
+            || self
+                .email
+                .as_ref()
+                .map(|e| e.to_lowercase().contains(&q))
+                .unwrap_or(false)
+    }
+}
+
+impl AccountsService {
+    pub fn providers(&self) -> Vec<String> {
+        let mut providers: Vec<String> = self
+            .sessions
+            .iter()
+            .map(|s| s.account.provider_id.clone())
+            .collect();
+        providers.sort_unstable();
+        providers.dedup();
+        providers
+    }
+
+    pub fn summary(&self) -> AccountsSummary {
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        let mut total_scopes = 0;
+        let mut sessions_with_email = 0;
+        for session in &self.sessions {
+            *counts.entry(session.account.provider_id.clone()).or_insert(0) += 1;
+            total_scopes += session.scopes.len();
+            if session.account.has_email() {
+                sessions_with_email += 1;
+            }
+        }
+        let mut sessions_per_provider: Vec<(String, usize)> = counts.into_iter().collect();
+        sessions_per_provider.sort_by(|a, b| a.0.cmp(&b.0));
+        AccountsSummary {
+            total_sessions: self.sessions.len(),
+            providers_count: sessions_per_provider.len(),
+            sessions_per_provider,
+            total_scopes,
+            sessions_with_email,
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &AuthSession> {
+        self.sessions.iter()
+    }
+
+    pub fn find_by_label(&self, label: &str) -> Vec<&AuthSession> {
+        self.sessions
+            .iter()
+            .filter(|s| s.account.label == label)
+            .collect()
+    }
+
+    pub fn find_by_filter(&self, query: &str) -> Vec<&AuthSession> {
+        self.sessions
+            .iter()
+            .filter(|s| s.account.matches_filter(query))
+            .collect()
+    }
+}
+
+impl<'a> IntoIterator for &'a AccountsService {
+    type Item = &'a AuthSession;
+    type IntoIter = std::slice::Iter<'a, AuthSession>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.sessions.iter()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1196,5 +1327,87 @@ mod tests {
     fn account_session_display_name() {
         let sess = make_test_account_session(Some(1000));
         assert_eq!(sess.display_name(), "Test User");
+    }
+
+    #[test]
+    fn account_info_matches_filter_by_label() {
+        let info = AccountInfo::new("a1", "Alice Smith", "github", None);
+        assert!(info.matches_filter("alice"));
+        assert!(info.matches_filter("SMITH"));
+        assert!(!info.matches_filter("bob"));
+    }
+
+    #[test]
+    fn account_info_matches_filter_by_provider_and_email() {
+        let info = AccountInfo::new("a1", "Alice", "github", Some("alice@corp.com".to_string()));
+        assert!(info.matches_filter("github"));
+        assert!(info.matches_filter("corp.com"));
+        assert!(info.matches_filter("a1"));
+        assert!(!info.matches_filter("azure"));
+    }
+
+    #[test]
+    fn accounts_service_providers_owned() {
+        let mut svc = AccountsService::new();
+        svc.add_session(make_session("s1", "github"));
+        svc.add_session(make_session("s2", "azure"));
+        svc.add_session(make_session("s3", "github"));
+        let providers = svc.providers();
+        assert_eq!(providers, vec!["azure".to_string(), "github".to_string()]);
+    }
+
+    #[test]
+    fn accounts_service_summary() {
+        let mut svc = AccountsService::new();
+        let mut s1 = make_session("s1", "github");
+        s1.account.email = Some("alice@example.com".to_string());
+        svc.add_session(s1);
+        svc.add_session(make_session("s2", "github"));
+        svc.add_session(make_session("s3", "azure"));
+        let summary = svc.summary();
+        assert_eq!(summary.total_sessions, 3);
+        assert_eq!(summary.providers_count, 2);
+        assert_eq!(summary.sessions_with_email, 1);
+        assert_eq!(summary.count_for_provider("github"), 2);
+        assert_eq!(summary.count_for_provider("azure"), 1);
+        assert_eq!(summary.count_for_provider("missing"), 0);
+        assert!(summary.has_provider("github"));
+        assert!(!summary.has_provider("bitbucket"));
+        assert!((summary.average_sessions_per_provider() - 1.5).abs() < f64::EPSILON);
+        let (max_p, max_c) = summary.max_sessions_provider().unwrap();
+        assert_eq!(max_p, "github");
+        assert_eq!(max_c, 2);
+        let (min_p, min_c) = summary.min_sessions_provider().unwrap();
+        assert_eq!(min_p, "azure");
+        assert_eq!(min_c, 1);
+        let display = format!("{summary}");
+        assert!(display.contains("sessions=3"));
+    }
+
+    #[test]
+    fn accounts_service_iter_and_into_iter() {
+        let mut svc = AccountsService::new();
+        svc.add_session(make_session("s1", "github"));
+        svc.add_session(make_session("s2", "azure"));
+        let ids_iter: Vec<&str> = svc.iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids_iter.len(), 2);
+        let ids_into: Vec<&str> = (&svc).into_iter().map(|s| s.id.as_str()).collect();
+        assert_eq!(ids_into, ids_iter);
+    }
+
+    #[test]
+    fn accounts_service_find_by_label_and_filter() {
+        let mut svc = AccountsService::new();
+        svc.add_session(make_session("s1", "github"));
+        svc.add_session(make_session("s2", "azure"));
+        let found = svc.find_by_label("User s1");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].id, "s1");
+        assert!(svc.find_by_label("Nobody").is_empty());
+        let filtered = svc.find_by_filter("azure");
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].id, "s2");
+        let all = svc.find_by_filter("User");
+        assert_eq!(all.len(), 2);
     }
 }

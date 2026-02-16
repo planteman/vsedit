@@ -714,6 +714,98 @@ impl ClipboardMonitor {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// SourceMode helpers
+// ---------------------------------------------------------------------------
+
+impl SourceMode {
+    /// Returns all source mode variants.
+    pub fn all() -> &'static [SourceMode] {
+        &[SourceMode::Normal, SourceMode::Visual, SourceMode::VisualLine, SourceMode::VisualBlock]
+    }
+
+    /// Parse from a string name.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().as_str() {
+            "normal" | "n" => Some(Self::Normal),
+            "visual" | "v" => Some(Self::Visual),
+            "visual-line" | "vl" | "visualline" => Some(Self::VisualLine),
+            "visual-block" | "vb" | "visualblock" => Some(Self::VisualBlock),
+            _ => None,
+        }
+    }
+
+    /// Returns true if this is a visual mode.
+    pub fn is_visual(&self) -> bool {
+        !matches!(self, SourceMode::Normal)
+    }
+
+    /// Returns the mode character (like Vim status line).
+    pub fn mode_char(&self) -> char {
+        match self {
+            SourceMode::Normal => 'N',
+            SourceMode::Visual => 'V',
+            SourceMode::VisualLine => 'L',
+            SourceMode::VisualBlock => 'B',
+        }
+    }
+}
+
+impl Default for SourceMode {
+    fn default() -> Self {
+        SourceMode::Normal
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardEntry helpers
+// ---------------------------------------------------------------------------
+
+impl ClipboardEntry {
+    /// Create a new entry with the current timestamp placeholder (0).
+    pub fn new(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            timestamp: 0,
+            source_mode: SourceMode::Normal,
+        }
+    }
+
+    /// Create with a specific source mode.
+    pub fn with_mode(text: impl Into<String>, mode: SourceMode) -> Self {
+        Self {
+            text: text.into(),
+            timestamp: 0,
+            source_mode: mode,
+        }
+    }
+
+    /// Returns the number of lines in the text.
+    pub fn line_count(&self) -> usize {
+        self.text.lines().count().max(1)
+    }
+
+    /// Returns the character count.
+    pub fn char_count(&self) -> usize {
+        self.text.len()
+    }
+
+    /// Returns true if the text contains multiple lines.
+    pub fn is_multiline(&self) -> bool {
+        self.text.contains('\n')
+    }
+
+    /// Truncate the text to a maximum length, adding "..." if truncated.
+    pub fn preview(&self, max_len: usize) -> String {
+        if self.text.len() <= max_len {
+            self.text.clone()
+        } else {
+            format!("{}...", &self.text[..max_len.saturating_sub(3)])
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1240,5 +1332,81 @@ mod tests {
         mon.record("c".into(), 20, SourceMode::Normal);
         let freq = mon.change_frequency();
         assert!((freq - 0.15).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_source_mode_all() {
+        assert_eq!(SourceMode::all().len(), 4);
+    }
+
+    #[test]
+    fn test_source_mode_from_name() {
+        assert_eq!(SourceMode::from_name("normal"), Some(SourceMode::Normal));
+        assert_eq!(SourceMode::from_name("v"), Some(SourceMode::Visual));
+        assert_eq!(SourceMode::from_name("vb"), Some(SourceMode::VisualBlock));
+        assert_eq!(SourceMode::from_name("bogus"), None);
+    }
+
+    #[test]
+    fn test_source_mode_is_visual() {
+        assert!(!SourceMode::Normal.is_visual());
+        assert!(SourceMode::Visual.is_visual());
+        assert!(SourceMode::VisualBlock.is_visual());
+    }
+
+    #[test]
+    fn test_source_mode_display_and_default() {
+        assert_eq!(format!("{}", SourceMode::Visual), "Visual");
+        assert_eq!(SourceMode::default(), SourceMode::Normal);
+    }
+
+    #[test]
+    fn test_source_mode_char() {
+        assert_eq!(SourceMode::Normal.mode_char(), 'N');
+        assert_eq!(SourceMode::VisualBlock.mode_char(), 'B');
+    }
+
+    #[test]
+    fn test_clipboard_entry_new() {
+        let e = ClipboardEntry::new("hello");
+        assert_eq!(e.text, "hello");
+        assert_eq!(e.source_mode, SourceMode::Normal);
+        assert_eq!(e.char_count(), 5);
+        assert_eq!(e.line_count(), 1);
+        assert!(!e.is_multiline());
+    }
+
+    #[test]
+    fn test_clipboard_entry_multiline() {
+        let e = ClipboardEntry::new("line1\nline2\nline3");
+        assert!(e.is_multiline());
+        assert_eq!(e.line_count(), 3);
+    }
+
+    #[test]
+    fn test_clipboard_entry_preview() {
+        let e = ClipboardEntry::new("a".repeat(100));
+        let p = e.preview(20);
+        assert!(p.len() <= 20);
+        assert!(p.ends_with("..."));
+    }
+
+    #[test]
+    fn test_clipboard_entry_display_with_mode() {
+        let e = ClipboardEntry::with_mode("test", SourceMode::Visual);
+        let s = format!("{e}");
+        assert!(s.contains("Visual"));
+        assert!(s.contains("test"));
+    }
+
+    #[test]
+    fn test_clipboard_stats_from_entries() {
+        let entries = vec![
+            ClipboardEntry::new("hello"),
+            ClipboardEntry::new("multi\nline"),
+            ClipboardEntry::with_mode("visual", SourceMode::Visual),
+        ];
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries.iter().filter(|e| e.is_multiline()).count(), 1);
     }
 }

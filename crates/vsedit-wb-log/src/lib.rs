@@ -622,6 +622,86 @@ pub fn log_needs_rotation(entry_count: usize, config: &LogRotateConfig) -> bool 
     entry_count > config.max_entries
 }
 
+// ---------------------------------------------------------------------------
+// Additional helpers
+// ---------------------------------------------------------------------------
+
+impl LogService {
+    /// Returns the last error-level entry, if any.
+    pub fn last_error(&self) -> Option<&LogEntry> {
+        self.entries.iter().rev().find(|e| e.is_error())
+    }
+
+    /// Returns the last warning-level entry, if any.
+    pub fn last_warning(&self) -> Option<&LogEntry> {
+        self.entries.iter().rev().find(|e| e.is_warning())
+    }
+
+    /// Returns a human-readable summary of the log state.
+    pub fn summary(&self) -> String {
+        let total = self.entries.len();
+        let errors = self.error_count();
+        let warnings = self.warning_count();
+        let sources = self.unique_sources();
+        format!(
+            "{total} entries ({errors} errors, {warnings} warnings, {} sources)",
+            sources.len()
+        )
+    }
+}
+
+impl fmt::Display for LogService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "LogService({} entries, min_level={}, max={})",
+            self.entries.len(),
+            self.min_level,
+            self.max_entries
+                .map(|n| n.to_string())
+                .unwrap_or_else(|| "unlimited".to_string()),
+        )
+    }
+}
+
+impl LogLevel {
+    /// Returns `true` if `self` is at least as severe as `other`.
+    pub fn is_at_least(&self, other: &LogLevel) -> bool {
+        self >= other
+    }
+
+    /// Returns a numeric rank (0=Trace .. 5=Critical).
+    pub fn rank(&self) -> u8 {
+        match self {
+            Self::Trace => 0,
+            Self::Debug => 1,
+            Self::Info => 2,
+            Self::Warning => 3,
+            Self::Error => 4,
+            Self::Critical => 5,
+        }
+    }
+}
+
+impl LogEntry {
+    /// Returns `true` if this entry has a source set.
+    pub fn has_source(&self) -> bool {
+        self.source.is_some()
+    }
+
+    /// Returns the length of the message string.
+    pub fn message_length(&self) -> usize {
+        self.message.len()
+    }
+}
+
+impl LogFilter {
+    /// Returns `true` if no filter constraints have been set.
+    pub fn is_empty(&self) -> bool {
+        self.level.is_none() && self.source.is_none() && self.message_contains.is_none()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1221,5 +1301,96 @@ mod tests {
         assert_eq!(config.max_entries, 10_000);
         assert_eq!(config.keep_entries, 5_000);
         assert_eq!(config.min_retain_level, LogLevel::Trace);
+    }
+
+    #[test]
+    fn last_error_returns_most_recent() {
+        let mut svc = LogService::new(LogLevel::Trace);
+        svc.info("ok");
+        svc.error("err1");
+        svc.info("ok2");
+        svc.error("err2");
+        let last = svc.last_error().unwrap();
+        assert_eq!(last.message, "err2");
+    }
+
+    #[test]
+    fn last_warning_returns_most_recent() {
+        let mut svc = LogService::new(LogLevel::Trace);
+        svc.warn("w1");
+        svc.info("ok");
+        svc.warn("w2");
+        let last = svc.last_warning().unwrap();
+        assert_eq!(last.message, "w2");
+    }
+
+    #[test]
+    fn last_error_returns_none_when_no_errors() {
+        let mut svc = LogService::new(LogLevel::Trace);
+        svc.info("ok");
+        assert!(svc.last_error().is_none());
+    }
+
+    #[test]
+    fn log_service_summary() {
+        let mut svc = LogService::new(LogLevel::Trace);
+        svc.error("e1");
+        svc.warn("w1");
+        svc.info("i1");
+        let s = svc.summary();
+        assert!(s.contains("3 entries"));
+        assert!(s.contains("1 errors"));
+        assert!(s.contains("1 warnings"));
+    }
+
+    #[test]
+    fn log_service_display() {
+        let svc = LogService::new(LogLevel::Info);
+        let s = format!("{svc}");
+        assert!(s.contains("0 entries"));
+        assert!(s.contains("min_level=INFO"));
+    }
+
+    #[test]
+    fn log_level_is_at_least() {
+        assert!(LogLevel::Error.is_at_least(&LogLevel::Warning));
+        assert!(LogLevel::Warning.is_at_least(&LogLevel::Warning));
+        assert!(!LogLevel::Info.is_at_least(&LogLevel::Warning));
+    }
+
+    #[test]
+    fn log_level_rank() {
+        assert_eq!(LogLevel::Trace.rank(), 0);
+        assert_eq!(LogLevel::Critical.rank(), 5);
+        assert!(LogLevel::Error.rank() > LogLevel::Info.rank());
+    }
+
+    #[test]
+    fn log_entry_has_source_and_message_length() {
+        let entry = LogEntry {
+            level: LogLevel::Info,
+            message: "hello".into(),
+            source: Some("test".into()),
+            timestamp: 0,
+        };
+        assert!(entry.has_source());
+        assert_eq!(entry.message_length(), 5);
+
+        let entry2 = LogEntry {
+            level: LogLevel::Info,
+            message: "".into(),
+            source: None,
+            timestamp: 0,
+        };
+        assert!(!entry2.has_source());
+        assert_eq!(entry2.message_length(), 0);
+    }
+
+    #[test]
+    fn log_filter_is_empty() {
+        let f = LogFilter::new();
+        assert!(f.is_empty());
+        let f2 = LogFilter::new().with_level(LogLevel::Error);
+        assert!(!f2.is_empty());
     }
 }

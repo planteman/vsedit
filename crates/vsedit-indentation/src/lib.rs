@@ -891,6 +891,90 @@ pub fn indentation_detect_from_content(text: &str) -> IndentDetection {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// IndentStyle helpers
+// ---------------------------------------------------------------------------
+
+impl IndentStyle {
+    /// Returns the visual width of one indent level.
+    pub fn width(&self) -> u32 {
+        match self {
+            IndentStyle::Spaces(n) => *n,
+            IndentStyle::Tabs => 4, // conventional tab width
+        }
+    }
+
+    /// Returns the character used for indentation.
+    pub fn indent_char(&self) -> char {
+        match self {
+            IndentStyle::Spaces(_) => ' ',
+            IndentStyle::Tabs => '\t',
+        }
+    }
+
+    /// Common indent styles for selection UI.
+    pub fn common_styles() -> Vec<IndentStyle> {
+        vec![
+            IndentStyle::Spaces(2),
+            IndentStyle::Spaces(4),
+            IndentStyle::Spaces(8),
+            IndentStyle::Tabs,
+        ]
+    }
+}
+
+impl Default for IndentStyle {
+    fn default() -> Self {
+        IndentStyle::Spaces(4)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Indentation analysis
+// ---------------------------------------------------------------------------
+
+/// Counts the indentation level of a single line (alternate implementation
+/// that counts all whitespace characters, not just leading contiguous ones).
+pub fn line_indent_level(line: &str, style: IndentStyle) -> u32 {
+    let ws = line.len() - line.trim_start().len();
+    if ws == 0 {
+        return 0;
+    }
+    let leading = &line[..ws];
+    match style {
+        IndentStyle::Tabs => leading.chars().filter(|&c| c == '\t').count() as u32,
+        IndentStyle::Spaces(n) => {
+            let spaces = leading.chars().filter(|&c| c == ' ').count() as u32;
+            spaces / n
+        }
+    }
+}
+
+/// Returns the maximum indentation level in the text.
+pub fn max_indent_level(text: &str, style: IndentStyle) -> u32 {
+    text.lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| line_indent_level(line, style))
+        .max()
+        .unwrap_or(0)
+}
+
+/// Strip all leading whitespace from every line.
+pub fn strip_all_indent(text: &str) -> String {
+    text.lines()
+        .map(|line| line.trim_start())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+impl IndentStats {
+    /// Analyze text for indentation statistics (delegates to [`analyse_indentation`]).
+    pub fn analyze(text: &str) -> Self {
+        analyse_indentation(text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1241,5 +1325,80 @@ mod tests {
         let s = format!("{d}");
         assert!(s.contains("85%"));
         assert!(s.contains("20 samples"));
+    }
+
+    #[test]
+    fn test_indent_style_width() {
+        assert_eq!(IndentStyle::Spaces(2).width(), 2);
+        assert_eq!(IndentStyle::Tabs.width(), 4);
+    }
+
+    #[test]
+    fn test_indent_style_string() {
+        assert_eq!(IndentStyle::Spaces(2).indent_string(), "  ");
+        assert_eq!(IndentStyle::Tabs.indent_string(), "\t");
+    }
+
+    #[test]
+    fn test_indent_style_is_spaces_tabs() {
+        assert!(IndentStyle::Spaces(4).is_spaces());
+        assert!(!IndentStyle::Spaces(4).is_tabs());
+        assert!(IndentStyle::Tabs.is_tabs());
+    }
+
+    #[test]
+    fn test_indent_style_display() {
+        assert_eq!(format!("{}", IndentStyle::Spaces(2)), "Spaces(2)");
+        assert_eq!(format!("{}", IndentStyle::Tabs), "Tabs");
+    }
+
+    #[test]
+    fn test_indent_style_default() {
+        assert_eq!(IndentStyle::default(), IndentStyle::Spaces(4));
+    }
+
+    #[test]
+    fn test_indent_style_common() {
+        let common = IndentStyle::common_styles();
+        assert_eq!(common.len(), 4);
+        assert!(common.contains(&IndentStyle::Tabs));
+    }
+
+    #[test]
+    fn test_line_indent_level_fn() {
+        assert_eq!(super::line_indent_level("    hello", IndentStyle::Spaces(4)), 1);
+        assert_eq!(super::line_indent_level("        hello", IndentStyle::Spaces(4)), 2);
+        assert_eq!(super::line_indent_level("\thello", IndentStyle::Tabs), 1);
+        assert_eq!(super::line_indent_level("hello", IndentStyle::Spaces(4)), 0);
+    }
+
+    #[test]
+    fn test_max_indent_level() {
+        let text = "a\n    b\n        c\n";
+        assert_eq!(max_indent_level(text, IndentStyle::Spaces(4)), 2);
+    }
+
+    #[test]
+    fn test_indent_stats_analyze() {
+        let text = "top\n    indented\n\n        deep\n";
+        let stats = IndentStats::analyze(text);
+        assert_eq!(stats.total_lines, 4);
+        assert_eq!(stats.space_indented_lines, 2);
+        assert_eq!(stats.blank_lines, 1);
+        assert!(!stats.mixed);
+        assert!(format!("{stats}").contains("4 lines"));
+    }
+
+    #[test]
+    fn test_indent_stats_mixed() {
+        let text = "    spaces\n\ttabs\n";
+        let stats = IndentStats::analyze(text);
+        assert!(stats.mixed);
+    }
+
+    #[test]
+    fn test_strip_all_indent() {
+        let text = "  a\n    b\nc\n";
+        assert_eq!(strip_all_indent(text), "a\nb\nc");
     }
 }

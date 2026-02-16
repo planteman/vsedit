@@ -706,6 +706,175 @@ impl ChatTokenCounter {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// ChatRole helpers
+// ---------------------------------------------------------------------------
+
+impl MessageRole {
+    /// Returns all role variants.
+    pub fn all() -> &'static [MessageRole] {
+        &[MessageRole::User, MessageRole::Assistant, MessageRole::System]
+    }
+
+    /// Parse from a string.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().as_str() {
+            "user" => Some(Self::User),
+            "assistant" | "ai" | "bot" => Some(Self::Assistant),
+            "system" => Some(Self::System),
+            _ => None,
+        }
+    }
+
+    /// Returns the role name as a string.
+    pub fn name(&self) -> &'static str {
+        match self {
+            MessageRole::User => "user",
+            MessageRole::Assistant => "assistant",
+            MessageRole::System => "system",
+        }
+    }
+
+    /// Returns an icon character for this role.
+    pub fn icon(&self) -> char {
+        match self {
+            MessageRole::User => '👤',
+            MessageRole::Assistant => '🤖',
+            MessageRole::System => '⚙',
+        }
+    }
+
+    /// Returns true if this is a user message.
+    pub fn is_user(&self) -> bool {
+        matches!(self, MessageRole::User)
+    }
+
+    /// Returns true if this is an assistant message.
+    pub fn is_assistant(&self) -> bool {
+        matches!(self, MessageRole::Assistant)
+    }
+}
+
+impl Default for MessageRole {
+    fn default() -> Self {
+        MessageRole::User
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChatMessage helpers
+// ---------------------------------------------------------------------------
+
+impl ChatMessage {
+    /// Create a user message.
+    pub fn user(content: impl Into<String>) -> Self {
+        Self {
+            role: MessageRole::User,
+            content: content.into(),
+            timestamp: 0,
+        }
+    }
+
+    /// Create an assistant message.
+    pub fn assistant(content: impl Into<String>) -> Self {
+        Self {
+            role: MessageRole::Assistant,
+            content: content.into(),
+            timestamp: 0,
+        }
+    }
+
+    /// Create a system message.
+    pub fn system(content: impl Into<String>) -> Self {
+        Self {
+            role: MessageRole::System,
+            content: content.into(),
+            timestamp: 0,
+        }
+    }
+
+    /// Returns the word count of the content.
+    pub fn word_count(&self) -> usize {
+        self.content.split_whitespace().count()
+    }
+
+    /// Returns a truncated preview of the content.
+    pub fn preview(&self, max_len: usize) -> String {
+        if self.content.len() <= max_len {
+            self.content.clone()
+        } else {
+            format!("{}...", &self.content[..max_len.saturating_sub(3)])
+        }
+    }
+
+    /// Returns the character count.
+    pub fn char_count(&self) -> usize {
+        self.content.len()
+    }
+}
+
+impl fmt::Display for ChatMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {}", self.role.name(), self.preview(80))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Chat analysis helpers
+// ---------------------------------------------------------------------------
+
+/// Summary of a chat conversation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatSummary {
+    pub total_messages: usize,
+    pub user_messages: usize,
+    pub assistant_messages: usize,
+    pub system_messages: usize,
+    pub total_words: usize,
+}
+
+impl ChatSummary {
+    /// Generate a summary from messages.
+    pub fn from_messages(messages: &[ChatMessage]) -> Self {
+        Self {
+            total_messages: messages.len(),
+            user_messages: messages.iter().filter(|m| m.role.is_user()).count(),
+            assistant_messages: messages.iter().filter(|m| m.role.is_assistant()).count(),
+            system_messages: messages.iter().filter(|m| matches!(m.role, MessageRole::System)).count(),
+            total_words: messages.iter().map(|m| m.word_count()).sum(),
+        }
+    }
+
+    /// Returns the average message length in words.
+    pub fn avg_words(&self) -> f64 {
+        if self.total_messages == 0 {
+            0.0
+        } else {
+            self.total_words as f64 / self.total_messages as f64
+        }
+    }
+}
+
+impl fmt::Display for ChatSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} messages ({} user, {} assistant, {} system), {} words",
+            self.total_messages, self.user_messages, self.assistant_messages,
+            self.system_messages, self.total_words
+        )
+    }
+}
+
+/// Extract all content from messages with a specific role.
+pub fn extract_role_content(messages: &[ChatMessage], role: MessageRole) -> Vec<String> {
+    messages.iter()
+        .filter(|m| m.role == role)
+        .map(|m| m.content.clone())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1243,5 +1412,93 @@ mod tests {
         let truncated = ChatTokenCounter::truncate_to_fit(&msgs, 5);
         assert!(truncated.len() < msgs.len());
         assert!(ChatTokenCounter::fits_in_context(&truncated, 5));
+    }
+
+    #[test]
+    fn test_chat_role_all() {
+        assert_eq!(MessageRole::all().len(), 3);
+    }
+
+    #[test]
+    fn test_chat_role_from_name() {
+        assert_eq!(MessageRole::from_name("user"), Some(MessageRole::User));
+        assert_eq!(MessageRole::from_name("AI"), Some(MessageRole::Assistant));
+        assert_eq!(MessageRole::from_name("bogus"), None);
+    }
+
+    #[test]
+    fn test_chat_role_name_and_icon() {
+        assert_eq!(MessageRole::User.name(), "user");
+        assert_eq!(MessageRole::Assistant.icon(), '🤖');
+    }
+
+    #[test]
+    fn test_chat_role_is_checks() {
+        assert!(MessageRole::User.is_user());
+        assert!(!MessageRole::User.is_assistant());
+        assert!(MessageRole::Assistant.is_assistant());
+        assert_eq!(MessageRole::default(), MessageRole::User);
+    }
+
+    #[test]
+    fn test_chat_message_constructors() {
+        let u = ChatMessage::user("Hello");
+        assert_eq!(u.role, MessageRole::User);
+        assert_eq!(u.content, "Hello");
+        let a = ChatMessage::assistant("Hi there");
+        assert_eq!(a.role, MessageRole::Assistant);
+        let s = ChatMessage::system("You are helpful");
+        assert_eq!(s.role, MessageRole::System);
+    }
+
+    #[test]
+    fn test_chat_message_word_count() {
+        let m = ChatMessage::user("hello world foo bar");
+        assert_eq!(m.word_count(), 4);
+        assert_eq!(m.char_count(), 19);
+    }
+
+    #[test]
+    fn test_chat_message_preview() {
+        let m = ChatMessage::user("a".repeat(100));
+        let p = m.preview(20);
+        assert!(p.len() <= 20);
+        assert!(p.ends_with("..."));
+    }
+
+    #[test]
+    fn test_chat_message_display() {
+        let m = ChatMessage::user("Hello world");
+        let s = format!("{m}");
+        assert!(s.contains("user"));
+        assert!(s.contains("Hello"));
+    }
+
+    #[test]
+    fn test_chat_summary() {
+        let messages = vec![
+            ChatMessage::system("Be helpful"),
+            ChatMessage::user("Hello"),
+            ChatMessage::assistant("Hi there how are you"),
+            ChatMessage::user("Fine thanks"),
+        ];
+        let summary = ChatSummary::from_messages(&messages);
+        assert_eq!(summary.total_messages, 4);
+        assert_eq!(summary.user_messages, 2);
+        assert_eq!(summary.assistant_messages, 1);
+        assert_eq!(summary.system_messages, 1);
+        assert!(summary.avg_words() > 0.0);
+        assert!(format!("{summary}").contains("4 messages"));
+    }
+
+    #[test]
+    fn test_extract_role_content() {
+        let messages = vec![
+            ChatMessage::user("Q1"),
+            ChatMessage::assistant("A1"),
+            ChatMessage::user("Q2"),
+        ];
+        let user_content = extract_role_content(&messages, MessageRole::User);
+        assert_eq!(user_content, vec!["Q1", "Q2"]);
     }
 }

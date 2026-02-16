@@ -776,6 +776,101 @@ pub fn stream_lines_with_pending(chunks: &[String]) -> (Vec<String>, Option<Stri
     }
 }
 
+// ---------------------------------------------------------------------------
+// BufferStream helpers
+// ---------------------------------------------------------------------------
+
+impl BufferStream {
+    /// Total bytes remaining across all unread chunks.
+    pub fn total_remaining_bytes(&self) -> usize {
+        self.chunks[self.position..].iter().map(|c| c.len()).sum()
+    }
+
+    /// Whether all chunks have been read.
+    pub fn is_exhausted(&self) -> bool {
+        self.position >= self.chunks.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StringStream helpers
+// ---------------------------------------------------------------------------
+
+impl StringStream {
+    /// Number of items remaining to be read.
+    pub fn remaining(&self) -> usize {
+        self.items.len().saturating_sub(self.position)
+    }
+
+    /// Create a StringStream by splitting a string on newlines.
+    pub fn from_str(s: &str) -> Self {
+        let items: Vec<String> = s.lines().map(|l| l.to_string()).collect();
+        Self { items, position: 0 }
+    }
+
+    /// Whether all items have been read.
+    pub fn is_exhausted(&self) -> bool {
+        self.position >= self.items.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StringWriter helpers
+// ---------------------------------------------------------------------------
+
+impl StringWriter {
+    /// Total character count across all written items.
+    pub fn total_char_count(&self) -> usize {
+        self.items.iter().map(|s| s.len()).sum()
+    }
+
+    /// Number of items written so far.
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+}
+
+impl fmt::Display for StringWriter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "StringWriter({} items, {} chars, ended={})",
+            self.items.len(),
+            self.total_char_count(),
+            self.ended,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BufferWriter helpers
+// ---------------------------------------------------------------------------
+
+impl BufferWriter {
+    /// Reset the writer, clearing all chunks and the ended flag.
+    pub fn clear(&mut self) {
+        self.chunks.clear();
+        self.ended = false;
+    }
+}
+
+impl fmt::Display for BufferWriter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "BufferWriter({} chunks, {} bytes, ended={})",
+            self.chunks.len(),
+            self.total_size(),
+            self.ended,
+        )
+    }
+}
+
+/// Collect all remaining items from a readable stream into a Vec.
+pub fn collect_all_items<S: ReadableStream>(stream: &mut S) -> Vec<S::Item> {
+    stream.collect_all()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1218,5 +1313,93 @@ mod tests {
         let (complete, pending) = stream_lines_with_pending(&chunks);
         assert_eq!(complete, vec!["line1", "line2"]);
         assert_eq!(pending, Some("partial".to_string()));
+    }
+
+    // -- BufferStream helpers ----------------------------------------------
+
+    #[test]
+    fn buffer_stream_total_remaining_bytes() {
+        let mut stream = BufferStream::from_chunks(vec![
+            VsBuffer::from_string("abc"),
+            VsBuffer::from_string("de"),
+        ]);
+        assert_eq!(stream.total_remaining_bytes(), 5);
+        stream.read();
+        assert_eq!(stream.total_remaining_bytes(), 2);
+        stream.read();
+        assert_eq!(stream.total_remaining_bytes(), 0);
+        assert!(stream.is_exhausted());
+    }
+
+    // -- StringStream helpers ----------------------------------------------
+
+    #[test]
+    fn string_stream_remaining() {
+        let mut stream = StringStream::from_strings(vec!["a".into(), "b".into(), "c".into()]);
+        assert_eq!(stream.remaining(), 3);
+        stream.read();
+        assert_eq!(stream.remaining(), 2);
+    }
+
+    #[test]
+    fn string_stream_from_str() {
+        let mut stream = StringStream::from_str("hello\nworld\nfoo");
+        assert_eq!(stream.remaining(), 3);
+        assert_eq!(stream.read().unwrap(), "hello");
+        assert_eq!(stream.read().unwrap(), "world");
+        assert_eq!(stream.read().unwrap(), "foo");
+        assert!(stream.is_exhausted());
+    }
+
+    // -- StringWriter helpers ----------------------------------------------
+
+    #[test]
+    fn string_writer_total_char_count() {
+        let mut w = StringWriter::new();
+        w.write("hello".into());
+        w.write("world".into());
+        assert_eq!(w.total_char_count(), 10);
+        assert_eq!(w.item_count(), 2);
+    }
+
+    #[test]
+    fn string_writer_display() {
+        let mut w = StringWriter::new();
+        w.write("test".into());
+        let s = format!("{}", w);
+        assert!(s.contains("1 items"));
+        assert!(s.contains("4 chars"));
+    }
+
+    // -- BufferWriter helpers ----------------------------------------------
+
+    #[test]
+    fn buffer_writer_clear() {
+        let mut w = BufferWriter::new();
+        w.write(VsBuffer::from_string("data"));
+        w.end();
+        assert!(w.is_ended());
+        assert_eq!(w.chunk_count(), 1);
+        w.clear();
+        assert!(!w.is_ended());
+        assert_eq!(w.chunk_count(), 0);
+    }
+
+    #[test]
+    fn buffer_writer_display() {
+        let mut w = BufferWriter::new();
+        w.write(VsBuffer::from_string("abc"));
+        let s = format!("{}", w);
+        assert!(s.contains("1 chunks"));
+        assert!(s.contains("3 bytes"));
+    }
+
+    // -- collect_all_items -------------------------------------------------
+
+    #[test]
+    fn collect_all_items_works() {
+        let mut stream = StringStream::from_strings(vec!["x".into(), "y".into()]);
+        let items = collect_all_items(&mut stream);
+        assert_eq!(items, vec!["x", "y"]);
     }
 }

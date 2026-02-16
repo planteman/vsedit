@@ -668,6 +668,198 @@ pub fn wrap_document(lines: &[&str], width: usize, mode: WordWrapMode) -> Vec<Wr
     result
 }
 
+// ---------------------------------------------------------------------------
+// RenderedEditorLine extensions
+// ---------------------------------------------------------------------------
+
+impl RenderedEditorLine {
+    pub fn is_empty(&self) -> bool {
+        self.content.is_empty()
+    }
+
+    pub fn char_count(&self) -> usize {
+        self.content.chars().count()
+    }
+
+    pub fn has_decorations(&self) -> bool {
+        !self.decorations.is_empty()
+    }
+
+    pub fn decoration_count(&self) -> usize {
+        self.decorations.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LineDecoration extensions
+// ---------------------------------------------------------------------------
+
+impl LineDecoration {
+    pub fn contains_column(&self, col: u32) -> bool {
+        col >= self.start_col && col < self.end_col
+    }
+
+    pub fn length(&self) -> u32 {
+        self.end_col.saturating_sub(self.start_col)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DecorationKind extensions
+// ---------------------------------------------------------------------------
+
+impl DecorationKind {
+    pub fn is_error(&self) -> bool {
+        matches!(self, Self::Error | Self::GutterError)
+    }
+
+    pub fn is_warning(&self) -> bool {
+        matches!(self, Self::Warning | Self::GutterWarning)
+    }
+
+    pub fn is_info(&self) -> bool {
+        matches!(self, Self::Info)
+    }
+
+    pub fn severity_rank(&self) -> Option<u8> {
+        match self {
+            Self::Hint => Some(1),
+            Self::Info => Some(2),
+            Self::Warning | Self::GutterWarning => Some(3),
+            Self::Error | Self::GutterError => Some(4),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewportState extensions
+// ---------------------------------------------------------------------------
+
+impl ViewportState {
+    pub fn center_line(&self) -> u32 {
+        self.first_visible_line + self.visible_line_count() / 2
+    }
+
+    pub fn scroll_percentage(&self, total: u32) -> f64 {
+        if total == 0 {
+            return 0.0;
+        }
+        (self.last_visible_line as f64 / total as f64) * 100.0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CursorDisplay extensions
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for CursorDisplay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Cursor({}:{} {} {})",
+            self.line,
+            self.column,
+            self.style,
+            if self.is_visible { "visible" } else { "hidden" }
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CursorStyle extensions
+// ---------------------------------------------------------------------------
+
+impl CursorStyle {
+    pub fn is_block(&self) -> bool {
+        matches!(self, Self::Block)
+    }
+
+    pub fn is_line(&self) -> bool {
+        matches!(self, Self::Line)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WordWrapMode extensions
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for WordWrapMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Off => write!(f, "Off"),
+            Self::On(col) => write!(f, "On({})", col),
+            Self::WordBoundary(col) => write!(f, "WordBoundary({})", col),
+            Self::Bounded(col) => write!(f, "Bounded({})", col),
+        }
+    }
+}
+
+impl WordWrapMode {
+    pub fn is_enabled(&self) -> bool {
+        !matches!(self, Self::Off)
+    }
+
+    pub fn effective_column(&self) -> Option<usize> {
+        match self {
+            Self::Off => None,
+            Self::On(c) | Self::WordBoundary(c) | Self::Bounded(c) => Some(*c),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WrappedLine extensions
+// ---------------------------------------------------------------------------
+
+impl WrappedLine {
+    pub fn visual_line_count(lines: &[WrappedLine]) -> usize {
+        lines.len()
+    }
+
+    pub fn is_wrapped(&self) -> bool {
+        self.is_continuation
+    }
+
+    pub fn original_length(&self) -> usize {
+        self.content.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenderCacheState extensions
+// ---------------------------------------------------------------------------
+
+impl RenderCacheState {
+    pub fn is_valid(&self) -> bool {
+        !self.dirty
+    }
+}
+
+impl fmt::Display for RenderCacheState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "RenderCache(line={} h={} cursor={} total={} {})",
+            self.last_viewport_first,
+            self.last_viewport_height,
+            self.last_cursor_line,
+            self.last_total_lines,
+            if self.dirty { "dirty" } else { "clean" }
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorRenderer extensions
+// ---------------------------------------------------------------------------
+
+impl EditorRenderer {
+    pub fn total_rendered_lines(&self) -> u32 {
+        self.viewport.visible_line_count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1210,5 +1402,144 @@ mod tests {
         let result = wrap_document(&lines, 5, WordWrapMode::Off);
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].content, "a very long line indeed");
+    }
+
+    // -- extension tests ----------------------------------------------------
+
+    #[test]
+    fn rendered_line_is_empty_and_char_count() {
+        let empty = RenderedEditorLine::new(1, "");
+        assert!(empty.is_empty());
+        assert_eq!(empty.char_count(), 0);
+
+        let line = RenderedEditorLine::new(2, "héllo");
+        assert!(!line.is_empty());
+        assert_eq!(line.char_count(), 5);
+    }
+
+    #[test]
+    fn rendered_line_has_decorations_and_count() {
+        let mut line = RenderedEditorLine::new(1, "abc");
+        assert!(!line.has_decorations());
+        assert_eq!(line.decoration_count(), 0);
+
+        line.decorations.push(LineDecoration::new(0, 2, DecorationKind::Error));
+        line.decorations.push(LineDecoration::new(2, 3, DecorationKind::Warning));
+        assert!(line.has_decorations());
+        assert_eq!(line.decoration_count(), 2);
+    }
+
+    #[test]
+    fn line_decoration_contains_column_and_length() {
+        let dec = LineDecoration::new(3, 7, DecorationKind::Selection);
+        assert!(!dec.contains_column(2));
+        assert!(dec.contains_column(3));
+        assert!(dec.contains_column(6));
+        assert!(!dec.contains_column(7));
+        assert_eq!(dec.length(), 4);
+    }
+
+    #[test]
+    fn decoration_kind_severity_helpers() {
+        assert!(DecorationKind::Error.is_error());
+        assert!(DecorationKind::GutterError.is_error());
+        assert!(!DecorationKind::Warning.is_error());
+
+        assert!(DecorationKind::Warning.is_warning());
+        assert!(DecorationKind::GutterWarning.is_warning());
+        assert!(!DecorationKind::Error.is_warning());
+
+        assert!(DecorationKind::Info.is_info());
+        assert!(!DecorationKind::Hint.is_info());
+
+        assert_eq!(DecorationKind::Error.severity_rank(), Some(4));
+        assert_eq!(DecorationKind::Warning.severity_rank(), Some(3));
+        assert_eq!(DecorationKind::Info.severity_rank(), Some(2));
+        assert_eq!(DecorationKind::Hint.severity_rank(), Some(1));
+        assert_eq!(DecorationKind::Selection.severity_rank(), None);
+    }
+
+    #[test]
+    fn viewport_center_line_and_scroll_percentage() {
+        let mut vp = ViewportState::new(10);
+        vp.update(1, 100);
+        assert_eq!(vp.center_line(), 6);
+        let pct = vp.scroll_percentage(100);
+        assert!((pct - 10.0).abs() < 0.01);
+
+        let empty_pct = vp.scroll_percentage(0);
+        assert!((empty_pct - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn cursor_and_style_extensions() {
+        assert!(CursorStyle::Block.is_block());
+        assert!(!CursorStyle::Block.is_line());
+        assert!(CursorStyle::Line.is_line());
+        assert!(!CursorStyle::Line.is_block());
+
+        let cursor = CursorDisplay {
+            line: 5,
+            column: 10,
+            is_visible: true,
+            style: CursorStyle::Block,
+        };
+        let s = format!("{}", cursor);
+        assert!(s.contains("5:10"));
+        assert!(s.contains("visible"));
+    }
+
+    #[test]
+    fn word_wrap_mode_display_and_helpers() {
+        assert_eq!(WordWrapMode::Off.to_string(), "Off");
+        assert_eq!(WordWrapMode::On(80).to_string(), "On(80)");
+        assert_eq!(WordWrapMode::WordBoundary(120).to_string(), "WordBoundary(120)");
+        assert_eq!(WordWrapMode::Bounded(40).to_string(), "Bounded(40)");
+
+        assert!(!WordWrapMode::Off.is_enabled());
+        assert!(WordWrapMode::On(80).is_enabled());
+        assert!(WordWrapMode::WordBoundary(120).is_enabled());
+
+        assert_eq!(WordWrapMode::Off.effective_column(), None);
+        assert_eq!(WordWrapMode::On(80).effective_column(), Some(80));
+        assert_eq!(WordWrapMode::Bounded(40).effective_column(), Some(40));
+    }
+
+    #[test]
+    fn wrapped_line_extensions() {
+        let lines = wrap_document(&["hello world"], 5, WordWrapMode::On(5));
+        assert_eq!(WrappedLine::visual_line_count(&lines), 3);
+        assert!(!lines[0].is_wrapped());
+        assert!(lines[1].is_wrapped());
+        assert_eq!(lines[0].original_length(), 5);
+    }
+
+    #[test]
+    fn render_cache_is_valid_and_display() {
+        let mut cache = RenderCacheState::new();
+        assert!(!cache.is_valid());
+
+        let mut vp = ViewportState::new(10);
+        vp.update(1, 100);
+        cache.update(&vp, 5);
+        assert!(cache.is_valid());
+
+        let s = format!("{}", cache);
+        assert!(s.contains("clean"));
+        assert!(s.contains("cursor=5"));
+
+        cache.invalidate();
+        let s2 = format!("{}", cache);
+        assert!(s2.contains("dirty"));
+    }
+
+    #[test]
+    fn editor_renderer_total_rendered_lines() {
+        let mut r = EditorRenderer::new().with_height(10);
+        r.viewport.update(1, 100);
+        assert_eq!(r.total_rendered_lines(), 10);
+
+        r.viewport.update(95, 100);
+        assert_eq!(r.total_rendered_lines(), 6);
     }
 }

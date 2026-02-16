@@ -760,6 +760,96 @@ impl ScmHistory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ScmBridge additional helpers
+// ---------------------------------------------------------------------------
+
+impl ScmBridge {
+    /// Collect all resources across all providers and groups.
+    pub fn all_resources(&self) -> Vec<&ScmResource> {
+        self.providers
+            .iter()
+            .flat_map(|p| &p.groups)
+            .flat_map(|g| &g.resources)
+            .collect()
+    }
+
+    /// Return providers that have at least one resource in any group.
+    pub fn providers_with_changes(&self) -> Vec<&SourceControl> {
+        self.providers
+            .iter()
+            .filter(|p| p.groups.iter().any(|g| !g.resources.is_empty()))
+            .collect()
+    }
+
+    /// Return a summary string listing all providers and their resource counts.
+    pub fn summary(&self) -> String {
+        let parts: Vec<String> = self
+            .providers
+            .iter()
+            .map(|p| {
+                let total: usize = p.groups.iter().map(|g| g.resources.len()).sum();
+                format!("{}({} resources)", p.label, total)
+            })
+            .collect();
+        if parts.is_empty() {
+            "ScmBridge: no providers".to_string()
+        } else {
+            format!("ScmBridge: {}", parts.join(", "))
+        }
+    }
+}
+
+impl fmt::Display for ScmBridge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SourceControl helpers
+// ---------------------------------------------------------------------------
+
+impl SourceControl {
+    /// Number of resource groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Total number of resources across all groups.
+    pub fn total_resources(&self) -> usize {
+        self.groups.iter().map(|g| g.resources.len()).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SourceControlGroup helpers
+// ---------------------------------------------------------------------------
+
+impl SourceControlGroup {
+    /// Whether this group contains no resources.
+    pub fn is_empty(&self) -> bool {
+        self.resources.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ScmResource helpers
+// ---------------------------------------------------------------------------
+
+impl ScmResource {
+    /// Extract the file extension from the URI (e.g. "rs" from "file:///a.rs").
+    pub fn extension(&self) -> Option<&str> {
+        let name = self.file_name()?;
+        let dot = name.rfind('.')?;
+        if dot + 1 < name.len() {
+            Some(&name[dot + 1..])
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1218,5 +1308,88 @@ mod tests {
         h.push(ScmHistoryItem::new("a", "old", "A", 100, "f.rs"));
         h.push(ScmHistoryItem::new("b", "new", "A", 500, "f.rs"));
         assert_eq!(h.latest().unwrap().id, "b");
+    }
+
+    // -- ScmBridge helpers -------------------------------------------------
+
+    #[test]
+    fn bridge_all_resources() {
+        let mut bridge = ScmBridge::new();
+        bridge.register_provider("git", "Git", None);
+        bridge.create_group("git", "changes", "Changes");
+        bridge.handle_message(&ScmMessage::UpdateResources {
+            provider_id: "git".into(),
+            group_id: "changes".into(),
+            resources: vec![
+                ScmResource::plain("file:///a.rs"),
+                ScmResource::plain("file:///b.rs"),
+            ],
+        });
+        let all = bridge.all_resources();
+        assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn bridge_providers_with_changes() {
+        let mut bridge = ScmBridge::new();
+        bridge.register_provider("git", "Git", None);
+        bridge.register_provider("svn", "SVN", None);
+        bridge.create_group("git", "changes", "Changes");
+        bridge.handle_message(&ScmMessage::UpdateResources {
+            provider_id: "git".into(),
+            group_id: "changes".into(),
+            resources: vec![ScmResource::plain("file:///a.rs")],
+        });
+        let with_changes = bridge.providers_with_changes();
+        assert_eq!(with_changes.len(), 1);
+        assert_eq!(with_changes[0].id, "git");
+    }
+
+    #[test]
+    fn bridge_summary_display() {
+        let bridge = ScmBridge::new();
+        let s = format!("{}", bridge);
+        assert!(s.contains("no providers"));
+
+        let mut bridge2 = ScmBridge::new();
+        bridge2.register_provider("git", "Git", None);
+        let s2 = bridge2.summary();
+        assert!(s2.contains("Git"));
+    }
+
+    #[test]
+    fn source_control_group_count_and_total() {
+        let mut bridge = ScmBridge::new();
+        bridge.register_provider("git", "Git", None);
+        bridge.create_group("git", "staged", "Staged");
+        bridge.create_group("git", "changes", "Changes");
+        let p = bridge.get_provider("git").unwrap();
+        assert_eq!(p.group_count(), 2);
+        assert_eq!(p.total_resources(), 0);
+    }
+
+    #[test]
+    fn source_control_group_is_empty() {
+        let g = SourceControlGroup {
+            id: "test".into(),
+            label: "Test".into(),
+            resources: Vec::new(),
+        };
+        assert!(g.is_empty());
+    }
+
+    #[test]
+    fn scm_resource_extension() {
+        let r = ScmResource::plain("file:///src/main.rs");
+        assert_eq!(r.extension(), Some("rs"));
+
+        let no_ext = ScmResource::plain("file:///Makefile");
+        assert!(no_ext.extension().is_none());
+    }
+
+    #[test]
+    fn scm_resource_extension_multi_dot() {
+        let r = ScmResource::plain("file:///archive.tar.gz");
+        assert_eq!(r.extension(), Some("gz"));
     }
 }

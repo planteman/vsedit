@@ -749,6 +749,133 @@ impl Default for FormatValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TextEdit helpers
+// ---------------------------------------------------------------------------
+
+impl TextEdit {
+    /// Number of lines this edit spans (inclusive).
+    pub fn line_span(&self) -> u32 {
+        self.end_line - self.start_line + 1
+    }
+
+    /// Whether this edit affects only a single line.
+    pub fn is_single_line(&self) -> bool {
+        self.start_line == self.end_line
+    }
+
+    /// Whether this edit overlaps with another edit's range.
+    pub fn overlaps(&self, other: &TextEdit) -> bool {
+        if self.end_line < other.start_line || other.end_line < self.start_line {
+            return false;
+        }
+        if self.end_line == other.start_line && self.end_column <= other.start_column {
+            return false;
+        }
+        if other.end_line == self.start_line && other.end_column <= self.start_column {
+            return false;
+        }
+        true
+    }
+
+    /// Character length of the replaced region on a single-line edit.
+    /// Returns 0 for multi-line edits.
+    pub fn replaced_length(&self) -> u32 {
+        if self.is_single_line() {
+            self.end_column.saturating_sub(self.start_column)
+        } else {
+            0
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FormattingOptions helpers
+// ---------------------------------------------------------------------------
+
+impl FormattingOptions {
+    /// Human-readable summary of the formatting options.
+    pub fn summary(&self) -> String {
+        let indent = if self.insert_spaces {
+            format!("{} spaces", self.tab_size)
+        } else {
+            "tabs".to_string()
+        };
+        format!(
+            "indent={}, trim_trailing={}, final_newline={}, trim_final={}",
+            indent,
+            self.trim_trailing_whitespace,
+            self.insert_final_newline,
+            self.trim_final_newlines,
+        )
+    }
+
+    /// Builder-style setter for tab_size.
+    pub fn with_tab_size(mut self, size: u32) -> Self {
+        self.tab_size = size;
+        self
+    }
+
+    /// Builder-style setter for insert_spaces.
+    pub fn with_insert_spaces(mut self, yes: bool) -> Self {
+        self.insert_spaces = yes;
+        self
+    }
+}
+
+impl fmt::Display for FormattingOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+/// Sort edits by start position (line, then column).
+pub fn sort_edits(edits: &mut [TextEdit]) {
+    edits.sort_by(|a, b| {
+        a.start_line
+            .cmp(&b.start_line)
+            .then(a.start_column.cmp(&b.start_column))
+    });
+}
+
+/// Merge adjacent or overlapping single-line edits on the same line into
+/// combined edits. Non-single-line edits are passed through unchanged.
+pub fn merge_adjacent_edits(edits: &[TextEdit]) -> Vec<TextEdit> {
+    if edits.is_empty() {
+        return Vec::new();
+    }
+    let mut sorted: Vec<TextEdit> = edits.to_vec();
+    sort_edits(&mut sorted);
+
+    let mut merged: Vec<TextEdit> = vec![sorted[0].clone()];
+    for edit in &sorted[1..] {
+        let last = merged.last_mut().unwrap();
+        if last.is_single_line()
+            && edit.is_single_line()
+            && last.end_line == edit.start_line
+            && last.end_column >= edit.start_column
+        {
+            last.end_column = last.end_column.max(edit.end_column);
+            last.new_text.push_str(&edit.new_text);
+        } else {
+            merged.push(edit.clone());
+        }
+    }
+    merged
+}
+
+/// Returns true if any edits in the slice overlap each other.
+pub fn has_overlapping_edits(edits: &[TextEdit]) -> bool {
+    for i in 0..edits.len() {
+        for j in (i + 1)..edits.len() {
+            if edits[i].overlaps(&edits[j]) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1217,5 +1344,121 @@ mod tests {
     fn formatting_service_default() {
         let svc = FormattingService::default();
         assert!(!svc.is_format_on_save());
+    }
+
+    // -- TextEdit helpers ---------------------------------------------------
+
+    #[test]
+    fn text_edit_line_span_single() {
+        let edit = TextEdit {
+            start_line: 3, start_column: 0, end_line: 3, end_column: 5,
+            new_text: "hi".into(),
+        };
+        assert_eq!(edit.line_span(), 1);
+        assert!(edit.is_single_line());
+    }
+
+    #[test]
+    fn text_edit_line_span_multi() {
+        let edit = TextEdit {
+            start_line: 1, start_column: 0, end_line: 4, end_column: 0,
+            new_text: String::new(),
+        };
+        assert_eq!(edit.line_span(), 4);
+        assert!(!edit.is_single_line());
+    }
+
+    #[test]
+    fn text_edit_overlaps_true() {
+        let a = TextEdit {
+            start_line: 1, start_column: 0, end_line: 1, end_column: 10,
+            new_text: String::new(),
+        };
+        let b = TextEdit {
+            start_line: 1, start_column: 5, end_line: 1, end_column: 15,
+            new_text: String::new(),
+        };
+        assert!(a.overlaps(&b));
+        assert!(b.overlaps(&a));
+    }
+
+    #[test]
+    fn text_edit_overlaps_false() {
+        let a = TextEdit {
+            start_line: 1, start_column: 0, end_line: 1, end_column: 5,
+            new_text: String::new(),
+        };
+        let b = TextEdit {
+            start_line: 1, start_column: 5, end_line: 1, end_column: 10,
+            new_text: String::new(),
+        };
+        assert!(!a.overlaps(&b));
+    }
+
+    #[test]
+    fn text_edit_replaced_length() {
+        let edit = TextEdit {
+            start_line: 0, start_column: 2, end_line: 0, end_column: 7,
+            new_text: "x".into(),
+        };
+        assert_eq!(edit.replaced_length(), 5);
+    }
+
+    #[test]
+    fn formatting_options_summary_and_display() {
+        let opts = FormattingOptions::default();
+        let s = opts.summary();
+        assert!(s.contains("4 spaces"));
+        assert!(s.contains("trim_trailing=true"));
+        let display = format!("{}", opts);
+        assert_eq!(display, s);
+    }
+
+    #[test]
+    fn formatting_options_with_tab_size() {
+        let opts = FormattingOptions::default().with_tab_size(2).with_insert_spaces(false);
+        assert_eq!(opts.tab_size, 2);
+        assert!(!opts.insert_spaces);
+    }
+
+    #[test]
+    fn sort_edits_orders_by_position() {
+        let mut edits = vec![
+            TextEdit { start_line: 5, start_column: 0, end_line: 5, end_column: 1, new_text: String::new() },
+            TextEdit { start_line: 1, start_column: 3, end_line: 1, end_column: 4, new_text: String::new() },
+            TextEdit { start_line: 1, start_column: 0, end_line: 1, end_column: 1, new_text: String::new() },
+        ];
+        sort_edits(&mut edits);
+        assert_eq!(edits[0].start_line, 1);
+        assert_eq!(edits[0].start_column, 0);
+        assert_eq!(edits[1].start_column, 3);
+        assert_eq!(edits[2].start_line, 5);
+    }
+
+    #[test]
+    fn merge_adjacent_edits_combines() {
+        let edits = vec![
+            TextEdit { start_line: 0, start_column: 0, end_line: 0, end_column: 3, new_text: "a".into() },
+            TextEdit { start_line: 0, start_column: 3, end_line: 0, end_column: 6, new_text: "b".into() },
+        ];
+        let merged = merge_adjacent_edits(&edits);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].new_text, "ab");
+        assert_eq!(merged[0].end_column, 6);
+    }
+
+    #[test]
+    fn has_overlapping_edits_detects() {
+        let edits = vec![
+            TextEdit { start_line: 0, start_column: 0, end_line: 0, end_column: 5, new_text: String::new() },
+            TextEdit { start_line: 0, start_column: 3, end_line: 0, end_column: 8, new_text: String::new() },
+        ];
+        assert!(has_overlapping_edits(&edits));
+
+        let no_overlap = vec![
+            TextEdit { start_line: 0, start_column: 0, end_line: 0, end_column: 3, new_text: String::new() },
+            TextEdit { start_line: 1, start_column: 0, end_line: 1, end_column: 3, new_text: String::new() },
+        ];
+        assert!(!has_overlapping_edits(&no_overlap));
     }
 }

@@ -760,6 +760,143 @@ impl EncryptionAuditLog {
     }
 }
 
+// ---------------------------------------------------------------------------
+// EncryptedPayload helpers
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for EncryptedPayload {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "EncryptedPayload(iv={} bytes, data={} bytes)",
+            self.iv.len(),
+            self.ciphertext.len()
+        )
+    }
+}
+
+impl Default for EncryptedPayload {
+    fn default() -> Self {
+        Self {
+            iv: Vec::new(),
+            ciphertext: Vec::new(),
+        }
+    }
+}
+
+impl EncryptedPayload {
+    /// Total size of the payload in bytes.
+    pub fn total_size(&self) -> usize {
+        self.iv.len() + self.ciphertext.len()
+    }
+
+    /// Returns true if the payload appears to be empty.
+    pub fn is_empty(&self) -> bool {
+        self.ciphertext.is_empty()
+    }
+
+    /// Encode the payload as a hex string (iv:data).
+    pub fn to_hex_string(&self) -> String {
+        let iv_hex: String = self.iv.iter().map(|b| format!("{:02x}", b)).collect();
+        let data_hex: String = self.ciphertext.iter().map(|b| format!("{:02x}", b)).collect();
+        format!("{}:{}", iv_hex, data_hex)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Key validation
+// ---------------------------------------------------------------------------
+
+/// Validates that a key meets minimum strength requirements.
+pub fn validate_key_strength(key: &[u8]) -> Result<(), String> {
+    if key.len() < 16 {
+        return Err(format!("key too short: {} bytes (minimum 16)", key.len()));
+    }
+    // Check for all-zero keys
+    if key.iter().all(|&b| b == 0) {
+        return Err("key is all zeros".to_string());
+    }
+    // Check for low entropy (all same byte)
+    if key.iter().all(|&b| b == key[0]) {
+        return Err("key has no entropy (all same byte)".to_string());
+    }
+    Ok(())
+}
+
+/// Validates password complexity.
+pub fn validate_password(password: &str) -> Result<(), Vec<String>> {
+    let mut errors = Vec::new();
+    if password.len() < 8 {
+        errors.push("password must be at least 8 characters".to_string());
+    }
+    if !password.chars().any(|c| c.is_uppercase()) {
+        errors.push("password must contain an uppercase letter".to_string());
+    }
+    if !password.chars().any(|c| c.is_lowercase()) {
+        errors.push("password must contain a lowercase letter".to_string());
+    }
+    if !password.chars().any(|c| c.is_ascii_digit()) {
+        errors.push("password must contain a digit".to_string());
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+/// Compute the Shannon entropy of a byte slice.
+pub fn byte_entropy(data: &[u8]) -> f64 {
+    if data.is_empty() {
+        return 0.0;
+    }
+    let mut counts = [0u32; 256];
+    for &b in data {
+        counts[b as usize] += 1;
+    }
+    let len = data.len() as f64;
+    counts.iter()
+        .filter(|&&c| c > 0)
+        .map(|&c| {
+            let p = c as f64 / len;
+            -p * p.log2()
+        })
+        .sum()
+}
+
+// ---------------------------------------------------------------------------
+// AuditEntry helpers
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for AuditEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}: size={}", self.timestamp_ns, self.operation, self.data_size)
+    }
+}
+
+impl Default for EncryptionAuditLog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EncryptionAuditLog {
+    /// Returns the number of entries.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns true if the log is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Returns entries filtered by operation type.
+    pub fn filter_by_operation(&self, op: &str) -> Vec<&AuditEntry> {
+        self.entries.iter().filter(|e| e.operation == op).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1241,5 +1378,62 @@ mod tests {
         log.log_operation("decrypt", 200, true);
         log.log_operation("encrypt", 50, false);
         assert_eq!(log.total_data_processed(), 350);
+    }
+
+    #[test]
+    fn test_encrypted_payload_display() {
+        let p = encrypt_payload(b"hello", &derive_key("test"));
+        let s = format!("{p}");
+        assert!(s.contains("bytes"));
+    }
+
+    #[test]
+    fn test_encrypted_payload_default() {
+        let p = EncryptedPayload::default();
+        assert!(p.is_empty());
+        assert_eq!(p.total_size(), 0);
+    }
+
+    #[test]
+    fn test_encrypted_payload_to_hex() {
+        let p = encrypt_payload(b"test", &derive_key("key"));
+        let hex = p.to_hex_string();
+        assert!(hex.contains(':'));
+        assert!(!hex.is_empty());
+    }
+
+    #[test]
+    fn test_validate_key_strength() {
+        let good_key = derive_key("strong password");
+        assert!(validate_key_strength(&good_key).is_ok());
+        assert!(validate_key_strength(&[0u8; 10]).is_err()); // too short
+        assert!(validate_key_strength(&[0u8; 32]).is_err()); // all zeros
+        assert!(validate_key_strength(&[42u8; 32]).is_err()); // all same
+    }
+
+    #[test]
+    fn test_validate_password() {
+        assert!(validate_password("StrongPass1").is_ok());
+        assert!(validate_password("short").is_err());
+        assert!(validate_password("nouppercase1").is_err());
+    }
+
+    #[test]
+    fn test_byte_entropy() {
+        assert!((byte_entropy(&[]) - 0.0).abs() < f64::EPSILON);
+        // Random-ish data should have higher entropy than constant data
+        let constant = vec![42u8; 100];
+        let varied: Vec<u8> = (0..=255).collect();
+        assert!(byte_entropy(&varied) > byte_entropy(&constant));
+    }
+
+    #[test]
+    fn test_audit_log_helpers() {
+        let mut log = EncryptionAuditLog::default();
+        assert!(log.is_empty());
+        log.log_operation("encrypt", 1000, true);
+        log.log_operation("decrypt", 1001, true);
+        assert_eq!(log.len(), 2);
+        assert_eq!(log.filter_by_operation("encrypt").len(), 1);
     }
 }

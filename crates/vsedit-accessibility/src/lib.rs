@@ -836,6 +836,151 @@ impl fmt::Display for AccessibleBuffer {
 }
 
 // ---------------------------------------------------------------------------
+// Accessibility role lookup helpers
+// ---------------------------------------------------------------------------
+
+impl AccessibilityRole {
+    /// Returns all role variants.
+    pub fn all() -> &'static [AccessibilityRole] {
+        &[
+            AccessibilityRole::TextBox,
+            AccessibilityRole::Button,
+            AccessibilityRole::Menu,
+            AccessibilityRole::MenuItem,
+            AccessibilityRole::TreeItem,
+            AccessibilityRole::Tab,
+            AccessibilityRole::StatusBar,
+            AccessibilityRole::Dialog,
+            AccessibilityRole::Alert,
+            AccessibilityRole::Progressbar,
+        ]
+    }
+
+    /// Parse a role from its ARIA string name.
+    pub fn from_aria_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().as_str() {
+            "textbox" => Some(Self::TextBox),
+            "button" => Some(Self::Button),
+            "menu" => Some(Self::Menu),
+            "menuitem" => Some(Self::MenuItem),
+            "treeitem" => Some(Self::TreeItem),
+            "tab" => Some(Self::Tab),
+            "statusbar" | "status" => Some(Self::StatusBar),
+            "dialog" => Some(Self::Dialog),
+            "alert" => Some(Self::Alert),
+            "progressbar" => Some(Self::Progressbar),
+            _ => None,
+        }
+    }
+
+    /// Returns the ARIA role string.
+    pub fn aria_name(&self) -> &'static str {
+        match self {
+            Self::TextBox => "textbox",
+            Self::Button => "button",
+            Self::Menu => "menu",
+            Self::MenuItem => "menuitem",
+            Self::TreeItem => "treeitem",
+            Self::Tab => "tab",
+            Self::StatusBar => "statusbar",
+            Self::Dialog => "dialog",
+            Self::Alert => "alert",
+            Self::Progressbar => "progressbar",
+        }
+    }
+
+    /// Returns true if this role is interactive (can receive focus).
+    pub fn is_interactive(&self) -> bool {
+        matches!(self, Self::TextBox | Self::Button | Self::MenuItem | Self::Tab | Self::TreeItem)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Rgb helpers
+// ---------------------------------------------------------------------------
+
+impl Rgb {
+    /// Creates a new Rgb from hex string like "#FF0000".
+    pub fn from_hex(hex: &str) -> Option<Self> {
+        let hex = hex.strip_prefix('#').unwrap_or(hex);
+        if hex.len() != 6 {
+            return None;
+        }
+        let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+        let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+        let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+        Some(Self(r, g, b))
+    }
+
+    /// Convert to hex string.
+    pub fn to_hex(&self) -> String {
+        format!("#{:02X}{:02X}{:02X}", self.0, self.1, self.2)
+    }
+
+    /// Compute relative luminance (0.0-1.0).
+    pub fn luminance(&self) -> f64 {
+        let r = self.0 as f64 / 255.0;
+        let g = self.1 as f64 / 255.0;
+        let b = self.2 as f64 / 255.0;
+        0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+
+    /// Returns true if this is a dark color.
+    pub fn is_dark(&self) -> bool {
+        self.luminance() < 0.5
+    }
+
+    /// Invert the color.
+    pub fn invert(&self) -> Self {
+        Self(255 - self.0, 255 - self.1, 255 - self.2)
+    }
+}
+
+impl fmt::Display for Rgb {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "rgb({}, {}, {})", self.0, self.1, self.2)
+    }
+}
+
+impl Default for Rgb {
+    fn default() -> Self {
+        Self(0, 0, 0)
+    }
+}
+
+impl From<(u8, u8, u8)> for Rgb {
+    fn from((r, g, b): (u8, u8, u8)) -> Self {
+        Self(r, g, b)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorBlindMode helpers
+// ---------------------------------------------------------------------------
+
+impl ColorBlindMode {
+    /// Returns all color blind mode variants.
+    pub fn all() -> &'static [ColorBlindMode] {
+        &[
+            ColorBlindMode::None,
+            ColorBlindMode::Protanopia,
+            ColorBlindMode::Deuteranopia,
+            ColorBlindMode::Tritanopia,
+        ]
+    }
+
+    /// Returns a human-readable description of the color blindness type.
+    pub fn description(&self) -> &'static str {
+        match self {
+            ColorBlindMode::None => "Normal vision",
+            ColorBlindMode::Protanopia => "Red-blind (missing L-cones)",
+            ColorBlindMode::Deuteranopia => "Green-blind (missing M-cones)",
+            ColorBlindMode::Tritanopia => "Blue-blind (missing S-cones)",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1231,5 +1376,80 @@ mod tests {
         let mut buf = AccessibleBuffer::new();
         buf.push_text("hello");
         assert_eq!(format!("{buf}"), "hello");
+    }
+
+    #[test]
+    fn test_accessibility_role_all() {
+        let roles = AccessibilityRole::all();
+        assert_eq!(roles.len(), 10);
+    }
+
+    #[test]
+    fn test_accessibility_role_from_aria_name() {
+        assert_eq!(AccessibilityRole::from_aria_name("button"), Some(AccessibilityRole::Button));
+        assert_eq!(AccessibilityRole::from_aria_name("TEXTBOX"), Some(AccessibilityRole::TextBox));
+        assert_eq!(AccessibilityRole::from_aria_name("unknown"), None);
+    }
+
+    #[test]
+    fn test_accessibility_role_aria_name() {
+        assert_eq!(AccessibilityRole::Button.aria_name(), "button");
+        assert_eq!(AccessibilityRole::TreeItem.aria_name(), "treeitem");
+    }
+
+    #[test]
+    fn test_accessibility_role_is_interactive() {
+        assert!(AccessibilityRole::Button.is_interactive());
+        assert!(AccessibilityRole::TextBox.is_interactive());
+        assert!(!AccessibilityRole::StatusBar.is_interactive());
+        assert!(!AccessibilityRole::Alert.is_interactive());
+    }
+
+    #[test]
+    fn test_rgb_from_hex() {
+        let c = Rgb::from_hex("#FF8000").unwrap();
+        assert_eq!(c.0, 255);
+        assert_eq!(c.1, 128);
+        assert_eq!(c.2, 0);
+        assert!(Rgb::from_hex("bad").is_none());
+    }
+
+    #[test]
+    fn test_rgb_to_hex() {
+        let c = Rgb(255, 128, 0);
+        assert_eq!(c.to_hex(), "#FF8000");
+    }
+
+    #[test]
+    fn test_rgb_luminance_and_dark() {
+        let white = Rgb(255, 255, 255);
+        let black = Rgb(0, 0, 0);
+        assert!(white.luminance() > 0.9);
+        assert!(black.luminance() < 0.01);
+        assert!(black.is_dark());
+        assert!(!white.is_dark());
+    }
+
+    #[test]
+    fn test_rgb_invert() {
+        let c = Rgb(100, 200, 50);
+        let inv = c.invert();
+        assert_eq!(inv, Rgb(155, 55, 205));
+    }
+
+    #[test]
+    fn test_rgb_display_and_from() {
+        let c: Rgb = (10u8, 20u8, 30u8).into();
+        assert_eq!(format!("{c}"), "rgb(10, 20, 30)");
+        let d = Rgb::default();
+        assert_eq!(d, Rgb(0, 0, 0));
+    }
+
+    #[test]
+    fn test_color_blind_mode_all_and_desc() {
+        let modes = ColorBlindMode::all();
+        assert_eq!(modes.len(), 4);
+        assert!(ColorBlindMode::Protanopia.description().contains("Red"));
+        assert!(ColorBlindMode::None.description().contains("Normal"));
     }
 }

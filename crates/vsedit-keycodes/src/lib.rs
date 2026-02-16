@@ -847,6 +847,94 @@ pub fn name_to_keycode(name: &str) -> Option<KeyCode> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// KeyCodeChord helpers
+// ---------------------------------------------------------------------------
+
+impl KeyCodeChord {
+    /// Returns `true` if any modifier key is active.
+    pub fn has_modifier(&self) -> bool {
+        self.ctrl || self.shift || self.alt || self.meta
+    }
+
+    /// Count the number of active modifier keys (0–4).
+    pub fn modifier_count(&self) -> u8 {
+        self.ctrl as u8 + self.shift as u8 + self.alt as u8 + self.meta as u8
+    }
+
+    /// Returns `true` if no modifier keys are active.
+    pub fn is_plain(&self) -> bool {
+        !self.has_modifier()
+    }
+
+    /// Builder: set ctrl and return self.
+    pub fn with_ctrl(mut self) -> Self {
+        self.ctrl = true;
+        self
+    }
+
+    /// Builder: set shift and return self.
+    pub fn with_shift(mut self) -> Self {
+        self.shift = true;
+        self
+    }
+
+    /// Builder: set alt and return self.
+    pub fn with_alt(mut self) -> Self {
+        self.alt = true;
+        self
+    }
+
+    /// Builder: set meta and return self.
+    pub fn with_meta(mut self) -> Self {
+        self.meta = true;
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeyCombo helpers
+// ---------------------------------------------------------------------------
+
+impl KeyCombo {
+    /// Returns `true` if the combo has no chords.
+    pub fn is_empty(&self) -> bool {
+        self.chords.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeyCode classification helpers
+// ---------------------------------------------------------------------------
+
+impl KeyCode {
+    /// Returns `true` if this is a letter key (A-Z).
+    pub fn is_letter(self) -> bool {
+        matches!(self.category(), KeyCategory::Letter)
+    }
+
+    /// Returns `true` if this is a digit key (0-9).
+    pub fn is_digit(self) -> bool {
+        matches!(self.category(), KeyCategory::Digit)
+    }
+
+    /// Returns `true` if this is a function key (F1-F24).
+    pub fn is_function_key(self) -> bool {
+        matches!(self.category(), KeyCategory::Function)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeyCategory helpers
+// ---------------------------------------------------------------------------
+
+impl KeyCategory {
+    /// Returns `true` for navigation keys (arrows, Home, End, PageUp, PageDown).
+    pub fn is_navigation(&self) -> bool {
+        matches!(self, KeyCategory::Navigation)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1223,5 +1311,79 @@ mod tests {
     #[test]
     fn name_to_keycode_unknown_returns_none() {
         assert_eq!(name_to_keycode("totallyinvalid"), None);
+    }
+
+    // -- New tests ----------------------------------------------------------
+
+    #[test]
+    fn chord_has_modifier() {
+        let chord = KeyCodeChord::new(true, false, false, false, KeyCode::KeyA);
+        assert!(chord.has_modifier());
+        let plain = KeyCodeChord::just(KeyCode::Enter);
+        assert!(!plain.has_modifier());
+    }
+
+    #[test]
+    fn chord_modifier_count() {
+        let chord = KeyCodeChord::new(true, true, true, true, KeyCode::KeyA);
+        assert_eq!(chord.modifier_count(), 4);
+        let chord2 = KeyCodeChord::new(true, false, true, false, KeyCode::KeyS);
+        assert_eq!(chord2.modifier_count(), 2);
+        assert_eq!(KeyCodeChord::just(KeyCode::Space).modifier_count(), 0);
+    }
+
+    #[test]
+    fn chord_is_plain() {
+        assert!(KeyCodeChord::just(KeyCode::F5).is_plain());
+        assert!(!KeyCodeChord::new(true, false, false, false, KeyCode::KeyC).is_plain());
+    }
+
+    #[test]
+    fn chord_builder_with_modifiers() {
+        let chord = KeyCodeChord::just(KeyCode::KeyS).with_ctrl().with_shift();
+        assert!(chord.ctrl);
+        assert!(chord.shift);
+        assert!(!chord.alt);
+        assert!(!chord.meta);
+        assert_eq!(chord.key_code, KeyCode::KeyS);
+        assert_eq!(chord.to_string(), "Ctrl+Shift+S");
+    }
+
+    #[test]
+    fn key_combo_is_empty() {
+        let empty = KeyCombo::new(vec![]);
+        assert!(empty.is_empty());
+        let non_empty = KeyCombo::single(KeyCodeChord::just(KeyCode::KeyA));
+        assert!(!non_empty.is_empty());
+    }
+
+    #[test]
+    fn keycode_is_letter() {
+        assert!(KeyCode::KeyA.is_letter());
+        assert!(KeyCode::KeyZ.is_letter());
+        assert!(!KeyCode::Digit0.is_letter());
+        assert!(!KeyCode::F1.is_letter());
+    }
+
+    #[test]
+    fn keycode_is_digit() {
+        assert!(KeyCode::Digit0.is_digit());
+        assert!(KeyCode::Digit9.is_digit());
+        assert!(!KeyCode::KeyA.is_digit());
+    }
+
+    #[test]
+    fn keycode_is_function_key() {
+        assert!(KeyCode::F1.is_function_key());
+        assert!(KeyCode::F24.is_function_key());
+        assert!(!KeyCode::KeyA.is_function_key());
+        assert!(!KeyCode::Escape.is_function_key());
+    }
+
+    #[test]
+    fn key_category_is_navigation() {
+        assert!(KeyCategory::Navigation.is_navigation());
+        assert!(!KeyCategory::Letter.is_navigation());
+        assert!(!KeyCategory::Modifier.is_navigation());
     }
 }

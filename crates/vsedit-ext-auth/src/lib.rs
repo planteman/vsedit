@@ -645,6 +645,88 @@ impl fmt::Display for AuthCapabilitySet {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Additional AuthBridge methods
+// ---------------------------------------------------------------------------
+
+impl AuthBridge {
+    /// Remove all registered providers.
+    pub fn clear_all(&mut self) {
+        self.providers.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional SessionStore methods
+// ---------------------------------------------------------------------------
+
+impl SessionStore {
+    /// Returns the total number of sessions across all providers.
+    pub fn session_count(&self) -> usize {
+        self.sessions.values().map(Vec::len).sum()
+    }
+
+    /// Returns the provider ids that have at least one session.
+    pub fn all_provider_ids(&self) -> Vec<&str> {
+        self.sessions.keys().map(String::as_str).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional AuthSession methods
+// ---------------------------------------------------------------------------
+
+impl AuthSession {
+    /// Returns `true` if the access token is non-empty.
+    pub fn is_token_present(&self) -> bool {
+        !self.access_token.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional AuthAuditLog methods
+// ---------------------------------------------------------------------------
+
+impl AuthAuditLog {
+    /// Returns the total number of recorded events.
+    pub fn event_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Remove all entries from the log.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional AuthTokenRefresher methods
+// ---------------------------------------------------------------------------
+
+impl AuthTokenRefresher {
+    /// Returns the number of remaining refresh attempts before the maximum is
+    /// reached.
+    pub fn attempts_remaining(&self) -> u32 {
+        self.max_attempts.saturating_sub(self.attempt_count)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display for AuthSession
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for AuthSession {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Session({}, account={}, scopes=[{}])",
+            self.id,
+            self.account.label,
+            self.scopes.join(", ")
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1219,5 +1301,95 @@ mod tests {
         let s = format!("{set}");
         assert!(s.contains("silent-refresh"));
         assert!(s.contains("pkce"));
+    }
+
+    #[test]
+    fn auth_bridge_clear_all() {
+        let mut bridge = AuthBridge::new();
+        bridge.register_provider("github");
+        bridge.register_provider("gitlab");
+        assert_eq!(bridge.provider_count(), 2);
+        bridge.clear_all();
+        assert_eq!(bridge.provider_count(), 0);
+    }
+
+    #[test]
+    fn session_store_session_count() {
+        let mut store = SessionStore::new();
+        assert_eq!(store.session_count(), 0);
+        store.add_session("gh", AuthSession {
+            id: "s1".into(), access_token: "t".into(),
+            account: AuthAccount { id: "a".into(), label: "u".into() },
+            scopes: vec!["read".into()],
+        });
+        store.add_session("gl", AuthSession {
+            id: "s2".into(), access_token: "t".into(),
+            account: AuthAccount { id: "a".into(), label: "u".into() },
+            scopes: vec!["write".into()],
+        });
+        assert_eq!(store.session_count(), 2);
+    }
+
+    #[test]
+    fn session_store_all_provider_ids() {
+        let mut store = SessionStore::new();
+        store.add_session("gh", AuthSession {
+            id: "s1".into(), access_token: "t".into(),
+            account: AuthAccount { id: "a".into(), label: "u".into() },
+            scopes: vec!["read".into()],
+        });
+        let ids = store.all_provider_ids();
+        assert_eq!(ids.len(), 1);
+        assert!(ids.contains(&"gh"));
+    }
+
+    #[test]
+    fn auth_session_is_token_present() {
+        let session = AuthSession {
+            id: "s1".into(), access_token: "tok".into(),
+            account: AuthAccount { id: "a".into(), label: "u".into() },
+            scopes: vec!["read".into()],
+        };
+        assert!(session.is_token_present());
+        let empty = AuthSession {
+            id: "s2".into(), access_token: "".into(),
+            account: AuthAccount { id: "a".into(), label: "u".into() },
+            scopes: vec![],
+        };
+        assert!(!empty.is_token_present());
+    }
+
+    #[test]
+    fn audit_log_event_count_and_clear() {
+        let mut log = AuthAuditLog::new();
+        assert_eq!(log.event_count(), 0);
+        log.record(AuthAuditEvent::ProviderRegistered { provider_id: "gh".into() }, 100);
+        log.record(AuthAuditEvent::SessionCreated { provider_id: "gh".into(), session_id: "s1".into() }, 200);
+        assert_eq!(log.event_count(), 2);
+        log.clear();
+        assert_eq!(log.event_count(), 0);
+    }
+
+    #[test]
+    fn auth_session_display() {
+        let session = AuthSession {
+            id: "s1".into(), access_token: "tok".into(),
+            account: AuthAccount { id: "a".into(), label: "alice".into() },
+            scopes: vec!["read".into(), "write".into()],
+        };
+        let s = format!("{session}");
+        assert!(s.contains("alice"));
+        assert!(s.contains("read, write"));
+    }
+
+    #[test]
+    fn auth_token_refresher_attempts_remaining() {
+        let mut r = AuthTokenRefresher::new("s1", 3);
+        assert_eq!(r.attempts_remaining(), 3);
+        r.begin_refresh(100);
+        assert_eq!(r.attempts_remaining(), 2);
+        r.begin_refresh(200);
+        r.begin_refresh(300);
+        assert_eq!(r.attempts_remaining(), 0);
     }
 }

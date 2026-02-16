@@ -767,6 +767,133 @@ pub fn opener_match(uri: &str, patterns: &[UriPattern]) -> Option<usize> {
     patterns.iter().position(|p| p.matches(&components))
 }
 
+
+// ---------------------------------------------------------------------------
+// URI component parser
+// ---------------------------------------------------------------------------
+
+impl UriComponents {
+    /// Parse a URI string into components.
+    pub fn parse(uri: &str) -> Option<Self> {
+        let (scheme, rest) = uri.split_once("://")?;
+        if scheme.is_empty() {
+            return None;
+        }
+        let (authority_and_path, fragment) = match rest.rsplit_once('#') {
+            Some((before, frag)) => (before, Some(frag.to_string())),
+            None => (rest, None),
+        };
+        let (authority_and_path, query) = match authority_and_path.split_once('?') {
+            Some((before, q)) => (before, Some(q.to_string())),
+            None => (authority_and_path, None),
+        };
+        let (authority, path) = match authority_and_path.find('/') {
+            Some(idx) => (&authority_and_path[..idx], &authority_and_path[idx..]),
+            None => (authority_and_path, ""),
+        };
+        Some(Self {
+            scheme: scheme.to_string(),
+            authority: authority.to_string(),
+            path: path.to_string(),
+            query,
+            fragment,
+        })
+    }
+
+    /// Reconstruct the URI from components.
+    pub fn to_uri(&self) -> String {
+        let mut uri = format!("{}://{}{}", self.scheme, self.authority, self.path);
+        if let Some(ref q) = self.query {
+            uri.push('?');
+            uri.push_str(q);
+        }
+        if let Some(ref f) = self.fragment {
+            uri.push('#');
+            uri.push_str(f);
+        }
+        uri
+    }
+
+    /// Returns true if this is a file URI.
+    pub fn is_file(&self) -> bool {
+        self.scheme == "file"
+    }
+
+    /// Returns true if this is an HTTP or HTTPS URI.
+    pub fn is_http(&self) -> bool {
+        self.scheme == "http" || self.scheme == "https"
+    }
+
+    /// Returns the file extension from the path, if any.
+    pub fn extension(&self) -> Option<String> {
+        self.path.rsplit_once('.').map(|(_, ext)| ext.to_string())
+    }
+}
+
+impl Default for UriComponents {
+    fn default() -> Self {
+        Self {
+            scheme: "file".to_string(),
+            authority: String::new(),
+            path: String::new(),
+            query: None,
+            fragment: None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Opener chain
+// ---------------------------------------------------------------------------
+
+/// Result of a chain of openers trying to handle a URI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChainResult {
+    /// One of the openers handled the URI at the given index.
+    Handled(usize),
+    /// No opener handled the URI.
+    Unhandled,
+}
+
+impl fmt::Display for ChainResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ChainResult::Handled(idx) => write!(f, "handled by opener #{idx}"),
+            ChainResult::Unhandled => write!(f, "unhandled"),
+        }
+    }
+}
+
+/// Classifies a URI's scheme into a category.
+pub fn classify_uri_scheme(uri: &str) -> &'static str {
+    match uri.split_once("://").map(|(s, _)| s) {
+        Some("http") | Some("https") => "web",
+        Some("file") => "local",
+        Some("ssh") | Some("sftp") => "remote",
+        Some("mailto") => "email",
+        Some("vscode") | Some("vscode-insiders") => "editor",
+        _ => "unknown",
+    }
+}
+
+/// Counts how many URIs in a list match a given scheme.
+pub fn count_by_scheme(uris: &[&str], scheme: &str) -> usize {
+    let prefix = format!("{scheme}://");
+    uris.iter().filter(|u| u.starts_with(&prefix)).count()
+}
+
+/// Groups URIs by their scheme.
+pub fn group_by_scheme<'a>(uris: &[&'a str]) -> HashMap<String, Vec<&'a str>> {
+    let mut groups: HashMap<String, Vec<&'a str>> = HashMap::new();
+    for &uri in uris {
+        let scheme = uri.split_once("://")
+            .map(|(s, _)| s.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        groups.entry(scheme).or_default().push(uri);
+    }
+    groups
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1229,5 +1356,77 @@ mod tests {
         ];
         assert_eq!(opener_match("https://x.com", &patterns), Some(1));
         assert_eq!(opener_match("file:///a", &patterns), Some(0));
+    }
+
+    #[test]
+    fn test_uri_components_parse_full() {
+        let c = UriComponents::parse("https://example.com/path?q=1#frag").unwrap();
+        assert_eq!(c.scheme, "https");
+        assert_eq!(c.authority, "example.com");
+        assert_eq!(c.path, "/path");
+        assert_eq!(c.query.as_deref(), Some("q=1"));
+        assert_eq!(c.fragment.as_deref(), Some("frag"));
+    }
+
+    #[test]
+    fn test_uri_components_roundtrip() {
+        let uri = "https://example.com/path?q=1#frag";
+        let c = UriComponents::parse(uri).unwrap();
+        assert_eq!(c.to_uri(), uri);
+    }
+
+    #[test]
+    fn test_uri_components_is_file() {
+        let c = UriComponents::parse("file:///tmp/test.rs").unwrap();
+        assert!(c.is_file());
+        assert!(!c.is_http());
+    }
+
+    #[test]
+    fn test_uri_components_extension() {
+        let c = UriComponents::parse("file:///tmp/test.rs").unwrap();
+        assert_eq!(c.extension().as_deref(), Some("rs"));
+    }
+
+    #[test]
+    fn test_uri_components_display() {
+        let c = UriComponents::parse("https://host/path").unwrap();
+        assert_eq!(format!("{c}"), "https://host/path");
+    }
+
+    #[test]
+    fn test_uri_components_default() {
+        let c = UriComponents::default();
+        assert_eq!(c.scheme, "file");
+        assert!(c.authority.is_empty());
+    }
+
+    #[test]
+    fn test_chain_result_display() {
+        assert_eq!(format!("{}", ChainResult::Handled(2)), "handled by opener #2");
+        assert_eq!(format!("{}", ChainResult::Unhandled), "unhandled");
+    }
+
+    #[test]
+    fn test_classify_uri_scheme() {
+        assert_eq!(classify_uri_scheme("https://example.com"), "web");
+        assert_eq!(classify_uri_scheme("file:///tmp"), "local");
+        assert_eq!(classify_uri_scheme("ssh://host"), "remote");
+        assert_eq!(classify_uri_scheme("custom://x"), "unknown");
+    }
+
+    #[test]
+    fn test_count_by_scheme() {
+        let uris = vec!["https://a.com", "https://b.com", "file:///c"];
+        assert_eq!(count_by_scheme(&uris, "https"), 2);
+        assert_eq!(count_by_scheme(&uris, "file"), 1);
+    }
+
+    #[test]
+    fn test_group_by_scheme() {
+        let uris = vec!["https://a.com", "file:///b", "https://c.com"];
+        let groups = group_by_scheme(&uris);
+        assert_eq!(groups["https"].len(), 2);
+        assert_eq!(groups["file"].len(), 1);
     }
 }

@@ -767,6 +767,191 @@ pub fn glob_to_regex(pattern: &str) -> String {
     regex
 }
 
+impl GlobPattern {
+    /// Extract the file extension from the pattern, if one is present.
+    ///
+    /// Returns the extension without the leading dot. Only returns a value when
+    /// the pattern ends with a literal (non-glob) extension segment.
+    pub fn extension(&self) -> Option<&str> {
+        let pat = self.pattern.as_str();
+        let after_slash = pat.rsplit('/').next().unwrap_or(pat);
+        let dot_pos = after_slash.rfind('.')?;
+        let ext = &after_slash[dot_pos + 1..];
+        if ext.is_empty() {
+            return None;
+        }
+        const META: &[char] = &['*', '?', '[', '{'];
+        if ext.contains(META) {
+            return None;
+        }
+        let offset = pat.len() - after_slash.len() + dot_pos + 1;
+        Some(&self.pattern[offset..])
+    }
+
+    /// Return the non-glob prefix directory of the pattern.
+    ///
+    /// This is the longest leading path composed entirely of literal segments.
+    pub fn base_dir(&self) -> &str {
+        split_glob_pattern(&self.pattern).0
+    }
+}
+
+impl GlobPatternSet {
+    /// Merge two pattern sets into a new combined set.
+    pub fn merge(&self, other: &GlobPatternSet) -> Result<GlobPatternSet, globset::Error> {
+        let combined: Vec<&str> = self
+            .patterns
+            .iter()
+            .chain(other.patterns.iter())
+            .map(|s| s.as_str())
+            .collect();
+        GlobPatternSet::new(&combined)
+    }
+
+    /// Iterate over the pattern strings in this set.
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        self.patterns.iter().map(|s| s.as_str())
+    }
+}
+
+impl<'a> IntoIterator for &'a GlobPatternSet {
+    type Item = &'a str;
+    type IntoIter = std::iter::Map<std::slice::Iter<'a, String>, fn(&'a String) -> &'a str>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.patterns.iter().map(|s| s.as_str())
+    }
+}
+
+impl FileFilter {
+    /// Return `true` if the given path matches at least one include pattern.
+    pub fn matches(&self, path: &str) -> bool {
+        self.includes.matches_any(path)
+    }
+
+    /// Return the number of include patterns.
+    pub fn included_count(&self) -> usize {
+        self.includes.pattern_count()
+    }
+
+    /// Return the number of exclude patterns.
+    pub fn excluded_count(&self) -> usize {
+        self.excludes.pattern_count()
+    }
+}
+
+/// The category of a glob pattern.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PatternCategory {
+    FileExtension,
+    Directory,
+    Recursive,
+    Literal,
+    Complex,
+}
+
+/// Categorizes glob patterns by their structure.
+#[derive(Debug, Clone, Default)]
+pub struct GlobPatternClassifier {
+    results: Vec<(String, PatternCategory)>,
+}
+
+impl GlobPatternClassifier {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Classify a single pattern string.
+    pub fn classify(pattern: &str) -> PatternCategory {
+        if pattern.contains("**") {
+            return PatternCategory::Recursive;
+        }
+        if pattern.ends_with('/') {
+            return PatternCategory::Directory;
+        }
+        const META: &[char] = &['*', '?', '[', '{'];
+        if !pattern.contains(META) {
+            return PatternCategory::Literal;
+        }
+        if pattern.starts_with("*.") && !pattern[2..].contains(META) {
+            return PatternCategory::FileExtension;
+        }
+        PatternCategory::Complex
+    }
+
+    /// Classify all patterns and store results.
+    pub fn classify_all(&mut self, patterns: &[&str]) {
+        for pat in patterns {
+            self.results
+                .push((pat.to_string(), Self::classify(pat)));
+        }
+    }
+
+    /// Return the stored classification results.
+    pub fn results(&self) -> &[(String, PatternCategory)] {
+        &self.results
+    }
+
+    /// Return only patterns matching a given category.
+    pub fn patterns_of(&self, category: PatternCategory) -> Vec<&str> {
+        self.results
+            .iter()
+            .filter(|(_, c)| *c == category)
+            .map(|(p, _)| p.as_str())
+            .collect()
+    }
+}
+
+impl GlobStats {
+    /// Return the average pattern length for a set of patterns, or `None` if empty.
+    pub fn average_pattern_length(patterns: &[String]) -> Option<f64> {
+        if patterns.is_empty() {
+            return None;
+        }
+        let total: usize = patterns.iter().map(|p| p.len()).sum();
+        Some(total as f64 / patterns.len() as f64)
+    }
+
+    /// Return the longest pattern, or `None` if the slice is empty.
+    pub fn longest_pattern(patterns: &[String]) -> Option<&str> {
+        patterns.iter().max_by_key(|p| p.len()).map(|p| p.as_str())
+    }
+
+    /// Return the shortest pattern, or `None` if the slice is empty.
+    pub fn shortest_pattern(patterns: &[String]) -> Option<&str> {
+        patterns.iter().min_by_key(|p| p.len()).map(|p| p.as_str())
+    }
+}
+
+/// Check whether a pattern contains only valid glob syntax characters.
+pub fn is_valid_glob_syntax(pattern: &str) -> bool {
+    if pattern.is_empty() {
+        return false;
+    }
+    let mut brace_depth: i32 = 0;
+    let mut bracket_depth: i32 = 0;
+    for ch in pattern.chars() {
+        match ch {
+            '{' => brace_depth += 1,
+            '}' => {
+                brace_depth -= 1;
+                if brace_depth < 0 {
+                    return false;
+                }
+            }
+            '[' => bracket_depth += 1,
+            ']' => {
+                bracket_depth -= 1;
+                if bracket_depth < 0 {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    brace_depth == 0 && bracket_depth == 0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1197,5 +1382,123 @@ mod tests {
     fn glob_to_regex_doublestar() {
         let re = glob_to_regex("src/**/*.rs");
         assert_eq!(re, "^src/(.*/)?[^/]*\\.rs$");
+    }
+
+    #[test]
+    fn glob_pattern_extension() {
+        let pat = GlobPattern::new("*.rs").unwrap();
+        assert_eq!(pat.extension(), Some("rs"));
+
+        let pat2 = GlobPattern::new("src/**/*.toml").unwrap();
+        assert_eq!(pat2.extension(), Some("toml"));
+
+        let pat3 = GlobPattern::new("src/**/*").unwrap();
+        assert_eq!(pat3.extension(), None);
+
+        let pat4 = GlobPattern::new("Makefile").unwrap();
+        assert_eq!(pat4.extension(), None);
+
+        let pat5 = GlobPattern::new("*.tar.gz").unwrap();
+        assert_eq!(pat5.extension(), Some("gz"));
+    }
+
+    #[test]
+    fn glob_pattern_base_dir() {
+        let pat = GlobPattern::new("src/**/*.rs").unwrap();
+        assert_eq!(pat.base_dir(), "src/");
+
+        let pat2 = GlobPattern::new("*.rs").unwrap();
+        assert_eq!(pat2.base_dir(), "");
+
+        let pat3 = GlobPattern::new("a/b/c.txt").unwrap();
+        assert_eq!(pat3.base_dir(), "a/b/c.txt");
+    }
+
+    #[test]
+    fn glob_pattern_set_merge() {
+        let a = GlobPatternSet::new(&["*.rs"]).unwrap();
+        let b = GlobPatternSet::new(&["*.toml", "*.lock"]).unwrap();
+        let merged = a.merge(&b).unwrap();
+        assert_eq!(merged.pattern_count(), 3);
+        assert!(merged.matches_any("lib.rs"));
+        assert!(merged.matches_any("Cargo.toml"));
+        assert!(merged.matches_any("Cargo.lock"));
+        assert!(!merged.matches_any("readme.md"));
+    }
+
+    #[test]
+    fn glob_pattern_set_iter_and_into_iter() {
+        let set = GlobPatternSet::new(&["*.rs", "*.toml"]).unwrap();
+        let via_iter: Vec<&str> = set.iter().collect();
+        assert_eq!(via_iter, vec!["*.rs", "*.toml"]);
+
+        let via_into: Vec<&str> = (&set).into_iter().collect();
+        assert_eq!(via_into, vec!["*.rs", "*.toml"]);
+    }
+
+    #[test]
+    fn file_filter_matches_and_counts() {
+        let filter = FileFilter::new(&["*.rs", "*.toml"], &["test_*"]).unwrap();
+        assert!(filter.matches("main.rs"));
+        assert!(!filter.matches("readme.md"));
+        assert_eq!(filter.included_count(), 2);
+        assert_eq!(filter.excluded_count(), 1);
+    }
+
+    #[test]
+    fn glob_pattern_classifier_categories() {
+        assert_eq!(
+            GlobPatternClassifier::classify("*.rs"),
+            PatternCategory::FileExtension
+        );
+        assert_eq!(
+            GlobPatternClassifier::classify("src/**/*.rs"),
+            PatternCategory::Recursive
+        );
+        assert_eq!(
+            GlobPatternClassifier::classify("build/"),
+            PatternCategory::Directory
+        );
+        assert_eq!(
+            GlobPatternClassifier::classify("Makefile"),
+            PatternCategory::Literal
+        );
+        assert_eq!(
+            GlobPatternClassifier::classify("src/*.rs"),
+            PatternCategory::Complex
+        );
+
+        let mut c = GlobPatternClassifier::new();
+        c.classify_all(&["*.rs", "src/**", "Makefile"]);
+        assert_eq!(c.results().len(), 3);
+        assert_eq!(
+            c.patterns_of(PatternCategory::Literal),
+            vec!["Makefile"]
+        );
+    }
+
+    #[test]
+    fn glob_stats_pattern_helpers() {
+        let patterns: Vec<String> = vec!["*.rs".into(), "src/**/*.toml".into(), "a".into()];
+        let avg = GlobStats::average_pattern_length(&patterns).unwrap();
+        assert!((avg - 6.0).abs() < f64::EPSILON);
+        assert_eq!(GlobStats::longest_pattern(&patterns), Some("src/**/*.toml"));
+        assert_eq!(GlobStats::shortest_pattern(&patterns), Some("a"));
+
+        let empty: Vec<String> = vec![];
+        assert_eq!(GlobStats::average_pattern_length(&empty), None);
+        assert_eq!(GlobStats::longest_pattern(&empty), None);
+        assert_eq!(GlobStats::shortest_pattern(&empty), None);
+    }
+
+    #[test]
+    fn is_valid_glob_syntax_checks() {
+        assert!(is_valid_glob_syntax("*.rs"));
+        assert!(is_valid_glob_syntax("src/{a,b}/*.rs"));
+        assert!(is_valid_glob_syntax("[abc].txt"));
+        assert!(!is_valid_glob_syntax(""));
+        assert!(!is_valid_glob_syntax("*.{rs"));
+        assert!(!is_valid_glob_syntax("foo}bar"));
+        assert!(!is_valid_glob_syntax("]bad"));
     }
 }

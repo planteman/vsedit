@@ -698,6 +698,159 @@ impl MinimapBrailleRenderer {
     }
 }
 
+impl MinimapConfig {
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn effective_width(&self) -> u32 {
+        self.max_column / self.scale.max(1)
+    }
+
+    pub fn summary(&self) -> String {
+        format!(
+            "{:?} minimap on {:?}, width={}, scale={}",
+            self.mode, self.side, self.max_column, self.scale,
+        )
+    }
+}
+
+impl MinimapMetrics {
+    pub fn coverage_ratio(&self) -> f64 {
+        if self.total_lines == 0 {
+            return 0.0;
+        }
+        self.viewport_lines as f64 / self.total_lines as f64
+    }
+
+    pub fn is_full_document(&self) -> bool {
+        self.viewport_lines >= self.total_lines
+    }
+
+    pub fn hidden_lines(&self) -> u32 {
+        self.total_lines.saturating_sub(self.viewport_lines)
+    }
+}
+
+impl MinimapToken {
+    pub fn end_col(&self) -> u32 {
+        self.start_col + self.length
+    }
+
+    pub fn overlaps(&self, other: &MinimapToken) -> bool {
+        self.start_col < other.end_col() && other.start_col < self.end_col()
+    }
+}
+
+impl MinimapLine {
+    pub fn is_blank(&self) -> bool {
+        self.tokens.is_empty()
+    }
+
+    pub fn char_count(&self) -> u32 {
+        self.tokens.iter().map(|t| t.length).sum()
+    }
+
+    pub fn max_column(&self) -> u32 {
+        self.tokens
+            .iter()
+            .map(|t| t.start_col + t.length)
+            .max()
+            .unwrap_or(0)
+    }
+
+    pub fn token_count(&self) -> usize {
+        self.tokens.len()
+    }
+}
+
+impl MinimapDecoration {
+    pub fn is_error(&self) -> bool {
+        self.decoration_type == DecorationType::Error
+    }
+
+    pub fn is_warning(&self) -> bool {
+        self.decoration_type == DecorationType::Warning
+    }
+}
+
+impl MinimapDecorationLayer {
+    pub fn merge(&mut self, other: &MinimapDecorationLayer) {
+        self.decorations.extend(other.decorations.iter().cloned());
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &MinimapDecoration> {
+        self.decorations.iter()
+    }
+
+    pub fn has_errors(&self) -> bool {
+        self.decorations.iter().any(|d| d.is_error())
+    }
+
+    pub fn filter_by_type(&self, dt: DecorationType) -> Vec<&MinimapDecoration> {
+        self.decorations
+            .iter()
+            .filter(|d| d.decoration_type == dt)
+            .collect()
+    }
+}
+
+impl MinimapRegion {
+    pub fn overlaps(&self, other: &MinimapRegion) -> bool {
+        self.start_line < other.end_line && other.start_line < self.end_line
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.start_line >= self.end_line
+    }
+}
+
+impl MinimapLayout {
+    pub fn is_within_viewport(&self, line: u32) -> bool {
+        line >= self.viewport_start && line < self.viewport_end
+    }
+
+    pub fn viewport_lines(&self) -> u32 {
+        self.viewport_end.saturating_sub(self.viewport_start)
+    }
+
+    pub fn viewport_height(&self) -> f64 {
+        self.viewport_lines() as f64 * self.line_height
+    }
+}
+
+impl MinimapSelection {
+    pub fn line_count(&self) -> u32 {
+        self.end_line - self.start_line + 1
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.start_line == self.end_line && self.start_col == self.end_col
+    }
+
+    pub fn is_single_line(&self) -> bool {
+        self.start_line == self.end_line
+    }
+}
+
+impl MinimapColorScheme {
+    pub fn is_dark(&self) -> bool {
+        let avg = (self.default_color[0] as u16
+            + self.default_color[1] as u16
+            + self.default_color[2] as u16)
+            / 3;
+        avg < 128
+    }
+
+    pub fn is_light(&self) -> bool {
+        !self.is_dark()
+    }
+
+    pub fn color_ids(&self) -> Vec<u8> {
+        self.colors.iter().map(|(id, _)| *id).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1201,5 +1354,172 @@ mod tests {
         let r = MinimapBrailleRenderer::new(3);
         let line = r.render_line("      "); // all spaces
         assert!(line.chars().all(|c| c == '\u{2800}')); // all blank
+    }
+
+    #[test]
+    fn config_is_enabled_and_effective_width() {
+        let cfg = MinimapConfig::default();
+        assert!(cfg.is_enabled());
+        assert_eq!(cfg.effective_width(), 120);
+
+        let cfg2 = MinimapConfigBuilder::new()
+            .enabled(false)
+            .max_column(200)
+            .scale(4)
+            .build();
+        assert!(!cfg2.is_enabled());
+        assert_eq!(cfg2.effective_width(), 50);
+        assert!(cfg2.summary().contains("200"));
+    }
+
+    #[test]
+    fn metrics_coverage_and_full_document() {
+        let full = MinimapMetrics {
+            visible_ratio: 1.0,
+            total_lines: 50,
+            viewport_lines: 50,
+            scaled_height: 100.0,
+        };
+        assert!(full.is_full_document());
+        assert!((full.coverage_ratio() - 1.0).abs() < f64::EPSILON);
+        assert_eq!(full.hidden_lines(), 0);
+
+        let partial = MinimapMetrics {
+            visible_ratio: 0.5,
+            total_lines: 100,
+            viewport_lines: 20,
+            scaled_height: 200.0,
+        };
+        assert!(!partial.is_full_document());
+        assert!((partial.coverage_ratio() - 0.2).abs() < f64::EPSILON);
+        assert_eq!(partial.hidden_lines(), 80);
+
+        let empty = MinimapMetrics {
+            visible_ratio: 0.0,
+            total_lines: 0,
+            viewport_lines: 0,
+            scaled_height: 0.0,
+        };
+        assert!((empty.coverage_ratio() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn line_is_blank_and_char_count() {
+        let blank = MinimapLine { line_number: 0, tokens: vec![] };
+        assert!(blank.is_blank());
+        assert_eq!(blank.char_count(), 0);
+        assert_eq!(blank.max_column(), 0);
+        assert_eq!(blank.token_count(), 0);
+
+        let line = MinimapLine {
+            line_number: 1,
+            tokens: vec![
+                MinimapToken { start_col: 0, length: 5, color_id: 1 },
+                MinimapToken { start_col: 10, length: 3, color_id: 2 },
+            ],
+        };
+        assert!(!line.is_blank());
+        assert_eq!(line.char_count(), 8);
+        assert_eq!(line.max_column(), 13);
+        assert_eq!(line.token_count(), 2);
+    }
+
+    #[test]
+    fn token_end_col_and_overlaps() {
+        let a = MinimapToken { start_col: 0, length: 5, color_id: 1 };
+        let b = MinimapToken { start_col: 3, length: 4, color_id: 2 };
+        let c = MinimapToken { start_col: 5, length: 2, color_id: 3 };
+        assert_eq!(a.end_col(), 5);
+        assert!(a.overlaps(&b));
+        assert!(!a.overlaps(&c));
+        assert!(b.overlaps(&c));
+    }
+
+    #[test]
+    fn decoration_layer_merge_and_iter() {
+        let mut l1 = MinimapDecorationLayer::new();
+        l1.add(MinimapDecoration {
+            line_number: 1,
+            color_id: 1,
+            decoration_type: DecorationType::Error,
+        });
+        let mut l2 = MinimapDecorationLayer::new();
+        l2.add(MinimapDecoration {
+            line_number: 2,
+            color_id: 2,
+            decoration_type: DecorationType::Warning,
+        });
+        l2.add(MinimapDecoration {
+            line_number: 3,
+            color_id: 3,
+            decoration_type: DecorationType::Info,
+        });
+
+        l1.merge(&l2);
+        assert_eq!(l1.count(), 3);
+        assert!(l1.has_errors());
+        assert_eq!(l1.iter().count(), 3);
+        assert_eq!(l1.filter_by_type(DecorationType::Warning).len(), 1);
+        assert_eq!(l1.filter_by_type(DecorationType::Search).len(), 0);
+    }
+
+    #[test]
+    fn region_overlaps_and_is_empty() {
+        let a = MinimapRegion { start_line: 10, end_line: 20, label: "a".into() };
+        let b = MinimapRegion { start_line: 15, end_line: 25, label: "b".into() };
+        let c = MinimapRegion { start_line: 20, end_line: 30, label: "c".into() };
+        let empty = MinimapRegion { start_line: 5, end_line: 5, label: "e".into() };
+
+        assert!(a.overlaps(&b));
+        assert!(!a.overlaps(&c));
+        assert!(!empty.is_empty() || empty.start_line >= empty.end_line);
+        assert!(empty.is_empty());
+        assert!(!a.is_empty());
+    }
+
+    #[test]
+    fn layout_viewport_helpers() {
+        let layout = MinimapLayout::new(3.0, 200, 50, 100);
+        assert!(layout.is_within_viewport(50));
+        assert!(layout.is_within_viewport(99));
+        assert!(!layout.is_within_viewport(100));
+        assert!(!layout.is_within_viewport(49));
+        assert_eq!(layout.viewport_lines(), 50);
+        assert!((layout.viewport_height() - 150.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn selection_line_count_and_is_empty() {
+        let sel = MinimapSelection::new(5, 10, 0, 80);
+        assert_eq!(sel.line_count(), 6);
+        assert!(!sel.is_empty());
+        assert!(!sel.is_single_line());
+
+        let single = MinimapSelection::new(3, 3, 5, 5);
+        assert_eq!(single.line_count(), 1);
+        assert!(single.is_empty());
+        assert!(single.is_single_line());
+
+        let single_range = MinimapSelection::new(3, 3, 0, 10);
+        assert!(!single_range.is_empty());
+        assert!(single_range.is_single_line());
+    }
+
+    #[test]
+    fn color_scheme_dark_light_and_ids() {
+        let mut dark = MinimapColorScheme::new("dark");
+        dark.default_color = [30, 30, 30];
+        dark.set_color(1, [255, 0, 0]);
+        dark.set_color(2, [0, 255, 0]);
+        assert!(dark.is_dark());
+        assert!(!dark.is_light());
+        let ids = dark.color_ids();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&1));
+        assert!(ids.contains(&2));
+
+        let light = MinimapColorScheme::new("light");
+        assert!(light.is_light());
+        assert!(!light.is_dark());
     }
 }

@@ -739,6 +739,192 @@ pub fn notebook_export_format(doc: &NotebookDocument, format: ExportFormat) -> S
     output
 }
 
+// ---------------------------------------------------------------------------
+// NotebookCellKind helpers
+// ---------------------------------------------------------------------------
+
+impl NotebookCellKind {
+    /// Returns all cell kind variants.
+    pub fn all() -> &'static [NotebookCellKind] {
+        &[NotebookCellKind::Code, NotebookCellKind::Markup]
+    }
+
+    /// Returns true if this is a code cell.
+    pub fn is_code(&self) -> bool {
+        matches!(self, NotebookCellKind::Code)
+    }
+
+    /// Returns true if this is a markup/markdown cell.
+    pub fn is_markup(&self) -> bool {
+        matches!(self, NotebookCellKind::Markup)
+    }
+}
+
+impl Default for NotebookCellKind {
+    fn default() -> Self {
+        NotebookCellKind::Code
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotebookCell helpers
+// ---------------------------------------------------------------------------
+
+impl NotebookCell {
+    /// Create a new code cell.
+    pub fn code(source: impl Into<String>, language: impl Into<String>) -> Self {
+        Self {
+            kind: NotebookCellKind::Code,
+            source: source.into(),
+            language: language.into(),
+            outputs: Vec::new(),
+            execution_order: None,
+        }
+    }
+
+    /// Create a new markup cell.
+    pub fn markup(source: impl Into<String>) -> Self {
+        Self {
+            kind: NotebookCellKind::Markup,
+            source: source.into(),
+            language: "markdown".to_string(),
+            outputs: Vec::new(),
+            execution_order: None,
+        }
+    }
+
+    /// Returns the number of lines in the source.
+    pub fn line_count(&self) -> usize {
+        self.source.lines().count().max(1)
+    }
+
+    /// Returns true if the cell has outputs.
+    pub fn has_outputs(&self) -> bool {
+        !self.outputs.is_empty()
+    }
+
+    /// Returns the character count of the source.
+    pub fn char_count(&self) -> usize {
+        self.source.len()
+    }
+
+    /// Returns true if the source is empty or whitespace-only.
+    pub fn is_empty(&self) -> bool {
+        self.source.trim().is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotebookDocument helpers
+// ---------------------------------------------------------------------------
+
+impl NotebookDocument {
+    /// Returns the number of code cells.
+    pub fn code_cell_count(&self) -> usize {
+        self.cells.iter().filter(|c| c.kind.is_code()).count()
+    }
+
+    /// Returns the number of markup cells.
+    pub fn markup_cell_count(&self) -> usize {
+        self.cells.iter().filter(|c| c.kind.is_markup()).count()
+    }
+
+    /// Returns all unique languages used in code cells.
+    pub fn languages(&self) -> Vec<String> {
+        let mut langs: Vec<String> = self.cells.iter()
+            .filter(|c| c.kind.is_code())
+            .map(|c| c.language.clone())
+            .collect();
+        langs.sort();
+        langs.dedup();
+        langs
+    }
+
+    /// Returns the total line count across all cells.
+    pub fn total_line_count(&self) -> usize {
+        self.cells.iter().map(|c| c.line_count()).sum()
+    }
+
+    /// Find cells containing a text substring.
+    pub fn search_cells(&self, query: &str) -> Vec<usize> {
+        let q = query.to_lowercase();
+        self.cells.iter()
+            .enumerate()
+            .filter(|(_, c)| c.source.to_lowercase().contains(&q))
+            .map(|(i, _)| i)
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CellExecutionState helpers
+// ---------------------------------------------------------------------------
+
+impl CellExecutionState {
+    /// Returns true if the cell has finished execution.
+    pub fn is_finished(&self) -> bool {
+        matches!(self, CellExecutionState::Succeeded { .. } | CellExecutionState::Failed { .. })
+    }
+
+    /// Returns true if the cell is currently running.
+    pub fn is_running(&self) -> bool {
+        matches!(self, CellExecutionState::Running)
+    }
+
+    /// Returns an icon character.
+    pub fn icon(&self) -> char {
+        match self {
+            CellExecutionState::Idle => '○',
+            CellExecutionState::Running => '●',
+            CellExecutionState::Succeeded { .. } => '✓',
+            CellExecutionState::Failed { .. } => '✗',
+        }
+    }
+}
+
+impl Default for CellExecutionState {
+    fn default() -> Self {
+        CellExecutionState::Idle
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ExportFormat helpers
+// ---------------------------------------------------------------------------
+
+impl ExportFormat {
+    /// Returns all export format variants.
+    pub fn all() -> &'static [ExportFormat] {
+        &[ExportFormat::Python, ExportFormat::Markdown]
+    }
+
+    /// Returns the file extension for this format.
+    pub fn extension(&self) -> &'static str {
+        match self {
+            ExportFormat::Python => "py",
+            ExportFormat::Markdown => "md",
+        }
+    }
+
+    /// Parse from a string.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().as_str() {
+            "python" | "py" => Some(Self::Python),
+            "markdown" | "md" => Some(Self::Markdown),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for ExportFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ExportFormat::Python => write!(f, "Python"),
+            ExportFormat::Markdown => write!(f, "Markdown"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1243,5 +1429,77 @@ mod tests {
         assert!(result.contains("```python"));
         assert!(result.contains("x = 1"));
         assert!(result.contains("Some text"));
+    }
+
+    #[test]
+    fn test_cell_kind_helpers() {
+        assert!(NotebookCellKind::Code.is_code());
+        assert!(!NotebookCellKind::Code.is_markup());
+        assert!(NotebookCellKind::Markup.is_markup());
+        assert_eq!(NotebookCellKind::all().len(), 2);
+        assert_eq!(NotebookCellKind::default(), NotebookCellKind::Code);
+    }
+
+    #[test]
+    fn test_notebook_cell_code() {
+        let cell = NotebookCell::code("let x = 1;", "rust");
+        assert_eq!(cell.line_count(), 1);
+        assert!(!cell.is_empty());
+        assert!(!cell.has_outputs());
+        assert!(format!("{cell}").contains("Code"));
+    }
+
+    #[test]
+    fn test_notebook_cell_markup() {
+        let cell = NotebookCell::markup("# Title\n\nSome text");
+        assert!(cell.kind.is_markup());
+        assert_eq!(cell.line_count(), 3);
+    }
+
+    #[test]
+    fn test_notebook_cell_empty() {
+        let cell = NotebookCell::code("   ", "python");
+        assert!(cell.is_empty());
+    }
+
+    #[test]
+    fn test_notebook_document_helpers() {
+        let mut doc = NotebookDocument::new("test.ipynb");
+        doc.add_cell(NotebookCell::code("x = 1", "python"));
+        doc.add_cell(NotebookCell::markup("# Header"));
+        doc.add_cell(NotebookCell::code("y = 2", "python"));
+        doc.add_cell(NotebookCell::code("console.log(1)", "javascript"));
+        assert_eq!(doc.code_cell_count(), 3);
+        assert_eq!(doc.markup_cell_count(), 1);
+        assert_eq!(doc.languages(), vec!["javascript", "python"]);
+        assert_eq!(doc.total_line_count(), 4);
+    }
+
+    #[test]
+    fn test_notebook_search_cells() {
+        let mut doc = NotebookDocument::new("test.ipynb");
+        doc.add_cell(NotebookCell::code("let x = 42;", "rust"));
+        doc.add_cell(NotebookCell::markup("Some text"));
+        doc.add_cell(NotebookCell::code("let y = 42;", "rust"));
+        let results = doc.search_cells("42");
+        assert_eq!(results, vec![0, 2]);
+    }
+
+    #[test]
+    fn test_cell_execution_state_helpers() {
+        assert!(CellExecutionState::Succeeded { duration_ms: 10 }.is_finished());
+        assert!(CellExecutionState::Running.is_running());
+        assert!(!CellExecutionState::Idle.is_finished());
+        assert_eq!(CellExecutionState::Succeeded { duration_ms: 0 }.icon(), '✓');
+        assert_eq!(CellExecutionState::default(), CellExecutionState::Idle);
+    }
+
+    #[test]
+    fn test_export_format_helpers() {
+        assert_eq!(ExportFormat::all().len(), 2);
+        assert_eq!(ExportFormat::Markdown.extension(), "md");
+        assert_eq!(ExportFormat::from_name("python"), Some(ExportFormat::Python));
+        assert_eq!(ExportFormat::from_name("bogus"), None);
+        assert_eq!(format!("{}", ExportFormat::Markdown), "Markdown");
     }
 }

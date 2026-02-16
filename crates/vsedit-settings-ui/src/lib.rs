@@ -730,6 +730,143 @@ pub fn modified_settings_count(registry: &SettingsRegistry) -> usize {
     registry.all().iter().filter(|s| s.is_modified()).count()
 }
 
+// ---------------------------------------------------------------------------
+// SettingType helpers
+// ---------------------------------------------------------------------------
+
+impl SettingType {
+    /// Returns all type variants.
+    pub fn all() -> &'static [SettingType] {
+        &[
+            SettingType::String,
+            SettingType::Number,
+            SettingType::Boolean,
+            SettingType::Enum,
+            SettingType::Array,
+            SettingType::Object,
+        ]
+    }
+
+    /// Returns true if this is a scalar type (not a container).
+    pub fn is_scalar(&self) -> bool {
+        matches!(self, SettingType::String | SettingType::Number | SettingType::Boolean)
+    }
+
+    /// Returns a suitable default value representation for this type.
+    pub fn default_value_str(&self) -> &'static str {
+        match self {
+            SettingType::String => "\"\"",
+            SettingType::Number => "0",
+            SettingType::Boolean => "false",
+            SettingType::Enum => "\"\"",
+            SettingType::Array => "[]",
+            SettingType::Object => "{}",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SettingScope helpers
+// ---------------------------------------------------------------------------
+
+impl SettingScope {
+    /// Returns all scope variants.
+    pub fn all() -> &'static [SettingScope] {
+        &[
+            SettingScope::User,
+            SettingScope::Workspace,
+            SettingScope::WorkspaceFolder,
+            SettingScope::Language,
+        ]
+    }
+
+    /// Parse a scope from a string.
+    pub fn from_str_opt(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "user" => Some(Self::User),
+            "workspace" => Some(Self::Workspace),
+            "workspacefolder" | "folder" => Some(Self::WorkspaceFolder),
+            "language" => Some(Self::Language),
+            _ => None,
+        }
+    }
+
+    /// Returns the relative priority (higher = more specific).
+    pub fn priority(&self) -> u8 {
+        match self {
+            Self::User => 0,
+            Self::Workspace => 1,
+            Self::WorkspaceFolder => 2,
+            Self::Language => 3,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Setting key utilities
+// ---------------------------------------------------------------------------
+
+/// Splits a dotted setting key into its parts.
+pub fn split_setting_key(key: &str) -> Vec<&str> {
+    key.split('.').collect()
+}
+
+/// Returns the category prefix of a setting key (e.g., "editor" from "editor.fontSize").
+pub fn setting_category(key: &str) -> &str {
+    key.split('.').next().unwrap_or(key)
+}
+
+/// Returns all unique categories from a list of setting items.
+pub fn unique_categories(settings: &[SettingItem]) -> Vec<String> {
+    let mut cats: Vec<String> = settings.iter()
+        .map(|s| setting_category(&s.key).to_string())
+        .collect();
+    cats.sort();
+    cats.dedup();
+    cats
+}
+
+/// Counts settings by type.
+pub fn count_by_type(settings: &[SettingItem]) -> std::collections::HashMap<String, usize> {
+    let mut map = std::collections::HashMap::new();
+    for s in settings {
+        *map.entry(format!("{}", s.setting_type)).or_insert(0) += 1;
+    }
+    map
+}
+
+/// Iterator over setting keys matching a prefix.
+pub struct SettingPrefixIter<'a> {
+    settings: &'a [SettingItem],
+    prefix: String,
+    index: usize,
+}
+
+impl<'a> SettingPrefixIter<'a> {
+    pub fn new(settings: &'a [SettingItem], prefix: &str) -> Self {
+        Self {
+            settings,
+            prefix: prefix.to_string(),
+            index: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for SettingPrefixIter<'a> {
+    type Item = &'a SettingItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.index < self.settings.len() {
+            let item = &self.settings[self.index];
+            self.index += 1;
+            if item.key.starts_with(&self.prefix) {
+                return Some(item);
+            }
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1233,5 +1370,65 @@ mod tests {
         assert!(patch.contains("a.b"));
         assert!(!patch.contains("c.d"));
         assert_eq!(modified_settings_count(&registry), 1);
+    }
+
+    #[test]
+    fn test_setting_type_all() {
+        assert_eq!(SettingType::all().len(), 6);
+    }
+
+    #[test]
+    fn test_setting_type_is_scalar() {
+        assert!(SettingType::String.is_scalar());
+        assert!(SettingType::Number.is_scalar());
+        assert!(SettingType::Boolean.is_scalar());
+        assert!(!SettingType::Array.is_scalar());
+        assert!(!SettingType::Object.is_scalar());
+    }
+
+    #[test]
+    fn test_setting_type_default_value_str() {
+        assert_eq!(SettingType::Boolean.default_value_str(), "false");
+        assert_eq!(SettingType::Array.default_value_str(), "[]");
+    }
+
+    #[test]
+    fn test_setting_scope_all() {
+        assert_eq!(SettingScope::all().len(), 4);
+    }
+
+    #[test]
+    fn test_setting_scope_from_str_opt() {
+        assert_eq!(SettingScope::from_str_opt("user"), Some(SettingScope::User));
+        assert_eq!(SettingScope::from_str_opt("folder"), Some(SettingScope::WorkspaceFolder));
+        assert_eq!(SettingScope::from_str_opt("bogus"), None);
+    }
+
+    #[test]
+    fn test_setting_scope_priority() {
+        assert!(SettingScope::Language.priority() > SettingScope::User.priority());
+    }
+
+    #[test]
+    fn test_split_setting_key() {
+        assert_eq!(split_setting_key("editor.fontSize"), vec!["editor", "fontSize"]);
+        assert_eq!(split_setting_key("simple"), vec!["simple"]);
+    }
+
+    #[test]
+    fn test_setting_category_fn() {
+        assert_eq!(setting_category("editor.fontSize"), "editor");
+        assert_eq!(setting_category("standalone"), "standalone");
+    }
+
+    #[test]
+    fn test_setting_prefix_iter() {
+        let items = vec![
+            SettingItem { key: "editor.fontSize".into(), label: "".into(), setting_type: SettingType::Number, scope: SettingScope::User, description: "".into(), default_value: "14".into(), current_value: None, enum_values: vec![] },
+            SettingItem { key: "terminal.shell".into(), label: "".into(), setting_type: SettingType::String, scope: SettingScope::User, description: "".into(), default_value: "bash".into(), current_value: None, enum_values: vec![] },
+            SettingItem { key: "editor.tabSize".into(), label: "".into(), setting_type: SettingType::Number, scope: SettingScope::User, description: "".into(), default_value: "4".into(), current_value: None, enum_values: vec![] },
+        ];
+        let editor_items: Vec<_> = SettingPrefixIter::new(&items, "editor.").collect();
+        assert_eq!(editor_items.len(), 2);
     }
 }

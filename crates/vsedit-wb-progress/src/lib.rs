@@ -701,6 +701,198 @@ pub fn estimate_remaining(progress: f64, elapsed: std::time::Duration) -> Option
     }
 }
 
+// ---------------------------------------------------------------------------
+// ProgressLocation extensions
+// ---------------------------------------------------------------------------
+
+impl ProgressLocation {
+    pub fn is_notification(&self) -> bool {
+        matches!(self, Self::Notification)
+    }
+
+    pub fn is_status_bar(&self) -> bool {
+        matches!(self, Self::StatusBar)
+    }
+
+    pub fn is_window(&self) -> bool {
+        matches!(self, Self::Window)
+    }
+
+    pub fn is_overlay(&self) -> bool {
+        matches!(self, Self::Notification | Self::Window)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProgressOptions extensions
+// ---------------------------------------------------------------------------
+
+impl ProgressOptions {
+    pub fn is_cancellable(&self) -> bool {
+        self.cancellable
+    }
+
+    pub fn has_title(&self) -> bool {
+        self.title.is_some()
+    }
+
+    pub fn summary(&self) -> String {
+        let title = self.title.as_deref().unwrap_or("(no title)");
+        let cancel = if self.cancellable { "cancellable" } else { "non-cancellable" };
+        format!("{title} @ {location} [{cancel}]", location = self.location)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProgressReport extensions
+// ---------------------------------------------------------------------------
+
+impl ProgressReport {
+    pub fn is_empty(&self) -> bool {
+        self.message.is_none() && self.increment.is_none() && self.total == 0.0
+    }
+
+    pub fn has_message(&self) -> bool {
+        self.message.is_some()
+    }
+
+    pub fn clamped_total(&self) -> f64 {
+        self.total.clamp(0.0, 100.0)
+    }
+}
+
+impl fmt::Display for ProgressReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let pct = self.clamped_total();
+        match &self.message {
+            Some(msg) => write!(f, "{pct:.0}% - {msg}"),
+            None => write!(f, "{pct:.0}%"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProgressTask extensions
+// ---------------------------------------------------------------------------
+
+impl ProgressTask {
+    pub fn is_complete(&self) -> bool {
+        self.done
+    }
+
+    pub fn is_active(&self) -> bool {
+        !self.done && !self.cancelled
+    }
+
+    pub fn percentage(&self) -> f64 {
+        self.report.clamped_total()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProgressService extensions — completed_count, find_by_title, iter
+// ---------------------------------------------------------------------------
+
+impl ProgressService {
+    pub fn completed_count(&self) -> usize {
+        self.tasks.iter().filter(|t| t.done).count()
+    }
+
+    pub fn find_by_title(&self, title: &str) -> Option<&ProgressTask> {
+        self.tasks
+            .iter()
+            .find(|t| t.options.title.as_deref() == Some(title))
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, ProgressTask> {
+        self.tasks.iter()
+    }
+
+    pub fn cancelled_count(&self) -> usize {
+        self.tasks.iter().filter(|t| t.cancelled).count()
+    }
+}
+
+impl<'a> IntoIterator for &'a ProgressService {
+    type Item = &'a ProgressTask;
+    type IntoIter = std::slice::Iter<'a, ProgressTask>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.tasks.iter()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProgressReportBatch extensions
+// ---------------------------------------------------------------------------
+
+impl ProgressReportBatch {
+    pub fn total_increment(&self) -> f64 {
+        self.reports
+            .iter()
+            .filter_map(|r| r.increment)
+            .sum()
+    }
+
+    pub fn message_count(&self) -> usize {
+        self.reports.iter().filter(|r| r.message.is_some()).count()
+    }
+
+    pub fn merge(&mut self, other: &mut ProgressReportBatch) {
+        self.reports.append(&mut other.reports);
+    }
+
+    pub fn task_ids(&self) -> Vec<u64> {
+        let mut ids: Vec<u64> = self.reports.iter().map(|r| r.task_id).collect();
+        ids.sort_unstable();
+        ids.dedup();
+        ids
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WbProgressStats extensions
+// ---------------------------------------------------------------------------
+
+impl WbProgressStats {
+    pub fn summary(&self) -> String {
+        format!(
+            "{total} ops ({ok} ok, {err} err) avg {avg}ns",
+            total = self.total_operations,
+            ok = self.successful_operations,
+            err = self.failed_operations,
+            avg = self.average_time_ns(),
+        )
+    }
+
+    pub fn has_failures(&self) -> bool {
+        self.failed_operations > 0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.total_operations == 0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ProgressTimer extensions
+// ---------------------------------------------------------------------------
+
+impl ProgressTimer {
+    pub fn is_running(&self) -> bool {
+        !self.is_paused()
+    }
+
+    pub fn elapsed_secs(&self) -> f64 {
+        self.elapsed().as_secs_f64()
+    }
+
+    pub fn restart(&mut self) {
+        self.start = std::time::Instant::now();
+        self.paused_elapsed = None;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1206,5 +1398,183 @@ mod tests {
         let elapsed = std::time::Duration::from_secs(10);
         assert!(estimate_remaining(0.0, elapsed).is_none());
         assert!(estimate_remaining(-0.5, elapsed).is_none());
+    }
+
+    // -- ProgressLocation extension tests --
+
+    #[test]
+    fn progress_location_predicates() {
+        assert!(ProgressLocation::Notification.is_notification());
+        assert!(!ProgressLocation::Window.is_notification());
+        assert!(ProgressLocation::StatusBar.is_status_bar());
+        assert!(!ProgressLocation::Panel.is_status_bar());
+        assert!(ProgressLocation::Window.is_window());
+        assert!(ProgressLocation::Notification.is_overlay());
+        assert!(ProgressLocation::Window.is_overlay());
+        assert!(!ProgressLocation::Panel.is_overlay());
+    }
+
+    // -- ProgressOptions extension tests --
+
+    #[test]
+    fn progress_options_extensions() {
+        let o = ProgressOptions {
+            location: ProgressLocation::Notification,
+            title: Some("Build".to_string()),
+            cancellable: true,
+        };
+        assert!(o.is_cancellable());
+        assert!(o.has_title());
+        let s = o.summary();
+        assert!(s.contains("Build"));
+        assert!(s.contains("cancellable"));
+
+        let o2 = ProgressOptions {
+            location: ProgressLocation::Window,
+            title: None,
+            cancellable: false,
+        };
+        assert!(!o2.is_cancellable());
+        assert!(!o2.has_title());
+        assert!(o2.summary().contains("(no title)"));
+        assert!(o2.summary().contains("non-cancellable"));
+    }
+
+    // -- ProgressReport extension tests --
+
+    #[test]
+    fn progress_report_extensions() {
+        let empty = ProgressReport {
+            message: None,
+            increment: None,
+            total: 0.0,
+        };
+        assert!(empty.is_empty());
+        assert!(!empty.has_message());
+        assert_eq!(empty.clamped_total(), 0.0);
+        assert_eq!(empty.to_string(), "0%");
+
+        let with_msg = ProgressReport {
+            message: Some("building".to_string()),
+            increment: Some(50.0),
+            total: 150.0,
+        };
+        assert!(!with_msg.is_empty());
+        assert!(with_msg.has_message());
+        assert_eq!(with_msg.clamped_total(), 100.0);
+        assert_eq!(with_msg.to_string(), "100% - building");
+    }
+
+    // -- ProgressTask extension tests --
+
+    #[test]
+    fn progress_task_extensions() {
+        let mut svc = ProgressService::new();
+        let id = svc.start(opts(ProgressLocation::Notification));
+        assert!(!svc.get_task(id).unwrap().is_complete());
+        assert!(svc.get_task(id).unwrap().is_active());
+        assert_eq!(svc.get_task(id).unwrap().percentage(), 0.0);
+
+        svc.report(id, None, Some(60.0));
+        assert_eq!(svc.get_task(id).unwrap().percentage(), 60.0);
+
+        svc.complete(id);
+        assert!(svc.get_task(id).unwrap().is_complete());
+        assert!(!svc.get_task(id).unwrap().is_active());
+    }
+
+    // -- ProgressService extension tests --
+
+    #[test]
+    fn progress_service_completed_and_cancelled_count() {
+        let mut svc = ProgressService::new();
+        let id1 = svc.start(opts(ProgressLocation::Notification));
+        let id2 = svc.start(opts(ProgressLocation::Window));
+        let _id3 = svc.start(opts(ProgressLocation::StatusBar));
+        svc.complete(id1);
+        svc.cancel(id2);
+        assert_eq!(svc.completed_count(), 2);
+        assert_eq!(svc.cancelled_count(), 1);
+    }
+
+    #[test]
+    fn progress_service_find_by_title() {
+        let mut svc = ProgressService::new();
+        svc.start(ProgressOptions {
+            location: ProgressLocation::Notification,
+            title: Some("Alpha".to_string()),
+            cancellable: false,
+        });
+        svc.start(ProgressOptions {
+            location: ProgressLocation::Window,
+            title: Some("Beta".to_string()),
+            cancellable: false,
+        });
+        assert_eq!(svc.find_by_title("Alpha").unwrap().options.title.as_deref(), Some("Alpha"));
+        assert_eq!(svc.find_by_title("Beta").unwrap().options.location, ProgressLocation::Window);
+        assert!(svc.find_by_title("Gamma").is_none());
+    }
+
+    #[test]
+    fn progress_service_iter_and_into_iter() {
+        let mut svc = ProgressService::new();
+        svc.start(opts(ProgressLocation::Notification));
+        svc.start(opts(ProgressLocation::Window));
+        assert_eq!(svc.iter().count(), 2);
+        let count = (&svc).into_iter().count();
+        assert_eq!(count, 2);
+    }
+
+    // -- ProgressReportBatch extension tests --
+
+    #[test]
+    fn batch_extensions() {
+        let mut batch = ProgressReportBatch::new();
+        batch.add(1, Some("a".to_string()), Some(10.0));
+        batch.add(2, None, Some(20.0));
+        batch.add(1, Some("b".to_string()), None);
+        assert_eq!(batch.total_increment(), 30.0);
+        assert_eq!(batch.message_count(), 2);
+        assert_eq!(batch.task_ids(), vec![1, 2]);
+
+        let mut batch2 = ProgressReportBatch::new();
+        batch2.add(3, None, Some(5.0));
+        batch.merge(&mut batch2);
+        assert_eq!(batch.len(), 4);
+        assert!(batch2.is_empty());
+    }
+
+    // -- WbProgressStats extension tests --
+
+    #[test]
+    fn wb_progress_stats_extensions() {
+        let empty = WbProgressStats::new();
+        assert!(empty.is_empty());
+        assert!(!empty.has_failures());
+        assert!(empty.summary().contains("0 ops"));
+
+        let mut stats = WbProgressStats::new();
+        stats.record_success(100);
+        stats.record_failure(200);
+        assert!(!stats.is_empty());
+        assert!(stats.has_failures());
+        let s = stats.summary();
+        assert!(s.contains("2 ops"));
+        assert!(s.contains("1 ok"));
+        assert!(s.contains("1 err"));
+    }
+
+    // -- ProgressTimer extension tests --
+
+    #[test]
+    fn progress_timer_extensions() {
+        let mut timer = ProgressTimer::start("test");
+        assert!(timer.is_running());
+        assert!(timer.elapsed_secs() >= 0.0);
+        timer.pause();
+        assert!(!timer.is_running());
+        timer.restart();
+        assert!(timer.is_running());
+        assert!(timer.elapsed_secs() < 1.0);
     }
 }

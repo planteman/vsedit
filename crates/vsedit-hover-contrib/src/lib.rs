@@ -708,6 +708,203 @@ pub fn filter_by_min_priority(hovers: Vec<PrioritizedHover>, min: HoverPriority)
     hovers.into_iter().filter(|h| h.priority >= min).collect()
 }
 
+// ---------------------------------------------------------------------------
+// MarkdownString extensions
+// ---------------------------------------------------------------------------
+
+impl MarkdownString {
+    pub fn truncate(&self, max_len: usize) -> MarkdownString {
+        if self.value.len() <= max_len {
+            return self.clone();
+        }
+        let truncated: String = self.value.chars().take(max_len.saturating_sub(1)).collect();
+        MarkdownString {
+            value: format!("{truncated}…"),
+            is_trusted: self.is_trusted,
+        }
+    }
+
+    pub fn line_count(&self) -> usize {
+        if self.value.is_empty() {
+            return 0;
+        }
+        self.value.lines().count()
+    }
+
+    pub fn contains_code_block(&self) -> bool {
+        self.value.contains("```")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hover extensions
+// ---------------------------------------------------------------------------
+
+impl Hover {
+    pub fn total_content_length(&self) -> usize {
+        self.contents.iter().map(|c| c.value.len()).sum()
+    }
+
+    pub fn section_count(&self) -> usize {
+        self.contents.len()
+    }
+
+    pub fn has_range(&self) -> bool {
+        self.range.is_some()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverPriority extensions
+// ---------------------------------------------------------------------------
+
+impl HoverPriority {
+    pub fn is_high(&self) -> bool {
+        matches!(self, HoverPriority::Builtin | HoverPriority::LanguageService)
+    }
+
+    pub fn is_low(&self) -> bool {
+        matches!(self, HoverPriority::Fallback)
+    }
+
+    pub fn numeric_value(&self) -> u8 {
+        match self {
+            HoverPriority::Fallback => 0,
+            HoverPriority::Normal => 1,
+            HoverPriority::LanguageService => 2,
+            HoverPriority::Builtin => 3,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PrioritizedHover extensions
+// ---------------------------------------------------------------------------
+
+impl PrioritizedHover {
+    pub fn matches_position(&self, line: u32, col: u32) -> bool {
+        match &self.hover.range {
+            Some(r) => r.contains_position(line, col),
+            None => true,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverCollection – manage multiple hovers with merge/dedup
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct HoverCollection {
+    hovers: Vec<Hover>,
+}
+
+impl HoverCollection {
+    pub fn new() -> Self {
+        Self { hovers: Vec::new() }
+    }
+
+    pub fn push(&mut self, hover: Hover) {
+        self.hovers.push(hover);
+    }
+
+    pub fn len(&self) -> usize {
+        self.hovers.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.hovers.is_empty()
+    }
+
+    pub fn merge_all(self) -> Hover {
+        merge_hovers(self.hovers)
+    }
+
+    pub fn filter_by_position(self, line: u32, col: u32) -> HoverCollection {
+        HoverCollection {
+            hovers: filter_hovers(self.hovers, line, col),
+        }
+    }
+
+    pub fn dedup_by_content(&mut self) {
+        let mut seen: Vec<Vec<String>> = Vec::new();
+        self.hovers.retain(|h| {
+            let key: Vec<String> = h.contents.iter().map(|c| c.value.clone()).collect();
+            if seen.contains(&key) {
+                false
+            } else {
+                seen.push(key);
+                true
+            }
+        });
+    }
+
+    pub fn total_content_length(&self) -> usize {
+        self.hovers.iter().map(|h| h.total_content_length()).sum()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, Hover> {
+        self.hovers.iter()
+    }
+}
+
+impl Default for HoverCollection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl fmt::Display for HoverCollection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HoverCollection({} hovers)", self.hovers.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverContribStats summary
+// ---------------------------------------------------------------------------
+
+impl HoverContribStats {
+    pub fn summary(&self) -> String {
+        format!(
+            "{} ops ({} ok, {} err), avg {}ns",
+            self.total_operations,
+            self.successful_operations,
+            self.failed_operations,
+            self.average_time_ns()
+        )
+    }
+
+    pub fn has_failures(&self) -> bool {
+        self.failed_operations > 0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HoverRegistry extensions
+// ---------------------------------------------------------------------------
+
+impl HoverRegistry {
+    pub fn provider_count(&self) -> usize {
+        self.providers.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.providers.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display for Hover
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for Hover {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let sections: Vec<&str> = self.contents.iter().map(|c| c.value.as_str()).collect();
+        write!(f, "{}", sections.join("\n---\n"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1201,5 +1398,161 @@ mod tests {
         let filtered = filter_by_min_priority(hovers, HoverPriority::Normal);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].provider_id, "b");
+    }
+
+    // -- new tests --
+
+    #[test]
+    fn markdown_string_truncate_short() {
+        let ms = MarkdownString::new("hi");
+        let t = ms.truncate(10);
+        assert_eq!(t.value, "hi");
+        assert_eq!(t.is_trusted, ms.is_trusted);
+    }
+
+    #[test]
+    fn markdown_string_truncate_long() {
+        let ms = MarkdownString::trusted("hello world");
+        let t = ms.truncate(6);
+        assert!(t.value.ends_with('…'));
+        assert_eq!(t.value.chars().count(), 6);
+        assert!(t.is_trusted);
+    }
+
+    #[test]
+    fn markdown_string_line_count() {
+        assert_eq!(MarkdownString::new("").line_count(), 0);
+        assert_eq!(MarkdownString::new("one").line_count(), 1);
+        assert_eq!(MarkdownString::new("one\ntwo\nthree").line_count(), 3);
+    }
+
+    #[test]
+    fn markdown_string_contains_code_block() {
+        assert!(MarkdownString::code("x", "rs").contains_code_block());
+        assert!(!MarkdownString::new("plain text").contains_code_block());
+    }
+
+    #[test]
+    fn hover_total_content_length_and_section_count() {
+        let h = Hover::new(vec![
+            MarkdownString::new("abc"),
+            MarkdownString::new("de"),
+        ]);
+        assert_eq!(h.total_content_length(), 5);
+        assert_eq!(h.section_count(), 2);
+    }
+
+    #[test]
+    fn hover_has_range() {
+        assert!(!Hover::new(vec![]).has_range());
+        assert!(Hover::new(vec![]).with_range(0, 0, 0, 1).has_range());
+    }
+
+    #[test]
+    fn hover_display() {
+        let h = Hover::new(vec![
+            MarkdownString::new("first"),
+            MarkdownString::new("second"),
+        ]);
+        let s = format!("{h}");
+        assert!(s.contains("first"));
+        assert!(s.contains("---"));
+        assert!(s.contains("second"));
+    }
+
+    #[test]
+    fn hover_priority_is_high_and_is_low() {
+        assert!(HoverPriority::Builtin.is_high());
+        assert!(HoverPriority::LanguageService.is_high());
+        assert!(!HoverPriority::Normal.is_high());
+        assert!(!HoverPriority::Fallback.is_high());
+        assert!(HoverPriority::Fallback.is_low());
+        assert!(!HoverPriority::Normal.is_low());
+    }
+
+    #[test]
+    fn hover_priority_numeric_value() {
+        assert_eq!(HoverPriority::Fallback.numeric_value(), 0);
+        assert_eq!(HoverPriority::Normal.numeric_value(), 1);
+        assert_eq!(HoverPriority::LanguageService.numeric_value(), 2);
+        assert_eq!(HoverPriority::Builtin.numeric_value(), 3);
+    }
+
+    #[test]
+    fn prioritized_hover_matches_position() {
+        let ph = PrioritizedHover::new(
+            Hover::new(vec![MarkdownString::new("x")]).with_range(1, 0, 1, 5),
+            HoverPriority::Normal,
+            "test",
+        );
+        assert!(ph.matches_position(1, 3));
+        assert!(!ph.matches_position(2, 0));
+
+        let no_range = PrioritizedHover::new(
+            Hover::new(vec![]),
+            HoverPriority::Normal,
+            "test2",
+        );
+        assert!(no_range.matches_position(99, 99));
+    }
+
+    #[test]
+    fn hover_collection_push_merge_dedup() {
+        let mut coll = HoverCollection::new();
+        assert!(coll.is_empty());
+        coll.push(Hover::new(vec![MarkdownString::new("a")]));
+        coll.push(Hover::new(vec![MarkdownString::new("b")]));
+        coll.push(Hover::new(vec![MarkdownString::new("a")]));
+        assert_eq!(coll.len(), 3);
+        coll.dedup_by_content();
+        assert_eq!(coll.len(), 2);
+        let merged = coll.merge_all();
+        assert_eq!(merged.contents.len(), 2);
+    }
+
+    #[test]
+    fn hover_collection_filter_and_display() {
+        let mut coll = HoverCollection::new();
+        coll.push(Hover::new(vec![MarkdownString::new("in")]).with_range(1, 0, 1, 5));
+        coll.push(Hover::new(vec![MarkdownString::new("out")]).with_range(5, 0, 5, 5));
+        let s = format!("{coll}");
+        assert!(s.contains("2 hovers"));
+        let filtered = coll.filter_by_position(1, 3);
+        assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn hover_collection_total_content_length() {
+        let mut coll = HoverCollection::new();
+        coll.push(Hover::new(vec![MarkdownString::new("abc")]));
+        coll.push(Hover::new(vec![MarkdownString::new("de")]));
+        assert_eq!(coll.total_content_length(), 5);
+    }
+
+    #[test]
+    fn hover_contrib_stats_summary_and_has_failures() {
+        let mut stats = HoverContribStats::new();
+        assert!(!stats.has_failures());
+        stats.record_success(100);
+        stats.record_failure(200);
+        assert!(stats.has_failures());
+        let s = stats.summary();
+        assert!(s.contains("2 ops"));
+        assert!(s.contains("1 ok"));
+        assert!(s.contains("1 err"));
+    }
+
+    #[test]
+    fn hover_registry_clear() {
+        struct Dummy;
+        impl HoverProvider for Dummy {
+            fn provide_hover(&self, _: &str, _: u32, _: u32) -> Option<Hover> { None }
+        }
+        let mut reg = HoverRegistry::new();
+        reg.register(Box::new(Dummy));
+        assert_eq!(reg.provider_count(), 1);
+        reg.clear();
+        assert_eq!(reg.provider_count(), 0);
+        assert!(reg.is_empty());
     }
 }

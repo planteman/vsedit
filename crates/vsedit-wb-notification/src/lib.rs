@@ -710,6 +710,131 @@ impl NotificationStack {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Notification filtering
+// ---------------------------------------------------------------------------
+
+/// Filter criteria for notifications.
+#[derive(Debug, Clone, Default)]
+pub struct NotificationFilter {
+    pub priority: Option<NotificationPriority>,
+    pub closed: Option<bool>,
+    pub message_contains: Option<String>,
+}
+
+impl NotificationFilter {
+    /// Filter for open notifications only.
+    pub fn open_only() -> Self {
+        Self { closed: Some(false), ..Default::default() }
+    }
+
+    /// Filter for urgent notifications.
+    pub fn urgent() -> Self {
+        Self { priority: Some(NotificationPriority::Urgent), ..Default::default() }
+    }
+
+    /// Check if a notification matches this filter.
+    pub fn matches(&self, notif: &WorkbenchNotification) -> bool {
+        if let Some(p) = &self.priority {
+            if notif.priority != *p {
+                return false;
+            }
+        }
+        if let Some(c) = self.closed {
+            if notif.closed != c {
+                return false;
+            }
+        }
+        if let Some(ref text) = self.message_contains {
+            if !notif.message.to_lowercase().contains(&text.to_lowercase()) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+/// Summary statistics for a set of notifications.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotificationSummary {
+    pub total: usize,
+    pub open: usize,
+    pub closed: usize,
+    pub urgent: usize,
+    pub with_progress: usize,
+}
+
+impl NotificationSummary {
+    /// Compute summary from a slice of notifications.
+    pub fn from_notifications(notifs: &[WorkbenchNotification]) -> Self {
+        Self {
+            total: notifs.len(),
+            open: notifs.iter().filter(|n| !n.closed).count(),
+            closed: notifs.iter().filter(|n| n.closed).count(),
+            urgent: notifs.iter().filter(|n| n.priority == NotificationPriority::Urgent).count(),
+            with_progress: notifs.iter().filter(|n| n.progress.is_some()).count(),
+        }
+    }
+}
+
+impl fmt::Display for NotificationSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} notifications ({} open, {} closed, {} urgent)",
+            self.total, self.open, self.closed, self.urgent
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Priority helpers
+// ---------------------------------------------------------------------------
+
+impl NotificationPriority {
+    /// Returns all priority variants in order.
+    pub fn all() -> &'static [NotificationPriority] {
+        &[
+            NotificationPriority::Silent,
+            NotificationPriority::Default,
+            NotificationPriority::Urgent,
+        ]
+    }
+
+    /// Parse from a string.
+    pub fn from_str_opt(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "silent" => Some(Self::Silent),
+            "default" | "normal" => Some(Self::Default),
+            "urgent" | "high" => Some(Self::Urgent),
+            _ => None,
+        }
+    }
+
+    /// Returns a numeric urgency level (0=silent, 1=default, 2=urgent).
+    pub fn level(&self) -> u8 {
+        match self {
+            Self::Silent => 0,
+            Self::Default => 1,
+            Self::Urgent => 2,
+        }
+    }
+}
+
+/// Groups notifications by priority, returning counts.
+pub fn group_by_priority(notifs: &[WorkbenchNotification]) -> std::collections::HashMap<String, usize> {
+    let mut map = std::collections::HashMap::new();
+    for n in notifs {
+        *map.entry(format!("{}", n.priority)).or_insert(0) += 1;
+    }
+    map
+}
+
+/// Returns the highest priority among a set of notifications.
+pub fn max_priority(notifs: &[WorkbenchNotification]) -> Option<NotificationPriority> {
+    notifs.iter().map(|n| n.priority).max()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1232,5 +1357,100 @@ mod tests {
         }
         stack.close_all();
         assert_eq!(stack.active_count(), 0);
+    }
+
+    #[test]
+    fn test_notification_filter_open_only() {
+        let notifs = vec![
+            WorkbenchNotification {
+                id: 1, message: "open msg".into(), priority: NotificationPriority::Default,
+                source: None, actions: vec![], progress: None, closeable: true, closed: false,
+            },
+            WorkbenchNotification {
+                id: 2, message: "closed msg".into(), priority: NotificationPriority::Default,
+                source: None, actions: vec![], progress: None, closeable: true, closed: true,
+            },
+        ];
+        let filter = NotificationFilter::open_only();
+        let open: Vec<_> = notifs.iter().filter(|n| filter.matches(n)).collect();
+        assert_eq!(open.len(), 1);
+        assert_eq!(open[0].message, "open msg");
+    }
+
+    #[test]
+    fn test_notification_filter_urgent() {
+        let notifs = vec![
+            WorkbenchNotification {
+                id: 1, message: "low".into(), priority: NotificationPriority::Default,
+                source: None, actions: vec![], progress: None, closeable: true, closed: false,
+            },
+            WorkbenchNotification {
+                id: 2, message: "high".into(), priority: NotificationPriority::Urgent,
+                source: None, actions: vec![], progress: None, closeable: true, closed: false,
+            },
+        ];
+        let filter = NotificationFilter::urgent();
+        let urgent: Vec<_> = notifs.iter().filter(|n| filter.matches(n)).collect();
+        assert_eq!(urgent.len(), 1);
+        assert_eq!(urgent[0].message, "high");
+    }
+
+    #[test]
+    fn test_notification_summary() {
+        let notifs = vec![
+            WorkbenchNotification {
+                id: 1, message: "a".into(), priority: NotificationPriority::Default,
+                source: None, actions: vec![], progress: None, closeable: true, closed: false,
+            },
+            WorkbenchNotification {
+                id: 2, message: "b".into(), priority: NotificationPriority::Urgent,
+                source: None, actions: vec![], progress: None, closeable: true, closed: false,
+            },
+            WorkbenchNotification {
+                id: 3, message: "c".into(), priority: NotificationPriority::Default,
+                source: None, actions: vec![], progress: None, closeable: true, closed: true,
+            },
+        ];
+        let summary = NotificationSummary::from_notifications(&notifs);
+        assert_eq!(summary.total, 3);
+        assert_eq!(summary.open, 2);
+        assert_eq!(summary.closed, 1);
+        assert_eq!(summary.urgent, 1);
+        assert!(format!("{summary}").contains("3 notifications"));
+    }
+
+    #[test]
+    fn test_priority_all() {
+        assert_eq!(NotificationPriority::all().len(), 3);
+    }
+
+    #[test]
+    fn test_priority_from_str_opt() {
+        assert_eq!(NotificationPriority::from_str_opt("urgent"), Some(NotificationPriority::Urgent));
+        assert_eq!(NotificationPriority::from_str_opt("normal"), Some(NotificationPriority::Default));
+        assert_eq!(NotificationPriority::from_str_opt("bogus"), None);
+    }
+
+    #[test]
+    fn test_priority_level() {
+        assert_eq!(NotificationPriority::Silent.level(), 0);
+        assert_eq!(NotificationPriority::Default.level(), 1);
+        assert_eq!(NotificationPriority::Urgent.level(), 2);
+    }
+
+    #[test]
+    fn test_max_priority() {
+        let notifs = vec![
+            WorkbenchNotification {
+                id: 1, message: "a".into(), priority: NotificationPriority::Default,
+                source: None, actions: vec![], progress: None, closeable: true, closed: false,
+            },
+            WorkbenchNotification {
+                id: 2, message: "b".into(), priority: NotificationPriority::Urgent,
+                source: None, actions: vec![], progress: None, closeable: true, closed: false,
+            },
+        ];
+        assert_eq!(max_priority(&notifs), Some(NotificationPriority::Urgent));
+        assert_eq!(max_priority(&[]), None);
     }
 }

@@ -665,6 +665,79 @@ pub fn output_channel_scroll_toggle(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Output channel statistics & iteration
+// ---------------------------------------------------------------------------
+
+impl OutputChannelService {
+    /// Returns all channel names.
+    pub fn channel_names(&self) -> Vec<&str> {
+        self.channels.iter().map(|c| c.descriptor.name.as_str()).collect()
+    }
+
+    /// Returns channels sorted by line count (descending).
+    pub fn channels_by_size(&self) -> Vec<&OutputChannelState> {
+        let mut channels: Vec<&OutputChannelState> = self.channels.iter().collect();
+        channels.sort_by(|a, b| b.line_count().cmp(&a.line_count()));
+        channels
+    }
+
+    /// Returns the total character count across all channels.
+    pub fn total_char_count(&self) -> usize {
+        self.channels.iter().map(|c| c.content.len()).sum()
+    }
+
+    /// Returns true if any channel contains the given text.
+    pub fn any_channel_contains(&self, text: &str) -> bool {
+        self.channels.iter().any(|c| c.content.contains(text))
+    }
+
+    /// Returns shortest channel by line count.
+    pub fn shortest_channel(&self) -> Option<&OutputChannelState> {
+        self.channels.iter().min_by_key(|c| c.line_count())
+    }
+}
+
+impl fmt::Display for OutputChannelService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "OutputChannelService({} channels, {} total lines)",
+            self.channel_count(),
+            self.total_line_count(),
+        )
+    }
+}
+
+impl LogEntry {
+    /// Returns a short one-line summary of this log entry.
+    pub fn summary(&self) -> String {
+        let msg = if self.message.len() > 60 {
+            format!("{}...", &self.message[..57])
+        } else {
+            self.message.clone()
+        };
+        format!("[{}] {}", self.severity, msg)
+    }
+
+    /// Returns true if the severity is Info.
+    pub fn is_info(&self) -> bool {
+        matches!(self.severity, OutputSeverity::Info)
+    }
+}
+
+impl OutputSeverity {
+    /// Returns the numeric rank of this severity for comparison.
+    pub fn rank(&self) -> u8 {
+        severity_rank(self)
+    }
+
+    /// Returns true if this severity is at least as severe as `other`.
+    pub fn at_least(&self, other: &OutputSeverity) -> bool {
+        self.rank() >= other.rank()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1213,5 +1286,55 @@ mod tests {
     fn scroll_lock_display() {
         let lock = ScrollLockState::new("ch1");
         assert!(format!("{lock}").contains("OFF"));
+    }
+
+    #[test]
+    fn output_service_display() {
+        let svc = OutputChannelService::new();
+        let s = svc.to_string();
+        assert!(s.contains("0 channels"));
+    }
+
+    #[test]
+    fn output_channel_names() {
+        let mut svc = OutputChannelService::new();
+        let d = desc("git");
+        svc.create_channel(d);
+        let names = svc.channel_names();
+        assert!(names.contains(&"git"));
+    }
+
+    #[test]
+    fn output_total_char_count() {
+        let mut svc = OutputChannelService::new();
+        let d = desc("test");
+        let id = svc.create_channel(d);
+        svc.append(&id, "hello");
+        assert_eq!(svc.total_char_count(), 5);
+    }
+
+    #[test]
+    fn output_any_channel_contains() {
+        let mut svc = OutputChannelService::new();
+        let d = desc("t");
+        let id = svc.create_channel(d);
+        svc.append(&id, "error: failed");
+        assert!(svc.any_channel_contains("error"));
+        assert!(!svc.any_channel_contains("warning"));
+    }
+
+    #[test]
+    fn log_entry_summary_short() {
+        let entry = LogEntry::new(OutputSeverity::Info, "hello world", "ch1");
+        let s = entry.summary();
+        assert!(s.contains("[INFO]"));
+        assert!(s.contains("hello world"));
+    }
+
+    #[test]
+    fn output_severity_at_least() {
+        assert!(OutputSeverity::Error.at_least(&OutputSeverity::Warning));
+        assert!(OutputSeverity::Warning.at_least(&OutputSeverity::Info));
+        assert!(!OutputSeverity::Info.at_least(&OutputSeverity::Error));
     }
 }

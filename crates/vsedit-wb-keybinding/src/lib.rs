@@ -641,6 +641,171 @@ impl Default for WbKeybindingValidator {
     }
 }
 
+impl ResolvedKeybinding {
+    pub fn has_when_context(&self) -> bool {
+        self.when.is_some()
+    }
+
+    pub fn matches_filter(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.key.to_lowercase().contains(&q)
+            || self.command.to_lowercase().contains(&q)
+            || self.source.to_string().to_lowercase().contains(&q)
+            || self
+                .when
+                .as_ref()
+                .map_or(false, |w| w.to_lowercase().contains(&q))
+    }
+
+    pub fn modifier_count(&self) -> usize {
+        self.modifiers.len()
+    }
+}
+
+impl KeybindingSource {
+    pub fn is_user(&self) -> bool {
+        matches!(self, KeybindingSource::User)
+    }
+
+    pub fn is_default(&self) -> bool {
+        matches!(self, KeybindingSource::Default)
+    }
+
+    pub fn is_extension(&self) -> bool {
+        matches!(self, KeybindingSource::Extension)
+    }
+}
+
+impl KeybindingService {
+    pub fn iter(&self) -> std::slice::Iter<'_, ResolvedKeybinding> {
+        self.bindings.iter()
+    }
+
+    pub fn find_by_command(&self, query: &str) -> Vec<&ResolvedKeybinding> {
+        let q = query.to_lowercase();
+        self.bindings
+            .iter()
+            .filter(|b| b.command.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    pub fn find_conflicts(&self) -> Vec<(String, Vec<&ResolvedKeybinding>)> {
+        let mut groups: std::collections::HashMap<String, Vec<&ResolvedKeybinding>> =
+            std::collections::HashMap::new();
+        for binding in &self.bindings {
+            let key = KeybindingService::format_binding(binding);
+            groups.entry(key).or_default().push(binding);
+        }
+        groups
+            .into_iter()
+            .filter(|(_, v)| v.len() > 1)
+            .collect()
+    }
+
+    pub fn commands(&self) -> Vec<&str> {
+        let mut cmds: Vec<&str> = self.bindings.iter().map(|b| b.command.as_str()).collect();
+        cmds.sort();
+        cmds.dedup();
+        cmds
+    }
+}
+
+impl<'a> IntoIterator for &'a KeybindingService {
+    type Item = &'a ResolvedKeybinding;
+    type IntoIter = std::slice::Iter<'a, ResolvedKeybinding>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.bindings.iter()
+    }
+}
+
+impl KeybindingWhenContext {
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    pub fn keys(&self) -> Vec<&str> {
+        self.values.keys().map(|k| k.as_str()).collect()
+    }
+
+    pub fn matches(&self, context: &str) -> bool {
+        self.evaluate(context)
+    }
+
+    pub fn remove(&mut self, key: &str) -> bool {
+        self.values.remove(key).is_some()
+    }
+
+    pub fn clear(&mut self) {
+        self.values.clear();
+    }
+}
+
+impl fmt::Display for KeybindingWhenContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let entries: Vec<String> = self
+            .values
+            .iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect();
+        write!(f, "WhenContext({})", entries.join(", "))
+    }
+}
+
+impl ChordSequence {
+    pub fn is_single(&self) -> bool {
+        self.chords.len() == 1
+    }
+
+    pub fn first_key(&self) -> Option<&str> {
+        self.chords.first().map(|(k, _)| k.as_str())
+    }
+
+    pub fn last_key(&self) -> Option<&str> {
+        self.chords.last().map(|(k, _)| k.as_str())
+    }
+}
+
+impl fmt::Display for ChordSequence {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let parts: Vec<String> = self
+            .chords
+            .iter()
+            .map(|(key, mods)| {
+                if mods.is_empty() {
+                    key.clone()
+                } else {
+                    let m: Vec<String> = mods.iter().map(|m| m.to_string()).collect();
+                    format!("{}+{}", m.join("+"), key)
+                }
+            })
+            .collect();
+        write!(f, "{}", parts.join(" "))
+    }
+}
+
+impl WbKeybindingStats {
+    pub fn summary(&self) -> String {
+        format!(
+            "{} ops ({} ok, {} err), avg {}ns, range [{}..{}]ns",
+            self.total_operations,
+            self.successful_operations,
+            self.failed_operations,
+            self.average_time_ns(),
+            self.min_time_ns().unwrap_or(0),
+            self.max_time_ns().unwrap_or(0),
+        )
+    }
+
+    pub fn has_failures(&self) -> bool {
+        self.failed_operations > 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1209,5 +1374,132 @@ mod tests {
         let defaults = keybinding_defaults();
         assert!(defaults.iter().any(|b| b.command == "workbench.action.files.save"));
         assert!(defaults.len() >= 10);
+    }
+
+    #[test]
+    fn resolved_keybinding_has_when_context_and_filter() {
+        let b = KeybindingBuilder::new()
+            .key("s")
+            .modifier(KeyMod::CtrlCmd)
+            .command("workbench.action.files.save")
+            .when("editorFocus")
+            .build();
+        assert!(b.has_when_context());
+        assert!(b.matches_filter("save"));
+        assert!(b.matches_filter("editor"));
+        assert!(!b.matches_filter("zzz"));
+        assert_eq!(b.modifier_count(), 1);
+
+        let bare = sample_binding("F5", "debug", vec![]);
+        assert!(!bare.has_when_context());
+        assert_eq!(bare.modifier_count(), 0);
+    }
+
+    #[test]
+    fn keybinding_source_predicates() {
+        assert!(KeybindingSource::User.is_user());
+        assert!(!KeybindingSource::User.is_default());
+        assert!(!KeybindingSource::User.is_extension());
+        assert!(KeybindingSource::Default.is_default());
+        assert!(KeybindingSource::Extension.is_extension());
+    }
+
+    #[test]
+    fn service_iter_and_find_by_command() {
+        let mut svc = KeybindingService::new();
+        svc.register(sample_binding("S", "save", vec![KeyMod::CtrlCmd]));
+        svc.register(sample_binding("A", "save_all", vec![KeyMod::CtrlCmd, KeyMod::Shift]));
+        svc.register(sample_binding("N", "new_file", vec![KeyMod::CtrlCmd]));
+
+        let count = svc.iter().count();
+        assert_eq!(count, 3);
+
+        let found = svc.find_by_command("save");
+        assert_eq!(found.len(), 2);
+
+        let cmds = svc.commands();
+        assert!(cmds.contains(&"new_file"));
+    }
+
+    #[test]
+    fn service_into_iterator() {
+        let mut svc = KeybindingService::new();
+        svc.register(sample_binding("X", "cut", vec![KeyMod::CtrlCmd]));
+        let mut count = 0;
+        for _b in &svc {
+            count += 1;
+        }
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn service_find_conflicts_returns_groups() {
+        let mut svc = KeybindingService::new();
+        svc.register(sample_binding("S", "save", vec![KeyMod::CtrlCmd]));
+        svc.register(sample_binding("S", "search", vec![KeyMod::CtrlCmd]));
+        svc.register(sample_binding("N", "new_file", vec![KeyMod::CtrlCmd]));
+
+        let conflicts = svc.find_conflicts();
+        assert_eq!(conflicts.len(), 1);
+        let (key, group) = &conflicts[0];
+        assert_eq!(key, "Ctrl+S");
+        assert_eq!(group.len(), 2);
+    }
+
+    #[test]
+    fn when_context_extensions() {
+        let mut ctx = KeybindingWhenContext::new();
+        assert!(ctx.is_empty());
+        assert_eq!(ctx.len(), 0);
+
+        ctx.set("editorFocus", true);
+        ctx.set("terminalFocus", false);
+        assert!(!ctx.is_empty());
+        assert_eq!(ctx.len(), 2);
+        assert!(ctx.matches("editorFocus"));
+        assert!(!ctx.matches("terminalFocus"));
+
+        let display = format!("{ctx}");
+        assert!(display.starts_with("WhenContext("));
+
+        assert!(ctx.remove("terminalFocus"));
+        assert_eq!(ctx.len(), 1);
+        assert!(!ctx.remove("nonexistent"));
+
+        ctx.clear();
+        assert!(ctx.is_empty());
+    }
+
+    #[test]
+    fn chord_sequence_extensions() {
+        let single = ChordSequence::single("k", vec![KeyMod::CtrlCmd]);
+        assert!(single.is_single());
+        assert_eq!(single.first_key(), Some("k"));
+        assert_eq!(single.last_key(), Some("k"));
+        assert_eq!(single.to_string(), "Ctrl+k");
+
+        let double = ChordSequence::double("k", vec![KeyMod::CtrlCmd], "s", vec![]);
+        assert!(!double.is_single());
+        assert_eq!(double.first_key(), Some("k"));
+        assert_eq!(double.last_key(), Some("s"));
+        assert_eq!(double.to_string(), "Ctrl+k s");
+
+        let empty = ChordSequence { chords: vec![] };
+        assert!(empty.is_empty());
+        assert_eq!(empty.first_key(), None);
+        assert_eq!(empty.last_key(), None);
+    }
+
+    #[test]
+    fn stats_summary_and_has_failures() {
+        let mut stats = WbKeybindingStats::new();
+        assert!(!stats.has_failures());
+        stats.record_success(100);
+        stats.record_failure(200);
+        assert!(stats.has_failures());
+        let s = stats.summary();
+        assert!(s.contains("2 ops"));
+        assert!(s.contains("1 ok"));
+        assert!(s.contains("1 err"));
     }
 }

@@ -694,6 +694,139 @@ impl ActionBarConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Action iterator
+// ---------------------------------------------------------------------------
+
+/// Iterator over actions filtered by category.
+pub struct ActionCategoryIter<'a> {
+    actions: &'a [Action],
+    category: ActionCategory,
+    index: usize,
+}
+
+impl<'a> ActionCategoryIter<'a> {
+    pub fn new(actions: &'a [Action], category: ActionCategory) -> Self {
+        Self { actions, category, index: 0 }
+    }
+}
+
+impl<'a> Iterator for ActionCategoryIter<'a> {
+    type Item = &'a Action;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.index < self.actions.len() {
+            let action = &self.actions[self.index];
+            self.index += 1;
+            if action.category == self.category {
+                return Some(action);
+            }
+        }
+        None
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActionCategory helpers
+// ---------------------------------------------------------------------------
+
+impl ActionCategory {
+    /// Returns all category variants.
+    pub fn all() -> &'static [ActionCategory] {
+        &[
+            ActionCategory::View,
+            ActionCategory::Edit,
+            ActionCategory::File,
+            ActionCategory::Selection,
+            ActionCategory::Terminal,
+            ActionCategory::Help,
+            ActionCategory::Debug,
+            ActionCategory::Source,
+        ]
+    }
+
+    /// Parse a category from a string.
+    pub fn from_str_opt(s: &str) -> Option<ActionCategory> {
+        match s.to_lowercase().as_str() {
+            "view" => Some(ActionCategory::View),
+            "edit" => Some(ActionCategory::Edit),
+            "file" => Some(ActionCategory::File),
+            "selection" => Some(ActionCategory::Selection),
+            "terminal" => Some(ActionCategory::Terminal),
+            "help" => Some(ActionCategory::Help),
+            "debug" => Some(ActionCategory::Debug),
+            "source" => Some(ActionCategory::Source),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Action search helpers
+// ---------------------------------------------------------------------------
+
+/// Fuzzy-match score for searching actions by label.
+pub fn action_match_score(action: &Action, query: &str) -> Option<u32> {
+    let label_lower = action.label.to_lowercase();
+    let query_lower = query.to_lowercase();
+
+    if label_lower == query_lower {
+        return Some(100);
+    }
+    if label_lower.starts_with(&query_lower) {
+        return Some(80);
+    }
+    if label_lower.contains(&query_lower) {
+        return Some(60);
+    }
+    // Check if all query chars appear in order
+    let mut label_chars = label_lower.chars();
+    let mut matched = 0u32;
+    for qc in query_lower.chars() {
+        if label_chars.any(|lc| lc == qc) {
+            matched += 1;
+        } else {
+            return None;
+        }
+    }
+    Some(matched * 10)
+}
+
+/// Search actions by label query, returning matches sorted by score.
+pub fn search_actions(actions: &[Action], query: &str) -> Vec<(usize, u32)> {
+    let mut results: Vec<(usize, u32)> = actions.iter()
+        .enumerate()
+        .filter_map(|(i, a)| action_match_score(a, query).map(|s| (i, s)))
+        .collect();
+    results.sort_by(|a, b| b.1.cmp(&a.1));
+    results
+}
+
+/// Groups actions by category, returning a map from category display name to count.
+pub fn group_actions_by_category(actions: &[Action]) -> std::collections::HashMap<String, usize> {
+    let mut map = std::collections::HashMap::new();
+    for action in actions {
+        *map.entry(format!("{}", action.category)).or_insert(0) += 1;
+    }
+    map
+}
+
+/// Validates an action ID format (must be non-empty, lowercase with dots/dashes).
+pub fn validate_action_id(id: &str) -> Result<(), ActionError> {
+    if id.is_empty() {
+        return Err(ActionError::NotFound(id.to_string()));
+    }
+    if !id.chars().all(|c| c.is_ascii_lowercase() || c == '.' || c == '-' || c == '_') {
+        return Err(ActionError::PreconditionFailed(format!("invalid action id: {id}")));
+    }
+    Ok(())
+}
+
+/// Returns actions that have keybindings assigned.
+pub fn actions_with_keybindings(actions: &[Action]) -> Vec<&Action> {
+    actions.iter().filter(|a| a.keybinding.is_some()).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1229,5 +1362,80 @@ mod tests {
         assert_eq!(bar.orientation, ActionBarOrientation::Horizontal);
         assert_eq!(bar.max_visible, 8);
         assert!(bar.show_labels);
+    }
+
+    #[test]
+    fn test_action_category_iter() {
+        let actions = vec![
+            Action { id: "a".into(), label: "Open".into(), category: ActionCategory::File, keybinding: None, precondition: None, enabled: true },
+            Action { id: "b".into(), label: "Cut".into(), category: ActionCategory::Edit, keybinding: None, precondition: None, enabled: true },
+            Action { id: "c".into(), label: "Save".into(), category: ActionCategory::File, keybinding: None, precondition: None, enabled: true },
+        ];
+        let file_actions: Vec<_> = ActionCategoryIter::new(&actions, ActionCategory::File).collect();
+        assert_eq!(file_actions.len(), 2);
+        assert_eq!(file_actions[0].label, "Open");
+        assert_eq!(file_actions[1].label, "Save");
+    }
+
+    #[test]
+    fn test_action_category_all() {
+        assert_eq!(ActionCategory::all().len(), 8);
+    }
+
+    #[test]
+    fn test_action_category_from_str_opt() {
+        assert_eq!(ActionCategory::from_str_opt("edit"), Some(ActionCategory::Edit));
+        assert_eq!(ActionCategory::from_str_opt("View"), Some(ActionCategory::View));
+        assert_eq!(ActionCategory::from_str_opt("nope"), None);
+    }
+
+    #[test]
+    fn test_action_match_score() {
+        let action = Action { id: "x".into(), label: "Toggle Sidebar".into(), category: ActionCategory::View, keybinding: None, precondition: None, enabled: true };
+        assert_eq!(action_match_score(&action, "Toggle Sidebar"), Some(100));
+        assert_eq!(action_match_score(&action, "toggle"), Some(80));
+        assert_eq!(action_match_score(&action, "sidebar"), Some(60));
+        assert!(action_match_score(&action, "zzz").is_none());
+    }
+
+    #[test]
+    fn test_search_actions() {
+        let actions = vec![
+            Action { id: "a".into(), label: "Open File".into(), category: ActionCategory::File, keybinding: None, precondition: None, enabled: true },
+            Action { id: "b".into(), label: "Close All".into(), category: ActionCategory::File, keybinding: None, precondition: None, enabled: true },
+        ];
+        let results = search_actions(&actions, "open");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, 0);
+    }
+
+    #[test]
+    fn test_group_actions_by_category() {
+        let actions = vec![
+            Action { id: "a".into(), label: "A".into(), category: ActionCategory::File, keybinding: None, precondition: None, enabled: true },
+            Action { id: "b".into(), label: "B".into(), category: ActionCategory::Edit, keybinding: None, precondition: None, enabled: true },
+            Action { id: "c".into(), label: "C".into(), category: ActionCategory::File, keybinding: None, precondition: None, enabled: true },
+        ];
+        let groups = group_actions_by_category(&actions);
+        assert_eq!(groups["File"], 2);
+        assert_eq!(groups["Edit"], 1);
+    }
+
+    #[test]
+    fn test_validate_action_id() {
+        assert!(validate_action_id("editor.fold").is_ok());
+        assert!(validate_action_id("").is_err());
+        assert!(validate_action_id("Has Caps").is_err());
+    }
+
+    #[test]
+    fn test_actions_with_keybindings() {
+        let actions = vec![
+            Action { id: "a".into(), label: "A".into(), category: ActionCategory::File, keybinding: Some("ctrl+s".into()), precondition: None, enabled: true },
+            Action { id: "b".into(), label: "B".into(), category: ActionCategory::Edit, keybinding: None, precondition: None, enabled: true },
+        ];
+        let with_kb = actions_with_keybindings(&actions);
+        assert_eq!(with_kb.len(), 1);
+        assert_eq!(with_kb[0].id, "a");
     }
 }

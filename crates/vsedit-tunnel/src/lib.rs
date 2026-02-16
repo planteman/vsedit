@@ -737,6 +737,100 @@ impl TunnelHealthCheck {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tunnel iteration & Display helpers
+// ---------------------------------------------------------------------------
+
+impl TunnelService {
+    /// Iterate over all tunnels.
+    pub fn iter(&self) -> std::slice::Iter<'_, TunnelInfo> {
+        self.tunnels.iter()
+    }
+
+    /// Returns all tunnel names.
+    pub fn tunnel_names(&self) -> Vec<&str> {
+        self.tunnels.iter().map(|t| t.name.as_str()).collect()
+    }
+
+    /// Returns tunnels that are in error state.
+    pub fn errored_tunnels(&self) -> Vec<&TunnelInfo> {
+        self.tunnels.iter().filter(|t| t.is_error()).collect()
+    }
+
+    /// Returns the total number of ports across all tunnels.
+    pub fn total_port_count(&self) -> usize {
+        self.tunnels.iter().map(|t| t.port_count()).sum()
+    }
+
+    /// Returns true if any tunnel has an error.
+    pub fn has_errors(&self) -> bool {
+        self.tunnels.iter().any(|t| t.is_error())
+    }
+}
+
+impl TunnelAccess {
+    /// Returns true if this access level allows public access.
+    pub fn is_public(&self) -> bool {
+        matches!(self, TunnelAccess::Public)
+    }
+
+    /// Returns a short label for display.
+    pub fn short_label(&self) -> &'static str {
+        match self {
+            TunnelAccess::Private => "priv",
+            TunnelAccess::Public => "pub",
+            TunnelAccess::Organization => "org",
+        }
+    }
+}
+
+impl TunnelStatus {
+    /// Returns true if the tunnel is in a connectable state.
+    pub fn is_connectable(&self) -> bool {
+        matches!(self, TunnelStatus::Connected)
+    }
+
+    /// Returns true if the tunnel is in a terminal state (disconnected or error).
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, TunnelStatus::Disconnected | TunnelStatus::Error(_))
+    }
+}
+
+impl TunnelInfo {
+    /// Returns a short status line for display.
+    pub fn status_line(&self) -> String {
+        format!(
+            "{}: {} ({}, {} ports)",
+            self.name,
+            self.status,
+            self.access,
+            self.port_count(),
+        )
+    }
+
+    /// Find a port by number.
+    pub fn find_port(&self, port_num: u16) -> Option<&TunnelPort> {
+        self.ports.iter().find(|p| p.port == port_num)
+    }
+
+    /// Returns true if any port uses HTTPS.
+    pub fn has_secure_port(&self) -> bool {
+        self.ports.iter().any(|p| p.is_secure())
+    }
+}
+
+impl TunnelHealthCheck {
+    /// Returns the minimum recorded latency.
+    pub fn min_latency(&self) -> Option<u64> {
+        self.samples.iter().copied().min()
+    }
+
+    /// Returns the maximum recorded latency.
+    pub fn max_latency(&self) -> Option<u64> {
+        self.samples.iter().copied().max()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1214,5 +1308,64 @@ mod tests {
         hc.reset();
         assert_eq!(hc.sample_count(), 0);
         assert_eq!(hc.status(), HealthStatus::Healthy);
+    }
+
+    #[test]
+    fn tunnel_service_names() {
+        let mut svc = TunnelService::new();
+        svc.create_tunnel("my-tunnel", TunnelAccess::Private);
+        let names = svc.tunnel_names();
+        assert_eq!(names, vec!["my-tunnel"]);
+    }
+
+    #[test]
+    fn tunnel_total_port_count() {
+        let mut svc = TunnelService::new();
+        let id = svc.create_tunnel("t1", TunnelAccess::Private);
+        svc.add_port(&id, TunnelPort { port: 8080, protocol: "https".into(), label: Some("web".into()) });
+        assert_eq!(svc.total_port_count(), 1);
+    }
+
+    #[test]
+    fn tunnel_access_helpers() {
+        assert!(TunnelAccess::Public.is_public());
+        assert!(!TunnelAccess::Private.is_public());
+        assert_eq!(TunnelAccess::Organization.short_label(), "org");
+    }
+
+    #[test]
+    fn tunnel_status_helpers() {
+        assert!(TunnelStatus::Connected.is_connectable());
+        assert!(!TunnelStatus::Connecting.is_connectable());
+        assert!(TunnelStatus::Disconnected.is_terminal());
+        assert!(TunnelStatus::Error("x".into()).is_terminal());
+    }
+
+    #[test]
+    fn tunnel_info_status_line() {
+        let mut svc = TunnelService::new();
+        let id = svc.create_tunnel("t", TunnelAccess::Public);
+        let info = svc.get_tunnel(&id).unwrap();
+        let line = info.status_line();
+        assert!(line.contains("t"));
+    }
+
+    #[test]
+    fn tunnel_health_min_max() {
+        let mut hc = TunnelHealthCheck::new(10, 100, 500);
+        hc.record_latency(50);
+        hc.record_latency(200);
+        hc.record_latency(100);
+        assert_eq!(hc.min_latency(), Some(50));
+        assert_eq!(hc.max_latency(), Some(200));
+    }
+
+    #[test]
+    fn tunnel_has_errors() {
+        let mut svc = TunnelService::new();
+        let id = svc.create_tunnel("t", TunnelAccess::Private);
+        assert!(!svc.has_errors());
+        svc.set_error(&id, "boom".to_string());
+        assert!(svc.has_errors());
     }
 }

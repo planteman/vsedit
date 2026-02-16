@@ -716,6 +716,223 @@ pub fn type_hierarchy_roots(tree: &TypeTree) -> Vec<&TypeHierarchyItem> {
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// SymbolKind extensions
+// ---------------------------------------------------------------------------
+
+impl SymbolKind {
+    pub fn is_type(&self) -> bool {
+        matches!(
+            self,
+            SymbolKind::Class | SymbolKind::Interface | SymbolKind::Enum | SymbolKind::Struct
+        )
+    }
+
+    pub fn is_container(&self) -> bool {
+        matches!(self, SymbolKind::Module)
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            SymbolKind::Class => "class",
+            SymbolKind::Interface => "interface",
+            SymbolKind::Struct => "struct",
+            SymbolKind::Enum => "enum",
+            SymbolKind::TypeParameter => "type parameter",
+            SymbolKind::Module => "module",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TypeHierarchyItem kind predicates
+// ---------------------------------------------------------------------------
+
+impl TypeHierarchyItem {
+    pub fn is_class(&self) -> bool {
+        self.kind == SymbolKind::Class
+    }
+
+    pub fn is_interface(&self) -> bool {
+        self.kind == SymbolKind::Interface
+    }
+
+    pub fn is_struct(&self) -> bool {
+        self.kind == SymbolKind::Struct
+    }
+
+    pub fn is_enum(&self) -> bool {
+        self.kind == SymbolKind::Enum
+    }
+
+    pub fn is_module(&self) -> bool {
+        self.kind == SymbolKind::Module
+    }
+
+    pub fn has_tags(&self) -> bool {
+        !self.tags.is_empty()
+    }
+
+    pub fn has_detail(&self) -> bool {
+        self.detail.is_some()
+    }
+
+    pub fn line_span(&self) -> u32 {
+        self.range_end_line.saturating_sub(self.range_start_line)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TypeTree extensions
+// ---------------------------------------------------------------------------
+
+impl TypeTree {
+    pub fn find_by_name(&self, name: &str) -> Option<(usize, &TypeHierarchyItem)> {
+        self.items
+            .iter()
+            .enumerate()
+            .find(|(_, item)| item.name == name)
+    }
+
+    pub fn flatten(&self) -> Vec<&TypeHierarchyItem> {
+        self.items.iter().collect()
+    }
+
+    pub fn count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn leaf_indices(&self) -> Vec<usize> {
+        (0..self.items.len())
+            .filter(|i| {
+                self.subtype_edges
+                    .get(i)
+                    .map_or(true, |set| set.is_empty())
+            })
+            .collect()
+    }
+
+    pub fn leaf_count(&self) -> usize {
+        self.leaf_indices().len()
+    }
+
+    pub fn root_indices(&self) -> Vec<usize> {
+        (0..self.items.len())
+            .filter(|i| {
+                self.supertype_edges
+                    .get(i)
+                    .map_or(true, |set| set.is_empty())
+            })
+            .collect()
+    }
+
+    pub fn roots(&self) -> Vec<&TypeHierarchyItem> {
+        self.root_indices()
+            .iter()
+            .filter_map(|&i| self.items.get(i))
+            .collect()
+    }
+
+    pub fn leaves(&self) -> Vec<&TypeHierarchyItem> {
+        self.leaf_indices()
+            .iter()
+            .filter_map(|&i| self.items.get(i))
+            .collect()
+    }
+
+    pub fn edge_count(&self) -> usize {
+        self.subtype_edges.values().map(|s| s.len()).sum()
+    }
+
+    pub fn bfs(&self, start: usize) -> Vec<&TypeHierarchyItem> {
+        let mut visited = HashSet::new();
+        let mut queue = std::collections::VecDeque::new();
+        let mut result = Vec::new();
+        if start >= self.items.len() {
+            return result;
+        }
+        visited.insert(start);
+        queue.push_back(start);
+        while let Some(cur) = queue.pop_front() {
+            if let Some(item) = self.items.get(cur) {
+                result.push(item);
+            }
+            if let Some(children) = self.subtype_edges.get(&cur) {
+                let mut sorted: Vec<usize> = children.iter().copied().collect();
+                sorted.sort_unstable();
+                for c in sorted {
+                    if visited.insert(c) {
+                        queue.push_back(c);
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    pub fn contains_name(&self, name: &str) -> bool {
+        self.items.iter().any(|item| item.name == name)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TypeHierarchyTree extensions
+// ---------------------------------------------------------------------------
+
+impl TypeHierarchyTree {
+    pub fn leaf_count(tree: &TypeTree) -> usize {
+        tree.leaf_count()
+    }
+
+    pub fn root(tree: &TypeTree) -> Option<&TypeHierarchyItem> {
+        let roots = tree.roots();
+        roots.into_iter().next()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TypehierStats extensions
+// ---------------------------------------------------------------------------
+
+impl TypehierStats {
+    pub fn summary(&self) -> String {
+        format!(
+            "{} ops ({} ok, {} err) avg={} ns",
+            self.total_operations,
+            self.successful_operations,
+            self.failed_operations,
+            self.average_time_ns()
+        )
+    }
+
+    pub fn has_failures(&self) -> bool {
+        self.failed_operations > 0
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.total_operations == 0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display for TypeTree
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for TypeTree {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "TypeTree({} types, {} edges)",
+            self.count(),
+            self.edge_count()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1201,5 +1418,139 @@ mod tests {
         let roots = type_hierarchy_roots(&tree);
         assert_eq!(roots.len(), 1);
         assert_eq!(roots[0].name, "Object");
+    }
+
+    // -----------------------------------------------------------------------
+    // New functionality tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn symbol_kind_is_type_and_label() {
+        assert!(SymbolKind::Class.is_type());
+        assert!(SymbolKind::Interface.is_type());
+        assert!(SymbolKind::Struct.is_type());
+        assert!(SymbolKind::Enum.is_type());
+        assert!(!SymbolKind::Module.is_type());
+        assert!(!SymbolKind::TypeParameter.is_type());
+
+        assert!(SymbolKind::Module.is_container());
+        assert!(!SymbolKind::Class.is_container());
+
+        assert_eq!(SymbolKind::Class.label(), "class");
+        assert_eq!(SymbolKind::Interface.label(), "interface");
+        assert_eq!(SymbolKind::Struct.label(), "struct");
+        assert_eq!(SymbolKind::Enum.label(), "enum");
+        assert_eq!(SymbolKind::TypeParameter.label(), "type parameter");
+        assert_eq!(SymbolKind::Module.label(), "module");
+    }
+
+    #[test]
+    fn item_kind_predicates() {
+        let cls = make_item("C", SymbolKind::Class);
+        assert!(cls.is_class());
+        assert!(!cls.is_interface());
+        assert!(!cls.is_struct());
+        assert!(!cls.is_enum());
+        assert!(!cls.is_module());
+
+        let iface = make_item("I", SymbolKind::Interface);
+        assert!(iface.is_interface());
+
+        let st = make_item("S", SymbolKind::Struct);
+        assert!(st.is_struct());
+
+        let en = make_item("E", SymbolKind::Enum);
+        assert!(en.is_enum());
+
+        let m = make_item("M", SymbolKind::Module);
+        assert!(m.is_module());
+    }
+
+    #[test]
+    fn item_has_tags_and_detail() {
+        let plain = make_item("X", SymbolKind::Class);
+        assert!(!plain.has_tags());
+        assert!(!plain.has_detail());
+        assert_eq!(plain.line_span(), 0);
+
+        let tagged = plain.with_tag(SymbolTag::Deprecated).with_detail("detail");
+        assert!(tagged.has_tags());
+        assert!(tagged.has_detail());
+    }
+
+    #[test]
+    fn type_tree_find_by_name_and_contains() {
+        let mut tree = TypeTree::new();
+        tree.add_type(make_item("Alpha", SymbolKind::Class));
+        tree.add_type(make_item("Beta", SymbolKind::Interface));
+
+        let (idx, item) = tree.find_by_name("Beta").unwrap();
+        assert_eq!(idx, 1);
+        assert_eq!(item.name, "Beta");
+
+        assert!(tree.find_by_name("Gamma").is_none());
+        assert!(tree.contains_name("Alpha"));
+        assert!(!tree.contains_name("Gamma"));
+    }
+
+    #[test]
+    fn type_tree_leaves_roots_and_bfs() {
+        let mut tree = TypeTree::new();
+        let root = tree.add_type(make_item("Root", SymbolKind::Class));
+        let mid = tree.add_type(make_item("Mid", SymbolKind::Class));
+        let leaf1 = tree.add_type(make_item("Leaf1", SymbolKind::Class));
+        let leaf2 = tree.add_type(make_item("Leaf2", SymbolKind::Class));
+        tree.add_subtype_edge(root, mid);
+        tree.add_subtype_edge(mid, leaf1);
+        tree.add_subtype_edge(mid, leaf2);
+
+        assert_eq!(tree.leaf_count(), 2);
+        let leaf_names: Vec<&str> = tree.leaves().iter().map(|i| i.name.as_str()).collect();
+        assert!(leaf_names.contains(&"Leaf1"));
+        assert!(leaf_names.contains(&"Leaf2"));
+
+        let root_items = tree.roots();
+        assert_eq!(root_items.len(), 1);
+        assert_eq!(root_items[0].name, "Root");
+
+        let bfs_items = tree.bfs(root);
+        assert_eq!(bfs_items.len(), 4);
+        assert_eq!(bfs_items[0].name, "Root");
+
+        assert_eq!(tree.edge_count(), 3);
+        assert!(!tree.is_empty());
+        assert_eq!(tree.count(), 4);
+    }
+
+    #[test]
+    fn type_tree_display_and_flatten() {
+        let mut tree = TypeTree::new();
+        tree.add_type(make_item("A", SymbolKind::Class));
+        tree.add_type(make_item("B", SymbolKind::Struct));
+        assert_eq!(format!("{tree}"), "TypeTree(2 types, 0 edges)");
+
+        let flat = tree.flatten();
+        assert_eq!(flat.len(), 2);
+
+        assert_eq!(TypeHierarchyTree::leaf_count(&tree), 2);
+        let root = TypeHierarchyTree::root(&tree);
+        assert!(root.is_some());
+    }
+
+    #[test]
+    fn typehier_stats_summary_and_flags() {
+        let mut stats = TypehierStats::new();
+        assert!(stats.is_empty());
+        assert!(!stats.has_failures());
+
+        stats.record_success(100);
+        stats.record_failure(200);
+        assert!(!stats.is_empty());
+        assert!(stats.has_failures());
+
+        let summary = stats.summary();
+        assert!(summary.contains("2 ops"));
+        assert!(summary.contains("1 ok"));
+        assert!(summary.contains("1 err"));
     }
 }

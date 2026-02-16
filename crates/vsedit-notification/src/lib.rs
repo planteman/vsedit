@@ -741,6 +741,204 @@ impl NotificationThrottle {
 }
 
 // ---------------------------------------------------------------------------
+// Notification — additional helpers
+// ---------------------------------------------------------------------------
+
+impl Notification {
+    /// Returns `true` if this notification has progress information attached.
+    pub fn is_progress(&self) -> bool {
+        self.progress.is_some()
+    }
+
+    /// Returns the age of this notification in seconds relative to `now`.
+    pub fn age(&self, now: Instant) -> Duration {
+        now.duration_since(self.timestamp)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationSeverity — additional helpers
+// ---------------------------------------------------------------------------
+
+impl NotificationSeverity {
+    /// Returns `true` for `Error` severity.
+    pub fn is_critical(&self) -> bool {
+        matches!(self, Self::Error)
+    }
+
+    /// Returns a human-readable label.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Warning => "warning",
+            Self::Error => "error",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationFilter — match helper
+// ---------------------------------------------------------------------------
+
+impl NotificationFilter {
+    /// Returns `true` if `notification` satisfies every criterion in this filter.
+    pub fn matches(&self, notification: &Notification) -> bool {
+        if let Some(sev) = self.severity {
+            if notification.severity != sev {
+                return false;
+            }
+        }
+        if let Some(ref src) = self.source {
+            if notification.source.as_deref() != Some(src.as_str()) {
+                return false;
+            }
+        }
+        if self.sticky_only && !notification.sticky {
+            return false;
+        }
+        true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationSeverityCount
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotificationSeverityCount {
+    pub info: usize,
+    pub warning: usize,
+    pub error: usize,
+}
+
+// ---------------------------------------------------------------------------
+// NotificationService — additional helpers
+// ---------------------------------------------------------------------------
+
+impl NotificationService {
+    /// Returns per-severity counts of the visible notifications.
+    pub fn count_by_severity(&self) -> NotificationSeverityCount {
+        let inner = self.inner.lock().unwrap();
+        let mut counts = NotificationSeverityCount {
+            info: 0,
+            warning: 0,
+            error: 0,
+        };
+        for n in inner.visible.iter() {
+            match n.severity {
+                NotificationSeverity::Info => counts.info += 1,
+                NotificationSeverity::Warning => counts.warning += 1,
+                NotificationSeverity::Error => counts.error += 1,
+            }
+        }
+        counts
+    }
+
+    /// Number of visible (active) notifications. Alias kept for clarity.
+    pub fn active_count(&self) -> usize {
+        self.inner.lock().unwrap().visible.len()
+    }
+
+    /// Total number of notifications (visible + queued).
+    pub fn total_count(&self) -> usize {
+        let inner = self.inner.lock().unwrap();
+        inner.visible.len() + inner.queue.len()
+    }
+
+    /// Returns the most common severity among visible notifications, or `None`
+    /// if the service is empty.
+    pub fn most_common_severity(&self) -> Option<NotificationSeverity> {
+        let counts = self.count_by_severity();
+        if counts.info == 0 && counts.warning == 0 && counts.error == 0 {
+            return None;
+        }
+        if counts.error >= counts.warning && counts.error >= counts.info {
+            Some(NotificationSeverity::Error)
+        } else if counts.warning >= counts.info {
+            Some(NotificationSeverity::Warning)
+        } else {
+            Some(NotificationSeverity::Info)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display for NotificationProgress
+// ---------------------------------------------------------------------------
+
+impl std::fmt::Display for NotificationProgress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.infinite {
+            return write!(f, "in progress…");
+        }
+        match (self.total, self.worked) {
+            (Some(total), Some(worked)) if total > 0 => {
+                let pct = ((worked as f64 / total as f64) * 100.0).round() as u32;
+                write!(f, "{worked}/{total} ({pct}%)")
+            }
+            _ => write!(f, "0%"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotificationBatch — bulk operations
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct NotificationBatch {
+    items: Vec<Notification>,
+}
+
+impl NotificationBatch {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    pub fn add(&mut self, notification: Notification) {
+        self.items.push(notification);
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn severities(&self) -> Vec<NotificationSeverity> {
+        self.items.iter().map(|n| n.severity).collect()
+    }
+
+    pub fn drain(self) -> Vec<Notification> {
+        self.items
+    }
+
+    pub fn send_all(self, service: &NotificationService) -> Vec<u64> {
+        self.items
+            .into_iter()
+            .map(|n| service.notify(n))
+            .collect()
+    }
+}
+
+impl Default for NotificationBatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IntoIterator for NotificationBatch {
+    type Item = Notification;
+    type IntoIter = std::vec::IntoIter<Notification>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1198,5 +1396,174 @@ mod tests {
         throttle.should_show("test", Instant::now());
         throttle.reset();
         assert_eq!(throttle.tracked_count(), 0);
+    }
+
+    // -- new functionality tests --
+
+    #[test]
+    fn notification_is_progress() {
+        let plain = Notification::info("plain");
+        assert!(!plain.is_progress());
+
+        let with_prog = Notification::info("dl").with_finite_progress(100);
+        assert!(with_prog.is_progress());
+
+        let infinite = Notification::info("spin").with_progress(true);
+        assert!(infinite.is_progress());
+    }
+
+    #[test]
+    fn notification_age() {
+        let n = Notification::info("old");
+        std::thread::sleep(Duration::from_millis(10));
+        let age = n.age(Instant::now());
+        assert!(age >= Duration::from_millis(10));
+    }
+
+    #[test]
+    fn severity_is_critical() {
+        assert!(!NotificationSeverity::Info.is_critical());
+        assert!(!NotificationSeverity::Warning.is_critical());
+        assert!(NotificationSeverity::Error.is_critical());
+    }
+
+    #[test]
+    fn severity_label() {
+        assert_eq!(NotificationSeverity::Info.label(), "info");
+        assert_eq!(NotificationSeverity::Warning.label(), "warning");
+        assert_eq!(NotificationSeverity::Error.label(), "error");
+    }
+
+    #[test]
+    fn filter_matches() {
+        let info = Notification::info("a").with_source("src1");
+        let error = Notification::error("b");
+        let sticky = Notification::info("c").with_sticky();
+
+        let sev_filter = NotificationFilter {
+            severity: Some(NotificationSeverity::Info),
+            ..Default::default()
+        };
+        assert!(sev_filter.matches(&info));
+        assert!(!sev_filter.matches(&error));
+
+        let src_filter = NotificationFilter {
+            source: Some("src1".into()),
+            ..Default::default()
+        };
+        assert!(src_filter.matches(&info));
+        assert!(!src_filter.matches(&error));
+
+        let sticky_filter = NotificationFilter {
+            sticky_only: true,
+            ..Default::default()
+        };
+        assert!(!sticky_filter.matches(&info));
+        assert!(sticky_filter.matches(&sticky));
+
+        let empty_filter = NotificationFilter::default();
+        assert!(empty_filter.matches(&info));
+        assert!(empty_filter.matches(&error));
+    }
+
+    #[test]
+    fn count_by_severity() {
+        let svc = NotificationService::new();
+        svc.notify(Notification::info("a"));
+        svc.notify(Notification::info("b"));
+        svc.notify(Notification::warning("c"));
+        svc.notify(Notification::error("d"));
+        let counts = svc.count_by_severity();
+        assert_eq!(
+            counts,
+            NotificationSeverityCount {
+                info: 2,
+                warning: 1,
+                error: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn active_count_and_total_count() {
+        let svc = NotificationService::new();
+        for i in 0..7 {
+            svc.notify(Notification::info(format!("n{i}")));
+        }
+        assert_eq!(svc.active_count(), MAX_VISIBLE);
+        assert_eq!(svc.total_count(), 7);
+    }
+
+    #[test]
+    fn most_common_severity_empty() {
+        let svc = NotificationService::new();
+        assert!(svc.most_common_severity().is_none());
+    }
+
+    #[test]
+    fn most_common_severity_pick() {
+        let svc = NotificationService::new();
+        svc.notify(Notification::warning("a"));
+        svc.notify(Notification::warning("b"));
+        svc.notify(Notification::info("c"));
+        assert_eq!(
+            svc.most_common_severity(),
+            Some(NotificationSeverity::Warning)
+        );
+    }
+
+    #[test]
+    fn display_notification_progress() {
+        let finite = NotificationProgress {
+            infinite: false,
+            total: Some(200),
+            worked: Some(100),
+        };
+        assert_eq!(format!("{finite}"), "100/200 (50%)");
+
+        let inf = NotificationProgress {
+            infinite: true,
+            total: None,
+            worked: None,
+        };
+        assert_eq!(format!("{inf}"), "in progress…");
+
+        let zero = NotificationProgress {
+            infinite: false,
+            total: None,
+            worked: None,
+        };
+        assert_eq!(format!("{zero}"), "0%");
+    }
+
+    #[test]
+    fn notification_batch_operations() {
+        let mut batch = NotificationBatch::new();
+        assert!(batch.is_empty());
+
+        batch.add(Notification::info("a"));
+        batch.add(Notification::error("b"));
+        batch.add(Notification::warning("c"));
+        assert_eq!(batch.len(), 3);
+        assert!(!batch.is_empty());
+
+        let sevs = batch.severities();
+        assert_eq!(sevs[0], NotificationSeverity::Info);
+        assert_eq!(sevs[1], NotificationSeverity::Error);
+        assert_eq!(sevs[2], NotificationSeverity::Warning);
+
+        let svc = NotificationService::new();
+        let ids = batch.send_all(&svc);
+        assert_eq!(ids.len(), 3);
+        assert_eq!(svc.active_count(), 3);
+    }
+
+    #[test]
+    fn notification_batch_into_iter() {
+        let mut batch = NotificationBatch::new();
+        batch.add(Notification::info("x"));
+        batch.add(Notification::info("y"));
+        let messages: Vec<String> = batch.into_iter().map(|n| n.message).collect();
+        assert_eq!(messages, vec!["x", "y"]);
     }
 }

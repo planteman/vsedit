@@ -796,6 +796,195 @@ impl RenderRegion {
 }
 
 // ---------------------------------------------------------------------------
+// KeyChord extensions
+// ---------------------------------------------------------------------------
+
+impl KeyChord {
+    pub fn is_modifier_only(&self) -> bool {
+        self.key.is_empty()
+    }
+
+    pub fn modifier_count(&self) -> usize {
+        self.ctrl as usize + self.alt as usize + self.shift as usize
+    }
+
+    pub fn has_modifiers(&self) -> bool {
+        self.ctrl || self.alt || self.shift
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalCapabilities summary extension
+// ---------------------------------------------------------------------------
+
+impl TerminalCapabilities {
+    pub fn enabled_count(&self) -> usize {
+        self.supports_color as usize
+            + self.supports_256_color as usize
+            + self.supports_true_color as usize
+            + self.supports_mouse as usize
+            + self.supports_bracketed_paste as usize
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorTheme extensions
+// ---------------------------------------------------------------------------
+
+impl ColorTheme {
+    pub fn color_count(&self) -> usize {
+        3
+    }
+
+    pub fn has_color(&self, hex: &str) -> bool {
+        self.fg == hex || self.bg == hex || self.accent == hex
+    }
+
+    pub fn is_dark(&self) -> bool {
+        parse_hex_luminance(&self.bg).map_or(false, |l| l < 128)
+    }
+
+    pub fn is_light(&self) -> bool {
+        parse_hex_luminance(&self.bg).map_or(false, |l| l >= 128)
+    }
+
+    pub fn merge(&self, other: &ColorTheme) -> ColorTheme {
+        ColorTheme {
+            name: format!("{}+{}", self.name, other.name),
+            fg: other.fg.clone(),
+            bg: self.bg.clone(),
+            accent: other.accent.clone(),
+        }
+    }
+}
+
+fn parse_hex_luminance(hex: &str) -> Option<u8> {
+    let hex = hex.strip_prefix('#')?;
+    if hex.len() != 6 {
+        return None;
+    }
+    let r = u32::from_str_radix(&hex[0..2], 16).ok()?;
+    let g = u32::from_str_radix(&hex[2..4], 16).ok()?;
+    let b = u32::from_str_radix(&hex[4..6], 16).ok()?;
+    Some(((r * 299 + g * 587 + b * 114) / 1000) as u8)
+}
+
+// ---------------------------------------------------------------------------
+// ThemeManager extensions
+// ---------------------------------------------------------------------------
+
+impl ThemeManager {
+    pub fn theme_count(&self) -> usize {
+        self.themes.len()
+    }
+
+    pub fn find_by_name(&self, name: &str) -> Option<&ColorTheme> {
+        self.themes.iter().find(|t| t.name == name)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &ColorTheme> {
+        self.themes.iter()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LayoutConstraint extensions
+// ---------------------------------------------------------------------------
+
+impl LayoutConstraint {
+    pub fn is_fixed(&self) -> bool {
+        matches!(self, LayoutConstraint::Fixed(_))
+    }
+
+    pub fn is_flexible(&self) -> bool {
+        !self.is_fixed()
+    }
+
+    pub fn effective_size(&self, total: u16) -> u16 {
+        match self {
+            LayoutConstraint::Fixed(v) => *v,
+            LayoutConstraint::Percentage(p) => ((total as f32) * p / 100.0) as u16,
+            LayoutConstraint::Min(v) => *v,
+            LayoutConstraint::Max(v) => (*v).min(total),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenderStats extensions
+// ---------------------------------------------------------------------------
+
+impl RenderStats {
+    pub fn merge(&self, other: &RenderStats) -> RenderStats {
+        RenderStats {
+            frame_number: self.frame_number.max(other.frame_number),
+            render_time_us: self.render_time_us + other.render_time_us,
+            widget_count: self.widget_count + other.widget_count,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenderTracker extensions
+// ---------------------------------------------------------------------------
+
+impl RenderTracker {
+    pub fn reset(&mut self) {
+        self.frames.clear();
+    }
+
+    pub fn total_render_time_us(&self) -> u64 {
+        self.frames.iter().map(|f| f.render_time_us).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenderRegion extensions
+// ---------------------------------------------------------------------------
+
+impl RenderRegion {
+    pub fn area(&self) -> u32 {
+        self.width as u32 * self.height as u32
+    }
+
+    pub fn intersection(&self, other: &RenderRegion) -> Option<RenderRegion> {
+        let x1 = self.x.max(other.x);
+        let y1 = self.y.max(other.y);
+        let x2 = (self.x + self.width).min(other.x + other.width);
+        let y2 = (self.y + self.height).min(other.y + other.height);
+        if x1 < x2 && y1 < y2 {
+            Some(RenderRegion::new(x1, y1, x2 - x1, y2 - y1))
+        } else {
+            None
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarItem extensions
+// ---------------------------------------------------------------------------
+
+impl StatusBarItem {
+    pub fn is_visible(&self) -> bool {
+        !self.text.is_empty()
+    }
+
+    pub fn has_tooltip(&self) -> bool {
+        self.tooltip.is_some()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBar iterator
+// ---------------------------------------------------------------------------
+
+impl StatusBar {
+    pub fn iter(&self) -> impl Iterator<Item = &StatusBarItem> {
+        self.items.iter()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1202,5 +1391,187 @@ mod tests {
         assert!(!r.contains_point(15, 20)); // x == x+width is out
         assert!(!r.contains_point(10, 23)); // y == y+height is out
         assert!(!r.contains_point(9, 20));
+    }
+
+    // -- KeyChord extensions --
+
+    #[test]
+    fn key_chord_modifier_count() {
+        let chord = KeyChord::parse("Ctrl+Alt+Shift+X").unwrap();
+        assert_eq!(chord.modifier_count(), 3);
+        assert!(chord.has_modifiers());
+
+        let plain = KeyChord::parse("A").unwrap();
+        assert_eq!(plain.modifier_count(), 0);
+        assert!(!plain.has_modifiers());
+    }
+
+    // -- ColorTheme extensions --
+
+    #[test]
+    fn color_theme_dark_light() {
+        let dark = ColorTheme {
+            name: "dark".into(),
+            fg: "#cccccc".into(),
+            bg: "#1e1e1e".into(),
+            accent: "#007acc".into(),
+        };
+        assert!(dark.is_dark());
+        assert!(!dark.is_light());
+
+        let light = ColorTheme {
+            name: "light".into(),
+            fg: "#333333".into(),
+            bg: "#ffffff".into(),
+            accent: "#0000aa".into(),
+        };
+        assert!(light.is_light());
+        assert!(!light.is_dark());
+    }
+
+    #[test]
+    fn color_theme_has_color_and_merge() {
+        let a = ColorTheme {
+            name: "a".into(),
+            fg: "#aaa".into(),
+            bg: "#111".into(),
+            accent: "#f00".into(),
+        };
+        let b = ColorTheme {
+            name: "b".into(),
+            fg: "#bbb".into(),
+            bg: "#222".into(),
+            accent: "#0f0".into(),
+        };
+        assert!(a.has_color("#f00"));
+        assert!(!a.has_color("#999"));
+        assert_eq!(a.color_count(), 3);
+
+        let merged = a.merge(&b);
+        assert_eq!(merged.name, "a+b");
+        assert_eq!(merged.fg, "#bbb");
+        assert_eq!(merged.bg, "#111");
+        assert_eq!(merged.accent, "#0f0");
+    }
+
+    // -- ThemeManager extensions --
+
+    #[test]
+    fn theme_manager_find_and_iter() {
+        let mut tm = ThemeManager::new();
+        tm.add_theme(ColorTheme {
+            name: "dark".into(),
+            fg: "#ccc".into(),
+            bg: "#111".into(),
+            accent: "#0af".into(),
+        });
+        tm.add_theme(ColorTheme {
+            name: "light".into(),
+            fg: "#333".into(),
+            bg: "#fff".into(),
+            accent: "#00a".into(),
+        });
+        assert_eq!(tm.theme_count(), 2);
+        assert_eq!(tm.find_by_name("dark").unwrap().name, "dark");
+        assert!(tm.find_by_name("missing").is_none());
+        assert_eq!(tm.iter().count(), 2);
+    }
+
+    // -- LayoutConstraint extensions --
+
+    #[test]
+    fn layout_constraint_is_fixed_flexible() {
+        assert!(LayoutConstraint::Fixed(10).is_fixed());
+        assert!(!LayoutConstraint::Fixed(10).is_flexible());
+        assert!(LayoutConstraint::Percentage(50.0).is_flexible());
+        assert!(LayoutConstraint::Min(5).is_flexible());
+        assert!(LayoutConstraint::Max(100).is_flexible());
+        assert_eq!(LayoutConstraint::Percentage(25.0).effective_size(200), 50);
+        assert_eq!(LayoutConstraint::Fixed(42).effective_size(200), 42);
+    }
+
+    // -- RenderStats merge --
+
+    #[test]
+    fn render_stats_merge() {
+        let a = RenderStats { frame_number: 1, render_time_us: 100, widget_count: 5 };
+        let b = RenderStats { frame_number: 3, render_time_us: 200, widget_count: 7 };
+        let merged = a.merge(&b);
+        assert_eq!(merged.frame_number, 3);
+        assert_eq!(merged.render_time_us, 300);
+        assert_eq!(merged.widget_count, 12);
+    }
+
+    // -- RenderTracker reset --
+
+    #[test]
+    fn render_tracker_reset_and_total() {
+        let mut tracker = RenderTracker::new();
+        tracker.record(RenderStats { frame_number: 1, render_time_us: 100, widget_count: 5 });
+        tracker.record(RenderStats { frame_number: 2, render_time_us: 200, widget_count: 6 });
+        assert_eq!(tracker.total_render_time_us(), 300);
+        tracker.reset();
+        assert_eq!(tracker.frame_count(), 0);
+        assert_eq!(tracker.total_render_time_us(), 0);
+    }
+
+    // -- RenderRegion area and intersection --
+
+    #[test]
+    fn render_region_area_and_intersection() {
+        let a = RenderRegion::new(0, 0, 10, 10);
+        assert_eq!(a.area(), 100);
+
+        let b = RenderRegion::new(5, 5, 10, 10);
+        let inter = a.intersection(&b).unwrap();
+        assert_eq!(inter.x, 5);
+        assert_eq!(inter.y, 5);
+        assert_eq!(inter.width, 5);
+        assert_eq!(inter.height, 5);
+        assert_eq!(inter.area(), 25);
+
+        let c = RenderRegion::new(20, 20, 5, 5);
+        assert!(a.intersection(&c).is_none());
+    }
+
+    // -- StatusBarItem extensions --
+
+    #[test]
+    fn status_bar_item_visibility_and_tooltip() {
+        let visible = StatusBarItem::new("a", "text").with_tooltip("tip");
+        assert!(visible.is_visible());
+        assert!(visible.has_tooltip());
+
+        let empty = StatusBarItem::new("b", "");
+        assert!(!empty.is_visible());
+        assert!(!empty.has_tooltip());
+    }
+
+    // -- StatusBar iterator --
+
+    #[test]
+    fn status_bar_iter() {
+        let mut bar = StatusBar::new();
+        bar.add_item(StatusBarItem::new("a", "A"));
+        bar.add_item(StatusBarItem::new("b", "B"));
+        let ids: Vec<_> = bar.iter().map(|i| i.id.as_str()).collect();
+        assert_eq!(ids, vec!["a", "b"]);
+    }
+
+    // -- TerminalCapabilities enabled_count --
+
+    #[test]
+    fn capabilities_enabled_count() {
+        let caps = TerminalCapabilities::default();
+        assert_eq!(caps.enabled_count(), 4);
+
+        let all = TerminalCapabilities {
+            supports_color: true,
+            supports_256_color: true,
+            supports_true_color: true,
+            supports_mouse: true,
+            supports_bracketed_paste: true,
+        };
+        assert_eq!(all.enabled_count(), 5);
     }
 }

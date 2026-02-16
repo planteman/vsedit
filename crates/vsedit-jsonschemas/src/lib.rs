@@ -49,7 +49,8 @@ impl SchemaProperty {
 
 impl fmt::Display for SchemaProperty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.name, self.schema_type)
+        let req = if self.required { " (required)" } else { "" };
+        write!(f, "{}: {}{}", self.name, self.schema_type, req)
     }
 }
 
@@ -560,6 +561,168 @@ impl SchemaValidator {
             JsonValue::Object(_) => "object",
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// SchemaType helpers
+// ---------------------------------------------------------------------------
+
+impl SchemaType {
+    /// Returns all type variants.
+    pub fn all() -> &'static [SchemaType] {
+        &[
+            SchemaType::String,
+            SchemaType::Number,
+            SchemaType::Integer,
+            SchemaType::Boolean,
+            SchemaType::Array,
+            SchemaType::Object,
+            SchemaType::Null,
+        ]
+    }
+
+    /// Returns true if this is a numeric type.
+    pub fn is_numeric(&self) -> bool {
+        matches!(self, SchemaType::Number | SchemaType::Integer)
+    }
+
+    /// Returns true if this is a primitive (non-container) type.
+    pub fn is_primitive(&self) -> bool {
+        matches!(
+            self,
+            SchemaType::String | SchemaType::Number | SchemaType::Integer
+                | SchemaType::Boolean | SchemaType::Null
+        )
+    }
+
+    /// Parse from a JSON schema type string.
+    pub fn from_json_name(name: &str) -> Option<Self> {
+        match name {
+            "string" => Some(Self::String),
+            "number" => Some(Self::Number),
+            "integer" => Some(Self::Integer),
+            "boolean" => Some(Self::Boolean),
+            "array" => Some(Self::Array),
+            "object" => Some(Self::Object),
+            "null" => Some(Self::Null),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SchemaProperty builder
+// ---------------------------------------------------------------------------
+
+impl SchemaProperty {
+    /// Create a new required property.
+    pub fn required_prop(name: &str, schema_type: SchemaType, description: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            schema_type,
+            description: Some(description.to_string()),
+            required: true,
+            default_value: None,
+        }
+    }
+
+    /// Create a new optional property with a default.
+    pub fn optional_prop(name: &str, schema_type: SchemaType, default: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            schema_type,
+            description: None,
+            required: false,
+            default_value: Some(default.to_string()),
+        }
+    }
+
+    /// Returns the effective value (current or default).
+    pub fn effective_default(&self) -> Option<&str> {
+        self.default_value.as_deref()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// JsonSchema helpers
+// ---------------------------------------------------------------------------
+
+impl JsonSchema {
+    /// Returns the number of required properties.
+    pub fn required_count(&self) -> usize {
+        self.properties.iter().filter(|p| p.required).count()
+    }
+
+    /// Returns the number of optional properties.
+    pub fn optional_count(&self) -> usize {
+        self.properties.iter().filter(|p| !p.required).count()
+    }
+
+    /// Find a property by name.
+    pub fn find_property(&self, name: &str) -> Option<&SchemaProperty> {
+        self.properties.iter().find(|p| p.name == name)
+    }
+
+    /// Returns property names as a sorted vec.
+    pub fn property_names(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self.properties.iter().map(|p| p.name.as_str()).collect();
+        names.sort();
+        names
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Schema comparison
+// ---------------------------------------------------------------------------
+
+/// Describes a difference between two schemas.
+#[derive(Debug, Clone)]
+pub enum SchemaDiff {
+    PropertyAdded(String),
+    PropertyRemoved(String),
+    TypeChanged { property: String, old: SchemaType, new: SchemaType },
+}
+
+impl fmt::Display for SchemaDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SchemaDiff::PropertyAdded(name) => write!(f, "+ {name}"),
+            SchemaDiff::PropertyRemoved(name) => write!(f, "- {name}"),
+            SchemaDiff::TypeChanged { property, old, new } => {
+                write!(f, "~ {property}: {old} -> {new}")
+            }
+        }
+    }
+}
+
+/// Compare two schemas and return differences.
+pub fn compare_schemas(old: &JsonSchema, new: &JsonSchema) -> Vec<SchemaDiff> {
+    let mut diffs = Vec::new();
+    let old_names: std::collections::HashSet<&str> = old.properties.iter().map(|p| p.name.as_str()).collect();
+    let new_names: std::collections::HashSet<&str> = new.properties.iter().map(|p| p.name.as_str()).collect();
+
+    for name in &new_names {
+        if !old_names.contains(name) {
+            diffs.push(SchemaDiff::PropertyAdded(name.to_string()));
+        }
+    }
+    for name in &old_names {
+        if !new_names.contains(name) {
+            diffs.push(SchemaDiff::PropertyRemoved(name.to_string()));
+        }
+    }
+    for old_prop in &old.properties {
+        if let Some(new_prop) = new.properties.iter().find(|p| p.name == old_prop.name) {
+            if old_prop.schema_type != new_prop.schema_type {
+                diffs.push(SchemaDiff::TypeChanged {
+                    property: old_prop.name.clone(),
+                    old: old_prop.schema_type,
+                    new: new_prop.schema_type,
+                });
+            }
+        }
+    }
+    diffs
 }
 
 #[cfg(test)]
@@ -1239,5 +1402,105 @@ mod tests {
         ];
         let errors = SchemaValidator::validate_required(&schema, &fields);
         assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_schema_type_all() {
+        assert_eq!(SchemaType::all().len(), 7);
+    }
+
+    #[test]
+    fn test_schema_type_is_numeric() {
+        assert!(SchemaType::Number.is_numeric());
+        assert!(SchemaType::Integer.is_numeric());
+        assert!(!SchemaType::String.is_numeric());
+    }
+
+    #[test]
+    fn test_schema_type_is_primitive() {
+        assert!(SchemaType::String.is_primitive());
+        assert!(!SchemaType::Array.is_primitive());
+        assert!(!SchemaType::Object.is_primitive());
+    }
+
+    #[test]
+    fn test_schema_type_from_json_name() {
+        assert_eq!(SchemaType::from_json_name("string"), Some(SchemaType::String));
+        assert_eq!(SchemaType::from_json_name("integer"), Some(SchemaType::Integer));
+        assert_eq!(SchemaType::from_json_name("bogus"), None);
+    }
+
+    #[test]
+    fn test_schema_property_builder() {
+        let req = SchemaProperty::required_prop("name", SchemaType::String, "The name");
+        assert!(req.required);
+        assert_eq!(req.schema_type, SchemaType::String);
+        let opt = SchemaProperty::optional_prop("count", SchemaType::Integer, "0");
+        assert!(!opt.required);
+        assert_eq!(opt.effective_default(), Some("0"));
+    }
+
+    #[test]
+    fn test_schema_property_display() {
+        let p = SchemaProperty::required_prop("id", SchemaType::String, "ID");
+        let s = format!("{p}");
+        assert!(s.contains("id"));
+        assert!(s.contains("required"));
+    }
+
+    #[test]
+    fn test_json_schema_helpers() {
+        let schema = JsonSchema {
+            id: Some("test".to_string()),
+            title: Some("Test".to_string()),
+            description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("name", SchemaType::String, "Name"),
+                SchemaProperty::optional_prop("age", SchemaType::Integer, "0"),
+            ],
+            file_match: vec![],
+        };
+        assert_eq!(schema.required_count(), 1);
+        assert_eq!(schema.optional_count(), 1);
+        assert!(schema.find_property("name").is_some());
+        assert!(schema.find_property("missing").is_none());
+        assert_eq!(schema.property_names(), vec!["age", "name"]);
+    }
+
+    #[test]
+    fn test_compare_schemas() {
+        let old = JsonSchema {
+            id: Some("a".to_string()),
+            title: Some("A".to_string()),
+            description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("name", SchemaType::String, "Name"),
+                SchemaProperty::optional_prop("old_field", SchemaType::Boolean, "false"),
+            ],
+            file_match: vec![],
+        };
+        let new = JsonSchema {
+            id: Some("a".to_string()),
+            title: Some("A".to_string()),
+            description: None,
+            schema_type: SchemaType::Object,
+            properties: vec![
+                SchemaProperty::required_prop("name", SchemaType::Integer, "Name"),
+                SchemaProperty::optional_prop("new_field", SchemaType::String, ""),
+            ],
+            file_match: vec![],
+        };
+        let diffs = compare_schemas(&old, &new);
+        assert!(diffs.iter().any(|d| matches!(d, SchemaDiff::PropertyAdded(n) if n == "new_field")));
+        assert!(diffs.iter().any(|d| matches!(d, SchemaDiff::PropertyRemoved(n) if n == "old_field")));
+        assert!(diffs.iter().any(|d| matches!(d, SchemaDiff::TypeChanged { property, .. } if property == "name")));
+    }
+
+    #[test]
+    fn test_schema_diff_display() {
+        let d = SchemaDiff::PropertyAdded("foo".into());
+        assert_eq!(format!("{d}"), "+ foo");
     }
 }

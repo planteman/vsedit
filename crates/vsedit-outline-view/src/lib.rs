@@ -663,6 +663,87 @@ impl OutlineModel {
     }
 }
 
+// ---------------------------------------------------------------------------
+// OutlineModel – additional query helpers
+// ---------------------------------------------------------------------------
+
+impl OutlineModel {
+    /// Return labels of all top-level and nested elements (pre-order).
+    pub fn labels(&self) -> Vec<&str> {
+        self.flatten().into_iter().map(|e| e.label.as_str()).collect()
+    }
+
+    /// Find the first element (at any depth) whose label matches `name` exactly.
+    pub fn find_by_name(&self, name: &str) -> Option<&OutlineElement> {
+        self.flatten().into_iter().find(|e| e.label == name)
+    }
+
+    /// Count how many elements (at any depth) have the given kind.
+    pub fn kind_count(&self, kind: OutlineKind) -> usize {
+        self.flatten().into_iter().filter(|e| e.kind == kind).count()
+    }
+
+    /// Return a one-line summary of the model.
+    pub fn summary(&self) -> String {
+        let total = self.element_count();
+        let top = self.elements.len();
+        let depth = self.depth();
+        format!(
+            "OutlineModel(uri={}, top_level={}, total={}, depth={})",
+            self.uri, top, total, depth
+        )
+    }
+}
+
+impl fmt::Display for OutlineModel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "OutlineModel(uri={}, elements={})",
+            self.uri,
+            self.element_count()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutlineElement – query helpers
+// ---------------------------------------------------------------------------
+
+impl OutlineElement {
+    /// Returns `true` if this element has any children.
+    pub fn is_container(&self) -> bool {
+        !self.children.is_empty()
+    }
+
+    /// Return the number of direct children.
+    pub fn child_count(&self) -> usize {
+        self.children.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutlineKind – classification helpers
+// ---------------------------------------------------------------------------
+
+impl OutlineKind {
+    /// Returns `true` for type-like kinds: Class, Struct, Interface, Enum.
+    pub fn is_type(&self) -> bool {
+        matches!(
+            self,
+            OutlineKind::Class | OutlineKind::Struct | OutlineKind::Interface | OutlineKind::Enum
+        )
+    }
+
+    /// Returns `true` for callable kinds: Function, Method, Constructor.
+    pub fn is_callable(&self) -> bool {
+        matches!(
+            self,
+            OutlineKind::Function | OutlineKind::Method | OutlineKind::Constructor
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1223,5 +1304,93 @@ mod tests {
         ];
         outline_sort(&mut elements, OutlineSortOrder::ByName);
         assert_eq!(elements[0].label, "a");
+    }
+
+    // -- New tests ----------------------------------------------------------
+
+    #[test]
+    fn model_labels() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(
+            elem("Foo", OutlineKind::Struct, 1, 20)
+                .with_child(elem("bar", OutlineKind::Method, 5, 10)),
+        );
+        model.add_element(elem("main", OutlineKind::Function, 22, 30));
+        let labels = model.labels();
+        assert_eq!(labels, vec!["Foo", "bar", "main"]);
+    }
+
+    #[test]
+    fn model_find_by_name() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(
+            elem("MyClass", OutlineKind::Class, 1, 50)
+                .with_child(elem("do_thing", OutlineKind::Method, 5, 20)),
+        );
+        assert!(model.find_by_name("do_thing").is_some());
+        assert_eq!(model.find_by_name("do_thing").unwrap().kind, OutlineKind::Method);
+        assert!(model.find_by_name("nonexistent").is_none());
+    }
+
+    #[test]
+    fn model_kind_count() {
+        let mut model = OutlineModel::new("file.rs");
+        model.add_element(elem("a", OutlineKind::Function, 1, 5));
+        model.add_element(elem("b", OutlineKind::Function, 6, 10));
+        model.add_element(elem("c", OutlineKind::Struct, 11, 20));
+        assert_eq!(model.kind_count(OutlineKind::Function), 2);
+        assert_eq!(model.kind_count(OutlineKind::Struct), 1);
+        assert_eq!(model.kind_count(OutlineKind::Enum), 0);
+    }
+
+    #[test]
+    fn model_summary() {
+        let mut model = OutlineModel::new("test.rs");
+        model.add_element(elem("main", OutlineKind::Function, 1, 10));
+        let s = model.summary();
+        assert!(s.contains("test.rs"));
+        assert!(s.contains("total=1"));
+    }
+
+    #[test]
+    fn model_display() {
+        let mut model = OutlineModel::new("test.rs");
+        model.add_element(elem("main", OutlineKind::Function, 1, 10));
+        let s = format!("{model}");
+        assert!(s.contains("OutlineModel"));
+        assert!(s.contains("test.rs"));
+        assert!(s.contains("elements=1"));
+    }
+
+    #[test]
+    fn element_is_container_and_child_count() {
+        let leaf = elem("x", OutlineKind::Variable, 1, 1);
+        assert!(!leaf.is_container());
+        assert_eq!(leaf.child_count(), 0);
+
+        let parent = elem("Foo", OutlineKind::Class, 1, 50)
+            .with_child(elem("a", OutlineKind::Field, 2, 2))
+            .with_child(elem("b", OutlineKind::Method, 5, 10));
+        assert!(parent.is_container());
+        assert_eq!(parent.child_count(), 2);
+    }
+
+    #[test]
+    fn outline_kind_is_type() {
+        assert!(OutlineKind::Class.is_type());
+        assert!(OutlineKind::Struct.is_type());
+        assert!(OutlineKind::Interface.is_type());
+        assert!(OutlineKind::Enum.is_type());
+        assert!(!OutlineKind::Function.is_type());
+        assert!(!OutlineKind::Variable.is_type());
+    }
+
+    #[test]
+    fn outline_kind_is_callable() {
+        assert!(OutlineKind::Function.is_callable());
+        assert!(OutlineKind::Method.is_callable());
+        assert!(OutlineKind::Constructor.is_callable());
+        assert!(!OutlineKind::Class.is_callable());
+        assert!(!OutlineKind::Field.is_callable());
     }
 }

@@ -623,6 +623,185 @@ impl fmt::Display for ParameterHintCycle {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ParameterInformation extensions
+// ---------------------------------------------------------------------------
+
+impl ParameterInformation {
+    pub fn has_documentation(&self) -> bool {
+        self.documentation.is_some()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.label.is_empty()
+    }
+
+    pub fn label_length(&self) -> usize {
+        self.label.len()
+    }
+}
+
+impl fmt::Display for ParameterInformation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.label)?;
+        if let Some(ref doc) = self.documentation {
+            write!(f, " — {doc}")?;
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SignatureInformation extensions
+// ---------------------------------------------------------------------------
+
+impl SignatureInformation {
+    pub fn is_empty(&self) -> bool {
+        self.parameters.is_empty()
+    }
+
+    pub fn find_parameter(&self, name: &str) -> Option<&ParameterInformation> {
+        self.parameters.iter().find(|p| {
+            let param_name = extract_parameter_name(&p.label);
+            param_name == name
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SignatureHelp extensions
+// ---------------------------------------------------------------------------
+
+impl SignatureHelp {
+    pub fn signature_count(&self) -> usize {
+        self.signatures.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.signatures.is_empty()
+    }
+
+    pub fn has_active_parameter(&self) -> bool {
+        self.active_signature_info()
+            .map(|sig| {
+                let idx = sig.active_parameter.unwrap_or(self.active_parameter) as usize;
+                idx < sig.parameters.len()
+            })
+            .unwrap_or(false)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SignatureHelpContext extensions
+// ---------------------------------------------------------------------------
+
+impl SignatureHelpContext {
+    pub fn is_manual_trigger(&self) -> bool {
+        self.trigger_kind == SignatureHelpTriggerKind::Invoke
+    }
+
+    pub fn is_auto_trigger(&self) -> bool {
+        matches!(
+            self.trigger_kind,
+            SignatureHelpTriggerKind::TriggerCharacter | SignatureHelpTriggerKind::ContentChange
+        )
+    }
+
+    pub fn has_active_signature(&self) -> bool {
+        self.is_retrigger
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SignatureHelpConfig extensions
+// ---------------------------------------------------------------------------
+
+impl SignatureHelpConfig {
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn summary(&self) -> String {
+        format!(
+            "enabled={}, triggers={:?}, retriggers={:?}, cycle={}",
+            self.enabled, self.trigger_characters, self.retrigger_characters, self.cycle,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SignatureHelpRegistry extensions
+// ---------------------------------------------------------------------------
+
+impl SignatureHelpRegistry {
+    pub fn is_empty(&self) -> bool {
+        self.providers.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.providers.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ParamHintStats extensions
+// ---------------------------------------------------------------------------
+
+impl ParamHintStats {
+    pub fn merge(&self, other: &ParamHintStats) -> ParamHintStats {
+        ParamHintStats {
+            total_signatures: self.total_signatures + other.total_signatures,
+            total_parameters: self.total_parameters + other.total_parameters,
+            active_hints: self.active_hints + other.active_hints,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!(
+            "sigs={}, params={}, active={}",
+            self.total_signatures, self.total_parameters, self.active_hints,
+        )
+    }
+}
+
+impl fmt::Display for ParamHintStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} signature(s), {} parameter(s), {} active",
+            self.total_signatures, self.total_parameters, self.active_hints,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ParameterHintCycle extensions
+// ---------------------------------------------------------------------------
+
+impl ParameterHintCycle {
+    pub fn is_first(&self) -> bool {
+        self.current_index == 0
+    }
+
+    pub fn is_last(&self) -> bool {
+        self.total_signatures > 0 && self.current_index == self.total_signatures - 1
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SignatureHelpWidget extensions
+// ---------------------------------------------------------------------------
+
+impl SignatureHelpWidget {
+    pub fn is_visible(&self) -> bool {
+        self.width > 0 && self.height > 0
+    }
+
+    pub fn area(&self) -> u32 {
+        self.width as u32 * self.height as u32
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1208,5 +1387,158 @@ mod tests {
         cycle.update_total(10);
         assert_eq!(cycle.current(), 0);
         assert_eq!(cycle.total(), 10);
+    }
+
+    // -----------------------------------------------------------------------
+    // New extension tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parameter_information_extensions() {
+        let p = ParameterInformation {
+            label: "x: i32".into(),
+            documentation: Some("an integer".into()),
+        };
+        assert!(p.has_documentation());
+        assert!(!p.is_empty());
+        assert_eq!(p.label_length(), 6);
+
+        let empty = ParameterInformation {
+            label: String::new(),
+            documentation: None,
+        };
+        assert!(!empty.has_documentation());
+        assert!(empty.is_empty());
+        assert_eq!(empty.label_length(), 0);
+    }
+
+    #[test]
+    fn display_parameter_information() {
+        let p = ParameterInformation {
+            label: "x: i32".into(),
+            documentation: Some("an integer".into()),
+        };
+        assert_eq!(format!("{p}"), "x: i32 — an integer");
+
+        let no_doc = ParameterInformation {
+            label: "y: bool".into(),
+            documentation: None,
+        };
+        assert_eq!(format!("{no_doc}"), "y: bool");
+    }
+
+    #[test]
+    fn signature_information_find_parameter() {
+        let sig = sample_signature();
+        let found = sig.find_parameter("x").unwrap();
+        assert_eq!(found.label, "x: i32");
+        assert!(sig.find_parameter("nonexistent").is_none());
+        assert!(!sig.is_empty());
+
+        let empty_sig = SignatureInformation {
+            label: "fn nop()".into(),
+            documentation: None,
+            parameters: vec![],
+            active_parameter: None,
+        };
+        assert!(empty_sig.is_empty());
+    }
+
+    #[test]
+    fn signature_help_extensions() {
+        let help = two_signature_help();
+        assert_eq!(help.signature_count(), 2);
+        assert!(!help.is_empty());
+        assert!(help.has_active_parameter());
+
+        let empty_help = SignatureHelp {
+            signatures: vec![],
+            active_signature: 0,
+            active_parameter: 0,
+        };
+        assert!(empty_help.is_empty());
+        assert!(!empty_help.has_active_parameter());
+    }
+
+    #[test]
+    fn signature_help_context_extensions() {
+        let manual = SignatureHelpContext {
+            trigger_kind: SignatureHelpTriggerKind::Invoke,
+            trigger_character: None,
+            is_retrigger: false,
+        };
+        assert!(manual.is_manual_trigger());
+        assert!(!manual.is_auto_trigger());
+        assert!(!manual.has_active_signature());
+
+        let auto = SignatureHelpContext {
+            trigger_kind: SignatureHelpTriggerKind::TriggerCharacter,
+            trigger_character: Some('('),
+            is_retrigger: true,
+        };
+        assert!(!auto.is_manual_trigger());
+        assert!(auto.is_auto_trigger());
+        assert!(auto.has_active_signature());
+    }
+
+    #[test]
+    fn config_extensions_and_registry_clear() {
+        let cfg = SignatureHelpConfig::default();
+        assert!(cfg.is_enabled());
+        let s = cfg.summary();
+        assert!(s.contains("enabled=true"));
+        assert!(s.contains("cycle=true"));
+
+        let mut registry = SignatureHelpRegistry::new();
+        assert!(registry.is_empty());
+        registry.register(Box::new(DummyProvider));
+        assert!(!registry.is_empty());
+        registry.clear();
+        assert!(registry.is_empty());
+        assert_eq!(registry.provider_count(), 0);
+    }
+
+    #[test]
+    fn param_hint_stats_merge_and_display() {
+        let a = ParamHintStats {
+            total_signatures: 2,
+            total_parameters: 5,
+            active_hints: 1,
+        };
+        let b = ParamHintStats {
+            total_signatures: 3,
+            total_parameters: 4,
+            active_hints: 2,
+        };
+        let merged = a.merge(&b);
+        assert_eq!(merged.total_signatures, 5);
+        assert_eq!(merged.total_parameters, 9);
+        assert_eq!(merged.active_hints, 3);
+        assert_eq!(merged.summary(), "sigs=5, params=9, active=3");
+        assert_eq!(
+            format!("{merged}"),
+            "5 signature(s), 9 parameter(s), 3 active"
+        );
+    }
+
+    #[test]
+    fn hint_cycle_is_first_is_last() {
+        let mut cycle = ParameterHintCycle::new(3);
+        assert!(cycle.is_first());
+        assert!(!cycle.is_last());
+        cycle.set_index(2);
+        assert!(!cycle.is_first());
+        assert!(cycle.is_last());
+    }
+
+    #[test]
+    fn widget_is_visible_and_area() {
+        let w = SignatureHelpWidget { x: 0, y: 0, width: 10, height: 5 };
+        assert!(w.is_visible());
+        assert_eq!(w.area(), 50);
+
+        let zero = SignatureHelpWidget { x: 0, y: 0, width: 0, height: 5 };
+        assert!(!zero.is_visible());
+        assert_eq!(zero.area(), 0);
     }
 }

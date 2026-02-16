@@ -679,6 +679,213 @@ pub fn timeline_import(store: &mut TimelineItemStore, provider_id: &str, json: &
     Ok(count)
 }
 
+// ── TimelineItem extensions ──
+
+impl TimelineItem {
+    pub fn age_secs(&self, now: u64) -> u64 {
+        now.saturating_sub(self.timestamp)
+    }
+
+    pub fn is_recent(&self, now: u64, threshold: u64) -> bool {
+        self.age_secs(now) <= threshold
+    }
+
+    pub fn has_description(&self) -> bool {
+        self.description.as_ref().map_or(false, |d| !d.is_empty())
+    }
+
+    pub fn matches_filter(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        if self.label.to_lowercase().contains(&q) {
+            return true;
+        }
+        if let Some(ref desc) = self.description {
+            if desc.to_lowercase().contains(&q) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+impl fmt::Display for TimelineItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {} (t={})", self.id, self.label, self.timestamp)
+    }
+}
+
+// ── TimelineItemStore extensions ──
+
+impl TimelineItemStore {
+    pub fn item_count(&self, provider_id: &str) -> usize {
+        self.items.get(provider_id).map_or(0, |v| v.len())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.values().all(|v| v.is_empty())
+    }
+
+    pub fn find_by_label(&self, provider_id: &str, label: &str) -> Option<&TimelineItem> {
+        self.items
+            .get(provider_id)
+            .and_then(|v| v.iter().find(|item| item.label == label))
+    }
+
+    pub fn oldest(&self, provider_id: &str) -> Option<&TimelineItem> {
+        self.items
+            .get(provider_id)
+            .and_then(|v| v.iter().min_by_key(|item| item.timestamp))
+    }
+
+    pub fn newest(&self, provider_id: &str) -> Option<&TimelineItem> {
+        self.items
+            .get(provider_id)
+            .and_then(|v| v.iter().max_by_key(|item| item.timestamp))
+    }
+
+    pub fn items_per_provider(&self) -> HashMap<&str, usize> {
+        self.items
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.len()))
+            .collect()
+    }
+}
+
+impl fmt::Display for TimelineItemStore {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let providers = self.items.len();
+        let total = self.total_item_count();
+        write!(f, "TimelineItemStore({} providers, {} items)", providers, total)
+    }
+}
+
+impl<'a> IntoIterator for &'a TimelineItemStore {
+    type Item = (&'a String, &'a Vec<TimelineItem>);
+    type IntoIter = std::collections::hash_map::Iter<'a, String, Vec<TimelineItem>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.iter()
+    }
+}
+
+// ── TimelineChangeEvent extensions ──
+
+impl TimelineChangeEvent {
+    pub fn is_reset(&self) -> bool {
+        self.reset
+    }
+
+    pub fn has_uri(&self) -> bool {
+        self.uri.is_some()
+    }
+}
+
+impl fmt::Display for TimelineChangeEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let uri_str = self.uri.as_deref().unwrap_or("<all>");
+        let kind = if self.reset { "reset" } else { "changed" };
+        write!(f, "TimelineChangeEvent({}, {}, {})", self.provider_id, uri_str, kind)
+    }
+}
+
+// ── TimelineEventFilter extensions ──
+
+impl TimelineEventFilter {
+    pub fn is_empty(&self) -> bool {
+        self.since.is_none()
+            && self.until.is_none()
+            && self.provider_ids.is_empty()
+            && self.label_contains.is_none()
+            && self.limit.is_none()
+    }
+}
+
+// ── TimelinePaginator extensions ──
+
+impl TimelinePaginator {
+    pub fn is_first_page(&self) -> bool {
+        self.page == 0
+    }
+
+    pub fn is_last_page(&self) -> bool {
+        match self.total_items {
+            Some(total) => (self.page + 1) * self.page_size >= total,
+            None => false,
+        }
+    }
+
+    pub fn current_page_one_indexed(&self) -> usize {
+        self.page + 1
+    }
+}
+
+// ── TimelineSummary ──
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimelineSummary {
+    pub provider_count: usize,
+    pub total_items: usize,
+    pub min_timestamp: Option<u64>,
+    pub max_timestamp: Option<u64>,
+    pub items_with_description: usize,
+    pub items_with_command: usize,
+}
+
+impl TimelineSummary {
+    pub fn from_store(store: &TimelineItemStore) -> Self {
+        let mut total_items = 0usize;
+        let mut min_ts: Option<u64> = None;
+        let mut max_ts: Option<u64> = None;
+        let mut with_desc = 0usize;
+        let mut with_cmd = 0usize;
+        let mut provider_count = 0usize;
+
+        for (_, items) in store {
+            provider_count += 1;
+            for item in items {
+                total_items += 1;
+                let ts = item.timestamp;
+                min_ts = Some(min_ts.map_or(ts, |m: u64| m.min(ts)));
+                max_ts = Some(max_ts.map_or(ts, |m: u64| m.max(ts)));
+                if item.has_description() {
+                    with_desc += 1;
+                }
+                if item.command.is_some() {
+                    with_cmd += 1;
+                }
+            }
+        }
+
+        Self {
+            provider_count,
+            total_items,
+            min_timestamp: min_ts,
+            max_timestamp: max_ts,
+            items_with_description: with_desc,
+            items_with_command: with_cmd,
+        }
+    }
+
+    pub fn time_span(&self) -> Option<u64> {
+        match (self.min_timestamp, self.max_timestamp) {
+            (Some(min), Some(max)) => Some(max - min),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for TimelineSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "TimelineSummary(providers={}, items={}, span={:?})",
+            self.provider_count,
+            self.total_items,
+            self.time_span()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1212,5 +1419,143 @@ mod tests {
     fn ext_timeline_is_ascii_printable() {
         assert!(ExtTimelineValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtTimelineValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn timeline_item_age_and_recent() {
+        let item = TimelineItem {
+            id: "c1".into(),
+            label: "Fix".into(),
+            description: Some("a fix".into()),
+            timestamp: 1000,
+            icon_id: None,
+            command: None,
+        };
+        assert_eq!(item.age_secs(1500), 500);
+        assert!(item.is_recent(1500, 500));
+        assert!(!item.is_recent(1500, 499));
+        assert!(item.has_description());
+        assert!(item.matches_filter("fix"));
+        assert!(item.matches_filter("a fix"));
+        assert!(!item.matches_filter("nope"));
+    }
+
+    #[test]
+    fn timeline_item_display() {
+        let item = TimelineItem {
+            id: "c1".into(),
+            label: "Commit".into(),
+            description: None,
+            timestamp: 42,
+            icon_id: None,
+            command: None,
+        };
+        let s = format!("{item}");
+        assert!(s.contains("c1"));
+        assert!(s.contains("Commit"));
+        assert!(s.contains("42"));
+        assert!(!item.has_description());
+    }
+
+    #[test]
+    fn store_find_oldest_newest() {
+        let mut store = TimelineItemStore::new();
+        assert!(store.is_empty());
+        store.add_items("git", vec![
+            TimelineItem { id: "c1".into(), label: "First".into(), description: None, timestamp: 100, icon_id: None, command: None },
+            TimelineItem { id: "c2".into(), label: "Second".into(), description: None, timestamp: 300, icon_id: None, command: None },
+            TimelineItem { id: "c3".into(), label: "Middle".into(), description: None, timestamp: 200, icon_id: None, command: None },
+        ]);
+        assert!(!store.is_empty());
+        assert_eq!(store.item_count("git"), 3);
+        assert_eq!(store.item_count("nope"), 0);
+        assert_eq!(store.oldest("git").unwrap().id, "c1");
+        assert_eq!(store.newest("git").unwrap().id, "c2");
+        assert!(store.find_by_label("git", "Middle").is_some());
+        assert!(store.find_by_label("git", "Missing").is_none());
+    }
+
+    #[test]
+    fn store_display_and_into_iterator() {
+        let mut store = TimelineItemStore::new();
+        store.add_items("git", vec![
+            TimelineItem { id: "1".into(), label: "a".into(), description: None, timestamp: 100, icon_id: None, command: None },
+        ]);
+        store.add_items("local", vec![
+            TimelineItem { id: "2".into(), label: "b".into(), description: None, timestamp: 200, icon_id: None, command: None },
+        ]);
+        let s = format!("{store}");
+        assert!(s.contains("2 providers"));
+        assert!(s.contains("2 items"));
+        let count: usize = (&store).into_iter().map(|(_, v)| v.len()).sum();
+        assert_eq!(count, 2);
+        let per_provider = store.items_per_provider();
+        assert_eq!(*per_provider.get("git").unwrap(), 1);
+        assert_eq!(*per_provider.get("local").unwrap(), 1);
+    }
+
+    #[test]
+    fn change_event_extensions_and_display() {
+        let evt = TimelineChangeEvent {
+            provider_id: "git".into(),
+            uri: Some("file:///a.rs".into()),
+            reset: true,
+        };
+        assert!(evt.is_reset());
+        assert!(evt.has_uri());
+        let s = format!("{evt}");
+        assert!(s.contains("reset"));
+        assert!(s.contains("git"));
+        let evt2 = TimelineChangeEvent {
+            provider_id: "local".into(),
+            uri: None,
+            reset: false,
+        };
+        assert!(!evt2.is_reset());
+        assert!(!evt2.has_uri());
+        let s2 = format!("{evt2}");
+        assert!(s2.contains("changed"));
+        assert!(s2.contains("<all>"));
+    }
+
+    #[test]
+    fn timeline_summary_from_store() {
+        let mut store = TimelineItemStore::new();
+        store.add_items("git", vec![
+            TimelineItem { id: "1".into(), label: "a".into(), description: Some("desc".into()), timestamp: 100, icon_id: None, command: Some("cmd".into()) },
+            TimelineItem { id: "2".into(), label: "b".into(), description: None, timestamp: 400, icon_id: None, command: None },
+        ]);
+        store.add_items("local", vec![
+            TimelineItem { id: "3".into(), label: "c".into(), description: Some("".into()), timestamp: 200, icon_id: None, command: None },
+        ]);
+        let summary = TimelineSummary::from_store(&store);
+        assert_eq!(summary.provider_count, 2);
+        assert_eq!(summary.total_items, 3);
+        assert_eq!(summary.min_timestamp, Some(100));
+        assert_eq!(summary.max_timestamp, Some(400));
+        assert_eq!(summary.time_span(), Some(300));
+        assert_eq!(summary.items_with_description, 1);
+        assert_eq!(summary.items_with_command, 1);
+        let s = format!("{summary}");
+        assert!(s.contains("providers=2"));
+    }
+
+    #[test]
+    fn filter_is_empty_and_paginator_extensions() {
+        let f = TimelineEventFilter::new();
+        assert!(f.is_empty());
+        let f2 = TimelineEventFilter::new().since(100);
+        assert!(!f2.is_empty());
+
+        let mut pag = TimelinePaginator::new(10);
+        pag.set_total(25);
+        assert!(pag.is_first_page());
+        assert!(!pag.is_last_page());
+        assert_eq!(pag.current_page_one_indexed(), 1);
+        pag.next_page();
+        assert!(!pag.is_first_page());
+        assert_eq!(pag.current_page_one_indexed(), 2);
+        pag.next_page();
+        assert!(pag.is_last_page());
     }
 }

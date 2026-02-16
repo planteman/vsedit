@@ -726,6 +726,92 @@ impl QuickFixTracker {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Additional DiagnosticCollection methods
+// ---------------------------------------------------------------------------
+
+impl DiagnosticCollection {
+    /// Remove all diagnostics from this collection.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Returns references to all diagnostics across all URIs.
+    pub fn all_diagnostics(&self) -> Vec<&Diagnostic> {
+        self.entries.values().flat_map(|v| v.iter()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional DiagnosticBridge methods
+// ---------------------------------------------------------------------------
+
+impl DiagnosticBridge {
+    /// Returns a human-readable summary of all collections.
+    pub fn summary(&self) -> String {
+        let total: usize = self.collections.values().map(|c| c.diagnostic_count()).sum();
+        let cols = self.collections.len();
+        format!("{} diagnostic(s) in {} collection(s)", total, cols)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display for DiagnosticBridge
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for DiagnosticBridge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional Diagnostic methods
+// ---------------------------------------------------------------------------
+
+impl Diagnostic {
+    /// Returns a human-readable label for the diagnostic severity.
+    pub fn severity_label(&self) -> &str {
+        match self.severity {
+            DiagnosticSeverity::Error => "error",
+            DiagnosticSeverity::Warning => "warning",
+            DiagnosticSeverity::Information => "info",
+            DiagnosticSeverity::Hint => "hint",
+        }
+    }
+
+    /// Returns `true` if this diagnostic is a warning.
+    pub fn is_warning(&self) -> bool {
+        self.severity == DiagnosticSeverity::Warning
+    }
+
+    /// Returns `true` if this diagnostic is a hint.
+    pub fn is_hint(&self) -> bool {
+        self.severity == DiagnosticSeverity::Hint
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional SeverityAggregation methods
+// ---------------------------------------------------------------------------
+
+impl SeverityAggregation {
+    /// Returns the most severe diagnostic level present, if any.
+    pub fn worst(&self) -> Option<DiagnosticSeverity> {
+        if self.errors > 0 {
+            Some(DiagnosticSeverity::Error)
+        } else if self.warnings > 0 {
+            Some(DiagnosticSeverity::Warning)
+        } else if self.infos > 0 {
+            Some(DiagnosticSeverity::Information)
+        } else if self.hints > 0 {
+            Some(DiagnosticSeverity::Hint)
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1220,5 +1306,100 @@ mod tests {
         diagnostic_sort(&mut diags);
         assert_eq!(diags[0].start_col, 2);
         assert_eq!(diags[1].start_col, 10);
+    }
+
+    #[test]
+    fn diagnostic_collection_clear() {
+        let mut col = DiagnosticCollection::new("test");
+        col.entries.insert("file:///a.rs".into(), vec![Diagnostic {
+            start_line: 0, start_col: 0, end_line: 0, end_col: 1,
+            message: "err".into(), severity: DiagnosticSeverity::Error,
+            code: None, source: None, related_info: Vec::new(), tags: Vec::new(),
+        }]);
+        assert_eq!(col.diagnostic_count(), 1);
+        col.clear();
+        assert_eq!(col.diagnostic_count(), 0);
+    }
+
+    #[test]
+    fn diagnostic_collection_all_diagnostics() {
+        let mut col = DiagnosticCollection::new("test");
+        col.entries.insert("file:///a.rs".into(), vec![
+            Diagnostic {
+                start_line: 0, start_col: 0, end_line: 0, end_col: 1,
+                message: "e1".into(), severity: DiagnosticSeverity::Error,
+                code: None, source: None, related_info: Vec::new(), tags: Vec::new(),
+            },
+        ]);
+        col.entries.insert("file:///b.rs".into(), vec![
+            Diagnostic {
+                start_line: 1, start_col: 0, end_line: 1, end_col: 5,
+                message: "w1".into(), severity: DiagnosticSeverity::Warning,
+                code: None, source: None, related_info: Vec::new(), tags: Vec::new(),
+            },
+        ]);
+        let all = col.all_diagnostics();
+        assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn diagnostic_bridge_summary_and_display() {
+        let mut bridge = DiagnosticBridge::new();
+        bridge.handle(DiagnosticMessage::SetDiagnostics {
+            collection: "rust".into(),
+            uri: "file:///a.rs".into(),
+            diagnostics: vec![Diagnostic {
+                start_line: 0, start_col: 0, end_line: 0, end_col: 1,
+                message: "err".into(), severity: DiagnosticSeverity::Error,
+                code: None, source: None, related_info: Vec::new(), tags: Vec::new(),
+            }],
+        });
+        assert_eq!(bridge.summary(), "1 diagnostic(s) in 1 collection(s)");
+        assert_eq!(format!("{bridge}"), "1 diagnostic(s) in 1 collection(s)");
+    }
+
+    #[test]
+    fn diagnostic_severity_label() {
+        let d = Diagnostic {
+            start_line: 0, start_col: 0, end_line: 0, end_col: 1,
+            message: "m".into(), severity: DiagnosticSeverity::Warning,
+            code: None, source: None, related_info: Vec::new(), tags: Vec::new(),
+        };
+        assert_eq!(d.severity_label(), "warning");
+        assert!(d.is_warning());
+        assert!(!d.is_hint());
+    }
+
+    #[test]
+    fn diagnostic_is_hint() {
+        let d = Diagnostic {
+            start_line: 0, start_col: 0, end_line: 0, end_col: 1,
+            message: "h".into(), severity: DiagnosticSeverity::Hint,
+            code: None, source: None, related_info: Vec::new(), tags: Vec::new(),
+        };
+        assert!(d.is_hint());
+        assert!(!d.is_warning());
+        assert_eq!(d.severity_label(), "hint");
+    }
+
+    #[test]
+    fn severity_aggregation_worst() {
+        let empty = SeverityAggregation::default();
+        assert!(empty.worst().is_none());
+
+        let hints_only = SeverityAggregation { errors: 0, warnings: 0, infos: 0, hints: 2 };
+        assert_eq!(hints_only.worst(), Some(DiagnosticSeverity::Hint));
+
+        let mixed = SeverityAggregation { errors: 1, warnings: 3, infos: 0, hints: 0 };
+        assert_eq!(mixed.worst(), Some(DiagnosticSeverity::Error));
+
+        let warns = SeverityAggregation { errors: 0, warnings: 1, infos: 2, hints: 0 };
+        assert_eq!(warns.worst(), Some(DiagnosticSeverity::Warning));
+    }
+
+    #[test]
+    fn diagnostic_bridge_empty_summary() {
+        let bridge = DiagnosticBridge::new();
+        assert_eq!(bridge.summary(), "0 diagnostic(s) in 0 collection(s)");
     }
 }

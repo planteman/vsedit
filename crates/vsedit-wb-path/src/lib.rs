@@ -687,6 +687,117 @@ pub fn path_shorten(path: &str, home_dir: &str) -> String {
     path.to_string()
 }
 
+
+// ---------------------------------------------------------------------------
+// PathSeparator helpers
+// ---------------------------------------------------------------------------
+
+impl PathSeparator {
+    /// Returns the character for this separator.
+    pub fn as_char(&self) -> char {
+        match self {
+            PathSeparator::Unix => '/',
+            PathSeparator::Windows => '\\',
+        }
+    }
+
+    /// Detect separator from a path string.
+    pub fn detect(path: &str) -> Self {
+        if path.contains('\\') {
+            PathSeparator::Windows
+        } else {
+            PathSeparator::Unix
+        }
+    }
+
+    /// Returns the other separator variant.
+    pub fn opposite(&self) -> Self {
+        match self {
+            PathSeparator::Unix => PathSeparator::Windows,
+            PathSeparator::Windows => PathSeparator::Unix,
+        }
+    }
+}
+
+impl fmt::Display for PathSeparator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PathSeparator::Unix => write!(f, "Unix (/)"),
+            PathSeparator::Windows => write!(f, "Windows (\\)"),
+        }
+    }
+}
+
+impl Default for PathSeparator {
+    fn default() -> Self {
+        PathSeparator::Unix
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Path analysis helpers
+// ---------------------------------------------------------------------------
+
+/// Count the depth (number of segments) in a path.
+pub fn path_depth(path: &str) -> usize {
+    path.split(|c: char| c == '/' || c == '\\')
+        .filter(|s| !s.is_empty())
+        .count()
+}
+
+/// Returns the common prefix of two paths.
+pub fn common_prefix(a: &str, b: &str) -> String {
+    let sep = if a.contains('\\') || b.contains('\\') { '\\' } else { '/' };
+    let a_parts: Vec<&str> = a.split(|c: char| c == '/' || c == '\\').collect();
+    let b_parts: Vec<&str> = b.split(|c: char| c == '/' || c == '\\').collect();
+    let common: Vec<&str> = a_parts.iter().zip(b_parts.iter())
+        .take_while(|(x, y)| x == y)
+        .map(|(x, _)| *x)
+        .collect();
+    if common.is_empty() {
+        String::new()
+    } else {
+        common.join(&sep.to_string())
+    }
+}
+
+/// Converts all separators in a path to the given separator.
+pub fn normalize_separators(path: &str, sep: PathSeparator) -> String {
+    let c = sep.as_char();
+    path.chars().map(|ch| if ch == '/' || ch == '\\' { c } else { ch }).collect()
+}
+
+/// Returns true if the path has a file extension.
+pub fn has_extension(path: &str) -> bool {
+    let filename = path.rsplit(|c: char| c == '/' || c == '\\').next().unwrap_or(path);
+    filename.contains('.') && !filename.starts_with('.')
+}
+
+/// Returns all ancestor paths (from root to parent).
+pub fn ancestors(path: &str) -> Vec<String> {
+    let parts: Vec<&str> = path.split(|c: char| c == '/' || c == '\\')
+        .filter(|s| !s.is_empty())
+        .collect();
+    let sep = if path.contains('\\') { "\\" } else { "/" };
+    let prefix = if path.starts_with('/') { "/" } else { "" };
+    let mut result = Vec::new();
+    for i in 1..parts.len() {
+        let ancestor = format!("{}{}", prefix, parts[..i].join(sep));
+        result.push(ancestor);
+    }
+    result
+}
+
+/// Joins multiple path segments.
+pub fn path_join_many(base: &str, segments: &[&str]) -> String {
+    let svc = PathService::new(PathSeparator::detect(base));
+    let mut result = base.to_string();
+    for seg in segments {
+        result = svc.join(&result, seg);
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1234,5 +1345,67 @@ mod tests {
     fn wb_path_is_ascii_printable() {
         assert!(WbPathValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbPathValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn test_path_separator_as_char() {
+        assert_eq!(PathSeparator::Unix.as_char(), '/');
+        assert_eq!(PathSeparator::Windows.as_char(), '\\');
+    }
+
+    #[test]
+    fn test_path_separator_detect() {
+        assert_eq!(PathSeparator::detect("/usr/bin"), PathSeparator::Unix);
+        assert_eq!(PathSeparator::detect("C:\\Users"), PathSeparator::Windows);
+    }
+
+    #[test]
+    fn test_path_separator_opposite() {
+        assert_eq!(PathSeparator::Unix.opposite(), PathSeparator::Windows);
+        assert_eq!(PathSeparator::Windows.opposite(), PathSeparator::Unix);
+    }
+
+    #[test]
+    fn test_path_separator_display_and_default() {
+        assert!(format!("{}", PathSeparator::Unix).contains('/'));
+        assert_eq!(PathSeparator::default(), PathSeparator::Unix);
+    }
+
+    #[test]
+    fn test_path_depth() {
+        assert_eq!(path_depth("/usr/local/bin"), 3);
+        assert_eq!(path_depth("a/b"), 2);
+        assert_eq!(path_depth(""), 0);
+    }
+
+    #[test]
+    fn test_common_prefix() {
+        assert_eq!(common_prefix("/usr/local/bin", "/usr/local/lib"), "/usr/local");
+        assert_eq!(common_prefix("/a/b", "/c/d"), "");
+    }
+
+    #[test]
+    fn test_normalize_separators() {
+        assert_eq!(normalize_separators("a/b\\c", PathSeparator::Unix), "a/b/c");
+        assert_eq!(normalize_separators("a/b/c", PathSeparator::Windows), "a\\b\\c");
+    }
+
+    #[test]
+    fn test_has_extension() {
+        assert!(has_extension("file.rs"));
+        assert!(!has_extension(".hidden"));
+        assert!(!has_extension("noext"));
+    }
+
+    #[test]
+    fn test_ancestors() {
+        let ancs = ancestors("/usr/local/bin/tool");
+        assert_eq!(ancs, vec!["/usr", "/usr/local", "/usr/local/bin"]);
+    }
+
+    #[test]
+    fn test_path_join_many() {
+        let result = path_join_many("/home", &["user", "docs", "file.txt"]);
+        assert_eq!(result, "/home/user/docs/file.txt");
     }
 }

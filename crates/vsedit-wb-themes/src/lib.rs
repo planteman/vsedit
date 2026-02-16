@@ -601,6 +601,107 @@ impl ThemeComparison {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ColorValue helpers
+// ---------------------------------------------------------------------------
+
+impl ColorValue {
+    /// Compute the relative luminance per WCAG 2.0.
+    pub fn luminance(&self) -> f64 {
+        relative_luminance(self)
+    }
+
+    /// Compute the WCAG 2.0 contrast ratio against another color.
+    pub fn contrast_ratio(&self, other: &ColorValue) -> f64 {
+        theme_contrast_ratio(self, other)
+    }
+
+    /// Format the color as a normalized 7-character hex string (e.g. "#ff0000").
+    pub fn to_hex_string(&self) -> String {
+        if self.hex.len() == 4 {
+            // Expand #RGB to #RRGGBB
+            let chars: Vec<char> = self.hex.chars().collect();
+            format!(
+                "#{0}{0}{1}{1}{2}{2}",
+                chars[1], chars[2], chars[3]
+            )
+        } else {
+            self.hex.to_lowercase()
+        }
+    }
+
+    /// Create a ColorValue from individual R, G, B components.
+    pub fn from_rgb(r: u8, g: u8, b: u8) -> Self {
+        let hex = format!("#{:02x}{:02x}{:02x}", r, g, b);
+        Self { hex }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThemeType helpers
+// ---------------------------------------------------------------------------
+
+impl ThemeType {
+    /// Returns true for Dark and HighContrast types.
+    pub fn is_dark(&self) -> bool {
+        matches!(self, Self::Dark | Self::HighContrast)
+    }
+
+    /// Returns true for Light and HighContrastLight types.
+    pub fn is_light(&self) -> bool {
+        matches!(self, Self::Light | Self::HighContrastLight)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColorTheme helpers
+// ---------------------------------------------------------------------------
+
+impl ColorTheme {
+    /// Returns true if the theme type is Light or HighContrastLight.
+    pub fn is_light(&self) -> bool {
+        self.theme_type.is_light()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ThemeService helpers
+// ---------------------------------------------------------------------------
+
+impl ThemeService {
+    /// Return all dark themes (Dark or HighContrast).
+    pub fn dark_themes(&self) -> Vec<&ColorTheme> {
+        self.themes.iter().filter(|t| t.theme_type.is_dark()).collect()
+    }
+
+    /// Return all light themes (Light or HighContrastLight).
+    pub fn light_themes(&self) -> Vec<&ColorTheme> {
+        self.themes.iter().filter(|t| t.theme_type.is_light()).collect()
+    }
+
+    /// Return a sorted list of all theme IDs.
+    pub fn all_theme_ids(&self) -> Vec<&str> {
+        let mut ids: Vec<&str> = self.themes.iter().map(|t| t.id.as_str()).collect();
+        ids.sort();
+        ids
+    }
+}
+
+impl fmt::Display for ThemeService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let active = self
+            .get_active()
+            .map(|t| t.label.as_str())
+            .unwrap_or("none");
+        write!(
+            f,
+            "ThemeService({} themes, active={})",
+            self.themes.len(),
+            active
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1218,5 +1319,107 @@ mod tests {
         assert!(darker.red() < light.red());
         assert!(darker.green() < light.green());
         assert!(darker.blue() < light.blue());
+    }
+
+    // -- ColorValue helpers ------------------------------------------------
+
+    #[test]
+    fn color_luminance() {
+        let white = ColorValue::new("#ffffff").unwrap();
+        let black = ColorValue::new("#000000").unwrap();
+        assert!(white.luminance() > 0.9);
+        assert!(black.luminance() < 0.01);
+    }
+
+    #[test]
+    fn color_contrast_ratio_bw() {
+        let white = ColorValue::new("#ffffff").unwrap();
+        let black = ColorValue::new("#000000").unwrap();
+        let ratio = white.contrast_ratio(&black);
+        assert!(ratio > 20.0);
+    }
+
+    #[test]
+    fn color_to_hex_string_long() {
+        let c = ColorValue::new("#FF0000").unwrap();
+        assert_eq!(c.to_hex_string(), "#ff0000");
+    }
+
+    #[test]
+    fn color_to_hex_string_short() {
+        let c = ColorValue::new("#f00").unwrap();
+        assert_eq!(c.to_hex_string(), "#ff0000");
+    }
+
+    #[test]
+    fn color_from_rgb() {
+        let c = ColorValue::from_rgb(255, 128, 0);
+        assert_eq!(c.red(), 255);
+        assert_eq!(c.green(), 128);
+        assert_eq!(c.blue(), 0);
+    }
+
+    // -- ThemeType helpers -------------------------------------------------
+
+    #[test]
+    fn theme_type_is_dark_light() {
+        assert!(ThemeType::Dark.is_dark());
+        assert!(ThemeType::HighContrast.is_dark());
+        assert!(!ThemeType::Light.is_dark());
+        assert!(ThemeType::Light.is_light());
+        assert!(ThemeType::HighContrastLight.is_light());
+        assert!(!ThemeType::Dark.is_light());
+    }
+
+    // -- ColorTheme::is_light ----------------------------------------------
+
+    #[test]
+    fn color_theme_is_light() {
+        let light = ColorTheme {
+            id: "light".into(),
+            label: "Light".into(),
+            theme_type: ThemeType::Light,
+            colors: HashMap::new(),
+            token_colors: Vec::new(),
+        };
+        assert!(light.is_light());
+        assert!(!dark_theme().is_light());
+    }
+
+    // -- ThemeService helpers -----------------------------------------------
+
+    #[test]
+    fn service_dark_and_light_themes() {
+        let mut svc = ThemeService::new();
+        svc.register_theme(dark_theme());
+        svc.register_theme(ColorTheme {
+            id: "light-plus".into(),
+            label: "Light+".into(),
+            theme_type: ThemeType::Light,
+            colors: HashMap::new(),
+            token_colors: Vec::new(),
+        });
+        assert_eq!(svc.dark_themes().len(), 1);
+        assert_eq!(svc.light_themes().len(), 1);
+    }
+
+    #[test]
+    fn service_all_theme_ids() {
+        let mut svc = ThemeService::new();
+        svc.register_theme(dark_theme());
+        let ids = svc.all_theme_ids();
+        assert_eq!(ids, vec!["dark-plus"]);
+    }
+
+    #[test]
+    fn service_display() {
+        let mut svc = ThemeService::new();
+        let s = format!("{}", svc);
+        assert!(s.contains("0 themes"));
+        assert!(s.contains("active=none"));
+        svc.register_theme(dark_theme());
+        svc.set_active("dark-plus");
+        let s2 = format!("{}", svc);
+        assert!(s2.contains("active=Dark+"));
     }
 }

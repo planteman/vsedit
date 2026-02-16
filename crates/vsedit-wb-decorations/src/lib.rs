@@ -648,6 +648,173 @@ impl fmt::Display for GutterDecoration {
     }
 }
 
+// ---------------------------------------------------------------------------
+// DecorationRange helpers
+// ---------------------------------------------------------------------------
+
+impl DecorationRange {
+    /// Create a single-line range.
+    pub fn single_line(line: u32, start_col: u32, end_col: u32) -> Self {
+        Self {
+            start_line: line,
+            start_col,
+            end_line: line,
+            end_col,
+            hover_message: None,
+        }
+    }
+
+    /// Create a whole-line range.
+    pub fn whole_line(line: u32) -> Self {
+        Self {
+            start_line: line,
+            start_col: 0,
+            end_line: line,
+            end_col: u32::MAX,
+            hover_message: None,
+        }
+    }
+
+    /// Set the hover message.
+    pub fn with_hover(mut self, msg: impl Into<String>) -> Self {
+        self.hover_message = Some(msg.into());
+        self
+    }
+
+    /// Number of lines this range spans.
+    pub fn line_span(&self) -> u32 {
+        self.end_line.saturating_sub(self.start_line) + 1
+    }
+
+    /// Returns true if the range spans multiple lines.
+    pub fn is_multiline(&self) -> bool {
+        self.start_line != self.end_line
+    }
+
+    /// Returns true if this range contains the given position.
+    pub fn contains_position(&self, line: u32, col: u32) -> bool {
+        if line < self.start_line || line > self.end_line {
+            return false;
+        }
+        if line == self.start_line && col < self.start_col {
+            return false;
+        }
+        if line == self.end_line && col > self.end_col {
+            return false;
+        }
+        true
+    }
+
+    /// Returns true if two ranges overlap.
+    pub fn overlaps(&self, other: &DecorationRange) -> bool {
+        if self.end_line < other.start_line || other.end_line < self.start_line {
+            return false;
+        }
+        if self.end_line == other.start_line && self.end_col <= other.start_col {
+            return false;
+        }
+        if other.end_line == self.start_line && other.end_col <= self.start_col {
+            return false;
+        }
+        true
+    }
+}
+
+impl Default for DecorationRange {
+    fn default() -> Self {
+        Self::single_line(0, 0, 0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DecorationType builder
+// ---------------------------------------------------------------------------
+
+impl DecorationType {
+    /// Create a minimal decoration type with just an id.
+    pub fn new(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            background_color: None,
+            border: None,
+            outline: None,
+            gutter_icon: None,
+            is_whole_line: false,
+            after_text: None,
+            before_text: None,
+        }
+    }
+
+    /// Set background color.
+    pub fn with_background(mut self, color: impl Into<String>) -> Self {
+        self.background_color = Some(color.into());
+        self
+    }
+
+    /// Set as whole line decoration.
+    pub fn whole_line(mut self) -> Self {
+        self.is_whole_line = true;
+        self
+    }
+
+    /// Set after text.
+    pub fn with_after_text(mut self, text: impl Into<String>) -> Self {
+        self.after_text = Some(text.into());
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GutterIndicatorKind helpers
+// ---------------------------------------------------------------------------
+
+impl GutterIndicatorKind {
+    /// Returns all gutter indicator variants.
+    pub fn all() -> Vec<Self> {
+        vec![
+            Self::Breakpoint,
+            Self::Error,
+            Self::Warning,
+            Self::GitAdd,
+            Self::GitModify,
+            Self::GitDelete,
+            Self::Custom,
+        ]
+    }
+
+    /// Returns true if this is a diff-related indicator.
+    pub fn is_diff(&self) -> bool {
+        matches!(self, Self::GitAdd | Self::GitModify | Self::GitDelete)
+    }
+
+    /// Returns true if this is a diagnostic indicator.
+    pub fn is_diagnostic(&self) -> bool {
+        matches!(self, Self::Error | Self::Warning)
+    }
+}
+
+/// Count decorations by type across all sets.
+pub fn count_by_type(service: &DecorationService) -> std::collections::HashMap<String, usize> {
+    let mut map = std::collections::HashMap::new();
+    for set in &service.sets {
+        *map.entry(set.type_id.clone()).or_insert(0) += set.ranges.len();
+    }
+    map
+}
+
+/// Find all decorations at a given line.
+pub fn decorations_at_line(service: &DecorationService, line: u32) -> Vec<(&DecorationSet, &DecorationRange)> {
+    let mut results = Vec::new();
+    for set in &service.sets {
+        for range in &set.ranges {
+            if range.start_line <= line && range.end_line >= line {
+                results.push((set, range));
+            }
+        }
+    }
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1238,5 +1405,100 @@ mod tests {
             kind: GutterIndicatorKind::Error,
         };
         assert_eq!(format!("{dec}"), "L42 [error]");
+    }
+
+    #[test]
+    fn test_decoration_range_single_line() {
+        let r = DecorationRange::single_line(5, 0, 10);
+        assert_eq!(r.line_span(), 1);
+        assert!(!r.is_multiline());
+    }
+
+    #[test]
+    fn test_decoration_range_whole_line() {
+        let r = DecorationRange::whole_line(3);
+        assert_eq!(r.start_line, 3);
+        assert_eq!(r.end_col, u32::MAX);
+    }
+
+    #[test]
+    fn test_decoration_range_with_hover() {
+        let r = DecorationRange::single_line(1, 0, 5).with_hover("hint");
+        assert_eq!(r.hover_message.as_deref(), Some("hint"));
+    }
+
+    #[test]
+    fn test_decoration_range_contains_position() {
+        let r = DecorationRange { start_line: 1, start_col: 5, end_line: 3, end_col: 10, hover_message: None };
+        assert!(r.contains_position(2, 0));
+        assert!(r.contains_position(1, 5));
+        assert!(!r.contains_position(0, 0));
+        assert!(!r.contains_position(3, 11));
+    }
+
+    #[test]
+    fn test_decoration_range_overlaps() {
+        let a = DecorationRange::single_line(5, 0, 10);
+        let b = DecorationRange::single_line(5, 5, 15);
+        let c = DecorationRange::single_line(6, 0, 5);
+        assert!(a.overlaps(&b));
+        assert!(!a.overlaps(&c));
+    }
+
+    #[test]
+    fn test_decoration_type_builder() {
+        let dt = DecorationType::new("test")
+            .with_background("#FF0000")
+            .whole_line()
+            .with_after_text("suffix");
+        assert_eq!(dt.id, "test");
+        assert_eq!(dt.background_color.as_deref(), Some("#FF0000"));
+        assert!(dt.is_whole_line);
+        assert_eq!(dt.after_text.as_deref(), Some("suffix"));
+    }
+
+    #[test]
+    fn test_gutter_indicator_kind_all() {
+        assert_eq!(GutterIndicatorKind::all().len(), 7);
+    }
+
+    #[test]
+    fn test_gutter_indicator_kind_is_diff_diagnostic() {
+        assert!(GutterIndicatorKind::GitAdd.is_diff());
+        assert!(!GutterIndicatorKind::Error.is_diff());
+        assert!(GutterIndicatorKind::Error.is_diagnostic());
+        assert!(!GutterIndicatorKind::GitAdd.is_diagnostic());
+    }
+
+    #[test]
+    fn test_count_by_type() {
+        let svc = DecorationService {
+            types: vec![],
+            sets: vec![
+                DecorationSet {
+                    type_id: "highlight".into(),
+                    uri: "file.rs".into(),
+                    ranges: vec![DecorationRange::single_line(1, 0, 5), DecorationRange::single_line(2, 0, 5)],
+                },
+            ],
+        };
+        let counts = count_by_type(&svc);
+        assert_eq!(counts["highlight"], 2);
+    }
+
+    #[test]
+    fn test_decorations_at_line() {
+        let svc = DecorationService {
+            types: vec![],
+            sets: vec![
+                DecorationSet {
+                    type_id: "hl".into(),
+                    uri: "f.rs".into(),
+                    ranges: vec![DecorationRange::single_line(5, 0, 10)],
+                },
+            ],
+        };
+        assert_eq!(decorations_at_line(&svc, 5).len(), 1);
+        assert_eq!(decorations_at_line(&svc, 6).len(), 0);
     }
 }

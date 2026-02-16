@@ -643,6 +643,249 @@ impl StatusBar {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Entry query helpers
+// ---------------------------------------------------------------------------
+
+impl StatusBarEntry {
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    pub fn has_tooltip(&self) -> bool {
+        self.tooltip.is_some()
+    }
+
+    pub fn has_command(&self) -> bool {
+        self.command.is_some()
+    }
+
+    pub fn matches_filter(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.id.to_lowercase().contains(&q) || self.text.to_lowercase().contains(&q)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBar iteration and query extensions
+// ---------------------------------------------------------------------------
+
+impl StatusBar {
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn visible_entries(&self) -> Vec<&StatusBarEntry> {
+        self.entries.iter().filter(|e| e.visible).collect()
+    }
+
+    pub fn find_by_id(&self, id: &str) -> Option<&StatusBarEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, StatusBarEntry> {
+        self.entries.iter()
+    }
+
+    pub fn summary(&self) -> StatusBarSummary {
+        let total = self.entries.len();
+        let visible = self.entries.iter().filter(|e| e.visible).count();
+        let with_tooltip = self.entries.iter().filter(|e| e.tooltip.is_some()).count();
+        let with_command = self.entries.iter().filter(|e| e.command.is_some()).count();
+        let left = self
+            .entries
+            .iter()
+            .filter(|e| e.alignment == StatusBarAlignment::Left)
+            .count();
+        let right = total - left;
+        StatusBarSummary {
+            total,
+            visible,
+            hidden: total - visible,
+            left,
+            right,
+            with_tooltip,
+            with_command,
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a StatusBar {
+    type Item = &'a StatusBarEntry;
+    type IntoIter = std::slice::Iter<'a, StatusBarEntry>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.entries.iter()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarSnapshot extensions
+// ---------------------------------------------------------------------------
+
+impl StatusBarSnapshot {
+    pub fn diff(&self, other: &StatusBarSnapshot) -> Vec<String> {
+        let mut changes = Vec::new();
+        for entry in &self.entries {
+            match other.get_entry(&entry.id) {
+                None => changes.push(format!("removed: {}", entry.id)),
+                Some(other_entry) => {
+                    if entry.text != other_entry.text {
+                        changes.push(format!(
+                            "changed text: {} '{}' -> '{}'",
+                            entry.id, entry.text, other_entry.text
+                        ));
+                    }
+                    if entry.visible != other_entry.visible {
+                        changes.push(format!(
+                            "changed visibility: {} {} -> {}",
+                            entry.id, entry.visible, other_entry.visible
+                        ));
+                    }
+                }
+            }
+        }
+        for entry in &other.entries {
+            if self.get_entry(&entry.id).is_none() {
+                changes.push(format!("added: {}", entry.id));
+            }
+        }
+        changes
+    }
+}
+
+impl fmt::Display for StatusBarSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "StatusBarSnapshot({} entries)", self.entries.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarGroup extensions
+// ---------------------------------------------------------------------------
+
+impl StatusBarGroup {
+    pub fn entry_count(&self) -> usize {
+        self.entry_ids.len()
+    }
+
+    pub fn merge(&mut self, other: &StatusBarGroup) {
+        for id in &other.entry_ids {
+            if !self.contains(id) {
+                self.entry_ids.push(id.clone());
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarLayout extensions
+// ---------------------------------------------------------------------------
+
+impl StatusBarLayout {
+    pub fn total_width(&self) -> usize {
+        self.left_text_width + self.right_text_width
+    }
+
+    pub fn left_count(&self) -> usize {
+        self.left_count
+    }
+
+    pub fn right_count(&self) -> usize {
+        self.right_count
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarPriorityTier extensions
+// ---------------------------------------------------------------------------
+
+impl StatusBarPriorityTier {
+    pub fn is_high(&self) -> bool {
+        *self == StatusBarPriorityTier::Essential
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            StatusBarPriorityTier::Essential => "essential",
+            StatusBarPriorityTier::Standard => "standard",
+            StatusBarPriorityTier::Optional => "optional",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarTooltip extensions
+// ---------------------------------------------------------------------------
+
+impl StatusBarTooltip {
+    pub fn is_empty(&self) -> bool {
+        self.title.is_empty() && self.description.is_none() && self.shortcut.is_none()
+    }
+
+    pub fn word_count(&self) -> usize {
+        let mut count = self.title.split_whitespace().count();
+        if let Some(ref desc) = self.description {
+            count += desc.split_whitespace().count();
+        }
+        if let Some(ref shortcut) = self.shortcut {
+            count += shortcut.split_whitespace().count();
+        }
+        count
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StatusBarVisibility extensions
+// ---------------------------------------------------------------------------
+
+impl StatusBarVisibility {
+    pub fn is_shown(&self) -> bool {
+        matches!(self, StatusBarVisibility::Always)
+    }
+}
+
+impl fmt::Display for StatusBarVisibility {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StatusBarVisibility::Always => write!(f, "Always"),
+            StatusBarVisibility::Hidden => write!(f, "Hidden"),
+            StatusBarVisibility::WhenNonEmpty => write!(f, "WhenNonEmpty"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Statistical summary
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusBarSummary {
+    pub total: usize,
+    pub visible: usize,
+    pub hidden: usize,
+    pub left: usize,
+    pub right: usize,
+    pub with_tooltip: usize,
+    pub with_command: usize,
+}
+
+impl fmt::Display for StatusBarSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "total={} visible={} hidden={} left={} right={} tooltips={} commands={}",
+            self.total,
+            self.visible,
+            self.hidden,
+            self.left,
+            self.right,
+            self.with_tooltip,
+            self.with_command,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1206,5 +1449,138 @@ mod tests {
     fn apply_visibility_rule_missing_entry() {
         let mut bar = StatusBar::new();
         assert!(!bar.apply_visibility_rule("nope", StatusBarVisibility::Always));
+    }
+
+    #[test]
+    fn entry_query_helpers() {
+        let entry = StatusBarEntry::builder("git", "main", StatusBarAlignment::Left)
+            .tooltip("branch info")
+            .build();
+        assert!(entry.is_visible());
+        assert!(entry.has_tooltip());
+        assert!(!entry.has_command());
+        assert!(entry.matches_filter("GIT"));
+        assert!(entry.matches_filter("mai"));
+        assert!(!entry.matches_filter("zzz"));
+    }
+
+    #[test]
+    fn statusbar_is_empty_and_iter() {
+        let mut bar = StatusBar::new();
+        assert!(bar.is_empty());
+        bar.add_entry(make_entry("a", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("b", StatusBarAlignment::Right, 1));
+        assert!(!bar.is_empty());
+        let ids: Vec<&str> = bar.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, vec!["a", "b"]);
+        let ids2: Vec<&str> = (&bar).into_iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids2, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn visible_entries_and_find_by_id() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("v", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("h", StatusBarAlignment::Left, 1));
+        bar.set_visibility("h", false);
+        assert_eq!(bar.visible_entries().len(), 1);
+        assert_eq!(bar.visible_entries()[0].id, "v");
+        assert!(bar.find_by_id("v").is_some());
+        assert!(bar.find_by_id("missing").is_none());
+    }
+
+    #[test]
+    fn snapshot_diff_detects_changes() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("a", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("b", StatusBarAlignment::Right, 1));
+        let snap1 = bar.snapshot();
+        bar.update_text("a", "changed");
+        bar.remove_entry("b");
+        bar.add_entry(make_entry("c", StatusBarAlignment::Left, 2));
+        let snap2 = bar.snapshot();
+        let diff = snap1.diff(&snap2);
+        assert!(diff.iter().any(|d| d.contains("changed text: a")));
+        assert!(diff.iter().any(|d| d.contains("removed: b")));
+        assert!(diff.iter().any(|d| d.contains("added: c")));
+        assert_eq!(format!("{}", snap1), "StatusBarSnapshot(2 entries)");
+    }
+
+    #[test]
+    fn group_merge_and_entry_count() {
+        let mut g1 = StatusBarGroup::new("g1");
+        g1.add("a");
+        g1.add("b");
+        let mut g2 = StatusBarGroup::new("g2");
+        g2.add("b");
+        g2.add("c");
+        g1.merge(&g2);
+        assert_eq!(g1.entry_count(), 3);
+        assert!(g1.contains("c"));
+    }
+
+    #[test]
+    fn layout_total_width_and_accessors() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("left", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("right", StatusBarAlignment::Right, 0));
+        bar.update_text("left", "hello");
+        bar.update_text("right", "world!");
+        let layout = bar.compute_layout();
+        assert_eq!(layout.total_width(), 11);
+        assert_eq!(layout.left_count(), 1);
+        assert_eq!(layout.right_count(), 1);
+    }
+
+    #[test]
+    fn priority_tier_helpers() {
+        assert!(StatusBarPriorityTier::Essential.is_high());
+        assert!(!StatusBarPriorityTier::Standard.is_high());
+        assert_eq!(StatusBarPriorityTier::Optional.label(), "optional");
+    }
+
+    #[test]
+    fn tooltip_is_empty_and_word_count() {
+        let empty = StatusBarTooltip::new("id", "");
+        assert!(empty.is_empty());
+        assert_eq!(empty.word_count(), 0);
+        let tip = StatusBarTooltip::new("id", "Hello World")
+            .with_description("A longer description here");
+        assert!(!tip.is_empty());
+        assert_eq!(tip.word_count(), 6);
+    }
+
+    #[test]
+    fn visibility_is_shown_and_display() {
+        assert!(StatusBarVisibility::Always.is_shown());
+        assert!(!StatusBarVisibility::Hidden.is_shown());
+        assert!(!StatusBarVisibility::WhenNonEmpty.is_shown());
+        assert_eq!(format!("{}", StatusBarVisibility::Always), "Always");
+        assert_eq!(format!("{}", StatusBarVisibility::Hidden), "Hidden");
+        assert_eq!(format!("{}", StatusBarVisibility::WhenNonEmpty), "WhenNonEmpty");
+    }
+
+    #[test]
+    fn summary_statistics() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(
+            StatusBarEntry::builder("a", "text", StatusBarAlignment::Left)
+                .tooltip("tip")
+                .command("cmd")
+                .build(),
+        );
+        bar.add_entry(make_entry("b", StatusBarAlignment::Right, 1));
+        bar.set_visibility("b", false);
+        let s = bar.summary();
+        assert_eq!(s.total, 2);
+        assert_eq!(s.visible, 1);
+        assert_eq!(s.hidden, 1);
+        assert_eq!(s.left, 1);
+        assert_eq!(s.right, 1);
+        assert_eq!(s.with_tooltip, 1);
+        assert_eq!(s.with_command, 1);
+        let display = format!("{s}");
+        assert!(display.contains("total=2"));
+        assert!(display.contains("commands=1"));
     }
 }

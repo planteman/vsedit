@@ -750,6 +750,107 @@ pub fn format_menu_item_with_shortcut(item: &MenuItem, width: usize) -> String {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MenuItemKind Display
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for MenuItemKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MenuItemKind::Action => write!(f, "action"),
+            MenuItemKind::Submenu => write!(f, "submenu"),
+            MenuItemKind::Separator => write!(f, "separator"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Deep action iterator
+// ---------------------------------------------------------------------------
+
+/// An iterator that yields all leaf `Action` items from a menu tree.
+pub struct MenuActionIter<'a> {
+    stack: Vec<&'a MenuItem>,
+}
+
+impl<'a> MenuActionIter<'a> {
+    pub fn new(items: &'a [MenuItem]) -> Self {
+        let stack: Vec<&'a MenuItem> = items.iter().rev().collect();
+        Self { stack }
+    }
+}
+
+impl<'a> Iterator for MenuActionIter<'a> {
+    type Item = &'a MenuItem;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(item) = self.stack.pop() {
+            for child in item.children.iter().rev() {
+                self.stack.push(child);
+            }
+            if item.kind == MenuItemKind::Action {
+                return Some(item);
+            }
+        }
+        None
+    }
+}
+
+impl MenuBar {
+    /// Returns an iterator over all leaf action items in the menu bar.
+    pub fn actions(&self) -> MenuActionIter<'_> {
+        MenuActionIter::new(&self.menus)
+    }
+
+    /// Count how many leaf action items exist across the entire menu bar.
+    pub fn action_count(&self) -> usize {
+        self.actions().count()
+    }
+
+    /// Collect all unique menu item IDs (non-empty) in the tree.
+    pub fn all_ids(&self) -> Vec<&str> {
+        fn collect_ids<'a>(items: &'a [MenuItem], out: &mut Vec<&'a str>) {
+            for item in items {
+                if !item.id.is_empty() {
+                    out.push(&item.id);
+                }
+                collect_ids(&item.children, out);
+            }
+        }
+        let mut ids = Vec::new();
+        collect_ids(&self.menus, &mut ids);
+        ids
+    }
+}
+
+impl MenuItem {
+    /// Returns true if this is a leaf action (no children, Action kind).
+    pub fn is_leaf_action(&self) -> bool {
+        self.kind == MenuItemKind::Action && self.children.is_empty()
+    }
+
+    /// Returns the depth of this item's submenu tree.
+    pub fn max_depth(&self) -> usize {
+        if self.children.is_empty() {
+            0
+        } else {
+            1 + self.children.iter().map(|c| c.max_depth()).max().unwrap_or(0)
+        }
+    }
+
+    /// Set the keybinding using builder style.
+    pub fn with_keybinding(mut self, kb: impl Into<String>) -> Self {
+        self.keybinding = Some(kb.into());
+        self
+    }
+
+    /// Set enabled flag using builder style.
+    pub fn with_enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1213,5 +1314,66 @@ mod tests {
         let item = MenuItem::action("open", "Open");
         let result = format_menu_item_with_shortcut(&item, 30);
         assert_eq!(result, "Open");
+    }
+
+    #[test]
+    fn menu_item_kind_display() {
+        assert_eq!(MenuItemKind::Action.to_string(), "action");
+        assert_eq!(MenuItemKind::Submenu.to_string(), "submenu");
+        assert_eq!(MenuItemKind::Separator.to_string(), "separator");
+    }
+
+    #[test]
+    fn menu_action_iter_flat() {
+        let mut bar = MenuBar::new();
+        bar.add_menu(MenuItem::action("a1", "A1"));
+        bar.add_menu(MenuItem::separator());
+        bar.add_menu(MenuItem::action("a2", "A2"));
+        let ids: Vec<&str> = bar.actions().map(|i| i.id.as_str()).collect();
+        assert_eq!(ids, vec!["a1", "a2"]);
+    }
+
+    #[test]
+    fn menu_action_iter_nested() {
+        let mut sub = MenuItem::submenu("sub", "Sub");
+        sub.children.push(MenuItem::action("c1", "C1"));
+        sub.children.push(MenuItem::action("c2", "C2"));
+        let mut bar = MenuBar::new();
+        bar.add_menu(sub);
+        assert_eq!(bar.action_count(), 2);
+    }
+
+    #[test]
+    fn menu_all_ids() {
+        let mut bar = MenuBar::new();
+        bar.add_menu(MenuItem::action("x", "X"));
+        bar.add_menu(MenuItem::separator()); // empty id
+        let ids = bar.all_ids();
+        assert_eq!(ids, vec!["x"]);
+    }
+
+    #[test]
+    fn menu_item_is_leaf_action() {
+        let a = MenuItem::action("a", "A");
+        assert!(a.is_leaf_action());
+        let s = MenuItem::submenu("s", "S");
+        assert!(!s.is_leaf_action());
+    }
+
+    #[test]
+    fn menu_item_max_depth() {
+        let mut sub = MenuItem::submenu("s", "S");
+        sub.children.push(MenuItem::action("a", "A"));
+        assert_eq!(sub.max_depth(), 1);
+        assert_eq!(MenuItem::action("a", "A").max_depth(), 0);
+    }
+
+    #[test]
+    fn menu_item_builder_methods() {
+        let item = MenuItem::action("save", "Save")
+            .with_keybinding("Ctrl+S")
+            .with_enabled(false);
+        assert_eq!(item.keybinding.as_deref(), Some("Ctrl+S"));
+        assert!(!item.enabled);
     }
 }

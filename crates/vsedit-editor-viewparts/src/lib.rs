@@ -653,6 +653,89 @@ pub fn compute_indentation_levels(lines: &[&str], tab_size: u32) -> Vec<u32> {
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Additional helpers
+// ---------------------------------------------------------------------------
+
+impl EditorViewParts {
+    /// Returns the number of view zones.
+    pub fn view_zone_count(&self) -> usize {
+        self.zones.len()
+    }
+
+    /// Returns the number of overlay widgets.
+    pub fn overlay_count(&self) -> usize {
+        self.overlays.len()
+    }
+
+    /// Returns the number of content widgets.
+    pub fn content_widget_count(&self) -> usize {
+        self.content_widgets.len()
+    }
+}
+
+impl std::fmt::Display for EditorViewParts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "EditorViewParts(zones: {}, overlays: {}, content: {}, glyphs: {})",
+            self.zones.len(),
+            self.overlays.len(),
+            self.content_widgets.len(),
+            self.glyph_margins.len(),
+        )
+    }
+}
+
+impl Minimap {
+    /// Builder: set the minimap side.
+    pub fn with_side(mut self, side: MinimapSide) -> Self {
+        self.side = side;
+        self
+    }
+
+    /// Builder: set the minimap scale.
+    pub fn with_scale(mut self, scale: f64) -> Self {
+        self.scale = scale;
+        self
+    }
+}
+
+impl std::fmt::Display for Minimap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = if self.enabled { "enabled" } else { "disabled" };
+        let side = match self.side {
+            MinimapSide::Left => "left",
+            MinimapSide::Right => "right",
+        };
+        write!(f, "Minimap({state}, {side}, scale={:.1}, max_col={})", self.scale, self.max_column)
+    }
+}
+
+impl ViewZone {
+    /// Compute the pixel height of this zone given a line height in pixels.
+    pub fn height_pixels(&self, line_height: u32) -> u32 {
+        self.height_in_lines * line_height
+    }
+}
+
+impl GutterDecoration {
+    /// Returns `true` if this decoration is a breakpoint (regular or conditional).
+    pub fn is_breakpoint(&self) -> bool {
+        matches!(
+            self.decoration_type,
+            GutterDecorationType::Breakpoint | GutterDecorationType::ConditionalBreakpoint
+        )
+    }
+}
+
+impl GutterDecorationType {
+    /// Returns `true` if this type represents a diagnostic (Error, Warning, or Info).
+    pub fn is_diagnostic(&self) -> bool {
+        matches!(self, Self::Error | Self::Warning | Self::Info)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1221,5 +1304,77 @@ mod tests {
     fn compute_indentation_levels_empty() {
         let levels = compute_indentation_levels(&[], 4);
         assert!(levels.is_empty());
+    }
+
+    #[test]
+    fn view_zone_count() {
+        let mut parts = EditorViewParts::new();
+        assert_eq!(parts.view_zone_count(), 0);
+        parts.add_view_zone(1, 3);
+        parts.add_view_zone(5, 2);
+        assert_eq!(parts.view_zone_count(), 2);
+    }
+
+    #[test]
+    fn overlay_and_content_widget_count() {
+        let mut parts = EditorViewParts::new();
+        assert_eq!(parts.overlay_count(), 0);
+        assert_eq!(parts.content_widget_count(), 0);
+        parts.add_overlay(OverlayWidget {
+            id: "o1".into(), position_top: 0, position_left: 0,
+            content: "test".into(), visible: true,
+        });
+        parts.add_content_widget(ContentWidget {
+            id: "c1".into(), line: 1, column: 1,
+            content: "hint".into(), visible: true,
+        });
+        assert_eq!(parts.overlay_count(), 1);
+        assert_eq!(parts.content_widget_count(), 1);
+    }
+
+    #[test]
+    fn editor_view_parts_display() {
+        let parts = EditorViewParts::new();
+        let s = format!("{parts}");
+        assert!(s.contains("zones: 0"));
+        assert!(s.contains("overlays: 0"));
+    }
+
+    #[test]
+    fn minimap_builder_and_display() {
+        let m = Minimap::default()
+            .with_side(MinimapSide::Left)
+            .with_scale(2.0);
+        assert_eq!(m.side, MinimapSide::Left);
+        assert!((m.scale - 2.0).abs() < f64::EPSILON);
+        let s = format!("{m}");
+        assert!(s.contains("left"));
+        assert!(s.contains("enabled"));
+    }
+
+    #[test]
+    fn view_zone_height_pixels() {
+        let zone = ViewZone { id: 1, after_line: 0, height_in_lines: 5, content: None };
+        assert_eq!(zone.height_pixels(20), 100);
+        assert_eq!(zone.height_pixels(0), 0);
+    }
+
+    #[test]
+    fn gutter_decoration_is_breakpoint() {
+        let bp = GutterDecoration::new(1, GutterDecorationType::Breakpoint);
+        assert!(bp.is_breakpoint());
+        let cbp = GutterDecoration::new(2, GutterDecorationType::ConditionalBreakpoint);
+        assert!(cbp.is_breakpoint());
+        let bm = GutterDecoration::new(3, GutterDecorationType::Bookmark);
+        assert!(!bm.is_breakpoint());
+    }
+
+    #[test]
+    fn gutter_decoration_type_is_diagnostic() {
+        assert!(GutterDecorationType::Error.is_diagnostic());
+        assert!(GutterDecorationType::Warning.is_diagnostic());
+        assert!(GutterDecorationType::Info.is_diagnostic());
+        assert!(!GutterDecorationType::Breakpoint.is_diagnostic());
+        assert!(!GutterDecorationType::Bookmark.is_diagnostic());
     }
 }

@@ -682,6 +682,176 @@ pub fn sticky_scroll_from_scopes(
     }).collect()
 }
 
+
+// ---------------------------------------------------------------------------
+// StickyScrollLine helpers
+// ---------------------------------------------------------------------------
+
+impl StickyScrollLine {
+    /// Create a new sticky scroll line.
+    pub fn new(line_number: u32, text: impl Into<String>, nesting_level: u32) -> Self {
+        Self {
+            line_number,
+            text: text.into(),
+            nesting_level,
+            collapsed: false,
+        }
+    }
+
+    /// Mark this line as collapsed.
+    pub fn collapsed(mut self) -> Self {
+        self.collapsed = true;
+        self
+    }
+
+    /// Returns the trimmed text (no leading whitespace).
+    pub fn trimmed_text(&self) -> &str {
+        self.text.trim_start()
+    }
+
+    /// Returns the visual indent width (4 spaces per level).
+    pub fn indent_width(&self) -> usize {
+        self.nesting_level as usize * 4
+    }
+
+    /// Returns true if this line is at the top level.
+    pub fn is_top_level(&self) -> bool {
+        self.nesting_level == 0
+    }
+}
+
+impl Default for StickyScrollLine {
+    fn default() -> Self {
+        Self::new(0, "", 0)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StickyScrollConfig helpers
+// ---------------------------------------------------------------------------
+
+impl StickyScrollConfig {
+    /// Create a config with default values.
+    pub fn standard() -> Self {
+        Self::default()
+    }
+
+    /// Create a minimal config (1 line max).
+    pub fn minimal() -> Self {
+        Self {
+            enabled: true,
+            max_line_count: 1,
+            default_model: "outlineModel".to_string(),
+        }
+    }
+
+    /// Create a disabled config.
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            max_line_count: 0,
+            default_model: "outlineModel".to_string(),
+        }
+    }
+
+    /// Validate the config.
+    pub fn validate(&self) -> Result<(), StickyScrollError> {
+        if self.enabled && self.max_line_count == 0 {
+            return Err(StickyScrollError::NoLinesAvailable);
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for StickyScrollConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.enabled {
+            write!(f, "enabled (max {} lines)", self.max_line_count)
+        } else {
+            write!(f, "disabled")
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StickyScrollStrategy helpers
+// ---------------------------------------------------------------------------
+
+impl StickyScrollStrategy {
+    /// Returns all strategy variants.
+    pub fn all() -> &'static [StickyScrollStrategy] {
+        &[StickyScrollStrategy::Indentation, StickyScrollStrategy::Scope]
+    }
+
+    /// Parse from a string.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().as_str() {
+            "indentation" | "indent" => Some(Self::Indentation),
+            "scope" | "ast" => Some(Self::Scope),
+            _ => None,
+        }
+    }
+}
+
+impl Default for StickyScrollStrategy {
+    fn default() -> Self {
+        StickyScrollStrategy::Indentation
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sticky scroll analysis helpers
+// ---------------------------------------------------------------------------
+
+/// Summary of sticky scroll state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StickyScrollSummary {
+    pub visible_lines: usize,
+    pub max_nesting: u32,
+    pub collapsed_count: usize,
+    pub widget_enabled: bool,
+}
+
+impl StickyScrollSummary {
+    /// Generate summary from a widget.
+    pub fn from_widget(widget: &StickyScrollWidget) -> Self {
+        let lines = widget.get_visible_sticky_lines();
+        Self {
+            visible_lines: lines.len(),
+            max_nesting: lines.iter().map(|l| l.nesting_level).max().unwrap_or(0),
+            collapsed_count: lines.iter().filter(|l| l.collapsed).count(),
+            widget_enabled: widget.is_enabled(),
+        }
+    }
+}
+
+impl fmt::Display for StickyScrollSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} visible lines (max nesting {}, {} collapsed)",
+            self.visible_lines, self.max_nesting, self.collapsed_count
+        )
+    }
+}
+
+/// Compute the nesting depth of a line based on indentation.
+pub fn nesting_depth_from_indent(line: &str, indent_size: usize) -> u32 {
+    if indent_size == 0 {
+        return 0;
+    }
+    let leading_spaces = line.len() - line.trim_start().len();
+    (leading_spaces / indent_size) as u32
+}
+
+/// Filter sticky scroll lines to only show up to max_depth nesting.
+pub fn filter_by_max_depth(lines: &[StickyScrollLine], max_depth: u32) -> Vec<StickyScrollLine> {
+    lines.iter()
+        .filter(|l| l.nesting_level <= max_depth)
+        .cloned()
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1243,5 +1413,85 @@ mod tests {
         ];
         let result = sticky_scroll_from_scopes(&scopes, 5, 2);
         assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_sticky_line_new() {
+        let line = StickyScrollLine::new(10, "fn main() {", 0);
+        assert_eq!(line.line_number, 10);
+        assert!(line.is_top_level());
+        assert!(!line.collapsed);
+        assert_eq!(line.indent_width(), 0);
+    }
+
+    #[test]
+    fn test_sticky_line_collapsed() {
+        let line = StickyScrollLine::new(5, "if cond {", 1).collapsed();
+        assert!(line.collapsed);
+        assert_eq!(line.nesting_level, 1);
+    }
+
+    #[test]
+    fn test_sticky_line_trimmed_text() {
+        let line = StickyScrollLine::new(1, "    fn foo()", 1);
+        assert_eq!(line.trimmed_text(), "fn foo()");
+    }
+
+    #[test]
+    fn test_sticky_line_default() {
+        let line = StickyScrollLine::default();
+        assert_eq!(line.line_number, 0);
+        assert!(line.text.is_empty());
+    }
+
+    #[test]
+    fn test_sticky_config_presets() {
+        let std = StickyScrollConfig::standard();
+        assert!(std.enabled);
+        let min = StickyScrollConfig::minimal();
+        assert_eq!(min.max_line_count, 1);
+        let dis = StickyScrollConfig::disabled();
+        assert!(!dis.enabled);
+    }
+
+    #[test]
+    fn test_sticky_config_display() {
+        let c = StickyScrollConfig::standard();
+        let s = format!("{c}");
+        assert!(s.contains("enabled"));
+    }
+
+    #[test]
+    fn test_sticky_config_validate() {
+        let bad = StickyScrollConfig { enabled: true, max_line_count: 0, default_model: "outlineModel".to_string() };
+        assert!(bad.validate().is_err());
+        let good = StickyScrollConfig::standard();
+        assert!(good.validate().is_ok());
+    }
+
+    #[test]
+    fn test_sticky_strategy_all_and_from_name() {
+        assert_eq!(StickyScrollStrategy::all().len(), 2);
+        assert_eq!(StickyScrollStrategy::from_name("indent"), Some(StickyScrollStrategy::Indentation));
+        assert_eq!(StickyScrollStrategy::from_name("scope"), Some(StickyScrollStrategy::Scope));
+        assert_eq!(StickyScrollStrategy::from_name("bogus"), None);
+        assert_eq!(StickyScrollStrategy::default(), StickyScrollStrategy::Indentation);
+    }
+
+    #[test]
+    fn test_nesting_depth_from_indent() {
+        assert_eq!(nesting_depth_from_indent("        x", 4), 2);
+        assert_eq!(nesting_depth_from_indent("x", 4), 0);
+    }
+
+    #[test]
+    fn test_filter_by_max_depth() {
+        let lines = vec![
+            StickyScrollLine::new(1, "fn main() {", 0),
+            StickyScrollLine::new(2, "if cond {", 1),
+            StickyScrollLine::new(3, "nested", 2),
+        ];
+        let filtered = filter_by_max_depth(&lines, 1);
+        assert_eq!(filtered.len(), 2);
     }
 }

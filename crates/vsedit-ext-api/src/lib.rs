@@ -806,6 +806,87 @@ pub fn is_valid_semver(version: &str) -> bool {
     parse_semver(version).is_some()
 }
 
+// ---------------------------------------------------------------------------
+// API registry helpers & iteration
+// ---------------------------------------------------------------------------
+
+impl ApiRegistry {
+    /// Returns the number of contribution points registered.
+    pub fn contribution_count(&self) -> usize {
+        self.contribution_points.len()
+    }
+
+    /// Check if a specific contribution point type is registered.
+    pub fn has_contribution(&self, point: &ContributionPoint) -> bool {
+        self.contribution_points.contains(point)
+    }
+
+    /// Returns a summary of the registry state.
+    pub fn summary(&self) -> String {
+        format!(
+            "ApiRegistry: {} namespaces, {} contributions",
+            self.namespace_count(),
+            self.contribution_count(),
+        )
+    }
+
+    /// Clear all registered namespaces and contribution points.
+    pub fn clear(&mut self) {
+        self.namespace_proxies.clear();
+        self.contribution_points.clear();
+    }
+}
+
+impl fmt::Display for ApiRegistry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let features = api_supported_features(&self.capabilities);
+        write!(
+            f,
+            "ApiRegistry({} ns, {} contrib, features={})",
+            self.namespace_count(),
+            self.contribution_count(),
+            if features.is_empty() { "none".to_string() } else { features.join("+") },
+        )
+    }
+}
+
+impl fmt::Display for ApiCapabilities {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let features = api_supported_features(self);
+        if features.is_empty() {
+            write!(f, "none")
+        } else {
+            write!(f, "{}", features.join("+"))
+        }
+    }
+}
+
+impl ActivationEvent {
+    /// Returns a canonical string representation for serialization.
+    pub fn to_key(&self) -> String {
+        match self {
+            ActivationEvent::OnLanguage(l) => format!("onLanguage:{}", l),
+            ActivationEvent::OnCommand(c) => format!("onCommand:{}", c),
+            ActivationEvent::OnView(v) => format!("onView:{}", v),
+            ActivationEvent::OnUri => "onUri".to_string(),
+            ActivationEvent::OnStartupFinished => "onStartupFinished".to_string(),
+            ActivationEvent::Star => "*".to_string(),
+            ActivationEvent::OnDebug(d) => format!("onDebug:{}", d),
+            ActivationEvent::OnFileSystem(fs) => format!("onFileSystem:{}", fs),
+            ActivationEvent::OnWebviewPanel(e) => format!("onWebviewPanel:{}", e),
+            ActivationEvent::OnNotebook(n) => format!("onNotebook:{}", n),
+            ActivationEvent::OnAuthenticationRequest(a) => format!("onAuthenticationRequest:{}", a),
+            ActivationEvent::OnTerminalProfile(t) => format!("onTerminalProfile:{}", t),
+            ActivationEvent::WorkspaceContains(p) => format!("workspaceContains:{}", p),
+        }
+    }
+
+    /// Returns true if this is a wildcard activation (activates on startup).
+    pub fn is_eager(&self) -> bool {
+        matches!(self, ActivationEvent::Star)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1214,5 +1295,68 @@ mod tests {
     #[test]
     fn parse_semver_valid() {
         assert_eq!(parse_semver("1.110.0"), Some((1, 110, 0)));
+    }
+
+    #[test]
+    fn api_registry_summary() {
+        let reg = ApiRegistry::new();
+        let s = reg.summary();
+        assert!(s.contains("0 namespaces"));
+    }
+
+    #[test]
+    fn api_registry_display() {
+        let reg = ApiRegistry::new();
+        let s = reg.to_string();
+        assert!(s.contains("ApiRegistry"));
+    }
+
+    #[test]
+    fn api_capabilities_display() {
+        let caps = ApiCapabilities {
+            supports_proposed_api: false,
+            supports_webview: false,
+            supports_terminal: false,
+            supports_debug: false,
+            supports_notebook: false,
+            supports_chat: false,
+            supports_language_models: false,
+            supports_testing: false,
+            supports_authentication: false,
+            supports_custom_editors: false,
+        };
+        let s = caps.to_string();
+        assert_eq!(s, "none");
+    }
+
+    #[test]
+    fn activation_event_to_key() {
+        let e = ActivationEvent::OnLanguage("rust".to_string());
+        assert_eq!(e.to_key(), "onLanguage:rust");
+        assert_eq!(ActivationEvent::Star.to_key(), "*");
+    }
+
+    #[test]
+    fn activation_event_is_eager() {
+        assert!(ActivationEvent::Star.is_eager());
+        assert!(!ActivationEvent::OnUri.is_eager());
+    }
+
+    #[test]
+    fn api_registry_clear() {
+        let mut reg = ApiRegistry::with_defaults();
+        assert!(reg.namespace_count() > 0);
+        reg.clear();
+        assert_eq!(reg.namespace_count(), 0);
+        assert_eq!(reg.contribution_count(), 0);
+    }
+
+    #[test]
+    fn api_capabilities_display_with_flags() {
+        let caps = ApiCapabilities::default();
+        // default has terminal, debug, testing, authentication = true
+        let s = caps.to_string();
+        assert!(s.contains("terminal"));
+        assert!(s.contains("debug"));
     }
 }

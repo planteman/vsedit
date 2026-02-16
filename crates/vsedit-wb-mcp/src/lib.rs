@@ -636,6 +636,163 @@ pub fn mcp_list_invocable(service: &McpService) -> Vec<(&McpServer, &McpTool)> {
     result
 }
 
+
+// ---------------------------------------------------------------------------
+// McpTool helpers
+// ---------------------------------------------------------------------------
+
+impl McpTool {
+    /// Create a new tool with name and description.
+    pub fn new(name: impl Into<String>, description: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            description: description.into(),
+            input_schema: None,
+        }
+    }
+
+    /// Set the input schema.
+    pub fn with_schema(mut self, schema: impl Into<String>) -> Self {
+        self.input_schema = Some(schema.into());
+        self
+    }
+
+    /// Returns true if this tool has an input schema.
+    pub fn has_schema(&self) -> bool {
+        self.input_schema.is_some()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// McpResource helpers
+// ---------------------------------------------------------------------------
+
+impl McpResource {
+    /// Create a new resource.
+    pub fn new(uri: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            uri: uri.into(),
+            name: name.into(),
+            description: None,
+            mime_type: None,
+        }
+    }
+
+    /// Set the description.
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+
+    /// Set the MIME type.
+    pub fn with_mime_type(mut self, mime: impl Into<String>) -> Self {
+        self.mime_type = Some(mime.into());
+        self
+    }
+
+    /// Returns the file extension from the URI, if any.
+    pub fn extension(&self) -> Option<String> {
+        self.uri.rsplit('.').next().map(|s| s.to_lowercase())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// McpServer helpers
+// ---------------------------------------------------------------------------
+
+impl McpServer {
+    /// Create a new connected server with no tools or resources.
+    pub fn new(id: impl Into<String>, name: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            name: name.into(),
+            tools: Vec::new(),
+            resources: Vec::new(),
+            connected: true,
+        }
+    }
+
+    /// Add a tool to this server.
+    pub fn with_tool(mut self, tool: McpTool) -> Self {
+        self.tools.push(tool);
+        self
+    }
+
+    /// Add a resource to this server.
+    pub fn with_resource(mut self, resource: McpResource) -> Self {
+        self.resources.push(resource);
+        self
+    }
+
+    /// Returns the total number of capabilities (tools + resources).
+    pub fn capability_count(&self) -> usize {
+        self.tools.len() + self.resources.len()
+    }
+
+    /// Find a tool by name.
+    pub fn find_tool(&self, name: &str) -> Option<&McpTool> {
+        self.tools.iter().find(|t| t.name == name)
+    }
+
+    /// Find a resource by URI.
+    pub fn find_resource(&self, uri: &str) -> Option<&McpResource> {
+        self.resources.iter().find(|r| r.uri == uri)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MCP service summary
+// ---------------------------------------------------------------------------
+
+/// Summary of the MCP service state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpServiceSummary {
+    pub total_servers: usize,
+    pub connected_servers: usize,
+    pub total_tools: usize,
+    pub total_resources: usize,
+}
+
+impl McpServiceSummary {
+    /// Generate a summary from the service.
+    pub fn from_service(service: &McpService) -> Self {
+        let servers = service.get_all_servers();
+        Self {
+            total_servers: servers.len(),
+            connected_servers: servers.iter().filter(|s| s.connected).count(),
+            total_tools: servers.iter().map(|s| s.tools.len()).sum(),
+            total_resources: servers.iter().map(|s| s.resources.len()).sum(),
+        }
+    }
+}
+
+impl fmt::Display for McpServiceSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} servers ({} connected), {} tools, {} resources",
+            self.total_servers, self.connected_servers,
+            self.total_tools, self.total_resources
+        )
+    }
+}
+
+/// Search for tools across all servers by name substring.
+pub fn search_tools<'a>(service: &'a McpService, query: &str) -> Vec<(&'a McpServer, &'a McpTool)> {
+    let query_lower = query.to_lowercase();
+    let mut results = Vec::new();
+    for server in service.get_all_servers() {
+        for tool in &server.tools {
+            if tool.name.to_lowercase().contains(&query_lower)
+                || tool.description.to_lowercase().contains(&query_lower)
+            {
+                results.push((server, tool));
+            }
+        }
+    }
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1241,5 +1398,69 @@ mod tests {
         let invocable = mcp_list_invocable(&svc);
         assert_eq!(invocable.len(), 2); // only srv1's tools
         assert!(invocable.iter().all(|(s, _)| s.connected));
+    }
+
+    #[test]
+    fn test_mcp_tool_new() {
+        let t = McpTool::new("read", "Read a file");
+        assert_eq!(t.name, "read");
+        assert!(!t.has_schema());
+    }
+
+    #[test]
+    fn test_mcp_tool_with_schema() {
+        let t = McpTool::new("read", "Read").with_schema(r#"{"type":"object"}"#);
+        assert!(t.has_schema());
+    }
+
+    #[test]
+    fn test_mcp_resource_new() {
+        let r = McpResource::new("file:///test.rs", "test.rs")
+            .with_description("Test file")
+            .with_mime_type("text/plain");
+        assert_eq!(r.name, "test.rs");
+        assert_eq!(r.description.as_deref(), Some("Test file"));
+        assert_eq!(r.extension().as_deref(), Some("rs"));
+    }
+
+    #[test]
+    fn test_mcp_resource_display_new() {
+        let r = McpResource::new("file:///test.rs", "test.rs");
+        assert!(format!("{r}").contains("test.rs"));
+    }
+
+    #[test]
+    fn test_mcp_server_builder() {
+        let s = McpServer::new("s1", "Server 1")
+            .with_tool(McpTool::new("read", "Read"))
+            .with_resource(McpResource::new("file:///a", "a"));
+        assert_eq!(s.capability_count(), 2);
+        assert!(s.find_tool("read").is_some());
+        assert!(s.find_tool("write").is_none());
+        assert!(s.find_resource("file:///a").is_some());
+    }
+
+    #[test]
+    fn test_mcp_service_summary() {
+        let mut svc = McpService::new();
+        svc.add_server(McpServer::new("s1", "Server 1").with_tool(McpTool::new("t1", "Tool 1")));
+        let summary = McpServiceSummary::from_service(&svc);
+        assert_eq!(summary.total_servers, 1);
+        assert_eq!(summary.connected_servers, 1);
+        assert_eq!(summary.total_tools, 1);
+        assert!(format!("{summary}").contains("1 servers"));
+    }
+
+    #[test]
+    fn test_search_tools_fn() {
+        let mut svc = McpService::new();
+        svc.add_server(
+            McpServer::new("s1", "S1")
+                .with_tool(McpTool::new("file_read", "Read a file"))
+                .with_tool(McpTool::new("web_search", "Search the web"))
+        );
+        let results = search_tools(&svc, "file");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].1.name, "file_read");
     }
 }

@@ -766,6 +766,72 @@ impl Default for CodeactionValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Additional helpers
+// ---------------------------------------------------------------------------
+
+impl CodeActionSet {
+    /// Returns the titles of all actions.
+    pub fn titles(&self) -> Vec<&str> {
+        self.actions.iter().map(|a| a.title.as_str()).collect()
+    }
+
+    /// Returns `true` if any action is marked as preferred.
+    pub fn has_preferred(&self) -> bool {
+        self.actions.iter().any(|a| a.is_preferred)
+    }
+}
+
+impl fmt::Display for CodeActionSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let preferred = if self.has_preferred() { ", has preferred" } else { "" };
+        write!(f, "CodeActionSet({} actions{preferred})", self.actions.len())
+    }
+}
+
+impl CodeAction {
+    /// Returns `true` if this action is a quick fix.
+    pub fn is_quickfix(&self) -> bool {
+        self.kind == CodeActionKind::QuickFix
+    }
+
+    /// Returns `true` if this action is any refactoring kind.
+    pub fn is_refactoring(&self) -> bool {
+        CodeActionKind::Refactor.contains(&self.kind)
+    }
+
+    /// Returns `true` if this action has a workspace edit.
+    pub fn has_edit(&self) -> bool {
+        self.edit.is_some()
+    }
+
+    /// Returns `true` if this action has a command.
+    pub fn has_command(&self) -> bool {
+        self.command.is_some()
+    }
+}
+
+impl fmt::Display for CodeAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let pref = if self.is_preferred { " [preferred]" } else { "" };
+        write!(f, "{} ({}){pref}", self.title, self.kind.as_str())
+    }
+}
+
+impl WorkspaceEdit {
+    /// Returns a list of file URIs affected by this edit.
+    pub fn files(&self) -> Vec<&str> {
+        self.changes.keys().map(|k| k.as_str()).collect()
+    }
+}
+
+impl CodeActionKind {
+    /// Returns `true` if this kind is a source action (Source, SourceOrganizeImports, SourceFixAll).
+    pub fn is_source(&self) -> bool {
+        CodeActionKind::Source.contains(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1223,5 +1289,97 @@ mod tests {
     fn codeaction_is_ascii_printable() {
         assert!(CodeactionValidator::is_ascii_printable("Hello World 123"));
         assert!(!CodeactionValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn code_action_set_titles() {
+        let set = CodeActionSet::from_actions(vec![
+            CodeAction::new("Fix A", CodeActionKind::QuickFix),
+            CodeAction::new("Extract B", CodeActionKind::RefactorExtract),
+        ]);
+        let titles = set.titles();
+        assert_eq!(titles, vec!["Fix A", "Extract B"]);
+    }
+
+    #[test]
+    fn code_action_set_has_preferred() {
+        let set1 = CodeActionSet::from_actions(vec![
+            CodeAction::new("A", CodeActionKind::QuickFix),
+        ]);
+        assert!(!set1.has_preferred());
+
+        let set2 = CodeActionSet::from_actions(vec![
+            CodeAction::new("B", CodeActionKind::QuickFix).preferred(),
+        ]);
+        assert!(set2.has_preferred());
+    }
+
+    #[test]
+    fn code_action_set_display() {
+        let set = CodeActionSet::from_actions(vec![
+            CodeAction::new("Fix", CodeActionKind::QuickFix).preferred(),
+        ]);
+        let s = format!("{set}");
+        assert!(s.contains("1 actions"));
+        assert!(s.contains("has preferred"));
+    }
+
+    #[test]
+    fn code_action_is_quickfix_and_refactoring() {
+        let qf = CodeAction::new("Fix", CodeActionKind::QuickFix);
+        assert!(qf.is_quickfix());
+        assert!(!qf.is_refactoring());
+
+        let rf = CodeAction::new("Extract", CodeActionKind::RefactorExtract);
+        assert!(!rf.is_quickfix());
+        assert!(rf.is_refactoring());
+    }
+
+    #[test]
+    fn code_action_has_edit_and_command() {
+        let a = CodeAction::new("A", CodeActionKind::QuickFix);
+        assert!(!a.has_edit());
+        assert!(!a.has_command());
+
+        let b = CodeAction::new("B", CodeActionKind::QuickFix)
+            .with_edit(WorkspaceEdit::new())
+            .with_command(Command::new("cmd", "cmd.id"));
+        assert!(b.has_edit());
+        assert!(b.has_command());
+    }
+
+    #[test]
+    fn code_action_display() {
+        let a = CodeAction::new("Fix typo", CodeActionKind::QuickFix).preferred();
+        let s = format!("{a}");
+        assert!(s.contains("Fix typo"));
+        assert!(s.contains("quickfix"));
+        assert!(s.contains("[preferred]"));
+    }
+
+    #[test]
+    fn workspace_edit_files() {
+        let mut edit = WorkspaceEdit::new();
+        edit.add_edit("file:///a.rs", TextEdit {
+            start_line: 0, start_col: 0, end_line: 0, end_col: 1,
+            new_text: "x".into(),
+        });
+        edit.add_edit("file:///b.rs", TextEdit {
+            start_line: 0, start_col: 0, end_line: 0, end_col: 1,
+            new_text: "y".into(),
+        });
+        let files = edit.files();
+        assert_eq!(files.len(), 2);
+        assert!(files.contains(&"file:///a.rs"));
+        assert!(files.contains(&"file:///b.rs"));
+    }
+
+    #[test]
+    fn code_action_kind_is_source() {
+        assert!(CodeActionKind::Source.is_source());
+        assert!(CodeActionKind::SourceOrganizeImports.is_source());
+        assert!(CodeActionKind::SourceFixAll.is_source());
+        assert!(!CodeActionKind::QuickFix.is_source());
+        assert!(!CodeActionKind::Refactor.is_source());
     }
 }

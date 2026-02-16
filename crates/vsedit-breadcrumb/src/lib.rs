@@ -686,6 +686,100 @@ pub fn update_breadcrumbs_for_cursor(
     }
 }
 
+// ---------------------------------------------------------------------------
+// Additional BreadcrumbPath methods
+// ---------------------------------------------------------------------------
+
+impl BreadcrumbPath {
+    /// Returns an iterator over the elements of this path.
+    pub fn iter(&self) -> std::slice::Iter<'_, BreadcrumbElement> {
+        self.elements.iter()
+    }
+
+    /// Find the first element whose label matches the given string.
+    pub fn find_by_label(&self, label: &str) -> Option<&BreadcrumbElement> {
+        self.elements.iter().find(|e| e.label == label)
+    }
+
+    /// Collect all element labels into a `Vec`.
+    pub fn labels(&self) -> Vec<&str> {
+        self.elements.iter().map(|e| e.label.as_str()).collect()
+    }
+}
+
+impl fmt::Display for BreadcrumbPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let path = self
+            .elements
+            .iter()
+            .map(|e| e.label.as_str())
+            .collect::<Vec<_>>()
+            .join(" > ");
+        write!(f, "{}", path)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional BreadcrumbElement methods
+// ---------------------------------------------------------------------------
+
+impl BreadcrumbElement {
+    /// Builder method to set the URI, consuming and returning self.
+    pub fn with_uri(mut self, uri: impl Into<String>) -> Self {
+        self.uri = Some(uri.into());
+        self
+    }
+
+    /// Builder method to set the range start line.
+    pub fn with_range_start_line(mut self, line: u32) -> Self {
+        self.range_start_line = Some(line);
+        self
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional BreadcrumbKind methods
+// ---------------------------------------------------------------------------
+
+impl BreadcrumbKind {
+    /// Returns `true` for symbol-like kinds: Symbol, Function, Method,
+    /// Property, Class, Enum, and Interface.
+    pub fn is_symbol(&self) -> bool {
+        matches!(
+            self,
+            BreadcrumbKind::Symbol
+                | BreadcrumbKind::Function
+                | BreadcrumbKind::Method
+                | BreadcrumbKind::Property
+                | BreadcrumbKind::Class
+                | BreadcrumbKind::Enum
+                | BreadcrumbKind::Interface
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional BreadcrumbBar methods
+// ---------------------------------------------------------------------------
+
+impl BreadcrumbBar {
+    /// Collect the labels of all items in the bar.
+    pub fn labels(&self) -> Vec<&str> {
+        self.items.iter().map(|i| i.label.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional BreadcrumbItem methods
+// ---------------------------------------------------------------------------
+
+impl BreadcrumbItem {
+    /// Extract the file name component from the item's path, if present.
+    pub fn file_name(&self) -> Option<&str> {
+        self.path.file_name().and_then(|n| n.to_str())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1219,5 +1313,73 @@ mod tests {
         path.push(sample_element("old", BreadcrumbKind::File));
         update_breadcrumbs_for_cursor(&mut path, &[]);
         assert!(path.is_empty());
+    }
+
+    #[test]
+    fn breadcrumb_path_iter() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("a", BreadcrumbKind::Folder));
+        path.push(sample_element("b", BreadcrumbKind::File));
+        let labels: Vec<&str> = path.iter().map(|e| e.label.as_str()).collect();
+        assert_eq!(labels, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn breadcrumb_path_find_by_label() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("src", BreadcrumbKind::Folder));
+        path.push(sample_element("main.rs", BreadcrumbKind::File));
+        assert!(path.find_by_label("main.rs").is_some());
+        assert_eq!(path.find_by_label("main.rs").unwrap().kind, BreadcrumbKind::File);
+        assert!(path.find_by_label("missing").is_none());
+    }
+
+    #[test]
+    fn breadcrumb_path_labels() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("x", BreadcrumbKind::Folder));
+        path.push(sample_element("y", BreadcrumbKind::File));
+        path.push(sample_element("z", BreadcrumbKind::Function));
+        assert_eq!(path.labels(), vec!["x", "y", "z"]);
+    }
+
+    #[test]
+    fn breadcrumb_path_display() {
+        let mut path = BreadcrumbPath::new();
+        path.push(sample_element("a", BreadcrumbKind::Folder));
+        path.push(sample_element("b", BreadcrumbKind::File));
+        path.push(sample_element("c", BreadcrumbKind::Function));
+        assert_eq!(format!("{path}"), "a > b > c");
+    }
+
+    #[test]
+    fn breadcrumb_kind_is_symbol() {
+        assert!(BreadcrumbKind::Function.is_symbol());
+        assert!(BreadcrumbKind::Method.is_symbol());
+        assert!(BreadcrumbKind::Class.is_symbol());
+        assert!(BreadcrumbKind::Symbol.is_symbol());
+        assert!(!BreadcrumbKind::File.is_symbol());
+        assert!(!BreadcrumbKind::Folder.is_symbol());
+        assert!(!BreadcrumbKind::Module.is_symbol());
+    }
+
+    #[test]
+    fn breadcrumb_bar_labels() {
+        let mut bar = BreadcrumbBar::new();
+        bar.set_items(sample_items());
+        assert_eq!(bar.labels(), vec!["src", "lib.rs", "MyStruct"]);
+    }
+
+    #[test]
+    fn breadcrumb_item_file_name() {
+        let item = BreadcrumbItem::new("lib.rs", "/project/src/lib.rs");
+        assert_eq!(item.file_name(), Some("lib.rs"));
+    }
+
+    #[test]
+    fn breadcrumb_element_with_uri() {
+        let elem = sample_element("func", BreadcrumbKind::Function)
+            .with_uri("file:///a.rs");
+        assert_eq!(elem.uri.as_deref(), Some("file:///a.rs"));
     }
 }

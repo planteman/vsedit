@@ -703,6 +703,188 @@ pub fn format_signature_tooltip(name: &str, params: &[SignatureParameter]) -> St
     tooltip
 }
 
+// ─── SignatureAlgorithm extensions ─────────────────────────────────
+
+impl SignatureAlgorithm {
+    pub fn is_asymmetric(&self) -> bool {
+        matches!(self, SignatureAlgorithm::Ed25519Stub)
+    }
+
+    pub fn is_symmetric(&self) -> bool {
+        !self.is_asymmetric()
+    }
+
+    pub fn key_size_bits(&self) -> usize {
+        match self {
+            SignatureAlgorithm::HmacSha256Stub => 256,
+            SignatureAlgorithm::Ed25519Stub => 256,
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            SignatureAlgorithm::HmacSha256Stub => "HMAC-SHA256 (stub)",
+            SignatureAlgorithm::Ed25519Stub => "Ed25519 (stub)",
+        }
+    }
+}
+
+impl fmt::Display for SignatureAlgorithm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+// ─── Signature extensions ─────────────────────────────────────────
+
+impl Signature {
+    pub fn parameter_count(&self) -> usize {
+        self.value.len()
+    }
+
+    pub fn has_parameters(&self) -> bool {
+        !self.value.is_empty()
+    }
+
+    pub fn matches_algorithm(&self, algo: SignatureAlgorithm) -> bool {
+        self.algorithm == algo
+    }
+}
+
+// ─── GlyphDecoration extensions ───────────────────────────────────
+
+impl GlyphDecoration {
+    pub fn is_visible(&self) -> bool {
+        !self.color.is_empty() && self.glyph_char != ' '
+    }
+
+    pub fn overlaps_line(&self, line: u32) -> bool {
+        self.line == line
+    }
+
+    pub fn has_tooltip(&self) -> bool {
+        !self.tooltip.is_empty()
+    }
+}
+
+// ─── GlyphMarginService iterator & extensions ─────────────────────
+
+pub struct DecorationIter<'a> {
+    inner: std::collections::hash_map::Values<'a, u64, GlyphDecoration>,
+}
+
+impl<'a> Iterator for DecorationIter<'a> {
+    type Item = &'a GlyphDecoration;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+}
+
+impl GlyphMarginService {
+    pub fn iter(&self) -> DecorationIter<'_> {
+        DecorationIter {
+            inner: self.decorations.values(),
+        }
+    }
+
+    pub fn decorations_on_line(&self, line: u32) -> Vec<&GlyphDecoration> {
+        self.decorations
+            .values()
+            .filter(|d| d.overlaps_line(line))
+            .collect()
+    }
+
+    pub fn has_decoration_on_line(&self, line: u32) -> bool {
+        self.decorations.values().any(|d| d.line == line)
+    }
+
+    pub fn visible_decoration_count(&self) -> usize {
+        self.decorations.values().filter(|d| d.is_visible()).count()
+    }
+
+    pub fn line_range(&self) -> Option<(u32, u32)> {
+        let mut min = u32::MAX;
+        let mut max = u32::MIN;
+        for d in self.decorations.values() {
+            if d.line < min {
+                min = d.line;
+            }
+            if d.line > max {
+                max = d.line;
+            }
+        }
+        if min <= max { Some((min, max)) } else { None }
+    }
+}
+
+impl<'a> IntoIterator for &'a GlyphMarginService {
+    type Item = &'a GlyphDecoration;
+    type IntoIter = DecorationIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+// ─── SignatureParameter extensions ────────────────────────────────
+
+impl SignatureParameter {
+    pub fn is_required(&self) -> bool {
+        !self.is_optional
+    }
+
+    pub fn has_documentation(&self) -> bool {
+        self.documentation.is_some()
+    }
+
+    pub fn has_default(&self) -> bool {
+        self.default_value.is_some()
+    }
+}
+
+// ─── SignatureStats extensions ────────────────────────────────────
+
+impl SignatureStats {
+    pub fn merge(&self, other: &SignatureStats) -> SignatureStats {
+        let total_signatures = self.total_signatures + other.total_signatures;
+        let total_parameters = self.total_parameters + other.total_parameters;
+        let avg_params_per_signature = if total_signatures == 0 {
+            0.0
+        } else {
+            total_parameters as f64 / total_signatures as f64
+        };
+        SignatureStats {
+            total_signatures,
+            total_parameters,
+            avg_params_per_signature,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!(
+            "{} signature(s), {} total parameter(s), {:.2} avg",
+            self.total_signatures,
+            self.total_parameters,
+            self.avg_params_per_signature,
+        )
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.total_signatures == 0
+    }
+}
+
+impl fmt::Display for SignatureStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1198,5 +1380,138 @@ mod tests {
     fn signature_param_display_trait() {
         let p = SignatureParameter::new("x", "f64");
         assert_eq!(format!("{p}"), "x: f64");
+    }
+
+    // ─── New functionality tests ────────────────────────────────
+
+    #[test]
+    fn algorithm_is_asymmetric() {
+        assert!(SignatureAlgorithm::Ed25519Stub.is_asymmetric());
+        assert!(!SignatureAlgorithm::HmacSha256Stub.is_asymmetric());
+        assert!(SignatureAlgorithm::HmacSha256Stub.is_symmetric());
+        assert!(!SignatureAlgorithm::Ed25519Stub.is_symmetric());
+    }
+
+    #[test]
+    fn algorithm_key_size_and_label() {
+        assert_eq!(SignatureAlgorithm::HmacSha256Stub.key_size_bits(), 256);
+        assert_eq!(SignatureAlgorithm::Ed25519Stub.key_size_bits(), 256);
+        assert_eq!(
+            format!("{}", SignatureAlgorithm::HmacSha256Stub),
+            "HMAC-SHA256 (stub)"
+        );
+        assert_eq!(
+            format!("{}", SignatureAlgorithm::Ed25519Stub),
+            "Ed25519 (stub)"
+        );
+    }
+
+    #[test]
+    fn signature_parameter_count_and_has_parameters() {
+        let sig = sign_content(b"abc", b"k", SignatureAlgorithm::HmacSha256Stub);
+        assert_eq!(sig.parameter_count(), 3);
+        assert!(sig.has_parameters());
+
+        let empty = Signature {
+            algorithm: SignatureAlgorithm::Ed25519Stub,
+            value: vec![],
+            signer: None,
+        };
+        assert_eq!(empty.parameter_count(), 0);
+        assert!(!empty.has_parameters());
+    }
+
+    #[test]
+    fn signature_matches_algorithm() {
+        let sig = sign_content(b"x", b"k", SignatureAlgorithm::HmacSha256Stub);
+        assert!(sig.matches_algorithm(SignatureAlgorithm::HmacSha256Stub));
+        assert!(!sig.matches_algorithm(SignatureAlgorithm::Ed25519Stub));
+    }
+
+    #[test]
+    fn glyph_decoration_visibility_and_overlap() {
+        let visible = GlyphDecoration::new(1, 5, '●', "red");
+        assert!(visible.is_visible());
+        assert!(visible.overlaps_line(5));
+        assert!(!visible.overlaps_line(6));
+        assert!(!visible.has_tooltip());
+
+        let with_tip = visible.with_tooltip("info");
+        assert!(with_tip.has_tooltip());
+
+        let invisible_color = GlyphDecoration::new(2, 1, '●', "");
+        assert!(!invisible_color.is_visible());
+
+        let invisible_char = GlyphDecoration::new(3, 1, ' ', "red");
+        assert!(!invisible_char.is_visible());
+    }
+
+    #[test]
+    fn glyph_margin_service_iter_and_into_iter() {
+        let mut svc = GlyphMarginService::new();
+        svc.register_decoration(1, 'A', "r");
+        svc.register_decoration(2, 'B', "g");
+        svc.register_decoration(3, 'C', "b");
+
+        let count = svc.iter().count();
+        assert_eq!(count, 3);
+
+        let count2 = (&svc).into_iter().count();
+        assert_eq!(count2, 3);
+    }
+
+    #[test]
+    fn glyph_margin_service_line_range_and_visible() {
+        let mut svc = GlyphMarginService::new();
+        assert!(svc.line_range().is_none());
+
+        svc.register_decoration(10, '●', "red");
+        svc.register_decoration(3, '▶', "green");
+        svc.register_decoration(7, ' ', "blue");
+
+        assert_eq!(svc.line_range(), Some((3, 10)));
+        assert_eq!(svc.visible_decoration_count(), 2);
+        assert!(svc.has_decoration_on_line(10));
+        assert!(!svc.has_decoration_on_line(99));
+    }
+
+    #[test]
+    fn signature_stats_merge_and_summary() {
+        let s1 = sign_content(b"ab", b"k", SignatureAlgorithm::HmacSha256Stub);
+        let s2 = sign_content(b"cdef", b"k", SignatureAlgorithm::Ed25519Stub);
+        let stats_a = compute_signature_stats(&[s1]);
+        let stats_b = compute_signature_stats(&[s2]);
+
+        let merged = stats_a.merge(&stats_b);
+        assert_eq!(merged.total_signatures, 2);
+        assert_eq!(merged.total_parameters, 6);
+        assert!((merged.avg_params_per_signature - 3.0).abs() < f64::EPSILON);
+        assert!(!merged.is_empty());
+
+        let summary = merged.summary();
+        assert!(summary.contains("2 signature(s)"));
+        assert!(summary.contains("6 total parameter(s)"));
+
+        let empty = compute_signature_stats(&[]);
+        assert!(empty.is_empty());
+
+        let display = format!("{}", merged);
+        assert!(display.contains("3.00 avg"));
+    }
+
+    #[test]
+    fn signature_parameter_required_and_has_flags() {
+        let required = SignatureParameter::new("x", "i32");
+        assert!(required.is_required());
+        assert!(!required.has_documentation());
+        assert!(!required.has_default());
+
+        let optional_with_all = SignatureParameter::new("y", "string")
+            .optional()
+            .with_doc("A value")
+            .with_default("foo");
+        assert!(!optional_with_all.is_required());
+        assert!(optional_with_all.has_documentation());
+        assert!(optional_with_all.has_default());
     }
 }

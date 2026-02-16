@@ -4,6 +4,7 @@
 //! Manages editor instances within groups (tab strips) and exposes events for
 //! active-editor changes.
 
+use std::fmt;
 use std::path::PathBuf;
 
 use vsedit_events::{Emitter, Event};
@@ -697,6 +698,104 @@ impl EditorGroup {
 }
 
 // ---------------------------------------------------------------------------
+// EditorService – query helpers
+// ---------------------------------------------------------------------------
+
+impl EditorService {
+    /// Return the total number of editors across all groups.
+    pub fn total_editor_count(&self) -> usize {
+        self.groups.iter().map(|g| g.count()).sum()
+    }
+
+    /// Return the number of editor groups.
+    pub fn group_count(&self) -> usize {
+        self.groups.len()
+    }
+
+    /// Return the index of the active group.
+    pub fn active_group_index(&self) -> usize {
+        self.active_group
+    }
+
+    /// Search all groups for the first editor whose URI matches `uri`.
+    /// Returns `(group_index, editor_index)` if found.
+    pub fn find_editor_by_uri(&self, uri: &VsUri) -> Option<(usize, usize)> {
+        for (gi, group) in self.groups.iter().enumerate() {
+            if let Some(ei) = group.find_by_uri(uri) {
+                return Some((gi, ei));
+            }
+        }
+        None
+    }
+}
+
+impl fmt::Display for EditorService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "EditorService(groups={}, total_editors={}, active_group={})",
+            self.groups.len(),
+            self.total_editor_count(),
+            self.active_group,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorTabService – query helpers
+// ---------------------------------------------------------------------------
+
+impl EditorTabService {
+    /// Return all tabs that have unsaved changes.
+    pub fn modified_tabs(&self) -> Vec<&EditorTab> {
+        self.tabs.iter().filter(|t| t.is_modified).collect()
+    }
+
+    /// Find the first tab whose file path matches `path`.
+    pub fn find_tab_by_path(&self, path: &PathBuf) -> Option<&EditorTab> {
+        self.tabs.iter().find(|t| t.file_path.as_ref() == Some(path))
+    }
+}
+
+impl fmt::Display for EditorTabService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let modified = self.modified_tabs().len();
+        write!(
+            f,
+            "EditorTabService(tabs={}, modified={}, active={:?})",
+            self.tabs.len(),
+            modified,
+            self.active_tab,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorTab – helpers
+// ---------------------------------------------------------------------------
+
+impl EditorTab {
+    /// Return the display title: the file name from the path, or the tab title.
+    pub fn display_title(&self) -> &str {
+        &self.title
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorGroupLayout – from_count
+// ---------------------------------------------------------------------------
+
+impl EditorGroupLayout {
+    /// Determine an appropriate layout from the number of groups.
+    pub fn from_count(n: usize) -> Self {
+        match n {
+            0 | 1 => Self::Single,
+            _ => Self::Horizontal,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1223,5 +1322,109 @@ mod tests {
         assert_eq!(closed, 2);
         assert_eq!(group.count(), 1);
         assert_eq!(group.active_editor().unwrap().uri, VsUri::file("/b.rs"));
+    }
+
+    // -- New tests ----------------------------------------------------------
+
+    #[test]
+    fn service_total_editor_count() {
+        let mut svc = EditorService::new();
+        svc.open_editor(make_input("/a.rs"), Some(0));
+        svc.open_editor(make_input("/b.rs"), Some(0));
+        let g1 = svc.add_group();
+        svc.open_editor(make_input("/c.rs"), Some(g1));
+        assert_eq!(svc.total_editor_count(), 3);
+    }
+
+    #[test]
+    fn service_group_count() {
+        let mut svc = EditorService::new();
+        assert_eq!(svc.group_count(), 1);
+        svc.add_group();
+        assert_eq!(svc.group_count(), 2);
+    }
+
+    #[test]
+    fn service_active_group_index() {
+        let mut svc = EditorService::new();
+        assert_eq!(svc.active_group_index(), 0);
+        let g1 = svc.add_group();
+        svc.set_active_group(g1);
+        assert_eq!(svc.active_group_index(), g1);
+    }
+
+    #[test]
+    fn service_find_editor_by_uri() {
+        let mut svc = EditorService::new();
+        let g1 = svc.add_group();
+        svc.open_editor(make_input("/a.rs"), Some(0));
+        svc.open_editor(make_input("/b.rs"), Some(g1));
+        assert_eq!(svc.find_editor_by_uri(&VsUri::file("/b.rs")), Some((g1, 0)));
+        assert_eq!(svc.find_editor_by_uri(&VsUri::file("/a.rs")), Some((0, 0)));
+        assert!(svc.find_editor_by_uri(&VsUri::file("/nope.rs")).is_none());
+    }
+
+    #[test]
+    fn service_display() {
+        let svc = EditorService::new();
+        let s = format!("{svc}");
+        assert!(s.contains("EditorService"));
+        assert!(s.contains("groups=1"));
+    }
+
+    #[test]
+    fn tab_service_modified_tabs() {
+        let mut svc = EditorTabService::new();
+        let a = svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        svc.open_tab(Some(PathBuf::from("/b.rs")), "b");
+        let c = svc.open_tab(Some(PathBuf::from("/c.rs")), "c");
+        svc.set_modified(a, true);
+        svc.set_modified(c, true);
+        let modified = svc.modified_tabs();
+        assert_eq!(modified.len(), 2);
+        assert!(modified.iter().any(|t| t.title == "a.rs"));
+        assert!(modified.iter().any(|t| t.title == "c.rs"));
+    }
+
+    #[test]
+    fn tab_service_find_tab_by_path() {
+        let mut svc = EditorTabService::new();
+        svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        svc.open_tab(Some(PathBuf::from("/b.rs")), "b");
+        let found = svc.find_tab_by_path(&PathBuf::from("/a.rs"));
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().title, "a.rs");
+        assert!(svc.find_tab_by_path(&PathBuf::from("/nope.rs")).is_none());
+    }
+
+    #[test]
+    fn tab_service_display() {
+        let svc = EditorTabService::new();
+        let s = format!("{svc}");
+        assert!(s.contains("EditorTabService"));
+        assert!(s.contains("tabs=0"));
+    }
+
+    #[test]
+    fn editor_tab_display_title() {
+        let tab = EditorTab {
+            id: 0,
+            file_path: Some(PathBuf::from("/foo/bar.rs")),
+            title: "bar.rs".to_string(),
+            is_modified: false,
+            is_active: true,
+            content: String::new(),
+            cursor_line: 1,
+            cursor_col: 1,
+        };
+        assert_eq!(tab.display_title(), "bar.rs");
+    }
+
+    #[test]
+    fn editor_group_layout_from_count() {
+        assert_eq!(EditorGroupLayout::from_count(0), EditorGroupLayout::Single);
+        assert_eq!(EditorGroupLayout::from_count(1), EditorGroupLayout::Single);
+        assert_eq!(EditorGroupLayout::from_count(2), EditorGroupLayout::Horizontal);
+        assert_eq!(EditorGroupLayout::from_count(5), EditorGroupLayout::Horizontal);
     }
 }

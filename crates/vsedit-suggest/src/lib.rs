@@ -658,6 +658,63 @@ pub fn suggest_active_details(list: &CompletionList) -> Option<DetailsPanel> {
     list.items.first().map(suggest_details_panel)
 }
 
+// ---------------------------------------------------------------------------
+// Additional helpers
+// ---------------------------------------------------------------------------
+
+impl CompletionList {
+    /// Returns a list of labels from all items.
+    pub fn labels(&self) -> Vec<&str> {
+        self.items.iter().map(|i| i.label.as_str()).collect()
+    }
+
+    /// Returns the first item, if any.
+    pub fn first(&self) -> Option<&CompletionItem> {
+        self.items.first()
+    }
+
+    /// Returns the last item, if any.
+    pub fn last(&self) -> Option<&CompletionItem> {
+        self.items.last()
+    }
+
+    /// Counts items matching the given kind.
+    pub fn count_by_kind(&self, kind: CompletionItemKind) -> usize {
+        self.items.iter().filter(|i| i.kind == kind).count()
+    }
+}
+
+impl fmt::Display for CompletionList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.is_incomplete { "incomplete" } else { "complete" };
+        write!(f, "CompletionList({} items, {status})", self.items.len())
+    }
+}
+
+impl CompletionItem {
+    /// Returns the length of the label string.
+    pub fn label_length(&self) -> usize {
+        self.label.len()
+    }
+
+    /// Returns `true` if documentation is set.
+    pub fn has_documentation(&self) -> bool {
+        self.documentation.is_some()
+    }
+
+    /// Returns `true` if detail is set.
+    pub fn has_detail(&self) -> bool {
+        self.detail.is_some()
+    }
+}
+
+impl CompletionItemKind {
+    /// Returns `true` for text-like kinds: Text, Keyword, Snippet.
+    pub fn is_text_like(&self) -> bool {
+        matches!(self, Self::Text | Self::Keyword | Self::Snippet)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1222,5 +1279,78 @@ mod tests {
     fn active_details_empty_list() {
         let list = CompletionList::new(vec![]);
         assert!(suggest_active_details(&list).is_none());
+    }
+
+    #[test]
+    fn completion_list_labels() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("foo", CompletionItemKind::Function),
+            CompletionItem::new("bar", CompletionItemKind::Variable),
+        ]);
+        let labels = list.labels();
+        assert_eq!(labels, vec!["foo", "bar"]);
+    }
+
+    #[test]
+    fn completion_list_first_and_last() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("first", CompletionItemKind::Function),
+            CompletionItem::new("last", CompletionItemKind::Variable),
+        ]);
+        assert_eq!(list.first().unwrap().label, "first");
+        assert_eq!(list.last().unwrap().label, "last");
+
+        let empty = CompletionList::new(vec![]);
+        assert!(empty.first().is_none());
+        assert!(empty.last().is_none());
+    }
+
+    #[test]
+    fn completion_list_count_by_kind() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("a", CompletionItemKind::Function),
+            CompletionItem::new("b", CompletionItemKind::Function),
+            CompletionItem::new("c", CompletionItemKind::Variable),
+        ]);
+        assert_eq!(list.count_by_kind(CompletionItemKind::Function), 2);
+        assert_eq!(list.count_by_kind(CompletionItemKind::Variable), 1);
+        assert_eq!(list.count_by_kind(CompletionItemKind::Class), 0);
+    }
+
+    #[test]
+    fn completion_list_display() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("x", CompletionItemKind::Text),
+        ]);
+        let s = format!("{list}");
+        assert!(s.contains("1 items"));
+        assert!(s.contains("complete"));
+
+        let inc = CompletionList::incomplete(vec![]);
+        let s2 = format!("{inc}");
+        assert!(s2.contains("incomplete"));
+    }
+
+    #[test]
+    fn completion_item_label_length_and_has_fields() {
+        let item = CompletionItem::new("hello", CompletionItemKind::Function)
+            .with_documentation("docs");
+        assert_eq!(item.label_length(), 5);
+        assert!(item.has_documentation());
+        assert!(!item.has_detail());
+
+        let item2 = CompletionItem::new("x", CompletionItemKind::Variable)
+            .with_detail("detail");
+        assert!(item2.has_detail());
+        assert!(!item2.has_documentation());
+    }
+
+    #[test]
+    fn completion_item_kind_is_text_like() {
+        assert!(CompletionItemKind::Text.is_text_like());
+        assert!(CompletionItemKind::Keyword.is_text_like());
+        assert!(CompletionItemKind::Snippet.is_text_like());
+        assert!(!CompletionItemKind::Function.is_text_like());
+        assert!(!CompletionItemKind::Class.is_text_like());
     }
 }

@@ -762,6 +762,168 @@ pub fn rulers_in_range(config: &RulersConfig, start_col: u32, end_col: u32) -> V
         .collect()
 }
 
+// ---------------------------------------------------------------------------
+// Iterator over ruler columns
+// ---------------------------------------------------------------------------
+
+/// Iterator that yields ruler columns in sorted order.
+pub struct RulerColumnIter {
+    columns: Vec<u32>,
+    index: usize,
+}
+
+impl RulerColumnIter {
+    /// Create a new iterator from a slice of columns.
+    pub fn new(columns: &[u32]) -> Self {
+        let mut sorted = columns.to_vec();
+        sorted.sort_unstable();
+        sorted.dedup();
+        Self { columns: sorted, index: 0 }
+    }
+
+    /// Returns the number of remaining columns.
+    pub fn remaining(&self) -> usize {
+        self.columns.len() - self.index
+    }
+}
+
+impl Iterator for RulerColumnIter {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.columns.len() {
+            let val = self.columns[self.index];
+            self.index += 1;
+            Some(val)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let rem = self.remaining();
+        (rem, Some(rem))
+    }
+}
+
+impl ExactSizeIterator for RulerColumnIter {}
+
+// ---------------------------------------------------------------------------
+// RulerSpan: range between consecutive rulers
+// ---------------------------------------------------------------------------
+
+/// Represents a span between two consecutive ruler columns.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RulerSpan {
+    /// Start column (inclusive).
+    pub start: u32,
+    /// End column (exclusive).
+    pub end: u32,
+}
+
+impl RulerSpan {
+    /// Width of the span.
+    pub fn width(&self) -> u32 {
+        self.end.saturating_sub(self.start)
+    }
+
+    /// Returns true if `col` falls within this span.
+    pub fn contains(&self, col: u32) -> bool {
+        col >= self.start && col < self.end
+    }
+}
+
+impl fmt::Display for RulerSpan {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}..{})", self.start, self.end)
+    }
+}
+
+/// Compute spans between consecutive rulers.
+pub fn ruler_spans(columns: &[u32]) -> Vec<RulerSpan> {
+    let mut sorted: Vec<u32> = columns.to_vec();
+    sorted.sort_unstable();
+    sorted.dedup();
+    if sorted.is_empty() {
+        return Vec::new();
+    }
+    let mut spans = Vec::new();
+    // Span from 0 to first ruler
+    if sorted[0] > 0 {
+        spans.push(RulerSpan { start: 0, end: sorted[0] });
+    }
+    for w in sorted.windows(2) {
+        spans.push(RulerSpan { start: w[0], end: w[1] });
+    }
+    spans
+}
+
+// ---------------------------------------------------------------------------
+// From impls
+// ---------------------------------------------------------------------------
+
+impl From<u32> for RulerSpan {
+    fn from(col: u32) -> Self {
+        Self { start: 0, end: col }
+    }
+}
+
+impl From<(u32, u32)> for RulerSpan {
+    fn from((start, end): (u32, u32)) -> Self {
+        Self { start, end }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Validation helpers
+// ---------------------------------------------------------------------------
+
+/// Validates that a list of ruler columns are all within bounds and unique.
+pub fn validate_ruler_columns(columns: &[u32]) -> Result<Vec<u32>, RulerError> {
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::with_capacity(columns.len());
+    for &col in columns {
+        if col > MAX_COLUMN {
+            return Err(RulerError::ColumnOutOfRange(col));
+        }
+        if !seen.insert(col) {
+            return Err(RulerError::DuplicateColumn(col));
+        }
+        result.push(col);
+    }
+    result.sort_unstable();
+    Ok(result)
+}
+
+/// Returns the nearest ruler column to the given position.
+pub fn nearest_ruler(columns: &[u32], position: u32) -> Option<u32> {
+    if columns.is_empty() {
+        return None;
+    }
+    columns.iter().copied().min_by_key(|&c| {
+        if c > position { c - position } else { position - c }
+    })
+}
+
+/// Summarizes ruler distribution as (min, max, mean).
+pub fn ruler_distribution(columns: &[u32]) -> Option<(u32, u32, f64)> {
+    if columns.is_empty() {
+        return None;
+    }
+    let min = *columns.iter().min().unwrap();
+    let max = *columns.iter().max().unwrap();
+    let mean = columns.iter().map(|&c| c as f64).sum::<f64>() / columns.len() as f64;
+    Some((min, max, mean))
+}
+
+/// Merges two sets of ruler columns, removing duplicates and sorting.
+pub fn merge_ruler_columns(a: &[u32], b: &[u32]) -> Vec<u32> {
+    let mut merged: Vec<u32> = a.iter().chain(b.iter()).copied().collect();
+    merged.sort_unstable();
+    merged.dedup();
+    merged
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1227,5 +1389,92 @@ mod tests {
         config.add_ruler(120, None);
         let visible = rulers_in_range(&config, 50, 100);
         assert_eq!(visible, vec![80]);
+    }
+
+    #[test]
+    fn test_ruler_column_iter_sorted_dedup() {
+        let iter = RulerColumnIter::new(&[80, 40, 80, 120, 40]);
+        let cols: Vec<u32> = iter.collect();
+        assert_eq!(cols, vec![40, 80, 120]);
+    }
+
+    #[test]
+    fn test_ruler_column_iter_empty() {
+        let iter = RulerColumnIter::new(&[]);
+        assert_eq!(iter.remaining(), 0);
+        assert_eq!(iter.collect::<Vec<u32>>(), Vec::<u32>::new());
+    }
+
+    #[test]
+    fn test_ruler_column_iter_exact_size() {
+        let iter = RulerColumnIter::new(&[10, 20, 30]);
+        assert_eq!(iter.len(), 3);
+    }
+
+    #[test]
+    fn test_ruler_span_basics() {
+        let span = RulerSpan { start: 10, end: 80 };
+        assert_eq!(span.width(), 70);
+        assert!(span.contains(10));
+        assert!(span.contains(50));
+        assert!(!span.contains(80));
+        assert_eq!(format!("{span}"), "[10..80)");
+    }
+
+    #[test]
+    fn test_ruler_spans_computation() {
+        let spans = ruler_spans(&[80, 40, 120]);
+        assert_eq!(spans.len(), 3);
+        assert_eq!(spans[0], RulerSpan { start: 0, end: 40 });
+        assert_eq!(spans[1], RulerSpan { start: 40, end: 80 });
+        assert_eq!(spans[2], RulerSpan { start: 80, end: 120 });
+    }
+
+    #[test]
+    fn test_ruler_span_from_impls() {
+        let span: RulerSpan = 80u32.into();
+        assert_eq!(span, RulerSpan { start: 0, end: 80 });
+        let span2: RulerSpan = (10u32, 50u32).into();
+        assert_eq!(span2, RulerSpan { start: 10, end: 50 });
+    }
+
+    #[test]
+    fn test_validate_ruler_columns_ok() {
+        let result = validate_ruler_columns(&[80, 40, 120]);
+        assert_eq!(result.unwrap(), vec![40, 80, 120]);
+    }
+
+    #[test]
+    fn test_validate_ruler_columns_out_of_range() {
+        let result = validate_ruler_columns(&[80, 20_000]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_ruler_columns_duplicate() {
+        let result = validate_ruler_columns(&[80, 80]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_nearest_ruler() {
+        assert_eq!(nearest_ruler(&[40, 80, 120], 50), Some(40));
+        assert_eq!(nearest_ruler(&[40, 80, 120], 75), Some(80));
+        assert_eq!(nearest_ruler(&[], 50), None);
+    }
+
+    #[test]
+    fn test_ruler_distribution() {
+        let dist = ruler_distribution(&[40, 80, 120]).unwrap();
+        assert_eq!(dist.0, 40);
+        assert_eq!(dist.1, 120);
+        assert!((dist.2 - 80.0).abs() < f64::EPSILON);
+        assert!(ruler_distribution(&[]).is_none());
+    }
+
+    #[test]
+    fn test_merge_ruler_columns() {
+        let merged = merge_ruler_columns(&[80, 40], &[120, 40]);
+        assert_eq!(merged, vec![40, 80, 120]);
     }
 }

@@ -797,6 +797,80 @@ fn looks_like_file_paths(content: &str) -> bool {
     })
 }
 
+// ---------------------------------------------------------------------------
+// Additional ClipboardHistory methods
+// ---------------------------------------------------------------------------
+
+impl ClipboardHistory {
+    /// Returns the total number of characters across all entries.
+    pub fn total_chars(&self) -> usize {
+        self.entries.iter().map(|e| e.text.len()).sum()
+    }
+
+    /// Returns a reference to the oldest entry (first in the list).
+    pub fn oldest(&self) -> Option<&ClipboardItem> {
+        self.entries.first()
+    }
+
+    /// Alias for `most_recent()` — returns the newest entry.
+    pub fn newest(&self) -> Option<&ClipboardItem> {
+        self.most_recent()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional ClipboardItem methods
+// ---------------------------------------------------------------------------
+
+impl ClipboardItem {
+    /// Returns the number of whitespace-separated words in the text.
+    pub fn word_count(&self) -> usize {
+        self.text.split_whitespace().count()
+    }
+
+    /// Returns `true` if the text contains at least one newline character.
+    pub fn is_multiline(&self) -> bool {
+        self.text.contains('\n')
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display for ClipboardHistory
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for ClipboardHistory {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ClipboardHistory({}/{} entries)",
+            self.entries.len(),
+            self.max_entries,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional InMemoryClipboard methods
+// ---------------------------------------------------------------------------
+
+impl InMemoryClipboard {
+    /// Returns `true` if the internal buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.buffer.lock().unwrap().is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional ClipboardWatcher methods
+// ---------------------------------------------------------------------------
+
+impl ClipboardWatcher {
+    /// Returns `true` if the watcher has observed at least one change.
+    pub fn has_changed(&self) -> bool {
+        self.change_count > 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1220,5 +1294,71 @@ mod tests {
             clipboard_format_detection("{\\rtf1 content}"),
             ClipboardFormat::RichText
         );
+    }
+
+    #[test]
+    fn clipboard_history_total_chars() {
+        let mut h = ClipboardHistory::new(10);
+        h.push(ClipboardItem::new("hello", 1, None));
+        h.push(ClipboardItem::new("world!", 2, None));
+        assert_eq!(h.total_chars(), 11); // 5 + 6
+    }
+
+    #[test]
+    fn clipboard_history_oldest_newest() {
+        let mut h = ClipboardHistory::new(10);
+        h.push(ClipboardItem::new("first", 1, None));
+        h.push(ClipboardItem::new("second", 2, None));
+        h.push(ClipboardItem::new("third", 3, None));
+        assert_eq!(h.oldest().unwrap().text, "first");
+        assert_eq!(h.newest().unwrap().text, "third");
+    }
+
+    #[test]
+    fn clipboard_item_word_count() {
+        let item = ClipboardItem::new("hello world foo", 1, None);
+        assert_eq!(item.word_count(), 3);
+        let empty = ClipboardItem::new("", 1, None);
+        assert_eq!(empty.word_count(), 0);
+    }
+
+    #[test]
+    fn clipboard_item_is_multiline() {
+        let single = ClipboardItem::new("one line", 1, None);
+        assert!(!single.is_multiline());
+        let multi = ClipboardItem::new("line1\nline2", 1, None);
+        assert!(multi.is_multiline());
+    }
+
+    #[test]
+    fn clipboard_history_display() {
+        let mut h = ClipboardHistory::new(5);
+        h.push(ClipboardItem::new("a", 1, None));
+        h.push(ClipboardItem::new("b", 2, None));
+        let s = format!("{h}");
+        assert!(s.contains("2/5"));
+    }
+
+    #[test]
+    fn in_memory_clipboard_is_empty() {
+        let clip = InMemoryClipboard::new();
+        assert!(clip.is_empty());
+        clip.write_text("data");
+        assert!(!clip.is_empty());
+    }
+
+    #[test]
+    fn clipboard_watcher_has_changed() {
+        let mut w = ClipboardWatcher::new();
+        assert!(!w.has_changed());
+        w.check_change("hello");
+        assert!(w.has_changed());
+    }
+
+    #[test]
+    fn clipboard_history_oldest_empty() {
+        let h = ClipboardHistory::new(10);
+        assert!(h.oldest().is_none());
+        assert!(h.newest().is_none());
     }
 }

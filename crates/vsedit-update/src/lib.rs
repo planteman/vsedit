@@ -10,6 +10,20 @@ pub enum UpdateChannel {
     Exploration,
 }
 
+impl UpdateChannel {
+    pub fn all() -> Vec<UpdateChannel> {
+        vec![
+            UpdateChannel::Stable,
+            UpdateChannel::Insider,
+            UpdateChannel::Exploration,
+        ]
+    }
+
+    pub fn is_preview(&self) -> bool {
+        matches!(self, UpdateChannel::Insider | UpdateChannel::Exploration)
+    }
+}
+
 impl fmt::Display for UpdateChannel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -28,6 +42,18 @@ pub struct VersionParts {
 }
 
 impl VersionParts {
+    pub fn distance_to(&self, other: &Self) -> (i64, i64, i64) {
+        (
+            i64::from(other.major) - i64::from(self.major),
+            i64::from(other.minor) - i64::from(self.minor),
+            i64::from(other.patch) - i64::from(self.patch),
+        )
+    }
+
+    pub fn is_compatible_with(&self, other: &Self) -> bool {
+        self.major == other.major
+    }
+
     pub fn parse(version: &str) -> Option<Self> {
         let parts: Vec<&str> = version.split('.').collect();
         if parts.len() != 3 {
@@ -114,6 +140,16 @@ pub enum UpdateState {
     Downloading,
     Ready,
     Error(String),
+}
+
+impl UpdateState {
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, UpdateState::Ready | UpdateState::Error(_))
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self, UpdateState::Error(_))
+    }
 }
 
 impl fmt::Display for UpdateState {
@@ -236,6 +272,7 @@ pub struct UpdateService {
     available_update: Option<UpdateInfo>,
     channel: UpdateChannel,
     progress: Option<f64>,
+    update_history: Vec<UpdateInfo>,
 }
 
 impl UpdateService {
@@ -246,6 +283,7 @@ impl UpdateService {
             available_update: None,
             channel: UpdateChannel::Stable,
             progress: None,
+            update_history: Vec::new(),
         }
     }
 
@@ -375,6 +413,29 @@ impl UpdateService {
     pub fn report_error(&mut self, message: impl Into<String>) {
         self.state = UpdateState::Error(message.into());
         self.progress = None;
+    }
+
+    pub fn reset(&mut self) {
+        self.state = UpdateState::Idle;
+        self.available_update = None;
+        self.progress = None;
+    }
+
+    pub fn history(&self) -> &[UpdateInfo] {
+        &self.update_history
+    }
+
+    pub fn push_history(&mut self, info: UpdateInfo) {
+        self.update_history.push(info);
+    }
+}
+
+impl IntoIterator for UpdateService {
+    type Item = UpdateInfo;
+    type IntoIter = std::vec::IntoIter<UpdateInfo>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.update_history.into_iter()
     }
 }
 
@@ -1196,5 +1257,77 @@ mod tests {
     fn interval_display() {
         assert_eq!(format!("{}", UpdateCheckInterval::Daily), "daily");
         assert_eq!(format!("{}", UpdateCheckInterval::Custom(60)), "every 60s");
+    }
+
+    #[test]
+    fn version_distance_to() {
+        let v1 = VersionParts::parse("1.2.3").unwrap();
+        let v2 = VersionParts::parse("2.4.1").unwrap();
+        assert_eq!(v1.distance_to(&v2), (1, 2, -2));
+        assert_eq!(v2.distance_to(&v1), (-1, -2, 2));
+        assert_eq!(v1.distance_to(&v1), (0, 0, 0));
+    }
+
+    #[test]
+    fn version_is_compatible_with() {
+        let v1 = VersionParts::parse("1.2.3").unwrap();
+        let v2 = VersionParts::parse("1.9.0").unwrap();
+        let v3 = VersionParts::parse("2.0.0").unwrap();
+        assert!(v1.is_compatible_with(&v2));
+        assert!(!v1.is_compatible_with(&v3));
+    }
+
+    #[test]
+    fn update_channel_all_and_preview() {
+        let all = UpdateChannel::all();
+        assert_eq!(all.len(), 3);
+        assert!(!UpdateChannel::Stable.is_preview());
+        assert!(UpdateChannel::Insider.is_preview());
+        assert!(UpdateChannel::Exploration.is_preview());
+    }
+
+    #[test]
+    fn update_state_terminal_and_error() {
+        assert!(!UpdateState::Idle.is_terminal());
+        assert!(!UpdateState::CheckingForUpdates.is_terminal());
+        assert!(!UpdateState::Downloading.is_terminal());
+        assert!(UpdateState::Ready.is_terminal());
+        assert!(UpdateState::Error("oops".into()).is_terminal());
+        assert!(!UpdateState::Idle.is_error());
+        assert!(UpdateState::Error("fail".into()).is_error());
+    }
+
+    #[test]
+    fn update_service_reset() {
+        let mut svc = UpdateService::new("1.0.0");
+        svc.download_progress(0.5);
+        svc.reset();
+        assert_eq!(*svc.get_state(), UpdateState::Idle);
+        assert_eq!(svc.get_progress(), None);
+        assert!(svc.get_available_update().is_none());
+    }
+
+    #[test]
+    fn update_service_history_and_into_iter() {
+        let mut svc = UpdateService::new("1.0.0");
+        assert!(svc.history().is_empty());
+        let info1 = UpdateInfo {
+            version: "1.1.0".into(),
+            product_version: "1.1.0".into(),
+            url: None,
+            release_notes: None,
+        };
+        let info2 = UpdateInfo {
+            version: "1.2.0".into(),
+            product_version: "1.2.0".into(),
+            url: None,
+            release_notes: None,
+        };
+        svc.push_history(info1.clone());
+        svc.push_history(info2.clone());
+        assert_eq!(svc.history().len(), 2);
+        assert_eq!(svc.history()[0], info1);
+        let versions: Vec<String> = svc.into_iter().map(|i| i.version).collect();
+        assert_eq!(versions, vec!["1.1.0", "1.2.0"]);
     }
 }

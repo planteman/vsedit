@@ -645,6 +645,94 @@ impl ViewModel {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Viewport – scroll helpers
+// ---------------------------------------------------------------------------
+
+impl Viewport {
+    /// Return a new viewport scrolled down by `lines`.
+    pub fn scroll_down(&self, lines: u32) -> Viewport {
+        Viewport {
+            first_view_line: self.first_view_line.saturating_add(lines),
+            visible_line_count: self.visible_line_count,
+        }
+    }
+
+    /// Return a new viewport scrolled up by `lines`.
+    pub fn scroll_up(&self, lines: u32) -> Viewport {
+        Viewport {
+            first_view_line: self.first_view_line.saturating_sub(lines).max(1),
+            visible_line_count: self.visible_line_count,
+        }
+    }
+
+    /// Returns `true` if the viewport shows zero lines.
+    pub fn is_empty(&self) -> bool {
+        self.visible_line_count == 0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VisibleRange – merge
+// ---------------------------------------------------------------------------
+
+impl VisibleRange {
+    /// Merge two ranges into one that spans both.
+    pub fn merge(&self, other: &VisibleRange) -> VisibleRange {
+        VisibleRange {
+            first_line: self.first_line.min(other.first_line),
+            last_line: self.last_line.max(other.last_line),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewLine – helpers
+// ---------------------------------------------------------------------------
+
+impl ViewLine {
+    /// Returns `true` if this view line is a continuation of a wrapped line.
+    pub fn is_continuation(&self) -> bool {
+        self.is_wrapped
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LineHeightTracker – helpers
+// ---------------------------------------------------------------------------
+
+impl LineHeightTracker {
+    /// Compute the average line height given a total line count.
+    pub fn average_height(&self, line_count: usize) -> f64 {
+        if line_count == 0 {
+            return self.default_height as f64;
+        }
+        self.total_height(line_count) as f64 / line_count as f64
+    }
+
+    /// Returns `true` if any line has a custom (non-default) height.
+    pub fn has_custom_heights(&self) -> bool {
+        self.heights.iter().any(|&h| h != self.default_height)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ViewModelStats – helpers
+// ---------------------------------------------------------------------------
+
+impl ViewModelStats {
+    /// Return a human-readable summary string.
+    pub fn summary(&self) -> String {
+        format!(
+            "{} model lines, {} view lines ({} wrapped), longest={}",
+            self.model_line_count,
+            self.view_line_count,
+            self.wrapped_line_count,
+            self.longest_view_line,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1223,5 +1311,93 @@ mod tests {
         assert_eq!(first, 1);
         assert_eq!(last, 3); // "hello " + "world" + "foo"
         assert!(vm.view_line_range_for_model_range(99, 100).is_none());
+    }
+
+    // -- New tests ----------------------------------------------------------
+
+    #[test]
+    fn viewport_scroll_down() {
+        let vp = Viewport::new(1, 20);
+        let scrolled = vp.scroll_down(5);
+        assert_eq!(scrolled.first_view_line, 6);
+        assert_eq!(scrolled.visible_line_count, 20);
+    }
+
+    #[test]
+    fn viewport_scroll_up() {
+        let vp = Viewport::new(10, 20);
+        let scrolled = vp.scroll_up(5);
+        assert_eq!(scrolled.first_view_line, 5);
+        // Cannot scroll below 1
+        let scrolled2 = vp.scroll_up(100);
+        assert_eq!(scrolled2.first_view_line, 1);
+    }
+
+    #[test]
+    fn viewport_is_empty() {
+        assert!(Viewport::new(1, 0).is_empty());
+        assert!(!Viewport::new(1, 10).is_empty());
+    }
+
+    #[test]
+    fn visible_range_merge() {
+        let a = VisibleRange::new(5, 15);
+        let b = VisibleRange::new(10, 25);
+        let merged = a.merge(&b);
+        assert_eq!(merged.first_line, 5);
+        assert_eq!(merged.last_line, 25);
+    }
+
+    #[test]
+    fn view_line_is_continuation() {
+        let wrapped = ViewLine {
+            content: "world".to_string(),
+            model_line: 1,
+            model_start_column: 7,
+            is_wrapped: true,
+        };
+        assert!(wrapped.is_continuation());
+        let normal = ViewLine {
+            content: "hello".to_string(),
+            model_line: 1,
+            model_start_column: 1,
+            is_wrapped: false,
+        };
+        assert!(!normal.is_continuation());
+    }
+
+    #[test]
+    fn line_height_tracker_average_height() {
+        let mut tracker = LineHeightTracker::new(20);
+        tracker.set_height(0, 30);
+        tracker.set_height(1, 20);
+        tracker.set_height(2, 10);
+        let avg = tracker.average_height(3);
+        assert!((avg - 20.0).abs() < f64::EPSILON);
+        // Empty case
+        assert!((tracker.average_height(0) - 20.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn line_height_tracker_has_custom_heights() {
+        let tracker = LineHeightTracker::new(20);
+        assert!(!tracker.has_custom_heights());
+        let mut tracker2 = LineHeightTracker::new(20);
+        tracker2.set_height(0, 30);
+        assert!(tracker2.has_custom_heights());
+    }
+
+    #[test]
+    fn view_model_stats_summary() {
+        let stats = ViewModelStats {
+            model_line_count: 100,
+            view_line_count: 120,
+            wrapped_line_count: 20,
+            longest_view_line: 80,
+        };
+        let s = stats.summary();
+        assert!(s.contains("100 model lines"));
+        assert!(s.contains("120 view lines"));
+        assert!(s.contains("20 wrapped"));
     }
 }

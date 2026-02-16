@@ -777,6 +777,318 @@ impl fmt::Display for NormalizeReport {
     }
 }
 
+// ---------------------------------------------------------------------------
+// WhitespaceChar extensions
+// ---------------------------------------------------------------------------
+
+impl WhitespaceChar {
+    pub fn is_tab(&self) -> bool {
+        self.kind == WhitespaceKind::Tab
+    }
+
+    pub fn is_space(&self) -> bool {
+        self.kind == WhitespaceKind::Space
+    }
+
+    pub fn is_nbsp(&self) -> bool {
+        self.kind == WhitespaceKind::Nbsp
+    }
+
+    pub fn visual_width(&self, tab_size: u32) -> u32 {
+        match self.kind {
+            WhitespaceKind::Tab => tab_size,
+            WhitespaceKind::Space | WhitespaceKind::Nbsp => 1,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WhitespaceConfig extensions
+// ---------------------------------------------------------------------------
+
+impl WhitespaceConfig {
+    pub fn is_default(&self) -> bool {
+        *self == WhitespaceConfig::default()
+    }
+
+    pub fn summary(&self) -> String {
+        let indent = if self.insert_spaces {
+            format!("{} spaces", self.tab_size)
+        } else {
+            "tabs".to_string()
+        };
+        let mut flags = Vec::new();
+        if self.trim_trailing {
+            flags.push("trim-trail");
+        }
+        if self.ensure_final_newline {
+            flags.push("final-nl");
+        }
+        if self.trim_final_newlines {
+            flags.push("trim-final-nl");
+        }
+        if flags.is_empty() {
+            indent
+        } else {
+            format!("{indent} [{}]", flags.join(", "))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WhitespaceStats extensions
+// ---------------------------------------------------------------------------
+
+impl WhitespaceStats {
+    pub fn merge(&mut self, other: &WhitespaceStats) {
+        self.total_lines += other.total_lines;
+        self.blank_lines += other.blank_lines;
+        self.lines_with_trailing += other.lines_with_trailing;
+        self.total_trailing_chars += other.total_trailing_chars;
+        self.tab_count += other.tab_count;
+        self.space_count += other.space_count;
+        self.nbsp_count += other.nbsp_count;
+    }
+
+    pub fn total_whitespace_chars(&self) -> usize {
+        self.tab_count + self.space_count + self.nbsp_count
+    }
+
+    pub fn whitespace_ratio(&self, total_chars: usize) -> f64 {
+        if total_chars == 0 {
+            return 0.0;
+        }
+        self.total_whitespace_chars() as f64 / total_chars as f64
+    }
+
+    pub fn has_tabs(&self) -> bool {
+        self.tab_count > 0
+    }
+
+    pub fn has_spaces(&self) -> bool {
+        self.space_count > 0
+    }
+
+    pub fn has_mixed_whitespace(&self) -> bool {
+        self.has_tabs() && self.has_spaces()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NormalizeReport extensions
+// ---------------------------------------------------------------------------
+
+impl NormalizeReport {
+    pub fn had_changes(&self) -> bool {
+        self.lines_changed > 0
+    }
+
+    pub fn change_count(&self) -> usize {
+        self.lines_changed
+    }
+
+    pub fn unchanged_lines(&self) -> usize {
+        self.total_lines.saturating_sub(self.lines_changed)
+    }
+
+    pub fn change_ratio(&self) -> f64 {
+        if self.total_lines == 0 {
+            return 0.0;
+        }
+        self.lines_changed as f64 / self.total_lines as f64
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NormalizeTarget extensions
+// ---------------------------------------------------------------------------
+
+impl NormalizeTarget {
+    pub fn label(&self) -> &'static str {
+        match self {
+            NormalizeTarget::Spaces(_) => "spaces",
+            NormalizeTarget::Tabs => "tabs",
+        }
+    }
+
+    pub fn indent_unit(&self) -> String {
+        match self {
+            NormalizeTarget::Spaces(n) => " ".repeat(*n),
+            NormalizeTarget::Tabs => "\t".to_string(),
+        }
+    }
+}
+
+impl fmt::Display for NormalizeTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NormalizeTarget::Spaces(n) => write!(f, "{n} spaces"),
+            NormalizeTarget::Tabs => f.write_str("tabs"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WhitespaceKind extensions
+// ---------------------------------------------------------------------------
+
+impl WhitespaceKind {
+    pub fn all() -> Vec<WhitespaceKind> {
+        vec![WhitespaceKind::Space, WhitespaceKind::Tab, WhitespaceKind::Nbsp]
+    }
+
+    pub fn as_char(&self) -> char {
+        match self {
+            WhitespaceKind::Space => ' ',
+            WhitespaceKind::Tab => '\t',
+            WhitespaceKind::Nbsp => '\u{00A0}',
+        }
+    }
+
+    pub fn glyph(&self) -> char {
+        match self {
+            WhitespaceKind::Space => '·',
+            WhitespaceKind::Tab => '→',
+            WhitespaceKind::Nbsp => '°',
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Indentation detection
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IndentationStyle {
+    Tab,
+    Spaces(u32),
+    Mixed,
+    Unknown,
+}
+
+impl fmt::Display for IndentationStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            IndentationStyle::Tab => f.write_str("tabs"),
+            IndentationStyle::Spaces(n) => write!(f, "{n} spaces"),
+            IndentationStyle::Mixed => f.write_str("mixed"),
+            IndentationStyle::Unknown => f.write_str("unknown"),
+        }
+    }
+}
+
+pub fn detect_indentation(lines: &[&str]) -> IndentationStyle {
+    let mut tab_lines = 0u32;
+    let mut space_lines = 0u32;
+    let mut min_space_indent: Option<u32> = None;
+
+    for line in lines {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let first = match line.chars().next() {
+            Some(c) => c,
+            None => continue,
+        };
+        if first == '\t' {
+            tab_lines += 1;
+        } else if first == ' ' {
+            space_lines += 1;
+            let count = line.chars().take_while(|c| *c == ' ').count() as u32;
+            if count > 0 {
+                min_space_indent = Some(match min_space_indent {
+                    Some(prev) => gcd(prev, count),
+                    None => count,
+                });
+            }
+        }
+    }
+
+    if tab_lines == 0 && space_lines == 0 {
+        return IndentationStyle::Unknown;
+    }
+    if tab_lines > 0 && space_lines > 0 {
+        return IndentationStyle::Mixed;
+    }
+    if tab_lines > 0 {
+        return IndentationStyle::Tab;
+    }
+    IndentationStyle::Spaces(min_space_indent.unwrap_or(4))
+}
+
+fn gcd(mut a: u32, mut b: u32) -> u32 {
+    while b != 0 {
+        let t = b;
+        b = a % b;
+        a = t;
+    }
+    a
+}
+
+// ---------------------------------------------------------------------------
+// Whitespace line iterator
+// ---------------------------------------------------------------------------
+
+pub struct WhitespaceIter<'a> {
+    chars: std::str::CharIndices<'a>,
+    col: usize,
+    tab_size: usize,
+}
+
+impl<'a> WhitespaceIter<'a> {
+    pub fn new(line: &'a str, tab_size: usize) -> Self {
+        Self {
+            chars: line.char_indices(),
+            col: 0,
+            tab_size,
+        }
+    }
+}
+
+impl<'a> Iterator for WhitespaceIter<'a> {
+    type Item = WhitespaceChar;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let (offset, ch) = self.chars.next()?;
+            match ch {
+                ' ' => {
+                    self.col += 1;
+                    return Some(WhitespaceChar {
+                        offset,
+                        kind: WhitespaceKind::Space,
+                        width: 1,
+                    });
+                }
+                '\t' => {
+                    let w = self.tab_size - (self.col % self.tab_size);
+                    self.col += w;
+                    return Some(WhitespaceChar {
+                        offset,
+                        kind: WhitespaceKind::Tab,
+                        width: w,
+                    });
+                }
+                '\u{00A0}' => {
+                    self.col += 1;
+                    return Some(WhitespaceChar {
+                        offset,
+                        kind: WhitespaceKind::Nbsp,
+                        width: 1,
+                    });
+                }
+                _ => {
+                    self.col += 1;
+                }
+            }
+        }
+    }
+}
+
+pub fn whitespace_iter(line: &str, tab_size: usize) -> WhitespaceIter<'_> {
+    WhitespaceIter::new(line, tab_size)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1203,5 +1515,120 @@ mod tests {
     fn normalize_report_display() {
         let r = NormalizeReport { lines_changed: 5, total_lines: 10 };
         assert_eq!(format!("{r}"), "5/10 lines changed");
+    }
+
+    #[test]
+    fn whitespace_char_is_helpers() {
+        let tab = WhitespaceChar { offset: 0, kind: WhitespaceKind::Tab, width: 4 };
+        let space = WhitespaceChar { offset: 0, kind: WhitespaceKind::Space, width: 1 };
+        let nbsp = WhitespaceChar { offset: 0, kind: WhitespaceKind::Nbsp, width: 1 };
+        assert!(tab.is_tab());
+        assert!(!tab.is_space());
+        assert!(space.is_space());
+        assert!(!space.is_tab());
+        assert!(nbsp.is_nbsp());
+        assert_eq!(tab.visual_width(8), 8);
+        assert_eq!(space.visual_width(8), 1);
+    }
+
+    #[test]
+    fn config_is_default_and_summary() {
+        let cfg = WhitespaceConfig::default();
+        assert!(cfg.is_default());
+        let custom = WhitespaceConfig { tab_size: 2, ..WhitespaceConfig::default() };
+        assert!(!custom.is_default());
+        let summary = cfg.summary();
+        assert!(summary.contains("4 spaces"));
+        assert!(summary.contains("trim-trail"));
+    }
+
+    #[test]
+    fn whitespace_stats_merge_and_totals() {
+        let mut a = WhitespaceStats {
+            total_lines: 10,
+            blank_lines: 2,
+            lines_with_trailing: 1,
+            total_trailing_chars: 3,
+            tab_count: 5,
+            space_count: 10,
+            nbsp_count: 0,
+        };
+        let b = WhitespaceStats {
+            total_lines: 5,
+            blank_lines: 1,
+            lines_with_trailing: 2,
+            total_trailing_chars: 4,
+            tab_count: 3,
+            space_count: 7,
+            nbsp_count: 1,
+        };
+        a.merge(&b);
+        assert_eq!(a.total_lines, 15);
+        assert_eq!(a.total_whitespace_chars(), 26);
+        assert!(a.has_mixed_whitespace());
+        let ratio = a.whitespace_ratio(100);
+        assert!((ratio - 0.26).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn normalize_report_extensions() {
+        let r = NormalizeReport { lines_changed: 3, total_lines: 10 };
+        assert!(r.had_changes());
+        assert_eq!(r.change_count(), 3);
+        assert_eq!(r.unchanged_lines(), 7);
+        assert!((r.change_ratio() - 0.3).abs() < f64::EPSILON);
+        let no_change = NormalizeReport { lines_changed: 0, total_lines: 5 };
+        assert!(!no_change.had_changes());
+    }
+
+    #[test]
+    fn normalize_target_label_and_display() {
+        let spaces = NormalizeTarget::Spaces(4);
+        let tabs = NormalizeTarget::Tabs;
+        assert_eq!(spaces.label(), "spaces");
+        assert_eq!(tabs.label(), "tabs");
+        assert_eq!(format!("{spaces}"), "4 spaces");
+        assert_eq!(format!("{tabs}"), "tabs");
+        assert_eq!(spaces.indent_unit(), "    ");
+        assert_eq!(tabs.indent_unit(), "\t");
+    }
+
+    #[test]
+    fn whitespace_kind_all_and_helpers() {
+        let all = WhitespaceKind::all();
+        assert_eq!(all.len(), 3);
+        assert_eq!(WhitespaceKind::Space.as_char(), ' ');
+        assert_eq!(WhitespaceKind::Tab.as_char(), '\t');
+        assert_eq!(WhitespaceKind::Nbsp.as_char(), '\u{00A0}');
+        assert_eq!(WhitespaceKind::Space.glyph(), '·');
+        assert_eq!(WhitespaceKind::Tab.glyph(), '→');
+    }
+
+    #[test]
+    fn detect_indentation_tabs_and_spaces() {
+        let tab_lines = vec!["\tfoo", "\t\tbar", "baz"];
+        assert_eq!(detect_indentation(&tab_lines), IndentationStyle::Tab);
+        let space_lines = vec!["    foo", "        bar", "baz"];
+        assert_eq!(detect_indentation(&space_lines), IndentationStyle::Spaces(4));
+        let mixed = vec!["\tfoo", "    bar"];
+        assert_eq!(detect_indentation(&mixed), IndentationStyle::Mixed);
+        let empty: Vec<&str> = vec!["no_indent", "also_none"];
+        assert_eq!(detect_indentation(&empty), IndentationStyle::Unknown);
+    }
+
+    #[test]
+    fn whitespace_iter_matches_detect() {
+        let line = "a b\tc";
+        let from_iter: Vec<WhitespaceChar> = whitespace_iter(line, 4).collect();
+        let from_detect = detect_whitespace(line, 4);
+        assert_eq!(from_iter, from_detect);
+    }
+
+    #[test]
+    fn indentation_style_display() {
+        assert_eq!(IndentationStyle::Tab.to_string(), "tabs");
+        assert_eq!(IndentationStyle::Spaces(2).to_string(), "2 spaces");
+        assert_eq!(IndentationStyle::Mixed.to_string(), "mixed");
+        assert_eq!(IndentationStyle::Unknown.to_string(), "unknown");
     }
 }

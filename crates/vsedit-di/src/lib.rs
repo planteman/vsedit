@@ -679,6 +679,202 @@ impl Default for ServiceRegistry {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ServiceLifecycle extensions
+// ---------------------------------------------------------------------------
+
+impl ServiceLifecycle {
+    /// Returns `true` if the service is in the [`Active`](Self::Active) phase.
+    pub fn is_active(&self) -> bool {
+        matches!(self, Self::Active)
+    }
+
+    /// Returns `true` if the service has been [`Disposed`](Self::Disposed).
+    pub fn is_disposed(&self) -> bool {
+        matches!(self, Self::Disposed)
+    }
+
+    /// Returns `true` if the service is [`Registered`](Self::Registered) but
+    /// not yet active.
+    pub fn is_pending(&self) -> bool {
+        matches!(self, Self::Registered)
+    }
+
+    /// A short label suitable for use in structured log output.
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Registered => "registered",
+            Self::Active => "active",
+            Self::Disposed => "disposed",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ServiceStats extensions
+// ---------------------------------------------------------------------------
+
+impl ServiceStats {
+    /// Merge two snapshots by summing their counters.
+    pub fn merge(&self, other: &Self) -> Self {
+        Self {
+            total_registered: self.total_registered + other.total_registered,
+            total_resolved: self.total_resolved + other.total_resolved,
+            resolution_errors: self.resolution_errors + other.resolution_errors,
+        }
+    }
+
+    /// Returns the number of services that have been registered but not yet
+    /// resolved (i.e. still pending as factories).
+    pub fn pending_count(&self) -> usize {
+        self.total_registered.saturating_sub(self.total_resolved)
+    }
+
+    /// Returns `true` when every registered service has been resolved.
+    pub fn all_resolved(&self) -> bool {
+        self.total_registered == self.total_resolved
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContainerDiagnostics extensions
+// ---------------------------------------------------------------------------
+
+impl ContainerDiagnostics {
+    /// Returns a single-line summary of the container health.
+    pub fn summary(&self) -> String {
+        if self.is_disposed {
+            return "container disposed".to_string();
+        }
+        format!(
+            "{} service(s): {} instance(s), {} factory(ies)",
+            self.service_count, self.instance_count, self.factory_count
+        )
+    }
+
+    /// Returns `true` when every registered service has been resolved to an
+    /// instance (no remaining factories).
+    pub fn fully_resolved(&self) -> bool {
+        self.factory_count == 0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ServiceRegistry extensions
+// ---------------------------------------------------------------------------
+
+impl ServiceRegistry {
+    /// Merge all entries from `other` into `self`.
+    ///
+    /// Tags that exist in both registries are combined (entries from `other`
+    /// are appended after entries in `self`).
+    pub fn merge(&mut self, other: ServiceRegistry) {
+        for (tag, entries) in other.tagged {
+            self.tagged.entry(tag).or_default().extend(entries);
+        }
+    }
+
+    /// Returns `true` if the registry contains no tags.
+    pub fn is_empty(&self) -> bool {
+        self.tagged.is_empty()
+    }
+
+    /// Returns an iterator over `(tag, service_count)` pairs.
+    pub fn iter_tags(&self) -> impl Iterator<Item = (&str, usize)> {
+        self.tagged.iter().map(|(k, v)| (k.as_str(), v.len()))
+    }
+
+    /// Returns the number of distinct tags in the registry.
+    pub fn tag_len(&self) -> usize {
+        self.tagged.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ServiceScope extensions
+// ---------------------------------------------------------------------------
+
+impl ServiceScope {
+    /// Returns `true` if the scope has a parent.
+    pub fn has_parent(&self) -> bool {
+        self.parent.is_some()
+    }
+
+    /// Returns `true` if the scope's own collection is empty.
+    pub fn is_empty(&self) -> bool {
+        self.own.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dependency graph helpers
+// ---------------------------------------------------------------------------
+
+/// Produce a topological ordering of a dependency graph, or return an error
+/// containing a cycle when one exists.
+///
+/// The graph is represented as a `HashMap<String, Vec<String>>` where each
+/// key is a service name and its value is the list of services it depends on.
+pub fn topological_sort(
+    graph: &HashMap<String, Vec<String>>,
+) -> Result<Vec<String>, Vec<String>> {
+    if let Some(cycle) = detect_circular_dependency(graph) {
+        return Err(cycle);
+    }
+
+    let mut in_degree: HashMap<&str, usize> = HashMap::new();
+    for key in graph.keys() {
+        in_degree.entry(key.as_str()).or_insert(0);
+    }
+    for deps in graph.values() {
+        for dep in deps {
+            *in_degree.entry(dep.as_str()).or_insert(0) += 1;
+        }
+    }
+
+    let mut queue: Vec<&str> = in_degree
+        .iter()
+        .filter(|&(_, d)| *d == 0)
+        .map(|(&k, _)| k)
+        .collect();
+    queue.sort();
+
+    let mut result = Vec::new();
+    while let Some(node) = queue.pop() {
+        result.push(node.to_string());
+        if let Some(deps) = graph.get(node) {
+            for dep in deps {
+                if let Some(d) = in_degree.get_mut(dep.as_str()) {
+                    *d = d.saturating_sub(1);
+                    if *d == 0 {
+                        queue.push(dep.as_str());
+                        queue.sort();
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+/// Summarise a dependency graph as a human-readable multi-line string showing
+/// each service and its direct dependencies.
+pub fn dependency_summary(graph: &HashMap<String, Vec<String>>) -> String {
+    let mut keys: Vec<&str> = graph.keys().map(|s| s.as_str()).collect();
+    keys.sort();
+    let mut out = String::new();
+    for key in keys {
+        let deps = &graph[key];
+        if deps.is_empty() {
+            out.push_str(&format!("{key} -> (none)\n"));
+        } else {
+            out.push_str(&format!("{key} -> {}\n", deps.join(", ")));
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1201,5 +1397,142 @@ mod tests {
         assert_eq!(reg.total_services(), 3);
         reg.clear_tag("loggers");
         assert_eq!(reg.total_services(), 1);
+    }
+
+    // -- ServiceLifecycle extensions ----------------------------------------
+
+    #[test]
+    fn lifecycle_predicates() {
+        assert!(ServiceLifecycle::Active.is_active());
+        assert!(!ServiceLifecycle::Registered.is_active());
+
+        assert!(ServiceLifecycle::Disposed.is_disposed());
+        assert!(!ServiceLifecycle::Active.is_disposed());
+
+        assert!(ServiceLifecycle::Registered.is_pending());
+        assert!(!ServiceLifecycle::Active.is_pending());
+    }
+
+    #[test]
+    fn lifecycle_label() {
+        assert_eq!(ServiceLifecycle::Registered.label(), "registered");
+        assert_eq!(ServiceLifecycle::Active.label(), "active");
+        assert_eq!(ServiceLifecycle::Disposed.label(), "disposed");
+    }
+
+    // -- ServiceStats extensions -------------------------------------------
+
+    #[test]
+    fn stats_merge() {
+        let a = ServiceStats { total_registered: 3, total_resolved: 2, resolution_errors: 1 };
+        let b = ServiceStats { total_registered: 5, total_resolved: 4, resolution_errors: 0 };
+        let merged = a.merge(&b);
+        assert_eq!(merged.total_registered, 8);
+        assert_eq!(merged.total_resolved, 6);
+        assert_eq!(merged.resolution_errors, 1);
+    }
+
+    #[test]
+    fn stats_pending_and_all_resolved() {
+        let partial = ServiceStats { total_registered: 5, total_resolved: 3, resolution_errors: 0 };
+        assert_eq!(partial.pending_count(), 2);
+        assert!(!partial.all_resolved());
+
+        let full = ServiceStats { total_registered: 4, total_resolved: 4, resolution_errors: 0 };
+        assert_eq!(full.pending_count(), 0);
+        assert!(full.all_resolved());
+    }
+
+    // -- ContainerDiagnostics extensions -----------------------------------
+
+    #[test]
+    fn diagnostics_summary_and_fully_resolved() {
+        let diag = ContainerDiagnostics {
+            service_count: 3,
+            factory_count: 0,
+            instance_count: 3,
+            is_disposed: false,
+        };
+        assert!(diag.fully_resolved());
+        assert!(diag.summary().contains("3 service(s)"));
+
+        let disposed = ContainerDiagnostics {
+            service_count: 1,
+            factory_count: 0,
+            instance_count: 1,
+            is_disposed: true,
+        };
+        assert_eq!(disposed.summary(), "container disposed");
+    }
+
+    // -- ServiceRegistry extensions ----------------------------------------
+
+    #[test]
+    fn registry_merge_and_iter() {
+        let mut r1 = ServiceRegistry::new();
+        r1.register_tagged("loggers", LogService { prefix: "a".into() });
+
+        let mut r2 = ServiceRegistry::new();
+        r2.register_tagged("loggers", LogService { prefix: "b".into() });
+        r2.register_tagged("configs", ConfigService { value: 1 });
+
+        assert!(!r1.is_empty());
+        assert_eq!(r1.tag_len(), 1);
+
+        r1.merge(r2);
+        assert_eq!(r1.tag_count("loggers"), 2);
+        assert_eq!(r1.tag_count("configs"), 1);
+        assert_eq!(r1.tag_len(), 2);
+
+        let tags: Vec<_> = r1.iter_tags().collect();
+        assert_eq!(tags.len(), 2);
+    }
+
+    // -- Dependency graph helpers ------------------------------------------
+
+    #[test]
+    fn topological_sort_acyclic() {
+        let mut graph = HashMap::new();
+        graph.insert("A".into(), vec!["B".into(), "C".into()]);
+        graph.insert("B".into(), vec!["C".into()]);
+        graph.insert("C".into(), vec![]);
+        let order = topological_sort(&graph).unwrap();
+        let pos_a = order.iter().position(|s| s == "A").unwrap();
+        let pos_b = order.iter().position(|s| s == "B").unwrap();
+        let pos_c = order.iter().position(|s| s == "C").unwrap();
+        assert!(pos_a < pos_b);
+        assert!(pos_b < pos_c);
+    }
+
+    #[test]
+    fn topological_sort_cyclic_returns_err() {
+        let mut graph = HashMap::new();
+        graph.insert("X".into(), vec!["Y".into()]);
+        graph.insert("Y".into(), vec!["X".into()]);
+        assert!(topological_sort(&graph).is_err());
+    }
+
+    #[test]
+    fn dependency_summary_output() {
+        let mut graph = HashMap::new();
+        graph.insert("A".into(), vec!["B".into()]);
+        graph.insert("B".into(), vec![]);
+        let summary = dependency_summary(&graph);
+        assert!(summary.contains("A -> B"));
+        assert!(summary.contains("B -> (none)"));
+    }
+
+    // -- ServiceScope extensions -------------------------------------------
+
+    #[test]
+    fn scope_has_parent_and_is_empty() {
+        let root = ServiceScope::new();
+        assert!(!root.has_parent());
+        assert!(root.is_empty());
+
+        let accessor = ServiceAccessor::new(ServiceCollection::new());
+        let child = ServiceScope::child(&accessor);
+        assert!(child.has_parent());
+        assert!(child.is_empty());
     }
 }

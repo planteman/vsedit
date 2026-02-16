@@ -752,6 +752,178 @@ impl OverrideRegistry {
     }
 }
 
+// ---------------------------------------------------------------------------
+// CursorStyle helpers
+// ---------------------------------------------------------------------------
+
+impl CursorStyle {
+    /// Returns all cursor style variants.
+    pub fn all() -> &'static [CursorStyle] {
+        &[
+            CursorStyle::Line,
+            CursorStyle::Block,
+            CursorStyle::Underline,
+            CursorStyle::LineThin,
+            CursorStyle::BlockOutline,
+            CursorStyle::UnderlineThin,
+        ]
+    }
+
+    /// Parse from a string.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().as_str() {
+            "line" => Some(Self::Line),
+            "block" => Some(Self::Block),
+            "underline" => Some(Self::Underline),
+            "line-thin" | "linethin" => Some(Self::LineThin),
+            "block-outline" | "blockoutline" => Some(Self::BlockOutline),
+            "underline-thin" | "underlinethin" => Some(Self::UnderlineThin),
+            _ => None,
+        }
+    }
+
+    /// Returns the cursor character representation.
+    pub fn cursor_char(&self) -> char {
+        match self {
+            CursorStyle::Line | CursorStyle::LineThin => '│',
+            CursorStyle::Block | CursorStyle::BlockOutline => '█',
+            CursorStyle::Underline | CursorStyle::UnderlineThin => '_',
+        }
+    }
+}
+
+impl fmt::Display for CursorStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CursorStyle::Line => write!(f, "line"),
+            CursorStyle::Block => write!(f, "block"),
+            CursorStyle::Underline => write!(f, "underline"),
+            CursorStyle::LineThin => write!(f, "line-thin"),
+            CursorStyle::BlockOutline => write!(f, "block-outline"),
+            CursorStyle::UnderlineThin => write!(f, "underline-thin"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WordWrap helpers
+// ---------------------------------------------------------------------------
+
+impl WordWrap {
+    /// Returns all word wrap variants.
+    pub fn all() -> &'static [WordWrap] {
+        &[WordWrap::Off, WordWrap::On, WordWrap::WordWrapColumn, WordWrap::Bounded, WordWrap::Inherit]
+    }
+
+    /// Returns true if wrapping is enabled in some form.
+    pub fn is_enabled(&self) -> bool {
+        !matches!(self, WordWrap::Off | WordWrap::Inherit)
+    }
+}
+
+impl fmt::Display for WordWrap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WordWrap::Off => write!(f, "off"),
+            WordWrap::On => write!(f, "on"),
+            WordWrap::WordWrapColumn => write!(f, "wordWrapColumn"),
+            WordWrap::Bounded => write!(f, "bounded"),
+            WordWrap::Inherit => write!(f, "inherit"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LineNumbersType helpers
+// ---------------------------------------------------------------------------
+
+impl LineNumbersType {
+    /// Returns all line numbers type variants.
+    pub fn all() -> &'static [LineNumbersType] {
+        &[
+            LineNumbersType::Off,
+            LineNumbersType::On,
+            LineNumbersType::Relative,
+            LineNumbersType::Interval,
+        ]
+    }
+
+    /// Returns true if line numbers are shown.
+    pub fn is_visible(&self) -> bool {
+        !matches!(self, LineNumbersType::Off)
+    }
+}
+
+impl fmt::Display for LineNumbersType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LineNumbersType::Off => write!(f, "off"),
+            LineNumbersType::On => write!(f, "on"),
+            LineNumbersType::Relative => write!(f, "relative"),
+            LineNumbersType::Interval => write!(f, "interval"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorOptions diff
+// ---------------------------------------------------------------------------
+
+/// Describes a single changed field between two EditorOptions.
+#[derive(Debug, Clone)]
+pub struct EditorOptionChange {
+    pub field: String,
+    pub old_value: String,
+    pub new_value: String,
+}
+
+impl fmt::Display for EditorOptionChange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: {} -> {}", self.field, self.old_value, self.new_value)
+    }
+}
+
+/// Compare two EditorOptions and return a list of field differences.
+pub fn diff_editor_options(a: &EditorOptions, b: &EditorOptions) -> Vec<EditorOptionChange> {
+    let mut changes = Vec::new();
+    if a.font_size != b.font_size {
+        changes.push(EditorOptionChange {
+            field: "font_size".to_string(),
+            old_value: format!("{}", a.font_size),
+            new_value: format!("{}", b.font_size),
+        });
+    }
+    if a.tab_size != b.tab_size {
+        changes.push(EditorOptionChange {
+            field: "tab_size".to_string(),
+            old_value: format!("{}", a.tab_size),
+            new_value: format!("{}", b.tab_size),
+        });
+    }
+    if a.insert_spaces != b.insert_spaces {
+        changes.push(EditorOptionChange {
+            field: "insert_spaces".to_string(),
+            old_value: format!("{}", a.insert_spaces),
+            new_value: format!("{}", b.insert_spaces),
+        });
+    }
+    if a.word_wrap != b.word_wrap {
+        changes.push(EditorOptionChange {
+            field: "word_wrap".to_string(),
+            old_value: format!("{:?}", a.word_wrap),
+            new_value: format!("{:?}", b.word_wrap),
+        });
+    }
+    if a.cursor_style != b.cursor_style {
+        changes.push(EditorOptionChange {
+            field: "cursor_style".to_string(),
+            old_value: format!("{:?}", a.cursor_style),
+            new_value: format!("{:?}", b.cursor_style),
+        });
+    }
+    changes
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1239,5 +1411,72 @@ mod tests {
         let ov = EditorConfigOverride::new("*.md");
         let json = serde_json::to_string(&ov).unwrap();
         assert!(!json.contains("tab_size"));
+    }
+
+    #[test]
+    fn test_cursor_style_all() {
+        assert_eq!(CursorStyle::all().len(), 6);
+    }
+
+    #[test]
+    fn test_cursor_style_from_name() {
+        assert_eq!(CursorStyle::from_name("block"), Some(CursorStyle::Block));
+        assert_eq!(CursorStyle::from_name("line-thin"), Some(CursorStyle::LineThin));
+        assert_eq!(CursorStyle::from_name("bogus"), None);
+    }
+
+    #[test]
+    fn test_cursor_style_display() {
+        assert_eq!(format!("{}", CursorStyle::Block), "block");
+        assert_eq!(format!("{}", CursorStyle::LineThin), "line-thin");
+    }
+
+    #[test]
+    fn test_cursor_style_cursor_char() {
+        assert_eq!(CursorStyle::Block.cursor_char(), '█');
+        assert_eq!(CursorStyle::Line.cursor_char(), '│');
+    }
+
+    #[test]
+    fn test_word_wrap_all_and_enabled() {
+        assert_eq!(WordWrap::all().len(), 5);
+        assert!(WordWrap::On.is_enabled());
+        assert!(!WordWrap::Off.is_enabled());
+        assert!(!WordWrap::Inherit.is_enabled());
+    }
+
+    #[test]
+    fn test_word_wrap_display() {
+        assert_eq!(format!("{}", WordWrap::Bounded), "bounded");
+    }
+
+    #[test]
+    fn test_line_numbers_type_all() {
+        assert_eq!(LineNumbersType::all().len(), 4);
+    }
+
+    #[test]
+    fn test_line_numbers_type_visible() {
+        assert!(LineNumbersType::On.is_visible());
+        assert!(!LineNumbersType::Off.is_visible());
+    }
+
+    #[test]
+    fn test_diff_editor_options_same() {
+        let a = EditorOptions::default();
+        let b = EditorOptions::default();
+        assert!(diff_editor_options(&a, &b).is_empty());
+    }
+
+    #[test]
+    fn test_diff_editor_options_changed() {
+        let a = EditorOptions::default();
+        let mut b = EditorOptions::default();
+        b.font_size = 20;
+        b.tab_size = 2;
+        let changes = diff_editor_options(&a, &b);
+        assert_eq!(changes.len(), 2);
+        assert!(changes.iter().any(|c| c.field == "font_size"));
+        assert!(format!("{}", changes[0]).contains("->"));
     }
 }

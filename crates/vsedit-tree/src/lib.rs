@@ -764,6 +764,146 @@ where
         .join("\n")
 }
 
+// ---------------------------------------------------------------------------
+// TreeNode helpers
+// ---------------------------------------------------------------------------
+
+impl<T> TreeNode<T> {
+    /// Returns true if this node has no children.
+    pub fn is_leaf(&self) -> bool {
+        self.children.is_empty()
+    }
+
+    /// Returns the number of direct children.
+    pub fn child_count(&self) -> usize {
+        self.children.len()
+    }
+
+    /// Returns the maximum depth in this subtree.
+    pub fn max_depth(&self) -> u32 {
+        if self.children.is_empty() {
+            self.depth
+        } else {
+            self.children.iter().map(|c| c.max_depth()).max().unwrap_or(self.depth)
+        }
+    }
+
+    /// Apply a function to this node and all descendants (depth-first).
+    pub fn for_each<F: FnMut(&TreeNode<T>)>(&self, f: &mut F) {
+        f(self);
+        for child in &self.children {
+            child.for_each(f);
+        }
+    }
+
+    /// Apply a mutable function to this node and all descendants.
+    pub fn for_each_mut<F: FnMut(&mut TreeNode<T>)>(&mut self, f: &mut F) {
+        f(self);
+        for child in &mut self.children {
+            child.for_each_mut(f);
+        }
+    }
+
+    /// Expand this node and all descendants.
+    pub fn expand_all(&mut self) {
+        self.is_expanded = true;
+        for child in &mut self.children {
+            child.expand_all();
+        }
+    }
+
+    /// Collapse this node and all descendants.
+    pub fn collapse_all(&mut self) {
+        self.is_expanded = false;
+        for child in &mut self.children {
+            child.collapse_all();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TreeModel helpers
+// ---------------------------------------------------------------------------
+
+impl<T> TreeModel<T> {
+    /// Returns total number of root nodes.
+    pub fn root_count(&self) -> usize {
+        self.roots.len()
+    }
+
+    /// Returns true if the model has no nodes.
+    pub fn is_empty(&self) -> bool {
+        self.roots.is_empty()
+    }
+
+    /// Count all leaf nodes in the tree.
+    pub fn count_leaves(&self) -> usize {
+        fn count_leaves_node<T>(node: &TreeNode<T>) -> usize {
+            if node.children.is_empty() {
+                1
+            } else {
+                node.children.iter().map(count_leaves_node).sum()
+            }
+        }
+        self.roots.iter().map(count_leaves_node).sum()
+    }
+
+    /// Collect all leaf node data references.
+    pub fn collect_leaves(&self) -> Vec<&T> {
+        fn collect<'a, T>(node: &'a TreeNode<T>, out: &mut Vec<&'a T>) {
+            if node.children.is_empty() {
+                out.push(&node.data);
+            } else {
+                for child in &node.children {
+                    collect(child, out);
+                }
+            }
+        }
+        let mut result = Vec::new();
+        for root in &self.roots {
+            collect(root, &mut result);
+        }
+        result
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tree depth iterator
+// ---------------------------------------------------------------------------
+
+/// Iterator that yields nodes at a specific depth.
+pub struct DepthIter<'a, T> {
+    stack: Vec<&'a TreeNode<T>>,
+    target_depth: u32,
+}
+
+impl<'a, T> DepthIter<'a, T> {
+    pub fn new(roots: &'a [TreeNode<T>], depth: u32) -> Self {
+        Self {
+            stack: roots.iter().rev().collect(),
+            target_depth: depth,
+        }
+    }
+}
+
+impl<'a, T> Iterator for DepthIter<'a, T> {
+    type Item = &'a TreeNode<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(node) = self.stack.pop() {
+            if node.depth == self.target_depth {
+                return Some(node);
+            }
+            if node.depth < self.target_depth {
+                for child in node.children.iter().rev() {
+                    self.stack.push(child);
+                }
+            }
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1235,5 +1375,88 @@ mod tests {
         assert!(output.contains("  main.rs"));
         assert!(output.contains("  ▶ lib"));
         assert!(output.contains("Cargo.toml"));
+    }
+
+    #[test]
+    fn test_tree_node_is_leaf() {
+        let leaf = TreeNode::new("leaf", 0);
+        assert!(leaf.is_leaf());
+        assert_eq!(leaf.child_count(), 0);
+    }
+
+    #[test]
+    fn test_tree_node_max_depth() {
+        let mut root = TreeNode::new("root", 0);
+        let child = root.add_child("child");
+        child.add_child("grandchild");
+        assert_eq!(root.max_depth(), 2);
+    }
+
+    #[test]
+    fn test_tree_node_for_each() {
+        let mut root = TreeNode::new("a", 0);
+        root.add_child("b");
+        root.add_child("c");
+        let mut count = 0;
+        root.for_each(&mut |_| count += 1);
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_tree_node_expand_collapse_all() {
+        let mut root = TreeNode::new("a", 0);
+        root.add_child("b");
+        root.expand_all();
+        assert!(root.is_expanded);
+        assert!(root.children[0].is_expanded);
+        root.collapse_all();
+        assert!(!root.is_expanded);
+    }
+
+    #[test]
+    fn test_tree_model_helpers() {
+        let mut model = TreeModel { roots: Vec::new() };
+        assert!(model.is_empty());
+        let mut root = TreeNode::new("root", 0);
+        root.add_child("leaf1");
+        root.add_child("leaf2");
+        model.roots.push(root);
+        assert_eq!(model.root_count(), 1);
+        assert!(!model.is_empty());
+        assert_eq!(model.count_leaves(), 2);
+    }
+
+    #[test]
+    fn test_tree_model_collect_leaves() {
+        let mut model = TreeModel { roots: Vec::new() };
+        let mut root = TreeNode::new("root", 0);
+        root.add_child("leaf1");
+        root.add_child("leaf2");
+        model.roots.push(root);
+        let leaves = model.collect_leaves();
+        assert_eq!(leaves, vec![&"leaf1", &"leaf2"]);
+    }
+
+    #[test]
+    fn test_tree_model_expand_collapse_all() {
+        let mut model = TreeModel { roots: Vec::new() };
+        let mut root = TreeNode::new("root", 0);
+        root.add_child("child");
+        model.roots.push(root);
+        model.expand_all();
+        assert!(model.roots[0].is_expanded);
+        model.collapse_all();
+        assert!(!model.roots[0].is_expanded);
+    }
+
+    #[test]
+    fn test_depth_iter() {
+        let mut root = TreeNode::new("root", 0);
+        root.add_child("a");
+        root.add_child("b");
+        let roots = vec![root];
+        let depth1: Vec<_> = DepthIter::new(&roots, 1).collect();
+        assert_eq!(depth1.len(), 2);
+        assert_eq!(depth1[0].data, "a");
     }
 }

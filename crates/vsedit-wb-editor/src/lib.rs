@@ -756,6 +756,152 @@ fn extract_parent(path: &str) -> String {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tab filtering and sorting
+// ---------------------------------------------------------------------------
+
+/// Criteria for filtering tabs.
+#[derive(Debug, Clone, Default)]
+pub struct TabFilter {
+    /// If set, only include tabs with this language ID.
+    pub language: Option<String>,
+    /// If true, only dirty tabs.
+    pub dirty_only: bool,
+    /// If true, only pinned tabs.
+    pub pinned_only: bool,
+}
+
+impl TabFilter {
+    /// Create a filter for dirty tabs only.
+    pub fn dirty() -> Self {
+        Self { dirty_only: true, ..Default::default() }
+    }
+
+    /// Create a filter for pinned tabs only.
+    pub fn pinned() -> Self {
+        Self { pinned_only: true, ..Default::default() }
+    }
+
+    /// Create a filter for a specific language.
+    pub fn for_language(lang: impl Into<String>) -> Self {
+        Self { language: Some(lang.into()), ..Default::default() }
+    }
+
+    /// Check if a tab matches this filter.
+    pub fn matches(&self, tab: &EditorTabInfo) -> bool {
+        if self.dirty_only && !tab.dirty {
+            return false;
+        }
+        if self.pinned_only && !tab.pinned {
+            return false;
+        }
+        if let Some(ref lang) = self.language {
+            let ext = tab.uri.rsplit('.').next().unwrap_or("");
+            if ext != lang {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+/// Sort order for tabs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabSortOrder {
+    /// By URI alphabetically.
+    ByUri,
+    /// Dirty tabs first.
+    DirtyFirst,
+    /// Pinned tabs first.
+    PinnedFirst,
+}
+
+impl fmt::Display for TabSortOrder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TabSortOrder::ByUri => write!(f, "by URI"),
+            TabSortOrder::DirtyFirst => write!(f, "dirty first"),
+            TabSortOrder::PinnedFirst => write!(f, "pinned first"),
+        }
+    }
+}
+
+/// Sort a slice of tabs by the given order.
+pub fn sort_tabs(tabs: &mut [EditorTabInfo], order: TabSortOrder) {
+    match order {
+        TabSortOrder::ByUri => tabs.sort_by(|a, b| a.uri.cmp(&b.uri)),
+        TabSortOrder::DirtyFirst => tabs.sort_by(|a, b| b.dirty.cmp(&a.dirty)),
+        TabSortOrder::PinnedFirst => tabs.sort_by(|a, b| b.pinned.cmp(&a.pinned)),
+    }
+}
+
+/// Filter tabs by the given criteria.
+pub fn filter_tabs(tabs: &[EditorTabInfo], filter: &TabFilter) -> Vec<EditorTabInfo> {
+    tabs.iter().filter(|t| filter.matches(t)).cloned().collect()
+}
+
+// ---------------------------------------------------------------------------
+// Tab summary
+// ---------------------------------------------------------------------------
+
+/// Summary statistics about tabs in a group.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TabSummary {
+    pub total: usize,
+    pub dirty: usize,
+    pub pinned: usize,
+    pub preview: usize,
+}
+
+impl TabSummary {
+    /// Compute a summary from a slice of tabs.
+    pub fn from_tabs(tabs: &[EditorTabInfo]) -> Self {
+        Self {
+            total: tabs.len(),
+            dirty: tabs.iter().filter(|t| t.dirty).count(),
+            pinned: tabs.iter().filter(|t| t.pinned).count(),
+            preview: tabs.iter().filter(|t| t.preview).count(),
+        }
+    }
+
+    /// Returns true if there are any unsaved tabs.
+    pub fn has_unsaved(&self) -> bool {
+        self.dirty > 0
+    }
+}
+
+impl fmt::Display for TabSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} tabs ({} dirty, {} pinned, {} preview)",
+            self.total, self.dirty, self.pinned, self.preview
+        )
+    }
+}
+
+/// Extract unique file extensions from tabs.
+pub fn tab_languages(tabs: &[EditorTabInfo]) -> Vec<String> {
+    let mut langs: Vec<String> = tabs.iter()
+        .filter_map(|t| t.uri.rsplit('.').next().map(String::from))
+        .collect();
+    langs.sort();
+    langs.dedup();
+    langs
+}
+
+/// Find duplicate URIs in a tab list.
+pub fn find_duplicate_uris(tabs: &[EditorTabInfo]) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut dupes = Vec::new();
+    for tab in tabs {
+        if !seen.insert(&tab.uri) {
+            dupes.push(tab.uri.clone());
+        }
+    }
+    dupes
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1229,5 +1375,81 @@ mod tests {
         let result = format_tab_breadcrumb(&tab);
         assert!(result.contains("main.rs"));
         assert!(result.contains("src"));
+    }
+
+    #[test]
+    fn test_tab_filter_dirty() {
+        let tabs = vec![
+            EditorTabInfo { uri: "a.rs".into(), label: "a.rs".into(), dirty: true, pinned: false, preview: false },
+            EditorTabInfo { uri: "b.rs".into(), label: "b.rs".into(), dirty: false, pinned: false, preview: false },
+        ];
+        let filtered = filter_tabs(&tabs, &TabFilter::dirty());
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].uri, "a.rs");
+    }
+
+    #[test]
+    fn test_tab_filter_language() {
+        let tabs = vec![
+            EditorTabInfo { uri: "a.rs".into(), label: "a.rs".into(), dirty: false, pinned: false, preview: false },
+            EditorTabInfo { uri: "b.py".into(), label: "b.py".into(), dirty: false, pinned: false, preview: false },
+        ];
+        let filtered = filter_tabs(&tabs, &TabFilter::for_language("rs"));
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].uri, "a.rs");
+    }
+
+    #[test]
+    fn test_sort_tabs_by_uri() {
+        let mut tabs = vec![
+            EditorTabInfo { uri: "c.rs".into(), label: "c.rs".into(), dirty: false, pinned: false, preview: false },
+            EditorTabInfo { uri: "a.rs".into(), label: "a.rs".into(), dirty: false, pinned: false, preview: false },
+        ];
+        sort_tabs(&mut tabs, TabSortOrder::ByUri);
+        assert_eq!(tabs[0].uri, "a.rs");
+    }
+
+    #[test]
+    fn test_tab_summary() {
+        let tabs = vec![
+            EditorTabInfo { uri: "a.rs".into(), label: "a.rs".into(), dirty: true, pinned: true, preview: false },
+            EditorTabInfo { uri: "b.rs".into(), label: "b.rs".into(), dirty: false, pinned: false, preview: true },
+            EditorTabInfo { uri: "c.rs".into(), label: "c.rs".into(), dirty: true, pinned: false, preview: false },
+        ];
+        let summary = TabSummary::from_tabs(&tabs);
+        assert_eq!(summary.total, 3);
+        assert_eq!(summary.dirty, 2);
+        assert_eq!(summary.pinned, 1);
+        assert_eq!(summary.preview, 1);
+        assert!(summary.has_unsaved());
+        assert!(format!("{summary}").contains("3 tabs"));
+    }
+
+    #[test]
+    fn test_tab_languages() {
+        let tabs = vec![
+            EditorTabInfo { uri: "a.rs".into(), label: "a.rs".into(), dirty: false, pinned: false, preview: false },
+            EditorTabInfo { uri: "b.py".into(), label: "b.py".into(), dirty: false, pinned: false, preview: false },
+            EditorTabInfo { uri: "c.rs".into(), label: "c.rs".into(), dirty: false, pinned: false, preview: false },
+        ];
+        let langs = tab_languages(&tabs);
+        assert_eq!(langs, vec!["py", "rs"]);
+    }
+
+    #[test]
+    fn test_find_duplicate_uris() {
+        let tabs = vec![
+            EditorTabInfo { uri: "a.rs".into(), label: "a.rs".into(), dirty: false, pinned: false, preview: false },
+            EditorTabInfo { uri: "a.rs".into(), label: "a.rs".into(), dirty: true, pinned: false, preview: false },
+            EditorTabInfo { uri: "b.rs".into(), label: "b.rs".into(), dirty: false, pinned: false, preview: false },
+        ];
+        let dupes = find_duplicate_uris(&tabs);
+        assert_eq!(dupes, vec!["a.rs"]);
+    }
+
+    #[test]
+    fn test_tab_sort_order_display() {
+        assert_eq!(format!("{}", TabSortOrder::DirtyFirst), "dirty first");
+        assert_eq!(format!("{}", TabSortOrder::PinnedFirst), "pinned first");
     }
 }

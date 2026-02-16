@@ -729,6 +729,184 @@ pub fn has_overlapping_selections(selections: &[Selection]) -> bool {
     merged.len() < selections.len()
 }
 
+// ---------------------------------------------------------------------------
+// CursorPosition extensions
+// ---------------------------------------------------------------------------
+
+impl CursorPosition {
+    pub fn is_before(&self, other: &CursorPosition) -> bool {
+        (self.line, self.column) < (other.line, other.column)
+    }
+
+    pub fn pos_min(&self, other: &Self) -> Self {
+        if self <= other { *self } else { *other }
+    }
+
+    pub fn pos_max(&self, other: &Self) -> Self {
+        if self >= other { *self } else { *other }
+    }
+
+    pub fn signed_distance_to(&self, other: &CursorPosition) -> (i64, i64) {
+        let dl = other.line as i64 - self.line as i64;
+        let dc = other.column as i64 - self.column as i64;
+        (dl, dc)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Selection extensions
+// ---------------------------------------------------------------------------
+
+impl Selection {
+    pub fn char_count(&self) -> u32 {
+        let n = self.normalized();
+        if n.start.line == n.end.line {
+            n.end.column.saturating_sub(n.start.column)
+        } else {
+            n.end.column + n.start.column
+        }
+    }
+
+    pub fn is_reversed(&self) -> bool {
+        self.start > self.end
+    }
+
+    pub fn merge_with(&self, other: &Selection) -> Option<Selection> {
+        if !self.overlaps(other) {
+            return None;
+        }
+        let a = self.normalized();
+        let b = other.normalized();
+        Some(Selection::new(
+            a.start.pos_min(&b.start),
+            a.end.pos_max(&b.end),
+        ))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MultiCursorSession extensions
+// ---------------------------------------------------------------------------
+
+impl MultiCursorSession {
+    pub fn total_selected_lines(&self) -> u32 {
+        self.selections.iter().map(|s| s.line_span()).sum()
+    }
+
+    pub fn bounding_range(&self) -> Option<Selection> {
+        if self.cursors.is_empty() && self.selections.is_empty() {
+            return None;
+        }
+        let mut min_pos = CursorPosition::new(u32::MAX, u32::MAX);
+        let mut max_pos = CursorPosition::new(1, 1);
+
+        for c in &self.cursors {
+            min_pos = min_pos.pos_min(c);
+            max_pos = max_pos.pos_max(c);
+        }
+        for s in &self.selections {
+            let n = s.normalized();
+            min_pos = min_pos.pos_min(&n.start);
+            max_pos = max_pos.pos_max(&n.end);
+        }
+        Some(Selection::new(min_pos, max_pos))
+    }
+
+    pub fn iter_cursors(&self) -> std::slice::Iter<'_, CursorPosition> {
+        self.cursors.iter()
+    }
+
+    pub fn find_at_line(&self, line: u32) -> Vec<&CursorPosition> {
+        self.cursors.iter().filter(|c| c.line == line).collect()
+    }
+}
+
+impl<'a> IntoIterator for &'a MultiCursorSession {
+    type Item = &'a CursorPosition;
+    type IntoIter = std::slice::Iter<'a, CursorPosition>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.cursors.iter()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ColumnSelectionMode extensions
+// ---------------------------------------------------------------------------
+
+impl ColumnSelectionMode {
+    pub fn is_block(&self) -> bool {
+        self.anchor_column > 0
+    }
+}
+
+impl fmt::Display for ColumnSelectionMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ColumnSelectionMode(anchor={})", self.anchor_column)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SelectionSummary
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SelectionSummary {
+    pub total_selections: usize,
+    pub overlapping_count: usize,
+    pub total_lines: u32,
+}
+
+impl SelectionSummary {
+    pub fn from_session(session: &MultiCursorSession) -> Self {
+        let total_selections = session.selections.len();
+        let total_lines = session.total_selected_lines();
+        let merged = cursor_merge_overlapping(&session.selections);
+        let overlapping_count = if total_selections > merged.len() {
+            total_selections - merged.len()
+        } else {
+            0
+        };
+        Self {
+            total_selections,
+            overlapping_count,
+            total_lines,
+        }
+    }
+}
+
+impl fmt::Display for SelectionSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SelectionSummary(selections={}, overlapping={}, lines={})",
+            self.total_selections, self.overlapping_count, self.total_lines
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Selection sorting helpers
+// ---------------------------------------------------------------------------
+
+pub fn sort_selections(selections: &mut [Selection]) {
+    selections.sort_by(|a, b| {
+        let an = a.normalized();
+        let bn = b.normalized();
+        (an.start.line, an.start.column).cmp(&(bn.start.line, bn.start.column))
+    });
+}
+
+pub fn deduplicate_selections(selections: &[Selection]) -> Vec<Selection> {
+    let mut normalized: Vec<Selection> = selections.iter().map(|s| s.normalized()).collect();
+    normalized.sort_by(|a, b| {
+        (a.start.line, a.start.column, a.end.line, a.end.column)
+            .cmp(&(b.start.line, b.start.column, b.end.line, b.end.column))
+    });
+    normalized.dedup();
+    normalized
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1202,5 +1380,136 @@ mod tests {
             Selection { start: CursorPosition { line: 1, column: 5 }, end: CursorPosition { line: 1, column: 15 } },
         ];
         assert!(has_overlapping_selections(&sels));
+    }
+
+    // -- new functionality tests --
+
+    #[test]
+    fn cursor_position_is_before() {
+        let a = CursorPosition::new(1, 5);
+        let b = CursorPosition::new(2, 1);
+        let c = CursorPosition::new(1, 5);
+        assert!(a.is_before(&b));
+        assert!(!b.is_before(&a));
+        assert!(!a.is_before(&c));
+    }
+
+    #[test]
+    fn cursor_position_min_max() {
+        let a = CursorPosition::new(2, 10);
+        let b = CursorPosition::new(3, 1);
+        assert_eq!(a.pos_min(&b), a);
+        assert_eq!(a.pos_max(&b), b);
+        assert_eq!(b.pos_min(&a), a);
+        assert_eq!(b.pos_max(&a), b);
+    }
+
+    #[test]
+    fn cursor_position_signed_distance() {
+        let a = CursorPosition::new(1, 5);
+        let b = CursorPosition::new(4, 2);
+        let (dl, dc) = a.signed_distance_to(&b);
+        assert_eq!(dl, 3);
+        assert_eq!(dc, -3);
+        let (dl2, dc2) = b.signed_distance_to(&a);
+        assert_eq!(dl2, -3);
+        assert_eq!(dc2, 3);
+    }
+
+    #[test]
+    fn selection_char_count_and_reversed() {
+        let sel = Selection::new(CursorPosition::new(1, 3), CursorPosition::new(1, 10));
+        assert_eq!(sel.char_count(), 7);
+        assert!(!sel.is_reversed());
+
+        let rev = Selection::new(CursorPosition::new(3, 5), CursorPosition::new(1, 2));
+        assert!(rev.is_reversed());
+    }
+
+    #[test]
+    fn selection_merge_with() {
+        let a = Selection::new(CursorPosition::new(1, 1), CursorPosition::new(2, 5));
+        let b = Selection::new(CursorPosition::new(2, 3), CursorPosition::new(3, 8));
+        let merged = a.merge_with(&b).unwrap();
+        assert_eq!(merged.start, CursorPosition::new(1, 1));
+        assert_eq!(merged.end, CursorPosition::new(3, 8));
+
+        let c = Selection::new(CursorPosition::new(5, 1), CursorPosition::new(6, 1));
+        assert!(a.merge_with(&c).is_none());
+    }
+
+    #[test]
+    fn session_bounding_range_and_total_lines() {
+        let mut session = MultiCursorSession::new();
+        session.add_cursor(CursorPosition::new(2, 3));
+        session.add_cursor(CursorPosition::new(8, 12));
+        session.selections.push(Selection::new(
+            CursorPosition::new(1, 1),
+            CursorPosition::new(4, 5),
+        ));
+        session.selections.push(Selection::new(
+            CursorPosition::new(6, 1),
+            CursorPosition::new(7, 3),
+        ));
+
+        let br = session.bounding_range().unwrap();
+        assert_eq!(br.start, CursorPosition::new(1, 1));
+        assert_eq!(br.end, CursorPosition::new(8, 12));
+
+        assert_eq!(session.total_selected_lines(), 6); // 4 + 2
+
+        let at_line_2: Vec<_> = session.find_at_line(2);
+        assert_eq!(at_line_2.len(), 1);
+        assert_eq!(at_line_2[0].column, 3);
+    }
+
+    #[test]
+    fn into_iterator_for_session() {
+        let mut session = MultiCursorSession::new();
+        session.add_cursor(CursorPosition::new(1, 1));
+        session.add_cursor(CursorPosition::new(2, 2));
+        let collected: Vec<_> = (&session).into_iter().collect();
+        assert_eq!(collected.len(), 2);
+        assert_eq!(*collected[0], CursorPosition::new(1, 1));
+    }
+
+    #[test]
+    fn column_selection_mode_display_and_is_block() {
+        let csm = ColumnSelectionMode::new(5);
+        assert!(csm.is_block());
+        assert_eq!(format!("{csm}"), "ColumnSelectionMode(anchor=5)");
+    }
+
+    #[test]
+    fn selection_summary_from_session() {
+        let mut session = MultiCursorSession::new();
+        session.add_cursor(CursorPosition::new(1, 1));
+        session.selections.push(Selection::new(
+            CursorPosition::new(1, 1),
+            CursorPosition::new(3, 5),
+        ));
+        session.selections.push(Selection::new(
+            CursorPosition::new(2, 1),
+            CursorPosition::new(4, 1),
+        ));
+        let summary = SelectionSummary::from_session(&session);
+        assert_eq!(summary.total_selections, 2);
+        assert_eq!(summary.overlapping_count, 1);
+        assert!(format!("{summary}").contains("overlapping=1"));
+    }
+
+    #[test]
+    fn sort_and_deduplicate_selections_helpers() {
+        let mut sels = vec![
+            Selection::new(CursorPosition::new(3, 1), CursorPosition::new(3, 5)),
+            Selection::new(CursorPosition::new(1, 1), CursorPosition::new(1, 5)),
+            Selection::new(CursorPosition::new(3, 1), CursorPosition::new(3, 5)),
+        ];
+        sort_selections(&mut sels);
+        assert_eq!(sels[0].start.line, 1);
+        assert_eq!(sels[1].start.line, 3);
+
+        let deduped = deduplicate_selections(&sels);
+        assert_eq!(deduped.len(), 2);
     }
 }

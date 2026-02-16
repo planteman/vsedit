@@ -741,6 +741,99 @@ pub fn notification_group_by_source(notifications: &[Notification]) -> Vec<Notif
     groups
 }
 
+// ---------------------------------------------------------------------------
+// Additional NotificationService methods
+// ---------------------------------------------------------------------------
+
+impl NotificationService {
+    /// Returns the number of error notifications (including dismissed).
+    pub fn error_count(&self) -> usize {
+        self.notifications
+            .iter()
+            .filter(|n| n.severity == NotificationSeverity::Error)
+            .count()
+    }
+
+    /// Returns the number of warning notifications (including dismissed).
+    pub fn warning_count(&self) -> usize {
+        self.notifications
+            .iter()
+            .filter(|n| n.severity == NotificationSeverity::Warning)
+            .count()
+    }
+
+    /// Returns the number of info notifications (including dismissed).
+    pub fn info_count(&self) -> usize {
+        self.notifications
+            .iter()
+            .filter(|n| n.severity == NotificationSeverity::Info)
+            .count()
+    }
+
+    /// Find the first notification whose message contains the given substring.
+    pub fn find_by_message(&self, msg: &str) -> Option<&Notification> {
+        self.notifications.iter().find(|n| n.message.contains(msg))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display for NotificationService
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for NotificationService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let active = self.notifications.iter().filter(|n| !n.dismissed).count();
+        write!(
+            f,
+            "NotificationService(total={}, active={})",
+            self.notifications.len(),
+            active
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display for Notification
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for Notification {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let sev = match self.severity {
+            NotificationSeverity::Info => "INFO",
+            NotificationSeverity::Warning => "WARN",
+            NotificationSeverity::Error => "ERROR",
+        };
+        write!(f, "[{}] {}", sev, self.message)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional NotificationProgress methods
+// ---------------------------------------------------------------------------
+
+impl NotificationProgress {
+    /// Returns the completion percentage as a value between 0.0 and 100.0.
+    /// Returns 100.0 when `total` is 0 to avoid division by zero.
+    pub fn percentage(&self) -> f64 {
+        if self.total == 0 {
+            return 100.0;
+        }
+        (self.worked as f64 / self.total as f64) * 100.0
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Notification age helper
+// ---------------------------------------------------------------------------
+
+impl Notification {
+    /// Compute the age in seconds given the current time and the notification id
+    /// as a proxy timestamp. Returns `now - id` (saturating).
+    pub fn age_seconds(&self, now: u64) -> u64 {
+        now.saturating_sub(self.id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1219,5 +1312,87 @@ mod tests {
         let mut g = NotificationGroup::new("test", NotificationSeverity::Warning);
         g.count = 3;
         assert_eq!(format!("{g}"), "test (x3)");
+    }
+
+    #[test]
+    fn error_warning_info_counts() {
+        let mut svc = NotificationService::new();
+        svc.info("i1");
+        svc.info("i2");
+        svc.warn("w1");
+        svc.error("e1");
+        svc.error("e2");
+        svc.error("e3");
+        assert_eq!(svc.info_count(), 2);
+        assert_eq!(svc.warning_count(), 1);
+        assert_eq!(svc.error_count(), 3);
+    }
+
+    #[test]
+    fn find_by_message_found() {
+        let mut svc = NotificationService::new();
+        svc.info("file not found");
+        svc.warn("disk full");
+        let n = svc.find_by_message("not found");
+        assert!(n.is_some());
+        assert_eq!(n.unwrap().severity, NotificationSeverity::Info);
+    }
+
+    #[test]
+    fn find_by_message_not_found() {
+        let mut svc = NotificationService::new();
+        svc.info("hello");
+        assert!(svc.find_by_message("missing").is_none());
+    }
+
+    #[test]
+    fn notification_service_display() {
+        let mut svc = NotificationService::new();
+        svc.info("a");
+        svc.warn("b");
+        let id = svc.error("c");
+        svc.dismiss(id);
+        let s = format!("{svc}");
+        assert!(s.contains("total=3"));
+        assert!(s.contains("active=2"));
+    }
+
+    #[test]
+    fn notification_display() {
+        let n = Notification {
+            id: 1, message: "boom".into(),
+            severity: NotificationSeverity::Error,
+            source: None, actions: Vec::new(),
+            sticky: false, dismissed: false, priority: None,
+        };
+        assert_eq!(format!("{n}"), "[ERROR] boom");
+    }
+
+    #[test]
+    fn progress_percentage() {
+        let mut p = NotificationProgress::new(200);
+        assert!((p.percentage() - 0.0).abs() < f64::EPSILON);
+        p.worked = 50;
+        assert!((p.percentage() - 25.0).abs() < f64::EPSILON);
+        p.worked = 200;
+        assert!((p.percentage() - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn progress_percentage_zero_total() {
+        let p = NotificationProgress::new(0);
+        assert!((p.percentage() - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn notification_age_seconds() {
+        let n = Notification {
+            id: 10, message: "x".into(),
+            severity: NotificationSeverity::Info,
+            source: None, actions: Vec::new(),
+            sticky: false, dismissed: false, priority: None,
+        };
+        assert_eq!(n.age_seconds(15), 5);
+        assert_eq!(n.age_seconds(5), 0);
     }
 }

@@ -578,6 +578,213 @@ impl LanguageFeatureSupport {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LanguageInfo extensions
+// ---------------------------------------------------------------------------
+
+impl LanguageInfo {
+    pub fn has_aliases(&self) -> bool {
+        !self.aliases.is_empty()
+    }
+
+    pub fn alias_count(&self) -> usize {
+        self.aliases.len()
+    }
+
+    pub fn extension_count(&self) -> usize {
+        self.extensions.len()
+    }
+
+    /// Case-insensitive search across id, name, aliases, and extensions.
+    pub fn matches_filter(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.id.to_lowercase().contains(&q)
+            || self.name.to_lowercase().contains(&q)
+            || self.aliases.iter().any(|a| a.to_lowercase().contains(&q))
+            || self.extensions.iter().any(|e| e.to_lowercase().contains(&q))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LanguageRegistry iterator support
+// ---------------------------------------------------------------------------
+
+impl LanguageRegistry {
+    pub fn iter(&self) -> std::slice::Iter<'_, LanguageInfo> {
+        self.languages.iter()
+    }
+
+    pub fn all_extensions(&self) -> Vec<String> {
+        let mut exts: Vec<String> = self
+            .languages
+            .iter()
+            .flat_map(|l| l.extensions.clone())
+            .collect();
+        exts.sort();
+        exts.dedup();
+        exts
+    }
+
+    pub fn find_by_alias(&self, alias: &str) -> Vec<&LanguageInfo> {
+        let lower = alias.to_lowercase();
+        self.languages
+            .iter()
+            .filter(|l| l.aliases.iter().any(|a| a.to_lowercase() == lower))
+            .collect()
+    }
+}
+
+impl<'a> IntoIterator for &'a LanguageRegistry {
+    type Item = &'a LanguageInfo;
+    type IntoIter = std::slice::Iter<'a, LanguageInfo>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.languages.iter()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LanguageGroup extensions
+// ---------------------------------------------------------------------------
+
+impl LanguageGroup {
+    pub fn total_languages(&self) -> usize {
+        self.language_ids.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.language_ids.is_empty()
+    }
+}
+
+impl fmt::Display for LanguageGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({} languages)", self.category, self.language_ids.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LanguageFeatureMatrix extensions
+// ---------------------------------------------------------------------------
+
+impl LanguageFeatureMatrix {
+    pub fn supported_features(&self) -> Vec<&'static str> {
+        let mut features = Vec::new();
+        if self.has_folding { features.push("folding"); }
+        if self.has_indentation_rules { features.push("indentation_rules"); }
+        if self.has_bracket_pairs { features.push("bracket_pairs"); }
+        if self.has_auto_closing_pairs { features.push("auto_closing_pairs"); }
+        features
+    }
+
+    pub fn feature_count(&self) -> usize {
+        4
+    }
+
+    pub fn is_fully_supported(&self) -> bool {
+        self.has_folding
+            && self.has_indentation_rules
+            && self.has_bracket_pairs
+            && self.has_auto_closing_pairs
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LanguageAssociation extensions
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for LanguageAssociation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} -> {}", self.extension, self.language_id)
+    }
+}
+
+impl LanguageAssociation {
+    pub fn is_extension_based(&self) -> bool {
+        self.extension.starts_with('.')
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LanguageDetector extensions
+// ---------------------------------------------------------------------------
+
+impl LanguageDetector {
+    pub fn add_rule(&mut self, pattern: impl Into<String>, language_id: impl Into<String>) {
+        self.rules.push(FirstLineRule {
+            pattern: pattern.into(),
+            language_id: language_id.into(),
+        });
+    }
+
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LanguageStatistics extensions
+// ---------------------------------------------------------------------------
+
+impl LanguageStatistics {
+    pub fn merge(&self, other: &LanguageStatistics) -> LanguageStatistics {
+        LanguageStatistics {
+            total: self.total + other.total,
+            total_extensions: self.total_extensions + other.total_extensions,
+            total_aliases: self.total_aliases + other.total_aliases,
+            total_mime_types: self.total_mime_types + other.total_mime_types,
+            with_first_line_pattern: self.with_first_line_pattern + other.with_first_line_pattern,
+        }
+    }
+
+    pub fn summary(&self) -> String {
+        format!(
+            "{} languages, {} extensions, {} aliases, {} mime types, {} with first-line patterns",
+            self.total,
+            self.total_extensions,
+            self.total_aliases,
+            self.total_mime_types,
+            self.with_first_line_pattern,
+        )
+    }
+}
+
+impl fmt::Display for LanguageStatistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.summary())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LanguageFeatureSupport extensions
+// ---------------------------------------------------------------------------
+
+impl LanguageFeatureSupport {
+    pub fn is_complete(&self) -> bool {
+        self.completion
+            && self.hover
+            && self.formatting
+            && self.diagnostics
+            && self.go_to_definition
+            && self.references
+            && self.rename
+            && self.code_actions
+    }
+
+    pub fn missing_features(&self) -> Vec<&'static str> {
+        let mut missing = Vec::new();
+        if !self.completion { missing.push("completion"); }
+        if !self.hover { missing.push("hover"); }
+        if !self.formatting { missing.push("formatting"); }
+        if !self.diagnostics { missing.push("diagnostics"); }
+        if !self.go_to_definition { missing.push("go_to_definition"); }
+        if !self.references { missing.push("references"); }
+        if !self.rename { missing.push("rename"); }
+        if !self.code_actions { missing.push("code_actions"); }
+        missing
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1204,5 +1411,173 @@ mod tests {
             code_actions: true,
         };
         assert_eq!(fs.supports_count(), 8);
+    }
+
+    #[test]
+    fn language_info_filter_and_counts() {
+        let py = sample_python();
+        assert!(py.has_aliases());
+        assert_eq!(py.alias_count(), 1);
+        assert_eq!(py.extension_count(), 2);
+        assert!(py.matches_filter("pyth"));
+        assert!(py.matches_filter(".py"));
+        assert!(!py.matches_filter("java"));
+
+        let empty = LanguageInfo {
+            id: "plain".into(),
+            name: "Plaintext".into(),
+            extensions: vec![],
+            aliases: vec![],
+            mime_types: vec![],
+            first_line_pattern: None,
+        };
+        assert!(!empty.has_aliases());
+        assert_eq!(empty.alias_count(), 0);
+    }
+
+    #[test]
+    fn registry_iter_and_into_iterator() {
+        let mut reg = LanguageRegistry::new();
+        reg.register(sample_rust());
+        reg.register(sample_python());
+
+        let ids_iter: Vec<&str> = reg.iter().map(|l| l.id.as_str()).collect();
+        assert_eq!(ids_iter.len(), 2);
+
+        let ids_into: Vec<&str> = (&reg).into_iter().map(|l| l.id.as_str()).collect();
+        assert_eq!(ids_into, ids_iter);
+    }
+
+    #[test]
+    fn registry_all_extensions_deduped() {
+        let mut reg = LanguageRegistry::new();
+        reg.register(sample_rust());
+        reg.register(sample_python());
+        let exts = reg.all_extensions();
+        assert_eq!(exts, vec![".py", ".pyw", ".rs"]);
+    }
+
+    #[test]
+    fn registry_find_by_alias_case_insensitive() {
+        let mut reg = LanguageRegistry::new();
+        reg.register(sample_rust());
+        reg.register(sample_python());
+        let found = reg.find_by_alias("RS");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].id, "rust");
+        assert!(reg.find_by_alias("unknown").is_empty());
+    }
+
+    #[test]
+    fn language_group_extensions_and_display() {
+        let group = LanguageGroup {
+            category: "R".into(),
+            language_ids: vec!["rust".into(), "ruby".into()],
+        };
+        assert_eq!(group.total_languages(), 2);
+        assert!(!group.is_empty());
+        assert_eq!(format!("{group}"), "R (2 languages)");
+
+        let empty_group = LanguageGroup {
+            category: "Z".into(),
+            language_ids: vec![],
+        };
+        assert!(empty_group.is_empty());
+    }
+
+    #[test]
+    fn feature_matrix_extensions() {
+        let fm = LanguageFeatureMatrix {
+            language_id: "rust".into(),
+            has_folding: true,
+            has_indentation_rules: false,
+            has_bracket_pairs: true,
+            has_auto_closing_pairs: true,
+        };
+        let supported = fm.supported_features();
+        assert_eq!(supported, vec!["folding", "bracket_pairs", "auto_closing_pairs"]);
+        assert_eq!(fm.feature_count(), 4);
+        assert!(!fm.is_fully_supported());
+
+        let full = LanguageFeatureMatrix {
+            language_id: "go".into(),
+            has_folding: true,
+            has_indentation_rules: true,
+            has_bracket_pairs: true,
+            has_auto_closing_pairs: true,
+        };
+        assert!(full.is_fully_supported());
+    }
+
+    #[test]
+    fn association_display_and_extension_based() {
+        let a = LanguageAssociation::new(".rs", "rust");
+        assert_eq!(format!("{a}"), ".rs -> rust");
+        assert!(a.is_extension_based());
+
+        let b = LanguageAssociation::new("Makefile", "makefile");
+        assert!(!b.is_extension_based());
+    }
+
+    #[test]
+    fn detector_add_rule_and_count() {
+        let mut d = LanguageDetector::new();
+        let initial = d.rule_count();
+        d.add_rule("#!/usr/bin/env ruby", "ruby");
+        assert_eq!(d.rule_count(), initial + 1);
+        assert_eq!(
+            d.detect_from_first_line("#!/usr/bin/env ruby"),
+            Some("ruby".into())
+        );
+    }
+
+    #[test]
+    fn statistics_merge_and_summary() {
+        let mut reg1 = LanguageRegistry::new();
+        reg1.register(sample_rust());
+        let stats1 = compute_language_statistics(&reg1);
+
+        let mut reg2 = LanguageRegistry::new();
+        reg2.register(sample_python());
+        let stats2 = compute_language_statistics(&reg2);
+
+        let merged = stats1.merge(&stats2);
+        assert_eq!(merged.total, 2);
+        assert_eq!(merged.total_extensions, 3);
+        assert_eq!(merged.total_aliases, 2);
+        assert!(merged.summary().contains("2 languages"));
+        assert_eq!(format!("{merged}"), merged.summary());
+    }
+
+    #[test]
+    fn feature_support_complete_and_missing() {
+        let full = LanguageFeatureSupport {
+            completion: true,
+            hover: true,
+            formatting: true,
+            diagnostics: true,
+            go_to_definition: true,
+            references: true,
+            rename: true,
+            code_actions: true,
+        };
+        assert!(full.is_complete());
+        assert!(full.missing_features().is_empty());
+
+        let partial = LanguageFeatureSupport {
+            completion: true,
+            hover: false,
+            formatting: true,
+            diagnostics: false,
+            go_to_definition: true,
+            references: false,
+            rename: true,
+            code_actions: false,
+        };
+        assert!(!partial.is_complete());
+        assert_eq!(
+            partial.missing_features(),
+            vec!["hover", "diagnostics", "references", "code_actions"]
+        );
     }
 }

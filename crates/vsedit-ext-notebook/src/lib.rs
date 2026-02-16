@@ -710,6 +710,85 @@ pub fn count_failed_executions(outputs: &[NotebookCellOutput]) -> usize {
     outputs.iter().filter(|o| !o.success).count()
 }
 
+// ---------------------------------------------------------------------------
+// NotebookDocument – additional query helpers
+// ---------------------------------------------------------------------------
+
+impl NotebookDocument {
+    /// Return the number of cells in this document.
+    pub fn cell_count(&self) -> usize {
+        self.cells.len()
+    }
+
+    /// Search all cells for one whose content contains the given text.
+    /// Returns `(cell_index_in_vec, &cell)`.
+    pub fn find_cell_by_content(&self, text: &str) -> Option<(usize, &NotebookCell)> {
+        self.cells
+            .iter()
+            .enumerate()
+            .find(|(_, c)| c.content.contains(text))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotebookCell – additional helpers
+// ---------------------------------------------------------------------------
+
+impl NotebookCell {
+    /// Approximate word count of the cell content.
+    pub fn word_count(&self) -> usize {
+        self.content.split_whitespace().count()
+    }
+
+    /// Returns `true` if this is a code cell.
+    pub fn is_code(&self) -> bool {
+        self.kind == NotebookCellKind::Code
+    }
+
+    /// Returns `true` if this is a markup cell.
+    pub fn is_markup(&self) -> bool {
+        self.kind == NotebookCellKind::Markup
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotebookBridge – additional query helpers
+// ---------------------------------------------------------------------------
+
+impl NotebookBridge {
+    /// Return the IDs of all registered kernels.
+    pub fn all_kernel_ids(&self) -> Vec<&str> {
+        self.kernels.iter().map(|k| k.id.as_str()).collect()
+    }
+
+    /// Return the URIs of all open documents.
+    pub fn open_document_uris(&self) -> Vec<&str> {
+        self.open_documents.iter().map(|u| u.as_str()).collect()
+    }
+}
+
+impl fmt::Display for NotebookBridge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "NotebookBridge(kernels={}, open_docs={})",
+            self.kernels.len(),
+            self.open_documents.len()
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CellMetadata – helpers
+// ---------------------------------------------------------------------------
+
+impl CellMetadata {
+    /// Return the number of tags on this cell.
+    pub fn tag_count(&self) -> usize {
+        self.tags.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1224,5 +1303,126 @@ mod tests {
         assert_eq!(order.get(&1), Some(&3));
         assert_eq!(count_successful_executions(&outputs), 2);
         assert_eq!(count_failed_executions(&outputs), 1);
+    }
+
+    // -- New tests ----------------------------------------------------------
+
+    #[test]
+    fn document_cell_count() {
+        let doc = NotebookDocumentBuilder::new()
+            .uri("file:///nb.ipynb")
+            .add_code_cell("python", "x = 1")
+            .add_markup_cell("# Title")
+            .add_code_cell("python", "y = 2")
+            .build()
+            .unwrap();
+        assert_eq!(doc.cell_count(), 3);
+    }
+
+    #[test]
+    fn document_find_cell_by_content() {
+        let doc = NotebookDocumentBuilder::new()
+            .uri("file:///nb.ipynb")
+            .add_code_cell("python", "import os")
+            .add_code_cell("python", "print('hello')")
+            .add_markup_cell("# Notes")
+            .build()
+            .unwrap();
+        let (idx, cell) = doc.find_cell_by_content("hello").unwrap();
+        assert_eq!(idx, 1);
+        assert!(cell.content.contains("hello"));
+        assert!(doc.find_cell_by_content("nonexistent").is_none());
+    }
+
+    #[test]
+    fn cell_word_count() {
+        let cell = NotebookCell {
+            index: 0,
+            kind: NotebookCellKind::Code,
+            language_id: "python".into(),
+            content: "x = 1\ny = 2".into(),
+            outputs: vec![],
+        };
+        assert_eq!(cell.word_count(), 6);
+    }
+
+    #[test]
+    fn cell_is_code_and_is_markup() {
+        let code_cell = NotebookCell {
+            index: 0,
+            kind: NotebookCellKind::Code,
+            language_id: "python".into(),
+            content: "x = 1".into(),
+            outputs: vec![],
+        };
+        assert!(code_cell.is_code());
+        assert!(!code_cell.is_markup());
+
+        let markup_cell = NotebookCell {
+            index: 1,
+            kind: NotebookCellKind::Markup,
+            language_id: "markdown".into(),
+            content: "# Title".into(),
+            outputs: vec![],
+        };
+        assert!(markup_cell.is_markup());
+        assert!(!markup_cell.is_code());
+    }
+
+    #[test]
+    fn bridge_all_kernel_ids() {
+        let mut bridge = NotebookBridge::new();
+        bridge.register_kernel(NotebookKernel {
+            id: "py".into(),
+            label: "Python".into(),
+            supported_languages: vec!["python".into()],
+        });
+        bridge.register_kernel(NotebookKernel {
+            id: "rs".into(),
+            label: "Rust".into(),
+            supported_languages: vec!["rust".into()],
+        });
+        let ids = bridge.all_kernel_ids();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&"py"));
+        assert!(ids.contains(&"rs"));
+    }
+
+    #[test]
+    fn bridge_open_document_uris() {
+        let mut bridge = NotebookBridge::new();
+        bridge.open_document("file:///a.ipynb");
+        bridge.open_document("file:///b.ipynb");
+        let uris = bridge.open_document_uris();
+        assert_eq!(uris.len(), 2);
+        assert!(uris.contains(&"file:///a.ipynb"));
+        assert!(uris.contains(&"file:///b.ipynb"));
+    }
+
+    #[test]
+    fn bridge_display() {
+        let mut bridge = NotebookBridge::new();
+        bridge.register_kernel(NotebookKernel {
+            id: "py".into(),
+            label: "Python".into(),
+            supported_languages: vec![],
+        });
+        bridge.open_document("file:///nb.ipynb");
+        let s = format!("{bridge}");
+        assert!(s.contains("NotebookBridge"));
+        assert!(s.contains("kernels=1"));
+        assert!(s.contains("open_docs=1"));
+    }
+
+    #[test]
+    fn cell_metadata_tag_count() {
+        let mut meta = CellMetadata::new(0);
+        assert_eq!(meta.tag_count(), 0);
+        meta.add_tag("important");
+        meta.add_tag("review");
+        assert_eq!(meta.tag_count(), 2);
+        // Duplicate ignored
+        meta.add_tag("important");
+        assert_eq!(meta.tag_count(), 2);
     }
 }

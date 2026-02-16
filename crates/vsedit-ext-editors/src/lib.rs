@@ -695,6 +695,183 @@ impl EditorTabSerializer {
     }
 }
 
+// ── EditorSelection helpers ──
+
+impl EditorSelection {
+    pub fn length(&self) -> u32 {
+        let r = self.to_range();
+        if r.start_line == r.end_line {
+            r.end_col.saturating_sub(r.start_col)
+        } else {
+            // Cross-line length is not well-defined without line lengths,
+            // but we report the column span of the bounding rectangle.
+            let full_lines = r.end_line - r.start_line - 1;
+            // Approximate: chars remaining on first line + full intermediate lines + chars on last line
+            // Without line-length info, count columns on first + last and 1 per intermediate newline.
+            (r.end_col) + full_lines + (u32::MAX - r.start_col).min(r.start_col) + 1
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.anchor_line == self.active_line && self.anchor_col == self.active_col
+    }
+
+    pub fn contains_line(&self, line: u32) -> bool {
+        let r = self.to_range();
+        line >= r.start_line && line <= r.end_line
+    }
+}
+
+// ── EditorRange additional methods ──
+
+impl EditorRange {
+    pub fn merge(&self, other: &EditorRange) -> EditorRange {
+        self.union(other)
+    }
+
+    pub fn overlaps(&self, other: &EditorRange) -> bool {
+        if !self.is_valid() || !other.is_valid() {
+            return false;
+        }
+        let self_before = (self.end_line, self.end_col) <= (other.start_line, other.start_col);
+        let other_before = (other.end_line, other.end_col) <= (self.start_line, self.start_col);
+        !(self_before || other_before)
+    }
+
+    pub fn contains_line(&self, line: u32) -> bool {
+        self.is_valid() && line >= self.start_line && line <= self.end_line
+    }
+}
+
+// ── EditorSelectionSet ──
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct EditorSelectionSet {
+    selections: Vec<EditorSelection>,
+}
+
+impl EditorSelectionSet {
+    pub fn new(selections: Vec<EditorSelection>) -> Self {
+        Self { selections }
+    }
+
+    pub fn from_slice(selections: &[EditorSelection]) -> Self {
+        Self { selections: selections.to_vec() }
+    }
+
+    pub fn len(&self) -> usize {
+        self.selections.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.selections.is_empty()
+    }
+
+    pub fn total_lines(&self) -> u32 {
+        self.selections.iter().map(|s| s.to_range().line_count()).sum()
+    }
+
+    pub fn has_overlaps(&self) -> bool {
+        let ranges: Vec<EditorRange> = self.selections.iter().map(|s| s.to_range()).collect();
+        for i in 0..ranges.len() {
+            for j in (i + 1)..ranges.len() {
+                if ranges[i].overlaps(&ranges[j]) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    pub fn sorted(&self) -> Self {
+        let mut sels = self.selections.clone();
+        sels.sort_by(|a, b| {
+            let ra = a.to_range();
+            let rb = b.to_range();
+            (ra.start_line, ra.start_col).cmp(&(rb.start_line, rb.start_col))
+        });
+        Self { selections: sels }
+    }
+
+    pub fn merge_overlapping(&self) -> Self {
+        if self.selections.is_empty() {
+            return Self::new(Vec::new());
+        }
+        let sorted = self.sorted();
+        let mut ranges: Vec<EditorRange> = sorted.selections.iter().map(|s| s.to_range()).collect();
+        let mut merged: Vec<EditorRange> = vec![ranges.remove(0)];
+        for r in &ranges {
+            let last = merged.last().unwrap().clone();
+            if last.overlaps(r) || (last.end_line, last.end_col) == (r.start_line, r.start_col) {
+                *merged.last_mut().unwrap() = last.merge(r);
+            } else {
+                merged.push(r.clone());
+            }
+        }
+        Self {
+            selections: merged
+                .into_iter()
+                .map(|r| EditorSelection {
+                    anchor_line: r.start_line,
+                    anchor_col: r.start_col,
+                    active_line: r.end_line,
+                    active_col: r.end_col,
+                })
+                .collect(),
+        }
+    }
+
+    pub fn selections(&self) -> &[EditorSelection] {
+        &self.selections
+    }
+}
+
+impl IntoIterator for EditorSelectionSet {
+    type Item = EditorSelection;
+    type IntoIter = std::vec::IntoIter<EditorSelection>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.selections.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a EditorSelectionSet {
+    type Item = &'a EditorSelection;
+    type IntoIter = std::slice::Iter<'a, EditorSelection>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.selections.iter()
+    }
+}
+
+impl fmt::Display for EditorSelectionSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SelectionSet({} selections, {} total lines)", self.len(), self.total_lines())
+    }
+}
+
+impl fmt::Display for EditorStateDiff {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Diff(uri_changed={}, +{}/-{} selections)",
+            self.uri_changed, self.selections_added, self.selections_removed
+        )
+    }
+}
+
+impl fmt::Display for EditorSnapshot {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Snapshot({}: {} @ {} selections)",
+            self.editor_id,
+            self.uri,
+            self.selections.len()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1197,5 +1374,123 @@ mod tests {
     #[test]
     fn tab_serializer_deserialize_invalid_json() {
         assert!(EditorTabSerializer::deserialize("not json").is_err());
+    }
+
+    #[test]
+    fn selection_length_single_line() {
+        let sel = EditorSelection { anchor_line: 3, anchor_col: 2, active_line: 3, active_col: 10 };
+        assert_eq!(sel.length(), 8);
+    }
+
+    #[test]
+    fn selection_is_empty_and_nonempty() {
+        let empty = EditorSelection { anchor_line: 5, anchor_col: 3, active_line: 5, active_col: 3 };
+        assert!(empty.is_empty());
+        let nonempty = EditorSelection { anchor_line: 5, anchor_col: 3, active_line: 5, active_col: 4 };
+        assert!(!nonempty.is_empty());
+    }
+
+    #[test]
+    fn selection_contains_line_check() {
+        let sel = EditorSelection { anchor_line: 3, anchor_col: 0, active_line: 7, active_col: 5 };
+        assert!(sel.contains_line(3));
+        assert!(sel.contains_line(5));
+        assert!(sel.contains_line(7));
+        assert!(!sel.contains_line(2));
+        assert!(!sel.contains_line(8));
+    }
+
+    #[test]
+    fn range_merge_and_overlaps() {
+        let a = EditorRange { start_line: 1, start_col: 0, end_line: 5, end_col: 10 };
+        let b = EditorRange { start_line: 3, start_col: 0, end_line: 8, end_col: 5 };
+        assert!(a.overlaps(&b));
+        let merged = a.merge(&b);
+        assert_eq!(merged.start_line, 1);
+        assert_eq!(merged.end_line, 8);
+        assert_eq!(merged.end_col, 5);
+
+        let c = EditorRange { start_line: 10, start_col: 0, end_line: 12, end_col: 0 };
+        assert!(!a.overlaps(&c));
+    }
+
+    #[test]
+    fn range_contains_line_check() {
+        let r = EditorRange { start_line: 5, start_col: 0, end_line: 10, end_col: 0 };
+        assert!(r.contains_line(5));
+        assert!(r.contains_line(7));
+        assert!(r.contains_line(10));
+        assert!(!r.contains_line(4));
+        assert!(!r.contains_line(11));
+    }
+
+    #[test]
+    fn selection_set_basic_operations() {
+        let sels = vec![
+            EditorSelection { anchor_line: 5, anchor_col: 0, active_line: 8, active_col: 0 },
+            EditorSelection { anchor_line: 1, anchor_col: 0, active_line: 3, active_col: 0 },
+        ];
+        let set = EditorSelectionSet::new(sels);
+        assert_eq!(set.len(), 2);
+        assert!(!set.is_empty());
+        assert_eq!(set.total_lines(), 7); // 4 + 3
+        assert!(!set.has_overlaps());
+
+        let sorted = set.sorted();
+        assert_eq!(sorted.selections()[0].anchor_line, 1);
+        assert_eq!(sorted.selections()[1].anchor_line, 5);
+
+        let display = format!("{set}");
+        assert!(display.contains("2 selections"));
+    }
+
+    #[test]
+    fn selection_set_merge_overlapping() {
+        let sels = vec![
+            EditorSelection { anchor_line: 1, anchor_col: 0, active_line: 5, active_col: 0 },
+            EditorSelection { anchor_line: 3, anchor_col: 0, active_line: 8, active_col: 0 },
+            EditorSelection { anchor_line: 20, anchor_col: 0, active_line: 22, active_col: 0 },
+        ];
+        let set = EditorSelectionSet::new(sels);
+        assert!(set.has_overlaps());
+        let merged = set.merge_overlapping();
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged.selections()[0].anchor_line, 1);
+        assert_eq!(merged.selections()[0].active_line, 8);
+        assert_eq!(merged.selections()[1].anchor_line, 20);
+    }
+
+    #[test]
+    fn selection_set_into_iter() {
+        let sels = vec![
+            EditorSelection { anchor_line: 1, anchor_col: 0, active_line: 2, active_col: 0 },
+            EditorSelection { anchor_line: 5, anchor_col: 0, active_line: 6, active_col: 0 },
+        ];
+        let set = EditorSelectionSet::new(sels);
+        let collected: Vec<_> = set.into_iter().collect();
+        assert_eq!(collected.len(), 2);
+    }
+
+    #[test]
+    fn snapshot_and_diff_display() {
+        let snap = EditorSnapshot {
+            editor_id: "e1".into(),
+            uri: "file:///test.rs".into(),
+            selections: vec![],
+        };
+        let s = format!("{snap}");
+        assert!(s.contains("e1"));
+        assert!(s.contains("file:///test.rs"));
+
+        let diff = EditorStateDiff {
+            uri_changed: true,
+            selections_added: 2,
+            selections_removed: 1,
+            old_uri: "file:///old.rs".into(),
+            new_uri: "file:///new.rs".into(),
+        };
+        let d = format!("{diff}");
+        assert!(d.contains("uri_changed=true"));
+        assert!(d.contains("+2/-1"));
     }
 }

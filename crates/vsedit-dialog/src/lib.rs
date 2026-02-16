@@ -850,6 +850,142 @@ impl fmt::Display for DialogOutcome {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// DialogKind helpers
+// ---------------------------------------------------------------------------
+
+impl DialogKind {
+    /// Returns all dialog kinds.
+    pub fn all() -> &'static [DialogKind] {
+        &[DialogKind::Info, DialogKind::Warning, DialogKind::Error, DialogKind::Confirm]
+    }
+
+    /// Returns an icon character for this dialog kind.
+    pub fn icon(&self) -> char {
+        match self {
+            DialogKind::Info => 'ℹ',
+            DialogKind::Warning => '⚠',
+            DialogKind::Error => '✖',
+            DialogKind::Confirm => '?',
+        }
+    }
+
+    /// Returns true if this is an error or warning dialog.
+    pub fn is_problem(&self) -> bool {
+        matches!(self, DialogKind::Error | DialogKind::Warning)
+    }
+
+    /// Parse from a string name.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().as_str() {
+            "info" | "information" => Some(Self::Info),
+            "warning" | "warn" => Some(Self::Warning),
+            "error" => Some(Self::Error),
+            "confirm" | "confirmation" => Some(Self::Confirm),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DialogButton builder pattern
+// ---------------------------------------------------------------------------
+
+impl DialogButton {
+    /// Set this button as primary.
+    pub fn as_primary(mut self) -> Self {
+        self.is_primary = true;
+        self
+    }
+
+    /// Convenience constructor for an OK button.
+    pub fn ok() -> Self {
+        Self::new("OK", "ok").as_primary()
+    }
+
+    /// Convenience constructor for a Cancel button.
+    pub fn cancel() -> Self {
+        Self::new("Cancel", "cancel")
+    }
+
+    /// Convenience constructor for a Yes button.
+    pub fn yes() -> Self {
+        Self::new("Yes", "yes").as_primary()
+    }
+
+    /// Convenience constructor for a No button.
+    pub fn no() -> Self {
+        Self::new("No", "no")
+    }
+}
+
+impl fmt::Display for DialogButton {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_primary {
+            write!(f, "[{}]", self.label)
+        } else {
+            write!(f, " {} ", self.label)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dialog presets
+// ---------------------------------------------------------------------------
+
+/// Creates a standard OK dialog config.
+pub fn info_dialog(title: &str, message: &str) -> DialogOptions {
+    DialogOptions {
+        kind: DialogKind::Info,
+        title: title.to_string(),
+        message: message.to_string(),
+        buttons: vec![DialogButton::ok()],
+        detail: None,
+    }
+}
+
+/// Creates a confirm/cancel dialog config.
+pub fn confirm_dialog(title: &str, message: &str) -> DialogOptions {
+    DialogOptions {
+        kind: DialogKind::Confirm,
+        title: title.to_string(),
+        message: message.to_string(),
+        buttons: vec![DialogButton::yes(), DialogButton::no()],
+        detail: None,
+    }
+}
+
+/// Creates an error dialog config.
+pub fn error_dialog(title: &str, message: &str) -> DialogOptions {
+    DialogOptions {
+        kind: DialogKind::Error,
+        title: title.to_string(),
+        message: message.to_string(),
+        buttons: vec![DialogButton::ok()],
+        detail: None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileDialogFilter helpers
+// ---------------------------------------------------------------------------
+
+/// Predefined filter for all files.
+pub fn all_files_filter() -> FileDialogFilter {
+    FileDialogFilter::new("All Files", vec!["*".to_string()])
+}
+
+/// Predefined filter for common image files.
+pub fn image_filter() -> FileDialogFilter {
+    FileDialogFilter::new("Images", vec!["png".into(), "jpg".into(), "jpeg".into(), "gif".into(), "bmp".into(), "svg".into()])
+}
+
+/// Predefined filter for text files.
+pub fn text_filter() -> FileDialogFilter {
+    FileDialogFilter::new("Text Files", vec!["txt".into(), "md".into(), "log".into()])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1234,5 +1370,78 @@ mod tests {
         };
         assert_eq!(custom_no_data.value(), None);
         assert_eq!(custom_no_data.to_string(), "Custom(skip)");
+    }
+
+    #[test]
+    fn test_dialog_kind_all() {
+        assert_eq!(DialogKind::all().len(), 4);
+    }
+
+    #[test]
+    fn test_dialog_kind_icon() {
+        assert_eq!(DialogKind::Info.icon(), 'ℹ');
+        assert_eq!(DialogKind::Error.icon(), '✖');
+    }
+
+    #[test]
+    fn test_dialog_kind_is_problem() {
+        assert!(DialogKind::Error.is_problem());
+        assert!(DialogKind::Warning.is_problem());
+        assert!(!DialogKind::Info.is_problem());
+    }
+
+    #[test]
+    fn test_dialog_kind_from_name() {
+        assert_eq!(DialogKind::from_name("info"), Some(DialogKind::Info));
+        assert_eq!(DialogKind::from_name("WARN"), Some(DialogKind::Warning));
+        assert_eq!(DialogKind::from_name("nope"), None);
+    }
+
+    #[test]
+    fn test_dialog_button_presets() {
+        let ok = DialogButton::ok();
+        assert!(ok.is_primary);
+        assert_eq!(ok.returns_value, "ok");
+        let cancel = DialogButton::cancel();
+        assert!(!cancel.is_primary);
+    }
+
+    #[test]
+    fn test_dialog_button_display() {
+        let ok = DialogButton::ok();
+        assert_eq!(format!("{ok}"), "[OK]");
+        let cancel = DialogButton::cancel();
+        assert_eq!(format!("{cancel}"), " Cancel ");
+    }
+
+    #[test]
+    fn test_info_dialog_preset() {
+        let d = info_dialog("Title", "Message");
+        assert_eq!(d.kind, DialogKind::Info);
+        assert_eq!(d.buttons.len(), 1);
+        assert!(d.buttons[0].is_primary);
+    }
+
+    #[test]
+    fn test_confirm_dialog_preset() {
+        let d = confirm_dialog("Delete?", "Are you sure?");
+        assert_eq!(d.kind, DialogKind::Confirm);
+        assert_eq!(d.buttons.len(), 2);
+    }
+
+    #[test]
+    fn test_error_dialog_preset() {
+        let d = error_dialog("Error", "Something failed");
+        assert_eq!(d.kind, DialogKind::Error);
+    }
+
+    #[test]
+    fn test_file_filters() {
+        let all = all_files_filter();
+        assert!(format!("{all}").contains("All Files"));
+        let img = image_filter();
+        assert!(img.extensions.contains(&"png".to_string()));
+        let txt = text_filter();
+        assert!(txt.extensions.contains(&"txt".to_string()));
     }
 }

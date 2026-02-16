@@ -637,6 +637,211 @@ pub fn history_diff_count(old_content: &str, new_content: &str) -> usize {
     history_diff(old_content, new_content).len()
 }
 
+// ---------------------------------------------------------------------------
+// HistoryEntry additional helpers
+// ---------------------------------------------------------------------------
+
+impl HistoryEntry {
+    pub fn age_secs(&self, now: u64) -> u64 {
+        now.saturating_sub(self.timestamp)
+    }
+
+    pub fn is_recent(&self, now: u64, threshold_secs: u64) -> bool {
+        self.age_secs(now) <= threshold_secs
+    }
+
+    pub fn is_undo(&self) -> bool {
+        self.source == HistorySource::Undo
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DiffSummary
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffSummary {
+    pub additions: usize,
+    pub deletions: usize,
+    pub modifications: usize,
+}
+
+impl DiffSummary {
+    pub fn total(&self) -> usize {
+        self.additions + self.deletions + self.modifications
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.total() == 0
+    }
+}
+
+impl fmt::Display for DiffSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "+{} -{} ~{}",
+            self.additions, self.deletions, self.modifications
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HistoryDiff extensions
+// ---------------------------------------------------------------------------
+
+impl HistoryDiff {
+    pub fn is_empty(&self) -> bool {
+        !self.hash_changed && self.size_delta == 0
+    }
+
+    pub fn time_span(&self) -> u64 {
+        self.to_timestamp.saturating_sub(self.from_timestamp)
+    }
+}
+
+pub fn compute_diff_summary(old_content: &str, new_content: &str) -> DiffSummary {
+    let diffs = history_diff(old_content, new_content);
+    let mut additions = 0;
+    let mut deletions = 0;
+    let mut modifications = 0;
+    for d in &diffs {
+        match d.kind {
+            LineDiffKind::Added => additions += 1,
+            LineDiffKind::Removed => deletions += 1,
+            LineDiffKind::Modified => modifications += 1,
+        }
+    }
+    DiffSummary {
+        additions,
+        deletions,
+        modifications,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HistoryFilter extensions
+// ---------------------------------------------------------------------------
+
+impl HistoryFilter {
+    pub fn by_source(source: HistorySource) -> Self {
+        Self {
+            source: Some(source),
+            ..Default::default()
+        }
+    }
+
+    pub fn by_time_range(min: u64, max: u64) -> Self {
+        Self {
+            min_timestamp: Some(min),
+            max_timestamp: Some(max),
+            ..Default::default()
+        }
+    }
+
+    pub fn matches(&self, entry: &HistoryEntry) -> bool {
+        if let Some(src) = &self.source {
+            if entry.source != *src {
+                return false;
+            }
+        }
+        if let Some(min) = self.min_timestamp {
+            if entry.timestamp < min {
+                return false;
+            }
+        }
+        if let Some(max) = self.max_timestamp {
+            if entry.timestamp > max {
+                return false;
+            }
+        }
+        if let Some(ref substr) = self.label_contains {
+            match &entry.label {
+                Some(label) => {
+                    if !label.contains(substr.as_str()) {
+                        return false;
+                    }
+                }
+                None => return false,
+            }
+        }
+        true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LocalHistoryService: entries_for_file, oldest/newest, iterator, stats
+// ---------------------------------------------------------------------------
+
+impl LocalHistoryService {
+    pub fn entries_for_file(&self, uri: &str) -> Vec<&HistoryEntry> {
+        self.entries.iter().filter(|e| e.uri == uri).collect()
+    }
+
+    pub fn oldest_entry(&self) -> Option<&HistoryEntry> {
+        self.entries.iter().min_by_key(|e| e.timestamp)
+    }
+
+    pub fn newest_entry(&self) -> Option<&HistoryEntry> {
+        self.entries.iter().max_by_key(|e| e.timestamp)
+    }
+
+    pub fn total_diffs(&self, uri: &str) -> usize {
+        let count = self.entries.iter().filter(|e| e.uri == uri).count();
+        count.saturating_sub(1)
+    }
+
+    pub fn average_entry_size(&self) -> f64 {
+        if self.entries.is_empty() {
+            return 0.0;
+        }
+        self.total_size_bytes() as f64 / self.entries.len() as f64
+    }
+
+    pub fn recent_entries(&self, now: u64, threshold_secs: u64) -> Vec<&HistoryEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.is_recent(now, threshold_secs))
+            .collect()
+    }
+}
+
+impl<'a> IntoIterator for &'a LocalHistoryService {
+    type Item = &'a HistoryEntry;
+    type IntoIter = std::slice::Iter<'a, HistoryEntry>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.entries.iter()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GarbageCollectionResult extensions
+// ---------------------------------------------------------------------------
+
+impl GarbageCollectionResult {
+    pub fn had_effect(&self) -> bool {
+        self.entries_removed > 0
+    }
+
+    pub fn removal_ratio(&self) -> f64 {
+        if self.entries_before == 0 {
+            return 0.0;
+        }
+        self.entries_removed as f64 / self.entries_before as f64
+    }
+}
+
+impl fmt::Display for GarbageCollectionResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "GC: removed {} of {} entries, freed {} bytes",
+            self.entries_removed, self.entries_before, self.bytes_freed
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1197,5 +1402,180 @@ mod tests {
         assert_eq!(format!("{}", LineDiffKind::Added), "+");
         assert_eq!(format!("{}", LineDiffKind::Removed), "-");
         assert_eq!(format!("{}", LineDiffKind::Modified), "~");
+    }
+
+    #[test]
+    fn entry_age_secs_and_is_recent() {
+        let entry = HistoryEntry {
+            uri: "file:///a.rs".to_string(),
+            timestamp: 100,
+            content_hash: "abc".to_string(),
+            label: None,
+            source: HistorySource::Auto,
+            content: None,
+            size_bytes: 0,
+        };
+        assert_eq!(entry.age_secs(150), 50);
+        assert_eq!(entry.age_secs(50), 0);
+        assert!(entry.is_recent(150, 50));
+        assert!(!entry.is_recent(200, 50));
+        assert!(entry.is_recent(100, 0));
+    }
+
+    #[test]
+    fn diff_summary_display_and_total() {
+        let summary = DiffSummary {
+            additions: 3,
+            deletions: 1,
+            modifications: 2,
+        };
+        assert_eq!(summary.total(), 6);
+        assert!(!summary.is_empty());
+        assert_eq!(format!("{}", summary), "+3 -1 ~2");
+
+        let empty = DiffSummary {
+            additions: 0,
+            deletions: 0,
+            modifications: 0,
+        };
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn compute_diff_summary_counts() {
+        let old = "line1\nline2\nline3";
+        let new = "line1\nchanged\nline3\nnew_line";
+        let summary = compute_diff_summary(old, new);
+        assert_eq!(summary.modifications, 1);
+        assert_eq!(summary.additions, 1);
+        assert_eq!(summary.deletions, 0);
+        assert_eq!(summary.total(), 2);
+    }
+
+    #[test]
+    fn history_diff_is_empty_and_time_span() {
+        let diff = HistoryDiff {
+            uri: "file:///a.rs".to_string(),
+            from_timestamp: 10,
+            to_timestamp: 20,
+            hash_changed: false,
+            size_delta: 0,
+        };
+        assert!(diff.is_empty());
+        assert_eq!(diff.time_span(), 10);
+
+        let diff2 = HistoryDiff {
+            uri: "file:///a.rs".to_string(),
+            from_timestamp: 5,
+            to_timestamp: 15,
+            hash_changed: true,
+            size_delta: 42,
+        };
+        assert!(!diff2.is_empty());
+        assert_eq!(diff2.time_span(), 10);
+    }
+
+    #[test]
+    fn history_filter_constructors_and_matches() {
+        let filter = HistoryFilter::by_source(HistorySource::Manual);
+        assert_eq!(filter.source, Some(HistorySource::Manual));
+        assert!(filter.min_timestamp.is_none());
+
+        let range = HistoryFilter::by_time_range(5, 10);
+        assert_eq!(range.min_timestamp, Some(5));
+        assert_eq!(range.max_timestamp, Some(10));
+
+        let entry = HistoryEntry {
+            uri: "file:///a.rs".to_string(),
+            timestamp: 7,
+            content_hash: "h".to_string(),
+            label: None,
+            source: HistorySource::Auto,
+            content: None,
+            size_bytes: 0,
+        };
+        assert!(range.matches(&entry));
+        assert!(!filter.matches(&entry));
+    }
+
+    #[test]
+    fn service_oldest_newest_and_entries_for_file() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///b.rs", "h2", HistorySource::Manual);
+        svc.add_entry("file:///a.rs", "h3", HistorySource::Undo);
+
+        assert_eq!(svc.oldest_entry().unwrap().content_hash, "h1");
+        assert_eq!(svc.newest_entry().unwrap().content_hash, "h3");
+        assert_eq!(svc.entries_for_file("file:///a.rs").len(), 2);
+        assert_eq!(svc.entries_for_file("file:///b.rs").len(), 1);
+        assert!(svc.entries_for_file("file:///missing.rs").is_empty());
+
+        assert!(LocalHistoryService::new(10).oldest_entry().is_none());
+        assert!(LocalHistoryService::new(10).newest_entry().is_none());
+    }
+
+    #[test]
+    fn service_stats_and_iterator() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h3", HistorySource::Manual);
+        svc.entries[0].size_bytes = 100;
+        svc.entries[1].size_bytes = 200;
+        svc.entries[2].size_bytes = 300;
+
+        assert_eq!(svc.total_diffs("file:///a.rs"), 2);
+        assert_eq!(svc.total_diffs("file:///missing.rs"), 0);
+        assert!((svc.average_entry_size() - 200.0).abs() < f64::EPSILON);
+        assert_eq!(LocalHistoryService::new(5).average_entry_size(), 0.0);
+
+        let collected: Vec<&HistoryEntry> = (&svc).into_iter().collect();
+        assert_eq!(collected.len(), 3);
+    }
+
+    #[test]
+    fn gc_result_extensions_and_display() {
+        let result = GarbageCollectionResult {
+            entries_before: 10,
+            entries_after: 6,
+            entries_removed: 4,
+            bytes_freed: 2048,
+        };
+        assert!(result.had_effect());
+        assert!((result.removal_ratio() - 0.4).abs() < f64::EPSILON);
+        assert_eq!(
+            format!("{}", result),
+            "GC: removed 4 of 10 entries, freed 2048 bytes"
+        );
+
+        let no_effect = GarbageCollectionResult {
+            entries_before: 5,
+            entries_after: 5,
+            entries_removed: 0,
+            bytes_freed: 0,
+        };
+        assert!(!no_effect.had_effect());
+        assert_eq!(no_effect.removal_ratio(), 0.0);
+
+        let empty = GarbageCollectionResult {
+            entries_before: 0,
+            entries_after: 0,
+            entries_removed: 0,
+            bytes_freed: 0,
+        };
+        assert_eq!(empty.removal_ratio(), 0.0);
+    }
+
+    #[test]
+    fn recent_entries_filters_by_threshold() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h3", HistorySource::Auto);
+        let recent = svc.recent_entries(4, 1);
+        assert_eq!(recent.len(), 1);
+        let recent_all = svc.recent_entries(4, 10);
+        assert_eq!(recent_all.len(), 3);
     }
 }

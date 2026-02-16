@@ -705,6 +705,222 @@ pub fn group_actions(actions: &[WeightedAction]) -> Vec<Vec<&WeightedAction>> {
     map.into_values().collect()
 }
 
+// ---------------------------------------------------------------------------
+// MenuItem extensions
+// ---------------------------------------------------------------------------
+
+impl MenuItem {
+    pub fn is_separator(&self) -> bool {
+        self.command_id == "-" || self.title == "-"
+    }
+
+    pub fn matches_filter(&self, query: &str) -> bool {
+        let q = query.to_ascii_lowercase();
+        self.title.to_ascii_lowercase().contains(&q)
+            || self.command_id.to_ascii_lowercase().contains(&q)
+    }
+}
+
+impl fmt::Display for MenuItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(ref group) = self.group {
+            write!(f, "[{}] {} ({})", group, self.title, self.command_id)
+        } else {
+            write!(f, "{} ({})", self.title, self.command_id)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MenuId extensions
+// ---------------------------------------------------------------------------
+
+impl MenuId {
+    pub fn is_context_menu(&self) -> bool {
+        matches!(
+            self,
+            MenuId::EditorContext
+                | MenuId::EditorTitleContext
+                | MenuId::ExplorerContext
+                | MenuId::ViewItemContext
+                | MenuId::SCMContext
+                | MenuId::TerminalContext
+                | MenuId::DebugCallStackContext
+        )
+    }
+
+    pub fn is_main_menu(&self) -> bool {
+        matches!(
+            self,
+            MenuId::MenubarFile
+                | MenuId::MenubarEdit
+                | MenuId::MenubarSelection
+                | MenuId::MenubarView
+                | MenuId::MenubarGo
+                | MenuId::MenubarRun
+                | MenuId::MenubarTerminal
+                | MenuId::MenubarHelp
+        )
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            MenuId::CommandPalette => "Command Palette",
+            MenuId::EditorContext => "Editor Context",
+            MenuId::EditorTitle => "Editor Title",
+            MenuId::EditorTitleContext => "Editor Title Context",
+            MenuId::ExplorerContext => "Explorer Context",
+            MenuId::MenubarFile => "File",
+            MenuId::MenubarEdit => "Edit",
+            MenuId::MenubarSelection => "Selection",
+            MenuId::MenubarView => "View",
+            MenuId::MenubarGo => "Go",
+            MenuId::MenubarRun => "Run",
+            MenuId::MenubarTerminal => "Terminal",
+            MenuId::MenubarHelp => "Help",
+            MenuId::StatusBarItem => "Status Bar",
+            MenuId::ViewTitle => "View Title",
+            MenuId::ViewItemContext => "View Item Context",
+            MenuId::SCMTitle => "SCM Title",
+            MenuId::SCMContext => "SCM Context",
+            MenuId::TerminalContext => "Terminal Context",
+            MenuId::DebugCallStackContext => "Debug Call Stack Context",
+            MenuId::TouchBar => "Touch Bar",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActionWeight extensions
+// ---------------------------------------------------------------------------
+
+impl ActionWeight {
+    pub fn is_high(&self) -> bool {
+        self.group == 0 && self.order <= 0
+    }
+
+    pub fn is_low(&self) -> bool {
+        self.group >= 100
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WeightedAction extensions
+// ---------------------------------------------------------------------------
+
+impl fmt::Display for WeightedAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} [{}] ({})", self.label, self.id, self.weight)
+    }
+}
+
+impl PartialEq for WeightedAction {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && self.weight == other.weight
+    }
+}
+
+impl Eq for WeightedAction {}
+
+impl PartialOrd for WeightedAction {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for WeightedAction {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.weight.cmp(&other.weight).then(self.id.cmp(&other.id))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActionRegistry extensions
+// ---------------------------------------------------------------------------
+
+impl ActionRegistry {
+    pub fn is_empty(&self) -> bool {
+        self.actions.read().unwrap().is_empty()
+    }
+
+    pub fn find_by_label(&self, label: &str) -> Vec<String> {
+        let actions = self.actions.read().unwrap();
+        actions
+            .iter()
+            .filter(|(_, meta)| meta.title == label)
+            .map(|(id, _)| id.clone())
+            .collect()
+    }
+
+    pub fn clear(&self) {
+        self.actions.write().unwrap().clear();
+        self.menus.write().unwrap().clear();
+        self._registrations.lock().unwrap().clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActionGroup
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+pub struct ActionGroup {
+    pub name: String,
+    pub actions: Vec<WeightedAction>,
+}
+
+impl ActionGroup {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            actions: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, action: WeightedAction) {
+        self.actions.push(action);
+    }
+
+    pub fn len(&self) -> usize {
+        self.actions.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.actions.is_empty()
+    }
+
+    pub fn sorted(&self) -> Vec<&WeightedAction> {
+        let mut refs: Vec<&WeightedAction> = self.actions.iter().collect();
+        refs.sort();
+        refs
+    }
+}
+
+impl fmt::Display for ActionGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({} actions)", self.name, self.actions.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActionsStats extensions
+// ---------------------------------------------------------------------------
+
+impl ActionsStats {
+    pub fn summary(&self) -> String {
+        format!(
+            "{} ops, {:.1}% success, avg {}ns",
+            self.total_operations,
+            self.success_rate() * 100.0,
+            self.average_time_ns(),
+        )
+    }
+
+    pub fn has_failures(&self) -> bool {
+        self.failed_operations > 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1205,5 +1421,159 @@ mod tests {
         let w = ActionWeight::default();
         assert_eq!(w.group, 0);
         assert_eq!(w.order, 0);
+    }
+
+    // -- New tests --
+
+    #[test]
+    fn menu_item_is_separator() {
+        let sep = MenuItem {
+            command_id: "-".into(),
+            title: "-".into(),
+            group: None,
+            order: None,
+            when: None,
+        };
+        assert!(sep.is_separator());
+
+        let normal = MenuItem {
+            command_id: "cmd.save".into(),
+            title: "Save".into(),
+            group: None,
+            order: None,
+            when: None,
+        };
+        assert!(!normal.is_separator());
+    }
+
+    #[test]
+    fn menu_item_matches_filter() {
+        let item = MenuItem {
+            command_id: "editor.formatDocument".into(),
+            title: "Format Document".into(),
+            group: None,
+            order: None,
+            when: None,
+        };
+        assert!(item.matches_filter("format"));
+        assert!(item.matches_filter("FORMAT"));
+        assert!(item.matches_filter("editor.format"));
+        assert!(!item.matches_filter("compile"));
+    }
+
+    #[test]
+    fn menu_item_display() {
+        let with_group = MenuItem {
+            command_id: "cmd.save".into(),
+            title: "Save".into(),
+            group: Some("file".into()),
+            order: None,
+            when: None,
+        };
+        assert_eq!(format!("{with_group}"), "[file] Save (cmd.save)");
+
+        let without_group = MenuItem {
+            command_id: "cmd.open".into(),
+            title: "Open".into(),
+            group: None,
+            order: None,
+            when: None,
+        };
+        assert_eq!(format!("{without_group}"), "Open (cmd.open)");
+    }
+
+    #[test]
+    fn menu_id_is_context_and_main_menu() {
+        assert!(MenuId::EditorContext.is_context_menu());
+        assert!(MenuId::ExplorerContext.is_context_menu());
+        assert!(MenuId::TerminalContext.is_context_menu());
+        assert!(!MenuId::CommandPalette.is_context_menu());
+        assert!(!MenuId::MenubarFile.is_context_menu());
+
+        assert!(MenuId::MenubarFile.is_main_menu());
+        assert!(MenuId::MenubarEdit.is_main_menu());
+        assert!(MenuId::MenubarHelp.is_main_menu());
+        assert!(!MenuId::EditorContext.is_main_menu());
+        assert!(!MenuId::TouchBar.is_main_menu());
+    }
+
+    #[test]
+    fn menu_id_label() {
+        assert_eq!(MenuId::CommandPalette.label(), "Command Palette");
+        assert_eq!(MenuId::MenubarFile.label(), "File");
+        assert_eq!(MenuId::TouchBar.label(), "Touch Bar");
+    }
+
+    #[test]
+    fn action_weight_is_high_and_is_low() {
+        assert!(ActionWeight::new(0, 0).is_high());
+        assert!(ActionWeight::new(0, -5).is_high());
+        assert!(!ActionWeight::new(0, 1).is_high());
+        assert!(!ActionWeight::new(1, 0).is_high());
+
+        assert!(ActionWeight::new(100, 0).is_low());
+        assert!(ActionWeight::new(200, 0).is_low());
+        assert!(!ActionWeight::new(99, 0).is_low());
+    }
+
+    #[test]
+    fn weighted_action_display_and_ord() {
+        let a = WeightedAction::new("a", "Alpha", ActionWeight::new(0, 1));
+        let b = WeightedAction::new("b", "Beta", ActionWeight::new(0, 2));
+        assert_eq!(format!("{a}"), "Alpha [a] (0:1)");
+        assert!(a < b);
+    }
+
+    #[test]
+    fn action_registry_is_empty_find_by_label_clear() {
+        let cmds = Arc::new(CommandRegistry::new());
+        let registry = ActionRegistry::new(cmds);
+        assert!(registry.is_empty());
+
+        registry.register_action("a", "Save", Some("File".into()), noop_handler(), vec![], None);
+        registry.register_action("b", "Save", None, noop_handler(), vec![], None);
+        registry.register_action("c", "Open", None, noop_handler(), vec![], None);
+
+        assert!(!registry.is_empty());
+        let mut found = registry.find_by_label("Save");
+        found.sort();
+        assert_eq!(found, vec!["a".to_string(), "b".to_string()]);
+        assert!(registry.find_by_label("Missing").is_empty());
+
+        registry.clear();
+        assert!(registry.is_empty());
+        assert_eq!(registry.action_count(), 0);
+    }
+
+    #[test]
+    fn action_group_basics() {
+        let mut group = ActionGroup::new("navigation");
+        assert!(group.is_empty());
+        assert_eq!(group.len(), 0);
+
+        group.add(WeightedAction::new("b", "Beta", ActionWeight::new(0, 2)));
+        group.add(WeightedAction::new("a", "Alpha", ActionWeight::new(0, 1)));
+        assert_eq!(group.len(), 2);
+        assert!(!group.is_empty());
+
+        let sorted = group.sorted();
+        assert_eq!(sorted[0].id, "a");
+        assert_eq!(sorted[1].id, "b");
+
+        assert_eq!(format!("{group}"), "navigation (2 actions)");
+    }
+
+    #[test]
+    fn actions_stats_summary_and_has_failures() {
+        let mut stats = ActionsStats::new();
+        assert!(!stats.has_failures());
+        assert!(stats.summary().contains("0 ops"));
+
+        stats.record_success(1000);
+        stats.record_failure(2000);
+        assert!(stats.has_failures());
+        let summary = stats.summary();
+        assert!(summary.contains("2 ops"));
+        assert!(summary.contains("50.0%"));
     }
 }

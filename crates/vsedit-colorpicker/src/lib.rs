@@ -702,6 +702,149 @@ impl Default for ColorpickerValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Color constructors
+// ---------------------------------------------------------------------------
+
+impl Color {
+    /// Opaque white.
+    pub fn white() -> Self {
+        Self::new(1.0, 1.0, 1.0, 1.0)
+    }
+
+    /// Opaque black.
+    pub fn black() -> Self {
+        Self::new(0.0, 0.0, 0.0, 1.0)
+    }
+
+    /// Opaque red.
+    pub fn red() -> Self {
+        Self::new(1.0, 0.0, 0.0, 1.0)
+    }
+
+    /// Opaque green.
+    pub fn green() -> Self {
+        Self::new(0.0, 1.0, 0.0, 1.0)
+    }
+
+    /// Opaque blue.
+    pub fn blue() -> Self {
+        Self::new(0.0, 0.0, 1.0, 1.0)
+    }
+
+    /// Transparent (alpha = 0).
+    pub fn transparent() -> Self {
+        Self::new(0.0, 0.0, 0.0, 0.0)
+    }
+
+    /// Create from 0-255 integer values.
+    pub fn from_u8(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self::new(
+            r as f64 / 255.0,
+            g as f64 / 255.0,
+            b as f64 / 255.0,
+            a as f64 / 255.0,
+        )
+    }
+
+    /// Convert to 0-255 integer tuple.
+    pub fn to_u8(&self) -> (u8, u8, u8, u8) {
+        (
+            (self.r * 255.0).round() as u8,
+            (self.g * 255.0).round() as u8,
+            (self.b * 255.0).round() as u8,
+            (self.a * 255.0).round() as u8,
+        )
+    }
+
+    /// Clamp all components to 0.0..=1.0.
+    pub fn clamp(&self) -> Self {
+        Self::new(
+            self.r.clamp(0.0, 1.0),
+            self.g.clamp(0.0, 1.0),
+            self.b.clamp(0.0, 1.0),
+            self.a.clamp(0.0, 1.0),
+        )
+    }
+
+    /// Set alpha to a new value, returning a new color.
+    pub fn with_alpha(&self, a: f64) -> Self {
+        Self::new(self.r, self.g, self.b, a)
+    }
+
+    /// Returns the grayscale equivalent.
+    pub fn grayscale(&self) -> Self {
+        let gray = luminance(self);
+        Self::new(gray, gray, gray, self.a)
+    }
+
+    /// Linear interpolation to another color.
+    pub fn lerp(&self, other: &Color, t: f64) -> Self {
+        let t = t.clamp(0.0, 1.0);
+        Self::new(
+            self.r + (other.r - self.r) * t,
+            self.g + (other.g - self.g) * t,
+            self.b + (other.b - self.b) * t,
+            self.a + (other.a - self.a) * t,
+        )
+    }
+}
+
+impl From<(f64, f64, f64)> for Color {
+    fn from((r, g, b): (f64, f64, f64)) -> Self {
+        Self::new(r, g, b, 1.0)
+    }
+}
+
+impl From<(f64, f64, f64, f64)> for Color {
+    fn from((r, g, b, a): (f64, f64, f64, f64)) -> Self {
+        Self::new(r, g, b, a)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Color distance
+// ---------------------------------------------------------------------------
+
+/// Compute Euclidean distance between two colors in RGB space.
+pub fn color_distance(a: &Color, b: &Color) -> f64 {
+    let dr = a.r - b.r;
+    let dg = a.g - b.g;
+    let db = a.b - b.b;
+    (dr * dr + dg * dg + db * db).sqrt()
+}
+
+/// Find the closest named color to the given color.
+pub fn closest_named_color(color: &Color) -> &'static str {
+    let named = [
+        ("black", Color::black()),
+        ("white", Color::white()),
+        ("red", Color::red()),
+        ("green", Color::green()),
+        ("blue", Color::blue()),
+    ];
+    named.iter()
+        .min_by(|(_, a), (_, b)| {
+            color_distance(color, a).partial_cmp(&color_distance(color, b)).unwrap()
+        })
+        .map(|(name, _)| *name)
+        .unwrap_or("unknown")
+}
+
+/// Checks WCAG contrast accessibility between foreground and background.
+pub fn wcag_contrast_level(fg: &Color, bg: &Color) -> &'static str {
+    let ratio = contrast_ratio(fg, bg);
+    if ratio >= 7.0 {
+        "AAA"
+    } else if ratio >= 4.5 {
+        "AA"
+    } else if ratio >= 3.0 {
+        "AA-large"
+    } else {
+        "fail"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1235,5 +1378,82 @@ mod tests {
         assert!(parse_color("#FF000080").is_some());
         assert!(parse_color("rgb(255, 0, 0)").is_some());
         assert!(parse_color("invalid").is_none());
+    }
+
+    #[test]
+    fn test_color_presets() {
+        let w = Color::white();
+        assert!((w.r - 1.0).abs() < f64::EPSILON);
+        let b = Color::black();
+        assert!((b.r - 0.0).abs() < f64::EPSILON);
+        let t = Color::transparent();
+        assert!((t.a - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_color_from_u8_roundtrip() {
+        let c = Color::from_u8(128, 64, 255, 200);
+        let (r, g, b, a) = c.to_u8();
+        assert_eq!(r, 128);
+        assert_eq!(g, 64);
+        assert_eq!(b, 255);
+        assert_eq!(a, 200);
+    }
+
+    #[test]
+    fn test_color_clamp() {
+        let c = Color::new(1.5, -0.5, 0.5, 2.0);
+        let clamped = c.clamp();
+        assert!((clamped.r - 1.0).abs() < f64::EPSILON);
+        assert!((clamped.g - 0.0).abs() < f64::EPSILON);
+        assert!((clamped.a - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_color_with_alpha() {
+        let c = Color::red().with_alpha(0.5);
+        assert!((c.a - 0.5).abs() < f64::EPSILON);
+        assert!((c.r - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_color_grayscale() {
+        let c = Color::red().grayscale();
+        assert!((c.r - c.g).abs() < f64::EPSILON);
+        assert!((c.g - c.b).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_color_lerp() {
+        let a = Color::black();
+        let b = Color::white();
+        let mid = a.lerp(&b, 0.5);
+        assert!((mid.r - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_color_from_tuple() {
+        let c: Color = (1.0, 0.0, 0.0).into();
+        assert!((c.r - 1.0).abs() < f64::EPSILON);
+        assert!((c.a - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_color_distance_fn() {
+        let d = color_distance(&Color::black(), &Color::white());
+        assert!((d - 3.0_f64.sqrt()).abs() < 0.001);
+        assert!((color_distance(&Color::red(), &Color::red())).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_closest_named_color() {
+        assert_eq!(closest_named_color(&Color::new(0.9, 0.1, 0.1, 1.0)), "red");
+        assert_eq!(closest_named_color(&Color::new(0.0, 0.0, 0.0, 1.0)), "black");
+    }
+
+    #[test]
+    fn test_wcag_contrast_level() {
+        assert_eq!(wcag_contrast_level(&Color::black(), &Color::white()), "AAA");
+        assert_eq!(wcag_contrast_level(&Color::white(), &Color::white()), "fail");
     }
 }

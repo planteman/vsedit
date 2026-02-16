@@ -720,6 +720,183 @@ impl Default for PlatformValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Platform capability set
+// ---------------------------------------------------------------------------
+
+/// A collected set of platform capabilities.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlatformCapabilities {
+    pub true_color: bool,
+    pub unicode: bool,
+    pub mouse: bool,
+    pub sixel: bool,
+    pub kitty_graphics: bool,
+    pub platform: Platform,
+}
+
+impl PlatformCapabilities {
+    /// Detect all capabilities for the current platform.
+    pub fn detect() -> Self {
+        Self {
+            true_color: supports_true_color(),
+            unicode: supports_unicode(),
+            mouse: supports_mouse(),
+            sixel: supports_sixel(),
+            kitty_graphics: supports_kitty_graphics(),
+            platform: Platform::current(),
+        }
+    }
+
+    /// Create a capabilities set with everything enabled (for testing).
+    pub fn all_enabled(platform: Platform) -> Self {
+        Self {
+            true_color: true,
+            unicode: true,
+            mouse: true,
+            sixel: true,
+            kitty_graphics: true,
+            platform,
+        }
+    }
+
+    /// Create a minimal capabilities set (nothing enabled).
+    pub fn minimal(platform: Platform) -> Self {
+        Self {
+            true_color: false,
+            unicode: false,
+            mouse: false,
+            sixel: false,
+            kitty_graphics: false,
+            platform,
+        }
+    }
+
+    /// Count the number of enabled capabilities.
+    pub fn enabled_count(&self) -> usize {
+        [self.true_color, self.unicode, self.mouse, self.sixel, self.kitty_graphics]
+            .iter()
+            .filter(|&&b| b)
+            .count()
+    }
+
+    /// Returns true if any graphics protocol (sixel or kitty) is supported.
+    pub fn has_graphics(&self) -> bool {
+        self.sixel || self.kitty_graphics
+    }
+}
+
+impl fmt::Display for PlatformCapabilities {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Platform({}, caps: {}/5)",
+            self.platform,
+            self.enabled_count()
+        )
+    }
+}
+
+impl Default for PlatformCapabilities {
+    fn default() -> Self {
+        Self::minimal(Platform::Unknown)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Iterator over platforms
+// ---------------------------------------------------------------------------
+
+/// Iterator over all known platform variants.
+pub struct PlatformIter {
+    index: usize,
+}
+
+impl PlatformIter {
+    pub fn new() -> Self {
+        Self { index: 0 }
+    }
+}
+
+impl Default for PlatformIter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+const ALL_PLATFORMS: [Platform; 5] = [
+    Platform::Windows,
+    Platform::MacOS,
+    Platform::Linux,
+    Platform::FreeBSD,
+    Platform::Unknown,
+];
+
+impl Iterator for PlatformIter {
+    type Item = Platform;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < ALL_PLATFORMS.len() {
+            let p = ALL_PLATFORMS[self.index];
+            self.index += 1;
+            Some(p)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let rem = ALL_PLATFORMS.len() - self.index;
+        (rem, Some(rem))
+    }
+}
+
+impl ExactSizeIterator for PlatformIter {}
+
+// ---------------------------------------------------------------------------
+// From impls
+// ---------------------------------------------------------------------------
+
+impl From<&str> for Platform {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "windows" | "win32" | "win" => Platform::Windows,
+            "macos" | "darwin" | "mac" => Platform::MacOS,
+            "linux" => Platform::Linux,
+            "freebsd" => Platform::FreeBSD,
+            _ => Platform::Unknown,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Platform path separator helpers
+// ---------------------------------------------------------------------------
+
+/// Returns the default path separator for the given platform.
+pub fn platform_path_separator(platform: Platform) -> char {
+    match platform {
+        Platform::Windows => '\\',
+        _ => '/',
+    }
+}
+
+/// Returns the default line ending for the given platform.
+pub fn platform_line_ending(platform: Platform) -> &'static str {
+    match platform {
+        Platform::Windows => "\r\n",
+        _ => "\n",
+    }
+}
+
+/// Returns the executable file extension for the given platform.
+pub fn platform_exe_extension(platform: Platform) -> &'static str {
+    match platform {
+        Platform::Windows => ".exe",
+        _ => "",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1228,5 +1405,78 @@ mod tests {
     fn temp_dir_exists() {
         let dir = platform_temp_dir();
         assert!(!dir.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn test_platform_capabilities_all_enabled() {
+        let caps = PlatformCapabilities::all_enabled(Platform::Linux);
+        assert_eq!(caps.enabled_count(), 5);
+        assert!(caps.has_graphics());
+        assert_eq!(caps.platform, Platform::Linux);
+    }
+
+    #[test]
+    fn test_platform_capabilities_minimal() {
+        let caps = PlatformCapabilities::minimal(Platform::Windows);
+        assert_eq!(caps.enabled_count(), 0);
+        assert!(!caps.has_graphics());
+    }
+
+    #[test]
+    fn test_platform_capabilities_display() {
+        let caps = PlatformCapabilities::all_enabled(Platform::MacOS);
+        let s = format!("{caps}");
+        assert!(s.contains("macOS"));
+        assert!(s.contains("5/5"));
+    }
+
+    #[test]
+    fn test_platform_capabilities_default() {
+        let caps = PlatformCapabilities::default();
+        assert_eq!(caps.platform, Platform::Unknown);
+        assert_eq!(caps.enabled_count(), 0);
+    }
+
+    #[test]
+    fn test_platform_iter() {
+        let platforms: Vec<Platform> = PlatformIter::new().collect();
+        assert_eq!(platforms.len(), 5);
+        assert!(platforms.contains(&Platform::Windows));
+        assert!(platforms.contains(&Platform::Linux));
+        assert!(platforms.contains(&Platform::Unknown));
+    }
+
+    #[test]
+    fn test_platform_iter_exact_size() {
+        let iter = PlatformIter::new();
+        assert_eq!(iter.len(), 5);
+    }
+
+    #[test]
+    fn test_platform_from_str() {
+        assert_eq!(Platform::from("windows"), Platform::Windows);
+        assert_eq!(Platform::from("darwin"), Platform::MacOS);
+        assert_eq!(Platform::from("linux"), Platform::Linux);
+        assert_eq!(Platform::from("freebsd"), Platform::FreeBSD);
+        assert_eq!(Platform::from("unknown-os"), Platform::Unknown);
+    }
+
+    #[test]
+    fn test_platform_path_separator() {
+        assert_eq!(platform_path_separator(Platform::Windows), '\\');
+        assert_eq!(platform_path_separator(Platform::Linux), '/');
+        assert_eq!(platform_path_separator(Platform::MacOS), '/');
+    }
+
+    #[test]
+    fn test_platform_line_ending() {
+        assert_eq!(platform_line_ending(Platform::Windows), "\r\n");
+        assert_eq!(platform_line_ending(Platform::Linux), "\n");
+    }
+
+    #[test]
+    fn test_platform_exe_extension() {
+        assert_eq!(platform_exe_extension(Platform::Windows), ".exe");
+        assert_eq!(platform_exe_extension(Platform::Linux), "");
     }
 }

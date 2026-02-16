@@ -767,6 +767,206 @@ impl fmt::Display for WindowState {
     }
 }
 
+// ── QuickPickItem extensions ──
+
+impl QuickPickItem {
+    pub fn matches_filter(&self, query: &str) -> bool {
+        let query_lower = query.to_ascii_lowercase();
+        if self.label.to_ascii_lowercase().contains(&query_lower) {
+            return true;
+        }
+        if let Some(ref desc) = self.description {
+            if desc.to_ascii_lowercase().contains(&query_lower) {
+                return true;
+            }
+        }
+        if let Some(ref detail) = self.detail {
+            if detail.to_ascii_lowercase().contains(&query_lower) {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+// ── QuickPickOptions extensions ──
+
+impl QuickPickOptions {
+    pub fn is_multi_select(&self) -> bool {
+        self.can_pick_many
+    }
+
+    pub fn has_placeholder(&self) -> bool {
+        self.placeholder.as_ref().map_or(false, |p| !p.is_empty())
+    }
+}
+
+// ── InputBoxOptions extensions ──
+
+impl InputBoxOptions {
+    pub fn has_validation(&self) -> bool {
+        self.validation_message.is_some()
+    }
+
+    pub fn has_value(&self) -> bool {
+        self.value.as_ref().map_or(false, |v| !v.is_empty())
+    }
+
+    pub fn is_password(&self) -> bool {
+        self.password
+    }
+}
+
+// ── WindowState extensions ──
+
+impl WindowState {
+    pub fn is_focused(&self) -> bool {
+        self.focused
+    }
+
+    pub fn is_maximized(&self) -> bool {
+        self.maximized
+    }
+
+    pub fn summary(&self) -> String {
+        let mut parts = Vec::new();
+        if self.focused {
+            parts.push("focused");
+        }
+        if self.visible {
+            parts.push("visible");
+        }
+        if self.maximized {
+            parts.push("maximized");
+        }
+        if self.fullscreen {
+            parts.push("fullscreen");
+        }
+        if parts.is_empty() {
+            return "hidden".to_string();
+        }
+        parts.join(", ")
+    }
+}
+
+// ── DialogFilter extensions ──
+
+impl DialogFilter {
+    pub fn accepts_extension(&self, ext: &str) -> bool {
+        self.extensions
+            .iter()
+            .any(|e| e.eq_ignore_ascii_case(ext))
+    }
+
+    pub fn all_extensions(&self) -> Vec<&str> {
+        self.extensions.iter().map(|e| e.as_str()).collect()
+    }
+}
+
+// ── WindowBridge extensions ──
+
+impl WindowBridge {
+    pub fn message_count(&self) -> usize {
+        self.status_bar_items.len() + self.output_channels.len()
+    }
+
+    pub fn has_pending_items(&self) -> bool {
+        !self.status_bar_items.is_empty() || !self.output_channels.is_empty()
+    }
+}
+
+// ── QuickPickItemSet ──
+
+#[derive(Debug, Clone, Default)]
+pub struct QuickPickItemSet {
+    items: Vec<QuickPickItem>,
+}
+
+impl QuickPickItemSet {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    pub fn with_items(items: Vec<QuickPickItem>) -> Self {
+        Self { items }
+    }
+
+    pub fn push(&mut self, item: QuickPickItem) {
+        self.items.push(item);
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    pub fn filter(&self, query: &str) -> Vec<&QuickPickItem> {
+        self.items.iter().filter(|i| i.matches_filter(query)).collect()
+    }
+
+    pub fn sort_by_label(&mut self) {
+        self.items.sort_by(|a, b| a.label.cmp(&b.label));
+    }
+
+    pub fn picked(&self) -> Vec<&QuickPickItem> {
+        self.items.iter().filter(|i| i.picked).collect()
+    }
+
+    pub fn find_by_label(&self, label: &str) -> Option<&QuickPickItem> {
+        self.items.iter().find(|i| i.label == label)
+    }
+
+    pub fn labels(&self) -> Vec<&str> {
+        self.items.iter().map(|i| i.label.as_str()).collect()
+    }
+}
+
+impl IntoIterator for QuickPickItemSet {
+    type Item = QuickPickItem;
+    type IntoIter = std::vec::IntoIter<QuickPickItem>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a QuickPickItemSet {
+    type Item = &'a QuickPickItem;
+    type IntoIter = std::slice::Iter<'a, QuickPickItem>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.iter()
+    }
+}
+
+impl fmt::Display for QuickPickItemSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "QuickPickItemSet({} items)", self.items.len())
+    }
+}
+
+// ── Display for InputBoxOptions ──
+
+impl fmt::Display for InputBoxOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let prompt = self.prompt.as_deref().unwrap_or("<no prompt>");
+        let pw = if self.password { ", password" } else { "" };
+        write!(f, "InputBox({prompt}{pw})")
+    }
+}
+
+// ── Display for QuickPickOptions ──
+
+impl fmt::Display for QuickPickOptions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let multi = if self.can_pick_many { "multi" } else { "single" };
+        write!(f, "QuickPick({multi})")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1201,5 +1401,160 @@ mod tests {
         let json = serde_json::to_string(&ws).unwrap();
         let ws2: WindowState = serde_json::from_str(&json).unwrap();
         assert_eq!(ws, ws2);
+    }
+
+    #[test]
+    fn quick_pick_item_matches_filter() {
+        let item = QuickPickItem {
+            label: "Open File".into(),
+            description: Some("Opens a document".into()),
+            detail: Some("Ctrl+O shortcut".into()),
+            picked: false,
+        };
+        assert!(item.matches_filter("open"));
+        assert!(item.matches_filter("DOCUMENT"));
+        assert!(item.matches_filter("shortcut"));
+        assert!(!item.matches_filter("save"));
+
+        let minimal = QuickPickItem {
+            label: "Run".into(),
+            description: None,
+            detail: None,
+            picked: false,
+        };
+        assert!(minimal.matches_filter("run"));
+        assert!(!minimal.matches_filter("debug"));
+    }
+
+    #[test]
+    fn input_box_options_extensions() {
+        let opts = InputBoxOptionsBuilder::new()
+            .prompt("Name")
+            .value("hello")
+            .password(true)
+            .build();
+        assert!(!opts.has_validation());
+        assert!(opts.has_value());
+        assert!(opts.is_password());
+
+        let empty = InputBoxOptionsBuilder::new().build();
+        assert!(!empty.has_value());
+        assert!(!empty.is_password());
+    }
+
+    #[test]
+    fn quick_pick_options_extensions() {
+        let opts = QuickPickOptions { placeholder: Some("Type here".into()), can_pick_many: true };
+        assert!(opts.is_multi_select());
+        assert!(opts.has_placeholder());
+
+        let opts2 = QuickPickOptions { placeholder: None, can_pick_many: false };
+        assert!(!opts2.is_multi_select());
+        assert!(!opts2.has_placeholder());
+    }
+
+    #[test]
+    fn window_state_summary_and_accessors() {
+        let ws = WindowState::active();
+        assert!(ws.is_focused());
+        assert!(!ws.is_maximized());
+        assert_eq!(ws.summary(), "focused, visible");
+
+        let inactive = WindowState::inactive();
+        assert_eq!(inactive.summary(), "hidden");
+
+        let mut max = WindowState::active();
+        max.toggle_maximized();
+        assert!(max.is_maximized());
+        assert!(max.summary().contains("maximized"));
+    }
+
+    #[test]
+    fn dialog_filter_accepts_extension() {
+        let f = DialogFilter {
+            name: "Images".into(),
+            extensions: vec!["png".into(), "jpg".into(), "gif".into()],
+        };
+        assert!(f.accepts_extension("png"));
+        assert!(f.accepts_extension("PNG"));
+        assert!(!f.accepts_extension("bmp"));
+        assert_eq!(f.all_extensions(), vec!["png", "jpg", "gif"]);
+    }
+
+    #[test]
+    fn quick_pick_item_set_operations() {
+        let mut set = QuickPickItemSet::new();
+        assert!(set.is_empty());
+
+        set.push(QuickPickItem {
+            label: "Zebra".into(),
+            description: Some("Animal".into()),
+            detail: None,
+            picked: true,
+        });
+        set.push(QuickPickItem {
+            label: "Apple".into(),
+            description: None,
+            detail: None,
+            picked: false,
+        });
+        set.push(QuickPickItem {
+            label: "Mango".into(),
+            description: Some("Fruit".into()),
+            detail: None,
+            picked: true,
+        });
+
+        assert_eq!(set.len(), 3);
+        assert_eq!(set.picked().len(), 2);
+        assert!(set.find_by_label("Apple").is_some());
+        assert!(set.find_by_label("Banana").is_none());
+
+        let filtered = set.filter("animal");
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].label, "Zebra");
+
+        set.sort_by_label();
+        assert_eq!(set.labels(), vec!["Apple", "Mango", "Zebra"]);
+
+        let display = format!("{set}");
+        assert!(display.contains("3 items"));
+
+        let collected: Vec<_> = set.into_iter().collect();
+        assert_eq!(collected.len(), 3);
+    }
+
+    #[test]
+    fn bridge_message_count_and_pending() {
+        let mut bridge = WindowBridge::new();
+        assert_eq!(bridge.message_count(), 0);
+        assert!(!bridge.has_pending_items());
+
+        bridge.handle(WindowMessage::CreateStatusBarItem {
+            id: "sb1".into(),
+            alignment: StatusBarAlignment::Left,
+            priority: None,
+        });
+        bridge.handle(WindowMessage::CreateOutputChannel { name: "Log".into() });
+        assert_eq!(bridge.message_count(), 2);
+        assert!(bridge.has_pending_items());
+    }
+
+    #[test]
+    fn display_impls_new() {
+        let opts = InputBoxOptions {
+            prompt: Some("Enter name".into()),
+            placeholder: None,
+            password: true,
+            value: None,
+            validation_message: None,
+        };
+        assert_eq!(opts.to_string(), "InputBox(Enter name, password)");
+
+        let qp = QuickPickOptions { placeholder: None, can_pick_many: false };
+        assert_eq!(qp.to_string(), "QuickPick(single)");
+
+        let qp_multi = QuickPickOptions { placeholder: None, can_pick_many: true };
+        assert_eq!(qp_multi.to_string(), "QuickPick(multi)");
     }
 }
