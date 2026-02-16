@@ -372,6 +372,202 @@ impl fmt::Display for RemoteWorkbenchService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Connection health monitoring
+// ---------------------------------------------------------------------------
+
+/// Health check result for a remote connection.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HealthCheckResult {
+    pub latency_ms: u64,
+    pub is_healthy: bool,
+    pub message: String,
+}
+
+impl fmt::Display for HealthCheckResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let status = if self.is_healthy { "healthy" } else { "unhealthy" };
+        write!(f, "{} ({}ms): {}", status, self.latency_ms, self.message)
+    }
+}
+
+/// Monitors connection health over time by tracking check results.
+pub struct ConnectionHealthMonitor {
+    results: Vec<HealthCheckResult>,
+    max_results: usize,
+}
+
+impl ConnectionHealthMonitor {
+    pub fn new(max_results: usize) -> Self {
+        Self { results: Vec::new(), max_results }
+    }
+
+    pub fn record(&mut self, result: HealthCheckResult) {
+        self.results.push(result);
+        if self.results.len() > self.max_results {
+            self.results.remove(0);
+        }
+    }
+
+    pub fn average_latency(&self) -> Option<u64> {
+        if self.results.is_empty() {
+            return None;
+        }
+        let sum: u64 = self.results.iter().map(|r| r.latency_ms).sum();
+        Some(sum / self.results.len() as u64)
+    }
+
+    pub fn failure_rate(&self) -> f64 {
+        if self.results.is_empty() {
+            return 0.0;
+        }
+        let failures = self.results.iter().filter(|r| !r.is_healthy).count();
+        failures as f64 / self.results.len() as f64
+    }
+
+    pub fn latest(&self) -> Option<&HealthCheckResult> {
+        self.results.last()
+    }
+
+    pub fn result_count(&self) -> usize {
+        self.results.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Connection retry policy
+// ---------------------------------------------------------------------------
+
+/// Configuration for connection retry behaviour.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RetryPolicy {
+    pub max_retries: u32,
+    pub initial_delay_ms: u64,
+    pub max_delay_ms: u64,
+    pub backoff_factor: f64,
+}
+
+impl Default for RetryPolicy {
+    fn default() -> Self {
+        Self {
+            max_retries: 3,
+            initial_delay_ms: 1000,
+            max_delay_ms: 30000,
+            backoff_factor: 2.0,
+        }
+    }
+}
+
+impl RetryPolicy {
+    /// Compute the delay in milliseconds for the given attempt number (0-based).
+    pub fn delay_for_attempt(&self, attempt: u32) -> u64 {
+        let delay = self.initial_delay_ms as f64 * self.backoff_factor.powi(attempt as i32);
+        (delay as u64).min(self.max_delay_ms)
+    }
+
+    /// Returns `true` if another retry is allowed at the given attempt number.
+    pub fn should_retry(&self, attempt: u32) -> bool {
+        attempt < self.max_retries
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bandwidth estimation
+// ---------------------------------------------------------------------------
+
+/// Simple bandwidth estimator based on transfer samples.
+pub struct BandwidthEstimator {
+    samples: Vec<(u64, u64)>, // (bytes, duration_ms)
+    max_samples: usize,
+}
+
+impl BandwidthEstimator {
+    pub fn new(max_samples: usize) -> Self {
+        Self { samples: Vec::new(), max_samples }
+    }
+
+    pub fn record_transfer(&mut self, bytes: u64, duration_ms: u64) {
+        if duration_ms == 0 {
+            return;
+        }
+        self.samples.push((bytes, duration_ms));
+        if self.samples.len() > self.max_samples {
+            self.samples.remove(0);
+        }
+    }
+
+    /// Returns estimated bytes per second, or `None` if no samples exist.
+    pub fn estimated_bps(&self) -> Option<u64> {
+        if self.samples.is_empty() {
+            return None;
+        }
+        let total_bytes: u64 = self.samples.iter().map(|(b, _)| *b).sum();
+        let total_ms: u64 = self.samples.iter().map(|(_, d)| *d).sum();
+        if total_ms == 0 {
+            return None;
+        }
+        Some(total_bytes * 1000 / total_ms)
+    }
+
+    pub fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Connection pool management
+// ---------------------------------------------------------------------------
+
+/// A pool of named remote connections with their states.
+pub struct ConnectionPool {
+    connections: Vec<(String, ConnectionState)>,
+    max_connections: usize,
+}
+
+impl ConnectionPool {
+    pub fn new(max_connections: usize) -> Self {
+        Self { connections: Vec::new(), max_connections }
+    }
+
+    pub fn add(&mut self, name: String) -> Result<(), RemoteError> {
+        if self.connections.len() >= self.max_connections {
+            return Err(RemoteError::Other("connection pool full".into()));
+        }
+        self.connections.push((name, ConnectionState::Disconnected));
+        Ok(())
+    }
+
+    pub fn connect(&mut self, name: &str) -> Result<(), RemoteError> {
+        for (n, state) in &mut self.connections {
+            if n == name {
+                *state = ConnectionState::Connected;
+                return Ok(());
+            }
+        }
+        Err(RemoteError::NotConnected)
+    }
+
+    pub fn disconnect(&mut self, name: &str) {
+        for (n, state) in &mut self.connections {
+            if n == name {
+                *state = ConnectionState::Disconnected;
+            }
+        }
+    }
+
+    pub fn active_count(&self) -> usize {
+        self.connections.iter().filter(|(_, s)| *s == ConnectionState::Connected).count()
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.connections.len()
+    }
+
+    pub fn get_state(&self, name: &str) -> Option<&ConnectionState> {
+        self.connections.iter().find(|(n, _)| n == name).map(|(_, s)| s)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -740,5 +936,67 @@ mod tests {
         assert!(!svc.get_history().is_empty());
         svc.clear_history();
         assert!(svc.get_history().is_empty());
+    }
+
+    #[test]
+    fn health_monitor_average_and_failure_rate() {
+        let mut monitor = ConnectionHealthMonitor::new(10);
+        assert!(monitor.average_latency().is_none());
+        assert_eq!(monitor.failure_rate(), 0.0);
+        monitor.record(HealthCheckResult { latency_ms: 100, is_healthy: true, message: "ok".into() });
+        monitor.record(HealthCheckResult { latency_ms: 200, is_healthy: false, message: "timeout".into() });
+        assert_eq!(monitor.average_latency(), Some(150));
+        assert!((monitor.failure_rate() - 0.5).abs() < f64::EPSILON);
+        assert_eq!(monitor.result_count(), 2);
+        assert!(!monitor.latest().unwrap().is_healthy);
+    }
+
+    #[test]
+    fn health_check_result_display() {
+        let r = HealthCheckResult { latency_ms: 50, is_healthy: true, message: "ok".into() };
+        let s = r.to_string();
+        assert!(s.contains("healthy"));
+        assert!(s.contains("50ms"));
+    }
+
+    #[test]
+    fn retry_policy_delays() {
+        let policy = RetryPolicy::default();
+        assert!(policy.should_retry(0));
+        assert!(policy.should_retry(2));
+        assert!(!policy.should_retry(3));
+        assert_eq!(policy.delay_for_attempt(0), 1000);
+        assert_eq!(policy.delay_for_attempt(1), 2000);
+        // Capped at max_delay_ms
+        let big = policy.delay_for_attempt(100);
+        assert!(big <= policy.max_delay_ms);
+    }
+
+    #[test]
+    fn bandwidth_estimator_basic() {
+        let mut est = BandwidthEstimator::new(5);
+        assert!(est.estimated_bps().is_none());
+        est.record_transfer(1000, 100); // 10,000 bytes/sec
+        assert_eq!(est.estimated_bps(), Some(10000));
+        est.record_transfer(0, 0); // ignored
+        assert_eq!(est.sample_count(), 1);
+        est.record_transfer(2000, 200);
+        assert_eq!(est.estimated_bps(), Some(10000));
+    }
+
+    #[test]
+    fn connection_pool_lifecycle() {
+        let mut pool = ConnectionPool::new(2);
+        assert!(pool.add("host1".into()).is_ok());
+        assert!(pool.add("host2".into()).is_ok());
+        assert!(pool.add("host3".into()).is_err());
+        assert_eq!(pool.total_count(), 2);
+        assert_eq!(pool.active_count(), 0);
+        assert!(pool.connect("host1").is_ok());
+        assert_eq!(pool.active_count(), 1);
+        assert_eq!(*pool.get_state("host1").unwrap(), ConnectionState::Connected);
+        pool.disconnect("host1");
+        assert_eq!(pool.active_count(), 0);
+        assert!(pool.connect("nonexistent").is_err());
     }
 }

@@ -1072,4 +1072,98 @@ mod tests {
         assert_eq!(cfg.bg_for_kind(DocumentHighlightKind::Write), cfg.write_bg);
         assert_eq!(cfg.bg_for_kind(DocumentHighlightKind::Text), cfg.text_bg);
     }
+
+    #[test]
+    fn categorize_symbol_keywords() {
+        assert_eq!(categorize_symbol("fn"), SymbolCategory::Keyword);
+        assert_eq!(categorize_symbol("let"), SymbolCategory::Keyword);
+        assert_eq!(categorize_symbol("return"), SymbolCategory::Keyword);
+    }
+
+    #[test]
+    fn categorize_symbol_types_and_variables() {
+        assert_eq!(categorize_symbol("MyStruct"), SymbolCategory::Type);
+        assert_eq!(categorize_symbol("my_var"), SymbolCategory::Variable);
+        assert_eq!(categorize_symbol("123"), SymbolCategory::Literal);
+    }
+
+    #[test]
+    fn symbol_category_display() {
+        assert_eq!(SymbolCategory::Variable.to_string(), "variable");
+        assert_eq!(SymbolCategory::Function.to_string(), "function");
+        assert_eq!(SymbolCategory::Type.to_string(), "type");
+        assert_eq!(SymbolCategory::Keyword.to_string(), "keyword");
+        assert_eq!(SymbolCategory::Literal.to_string(), "literal");
+        assert_eq!(SymbolCategory::Unknown.to_string(), "unknown");
+    }
+
+    #[test]
+    fn prioritized_highlight_sorting() {
+        let mut phs = vec![
+            PrioritizedHighlight {
+                highlight: DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+                priority: HighlightPriority::LOW,
+            },
+            PrioritizedHighlight {
+                highlight: DocumentHighlight::new(1, 10, 15, DocumentHighlightKind::Read),
+                priority: HighlightPriority::HIGH,
+            },
+            PrioritizedHighlight {
+                highlight: DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Write),
+                priority: HighlightPriority::NORMAL,
+            },
+        ];
+        sort_by_priority(&mut phs);
+        assert_eq!(phs[0].priority, HighlightPriority::HIGH);
+        assert_eq!(phs[1].priority, HighlightPriority::NORMAL);
+        assert_eq!(phs[2].priority, HighlightPriority::LOW);
+    }
+
+    #[test]
+    fn multi_word_tracker_operations() {
+        let mut tracker = MultiWordTracker::new();
+        assert_eq!(tracker.word_count(), 0);
+        assert_eq!(tracker.total_highlights(), 0);
+
+        let mut set1 = HighlightSet::new();
+        set1.push(DocumentHighlight::new(1, 1, 4, DocumentHighlightKind::Text));
+        set1.push(DocumentHighlight::new(2, 1, 4, DocumentHighlightKind::Read));
+        tracker.set_word("foo".to_string(), set1);
+        assert_eq!(tracker.word_count(), 1);
+        assert_eq!(tracker.total_highlights(), 2);
+        assert!(tracker.get_word("foo").is_some());
+        assert!(tracker.get_word("bar").is_none());
+
+        assert!(tracker.remove_word("foo"));
+        assert!(!tracker.remove_word("foo"));
+        assert_eq!(tracker.word_count(), 0);
+    }
+
+    #[test]
+    fn multi_word_tracker_replace_and_clear() {
+        let mut tracker = MultiWordTracker::new();
+        let set1 = HighlightSet::from_highlights(vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+        ]);
+        tracker.set_word("x".to_string(), set1);
+        assert_eq!(tracker.total_highlights(), 1);
+
+        let set2 = HighlightSet::from_highlights(vec![
+            DocumentHighlight::new(1, 1, 5, DocumentHighlightKind::Text),
+            DocumentHighlight::new(2, 1, 5, DocumentHighlightKind::Text),
+        ]);
+        tracker.set_word("x".to_string(), set2);
+        assert_eq!(tracker.word_count(), 1);
+        assert_eq!(tracker.total_highlights(), 2);
+
+        tracker.clear();
+        assert_eq!(tracker.word_count(), 0);
+    }
+
+    #[test]
+    fn highlight_priority_ordering() {
+        assert!(HighlightPriority::HIGH > HighlightPriority::NORMAL);
+        assert!(HighlightPriority::NORMAL > HighlightPriority::LOW);
+        assert_eq!(HighlightPriority(50), HighlightPriority::NORMAL);
+    }
 }

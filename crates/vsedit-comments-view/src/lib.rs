@@ -321,6 +321,76 @@ impl std::fmt::Display for CommentReaction {
     }
 }
 
+/// Track resolution state changes for a comment thread.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolutionEvent {
+    pub thread_id: String,
+    pub resolved: bool,
+    pub timestamp: u64,
+    pub actor: String,
+}
+
+impl CommentsService {
+    /// Search all threads for comments whose body contains the query string.
+    pub fn search_comments(&self, query: &str) -> Vec<(&CommentThread, &Comment)> {
+        let lower_query = query.to_ascii_lowercase();
+        let mut results = Vec::new();
+        for thread in &self.threads {
+            for comment in &thread.comments {
+                if comment.body.to_ascii_lowercase().contains(&lower_query) {
+                    results.push((thread, comment));
+                }
+            }
+        }
+        results
+    }
+
+    /// Compute aggregate statistics for all threads.
+    pub fn compute_statistics(&self) -> CommentStatistics {
+        let total_threads = self.threads.len() as u32;
+        let resolved_threads = self.threads.iter().filter(|t| t.resolved).count() as u32;
+        let total_comments: u32 = self.threads.iter().map(|t| t.comments.len() as u32).sum();
+        let total_reactions: u32 = self.threads.iter().map(|t| t.total_reactions()).sum();
+        let unique_authors = self.all_authors().len() as u32;
+        CommentStatistics {
+            total_threads,
+            resolved_threads,
+            unresolved_threads: total_threads - resolved_threads,
+            total_comments,
+            total_reactions,
+            unique_authors,
+        }
+    }
+
+    /// Sort comments within each thread by timestamp.
+    pub fn sort_comments_in_threads(&mut self) {
+        for thread in &mut self.threads {
+            thread.comments.sort_by_key(|c| c.timestamp);
+        }
+    }
+}
+
+/// Aggregate statistics for a comments service.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommentStatistics {
+    pub total_threads: u32,
+    pub resolved_threads: u32,
+    pub unresolved_threads: u32,
+    pub total_comments: u32,
+    pub total_reactions: u32,
+    pub unique_authors: u32,
+}
+
+impl fmt::Display for CommentStatistics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "threads={}, comments={}, resolved={}",
+            self.total_threads, self.total_comments, self.resolved_threads
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -778,6 +848,97 @@ mod tests {
         let c3 = make_comment(2, "alice", "hi", 10);
         assert_eq!(c1, c2);
         assert_ne!(c1, c3);
+    }
+
+    #[test]
+    fn test_search_comments_found() {
+        let mut svc = CommentsService::new();
+        let mut t1 = make_thread("t1", "file.rs", 1);
+        t1.comments.push(make_comment(1, "alice", "fix the bug", 10));
+        t1.comments.push(make_comment(2, "bob", "looks good", 20));
+        svc.add_thread(t1);
+        let results = svc.search_comments("bug");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].1.author, "alice");
+    }
+
+    #[test]
+    fn test_search_comments_case_insensitive() {
+        let mut svc = CommentsService::new();
+        let mut t1 = make_thread("t1", "file.rs", 1);
+        t1.comments.push(make_comment(1, "alice", "LGTM", 10));
+        svc.add_thread(t1);
+        let results = svc.search_comments("lgtm");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_search_comments_no_match() {
+        let mut svc = CommentsService::new();
+        let mut t1 = make_thread("t1", "file.rs", 1);
+        t1.comments.push(make_comment(1, "alice", "hello", 10));
+        svc.add_thread(t1);
+        let results = svc.search_comments("zzz_not_found");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_compute_statistics() {
+        let mut svc = CommentsService::new();
+        let mut t1 = make_thread("t1", "a.rs", 1);
+        t1.comments.push(make_comment(1, "alice", "hi", 10));
+        t1.comments.push(make_comment(2, "bob", "hey", 20));
+        t1.resolved = true;
+        let mut t2 = make_thread("t2", "b.rs", 2);
+        t2.comments.push(make_comment(3, "alice", "yo", 30));
+        svc.add_thread(t1);
+        svc.add_thread(t2);
+        let stats = svc.compute_statistics();
+        assert_eq!(stats.total_threads, 2);
+        assert_eq!(stats.resolved_threads, 1);
+        assert_eq!(stats.unresolved_threads, 1);
+        assert_eq!(stats.total_comments, 3);
+        assert_eq!(stats.unique_authors, 2);
+    }
+
+    #[test]
+    fn test_statistics_display() {
+        let stats = CommentStatistics {
+            total_threads: 5,
+            resolved_threads: 3,
+            unresolved_threads: 2,
+            total_comments: 12,
+            total_reactions: 7,
+            unique_authors: 4,
+        };
+        let s = format!("{}", stats);
+        assert!(s.contains("threads=5"));
+        assert!(s.contains("comments=12"));
+    }
+
+    #[test]
+    fn test_sort_comments_in_threads() {
+        let mut svc = CommentsService::new();
+        let mut t1 = make_thread("t1", "file.rs", 1);
+        t1.comments.push(make_comment(2, "bob", "second", 200));
+        t1.comments.push(make_comment(1, "alice", "first", 100));
+        svc.add_thread(t1);
+        svc.sort_comments_in_threads();
+        let t = svc.get_thread("t1").unwrap();
+        assert_eq!(t.comments[0].timestamp, 100);
+        assert_eq!(t.comments[1].timestamp, 200);
+    }
+
+    #[test]
+    fn test_resolution_event_struct() {
+        let evt = ResolutionEvent {
+            thread_id: "t1".to_string(),
+            resolved: true,
+            timestamp: 12345,
+            actor: "alice".to_string(),
+        };
+        assert_eq!(evt.thread_id, "t1");
+        assert!(evt.resolved);
     }
 
     #[test]

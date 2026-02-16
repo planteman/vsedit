@@ -374,6 +374,94 @@ impl InlineChatHistory {
     }
 }
 
+/// Tracks the state of a streaming response.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StreamingState {
+    pub chunks_received: usize,
+    pub total_bytes: usize,
+    pub is_complete: bool,
+}
+
+impl StreamingState {
+    pub fn new() -> Self {
+        Self {
+            chunks_received: 0,
+            total_bytes: 0,
+            is_complete: false,
+        }
+    }
+
+    pub fn add_chunk(&mut self, bytes: usize) {
+        self.chunks_received += 1;
+        self.total_bytes += bytes;
+    }
+
+    pub fn complete(&mut self) {
+        self.is_complete = true;
+    }
+}
+
+impl Default for StreamingState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A thread in a conversation, grouping related messages.
+#[derive(Debug, Clone)]
+pub struct ConversationThread {
+    pub thread_id: String,
+    pub parent_prompt: String,
+    pub follow_ups: Vec<InlineChatRequest>,
+}
+
+impl ConversationThread {
+    pub fn new(thread_id: impl Into<String>, parent_prompt: impl Into<String>) -> Self {
+        Self {
+            thread_id: thread_id.into(),
+            parent_prompt: parent_prompt.into(),
+            follow_ups: Vec::new(),
+        }
+    }
+
+    pub fn add_follow_up(&mut self, request: InlineChatRequest) {
+        self.follow_ups.push(request);
+    }
+
+    pub fn follow_up_count(&self) -> usize {
+        self.follow_ups.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.follow_ups.is_empty()
+    }
+}
+
+/// Search results from chat history.
+#[derive(Debug, Clone)]
+pub struct ChatSearchResult<'a> {
+    pub index: usize,
+    pub entry: &'a InlineChatHistoryEntry,
+}
+
+/// Search chat history entries whose prompt or response text contains the query.
+pub fn search_history_entries<'a>(
+    history: &'a InlineChatHistory,
+    query: &str,
+) -> Vec<ChatSearchResult<'a>> {
+    let q = query.to_lowercase();
+    history
+        .entries()
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| {
+            e.request.prompt.to_lowercase().contains(&q)
+                || e.response.text.to_lowercase().contains(&q)
+        })
+        .map(|(index, entry)| ChatSearchResult { index, entry })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -714,5 +802,62 @@ mod tests {
         let a = sample_request();
         let b = sample_request();
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn streaming_state_tracking() {
+        let mut ss = StreamingState::new();
+        assert_eq!(ss.chunks_received, 0);
+        assert_eq!(ss.total_bytes, 0);
+        assert!(!ss.is_complete);
+        ss.add_chunk(100);
+        ss.add_chunk(200);
+        assert_eq!(ss.chunks_received, 2);
+        assert_eq!(ss.total_bytes, 300);
+        ss.complete();
+        assert!(ss.is_complete);
+    }
+
+    #[test]
+    fn conversation_thread_management() {
+        let mut thread = ConversationThread::new("t1", "initial prompt");
+        assert!(thread.is_empty());
+        assert_eq!(thread.follow_up_count(), 0);
+        thread.add_follow_up(sample_request());
+        assert_eq!(thread.follow_up_count(), 1);
+        assert!(!thread.is_empty());
+        assert_eq!(thread.thread_id, "t1");
+        assert_eq!(thread.parent_prompt, "initial prompt");
+    }
+
+    #[test]
+    fn search_history_entries_by_response() {
+        let mut h = InlineChatHistory::new();
+        h.push(
+            sample_request(),
+            InlineChatResponse { text: "optimized result".into(), edits: Vec::new() },
+        );
+        h.push(
+            InlineChatRequest { prompt: "other".into(), selection_start_line: 1, selection_end_line: 2, uri: "x.rs".into() },
+            InlineChatResponse::empty(),
+        );
+        let results = search_history_entries(&h, "optimized");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].index, 0);
+    }
+
+    #[test]
+    fn search_history_entries_no_match() {
+        let mut h = InlineChatHistory::new();
+        h.push(sample_request(), sample_response());
+        let results = search_history_entries(&h, "nonexistent");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn streaming_state_default() {
+        let ss = StreamingState::default();
+        assert_eq!(ss.chunks_received, 0);
+        assert!(!ss.is_complete);
     }
 }

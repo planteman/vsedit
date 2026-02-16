@@ -427,6 +427,110 @@ impl WorkspaceTrustService {
     }
 }
 
+/// Statistics about a workspace configuration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceStats {
+    /// Total number of folders.
+    pub folder_count: usize,
+    /// Total number of settings.
+    pub setting_count: usize,
+    /// Number of unique setting prefixes (e.g. "editor" in "editor.tabSize").
+    pub setting_prefix_count: usize,
+    /// Whether the workspace has a name set.
+    pub has_name: bool,
+    /// Whether this is a multi-root workspace.
+    pub is_multi_root: bool,
+}
+
+impl WorkspaceConfiguration {
+    /// Compute summary statistics for this workspace.
+    pub fn stats(&self) -> WorkspaceStats {
+        let mut prefixes = std::collections::HashSet::new();
+        for key in self.settings.keys() {
+            if let Some(prefix) = key.split('.').next() {
+                prefixes.insert(prefix.to_string());
+            }
+        }
+        WorkspaceStats {
+            folder_count: self.folders.len(),
+            setting_count: self.settings.len(),
+            setting_prefix_count: prefixes.len(),
+            has_name: self.name.is_some(),
+            is_multi_root: self.is_multi_root(),
+        }
+    }
+
+    /// Search across all folder names and URIs for a substring match.
+    pub fn search_folders(&self, query: &str) -> Vec<&WorkspaceFolder> {
+        let q = query.to_lowercase();
+        self.folders
+            .iter()
+            .filter(|f| f.name.to_lowercase().contains(&q) || f.uri.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    /// Serialize the workspace configuration to a simple summary string.
+    pub fn serialize_summary(&self) -> String {
+        let mut parts = Vec::new();
+        if let Some(ref name) = self.name {
+            parts.push(format!("name={}", name));
+        }
+        parts.push(format!("folders={}", self.folders.len()));
+        parts.push(format!("settings={}", self.settings.len()));
+        for folder in &self.folders {
+            parts.push(format!("folder[{}]={}", folder.index, folder.uri));
+        }
+        parts.join(";")
+    }
+
+    /// Deserialize a summary string back into basic workspace info.
+    /// Returns (name, folder_count, setting_count).
+    pub fn parse_summary(summary: &str) -> (Option<String>, usize, usize) {
+        let mut name = None;
+        let mut folders = 0usize;
+        let mut settings = 0usize;
+        for part in summary.split(';') {
+            if let Some(val) = part.strip_prefix("name=") {
+                name = Some(val.to_string());
+            } else if let Some(val) = part.strip_prefix("folders=") {
+                folders = val.parse().unwrap_or(0);
+            } else if let Some(val) = part.strip_prefix("settings=") {
+                settings = val.parse().unwrap_or(0);
+            }
+        }
+        (name, folders, settings)
+    }
+
+    /// Reorder folders by moving the folder at `from` to position `to`.
+    /// Returns an error if either index is out of range.
+    pub fn reorder_folder(&mut self, from: usize, to: usize) -> Result<(), WorkspaceError> {
+        if from >= self.folders.len() {
+            return Err(WorkspaceError::FolderIndexOutOfRange(from as u32));
+        }
+        if to >= self.folders.len() {
+            return Err(WorkspaceError::FolderIndexOutOfRange(to as u32));
+        }
+        let folder = self.folders.remove(from);
+        self.folders.insert(to, folder);
+        for (i, f) in self.folders.iter_mut().enumerate() {
+            f.index = i as u32;
+        }
+        Ok(())
+    }
+
+    /// Return the folder with the highest index (last added).
+    pub fn last_folder(&self) -> Option<&WorkspaceFolder> {
+        self.folders.last()
+    }
+
+    /// Return folders sorted by name alphabetically.
+    pub fn folders_sorted_by_name(&self) -> Vec<&WorkspaceFolder> {
+        let mut sorted: Vec<&WorkspaceFolder> = self.folders.iter().collect();
+        sorted.sort_by(|a, b| a.name.cmp(&b.name));
+        sorted
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -705,5 +809,94 @@ mod tests {
             .unwrap();
         let cloned = config.clone();
         assert_eq!(config, cloned);
+    }
+
+    #[test]
+    fn workspace_stats_computation() {
+        let config = WorkspaceConfigurationBuilder::new()
+            .name("test")
+            .folder("/a", "alpha")
+            .folder("/b", "beta")
+            .setting("editor.tabSize", "4")
+            .setting("editor.fontSize", "14")
+            .setting("terminal.shell", "/bin/bash")
+            .build()
+            .unwrap();
+        let stats = config.stats();
+        assert_eq!(stats.folder_count, 2);
+        assert_eq!(stats.setting_count, 3);
+        assert_eq!(stats.setting_prefix_count, 2);
+        assert!(stats.has_name);
+        assert!(stats.is_multi_root);
+    }
+
+    #[test]
+    fn search_folders_by_name_and_uri() {
+        let mut ws = WorkspaceConfiguration::new();
+        ws.add_folder("/home/user/project".into(), "my-project".into());
+        ws.add_folder("/home/user/lib".into(), "library".into());
+        ws.add_folder("/opt/tools".into(), "tools".into());
+        let results = ws.search_folders("project");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "my-project");
+        let results_uri = ws.search_folders("/home");
+        assert_eq!(results_uri.len(), 2);
+        assert!(ws.search_folders("nonexistent").is_empty());
+    }
+
+    #[test]
+    fn serialize_and_parse_summary() {
+        let config = WorkspaceConfigurationBuilder::new()
+            .name("demo")
+            .folder("/src", "source")
+            .setting("k", "v")
+            .build()
+            .unwrap();
+        let summary = config.serialize_summary();
+        assert!(summary.contains("name=demo"));
+        assert!(summary.contains("folders=1"));
+        let (name, folders, settings) = WorkspaceConfiguration::parse_summary(&summary);
+        assert_eq!(name.as_deref(), Some("demo"));
+        assert_eq!(folders, 1);
+        assert_eq!(settings, 1);
+    }
+
+    #[test]
+    fn reorder_folder_moves_correctly() {
+        let mut ws = WorkspaceConfiguration::new();
+        ws.add_folder("/a".into(), "alpha".into());
+        ws.add_folder("/b".into(), "beta".into());
+        ws.add_folder("/c".into(), "gamma".into());
+        ws.reorder_folder(2, 0).unwrap();
+        assert_eq!(ws.folders[0].uri, "/c");
+        assert_eq!(ws.folders[1].uri, "/a");
+        assert_eq!(ws.folders[0].index, 0);
+        assert_eq!(ws.folders[1].index, 1);
+        assert!(ws.reorder_folder(10, 0).is_err());
+    }
+
+    #[test]
+    fn last_folder_and_sorted_by_name() {
+        let mut ws = WorkspaceConfiguration::new();
+        assert!(ws.last_folder().is_none());
+        ws.add_folder("/z".into(), "zulu".into());
+        ws.add_folder("/a".into(), "alpha".into());
+        ws.add_folder("/m".into(), "mike".into());
+        assert_eq!(ws.last_folder().unwrap().name, "mike");
+        let sorted = ws.folders_sorted_by_name();
+        assert_eq!(sorted[0].name, "alpha");
+        assert_eq!(sorted[1].name, "mike");
+        assert_eq!(sorted[2].name, "zulu");
+    }
+
+    #[test]
+    fn stats_empty_workspace() {
+        let ws = WorkspaceConfiguration::new();
+        let stats = ws.stats();
+        assert_eq!(stats.folder_count, 0);
+        assert_eq!(stats.setting_count, 0);
+        assert_eq!(stats.setting_prefix_count, 0);
+        assert!(!stats.has_name);
+        assert!(!stats.is_multi_root);
     }
 }

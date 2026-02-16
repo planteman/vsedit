@@ -505,6 +505,106 @@ impl TokenizationState {
     }
 }
 
+/// Statistics about tokens in a line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TokenStatistics {
+    pub total_tokens: usize,
+    pub comment_count: usize,
+    pub string_count: usize,
+    pub regexp_count: usize,
+    pub other_count: usize,
+}
+
+/// Computes token type statistics for a `LineTokens`.
+pub fn compute_token_statistics(line_tokens: &LineTokens) -> TokenStatistics {
+    let mut comment_count = 0;
+    let mut string_count = 0;
+    let mut regexp_count = 0;
+    let mut other_count = 0;
+    for t in &line_tokens.tokens {
+        match t.metadata.token_type() {
+            StandardTokenType::Comment => comment_count += 1,
+            StandardTokenType::String => string_count += 1,
+            StandardTokenType::RegExp => regexp_count += 1,
+            StandardTokenType::Other => other_count += 1,
+        }
+    }
+    TokenStatistics {
+        total_tokens: line_tokens.count(),
+        comment_count,
+        string_count,
+        regexp_count,
+        other_count,
+    }
+}
+
+/// Merges overlapping or adjacent token ranges, keeping the first token's metadata.
+pub fn merge_token_ranges(tokens: &[Token]) -> Vec<Token> {
+    if tokens.is_empty() {
+        return Vec::new();
+    }
+    let mut result = vec![tokens[0]];
+    for t in &tokens[1..] {
+        let last = result.last().unwrap();
+        if t.start_offset == last.start_offset {
+            continue;
+        }
+        result.push(*t);
+    }
+    result
+}
+
+/// Maps a `StandardTokenType` to a color name string.
+pub fn token_type_color_name(tt: StandardTokenType) -> &'static str {
+    match tt {
+        StandardTokenType::Comment => "comment.foreground",
+        StandardTokenType::String => "string.foreground",
+        StandardTokenType::RegExp => "regexp.foreground",
+        StandardTokenType::Other => "editor.foreground",
+    }
+}
+
+/// A simple tokenization cache keyed by line number.
+#[derive(Debug, Clone, Default)]
+pub struct TokenizationCache {
+    entries: Vec<Option<(LineTokens, TokenizationState)>>,
+}
+
+impl TokenizationCache {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    pub fn get(&self, line: usize) -> Option<&(LineTokens, TokenizationState)> {
+        self.entries.get(line).and_then(|e| e.as_ref())
+    }
+
+    pub fn set(&mut self, line: usize, tokens: LineTokens, state: TokenizationState) {
+        if line >= self.entries.len() {
+            self.entries.resize_with(line + 1, || None);
+        }
+        self.entries[line] = Some((tokens, state));
+    }
+
+    pub fn invalidate(&mut self, from_line: usize) {
+        for i in from_line..self.entries.len() {
+            self.entries[i] = None;
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn cached_line_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.is_some()).count()
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.entries.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -715,5 +815,80 @@ mod tests {
         assert_eq!(s.to_string(), "State(0)");
         let s2 = TokenizationState(42);
         assert!(!s2.is_initial());
+    }
+
+    #[test]
+    fn token_statistics_computation() {
+        let comment_meta = TokenMetadata::new(0, StandardTokenType::Comment, FontStyle::NONE, 0, 0);
+        let string_meta = TokenMetadata::new(0, StandardTokenType::String, FontStyle::NONE, 0, 0);
+        let other_meta = TokenMetadata::new(0, StandardTokenType::Other, FontStyle::NONE, 0, 0);
+        let lt = LineTokens::new(vec![
+            Token { start_offset: 0, metadata: comment_meta },
+            Token { start_offset: 5, metadata: string_meta },
+            Token { start_offset: 10, metadata: comment_meta },
+            Token { start_offset: 15, metadata: other_meta },
+        ]);
+        let stats = compute_token_statistics(&lt);
+        assert_eq!(stats.total_tokens, 4);
+        assert_eq!(stats.comment_count, 2);
+        assert_eq!(stats.string_count, 1);
+        assert_eq!(stats.other_count, 1);
+        assert_eq!(stats.regexp_count, 0);
+    }
+
+    #[test]
+    fn merge_token_ranges_deduplicates() {
+        let meta = TokenMetadata(0);
+        let tokens = vec![
+            Token { start_offset: 0, metadata: meta },
+            Token { start_offset: 0, metadata: TokenMetadata(1) },
+            Token { start_offset: 5, metadata: meta },
+        ];
+        let merged = merge_token_ranges(&tokens);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].start_offset, 0);
+        assert_eq!(merged[1].start_offset, 5);
+    }
+
+    #[test]
+    fn token_type_color_mapping() {
+        assert_eq!(token_type_color_name(StandardTokenType::Comment), "comment.foreground");
+        assert_eq!(token_type_color_name(StandardTokenType::String), "string.foreground");
+        assert_eq!(token_type_color_name(StandardTokenType::RegExp), "regexp.foreground");
+        assert_eq!(token_type_color_name(StandardTokenType::Other), "editor.foreground");
+    }
+
+    #[test]
+    fn tokenization_cache_set_and_get() {
+        let mut cache = TokenizationCache::new();
+        let lt = LineTokens::new(vec![Token { start_offset: 0, metadata: TokenMetadata(0) }]);
+        let state = TokenizationState::initial();
+        cache.set(0, lt.clone(), state.clone());
+        cache.set(2, lt.clone(), state.clone());
+        assert!(cache.get(0).is_some());
+        assert!(cache.get(1).is_none());
+        assert!(cache.get(2).is_some());
+        assert_eq!(cache.cached_line_count(), 2);
+    }
+
+    #[test]
+    fn tokenization_cache_invalidate() {
+        let mut cache = TokenizationCache::new();
+        let lt = LineTokens::new(vec![Token { start_offset: 0, metadata: TokenMetadata(0) }]);
+        let state = TokenizationState::initial();
+        cache.set(0, lt.clone(), state.clone());
+        cache.set(1, lt.clone(), state.clone());
+        cache.set(2, lt.clone(), state.clone());
+        assert_eq!(cache.cached_line_count(), 3);
+        cache.invalidate(1);
+        assert_eq!(cache.cached_line_count(), 1);
+        assert!(cache.get(0).is_some());
+        assert!(cache.get(1).is_none());
+    }
+
+    #[test]
+    fn merge_token_ranges_empty() {
+        let merged = merge_token_ranges(&[]);
+        assert!(merged.is_empty());
     }
 }

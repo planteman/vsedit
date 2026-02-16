@@ -418,6 +418,140 @@ pub fn register() {
     // Registration will connect RPC handlers when extension host starts
 }
 
+// ── Cell Serialization Helpers ──
+
+/// Serialize a notebook cell to a compact JSON string.
+pub fn serialize_cell(cell: &NotebookCell) -> String {
+    serde_json::to_string(cell).unwrap_or_default()
+}
+
+/// Deserialize a notebook cell from a JSON string.
+pub fn deserialize_cell(json: &str) -> Result<NotebookCell, String> {
+    serde_json::from_str(json).map_err(|e| e.to_string())
+}
+
+/// Serialize all cells of a document to a JSON array string.
+pub fn serialize_cells(doc: &NotebookDocument) -> String {
+    serde_json::to_string(&doc.cells).unwrap_or_default()
+}
+
+// ── Cell Metadata Management ──
+
+/// Metadata associated with a notebook cell for extension use.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CellMetadata {
+    pub cell_index: u32,
+    pub execution_count: Option<u32>,
+    pub tags: Vec<String>,
+    pub custom: std::collections::HashMap<String, String>,
+}
+
+impl CellMetadata {
+    /// Create empty metadata for a given cell index.
+    pub fn new(cell_index: u32) -> Self {
+        Self {
+            cell_index,
+            execution_count: None,
+            tags: Vec::new(),
+            custom: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Add a tag to this cell's metadata. Duplicates are ignored.
+    pub fn add_tag(&mut self, tag: impl Into<String>) {
+        let tag = tag.into();
+        if !self.tags.contains(&tag) {
+            self.tags.push(tag);
+        }
+    }
+
+    /// Check whether a specific tag is present.
+    pub fn has_tag(&self, tag: &str) -> bool {
+        self.tags.iter().any(|t| t == tag)
+    }
+
+    /// Set a custom key-value pair.
+    pub fn set_custom(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.custom.insert(key.into(), value.into());
+    }
+}
+
+// ── Notebook Document Diff Computation ──
+
+/// Represents a single change between two notebook documents.
+#[derive(Debug, Clone, PartialEq)]
+pub enum CellDiff {
+    Added { index: u32 },
+    Removed { index: u32 },
+    ContentChanged { index: u32, old_len: usize, new_len: usize },
+}
+
+/// Compute the cell-level differences between two notebook documents.
+pub fn diff_documents(old: &NotebookDocument, new: &NotebookDocument) -> Vec<CellDiff> {
+    let mut diffs = Vec::new();
+    let max_len = old.cells.len().max(new.cells.len());
+    for i in 0..max_len {
+        match (old.cells.get(i), new.cells.get(i)) {
+            (None, Some(_)) => diffs.push(CellDiff::Added { index: i as u32 }),
+            (Some(_), None) => diffs.push(CellDiff::Removed { index: i as u32 }),
+            (Some(a), Some(b)) if a.content != b.content => {
+                diffs.push(CellDiff::ContentChanged {
+                    index: i as u32,
+                    old_len: a.content.len(),
+                    new_len: b.content.len(),
+                });
+            }
+            _ => {}
+        }
+    }
+    diffs
+}
+
+// ── Execution Order Tracking ──
+
+/// Tracks the execution order of notebook cells.
+#[derive(Debug, Clone)]
+pub struct ExecutionTracker {
+    order: Vec<u32>,
+}
+
+impl ExecutionTracker {
+    pub fn new() -> Self {
+        Self { order: Vec::new() }
+    }
+
+    /// Record that a cell at the given index was executed.
+    pub fn record_execution(&mut self, cell_index: u32) {
+        self.order.push(cell_index);
+    }
+
+    /// Return the execution order as a slice.
+    pub fn execution_order(&self) -> &[u32] {
+        &self.order
+    }
+
+    /// Return the number of executions recorded.
+    pub fn execution_count(&self) -> usize {
+        self.order.len()
+    }
+
+    /// Return the last executed cell index, if any.
+    pub fn last_executed(&self) -> Option<u32> {
+        self.order.last().copied()
+    }
+
+    /// Reset the execution history.
+    pub fn reset(&mut self) {
+        self.order.clear();
+    }
+}
+
+impl Default for ExecutionTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -757,5 +891,88 @@ mod tests {
         let s = format!("{k}");
         assert!(s.contains("py"));
         assert!(s.contains("Python 3"));
+    }
+
+    #[test]
+    fn serialize_and_deserialize_cell() {
+        let cell = NotebookCell {
+            index: 0,
+            kind: NotebookCellKind::Code,
+            language_id: "python".into(),
+            content: "x = 1".into(),
+            outputs: vec![],
+        };
+        let json = serialize_cell(&cell);
+        let back = deserialize_cell(&json).unwrap();
+        assert_eq!(cell, back);
+    }
+
+    #[test]
+    fn deserialize_cell_invalid_json() {
+        let result = deserialize_cell("not json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn cell_metadata_tags_and_custom() {
+        let mut meta = CellMetadata::new(0);
+        meta.add_tag("important");
+        meta.add_tag("important"); // duplicate ignored
+        meta.set_custom("author", "alice");
+        assert!(meta.has_tag("important"));
+        assert!(!meta.has_tag("other"));
+        assert_eq!(meta.tags.len(), 1);
+        assert_eq!(meta.custom.get("author").unwrap(), "alice");
+    }
+
+    #[test]
+    fn diff_documents_detects_changes() {
+        let old = NotebookDocumentBuilder::new()
+            .uri("file:///a.ipynb")
+            .add_code_cell("python", "x = 1")
+            .add_code_cell("python", "y = 2")
+            .build()
+            .unwrap();
+        let new = NotebookDocumentBuilder::new()
+            .uri("file:///a.ipynb")
+            .add_code_cell("python", "x = 1")
+            .add_code_cell("python", "y = 999")
+            .add_markup_cell("# Added")
+            .build()
+            .unwrap();
+        let diffs = diff_documents(&old, &new);
+        assert_eq!(diffs.len(), 2);
+        assert!(matches!(diffs[0], CellDiff::ContentChanged { index: 1, .. }));
+        assert!(matches!(diffs[1], CellDiff::Added { index: 2 }));
+    }
+
+    #[test]
+    fn execution_tracker_lifecycle() {
+        let mut tracker = ExecutionTracker::new();
+        assert_eq!(tracker.execution_count(), 0);
+        assert!(tracker.last_executed().is_none());
+        tracker.record_execution(0);
+        tracker.record_execution(1);
+        tracker.record_execution(0);
+        assert_eq!(tracker.execution_count(), 3);
+        assert_eq!(tracker.last_executed(), Some(0));
+        assert_eq!(tracker.execution_order(), &[0, 1, 0]);
+        tracker.reset();
+        assert_eq!(tracker.execution_count(), 0);
+    }
+
+    #[test]
+    fn serialize_cells_roundtrip() {
+        let doc = NotebookDocumentBuilder::new()
+            .uri("file:///nb.ipynb")
+            .add_code_cell("python", "a = 1")
+            .add_markup_cell("# Title")
+            .build()
+            .unwrap();
+        let json = serialize_cells(&doc);
+        let cells: Vec<NotebookCell> = serde_json::from_str(&json).unwrap();
+        assert_eq!(cells.len(), 2);
+        assert_eq!(cells[0].kind, NotebookCellKind::Code);
+        assert_eq!(cells[1].kind, NotebookCellKind::Markup);
     }
 }

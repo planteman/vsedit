@@ -402,6 +402,114 @@ pub fn compute_output_stats(panel: &OutputPanel) -> OutputStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Channel filtering, batch append, reordering, and export
+// ---------------------------------------------------------------------------
+
+impl OutputPanel {
+    /// Return indices of all visible channels.
+    pub fn visible_channel_indices(&self) -> Vec<usize> {
+        self.channels
+            .iter()
+            .enumerate()
+            .filter(|(_, ch)| ch.is_visible)
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Return indices of all hidden channels.
+    pub fn hidden_channel_indices(&self) -> Vec<usize> {
+        self.channels
+            .iter()
+            .enumerate()
+            .filter(|(_, ch)| !ch.is_visible)
+            .map(|(i, _)| i)
+            .collect()
+    }
+
+    /// Set visibility for a channel by index. Returns false if index is invalid.
+    pub fn set_channel_visibility(&mut self, index: usize, visible: bool) -> bool {
+        if let Some(ch) = self.channels.get_mut(index) {
+            ch.is_visible = visible;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Append multiple lines to a channel at once.
+    pub fn batch_append(&mut self, channel_index: usize, lines: &[&str]) -> bool {
+        if let Some(ch) = self.channels.get_mut(channel_index) {
+            for line in lines {
+                ch.content.push((*line).to_string());
+            }
+            if self.auto_scroll && channel_index == self.active_channel_index {
+                self.scroll_to_bottom();
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Swap the positions of two channels. Returns false if either index is invalid.
+    pub fn swap_channels(&mut self, a: usize, b: usize) -> bool {
+        if a >= self.channels.len() || b >= self.channels.len() {
+            return false;
+        }
+        self.channels.swap(a, b);
+        // Adjust active index if it was one of the swapped channels.
+        if self.active_channel_index == a {
+            self.active_channel_index = b;
+        } else if self.active_channel_index == b {
+            self.active_channel_index = a;
+        }
+        true
+    }
+
+    /// Move a channel from `from` index to `to` index, shifting others.
+    pub fn move_channel(&mut self, from: usize, to: usize) -> bool {
+        if from >= self.channels.len() || to >= self.channels.len() {
+            return false;
+        }
+        let ch = self.channels.remove(from);
+        self.channels.insert(to, ch);
+        // Reset active to the moved channel's new position if it was active.
+        if self.active_channel_index == from {
+            self.active_channel_index = to;
+        } else if from < self.active_channel_index && to >= self.active_channel_index {
+            self.active_channel_index = self.active_channel_index.saturating_sub(1);
+        } else if from > self.active_channel_index && to <= self.active_channel_index {
+            self.active_channel_index = (self.active_channel_index + 1).min(self.channels.len() - 1);
+        }
+        true
+    }
+
+    /// Export the content of the active channel as a single newline-joined string.
+    pub fn export_active_channel(&self) -> Option<String> {
+        self.active_channel().map(|ch| ch.content.join("\n"))
+    }
+
+    /// Export the content of a specific channel by index.
+    pub fn export_channel(&self, index: usize) -> Option<String> {
+        self.channels.get(index).map(|ch| ch.content.join("\n"))
+    }
+
+    /// Export all channels as a combined string with channel headers.
+    pub fn export_all_channels(&self) -> String {
+        let mut result = String::new();
+        for ch in &self.channels {
+            result.push_str(&format!("=== {} ===\n", ch.name));
+            for line in &ch.content {
+                result.push_str(line);
+                result.push('\n');
+            }
+            result.push('\n');
+        }
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -697,5 +805,77 @@ mod tests {
         assert_eq!(stats.channel_count, 1);
         assert_eq!(stats.total_lines, 0);
         assert_eq!(stats.total_bytes, 0);
+    }
+
+    #[test]
+    fn visible_channel_indices() {
+        let mut p = OutputPanel::new();
+        p.create_channel("A");
+        p.create_channel("B");
+        p.channels[1].is_visible = false;
+        assert_eq!(p.visible_channel_indices(), vec![0]);
+        assert_eq!(p.hidden_channel_indices(), vec![1]);
+    }
+
+    #[test]
+    fn set_channel_visibility() {
+        let mut p = OutputPanel::new();
+        p.create_channel("X");
+        assert!(p.set_channel_visibility(0, false));
+        assert!(!p.channels[0].is_visible);
+        assert!(!p.set_channel_visibility(99, true));
+    }
+
+    #[test]
+    fn batch_append_lines() {
+        let mut p = OutputPanel::new();
+        p.create_channel("Log");
+        assert!(p.batch_append(0, &["line1", "line2", "line3"]));
+        assert_eq!(p.channels[0].content.len(), 3);
+        assert!(!p.batch_append(5, &["nope"]));
+    }
+
+    #[test]
+    fn swap_channels_adjusts_active() {
+        let mut p = OutputPanel::new();
+        p.create_channel("A");
+        p.create_channel("B");
+        p.select_channel(0);
+        assert!(p.swap_channels(0, 1));
+        assert_eq!(p.active_channel_index, 1);
+        assert_eq!(p.channels[0].name, "B");
+        assert!(!p.swap_channels(0, 99));
+    }
+
+    #[test]
+    fn move_channel_reorders() {
+        let mut p = OutputPanel::new();
+        p.create_channel("A");
+        p.create_channel("B");
+        p.create_channel("C");
+        assert!(p.move_channel(0, 2));
+        assert_eq!(p.channel_names(), vec!["B", "C", "A"]);
+        assert!(!p.move_channel(0, 99));
+    }
+
+    #[test]
+    fn export_channel_content() {
+        let mut p = OutputPanel::new();
+        p.create_channel("Out");
+        p.append_line(0, "hello");
+        p.append_line(0, "world");
+        assert_eq!(p.export_active_channel(), Some("hello\nworld".to_string()));
+        assert_eq!(p.export_channel(0), Some("hello\nworld".to_string()));
+        assert!(p.export_channel(5).is_none());
+    }
+
+    #[test]
+    fn export_all_channels_format() {
+        let mut p = OutputPanel::new();
+        p.create_channel("A");
+        p.append_line(0, "data");
+        let exported = p.export_all_channels();
+        assert!(exported.contains("=== A ==="));
+        assert!(exported.contains("data"));
     }
 }

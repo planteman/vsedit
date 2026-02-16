@@ -470,6 +470,106 @@ impl<T> fmt::Debug for Event<T> {
 // Tests
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Event filtering by type tag
+// ---------------------------------------------------------------------------
+
+/// An event filter that selectively passes events based on a predicate.
+pub struct EventFilter<T> {
+    predicate: Box<dyn Fn(&T) -> bool + Send + Sync>,
+}
+
+impl<T> EventFilter<T> {
+    /// Create a new filter with the given predicate.
+    pub fn new(predicate: impl Fn(&T) -> bool + Send + Sync + 'static) -> Self {
+        Self { predicate: Box::new(predicate) }
+    }
+
+    /// Test whether the value passes the filter.
+    pub fn matches(&self, value: &T) -> bool {
+        (self.predicate)(value)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Event replay buffer
+// ---------------------------------------------------------------------------
+
+/// A fixed-capacity ring buffer that stores the most recent events for replay.
+pub struct EventReplayBuffer<T> {
+    buffer: Vec<T>,
+    capacity: usize,
+}
+
+impl<T: Clone> EventReplayBuffer<T> {
+    /// Create a new replay buffer with the given capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            buffer: Vec::with_capacity(capacity),
+            capacity,
+        }
+    }
+
+    /// Push a value into the buffer, evicting the oldest if at capacity.
+    pub fn push(&mut self, value: T) {
+        if self.buffer.len() >= self.capacity {
+            self.buffer.remove(0);
+        }
+        self.buffer.push(value);
+    }
+
+    /// Return all buffered values in order (oldest first).
+    pub fn values(&self) -> &[T] {
+        &self.buffer
+    }
+
+    /// Clear the buffer.
+    pub fn clear(&mut self) {
+        self.buffer.clear();
+    }
+
+    /// Number of items currently buffered.
+    pub fn len(&self) -> usize {
+        self.buffer.len()
+    }
+
+    /// Whether the buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
+    }
+
+    /// The maximum capacity of the buffer.
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Listener priority helpers
+// ---------------------------------------------------------------------------
+
+/// A priority value for ordering listener invocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ListenerPriority(pub u32);
+
+impl ListenerPriority {
+    pub const LOW: Self = Self(10);
+    pub const NORMAL: Self = Self(50);
+    pub const HIGH: Self = Self(90);
+}
+
+impl Default for ListenerPriority {
+    fn default() -> Self {
+        Self::NORMAL
+    }
+}
+
+impl fmt::Display for ListenerPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Priority({})", self.0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -730,5 +830,64 @@ mod tests {
         let event = emitter.event();
         let dbg = format!("{event:?}");
         assert!(dbg.contains("Event"));
+    }
+
+    #[test]
+    fn event_filter_matches() {
+        let filter = EventFilter::new(|v: &i32| *v > 5);
+        assert!(filter.matches(&10));
+        assert!(!filter.matches(&3));
+    }
+
+    #[test]
+    fn event_filter_string_predicate() {
+        let filter = EventFilter::new(|s: &String| s.starts_with("err"));
+        assert!(filter.matches(&"error: bad".to_string()));
+        assert!(!filter.matches(&"info: ok".to_string()));
+    }
+
+    #[test]
+    fn replay_buffer_push_and_values() {
+        let mut buf = EventReplayBuffer::new(3);
+        buf.push(1);
+        buf.push(2);
+        buf.push(3);
+        assert_eq!(buf.values(), &[1, 2, 3]);
+        buf.push(4);
+        assert_eq!(buf.values(), &[2, 3, 4]);
+        assert_eq!(buf.len(), 3);
+    }
+
+    #[test]
+    fn replay_buffer_clear() {
+        let mut buf = EventReplayBuffer::new(5);
+        buf.push(10);
+        buf.push(20);
+        assert!(!buf.is_empty());
+        buf.clear();
+        assert!(buf.is_empty());
+        assert_eq!(buf.capacity(), 5);
+    }
+
+    #[test]
+    fn listener_priority_ordering() {
+        assert!(ListenerPriority::HIGH > ListenerPriority::NORMAL);
+        assert!(ListenerPriority::NORMAL > ListenerPriority::LOW);
+        assert_eq!(ListenerPriority::default(), ListenerPriority::NORMAL);
+    }
+
+    #[test]
+    fn listener_priority_display() {
+        assert_eq!(format!("{}", ListenerPriority::HIGH), "Priority(90)");
+        assert_eq!(format!("{}", ListenerPriority(42)), "Priority(42)");
+    }
+
+    #[test]
+    fn replay_buffer_single_capacity() {
+        let mut buf = EventReplayBuffer::new(1);
+        buf.push("a");
+        buf.push("b");
+        assert_eq!(buf.values(), &["b"]);
+        assert_eq!(buf.len(), 1);
     }
 }

@@ -389,6 +389,140 @@ impl fmt::Display for RequestStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Retry logic, timeout tracking, request batching, and more statistics
+// ---------------------------------------------------------------------------
+
+/// Configuration for request retry behaviour.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RetryConfig {
+    pub max_retries: u32,
+    pub base_delay_ms: u64,
+}
+
+impl RetryConfig {
+    pub fn new(max_retries: u32, base_delay_ms: u64) -> Self {
+        Self {
+            max_retries,
+            base_delay_ms,
+        }
+    }
+
+    /// Compute the delay for the nth retry (exponential backoff).
+    pub fn delay_for_retry(&self, attempt: u32) -> u64 {
+        self.base_delay_ms.saturating_mul(1u64 << attempt.min(16))
+    }
+}
+
+impl Default for RetryConfig {
+    fn default() -> Self {
+        Self {
+            max_retries: 3,
+            base_delay_ms: 100,
+        }
+    }
+}
+
+/// Tracks retry state for a single request.
+#[derive(Debug, Clone)]
+pub struct RetryTracker {
+    pub request_id: RequestId,
+    pub attempts: u32,
+    pub config: RetryConfig,
+}
+
+impl RetryTracker {
+    pub fn new(request_id: RequestId, config: RetryConfig) -> Self {
+        Self {
+            request_id,
+            attempts: 0,
+            config,
+        }
+    }
+
+    /// Record an attempt and return true if more retries are allowed.
+    pub fn record_attempt(&mut self) -> bool {
+        self.attempts += 1;
+        self.attempts <= self.config.max_retries
+    }
+
+    /// Check if retries are exhausted.
+    pub fn is_exhausted(&self) -> bool {
+        self.attempts > self.config.max_retries
+    }
+
+    /// Compute the delay before the next retry.
+    pub fn next_delay(&self) -> u64 {
+        self.config.delay_for_retry(self.attempts)
+    }
+}
+
+/// Tracks request timeout state.
+#[derive(Debug, Clone)]
+pub struct TimeoutTracker {
+    pub request_id: RequestId,
+    pub timeout_ms: u64,
+    pub started_at_ms: u64,
+}
+
+impl TimeoutTracker {
+    pub fn new(request_id: RequestId, timeout_ms: u64, started_at_ms: u64) -> Self {
+        Self {
+            request_id,
+            timeout_ms,
+            started_at_ms,
+        }
+    }
+
+    /// Check if the request has timed out given the current time.
+    pub fn is_timed_out(&self, current_time_ms: u64) -> bool {
+        current_time_ms.saturating_sub(self.started_at_ms) >= self.timeout_ms
+    }
+
+    /// Return how many milliseconds remain before timeout.
+    pub fn remaining_ms(&self, current_time_ms: u64) -> u64 {
+        let elapsed = current_time_ms.saturating_sub(self.started_at_ms);
+        self.timeout_ms.saturating_sub(elapsed)
+    }
+}
+
+/// A batch of requests that can be submitted together.
+#[derive(Debug, Clone)]
+pub struct RequestBatch {
+    pub methods: Vec<String>,
+}
+
+impl RequestBatch {
+    pub fn new() -> Self {
+        Self {
+            methods: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, method: impl Into<String>) {
+        self.methods.push(method.into());
+    }
+
+    pub fn len(&self) -> usize {
+        self.methods.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.methods.is_empty()
+    }
+
+    /// Submit all methods in the batch to a `RequestService`, returning their IDs.
+    pub fn submit(&self, service: &mut RequestService) -> Vec<RequestId> {
+        self.methods.iter().map(|m| service.create_request(m.clone())).collect()
+    }
+}
+
+impl Default for RequestBatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -705,5 +839,55 @@ mod tests {
         assert_eq!(svc.get_state(id1), Some(&RequestState::Failed("shutdown".into())));
         assert_eq!(svc.get_state(id2), Some(&RequestState::Failed("shutdown".into())));
         assert_eq!(svc.pending_count(), 1);
+    }
+
+    #[test]
+    fn retry_config_delay_exponential() {
+        let cfg = RetryConfig::new(3, 100);
+        assert_eq!(cfg.delay_for_retry(0), 100);
+        assert_eq!(cfg.delay_for_retry(1), 200);
+        assert_eq!(cfg.delay_for_retry(2), 400);
+        assert_eq!(cfg.delay_for_retry(3), 800);
+    }
+
+    #[test]
+    fn retry_tracker_exhaustion() {
+        let cfg = RetryConfig::new(2, 50);
+        let mut rt = RetryTracker::new(RequestId(1), cfg);
+        assert!(!rt.is_exhausted());
+        assert!(rt.record_attempt()); // attempt 1 <= 2
+        assert!(rt.record_attempt()); // attempt 2 <= 2
+        assert!(!rt.record_attempt()); // attempt 3 > 2
+        assert!(rt.is_exhausted());
+    }
+
+    #[test]
+    fn timeout_tracker_check() {
+        let tt = TimeoutTracker::new(RequestId(1), 1000, 500);
+        assert!(!tt.is_timed_out(1000));
+        assert!(tt.is_timed_out(1500));
+        assert!(tt.is_timed_out(2000));
+        assert_eq!(tt.remaining_ms(1000), 500);
+        assert_eq!(tt.remaining_ms(1500), 0);
+    }
+
+    #[test]
+    fn request_batch_submit() {
+        let mut batch = RequestBatch::new();
+        assert!(batch.is_empty());
+        batch.add("GET /a");
+        batch.add("POST /b");
+        assert_eq!(batch.len(), 2);
+        let mut svc = RequestService::new();
+        let ids = batch.submit(&mut svc);
+        assert_eq!(ids.len(), 2);
+        assert_eq!(svc.total_count(), 2);
+    }
+
+    #[test]
+    fn retry_config_default() {
+        let cfg = RetryConfig::default();
+        assert_eq!(cfg.max_retries, 3);
+        assert_eq!(cfg.base_delay_ms, 100);
     }
 }

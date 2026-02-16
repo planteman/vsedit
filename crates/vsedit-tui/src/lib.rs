@@ -498,6 +498,167 @@ impl fmt::Display for KeyChord {
 }
 
 // ---------------------------------------------------------------------------
+// Terminal capability detection
+// ---------------------------------------------------------------------------
+
+/// Detected terminal capabilities.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerminalCapabilities {
+    pub supports_color: bool,
+    pub supports_256_color: bool,
+    pub supports_true_color: bool,
+    pub supports_mouse: bool,
+    pub supports_bracketed_paste: bool,
+}
+
+impl Default for TerminalCapabilities {
+    fn default() -> Self {
+        Self {
+            supports_color: true,
+            supports_256_color: true,
+            supports_true_color: false,
+            supports_mouse: true,
+            supports_bracketed_paste: true,
+        }
+    }
+}
+
+/// Detect terminal capabilities from environment variables.
+pub fn detect_capabilities() -> TerminalCapabilities {
+    let colorterm = std::env::var("COLORTERM").unwrap_or_default();
+    let term = std::env::var("TERM").unwrap_or_default();
+    let supports_true_color =
+        colorterm.eq_ignore_ascii_case("truecolor") || colorterm.eq_ignore_ascii_case("24bit");
+    let supports_256 = supports_true_color || term.contains("256color");
+    TerminalCapabilities {
+        supports_color: !term.is_empty(),
+        supports_256_color: supports_256,
+        supports_true_color,
+        supports_mouse: true,
+        supports_bracketed_paste: true,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Color theme management
+// ---------------------------------------------------------------------------
+
+/// A named color theme with foreground/background pairs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColorTheme {
+    pub name: String,
+    pub fg: String,
+    pub bg: String,
+    pub accent: String,
+}
+
+/// Manages a collection of color themes.
+#[derive(Debug, Default)]
+pub struct ThemeManager {
+    themes: Vec<ColorTheme>,
+    active: Option<String>,
+}
+
+impl ThemeManager {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_theme(&mut self, theme: ColorTheme) {
+        self.themes.push(theme);
+    }
+
+    pub fn set_active(&mut self, name: &str) -> bool {
+        if self.themes.iter().any(|t| t.name == name) {
+            self.active = Some(name.to_string());
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn active_theme(&self) -> Option<&ColorTheme> {
+        self.active
+            .as_ref()
+            .and_then(|n| self.themes.iter().find(|t| &t.name == n))
+    }
+
+    pub fn theme_names(&self) -> Vec<&str> {
+        self.themes.iter().map(|t| t.name.as_str()).collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Layout constraint computation
+// ---------------------------------------------------------------------------
+
+/// A layout constraint for a TUI panel.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LayoutConstraint {
+    Fixed(u16),
+    Percentage(f32),
+    Min(u16),
+    Max(u16),
+}
+
+/// Resolve a sequence of constraints into concrete sizes for a total available space.
+pub fn resolve_constraints(constraints: &[LayoutConstraint], total: u16) -> Vec<u16> {
+    constraints
+        .iter()
+        .map(|c| match c {
+            LayoutConstraint::Fixed(v) => *v,
+            LayoutConstraint::Percentage(p) => ((total as f32) * p / 100.0) as u16,
+            LayoutConstraint::Min(v) => *v,
+            LayoutConstraint::Max(v) => (*v).min(total),
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Render statistics tracking
+// ---------------------------------------------------------------------------
+
+/// Statistics for a single render frame.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RenderStats {
+    pub frame_number: u64,
+    pub render_time_us: u64,
+    pub widget_count: u32,
+}
+
+/// Tracks render statistics across frames.
+#[derive(Debug, Default)]
+pub struct RenderTracker {
+    frames: Vec<RenderStats>,
+}
+
+impl RenderTracker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record(&mut self, stats: RenderStats) {
+        self.frames.push(stats);
+    }
+
+    pub fn frame_count(&self) -> usize {
+        self.frames.len()
+    }
+
+    pub fn average_render_time_us(&self) -> u64 {
+        if self.frames.is_empty() {
+            return 0;
+        }
+        let total: u64 = self.frames.iter().map(|f| f.render_time_us).sum();
+        total / self.frames.len() as u64
+    }
+
+    pub fn last_frame(&self) -> Option<&RenderStats> {
+        self.frames.last()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -719,5 +880,81 @@ mod tests {
         let chord = KeyChord::parse("Escape").unwrap();
         let event = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
         assert!(chord.matches_key_event(&event));
+    }
+
+    #[test]
+    fn terminal_capabilities_default() {
+        let caps = TerminalCapabilities::default();
+        assert!(caps.supports_color);
+        assert!(caps.supports_256_color);
+        assert!(!caps.supports_true_color);
+        assert!(caps.supports_mouse);
+        assert!(caps.supports_bracketed_paste);
+    }
+
+    #[test]
+    fn theme_manager_add_and_activate() {
+        let mut tm = ThemeManager::new();
+        tm.add_theme(ColorTheme {
+            name: "dark".into(),
+            fg: "#ccc".into(),
+            bg: "#1e1e1e".into(),
+            accent: "#007acc".into(),
+        });
+        assert!(tm.set_active("dark"));
+        assert_eq!(tm.active_theme().unwrap().name, "dark");
+        assert!(!tm.set_active("nonexistent"));
+    }
+
+    #[test]
+    fn theme_manager_names() {
+        let mut tm = ThemeManager::new();
+        tm.add_theme(ColorTheme {
+            name: "dark".into(),
+            fg: "#ccc".into(),
+            bg: "#111".into(),
+            accent: "#0af".into(),
+        });
+        tm.add_theme(ColorTheme {
+            name: "light".into(),
+            fg: "#333".into(),
+            bg: "#fff".into(),
+            accent: "#00a".into(),
+        });
+        assert_eq!(tm.theme_names(), vec!["dark", "light"]);
+    }
+
+    #[test]
+    fn resolve_constraints_basic() {
+        let constraints = vec![
+            LayoutConstraint::Fixed(10),
+            LayoutConstraint::Percentage(50.0),
+            LayoutConstraint::Min(5),
+            LayoutConstraint::Max(100),
+        ];
+        let sizes = resolve_constraints(&constraints, 80);
+        assert_eq!(sizes[0], 10);
+        assert_eq!(sizes[1], 40);
+        assert_eq!(sizes[2], 5);
+        assert_eq!(sizes[3], 80);
+    }
+
+    #[test]
+    fn render_tracker_stats() {
+        let mut tracker = RenderTracker::new();
+        tracker.record(RenderStats { frame_number: 1, render_time_us: 100, widget_count: 5 });
+        tracker.record(RenderStats { frame_number: 2, render_time_us: 200, widget_count: 6 });
+        tracker.record(RenderStats { frame_number: 3, render_time_us: 300, widget_count: 4 });
+        assert_eq!(tracker.frame_count(), 3);
+        assert_eq!(tracker.average_render_time_us(), 200);
+        assert_eq!(tracker.last_frame().unwrap().frame_number, 3);
+    }
+
+    #[test]
+    fn render_tracker_empty() {
+        let tracker = RenderTracker::new();
+        assert_eq!(tracker.frame_count(), 0);
+        assert_eq!(tracker.average_render_time_us(), 0);
+        assert!(tracker.last_frame().is_none());
     }
 }

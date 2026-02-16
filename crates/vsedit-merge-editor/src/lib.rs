@@ -453,6 +453,110 @@ pub fn parse_conflict_markers(text: &str) -> Vec<MergeConflict> {
     conflicts
 }
 
+/// Statistics about the conflicts in a merge editor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConflictStats {
+    pub total: usize,
+    pub resolved: usize,
+    pub unresolved: usize,
+    pub trivial: usize,
+    pub total_lines: u32,
+}
+
+impl MergeEditorWidget {
+    /// Compute detailed statistics about the conflicts.
+    pub fn conflict_stats(&self) -> ConflictStats {
+        let total = self.conflicts.len();
+        let resolved = self.resolved_count();
+        let trivial = self.conflicts.iter().filter(|c| c.is_trivial()).count();
+        let total_lines: u32 = self.conflicts.iter().map(|c| c.line_span()).sum();
+        ConflictStats {
+            total,
+            resolved,
+            unresolved: total - resolved,
+            trivial,
+            total_lines,
+        }
+    }
+
+    /// Validate the merged result: check that all resolutions are non-empty.
+    pub fn validate_result(&self) -> Result<(), MergeError> {
+        let remaining = self.unresolved_count();
+        if remaining > 0 {
+            return Err(MergeError::UnresolvedConflicts { remaining });
+        }
+        for c in &self.conflicts {
+            if let Some(ref res) = c.resolution {
+                if res.is_empty() {
+                    return Err(MergeError::EmptyCustomResolution);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Auto-resolve conflicts where changes don't overlap with each other.
+    /// A conflict is considered non-overlapping if its current text equals the base text
+    /// (only incoming changed) or its incoming text equals the base text (only current changed).
+    pub fn auto_resolve_non_overlapping(&mut self) -> usize {
+        let mut count = 0;
+        for c in &mut self.conflicts {
+            if c.resolved {
+                continue;
+            }
+            if c.current_text == c.base_text && c.incoming_text != c.base_text {
+                c.resolution = Some(c.incoming_text.clone());
+                c.resolved = true;
+                count += 1;
+            } else if c.incoming_text == c.base_text && c.current_text != c.base_text {
+                c.resolution = Some(c.current_text.clone());
+                c.resolved = true;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Generate a preview of the merge result, showing conflict markers for unresolved conflicts.
+    pub fn generate_preview(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+        for c in &self.conflicts {
+            if c.resolved {
+                if let Some(ref res) = c.resolution {
+                    lines.push(res.clone());
+                }
+            } else {
+                lines.push(format!("<<<<<<< Current"));
+                lines.push(c.current_text.clone());
+                lines.push("=======".to_string());
+                lines.push(c.incoming_text.clone());
+                lines.push(format!(">>>>>>> Incoming"));
+            }
+        }
+        lines
+    }
+
+    /// Return indices of all unresolved conflicts.
+    pub fn unresolved_indices(&self) -> Vec<usize> {
+        self.conflicts
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| !c.resolved)
+            .map(|(i, _)| i)
+            .collect()
+    }
+}
+
+impl fmt::Display for ConflictStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ConflictStats(total={}, resolved={}, unresolved={}, trivial={}, lines={})",
+            self.total, self.resolved, self.unresolved, self.trivial, self.total_lines
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -712,5 +816,145 @@ d
         let text = "just some\nplain text\nno markers";
         let conflicts = parse_conflict_markers(text);
         assert!(conflicts.is_empty());
+    }
+
+    #[test]
+    fn conflict_stats_computation() {
+        let mut w = MergeEditorWidget::new();
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(0, 3)
+                .current_text("same")
+                .incoming_text("same")
+                .build()
+                .unwrap(),
+        );
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(3, 7)
+                .current_text("a")
+                .incoming_text("b")
+                .build()
+                .unwrap(),
+        );
+        let stats = w.conflict_stats();
+        assert_eq!(stats.total, 2);
+        assert_eq!(stats.unresolved, 2);
+        assert_eq!(stats.trivial, 1);
+        assert_eq!(stats.total_lines, 7);
+    }
+
+    #[test]
+    fn validate_result_all_resolved() {
+        let mut w = MergeEditorWidget::new();
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(0, 2)
+                .current_text("a")
+                .incoming_text("b")
+                .build()
+                .unwrap(),
+        );
+        w.resolve_conflict(0, MergeResolution::AcceptCurrent);
+        assert!(w.validate_result().is_ok());
+    }
+
+    #[test]
+    fn validate_result_unresolved() {
+        let mut w = MergeEditorWidget::new();
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(0, 2)
+                .current_text("a")
+                .incoming_text("b")
+                .build()
+                .unwrap(),
+        );
+        assert!(w.validate_result().is_err());
+    }
+
+    #[test]
+    fn auto_resolve_non_overlapping() {
+        let mut w = MergeEditorWidget::new();
+        w.add_conflict(MergeConflict {
+            base_start: 0,
+            base_end: 2,
+            current_text: "base".into(),
+            incoming_text: "changed".into(),
+            base_text: "base".into(),
+            resolved: false,
+            resolution: None,
+        });
+        w.add_conflict(MergeConflict {
+            base_start: 2,
+            base_end: 4,
+            current_text: "modified".into(),
+            incoming_text: "original".into(),
+            base_text: "original".into(),
+            resolved: false,
+            resolution: None,
+        });
+        let count = w.auto_resolve_non_overlapping();
+        assert_eq!(count, 2);
+        assert!(w.all_resolved());
+        assert_eq!(w.conflicts[0].resolution.as_deref(), Some("changed"));
+        assert_eq!(w.conflicts[1].resolution.as_deref(), Some("modified"));
+    }
+
+    #[test]
+    fn generate_preview_mixed() {
+        let mut w = MergeEditorWidget::new();
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(0, 2)
+                .current_text("ours")
+                .incoming_text("theirs")
+                .build()
+                .unwrap(),
+        );
+        w.add_conflict(
+            MergeConflictBuilder::new()
+                .region(2, 4)
+                .current_text("x")
+                .incoming_text("y")
+                .build()
+                .unwrap(),
+        );
+        w.resolve_conflict(0, MergeResolution::AcceptCurrent);
+        let preview = w.generate_preview();
+        assert_eq!(preview[0], "ours");
+        assert!(preview.iter().any(|l| l.contains("<<<<<<< Current")));
+    }
+
+    #[test]
+    fn unresolved_indices() {
+        let mut w = MergeEditorWidget::new();
+        for i in 0..4 {
+            w.add_conflict(
+                MergeConflictBuilder::new()
+                    .region(i, i + 1)
+                    .current_text("a")
+                    .incoming_text("b")
+                    .build()
+                    .unwrap(),
+            );
+        }
+        w.resolve_conflict(1, MergeResolution::AcceptCurrent);
+        w.resolve_conflict(3, MergeResolution::AcceptIncoming);
+        assert_eq!(w.unresolved_indices(), vec![0, 2]);
+    }
+
+    #[test]
+    fn conflict_stats_display() {
+        let stats = ConflictStats {
+            total: 5,
+            resolved: 3,
+            unresolved: 2,
+            trivial: 1,
+            total_lines: 20,
+        };
+        let s = format!("{stats}");
+        assert!(s.contains("total=5"));
+        assert!(s.contains("resolved=3"));
     }
 }

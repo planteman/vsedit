@@ -329,6 +329,101 @@ pub fn compute_language_status_stats(languages: &[LanguageInfo]) -> LanguageStat
     }
 }
 
+/// Statistics about languages in a registry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LanguageStatistics {
+    /// Total number of registered languages.
+    pub total: usize,
+    /// Total number of extensions across all languages.
+    pub total_extensions: usize,
+    /// Total number of aliases across all languages.
+    pub total_aliases: usize,
+    /// Total number of MIME types across all languages.
+    pub total_mime_types: usize,
+    /// Number of languages with a first-line pattern.
+    pub with_first_line_pattern: usize,
+}
+
+/// Computes detailed statistics for a language registry.
+pub fn compute_language_statistics(registry: &LanguageRegistry) -> LanguageStatistics {
+    let mut total_extensions = 0;
+    let mut total_aliases = 0;
+    let mut total_mime_types = 0;
+    let mut with_first_line_pattern = 0;
+    for lang in &registry.languages {
+        total_extensions += lang.extensions.len();
+        total_aliases += lang.aliases.len();
+        total_mime_types += lang.mime_types.len();
+        if lang.first_line_pattern.is_some() {
+            with_first_line_pattern += 1;
+        }
+    }
+    LanguageStatistics {
+        total: registry.language_count(),
+        total_extensions,
+        total_aliases,
+        total_mime_types,
+        with_first_line_pattern,
+    }
+}
+
+/// Represents a category grouping for languages.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LanguageGroup {
+    pub category: String,
+    pub language_ids: Vec<String>,
+}
+
+/// Groups languages by the first character of their name (uppercased).
+pub fn group_languages_by_initial(registry: &LanguageRegistry) -> Vec<LanguageGroup> {
+    let mut map: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+    for lang in &registry.languages {
+        let initial = lang.name.chars().next()
+            .map(|c| c.to_uppercase().to_string())
+            .unwrap_or_else(|| "?".to_string());
+        map.entry(initial).or_default().push(lang.id.clone());
+    }
+    map.into_iter()
+        .map(|(category, language_ids)| LanguageGroup { category, language_ids })
+        .collect()
+}
+
+/// Resolves a language alias to its canonical language id.
+pub fn resolve_alias(registry: &LanguageRegistry, alias: &str) -> Option<String> {
+    registry.get_by_alias(alias).map(|l| l.id.clone())
+}
+
+/// Feature flags that a language may support.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LanguageFeatureMatrix {
+    pub language_id: String,
+    pub has_folding: bool,
+    pub has_indentation_rules: bool,
+    pub has_bracket_pairs: bool,
+    pub has_auto_closing_pairs: bool,
+}
+
+impl LanguageFeatureMatrix {
+    /// Creates a new feature matrix with all features disabled.
+    pub fn new(language_id: impl Into<String>) -> Self {
+        Self {
+            language_id: language_id.into(),
+            has_folding: false,
+            has_indentation_rules: false,
+            has_bracket_pairs: false,
+            has_auto_closing_pairs: false,
+        }
+    }
+
+    /// Returns the number of enabled features.
+    pub fn enabled_count(&self) -> usize {
+        [self.has_folding, self.has_indentation_rules, self.has_bracket_pairs, self.has_auto_closing_pairs]
+            .iter()
+            .filter(|&&v| v)
+            .count()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -712,5 +807,59 @@ mod tests {
         let stats = compute_language_status_stats(&reg.languages);
         assert_eq!(stats.total_items, reg.language_count());
         assert_eq!(stats.active_count, 2);
+    }
+
+    #[test]
+    fn language_statistics_computation() {
+        let mut reg = LanguageRegistry::new();
+        reg.register(sample_rust());
+        reg.register(sample_python());
+        let stats = compute_language_statistics(&reg);
+        assert_eq!(stats.total, 2);
+        assert_eq!(stats.total_extensions, 3); // .rs + .py + .pyw
+        assert_eq!(stats.total_aliases, 2); // rs + py
+        assert_eq!(stats.total_mime_types, 2);
+        assert_eq!(stats.with_first_line_pattern, 1); // only python
+    }
+
+    #[test]
+    fn group_languages_by_initial_letter() {
+        let mut reg = LanguageRegistry::new();
+        reg.register(sample_rust());
+        reg.register(sample_python());
+        let groups = group_languages_by_initial(&reg);
+        assert_eq!(groups.len(), 2); // P and R
+        assert_eq!(groups[0].category, "P");
+        assert_eq!(groups[1].category, "R");
+    }
+
+    #[test]
+    fn resolve_alias_finds_language() {
+        let mut reg = LanguageRegistry::new();
+        reg.register(sample_rust());
+        reg.register(sample_python());
+        assert_eq!(resolve_alias(&reg, "rs"), Some("rust".to_string()));
+        assert_eq!(resolve_alias(&reg, "py"), Some("python".to_string()));
+        assert_eq!(resolve_alias(&reg, "unknown"), None);
+    }
+
+    #[test]
+    fn feature_matrix_new_defaults() {
+        let fm = LanguageFeatureMatrix::new("rust");
+        assert_eq!(fm.language_id, "rust");
+        assert!(!fm.has_folding);
+        assert_eq!(fm.enabled_count(), 0);
+    }
+
+    #[test]
+    fn feature_matrix_enabled_count() {
+        let fm = LanguageFeatureMatrix {
+            language_id: "rust".into(),
+            has_folding: true,
+            has_indentation_rules: true,
+            has_bracket_pairs: false,
+            has_auto_closing_pairs: true,
+        };
+        assert_eq!(fm.enabled_count(), 3);
     }
 }

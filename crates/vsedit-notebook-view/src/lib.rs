@@ -379,6 +379,209 @@ impl fmt::Display for NotebookSummary {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Cell execution tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks the execution state and timing of notebook cells.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CellExecutionState {
+    Idle,
+    Running,
+    Succeeded { duration_ms: u64 },
+    Failed { duration_ms: u64, error: String },
+}
+
+impl fmt::Display for CellExecutionState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CellExecutionState::Idle => write!(f, "Idle"),
+            CellExecutionState::Running => write!(f, "Running"),
+            CellExecutionState::Succeeded { duration_ms } => {
+                write!(f, "Succeeded ({duration_ms}ms)")
+            }
+            CellExecutionState::Failed { duration_ms, error } => {
+                write!(f, "Failed ({duration_ms}ms): {error}")
+            }
+        }
+    }
+}
+
+/// Tracks execution history and state for all cells in a notebook.
+pub struct CellExecutionTracker {
+    states: HashMap<usize, CellExecutionState>,
+    execution_count: u32,
+}
+
+impl CellExecutionTracker {
+    pub fn new() -> Self {
+        Self {
+            states: HashMap::new(),
+            execution_count: 0,
+        }
+    }
+
+    pub fn mark_running(&mut self, cell_index: usize) -> u32 {
+        self.execution_count += 1;
+        self.states.insert(cell_index, CellExecutionState::Running);
+        self.execution_count
+    }
+
+    pub fn mark_succeeded(&mut self, cell_index: usize, duration_ms: u64) {
+        self.states.insert(cell_index, CellExecutionState::Succeeded { duration_ms });
+    }
+
+    pub fn mark_failed(&mut self, cell_index: usize, duration_ms: u64, error: String) {
+        self.states.insert(cell_index, CellExecutionState::Failed { duration_ms, error });
+    }
+
+    pub fn get_state(&self, cell_index: usize) -> &CellExecutionState {
+        self.states.get(&cell_index).unwrap_or(&CellExecutionState::Idle)
+    }
+
+    pub fn running_cells(&self) -> Vec<usize> {
+        self.states.iter()
+            .filter(|(_, s)| matches!(s, CellExecutionState::Running))
+            .map(|(i, _)| *i)
+            .collect()
+    }
+
+    pub fn total_executions(&self) -> u32 {
+        self.execution_count
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cell output management
+// ---------------------------------------------------------------------------
+
+/// Manages output buffers for notebook cells, supporting append and replace.
+pub struct CellOutputManager {
+    max_outputs_per_cell: usize,
+}
+
+impl CellOutputManager {
+    pub fn new(max_outputs_per_cell: usize) -> Self {
+        Self { max_outputs_per_cell }
+    }
+
+    /// Append an output to a cell, respecting the maximum output limit.
+    /// Returns `true` if the output was added, `false` if the limit was reached.
+    pub fn append_output(&self, cell: &mut NotebookCell, output: NotebookCellOutput) -> bool {
+        if cell.outputs.len() >= self.max_outputs_per_cell {
+            return false;
+        }
+        cell.outputs.push(output);
+        true
+    }
+
+    /// Replace all outputs of a cell with a single output.
+    pub fn replace_outputs(&self, cell: &mut NotebookCell, output: NotebookCellOutput) {
+        cell.outputs.clear();
+        cell.outputs.push(output);
+    }
+
+    /// Return the total byte size of all outputs in a cell.
+    pub fn output_byte_size(cell: &NotebookCell) -> usize {
+        cell.outputs.iter().map(|o| o.mime_type.len() + o.data.len()).sum()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Notebook outline generation
+// ---------------------------------------------------------------------------
+
+/// An entry in a notebook outline (table of contents).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotebookOutlineEntry {
+    pub cell_index: usize,
+    pub heading_level: u8,
+    pub text: String,
+}
+
+/// Generate an outline from markup cells that contain markdown headings.
+pub fn generate_notebook_outline(doc: &NotebookDocument) -> Vec<NotebookOutlineEntry> {
+    let mut entries = Vec::new();
+    for (idx, cell) in doc.cells.iter().enumerate() {
+        if cell.kind != NotebookCellKind::Markup {
+            continue;
+        }
+        for line in cell.source.lines() {
+            let trimmed = line.trim();
+            if let Some(rest) = trimmed.strip_prefix('#') {
+                let mut level: u8 = 1;
+                let mut remaining = rest;
+                while let Some(r) = remaining.strip_prefix('#') {
+                    level += 1;
+                    remaining = r;
+                    if level >= 6 {
+                        break;
+                    }
+                }
+                let text = remaining.trim().to_string();
+                if !text.is_empty() {
+                    entries.push(NotebookOutlineEntry {
+                        cell_index: idx,
+                        heading_level: level,
+                        text,
+                    });
+                }
+            }
+        }
+    }
+    entries
+}
+
+// ---------------------------------------------------------------------------
+// Cell dependency analysis
+// ---------------------------------------------------------------------------
+
+/// Represents a dependency edge: the cell at `cell_index` depends on `depends_on`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CellDependency {
+    pub cell_index: usize,
+    pub depends_on: usize,
+    pub symbol: String,
+}
+
+/// Analyze simple variable dependencies between code cells.
+/// A cell that uses a name defined (assigned with `=`) in an earlier cell
+/// is considered to depend on that cell.
+pub fn analyze_cell_dependencies(doc: &NotebookDocument) -> Vec<CellDependency> {
+    let mut definitions: Vec<(usize, String)> = Vec::new();
+    let mut deps = Vec::new();
+
+    for (idx, cell) in doc.cells.iter().enumerate() {
+        if cell.kind != NotebookCellKind::Code {
+            continue;
+        }
+        // Check if this cell uses symbols defined in earlier cells
+        for (def_idx, symbol) in &definitions {
+            if cell.source.contains(symbol.as_str()) {
+                deps.push(CellDependency {
+                    cell_index: idx,
+                    depends_on: *def_idx,
+                    symbol: symbol.clone(),
+                });
+            }
+        }
+        // Extract simple definitions (lines like `name = ...`)
+        for line in cell.source.lines() {
+            let trimmed = line.trim();
+            if let Some(name) = trimmed.split('=').next() {
+                let name = name.trim();
+                if !name.is_empty()
+                    && name.chars().all(|c| c.is_alphanumeric() || c == '_')
+                    && name.chars().next().map_or(false, |c| c.is_alphabetic() || c == '_')
+                {
+                    definitions.push((idx, name.to_string()));
+                }
+            }
+        }
+    }
+    deps
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -732,5 +935,85 @@ mod tests {
         let c = NotebookCellOutput { mime_type: "text/html".into(), data: "hello".into() };
         assert_eq!(a, b);
         assert_ne!(a, c);
+    }
+
+    #[test]
+    fn execution_tracker_lifecycle() {
+        let mut tracker = CellExecutionTracker::new();
+        assert_eq!(*tracker.get_state(0), CellExecutionState::Idle);
+        let order = tracker.mark_running(0);
+        assert_eq!(order, 1);
+        assert_eq!(*tracker.get_state(0), CellExecutionState::Running);
+        assert_eq!(tracker.running_cells(), vec![0]);
+        tracker.mark_succeeded(0, 150);
+        assert_eq!(*tracker.get_state(0), CellExecutionState::Succeeded { duration_ms: 150 });
+        assert!(tracker.running_cells().is_empty());
+        assert_eq!(tracker.total_executions(), 1);
+    }
+
+    #[test]
+    fn execution_tracker_failure() {
+        let mut tracker = CellExecutionTracker::new();
+        tracker.mark_running(2);
+        tracker.mark_failed(2, 300, "RuntimeError".into());
+        assert_eq!(
+            *tracker.get_state(2),
+            CellExecutionState::Failed { duration_ms: 300, error: "RuntimeError".into() }
+        );
+    }
+
+    #[test]
+    fn execution_state_display() {
+        assert_eq!(CellExecutionState::Idle.to_string(), "Idle");
+        assert_eq!(CellExecutionState::Running.to_string(), "Running");
+        assert_eq!(
+            CellExecutionState::Succeeded { duration_ms: 42 }.to_string(),
+            "Succeeded (42ms)"
+        );
+        assert!(CellExecutionState::Failed { duration_ms: 10, error: "err".into() }
+            .to_string()
+            .contains("err"));
+    }
+
+    #[test]
+    fn output_manager_append_and_limit() {
+        let mgr = CellOutputManager::new(2);
+        let mut cell = code_cell("x = 1");
+        let out = || NotebookCellOutput { mime_type: "text/plain".into(), data: "v".into() };
+        assert!(mgr.append_output(&mut cell, out()));
+        assert!(mgr.append_output(&mut cell, out()));
+        assert!(!mgr.append_output(&mut cell, out()));
+        assert_eq!(cell.outputs.len(), 2);
+        mgr.replace_outputs(&mut cell, out());
+        assert_eq!(cell.outputs.len(), 1);
+        assert!(CellOutputManager::output_byte_size(&cell) > 0);
+    }
+
+    #[test]
+    fn generate_outline_from_markup() {
+        let mut doc = NotebookDocument::new("nb.ipynb");
+        doc.add_cell(markup_cell("# Introduction\nSome text\n## Background"));
+        doc.add_cell(code_cell("x = 1"));
+        doc.add_cell(markup_cell("### Details"));
+        let outline = generate_notebook_outline(&doc);
+        assert_eq!(outline.len(), 3);
+        assert_eq!(outline[0].heading_level, 1);
+        assert_eq!(outline[0].text, "Introduction");
+        assert_eq!(outline[0].cell_index, 0);
+        assert_eq!(outline[1].heading_level, 2);
+        assert_eq!(outline[1].text, "Background");
+        assert_eq!(outline[2].cell_index, 2);
+    }
+
+    #[test]
+    fn cell_dependency_analysis() {
+        let mut doc = NotebookDocument::new("nb.ipynb");
+        doc.add_cell(code_cell("data = load()"));
+        doc.add_cell(code_cell("result = process(data)"));
+        doc.add_cell(markup_cell("# Notes"));
+        doc.add_cell(code_cell("print(result)"));
+        let deps = analyze_cell_dependencies(&doc);
+        assert!(deps.iter().any(|d| d.cell_index == 1 && d.depends_on == 0 && d.symbol == "data"));
+        assert!(deps.iter().any(|d| d.cell_index == 3 && d.depends_on == 1 && d.symbol == "result"));
     }
 }

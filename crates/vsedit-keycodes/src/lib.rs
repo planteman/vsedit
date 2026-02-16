@@ -582,6 +582,107 @@ impl KeycodesStats {
 
 impl Default for KeycodesStats { fn default() -> Self { Self::new() } }
 
+/// Classification categories for key codes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeyCategory {
+    /// Modifier keys (Ctrl, Shift, Alt, Meta).
+    Modifier,
+    /// Alphabetic keys (A-Z).
+    Letter,
+    /// Digit keys (0-9).
+    Digit,
+    /// Function keys (F1-F24).
+    Function,
+    /// Navigation keys (arrows, Home, End, PageUp, PageDown).
+    Navigation,
+    /// Numpad keys.
+    Numpad,
+    /// Punctuation / symbol keys.
+    Punctuation,
+    /// Media and browser keys.
+    Media,
+    /// All other keys.
+    Other,
+}
+
+impl KeyCode {
+    /// Classify this key code into a [`KeyCategory`].
+    pub fn category(self) -> KeyCategory {
+        match self {
+            Self::Ctrl | Self::Shift | Self::Alt | Self::Meta => KeyCategory::Modifier,
+            Self::KeyA | Self::KeyB | Self::KeyC | Self::KeyD | Self::KeyE
+            | Self::KeyF | Self::KeyG | Self::KeyH | Self::KeyI | Self::KeyJ
+            | Self::KeyK | Self::KeyL | Self::KeyM | Self::KeyN | Self::KeyO
+            | Self::KeyP | Self::KeyQ | Self::KeyR | Self::KeyS | Self::KeyT
+            | Self::KeyU | Self::KeyV | Self::KeyW | Self::KeyX | Self::KeyY
+            | Self::KeyZ => KeyCategory::Letter,
+            Self::Digit0 | Self::Digit1 | Self::Digit2 | Self::Digit3 | Self::Digit4
+            | Self::Digit5 | Self::Digit6 | Self::Digit7 | Self::Digit8
+            | Self::Digit9 => KeyCategory::Digit,
+            Self::F1 | Self::F2 | Self::F3 | Self::F4 | Self::F5 | Self::F6
+            | Self::F7 | Self::F8 | Self::F9 | Self::F10 | Self::F11 | Self::F12
+            | Self::F13 | Self::F14 | Self::F15 | Self::F16 | Self::F17 | Self::F18
+            | Self::F19 | Self::F20 | Self::F21 | Self::F22 | Self::F23
+            | Self::F24 => KeyCategory::Function,
+            Self::LeftArrow | Self::UpArrow | Self::RightArrow | Self::DownArrow
+            | Self::Home | Self::End | Self::PageUp | Self::PageDown => KeyCategory::Navigation,
+            Self::Numpad0 | Self::Numpad1 | Self::Numpad2 | Self::Numpad3
+            | Self::Numpad4 | Self::Numpad5 | Self::Numpad6 | Self::Numpad7
+            | Self::Numpad8 | Self::Numpad9 | Self::NumpadMultiply | Self::NumpadAdd
+            | Self::NUMPAD_SEPARATOR | Self::NumpadSubtract | Self::NumpadDecimal
+            | Self::NumpadDivide => KeyCategory::Numpad,
+            Self::Semicolon | Self::Equal | Self::Comma | Self::Minus | Self::Period
+            | Self::Slash | Self::Backquote | Self::BracketLeft | Self::Backslash
+            | Self::BracketRight | Self::Quote => KeyCategory::Punctuation,
+            Self::AudioVolumeMute | Self::AudioVolumeUp | Self::AudioVolumeDown
+            | Self::BrowserSearch | Self::BrowserHome | Self::BrowserBack
+            | Self::BrowserForward | Self::MediaTrackNext | Self::MediaTrackPrevious
+            | Self::MediaStop | Self::MediaPlayPause | Self::LaunchMediaPlayer
+            | Self::LaunchMail | Self::LaunchApp2 => KeyCategory::Media,
+            _ => KeyCategory::Other,
+        }
+    }
+
+    /// Returns `true` if this key code produces a printable character.
+    pub fn is_printable(self) -> bool {
+        matches!(
+            self.category(),
+            KeyCategory::Letter | KeyCategory::Digit | KeyCategory::Punctuation
+        ) || self == Self::Space
+    }
+
+    /// Returns a human-readable display name for this key code.
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::Backspace => "Backspace",
+            Self::Tab => "Tab",
+            Self::Enter => "Enter",
+            Self::Shift => "Shift",
+            Self::Ctrl => "Control",
+            Self::Alt => "Alt",
+            Self::Meta => "Meta",
+            Self::Escape => "Escape",
+            Self::Space => "Space",
+            Self::Delete => "Delete",
+            Self::Insert => "Insert",
+            Self::Home => "Home",
+            Self::End => "End",
+            Self::PageUp => "Page Up",
+            Self::PageDown => "Page Down",
+            Self::LeftArrow => "Left Arrow",
+            Self::RightArrow => "Right Arrow",
+            Self::UpArrow => "Up Arrow",
+            Self::DownArrow => "Down Arrow",
+            Self::CapsLock => "Caps Lock",
+            Self::NumLock => "Num Lock",
+            Self::ScrollLock => "Scroll Lock",
+            Self::PauseBreak => "Pause/Break",
+            Self::ContextMenu => "Context Menu",
+            _ => key_code_to_string(self),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -784,6 +885,67 @@ mod tests {
         stats.record_success(500);
         stats.reset();
         assert_eq!(stats.total(), 0);
+    }
+
+    #[test]
+    fn category_modifier() {
+        assert_eq!(KeyCode::Ctrl.category(), KeyCategory::Modifier);
+        assert_eq!(KeyCode::Shift.category(), KeyCategory::Modifier);
+        assert_eq!(KeyCode::Alt.category(), KeyCategory::Modifier);
+        assert_eq!(KeyCode::Meta.category(), KeyCategory::Modifier);
+    }
+
+    #[test]
+    fn category_letter_and_digit() {
+        assert_eq!(KeyCode::KeyA.category(), KeyCategory::Letter);
+        assert_eq!(KeyCode::KeyZ.category(), KeyCategory::Letter);
+        assert_eq!(KeyCode::Digit0.category(), KeyCategory::Digit);
+        assert_eq!(KeyCode::Digit9.category(), KeyCategory::Digit);
+    }
+
+    #[test]
+    fn category_function() {
+        assert_eq!(KeyCode::F1.category(), KeyCategory::Function);
+        assert_eq!(KeyCode::F12.category(), KeyCategory::Function);
+        assert_eq!(KeyCode::F24.category(), KeyCategory::Function);
+    }
+
+    #[test]
+    fn category_navigation() {
+        assert_eq!(KeyCode::LeftArrow.category(), KeyCategory::Navigation);
+        assert_eq!(KeyCode::Home.category(), KeyCategory::Navigation);
+        assert_eq!(KeyCode::PageUp.category(), KeyCategory::Navigation);
+    }
+
+    #[test]
+    fn is_printable_letters_digits() {
+        assert!(KeyCode::KeyA.is_printable());
+        assert!(KeyCode::Digit5.is_printable());
+        assert!(KeyCode::Space.is_printable());
+        assert!(KeyCode::Comma.is_printable());
+        assert!(!KeyCode::Ctrl.is_printable());
+        assert!(!KeyCode::F1.is_printable());
+        assert!(!KeyCode::LeftArrow.is_printable());
+    }
+
+    #[test]
+    fn display_name_special_keys() {
+        assert_eq!(KeyCode::PageUp.display_name(), "Page Up");
+        assert_eq!(KeyCode::LeftArrow.display_name(), "Left Arrow");
+        assert_eq!(KeyCode::CapsLock.display_name(), "Caps Lock");
+        assert_eq!(KeyCode::Ctrl.display_name(), "Control");
+    }
+
+    #[test]
+    fn category_numpad() {
+        assert_eq!(KeyCode::Numpad0.category(), KeyCategory::Numpad);
+        assert_eq!(KeyCode::NumpadAdd.category(), KeyCategory::Numpad);
+    }
+
+    #[test]
+    fn category_media() {
+        assert_eq!(KeyCode::AudioVolumeMute.category(), KeyCategory::Media);
+        assert_eq!(KeyCode::BrowserBack.category(), KeyCategory::Media);
     }
 
     #[test]

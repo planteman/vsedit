@@ -440,6 +440,114 @@ fn parse_chord(input: &str, platform: Platform) -> Option<KeyCodeChord> {
 }
 
 // ---------------------------------------------------------------------------
+// Conflict detection
+// ---------------------------------------------------------------------------
+
+/// A keybinding conflict between two bindings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeybindingConflict {
+    pub binding_a: Keybinding,
+    pub binding_b: Keybinding,
+}
+
+/// Detect conflicts in a slice of keybindings.
+///
+/// Two bindings conflict if they have the same chord sequence.
+pub fn detect_conflicts(bindings: &[Keybinding]) -> Vec<KeybindingConflict> {
+    let mut conflicts = Vec::new();
+    for i in 0..bindings.len() {
+        for j in (i + 1)..bindings.len() {
+            if bindings[i].parts == bindings[j].parts {
+                conflicts.push(KeybindingConflict {
+                    binding_a: bindings[i].clone(),
+                    binding_b: bindings[j].clone(),
+                });
+            }
+        }
+    }
+    conflicts
+}
+
+// ---------------------------------------------------------------------------
+// Serialization helpers
+// ---------------------------------------------------------------------------
+
+/// Serialize a keybinding to a lowercase dispatch string.
+///
+/// Multi-chord bindings use space as separator, e.g. `"ctrl+k ctrl+c"`.
+pub fn serialize_keybinding(binding: &Keybinding) -> String {
+    binding
+        .parts
+        .iter()
+        .map(|c| SimpleResolvedKeybinding::format_chord_dispatch(c))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+// ---------------------------------------------------------------------------
+// Chord matching score
+// ---------------------------------------------------------------------------
+
+/// Compute a match score between a pressed chord and a target chord.
+///
+/// Returns 0 if they don't match, otherwise a score based on how many
+/// modifiers match (each matching modifier adds 1, matching key adds 4).
+pub fn chord_match_score(pressed: &KeyCodeChord, target: &KeyCodeChord) -> u32 {
+    if pressed.key_code != target.key_code {
+        return 0;
+    }
+    let mut score: u32 = 4;
+    if pressed.ctrl == target.ctrl {
+        score += 1;
+    }
+    if pressed.shift == target.shift {
+        score += 1;
+    }
+    if pressed.alt == target.alt {
+        score += 1;
+    }
+    if pressed.meta == target.meta {
+        score += 1;
+    }
+    score
+}
+
+// ---------------------------------------------------------------------------
+// Category grouping
+// ---------------------------------------------------------------------------
+
+/// Category for organizing keybindings in UI.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum KeybindingCategory {
+    General,
+    Editor,
+    Navigation,
+    Debug,
+    Custom(String),
+}
+
+/// A keybinding tagged with a command and category.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CategorizedKeybinding {
+    pub binding: Keybinding,
+    pub command: String,
+    pub category: KeybindingCategory,
+}
+
+/// Group categorized keybindings by their category.
+pub fn group_by_category(
+    bindings: &[CategorizedKeybinding],
+) -> std::collections::HashMap<KeybindingCategory, Vec<&CategorizedKeybinding>> {
+    let mut map = std::collections::HashMap::new();
+    for b in bindings {
+        map.entry(b.category.clone())
+            .or_insert_with(Vec::new)
+            .push(b);
+    }
+    map
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -717,5 +825,86 @@ mod tests {
         let kb = Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::Unknown));
         let resolved = SimpleResolvedKeybinding::new(kb, Platform::Linux);
         assert!(resolved.get_electron_accelerator().is_none());
+    }
+
+    #[test]
+    fn detect_no_conflicts() {
+        let bindings = vec![
+            Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+            Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyK)),
+        ];
+        assert!(detect_conflicts(&bindings).is_empty());
+    }
+
+    #[test]
+    fn detect_duplicate_conflicts() {
+        let bindings = vec![
+            Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+            Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+        ];
+        let conflicts = detect_conflicts(&bindings);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].binding_a, conflicts[0].binding_b);
+    }
+
+    #[test]
+    fn serialize_single_chord() {
+        let kb = Keybinding::new(KeyCodeChord::new(true, true, false, false, KeyCode::KeyS));
+        assert_eq!(serialize_keybinding(&kb), "ctrl+shift+s");
+    }
+
+    #[test]
+    fn serialize_two_chord() {
+        let kb = Keybinding::two_chords(
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyK),
+            KeyCodeChord::new(true, false, false, false, KeyCode::KeyC),
+        );
+        assert_eq!(serialize_keybinding(&kb), "ctrl+k ctrl+c");
+    }
+
+    #[test]
+    fn chord_match_score_exact() {
+        let chord = KeyCodeChord::new(true, false, false, false, KeyCode::KeyS);
+        assert_eq!(chord_match_score(&chord, &chord), 8);
+    }
+
+    #[test]
+    fn chord_match_score_wrong_key() {
+        let a = KeyCodeChord::new(true, false, false, false, KeyCode::KeyS);
+        let b = KeyCodeChord::new(true, false, false, false, KeyCode::KeyA);
+        assert_eq!(chord_match_score(&a, &b), 0);
+    }
+
+    #[test]
+    fn chord_match_score_partial_modifier() {
+        let pressed = KeyCodeChord::new(true, true, false, false, KeyCode::KeyS);
+        let target = KeyCodeChord::new(true, false, false, false, KeyCode::KeyS);
+        // key matches (4), ctrl matches (1), alt matches (1), meta matches (1) = 7
+        // shift does NOT match so no +1 for shift
+        assert_eq!(chord_match_score(&pressed, &target), 7);
+    }
+
+    #[test]
+    fn group_by_category_works() {
+        let bindings = vec![
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyS)),
+                command: "save".into(),
+                category: KeybindingCategory::General,
+            },
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyG)),
+                command: "goto".into(),
+                category: KeybindingCategory::Navigation,
+            },
+            CategorizedKeybinding {
+                binding: Keybinding::new(KeyCodeChord::new(true, false, false, false, KeyCode::KeyN)),
+                command: "new".into(),
+                category: KeybindingCategory::General,
+            },
+        ];
+        let groups = group_by_category(&bindings);
+        assert_eq!(groups[&KeybindingCategory::General].len(), 2);
+        assert_eq!(groups[&KeybindingCategory::Navigation].len(), 1);
     }
 }

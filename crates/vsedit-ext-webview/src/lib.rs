@@ -486,6 +486,107 @@ impl std::fmt::Debug for WebviewMessageRouter {
     }
 }
 
+// ── Resource URI Resolution ──
+
+/// Resolve a local file path to a webview-safe resource URI.
+///
+/// Converts an absolute file path into a `vscode-resource://` URI,
+/// rejecting paths containing `..` traversal sequences.
+pub fn resolve_resource_uri(extension_root: &str, relative_path: &str) -> Result<String, WebviewError> {
+    if relative_path.contains("..") {
+        return Err(WebviewError::InvalidResourceRoot(relative_path.to_string()));
+    }
+    if relative_path.is_empty() {
+        return Err(WebviewError::InvalidContent("path must not be empty".into()));
+    }
+    let sep = if extension_root.ends_with('/') { "" } else { "/" };
+    Ok(format!("vscode-resource://{}{}{}", extension_root, sep, relative_path))
+}
+
+// ── CSP Header Generation ──
+
+/// Generate a Content-Security-Policy header value for a webview.
+///
+/// The generated policy restricts resources based on the provided
+/// security configuration and an optional nonce for inline scripts.
+pub fn generate_csp_header(config: &WebviewSecurityConfig, nonce: Option<&str>) -> String {
+    let mut directives = Vec::new();
+
+    let default_src = match config.policy {
+        WebviewResourcePolicy::Allow => "default-src *".to_string(),
+        WebviewResourcePolicy::Deny => "default-src 'none'".to_string(),
+        WebviewResourcePolicy::SameOrigin => "default-src 'self'".to_string(),
+    };
+    directives.push(default_src);
+
+    if config.enable_scripts {
+        let script_src = match nonce {
+            Some(n) => format!("script-src 'nonce-{}'", n),
+            None => "script-src 'self'".to_string(),
+        };
+        directives.push(script_src);
+    }
+
+    if !config.allowed_origins.is_empty() {
+        let origins = config.allowed_origins.join(" ");
+        directives.push(format!("connect-src {}", origins));
+    }
+
+    directives.join("; ")
+}
+
+// ── Webview State Serialization ──
+
+/// Serializable snapshot of a webview's state for persistence.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WebviewStateSnapshot {
+    pub handle: u64,
+    pub html: String,
+    pub options: WebviewOptions,
+    pub custom_state: serde_json::Value,
+}
+
+impl WebviewBridge {
+    /// Serialize the state of a webview into a snapshot.
+    pub fn snapshot_webview(
+        &self,
+        handle: u64,
+        custom_state: serde_json::Value,
+    ) -> Result<WebviewStateSnapshot, WebviewError> {
+        let wv = self
+            .webviews
+            .iter()
+            .find(|w| w.handle == handle)
+            .ok_or(WebviewError::NotFound(handle))?;
+        Ok(WebviewStateSnapshot {
+            handle: wv.handle,
+            html: wv.html.clone(),
+            options: wv.options.clone(),
+            custom_state,
+        })
+    }
+
+    /// Restore a webview from a snapshot, creating it if it doesn't exist.
+    pub fn restore_from_snapshot(&mut self, snapshot: &WebviewStateSnapshot) -> Result<(), WebviewError> {
+        if let Some(wv) = self.webviews.iter_mut().find(|w| w.handle == snapshot.handle) {
+            wv.html = snapshot.html.clone();
+            wv.options = snapshot.options.clone();
+        } else {
+            self.webviews.push(WebviewContent {
+                handle: snapshot.handle,
+                html: snapshot.html.clone(),
+                options: snapshot.options.clone(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Return the total number of pending messages across all webviews.
+    pub fn total_pending_messages(&self) -> usize {
+        self.messages.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -777,5 +878,95 @@ mod tests {
         let json = serde_json::to_string(&config).unwrap();
         let back: WebviewSecurityConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(config, back);
+    }
+
+    #[test]
+    fn resolve_resource_uri_success() {
+        let uri = resolve_resource_uri("/ext/my-extension", "media/style.css").unwrap();
+        assert_eq!(uri, "vscode-resource:///ext/my-extension/media/style.css");
+    }
+
+    #[test]
+    fn resolve_resource_uri_rejects_traversal() {
+        let result = resolve_resource_uri("/ext", "../etc/passwd");
+        assert!(matches!(result, Err(WebviewError::InvalidResourceRoot(_))));
+    }
+
+    #[test]
+    fn resolve_resource_uri_rejects_empty() {
+        let result = resolve_resource_uri("/ext", "");
+        assert!(matches!(result, Err(WebviewError::InvalidContent(_))));
+    }
+
+    #[test]
+    fn generate_csp_header_deny() {
+        let config = WebviewSecurityConfig::restrictive();
+        let csp = generate_csp_header(&config, None);
+        assert!(csp.contains("default-src 'none'"));
+        assert!(!csp.contains("script-src"));
+    }
+
+    #[test]
+    fn generate_csp_header_with_scripts_and_nonce() {
+        let config = WebviewSecurityConfig {
+            policy: WebviewResourcePolicy::SameOrigin,
+            allowed_origins: vec!["https://api.example.com".into()],
+            enable_scripts: true,
+            enable_forms: false,
+        };
+        let csp = generate_csp_header(&config, Some("abc123"));
+        assert!(csp.contains("default-src 'self'"));
+        assert!(csp.contains("script-src 'nonce-abc123'"));
+        assert!(csp.contains("connect-src https://api.example.com"));
+    }
+
+    #[test]
+    fn webview_state_snapshot_roundtrip() {
+        let mut bridge = WebviewBridge::new();
+        let opts = WebviewOptionsBuilder::new().enable_scripts(true).build().unwrap();
+        bridge.create_webview_checked(1, opts).unwrap();
+        bridge.set_html_checked(1, "<p>hello</p>".into()).unwrap();
+
+        let snapshot = bridge.snapshot_webview(1, serde_json::json!({"key": "val"})).unwrap();
+        assert_eq!(snapshot.handle, 1);
+        assert_eq!(snapshot.html, "<p>hello</p>");
+
+        let json = serde_json::to_string(&snapshot).unwrap();
+        let back: WebviewStateSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(snapshot, back);
+    }
+
+    #[test]
+    fn restore_from_snapshot_creates_webview() {
+        let mut bridge = WebviewBridge::new();
+        let snapshot = WebviewStateSnapshot {
+            handle: 42,
+            html: "<div>restored</div>".into(),
+            options: WebviewOptions {
+                enable_scripts: false,
+                enable_forms: false,
+                local_resource_roots: Vec::new(),
+            },
+            custom_state: serde_json::json!(null),
+        };
+        bridge.restore_from_snapshot(&snapshot).unwrap();
+        assert_eq!(bridge.webview_count(), 1);
+        assert_eq!(bridge.get_webview(42).unwrap().html, "<div>restored</div>");
+    }
+
+    #[test]
+    fn total_pending_messages_count() {
+        let mut bridge = WebviewBridge::new();
+        bridge.create_webview(1);
+        assert_eq!(bridge.total_pending_messages(), 0);
+        bridge.handle_message(&WebviewMessage::PostMessage {
+            handle: 1,
+            message: serde_json::json!("a"),
+        });
+        bridge.handle_message(&WebviewMessage::PostMessage {
+            handle: 1,
+            message: serde_json::json!("b"),
+        });
+        assert_eq!(bridge.total_pending_messages(), 2);
     }
 }

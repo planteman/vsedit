@@ -500,6 +500,124 @@ pub fn longest_common_substring_len(a: &str, b: &str) -> usize {
     max_len
 }
 
+// ---------------------------------------------------------------------------
+// Word boundary, string similarity, fuzzy matching, case conversion
+// ---------------------------------------------------------------------------
+
+/// Find word boundary positions (start indices of each word) in the string.
+pub fn word_boundary_positions(s: &str) -> Vec<usize> {
+    let mut positions = Vec::new();
+    let mut in_word = false;
+    for (i, c) in s.char_indices() {
+        if is_word_separator(c) || c.is_whitespace() {
+            in_word = false;
+        } else if !in_word {
+            positions.push(i);
+            in_word = true;
+        }
+    }
+    positions
+}
+
+/// Compute a normalized similarity score between two strings (0.0 = different, 1.0 = identical).
+pub fn similarity_score(a: &str, b: &str) -> f64 {
+    if a == b {
+        return 1.0;
+    }
+    let max_len = a.len().max(b.len());
+    if max_len == 0 {
+        return 1.0;
+    }
+    let dist = edit_distance(a, b);
+    1.0 - (dist as f64 / max_len as f64)
+}
+
+/// Compute a fuzzy matching score: number of query chars that appear in order in the target.
+pub fn fuzzy_match_score(query: &str, target: &str) -> usize {
+    let mut matched = 0;
+    let mut target_iter = target.chars();
+    for qc in query.chars() {
+        let qc_lower = qc.to_lowercase().next().unwrap_or(qc);
+        for tc in target_iter.by_ref() {
+            let tc_lower = tc.to_lowercase().next().unwrap_or(tc);
+            if qc_lower == tc_lower {
+                matched += 1;
+                break;
+            }
+        }
+    }
+    matched
+}
+
+/// Convert a camelCase or PascalCase string to snake_case.
+pub fn to_snake_case(s: &str) -> String {
+    let mut result = String::with_capacity(s.len() + 4);
+    for (i, c) in s.chars().enumerate() {
+        if c.is_uppercase() {
+            if i > 0 {
+                result.push('_');
+            }
+            for lc in c.to_lowercase() {
+                result.push(lc);
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Convert a snake_case string to camelCase.
+pub fn to_camel_case(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut capitalize_next = false;
+    for c in s.chars() {
+        if c == '_' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            for uc in c.to_uppercase() {
+                result.push(uc);
+            }
+            capitalize_next = false;
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Convert a snake_case string to PascalCase.
+pub fn to_pascal_case(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut capitalize_next = true;
+    for c in s.chars() {
+        if c == '_' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            for uc in c.to_uppercase() {
+                result.push(uc);
+            }
+            capitalize_next = false;
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Check if a string is a valid identifier (ASCII alphanumeric + underscore, not starting with digit).
+pub fn is_valid_identifier(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    let mut chars = s.chars();
+    let first = chars.next().unwrap();
+    if !first.is_ascii_alphabetic() && first != '_' {
+        return false;
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -702,5 +820,59 @@ mod tests {
         assert!(is_low_surrogate(0xDC00));
         assert!(is_low_surrogate(0xDFFF));
         assert!(!is_low_surrogate(0xD800));
+    }
+
+    #[test]
+    fn test_word_boundary_positions() {
+        assert_eq!(word_boundary_positions("hello world"), vec![0, 6]);
+        assert_eq!(word_boundary_positions("foo.bar+baz"), vec![0, 4, 8]);
+        assert!(word_boundary_positions("   ").is_empty());
+        assert_eq!(word_boundary_positions("single"), vec![0]);
+    }
+
+    #[test]
+    fn test_similarity_score() {
+        assert!((similarity_score("abc", "abc") - 1.0).abs() < f64::EPSILON);
+        assert!(similarity_score("kitten", "sitting") > 0.0);
+        assert!(similarity_score("kitten", "sitting") < 1.0);
+        assert!((similarity_score("", "") - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_fuzzy_match_score() {
+        assert_eq!(fuzzy_match_score("abc", "aXbXcX"), 3);
+        assert_eq!(fuzzy_match_score("xyz", "abc"), 0);
+        assert_eq!(fuzzy_match_score("fl", "FooBarList"), 2);
+    }
+
+    #[test]
+    fn test_to_snake_case() {
+        assert_eq!(to_snake_case("camelCase"), "camel_case");
+        assert_eq!(to_snake_case("PascalCase"), "_pascal_case");
+        assert_eq!(to_snake_case("already_snake"), "already_snake");
+        assert_eq!(to_snake_case("HTMLParser"), "_h_t_m_l_parser");
+    }
+
+    #[test]
+    fn test_to_camel_case() {
+        assert_eq!(to_camel_case("snake_case"), "snakeCase");
+        assert_eq!(to_camel_case("hello_world"), "helloWorld");
+        assert_eq!(to_camel_case("already"), "already");
+    }
+
+    #[test]
+    fn test_to_pascal_case() {
+        assert_eq!(to_pascal_case("snake_case"), "SnakeCase");
+        assert_eq!(to_pascal_case("hello_world"), "HelloWorld");
+    }
+
+    #[test]
+    fn test_is_valid_identifier() {
+        assert!(is_valid_identifier("hello"));
+        assert!(is_valid_identifier("_foo"));
+        assert!(is_valid_identifier("bar_123"));
+        assert!(!is_valid_identifier(""));
+        assert!(!is_valid_identifier("123abc"));
+        assert!(!is_valid_identifier("foo bar"));
     }
 }

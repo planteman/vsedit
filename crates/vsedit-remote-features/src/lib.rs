@@ -410,6 +410,102 @@ impl fmt::Display for RemoteServiceSummary {
     }
 }
 
+/// Result of a feature capability negotiation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CapabilityNegotiationResult {
+    pub feature: String,
+    pub supported: bool,
+    pub reason: Option<String>,
+}
+
+/// Negotiate which features are supported given a set of required features.
+pub fn negotiate_capabilities(
+    service: &RemoteFeaturesService,
+    required: &[RemoteFeature],
+) -> Vec<CapabilityNegotiationResult> {
+    required
+        .iter()
+        .map(|f| {
+            let supported = service.is_enabled(f);
+            CapabilityNegotiationResult {
+                feature: f.to_string(),
+                supported,
+                reason: if supported { None } else { Some("not enabled".to_string()) },
+            }
+        })
+        .collect()
+}
+
+/// Checks if a client version is compatible with a minimum required version.
+pub fn is_version_compatible(client_version: (u32, u32, u32), min_version: (u32, u32, u32)) -> bool {
+    client_version >= min_version
+}
+
+/// A node in a feature dependency graph.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FeatureDependency {
+    pub feature: RemoteFeature,
+    pub depends_on: Vec<RemoteFeature>,
+}
+
+/// Checks if all dependencies of a feature are enabled.
+pub fn check_feature_dependencies(
+    service: &RemoteFeaturesService,
+    dep: &FeatureDependency,
+) -> bool {
+    dep.depends_on.iter().all(|d| service.is_enabled(d))
+}
+
+/// Tracks activation state of features with timestamps.
+#[derive(Debug, Clone)]
+pub struct FeatureActivationRecord {
+    pub feature: RemoteFeature,
+    pub activated: bool,
+    pub activation_order: u32,
+}
+
+/// Tracks the order in which features were activated.
+#[derive(Debug, Clone, Default)]
+pub struct FeatureActivationTracker {
+    records: Vec<FeatureActivationRecord>,
+    next_order: u32,
+}
+
+impl FeatureActivationTracker {
+    pub fn new() -> Self {
+        Self { records: Vec::new(), next_order: 0 }
+    }
+
+    pub fn activate(&mut self, feature: RemoteFeature) {
+        if !self.records.iter().any(|r| r.feature == feature && r.activated) {
+            self.records.push(FeatureActivationRecord {
+                feature,
+                activated: true,
+                activation_order: self.next_order,
+            });
+            self.next_order += 1;
+        }
+    }
+
+    pub fn deactivate(&mut self, feature: &RemoteFeature) {
+        if let Some(r) = self.records.iter_mut().find(|r| &r.feature == feature && r.activated) {
+            r.activated = false;
+        }
+    }
+
+    pub fn is_active(&self, feature: &RemoteFeature) -> bool {
+        self.records.iter().any(|r| &r.feature == feature && r.activated)
+    }
+
+    pub fn active_count(&self) -> usize {
+        self.records.iter().filter(|r| r.activated).count()
+    }
+
+    pub fn activation_history(&self) -> &[FeatureActivationRecord] {
+        &self.records
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -714,5 +810,63 @@ mod tests {
         svc.add_port_forward(PortForwardBuilder::new(5000, 5000).visibility(PortVisibility::Private).build());
         assert_eq!(svc.ports_by_visibility(&PortVisibility::Public).len(), 1);
         assert_eq!(svc.ports_by_visibility(&PortVisibility::Private).len(), 1);
+    }
+
+    #[test]
+    fn capability_negotiation_supported() {
+        let mut svc = RemoteFeaturesService::new();
+        svc.enable_feature(RemoteFeature::Terminal);
+        svc.enable_feature(RemoteFeature::FileSystem);
+        let results = negotiate_capabilities(&svc, &[RemoteFeature::Terminal, RemoteFeature::Debugging]);
+        assert!(results[0].supported);
+        assert!(!results[1].supported);
+        assert!(results[1].reason.is_some());
+    }
+
+    #[test]
+    fn version_compatibility_check() {
+        assert!(is_version_compatible((1, 2, 3), (1, 2, 0)));
+        assert!(is_version_compatible((2, 0, 0), (1, 9, 9)));
+        assert!(!is_version_compatible((1, 0, 0), (1, 0, 1)));
+        assert!(is_version_compatible((1, 0, 0), (1, 0, 0)));
+    }
+
+    #[test]
+    fn feature_dependency_check() {
+        let mut svc = RemoteFeaturesService::new();
+        svc.enable_feature(RemoteFeature::FileSystem);
+        svc.enable_feature(RemoteFeature::Terminal);
+        let dep = FeatureDependency {
+            feature: RemoteFeature::Debugging,
+            depends_on: vec![RemoteFeature::FileSystem, RemoteFeature::Terminal],
+        };
+        assert!(check_feature_dependencies(&svc, &dep));
+        let dep2 = FeatureDependency {
+            feature: RemoteFeature::Debugging,
+            depends_on: vec![RemoteFeature::Extensions],
+        };
+        assert!(!check_feature_dependencies(&svc, &dep2));
+    }
+
+    #[test]
+    fn activation_tracker_lifecycle() {
+        let mut tracker = FeatureActivationTracker::new();
+        assert_eq!(tracker.active_count(), 0);
+        tracker.activate(RemoteFeature::Terminal);
+        tracker.activate(RemoteFeature::FileSystem);
+        assert_eq!(tracker.active_count(), 2);
+        assert!(tracker.is_active(&RemoteFeature::Terminal));
+        tracker.deactivate(&RemoteFeature::Terminal);
+        assert!(!tracker.is_active(&RemoteFeature::Terminal));
+        assert_eq!(tracker.active_count(), 1);
+    }
+
+    #[test]
+    fn activation_tracker_no_double_activate() {
+        let mut tracker = FeatureActivationTracker::new();
+        tracker.activate(RemoteFeature::Terminal);
+        tracker.activate(RemoteFeature::Terminal);
+        assert_eq!(tracker.active_count(), 1);
+        assert_eq!(tracker.activation_history().len(), 1);
     }
 }

@@ -445,6 +445,116 @@ pub fn tree_statistics<T>(model: &TreeModel<T>) -> TreeStatistics {
     }
 }
 
+// ── Tree Serialization ──
+
+/// Serialize a tree model to a nested indented string representation.
+/// Each node is printed as `indent + label`, where `label` comes from `to_label`.
+pub fn serialize_tree<T, F>(model: &TreeModel<T>, to_label: F) -> String
+where
+    F: Fn(&T) -> String,
+{
+    let mut out = String::new();
+    for root in &model.roots {
+        serialize_node(root, &to_label, &mut out);
+    }
+    out
+}
+
+fn serialize_node<T, F>(node: &TreeNode<T>, to_label: &F, out: &mut String)
+where
+    F: Fn(&T) -> String,
+{
+    let indent = "  ".repeat(node.depth as usize);
+    out.push_str(&format!("{}{}\n", indent, to_label(&node.data)));
+    for child in &node.children {
+        serialize_node(child, to_label, out);
+    }
+}
+
+/// Compute the path from root to a node identified by a predicate.
+/// Returns the first match found in DFS order, or `None`.
+pub fn find_node_path<T, F>(model: &TreeModel<T>, predicate: F) -> Option<Vec<usize>>
+where
+    F: Fn(&T) -> bool,
+{
+    for (i, root) in model.roots.iter().enumerate() {
+        let mut path = vec![i];
+        if find_path_in_node(root, &predicate, &mut path) {
+            return Some(path);
+        }
+    }
+    None
+}
+
+fn find_path_in_node<T, F>(node: &TreeNode<T>, predicate: &F, path: &mut Vec<usize>) -> bool
+where
+    F: Fn(&T) -> bool,
+{
+    if predicate(&node.data) {
+        return true;
+    }
+    for (i, child) in node.children.iter().enumerate() {
+        path.push(i);
+        if find_path_in_node(child, predicate, path) {
+            return true;
+        }
+        path.pop();
+    }
+    false
+}
+
+/// Subtree statistics for a single node and all its descendants.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SubtreeStats {
+    pub total_nodes: usize,
+    pub leaf_count: usize,
+    pub max_depth: u32,
+}
+
+/// Compute statistics for the subtree rooted at the node found via `path`.
+pub fn subtree_statistics<T>(model: &TreeModel<T>, path: &[usize]) -> Option<SubtreeStats> {
+    let node = node_at_path_ref(&model.roots, path)?;
+    let mut total: usize = 0;
+    let mut leaves: usize = 0;
+    let mut max_d: u32 = 0;
+    count_subtree(node, &mut total, &mut leaves, &mut max_d);
+    Some(SubtreeStats { total_nodes: total, leaf_count: leaves, max_depth: max_d })
+}
+
+fn node_at_path_ref<'a, T>(nodes: &'a [TreeNode<T>], path: &[usize]) -> Option<&'a TreeNode<T>> {
+    match path {
+        [] => None,
+        [idx] => nodes.get(*idx),
+        [idx, rest @ ..] => nodes.get(*idx).and_then(|n| node_at_path_ref(&n.children, rest)),
+    }
+}
+
+fn count_subtree<T>(node: &TreeNode<T>, total: &mut usize, leaves: &mut usize, max_d: &mut u32) {
+    *total += 1;
+    if node.depth > *max_d {
+        *max_d = node.depth;
+    }
+    if node.children.is_empty() {
+        *leaves += 1;
+    } else {
+        for child in &node.children {
+            count_subtree(child, total, leaves, max_d);
+        }
+    }
+}
+
+/// Count the number of leaf nodes in the entire tree.
+pub fn leaf_count<T>(model: &TreeModel<T>) -> usize {
+    fn count_leaves<T>(node: &TreeNode<T>) -> usize {
+        if node.children.is_empty() {
+            1
+        } else {
+            node.children.iter().map(count_leaves).sum()
+        }
+    }
+    model.roots.iter().map(count_leaves).sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -759,5 +869,52 @@ mod tests {
         assert_eq!(results[0].depth, 1);
         assert_eq!(results[0].node_index, 2); // src(0), main.rs(1), lib(2)
         assert_eq!(results[0].path, vec![0, 1]);
+    }
+
+    #[test]
+    fn serialize_tree_produces_indented_output() {
+        let model = sample_model();
+        let output = serialize_tree(&model, |d| d.to_string());
+        assert!(output.contains("src\n"));
+        assert!(output.contains("  main.rs\n"));
+        assert!(output.contains("  lib\n"));
+        assert!(output.contains("    mod.rs\n"));
+        assert!(output.contains("Cargo.toml\n"));
+    }
+
+    #[test]
+    fn find_node_path_locates_nested_node() {
+        let model = sample_model();
+        let path = find_node_path(&model, |d| *d == "utils.rs");
+        assert_eq!(path, Some(vec![0, 1, 1]));
+    }
+
+    #[test]
+    fn find_node_path_returns_none_for_missing() {
+        let model = sample_model();
+        assert!(find_node_path(&model, |d| *d == "missing").is_none());
+    }
+
+    #[test]
+    fn subtree_statistics_for_subtree() {
+        let model = sample_model();
+        let stats = subtree_statistics(&model, &[0, 1]).unwrap(); // "lib" subtree
+        assert_eq!(stats.total_nodes, 3); // lib, mod.rs, utils.rs
+        assert_eq!(stats.leaf_count, 2);
+        assert_eq!(stats.max_depth, 2);
+    }
+
+    #[test]
+    fn subtree_statistics_returns_none_for_bad_path() {
+        let model = sample_model();
+        assert!(subtree_statistics(&model, &[9]).is_none());
+    }
+
+    #[test]
+    fn leaf_count_counts_leaves() {
+        let model = sample_model();
+        assert_eq!(leaf_count(&model), 4); // main.rs, mod.rs, utils.rs, Cargo.toml
+        let empty: TreeModel<&str> = TreeModel::new();
+        assert_eq!(leaf_count(&empty), 0);
     }
 }

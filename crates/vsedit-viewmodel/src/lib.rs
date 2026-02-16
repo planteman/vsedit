@@ -336,6 +336,131 @@ impl std::fmt::Display for ViewLine {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Viewport calculation, visible range, coordinate mapping, line heights
+// ---------------------------------------------------------------------------
+
+/// Describes a rectangular viewport within the view model.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Viewport {
+    pub first_view_line: u32,
+    pub visible_line_count: u32,
+}
+
+impl Viewport {
+    pub fn new(first_view_line: u32, visible_line_count: u32) -> Self {
+        Self {
+            first_view_line,
+            visible_line_count,
+        }
+    }
+
+    /// Return the last visible view line (1-based, inclusive).
+    pub fn last_view_line(&self) -> u32 {
+        self.first_view_line + self.visible_line_count.saturating_sub(1)
+    }
+
+    /// Check if a 1-based view line is within this viewport.
+    pub fn contains_view_line(&self, view_line: u32) -> bool {
+        view_line >= self.first_view_line && view_line <= self.last_view_line()
+    }
+}
+
+impl fmt::Display for Viewport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Viewport(first={}, count={})",
+            self.first_view_line, self.visible_line_count
+        )
+    }
+}
+
+/// Tracks per-line heights for variable-height rendering.
+#[derive(Debug, Clone)]
+pub struct LineHeightTracker {
+    heights: Vec<u32>,
+    default_height: u32,
+}
+
+impl LineHeightTracker {
+    pub fn new(default_height: u32) -> Self {
+        Self {
+            heights: Vec::new(),
+            default_height: if default_height == 0 { 1 } else { default_height },
+        }
+    }
+
+    /// Set the height of a specific 0-based line index.
+    pub fn set_height(&mut self, line_index: usize, height: u32) {
+        if line_index >= self.heights.len() {
+            self.heights.resize(line_index + 1, self.default_height);
+        }
+        self.heights[line_index] = height;
+    }
+
+    /// Get the height of a specific 0-based line index.
+    pub fn get_height(&self, line_index: usize) -> u32 {
+        self.heights.get(line_index).copied().unwrap_or(self.default_height)
+    }
+
+    /// Compute the total pixel height of all tracked lines.
+    pub fn total_height(&self, line_count: usize) -> u32 {
+        let mut total: u32 = 0;
+        for i in 0..line_count {
+            total += self.get_height(i);
+        }
+        total
+    }
+
+    /// Find which line a given y-pixel offset falls on (0-based line index).
+    pub fn line_at_offset(&self, y_offset: u32, line_count: usize) -> usize {
+        let mut accumulated: u32 = 0;
+        for i in 0..line_count {
+            let h = self.get_height(i);
+            if accumulated + h > y_offset {
+                return i;
+            }
+            accumulated += h;
+        }
+        line_count.saturating_sub(1)
+    }
+
+    /// Compute the y-pixel offset of a given 0-based line index.
+    pub fn offset_of_line(&self, line_index: usize) -> u32 {
+        let mut offset: u32 = 0;
+        for i in 0..line_index {
+            offset += self.get_height(i);
+        }
+        offset
+    }
+}
+
+impl ViewModel {
+    /// Compute the visible range of model lines for a given viewport.
+    pub fn visible_model_range(&self, viewport: &Viewport) -> (u32, u32) {
+        let lines = self.get_viewport_lines(viewport.first_view_line, viewport.visible_line_count);
+        if lines.is_empty() {
+            return (0, 0);
+        }
+        let first_model = lines.first().unwrap().model_line;
+        let last_model = lines.last().unwrap().model_line;
+        (first_model, last_model)
+    }
+
+    /// Map a pixel y-coordinate to a view line (1-based) using a line height tracker.
+    pub fn view_line_at_pixel(&self, y: u32, tracker: &LineHeightTracker) -> u32 {
+        let count = self.get_view_line_count() as usize;
+        let idx = tracker.line_at_offset(y, count);
+        (idx as u32) + 1
+    }
+
+    /// Compute the pixel y-offset of a view line (1-based) using a line height tracker.
+    pub fn pixel_offset_of_view_line(&self, view_line: u32, tracker: &LineHeightTracker) -> u32 {
+        tracker.offset_of_line((view_line - 1) as usize)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -702,5 +827,56 @@ mod tests {
         let s = format!("{vl}");
         assert!(s.contains("↪"));
         assert!(s.contains("world"));
+    }
+
+    #[test]
+    fn viewport_contains_view_line() {
+        let vp = Viewport::new(3, 5);
+        assert_eq!(vp.last_view_line(), 7);
+        assert!(!vp.contains_view_line(2));
+        assert!(vp.contains_view_line(3));
+        assert!(vp.contains_view_line(7));
+        assert!(!vp.contains_view_line(8));
+    }
+
+    #[test]
+    fn viewport_display() {
+        let vp = Viewport::new(1, 10);
+        let s = format!("{vp}");
+        assert!(s.contains("first=1"));
+        assert!(s.contains("count=10"));
+    }
+
+    #[test]
+    fn line_height_tracker_basics() {
+        let mut t = LineHeightTracker::new(20);
+        assert_eq!(t.get_height(0), 20);
+        t.set_height(0, 30);
+        assert_eq!(t.get_height(0), 30);
+        assert_eq!(t.total_height(3), 30 + 20 + 20);
+        assert_eq!(t.offset_of_line(1), 30);
+        assert_eq!(t.line_at_offset(35, 3), 1);
+    }
+
+    #[test]
+    fn visible_model_range_with_wrap() {
+        let model = make_model("hello world\nfoo");
+        let vm = ViewModel::new(model, 6, WordWrap::On);
+        let vp = Viewport::new(1, 3);
+        let (first, last) = vm.visible_model_range(&vp);
+        assert_eq!(first, 1);
+        assert_eq!(last, 2);
+    }
+
+    #[test]
+    fn pixel_mapping_with_tracker() {
+        let model = make_model("hello\nworld\nfoo");
+        let vm = ViewModel::new(model, 0, WordWrap::Off);
+        let mut tracker = LineHeightTracker::new(20);
+        tracker.set_height(0, 25);
+        assert_eq!(vm.pixel_offset_of_view_line(1, &tracker), 0);
+        assert_eq!(vm.pixel_offset_of_view_line(2, &tracker), 25);
+        let vl = vm.view_line_at_pixel(30, &tracker);
+        assert_eq!(vl, 2); // 25..45 is line 2
     }
 }

@@ -408,6 +408,147 @@ pub fn hash_combine_unordered(values: &[&str]) -> u32 {
     hash
 }
 
+// ---------------------------------------------------------------------------
+// CRC32, hash mixing, consistent hashing ring, Bloom filter
+// ---------------------------------------------------------------------------
+
+/// Compute CRC32 checksum (using the standard polynomial 0xEDB88320).
+pub fn crc32(data: &[u8]) -> u32 {
+    let mut crc: u32 = 0xFFFF_FFFF;
+    for &byte in data {
+        crc ^= u32::from(byte);
+        for _ in 0..8 {
+            if crc & 1 != 0 {
+                crc = (crc >> 1) ^ 0xEDB8_8320;
+            } else {
+                crc >>= 1;
+            }
+        }
+    }
+    !crc
+}
+
+/// Mix two 32-bit hash values using a Murmur-like finalizer.
+pub fn hash_mix(a: u32, b: u32) -> u32 {
+    let mut h = a.wrapping_add(b.wrapping_mul(0x9e37_79b9));
+    h ^= h >> 16;
+    h = h.wrapping_mul(0x85eb_ca6b);
+    h ^= h >> 13;
+    h = h.wrapping_mul(0xc2b2_ae35);
+    h ^= h >> 16;
+    h
+}
+
+/// Combine a slice of u32 hash values into a single hash using `hash_mix`.
+pub fn hash_combine_all(values: &[u32]) -> u32 {
+    let mut acc: u32 = 0;
+    for &v in values {
+        acc = hash_mix(acc, v);
+    }
+    acc
+}
+
+/// A consistent hashing ring that maps keys to named nodes.
+pub struct ConsistentHashRing {
+    nodes: Vec<String>,
+}
+
+impl ConsistentHashRing {
+    pub fn new() -> Self {
+        Self { nodes: Vec::new() }
+    }
+
+    /// Add a node to the ring.
+    pub fn add_node(&mut self, name: impl Into<String>) {
+        self.nodes.push(name.into());
+    }
+
+    /// Remove a node by name. Returns true if found and removed.
+    pub fn remove_node(&mut self, name: &str) -> bool {
+        let before = self.nodes.len();
+        self.nodes.retain(|n| n != name);
+        self.nodes.len() < before
+    }
+
+    /// Determine which node a key maps to. Returns `None` if the ring is empty.
+    pub fn get_node(&self, key: &str) -> Option<&str> {
+        if self.nodes.is_empty() {
+            return None;
+        }
+        let h = fnv1a_hash(key.as_bytes()) as usize;
+        let idx = h % self.nodes.len();
+        Some(&self.nodes[idx])
+    }
+
+    pub fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+}
+
+impl Default for ConsistentHashRing {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A simple Bloom filter for probabilistic set membership.
+pub struct BloomFilter {
+    bits: Vec<bool>,
+    num_hashes: usize,
+}
+
+impl BloomFilter {
+    /// Create a new Bloom filter with `size` bits and `num_hashes` hash functions.
+    pub fn new(size: usize, num_hashes: usize) -> Self {
+        let size = if size == 0 { 64 } else { size };
+        let num_hashes = if num_hashes == 0 { 1 } else { num_hashes };
+        Self {
+            bits: vec![false; size],
+            num_hashes,
+        }
+    }
+
+    /// Insert an item into the Bloom filter.
+    pub fn insert(&mut self, item: &[u8]) {
+        for i in 0..self.num_hashes {
+            let idx = self.hash_index(item, i);
+            self.bits[idx] = true;
+        }
+    }
+
+    /// Check if an item may be in the set. False positives are possible.
+    pub fn may_contain(&self, item: &[u8]) -> bool {
+        for i in 0..self.num_hashes {
+            let idx = self.hash_index(item, i);
+            if !self.bits[idx] {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Clear all bits.
+    pub fn clear(&mut self) {
+        self.bits.iter_mut().for_each(|b| *b = false);
+    }
+
+    /// Return the number of bits set to true.
+    pub fn count_ones(&self) -> usize {
+        self.bits.iter().filter(|&&b| b).count()
+    }
+
+    fn hash_index(&self, item: &[u8], seed: usize) -> usize {
+        let mut data = Vec::with_capacity(item.len() + 8);
+        data.extend_from_slice(item);
+        data.extend_from_slice(&(seed as u64).to_le_bytes());
+        (fnv1a_hash(&data) as usize) % self.bits.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -702,5 +843,71 @@ mod tests {
         let algo_h = HashAlgorithm::FnvLike.hash_str("test string");
         let direct_h = fnv1a_hash(b"test string");
         assert_eq!(algo_h, direct_h);
+    }
+
+    #[test]
+    fn test_crc32_deterministic() {
+        let a = crc32(b"hello world");
+        let b = crc32(b"hello world");
+        assert_eq!(a, b);
+        assert_ne!(a, crc32(b"other"));
+        // empty data should produce a known value
+        assert_ne!(crc32(b""), 0);
+    }
+
+    #[test]
+    fn test_hash_mix_and_combine_all() {
+        let m = hash_mix(123, 456);
+        assert_ne!(m, 0);
+        assert_eq!(m, hash_mix(123, 456));
+        assert_ne!(hash_mix(123, 456), hash_mix(456, 123));
+
+        let combined = hash_combine_all(&[1, 2, 3]);
+        assert_eq!(combined, hash_combine_all(&[1, 2, 3]));
+        assert_ne!(combined, hash_combine_all(&[3, 2, 1]));
+    }
+
+    #[test]
+    fn test_consistent_hash_ring() {
+        let mut ring = ConsistentHashRing::new();
+        assert!(ring.is_empty());
+        assert!(ring.get_node("key").is_none());
+        ring.add_node("node-a");
+        ring.add_node("node-b");
+        ring.add_node("node-c");
+        assert_eq!(ring.node_count(), 3);
+        let node = ring.get_node("my-key").unwrap();
+        assert!(!node.is_empty());
+        // deterministic
+        assert_eq!(ring.get_node("my-key"), Some(node));
+        assert!(ring.remove_node("node-b"));
+        assert!(!ring.remove_node("nonexistent"));
+        assert_eq!(ring.node_count(), 2);
+    }
+
+    #[test]
+    fn test_bloom_filter_insert_and_query() {
+        let mut bf = BloomFilter::new(256, 3);
+        bf.insert(b"hello");
+        bf.insert(b"world");
+        assert!(bf.may_contain(b"hello"));
+        assert!(bf.may_contain(b"world"));
+        // False negative must never happen
+        assert!(bf.count_ones() > 0);
+        bf.clear();
+        assert_eq!(bf.count_ones(), 0);
+        assert!(!bf.may_contain(b"hello"));
+    }
+
+    #[test]
+    fn test_bloom_filter_false_positive_rate() {
+        let mut bf = BloomFilter::new(1024, 5);
+        for i in 0..10u32 {
+            bf.insert(&i.to_le_bytes());
+        }
+        // All inserted items must be found
+        for i in 0..10u32 {
+            assert!(bf.may_contain(&i.to_le_bytes()));
+        }
     }
 }

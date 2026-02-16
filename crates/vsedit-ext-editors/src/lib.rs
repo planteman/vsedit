@@ -436,6 +436,101 @@ pub fn register() {
     // Registration will connect RPC handlers when extension host starts
 }
 
+/// Represents a snapshot of an editor's state at a point in time.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EditorSnapshot {
+    pub editor_id: String,
+    pub uri: String,
+    pub selections: Vec<EditorSelection>,
+}
+
+/// Diff between two editor states.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EditorStateDiff {
+    pub uri_changed: bool,
+    pub selections_added: usize,
+    pub selections_removed: usize,
+    pub old_uri: String,
+    pub new_uri: String,
+}
+
+impl EditorBridge {
+    /// Take a snapshot of a specific editor's current state.
+    pub fn snapshot(&self, editor_id: &str) -> Result<EditorSnapshot, EditorError> {
+        let state = self
+            .editors
+            .get(editor_id)
+            .ok_or_else(|| EditorError::EditorNotFound(editor_id.to_owned()))?;
+        Ok(EditorSnapshot {
+            editor_id: editor_id.to_owned(),
+            uri: state.uri.clone(),
+            selections: state.selections.clone(),
+        })
+    }
+
+    /// Compute the diff between two editor snapshots.
+    pub fn diff_snapshots(old: &EditorSnapshot, new: &EditorSnapshot) -> EditorStateDiff {
+        let old_count = old.selections.len();
+        let new_count = new.selections.len();
+        EditorStateDiff {
+            uri_changed: old.uri != new.uri,
+            selections_added: if new_count > old_count { new_count - old_count } else { 0 },
+            selections_removed: if old_count > new_count { old_count - new_count } else { 0 },
+            old_uri: old.uri.clone(),
+            new_uri: new.uri.clone(),
+        }
+    }
+}
+
+/// Merge two selections into one that covers both ranges.
+pub fn merge_selections(a: &EditorSelection, b: &EditorSelection) -> EditorSelection {
+    let range_a = a.to_range();
+    let range_b = b.to_range();
+    let merged = range_a.union(&range_b);
+    EditorSelection {
+        anchor_line: merged.start_line,
+        anchor_col: merged.start_col,
+        active_line: merged.end_line,
+        active_col: merged.end_col,
+    }
+}
+
+/// Check if two decoration ranges overlap, indicating a conflict.
+pub fn decorations_conflict(a: &TextEditorDecoration, b: &TextEditorDecoration) -> bool {
+    if !a.range.is_valid() || !b.range.is_valid() {
+        return false;
+    }
+    let a_before_b = (a.range.end_line, a.range.end_col) <= (b.range.start_line, b.range.start_col);
+    let b_before_a = (b.range.end_line, b.range.end_col) <= (a.range.start_line, a.range.start_col);
+    !(a_before_b || b_before_a)
+}
+
+/// Resolve conflicting decorations by merging overlapping ones.
+/// Returns a new list with non-overlapping decorations.
+pub fn resolve_decoration_conflicts(decorations: &[TextEditorDecoration]) -> Vec<TextEditorDecoration> {
+    if decorations.is_empty() {
+        return Vec::new();
+    }
+    let mut sorted: Vec<TextEditorDecoration> = decorations.to_vec();
+    sorted.sort_by_key(|d| (d.range.start_line, d.range.start_col));
+    let mut result: Vec<TextEditorDecoration> = vec![sorted[0].clone()];
+    for dec in sorted.iter().skip(1) {
+        let last = result.last().unwrap().clone();
+        if decorations_conflict(&last, dec) {
+            let merged_range = last.range.union(&dec.range);
+            let merged = TextEditorDecoration {
+                range: merged_range,
+                hover_message: last.hover_message.or(dec.hover_message.clone()),
+                style: last.style.or(dec.style.clone()),
+            };
+            *result.last_mut().unwrap() = merged;
+        } else {
+            result.push(dec.clone());
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -708,5 +803,108 @@ mod tests {
         assert_eq!(ids.len(), 2);
         assert!(ids.contains(&"e1"));
         assert!(ids.contains(&"e2"));
+    }
+
+    #[test]
+    fn snapshot_and_diff() {
+        let mut bridge = EditorBridge::new();
+        bridge.add_editor("e1".into(), "file:///a.rs".into());
+        let snap1 = bridge.snapshot("e1").unwrap();
+        assert_eq!(snap1.uri, "file:///a.rs");
+        assert!(snap1.selections.is_empty());
+
+        bridge.handle(EditorMessage::SetSelection {
+            editor_id: "e1".into(),
+            selections: vec![
+                EditorSelection { anchor_line: 0, anchor_col: 0, active_line: 1, active_col: 5 },
+            ],
+        });
+        let snap2 = bridge.snapshot("e1").unwrap();
+        let diff = EditorBridge::diff_snapshots(&snap1, &snap2);
+        assert!(!diff.uri_changed);
+        assert_eq!(diff.selections_added, 1);
+        assert_eq!(diff.selections_removed, 0);
+    }
+
+    #[test]
+    fn snapshot_missing_editor() {
+        let bridge = EditorBridge::new();
+        assert!(bridge.snapshot("nope").is_err());
+    }
+
+    #[test]
+    fn merge_selections_covers_both() {
+        let a = EditorSelection { anchor_line: 1, anchor_col: 0, active_line: 3, active_col: 5 };
+        let b = EditorSelection { anchor_line: 2, anchor_col: 3, active_line: 7, active_col: 10 };
+        let merged = merge_selections(&a, &b);
+        assert_eq!(merged.anchor_line, 1);
+        assert_eq!(merged.anchor_col, 0);
+        assert_eq!(merged.active_line, 7);
+        assert_eq!(merged.active_col, 10);
+    }
+
+    #[test]
+    fn decorations_conflict_detection() {
+        let d1 = TextEditorDecoration {
+            range: EditorRange { start_line: 1, start_col: 0, end_line: 5, end_col: 10 },
+            hover_message: None,
+            style: None,
+        };
+        let d2 = TextEditorDecoration {
+            range: EditorRange { start_line: 3, start_col: 0, end_line: 8, end_col: 0 },
+            hover_message: None,
+            style: None,
+        };
+        let d3 = TextEditorDecoration {
+            range: EditorRange { start_line: 10, start_col: 0, end_line: 12, end_col: 0 },
+            hover_message: None,
+            style: None,
+        };
+        assert!(decorations_conflict(&d1, &d2));
+        assert!(!decorations_conflict(&d1, &d3));
+    }
+
+    #[test]
+    fn resolve_decoration_conflicts_merges() {
+        let decs = vec![
+            TextEditorDecoration {
+                range: EditorRange { start_line: 1, start_col: 0, end_line: 5, end_col: 0 },
+                hover_message: Some("first".into()),
+                style: None,
+            },
+            TextEditorDecoration {
+                range: EditorRange { start_line: 3, start_col: 0, end_line: 8, end_col: 0 },
+                hover_message: None,
+                style: Some("bold".into()),
+            },
+            TextEditorDecoration {
+                range: EditorRange { start_line: 20, start_col: 0, end_line: 25, end_col: 0 },
+                hover_message: None,
+                style: None,
+            },
+        ];
+        let resolved = resolve_decoration_conflicts(&decs);
+        assert_eq!(resolved.len(), 2);
+        assert_eq!(resolved[0].range.start_line, 1);
+        assert_eq!(resolved[0].range.end_line, 8);
+        assert_eq!(resolved[1].range.start_line, 20);
+    }
+
+    #[test]
+    fn diff_snapshots_uri_changed() {
+        let snap1 = EditorSnapshot {
+            editor_id: "e1".into(),
+            uri: "file:///old.rs".into(),
+            selections: vec![],
+        };
+        let snap2 = EditorSnapshot {
+            editor_id: "e1".into(),
+            uri: "file:///new.rs".into(),
+            selections: vec![],
+        };
+        let diff = EditorBridge::diff_snapshots(&snap1, &snap2);
+        assert!(diff.uri_changed);
+        assert_eq!(diff.old_uri, "file:///old.rs");
+        assert_eq!(diff.new_uri, "file:///new.rs");
     }
 }

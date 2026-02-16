@@ -411,6 +411,147 @@ impl fmt::Display for ConnectionInfo {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Connection latency tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks latency samples for a connection.
+#[derive(Debug, Clone, Default)]
+pub struct LatencyTracker {
+    samples: Vec<u64>,
+}
+
+impl LatencyTracker {
+    pub fn new() -> Self {
+        Self { samples: Vec::new() }
+    }
+
+    /// Record a latency sample in milliseconds.
+    pub fn record(&mut self, ms: u64) {
+        self.samples.push(ms);
+    }
+
+    /// Average latency in milliseconds, or 0 if no samples.
+    pub fn average_ms(&self) -> u64 {
+        if self.samples.is_empty() {
+            return 0;
+        }
+        self.samples.iter().sum::<u64>() / self.samples.len() as u64
+    }
+
+    /// Minimum latency sample.
+    pub fn min_ms(&self) -> Option<u64> {
+        self.samples.iter().copied().min()
+    }
+
+    /// Maximum latency sample.
+    pub fn max_ms(&self) -> Option<u64> {
+        self.samples.iter().copied().max()
+    }
+
+    /// Number of recorded samples.
+    pub fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+
+    /// Clear all samples.
+    pub fn reset(&mut self) {
+        self.samples.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Reconnection backoff computation
+// ---------------------------------------------------------------------------
+
+/// Compute exponential backoff delay for reconnection attempts.
+///
+/// Returns delay in milliseconds, capped at `max_delay_ms`.
+pub fn compute_backoff(attempt: u32, base_ms: u64, max_delay_ms: u64) -> u64 {
+    let delay = base_ms.saturating_mul(2u64.saturating_pow(attempt));
+    delay.min(max_delay_ms)
+}
+
+// ---------------------------------------------------------------------------
+// Connection capability negotiation
+// ---------------------------------------------------------------------------
+
+/// Capabilities that a remote connection endpoint may support.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectionCapabilities {
+    pub supports_file_system: bool,
+    pub supports_terminal: bool,
+    pub supports_port_forwarding: bool,
+    pub supports_search: bool,
+}
+
+impl Default for ConnectionCapabilities {
+    fn default() -> Self {
+        Self {
+            supports_file_system: true,
+            supports_terminal: false,
+            supports_port_forwarding: false,
+            supports_search: false,
+        }
+    }
+}
+
+impl ConnectionCapabilities {
+    /// Negotiate capabilities by taking the intersection of two sets.
+    pub fn negotiate(&self, other: &Self) -> Self {
+        Self {
+            supports_file_system: self.supports_file_system && other.supports_file_system,
+            supports_terminal: self.supports_terminal && other.supports_terminal,
+            supports_port_forwarding: self.supports_port_forwarding && other.supports_port_forwarding,
+            supports_search: self.supports_search && other.supports_search,
+        }
+    }
+
+    /// Return the number of supported capabilities.
+    pub fn supported_count(&self) -> usize {
+        [
+            self.supports_file_system,
+            self.supports_terminal,
+            self.supports_port_forwarding,
+            self.supports_search,
+        ]
+        .iter()
+        .filter(|&&v| v)
+        .count()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Session duration tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks a session's start and optional end time (as epoch seconds).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionDuration {
+    pub start_secs: u64,
+    pub end_secs: Option<u64>,
+}
+
+impl SessionDuration {
+    pub fn start(start_secs: u64) -> Self {
+        Self { start_secs, end_secs: None }
+    }
+
+    pub fn stop(&mut self, end_secs: u64) {
+        self.end_secs = Some(end_secs);
+    }
+
+    /// Duration in seconds, or time since start relative to `now` if still running.
+    pub fn elapsed(&self, now: u64) -> u64 {
+        let end = self.end_secs.unwrap_or(now);
+        end.saturating_sub(self.start_secs)
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.end_secs.is_none()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -780,5 +921,71 @@ mod tests {
         };
         let info2 = ConnectionInfo::from_connection(&conn2);
         assert_eq!(info2.state, ConnectionState::Closed);
+    }
+
+    #[test]
+    fn latency_tracker_basic() {
+        let mut lt = LatencyTracker::new();
+        assert_eq!(lt.average_ms(), 0);
+        assert_eq!(lt.sample_count(), 0);
+        lt.record(10);
+        lt.record(20);
+        lt.record(30);
+        assert_eq!(lt.average_ms(), 20);
+        assert_eq!(lt.min_ms(), Some(10));
+        assert_eq!(lt.max_ms(), Some(30));
+        assert_eq!(lt.sample_count(), 3);
+        lt.reset();
+        assert_eq!(lt.sample_count(), 0);
+    }
+
+    #[test]
+    fn compute_backoff_exponential() {
+        assert_eq!(compute_backoff(0, 100, 10000), 100);
+        assert_eq!(compute_backoff(1, 100, 10000), 200);
+        assert_eq!(compute_backoff(2, 100, 10000), 400);
+        assert_eq!(compute_backoff(3, 100, 10000), 800);
+        // Capped at max_delay.
+        assert_eq!(compute_backoff(10, 100, 5000), 5000);
+    }
+
+    #[test]
+    fn capabilities_negotiation() {
+        let client = ConnectionCapabilities {
+            supports_file_system: true,
+            supports_terminal: true,
+            supports_port_forwarding: false,
+            supports_search: true,
+        };
+        let server = ConnectionCapabilities {
+            supports_file_system: true,
+            supports_terminal: false,
+            supports_port_forwarding: true,
+            supports_search: true,
+        };
+        let result = client.negotiate(&server);
+        assert!(result.supports_file_system);
+        assert!(!result.supports_terminal);
+        assert!(!result.supports_port_forwarding);
+        assert!(result.supports_search);
+        assert_eq!(result.supported_count(), 2);
+    }
+
+    #[test]
+    fn capabilities_default_and_count() {
+        let caps = ConnectionCapabilities::default();
+        assert!(caps.supports_file_system);
+        assert!(!caps.supports_terminal);
+        assert_eq!(caps.supported_count(), 1);
+    }
+
+    #[test]
+    fn session_duration_tracking() {
+        let mut session = SessionDuration::start(1000);
+        assert!(session.is_running());
+        assert_eq!(session.elapsed(1500), 500);
+        session.stop(2000);
+        assert!(!session.is_running());
+        assert_eq!(session.elapsed(9999), 1000);
     }
 }

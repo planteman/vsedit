@@ -411,6 +411,105 @@ impl fmt::Display for SelectionAnchor {
     }
 }
 
+/// A stack that records selection history for undo/redo of expand/shrink.
+#[derive(Debug, Clone)]
+pub struct SelectionHistoryStack {
+    entries: Vec<SelectionRange>,
+    cursor: usize,
+}
+
+impl SelectionHistoryStack {
+    /// Create an empty history stack.
+    pub fn new() -> Self {
+        Self { entries: Vec::new(), cursor: 0 }
+    }
+
+    /// Push a new selection onto the stack, discarding any forward history.
+    pub fn push(&mut self, range: SelectionRange) {
+        self.entries.truncate(self.cursor);
+        self.entries.push(range);
+        self.cursor = self.entries.len();
+    }
+
+    /// Move back in history, returning the previous selection.
+    pub fn undo(&mut self) -> Option<&SelectionRange> {
+        if self.cursor > 1 {
+            self.cursor -= 1;
+            Some(&self.entries[self.cursor - 1])
+        } else {
+            None
+        }
+    }
+
+    /// Move forward in history, returning the next selection.
+    pub fn redo(&mut self) -> Option<&SelectionRange> {
+        if self.cursor < self.entries.len() {
+            let r = &self.entries[self.cursor];
+            self.cursor += 1;
+            Some(r)
+        } else {
+            None
+        }
+    }
+
+    /// Number of entries in the stack.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns true if the stack is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Current cursor position (1-based, 0 means nothing viewed yet).
+    pub fn position(&self) -> usize {
+        self.cursor
+    }
+
+    /// Clear all history.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.cursor = 0;
+    }
+}
+
+/// Expand selections for multiple cursor positions simultaneously.
+pub fn expand_multi_cursor(selections: &[SelectionRange]) -> Vec<Option<&SelectionRange>> {
+    selections.iter().map(|s| expand_selection(s)).collect()
+}
+
+/// Detect the scope kind for a selection based on simple heuristics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectionScope {
+    /// Selection is empty (cursor).
+    Cursor,
+    /// Selection spans part of a single line (likely a word or expression).
+    SubLine,
+    /// Selection covers exactly one full line.
+    WholeLine,
+    /// Selection spans multiple lines.
+    MultiLine,
+}
+
+/// Classify a selection range into a [`SelectionScope`].
+pub fn detect_scope(range: &SelectionRange) -> SelectionScope {
+    if range.is_empty() {
+        SelectionScope::Cursor
+    } else if range.is_single_line() {
+        SelectionScope::SubLine
+    } else if range.start_col == 0 && range.end_col == 0 && range.line_count() == 2 {
+        SelectionScope::WholeLine
+    } else {
+        SelectionScope::MultiLine
+    }
+}
+
+/// Snap a selection's boundaries to the nearest line boundaries.
+pub fn snap_to_line_boundaries(range: &SelectionRange) -> SelectionRange {
+    SelectionRange::new(range.start_line, 0, range.end_line + 1, 0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -771,6 +870,85 @@ mod tests {
     fn anchor_display() {
         let a = SelectionAnchor::new(7, 3);
         assert_eq!(format!("{a}"), "anchor(7:3)");
+    }
+
+    #[test]
+    fn history_stack_push_and_undo() {
+        let mut stack = SelectionHistoryStack::new();
+        assert!(stack.is_empty());
+        stack.push(SelectionRange::new(1, 0, 1, 5));
+        stack.push(SelectionRange::new(1, 0, 1, 20));
+        assert_eq!(stack.len(), 2);
+        let prev = stack.undo().unwrap();
+        assert_eq!(prev.end_col, 5);
+    }
+
+    #[test]
+    fn history_stack_redo() {
+        let mut stack = SelectionHistoryStack::new();
+        stack.push(SelectionRange::new(1, 0, 1, 5));
+        stack.push(SelectionRange::new(1, 0, 1, 20));
+        stack.undo();
+        let next = stack.redo().unwrap();
+        assert_eq!(next.end_col, 20);
+        assert!(stack.redo().is_none());
+    }
+
+    #[test]
+    fn history_stack_push_truncates_forward() {
+        let mut stack = SelectionHistoryStack::new();
+        stack.push(SelectionRange::new(1, 0, 1, 5));
+        stack.push(SelectionRange::new(1, 0, 1, 20));
+        stack.undo();
+        stack.push(SelectionRange::new(2, 0, 2, 10));
+        assert_eq!(stack.len(), 2);
+        assert!(stack.redo().is_none());
+    }
+
+    #[test]
+    fn history_stack_clear() {
+        let mut stack = SelectionHistoryStack::new();
+        stack.push(SelectionRange::new(1, 0, 1, 5));
+        stack.clear();
+        assert!(stack.is_empty());
+        assert_eq!(stack.position(), 0);
+    }
+
+    #[test]
+    fn expand_multi_cursor_works() {
+        let chain1 = SelectionRange::new(1, 0, 1, 5)
+            .with_parent(SelectionRange::new(1, 0, 1, 40));
+        let chain2 = SelectionRange::new(5, 0, 5, 3);
+        let results = expand_multi_cursor(&[chain1, chain2]);
+        assert!(results[0].is_some());
+        assert!(results[1].is_none());
+    }
+
+    #[test]
+    fn detect_scope_cursor() {
+        let r = SelectionRange::new(3, 5, 3, 5);
+        assert_eq!(detect_scope(&r), SelectionScope::Cursor);
+    }
+
+    #[test]
+    fn detect_scope_subline() {
+        let r = SelectionRange::new(3, 5, 3, 15);
+        assert_eq!(detect_scope(&r), SelectionScope::SubLine);
+    }
+
+    #[test]
+    fn detect_scope_multiline() {
+        let r = SelectionRange::new(1, 0, 5, 10);
+        assert_eq!(detect_scope(&r), SelectionScope::MultiLine);
+    }
+
+    #[test]
+    fn snap_to_line_boundaries_works() {
+        let r = SelectionRange::new(3, 5, 7, 15);
+        let snapped = snap_to_line_boundaries(&r);
+        assert_eq!(snapped.start_col, 0);
+        assert_eq!(snapped.end_line, 8);
+        assert_eq!(snapped.end_col, 0);
     }
 
     #[test]

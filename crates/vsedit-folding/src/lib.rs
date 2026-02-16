@@ -423,6 +423,72 @@ impl FoldingProvider for CompositeFoldingProvider {
     }
 }
 
+impl FoldingRange {
+    /// Compute the fold level (0-based nesting depth) within a list of ranges.
+    pub fn fold_level_in(&self, ranges: &[FoldingRange]) -> u32 {
+        self.nesting_depth_in(ranges)
+    }
+
+    /// Returns true if this range is nested inside another range.
+    pub fn is_nested_in(&self, other: &FoldingRange) -> bool {
+        other.start_line < self.start_line && other.end_line > self.end_line
+    }
+
+    /// Span of this range in lines.
+    pub fn line_span(&self) -> u32 {
+        self.end_line.saturating_sub(self.start_line)
+    }
+}
+
+impl FoldingModel {
+    /// Find all ranges that are nested inside a given parent range.
+    pub fn find_nested(&self, parent: &FoldingRange) -> Vec<&FoldingRange> {
+        self.ranges
+            .iter()
+            .filter(|r| r.start_line > parent.start_line && r.end_line < parent.end_line)
+            .collect()
+    }
+
+    /// Serialize fold state as a list of (start_line, is_collapsed) pairs.
+    pub fn serialize_state(&self) -> Vec<(u32, bool)> {
+        self.ranges.iter().map(|r| (r.start_line, r.is_collapsed)).collect()
+    }
+
+    /// Restore fold state from serialized pairs. Only affects ranges whose
+    /// start_line matches an entry.
+    pub fn restore_state(&mut self, state: &[(u32, bool)]) {
+        for (line, collapsed) in state {
+            for range in &mut self.ranges {
+                if range.start_line == *line {
+                    range.is_collapsed = *collapsed;
+                }
+            }
+        }
+    }
+
+    /// Compute statistics about folding ranges.
+    pub fn statistics(&self) -> FoldingStatistics {
+        let total = self.ranges.len() as u32;
+        let collapsed = self.ranges.iter().filter(|r| r.is_collapsed).count() as u32;
+        let max_depth = self.ranges.iter()
+            .map(|r| r.nesting_depth_in(&self.ranges))
+            .max()
+            .unwrap_or(0);
+        let total_span: u32 = self.ranges.iter().map(|r| r.line_span()).sum();
+        FoldingStatistics { total, collapsed, expanded: total - collapsed, max_depth, total_span }
+    }
+}
+
+/// Aggregate statistics for a folding model.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoldingStatistics {
+    pub total: u32,
+    pub collapsed: u32,
+    pub expanded: u32,
+    pub max_depth: u32,
+    pub total_span: u32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -788,6 +854,76 @@ mod tests {
     }
 
     // -- Composite folding ----------------------------------------------------
+
+    #[test]
+    fn fold_level_in_ranges() {
+        let ranges = vec![
+            FoldingRange { start_line: 1, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 3, end_line: 15, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 5, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ];
+        assert_eq!(ranges[0].fold_level_in(&ranges), 0);
+        assert_eq!(ranges[1].fold_level_in(&ranges), 1);
+        assert_eq!(ranges[2].fold_level_in(&ranges), 2);
+    }
+
+    #[test]
+    fn is_nested_in_check() {
+        let outer = FoldingRange { start_line: 1, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: false };
+        let inner = FoldingRange { start_line: 5, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false };
+        assert!(inner.is_nested_in(&outer));
+        assert!(!outer.is_nested_in(&inner));
+    }
+
+    #[test]
+    fn find_nested_ranges() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 5, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+            FoldingRange { start_line: 25, end_line: 30, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let parent = &model.get_ranges()[0];
+        let nested = model.find_nested(parent);
+        assert_eq!(nested.len(), 1);
+        assert_eq!(nested[0].start_line, 5);
+    }
+
+    #[test]
+    fn serialize_and_restore_state() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 5, kind: FoldingRangeKind::Region, is_collapsed: true },
+            FoldingRange { start_line: 10, end_line: 15, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let state = model.serialize_state();
+        assert_eq!(state, vec![(1, true), (10, false)]);
+        model.unfold_all();
+        model.restore_state(&state);
+        assert!(model.get_range_at(1).unwrap().is_collapsed);
+        assert!(!model.get_range_at(10).unwrap().is_collapsed);
+    }
+
+    #[test]
+    fn folding_statistics_computation() {
+        let mut model = FoldingModel::new();
+        model.set_ranges(vec![
+            FoldingRange { start_line: 1, end_line: 20, kind: FoldingRangeKind::Region, is_collapsed: true },
+            FoldingRange { start_line: 5, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false },
+        ]);
+        let stats = model.statistics();
+        assert_eq!(stats.total, 2);
+        assert_eq!(stats.collapsed, 1);
+        assert_eq!(stats.expanded, 1);
+        assert_eq!(stats.max_depth, 1);
+        assert_eq!(stats.total_span, 24); // 19 + 5
+    }
+
+    #[test]
+    fn line_span_calculation() {
+        let r = FoldingRange { start_line: 3, end_line: 10, kind: FoldingRangeKind::Region, is_collapsed: false };
+        assert_eq!(r.line_span(), 7);
+    }
 
     #[test]
     fn composite_folding_provider() {

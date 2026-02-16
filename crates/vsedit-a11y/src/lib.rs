@@ -423,6 +423,178 @@ impl AccessibilityConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Announcement queue management, focus history, landmark registry, tree depth
+// ---------------------------------------------------------------------------
+
+impl AccessibilityService {
+    /// Return only assertive announcements from the pending queue.
+    pub fn assertive_announcements(&self) -> Vec<&Announcement> {
+        self.announcements
+            .iter()
+            .filter(|a| a.priority == AnnouncementPriority::Assertive)
+            .collect()
+    }
+
+    /// Return only polite announcements from the pending queue.
+    pub fn polite_announcements(&self) -> Vec<&Announcement> {
+        self.announcements
+            .iter()
+            .filter(|a| a.priority == AnnouncementPriority::Polite)
+            .collect()
+    }
+
+    /// Drain announcements of a specific priority, leaving others.
+    pub fn take_by_priority(&mut self, priority: AnnouncementPriority) -> Vec<Announcement> {
+        let mut taken = Vec::new();
+        let mut remaining = Vec::new();
+        for ann in std::mem::take(&mut self.announcements) {
+            if ann.priority == priority {
+                taken.push(ann);
+            } else {
+                remaining.push(ann);
+            }
+        }
+        self.announcements = remaining;
+        taken
+    }
+}
+
+/// Tracks the history of focused element IDs.
+#[derive(Debug, Clone)]
+pub struct FocusHistory {
+    history: Vec<String>,
+    max_size: usize,
+}
+
+impl FocusHistory {
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            history: Vec::new(),
+            max_size: if max_size == 0 { 1 } else { max_size },
+        }
+    }
+
+    /// Record a focus change to `element_id`.
+    pub fn record(&mut self, element_id: impl Into<String>) {
+        if self.history.len() >= self.max_size {
+            self.history.remove(0);
+        }
+        self.history.push(element_id.into());
+    }
+
+    /// Return the most recently focused element.
+    pub fn current(&self) -> Option<&str> {
+        self.history.last().map(|s| s.as_str())
+    }
+
+    /// Return the previously focused element (one before current).
+    pub fn previous(&self) -> Option<&str> {
+        if self.history.len() >= 2 {
+            Some(&self.history[self.history.len() - 2])
+        } else {
+            None
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.history.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.history.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.history.clear();
+    }
+}
+
+/// Registry for ARIA landmark regions.
+#[derive(Debug, Clone)]
+pub struct LandmarkRegistry {
+    landmarks: Vec<(String, AriaRole)>,
+}
+
+impl LandmarkRegistry {
+    pub fn new() -> Self {
+        Self {
+            landmarks: Vec::new(),
+        }
+    }
+
+    /// Register a landmark with the given label and role.
+    pub fn register(&mut self, label: impl Into<String>, role: AriaRole) {
+        self.landmarks.push((label.into(), role));
+    }
+
+    /// Remove a landmark by label. Returns true if found.
+    pub fn unregister(&mut self, label: &str) -> bool {
+        let before = self.landmarks.len();
+        self.landmarks.retain(|(l, _)| l != label);
+        self.landmarks.len() < before
+    }
+
+    /// Find landmarks by role.
+    pub fn find_by_role(&self, role: AriaRole) -> Vec<&str> {
+        self.landmarks
+            .iter()
+            .filter(|(_, r)| *r == role)
+            .map(|(l, _)| l.as_str())
+            .collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.landmarks.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.landmarks.is_empty()
+    }
+}
+
+impl Default for LandmarkRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A node in an accessibility tree for computing depth.
+#[derive(Debug, Clone)]
+pub struct AccessibilityNode {
+    pub label: String,
+    pub role: AriaRole,
+    pub children: Vec<AccessibilityNode>,
+}
+
+impl AccessibilityNode {
+    pub fn new(label: impl Into<String>, role: AriaRole) -> Self {
+        Self {
+            label: label.into(),
+            role,
+            children: Vec::new(),
+        }
+    }
+
+    pub fn add_child(&mut self, child: AccessibilityNode) {
+        self.children.push(child);
+    }
+
+    /// Compute the maximum depth of this subtree (1 for a leaf).
+    pub fn depth(&self) -> usize {
+        if self.children.is_empty() {
+            1
+        } else {
+            1 + self.children.iter().map(|c| c.depth()).max().unwrap_or(0)
+        }
+    }
+
+    /// Count total nodes in this subtree (including self).
+    pub fn node_count(&self) -> usize {
+        1 + self.children.iter().map(|c| c.node_count()).sum::<usize>()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -700,5 +872,74 @@ mod tests {
     fn test_config_with_verbosity() {
         let cfg = AccessibilityConfig::default().with_verbosity(Verbosity::High);
         assert_eq!(cfg.verbosity, Verbosity::High);
+    }
+
+    #[test]
+    fn test_assertive_and_polite_filter() {
+        let mut svc = AccessibilityService::new();
+        svc.announce_status("info");
+        svc.announce_alert("danger");
+        svc.announce_status("more info");
+        assert_eq!(svc.assertive_announcements().len(), 1);
+        assert_eq!(svc.polite_announcements().len(), 2);
+    }
+
+    #[test]
+    fn test_take_by_priority() {
+        let mut svc = AccessibilityService::new();
+        svc.announce_status("a");
+        svc.announce_alert("b");
+        svc.announce_status("c");
+        let polites = svc.take_by_priority(AnnouncementPriority::Polite);
+        assert_eq!(polites.len(), 2);
+        assert_eq!(svc.announcement_count(), 1);
+    }
+
+    #[test]
+    fn test_focus_history() {
+        let mut fh = FocusHistory::new(3);
+        assert!(fh.is_empty());
+        fh.record("btn1");
+        fh.record("btn2");
+        assert_eq!(fh.current(), Some("btn2"));
+        assert_eq!(fh.previous(), Some("btn1"));
+        assert_eq!(fh.len(), 2);
+        fh.record("btn3");
+        fh.record("btn4"); // evicts "btn1"
+        assert_eq!(fh.len(), 3);
+        fh.clear();
+        assert!(fh.is_empty());
+    }
+
+    #[test]
+    fn test_landmark_registry() {
+        let mut reg = LandmarkRegistry::new();
+        assert!(reg.is_empty());
+        reg.register("Main Content", AriaRole::Status);
+        reg.register("Sidebar", AriaRole::List);
+        reg.register("Footer", AriaRole::Status);
+        assert_eq!(reg.len(), 3);
+        assert_eq!(reg.find_by_role(AriaRole::Status).len(), 2);
+        assert!(reg.unregister("Sidebar"));
+        assert!(!reg.unregister("Nonexistent"));
+        assert_eq!(reg.len(), 2);
+    }
+
+    #[test]
+    fn test_accessibility_node_depth() {
+        let mut root = AccessibilityNode::new("root", AriaRole::Tree);
+        let mut child = AccessibilityNode::new("child", AriaRole::TreeItem);
+        child.add_child(AccessibilityNode::new("grandchild", AriaRole::TreeItem));
+        root.add_child(child);
+        root.add_child(AccessibilityNode::new("leaf", AriaRole::TreeItem));
+        assert_eq!(root.depth(), 3);
+        assert_eq!(root.node_count(), 4);
+    }
+
+    #[test]
+    fn test_accessibility_node_leaf() {
+        let leaf = AccessibilityNode::new("leaf", AriaRole::Button);
+        assert_eq!(leaf.depth(), 1);
+        assert_eq!(leaf.node_count(), 1);
     }
 }

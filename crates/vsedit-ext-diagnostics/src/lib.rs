@@ -462,6 +462,130 @@ pub fn register() {
     // Registration will connect RPC handlers when extension host starts
 }
 
+// ---------------------------------------------------------------------------
+// Diagnostic severity aggregation
+// ---------------------------------------------------------------------------
+
+/// Aggregated counts of diagnostics by severity.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SeverityAggregation {
+    pub errors: usize,
+    pub warnings: usize,
+    pub infos: usize,
+    pub hints: usize,
+}
+
+impl SeverityAggregation {
+    /// Build an aggregation from a slice of diagnostics.
+    pub fn from_diagnostics(diags: &[Diagnostic]) -> Self {
+        let mut agg = Self::default();
+        for d in diags {
+            match d.severity {
+                DiagnosticSeverity::Error => agg.errors += 1,
+                DiagnosticSeverity::Warning => agg.warnings += 1,
+                DiagnosticSeverity::Information => agg.infos += 1,
+                DiagnosticSeverity::Hint => agg.hints += 1,
+            }
+        }
+        agg
+    }
+
+    /// Total number of diagnostics.
+    pub fn total(&self) -> usize {
+        self.errors + self.warnings + self.infos + self.hints
+    }
+
+    /// Returns `true` if there are no diagnostics.
+    pub fn is_empty(&self) -> bool {
+        self.total() == 0
+    }
+}
+
+impl fmt::Display for SeverityAggregation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "E:{} W:{} I:{} H:{}", self.errors, self.warnings, self.infos, self.hints)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostic deduplication
+// ---------------------------------------------------------------------------
+
+/// Remove duplicate diagnostics from a list, keeping the first occurrence.
+/// Two diagnostics are considered duplicates if they have the same span,
+/// message, and severity.
+pub fn deduplicate_diagnostics(diags: &[Diagnostic]) -> Vec<Diagnostic> {
+    let mut seen = Vec::new();
+    let mut result = Vec::new();
+    for d in diags {
+        let key = (d.start_line, d.start_col, d.end_line, d.end_col, &d.message, d.severity);
+        if !seen.contains(&key) {
+            seen.push(key);
+            result.push(d.clone());
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostic range intersection
+// ---------------------------------------------------------------------------
+
+/// Check whether two diagnostic spans intersect.
+pub fn ranges_intersect(a: &Diagnostic, b: &Diagnostic) -> bool {
+    // No intersection if one ends before the other starts
+    if a.end_line < b.start_line || b.end_line < a.start_line {
+        return false;
+    }
+    if a.end_line == b.start_line && a.end_col <= b.start_col {
+        return false;
+    }
+    if b.end_line == a.start_line && b.end_col <= a.start_col {
+        return false;
+    }
+    true
+}
+
+// ---------------------------------------------------------------------------
+// Quick fix suggestion tracking
+// ---------------------------------------------------------------------------
+
+/// A quick fix suggestion associated with a diagnostic.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct QuickFixSuggestion {
+    pub title: String,
+    pub replacement_text: String,
+    pub diagnostic_index: usize,
+}
+
+/// Tracks quick fix suggestions for diagnostics.
+#[derive(Debug, Default)]
+pub struct QuickFixTracker {
+    suggestions: Vec<QuickFixSuggestion>,
+}
+
+impl QuickFixTracker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, suggestion: QuickFixSuggestion) {
+        self.suggestions.push(suggestion);
+    }
+
+    pub fn suggestions_for(&self, diagnostic_index: usize) -> Vec<&QuickFixSuggestion> {
+        self.suggestions.iter().filter(|s| s.diagnostic_index == diagnostic_index).collect()
+    }
+
+    pub fn total_suggestions(&self) -> usize {
+        self.suggestions.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.suggestions.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -741,5 +865,82 @@ mod tests {
             start_line: 5, start_col: 10, end_line: 3, end_col: 0,
         };
         assert!(e.to_string().contains("invalid span"));
+    }
+
+    #[test]
+    fn severity_aggregation_basic() {
+        let diags = vec![
+            make_diag("e1", DiagnosticSeverity::Error),
+            make_diag("e2", DiagnosticSeverity::Error),
+            make_diag("w1", DiagnosticSeverity::Warning),
+            make_diag("i1", DiagnosticSeverity::Information),
+            make_diag("h1", DiagnosticSeverity::Hint),
+        ];
+        let agg = SeverityAggregation::from_diagnostics(&diags);
+        assert_eq!(agg.errors, 2);
+        assert_eq!(agg.warnings, 1);
+        assert_eq!(agg.infos, 1);
+        assert_eq!(agg.hints, 1);
+        assert_eq!(agg.total(), 5);
+        assert!(!agg.is_empty());
+        assert!(agg.to_string().contains("E:2"));
+    }
+
+    #[test]
+    fn severity_aggregation_empty() {
+        let agg = SeverityAggregation::from_diagnostics(&[]);
+        assert!(agg.is_empty());
+        assert_eq!(agg.total(), 0);
+    }
+
+    #[test]
+    fn deduplication_removes_duplicates() {
+        let d1 = make_diag("same msg", DiagnosticSeverity::Warning);
+        let d2 = make_diag("same msg", DiagnosticSeverity::Warning);
+        let d3 = make_diag("different", DiagnosticSeverity::Warning);
+        let result = deduplicate_diagnostics(&[d1, d2, d3]);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].message, "same msg");
+        assert_eq!(result[1].message, "different");
+    }
+
+    #[test]
+    fn ranges_intersect_overlapping() {
+        let a = DiagnosticBuilder::new("a", DiagnosticSeverity::Error).span(1, 0, 3, 10).build().unwrap();
+        let b = DiagnosticBuilder::new("b", DiagnosticSeverity::Error).span(2, 5, 4, 0).build().unwrap();
+        assert!(ranges_intersect(&a, &b));
+    }
+
+    #[test]
+    fn ranges_intersect_non_overlapping() {
+        let a = DiagnosticBuilder::new("a", DiagnosticSeverity::Error).span(1, 0, 1, 10).build().unwrap();
+        let b = DiagnosticBuilder::new("b", DiagnosticSeverity::Error).span(2, 0, 2, 10).build().unwrap();
+        assert!(!ranges_intersect(&a, &b));
+    }
+
+    #[test]
+    fn quick_fix_tracker_basic() {
+        let mut tracker = QuickFixTracker::new();
+        tracker.add(QuickFixSuggestion {
+            title: "Add import".into(),
+            replacement_text: "use std::fmt;".into(),
+            diagnostic_index: 0,
+        });
+        tracker.add(QuickFixSuggestion {
+            title: "Remove unused".into(),
+            replacement_text: "".into(),
+            diagnostic_index: 1,
+        });
+        tracker.add(QuickFixSuggestion {
+            title: "Rename".into(),
+            replacement_text: "new_name".into(),
+            diagnostic_index: 0,
+        });
+        assert_eq!(tracker.total_suggestions(), 3);
+        assert_eq!(tracker.suggestions_for(0).len(), 2);
+        assert_eq!(tracker.suggestions_for(1).len(), 1);
+        assert_eq!(tracker.suggestions_for(99).len(), 0);
+        tracker.clear();
+        assert_eq!(tracker.total_suggestions(), 0);
     }
 }

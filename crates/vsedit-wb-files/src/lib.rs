@@ -414,6 +414,164 @@ impl FileService {
     }
 }
 
+/// Detected file encoding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FileEncoding {
+    Utf8,
+    Utf8Bom,
+    Utf16Le,
+    Utf16Be,
+    Ascii,
+    Unknown,
+}
+
+impl FileEncoding {
+    /// Detect encoding from a byte-order mark at the start of content.
+    pub fn detect_from_bom(bytes: &[u8]) -> Self {
+        if bytes.starts_with(&[0xEF, 0xBB, 0xBF]) {
+            FileEncoding::Utf8Bom
+        } else if bytes.starts_with(&[0xFF, 0xFE]) {
+            FileEncoding::Utf16Le
+        } else if bytes.starts_with(&[0xFE, 0xFF]) {
+            FileEncoding::Utf16Be
+        } else if bytes.iter().all(|&b| b.is_ascii()) {
+            FileEncoding::Ascii
+        } else if std::str::from_utf8(bytes).is_ok() {
+            FileEncoding::Utf8
+        } else {
+            FileEncoding::Unknown
+        }
+    }
+
+    /// Return the BOM bytes for this encoding, if any.
+    pub fn bom_bytes(&self) -> &'static [u8] {
+        match self {
+            FileEncoding::Utf8Bom => &[0xEF, 0xBB, 0xBF],
+            FileEncoding::Utf16Le => &[0xFF, 0xFE],
+            FileEncoding::Utf16Be => &[0xFE, 0xFF],
+            _ => &[],
+        }
+    }
+}
+
+impl fmt::Display for FileEncoding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FileEncoding::Utf8 => write!(f, "UTF-8"),
+            FileEncoding::Utf8Bom => write!(f, "UTF-8 with BOM"),
+            FileEncoding::Utf16Le => write!(f, "UTF-16 LE"),
+            FileEncoding::Utf16Be => write!(f, "UTF-16 BE"),
+            FileEncoding::Ascii => write!(f, "ASCII"),
+            FileEncoding::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
+/// Result of comparing two file contents.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileContentComparison {
+    pub are_equal: bool,
+    pub size_difference: i64,
+    pub first_differing_byte: Option<usize>,
+}
+
+impl FileContentComparison {
+    /// Compare two byte slices and return a comparison result.
+    pub fn compare(a: &[u8], b: &[u8]) -> Self {
+        let size_difference = a.len() as i64 - b.len() as i64;
+        let first_differing_byte = a.iter().zip(b.iter())
+            .position(|(x, y)| x != y)
+            .or_else(|| if a.len() != b.len() { Some(a.len().min(b.len())) } else { None });
+        FileContentComparison {
+            are_equal: a == b,
+            size_difference,
+            first_differing_byte,
+        }
+    }
+}
+
+/// Tracks metadata changes for a file over time.
+#[derive(Debug, Clone)]
+pub struct FileMetadataTracker {
+    entries: Vec<(String, FileStat)>,
+}
+
+impl FileMetadataTracker {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    pub fn record(&mut self, uri: String, stat: FileStat) {
+        self.entries.push((uri, stat));
+    }
+
+    pub fn latest_for(&self, uri: &str) -> Option<&FileStat> {
+        self.entries.iter().rev().find(|(u, _)| u == uri).map(|(_, s)| s)
+    }
+
+    pub fn entry_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn has_changed(&self, uri: &str) -> bool {
+        let matching: Vec<_> = self.entries.iter().filter(|(u, _)| u == uri).collect();
+        if matching.len() < 2 { return false; }
+        matching.first().map(|(_, s)| s) != matching.last().map(|(_, s)| s)
+    }
+}
+
+impl Default for FileMetadataTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Result of a batch file operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchFileResult {
+    pub uri: String,
+    pub success: bool,
+    pub error_message: Option<String>,
+}
+
+/// Aggregated results for a batch of file operations.
+#[derive(Debug, Clone)]
+pub struct BatchFileResults {
+    pub results: Vec<BatchFileResult>,
+}
+
+impl BatchFileResults {
+    pub fn new() -> Self {
+        Self { results: Vec::new() }
+    }
+
+    pub fn add(&mut self, result: BatchFileResult) {
+        self.results.push(result);
+    }
+
+    pub fn success_count(&self) -> usize {
+        self.results.iter().filter(|r| r.success).count()
+    }
+
+    pub fn failure_count(&self) -> usize {
+        self.results.iter().filter(|r| !r.success).count()
+    }
+
+    pub fn all_succeeded(&self) -> bool {
+        self.results.iter().all(|r| r.success)
+    }
+
+    pub fn failed_uris(&self) -> Vec<&str> {
+        self.results.iter().filter(|r| !r.success).map(|r| r.uri.as_str()).collect()
+    }
+}
+
+impl Default for BatchFileResults {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -721,5 +879,116 @@ mod tests {
         assert!(uris.contains(&"a.rs".to_string()));
         assert!(uris.contains(&"b.rs".to_string()));
         assert!(uris.contains(&"c.rs".to_string()));
+    }
+
+    #[test]
+    fn test_encoding_detect_utf8_bom() {
+        let bytes = [0xEF, 0xBB, 0xBF, b'h', b'i'];
+        assert_eq!(FileEncoding::detect_from_bom(&bytes), FileEncoding::Utf8Bom);
+    }
+
+    #[test]
+    fn test_encoding_detect_ascii() {
+        assert_eq!(FileEncoding::detect_from_bom(b"hello"), FileEncoding::Ascii);
+    }
+
+    #[test]
+    fn test_encoding_detect_utf16le() {
+        let bytes = [0xFF, 0xFE, 0x00, 0x41];
+        assert_eq!(FileEncoding::detect_from_bom(&bytes), FileEncoding::Utf16Le);
+    }
+
+    #[test]
+    fn test_encoding_detect_utf16be() {
+        let bytes = [0xFE, 0xFF, 0x00, 0x41];
+        assert_eq!(FileEncoding::detect_from_bom(&bytes), FileEncoding::Utf16Be);
+    }
+
+    #[test]
+    fn test_encoding_detect_utf8() {
+        let bytes = "héllo".as_bytes();
+        assert_eq!(FileEncoding::detect_from_bom(bytes), FileEncoding::Utf8);
+    }
+
+    #[test]
+    fn test_encoding_display() {
+        assert_eq!(format!("{}", FileEncoding::Utf8), "UTF-8");
+        assert_eq!(format!("{}", FileEncoding::Ascii), "ASCII");
+        assert_eq!(format!("{}", FileEncoding::Unknown), "Unknown");
+    }
+
+    #[test]
+    fn test_encoding_bom_bytes() {
+        assert_eq!(FileEncoding::Utf8Bom.bom_bytes(), &[0xEF, 0xBB, 0xBF]);
+        assert!(FileEncoding::Utf8.bom_bytes().is_empty());
+    }
+
+    #[test]
+    fn test_file_content_comparison_equal() {
+        let cmp = FileContentComparison::compare(b"hello", b"hello");
+        assert!(cmp.are_equal);
+        assert_eq!(cmp.size_difference, 0);
+        assert_eq!(cmp.first_differing_byte, None);
+    }
+
+    #[test]
+    fn test_file_content_comparison_different() {
+        let cmp = FileContentComparison::compare(b"hello", b"hXllo");
+        assert!(!cmp.are_equal);
+        assert_eq!(cmp.first_differing_byte, Some(1));
+    }
+
+    #[test]
+    fn test_file_content_comparison_size_diff() {
+        let cmp = FileContentComparison::compare(b"hi", b"hello");
+        assert!(!cmp.are_equal);
+        assert_eq!(cmp.size_difference, -3);
+    }
+
+    #[test]
+    fn test_metadata_tracker_basic() {
+        let mut tracker = FileMetadataTracker::new();
+        let stat = FileStat {
+            file_type: FileType::File, size: 100, modified: 1000, created: 900, readonly: false,
+        };
+        tracker.record("a.rs".into(), stat.clone());
+        assert_eq!(tracker.entry_count(), 1);
+        assert_eq!(tracker.latest_for("a.rs").unwrap().size, 100);
+        assert!(tracker.latest_for("b.rs").is_none());
+    }
+
+    #[test]
+    fn test_metadata_tracker_has_changed() {
+        let mut tracker = FileMetadataTracker::new();
+        let stat1 = FileStat {
+            file_type: FileType::File, size: 100, modified: 1000, created: 900, readonly: false,
+        };
+        let stat2 = FileStat {
+            file_type: FileType::File, size: 200, modified: 2000, created: 900, readonly: false,
+        };
+        tracker.record("a.rs".into(), stat1);
+        assert!(!tracker.has_changed("a.rs"));
+        tracker.record("a.rs".into(), stat2);
+        assert!(tracker.has_changed("a.rs"));
+    }
+
+    #[test]
+    fn test_batch_file_results_all_success() {
+        let mut results = BatchFileResults::new();
+        results.add(BatchFileResult { uri: "a.rs".into(), success: true, error_message: None });
+        results.add(BatchFileResult { uri: "b.rs".into(), success: true, error_message: None });
+        assert!(results.all_succeeded());
+        assert_eq!(results.success_count(), 2);
+        assert_eq!(results.failure_count(), 0);
+    }
+
+    #[test]
+    fn test_batch_file_results_with_failures() {
+        let mut results = BatchFileResults::new();
+        results.add(BatchFileResult { uri: "a.rs".into(), success: true, error_message: None });
+        results.add(BatchFileResult { uri: "b.rs".into(), success: false, error_message: Some("err".into()) });
+        assert!(!results.all_succeeded());
+        assert_eq!(results.failure_count(), 1);
+        assert_eq!(results.failed_uris(), vec!["b.rs"]);
     }
 }

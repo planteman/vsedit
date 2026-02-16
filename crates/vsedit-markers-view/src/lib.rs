@@ -345,6 +345,90 @@ pub trait MarkerProvider {
 // Tests
 // ---------------------------------------------------------------------------
 
+/// Statistics for markers grouped by severity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkerSeverityStats {
+    pub severity: MarkerSeverity,
+    pub count: usize,
+    pub affected_files: usize,
+}
+
+/// Computes per-severity statistics from the service.
+pub fn compute_severity_stats(service: &MarkersService) -> Vec<MarkerSeverityStats> {
+    let severities = [
+        MarkerSeverity::Error,
+        MarkerSeverity::Warning,
+        MarkerSeverity::Info,
+        MarkerSeverity::Hint,
+    ];
+    severities
+        .iter()
+        .map(|sev| {
+            let matching: Vec<&Marker> = service.markers.iter().filter(|m| m.severity == *sev).collect();
+            let mut files: Vec<&str> = matching.iter().map(|m| m.uri.as_str()).collect();
+            files.sort();
+            files.dedup();
+            MarkerSeverityStats {
+                severity: *sev,
+                count: matching.len(),
+                affected_files: files.len(),
+            }
+        })
+        .collect()
+}
+
+/// Represents a group of markers for a single file.
+#[derive(Debug, Clone)]
+pub struct FileMarkerGroup<'a> {
+    pub uri: &'a str,
+    pub markers: Vec<&'a Marker>,
+    pub error_count: usize,
+    pub warning_count: usize,
+}
+
+/// Groups markers by file, computing per-file error/warning counts.
+pub fn group_markers_by_file<'a>(service: &'a MarkersService) -> Vec<FileMarkerGroup<'a>> {
+    let mut map: std::collections::BTreeMap<&str, Vec<&Marker>> = std::collections::BTreeMap::new();
+    for m in &service.markers {
+        map.entry(m.uri.as_str()).or_default().push(m);
+    }
+    map.into_iter()
+        .map(|(uri, markers)| {
+            let error_count = markers.iter().filter(|m| m.severity == MarkerSeverity::Error).count();
+            let warning_count = markers.iter().filter(|m| m.severity == MarkerSeverity::Warning).count();
+            FileMarkerGroup { uri, markers, error_count, warning_count }
+        })
+        .collect()
+}
+
+/// A pipeline of filters to apply sequentially.
+#[derive(Debug, Clone, Default)]
+pub struct MarkerFilterPipeline {
+    pub filters: Vec<MarkerFilter>,
+}
+
+impl MarkerFilterPipeline {
+    pub fn new() -> Self {
+        Self { filters: Vec::new() }
+    }
+
+    pub fn add_filter(&mut self, filter: MarkerFilter) {
+        self.filters.push(filter);
+    }
+
+    /// Apply all filters; a marker must pass every filter.
+    pub fn apply<'a>(&self, markers: &'a [Marker]) -> Vec<&'a Marker> {
+        markers
+            .iter()
+            .filter(|m| self.filters.iter().all(|f| f.matches(m)))
+            .collect()
+    }
+
+    pub fn filter_count(&self) -> usize {
+        self.filters.len()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -714,5 +798,68 @@ mod tests {
         assert_eq!(groups[0].0, "a.rs");
         assert_eq!(groups[0].1[0].severity, MarkerSeverity::Error);
         assert_eq!(groups[0].1[1].severity, MarkerSeverity::Warning);
+    }
+
+    #[test]
+    fn severity_stats_computation() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "e1"));
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Error, "e2"));
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Warning, "w1"));
+        svc.add_marker(make_marker("c.rs", MarkerSeverity::Info, "i1"));
+        let stats = compute_severity_stats(&svc);
+        assert_eq!(stats[0].severity, MarkerSeverity::Error);
+        assert_eq!(stats[0].count, 2);
+        assert_eq!(stats[0].affected_files, 2);
+        assert_eq!(stats[1].count, 1); // warning
+    }
+
+    #[test]
+    fn group_markers_by_file_counts() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "e1"));
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Warning, "w1"));
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Error, "e2"));
+        let groups = group_markers_by_file(&svc);
+        assert_eq!(groups.len(), 2);
+        let a_group = groups.iter().find(|g| g.uri == "a.rs").unwrap();
+        assert_eq!(a_group.error_count, 1);
+        assert_eq!(a_group.warning_count, 1);
+    }
+
+    #[test]
+    fn filter_pipeline_multiple_filters() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker_ext("src/a.rs", MarkerSeverity::Error, "e1", 1, Some("rustc")));
+        svc.add_marker(make_marker_ext("src/b.rs", MarkerSeverity::Warning, "w1", 2, Some("rustc")));
+        svc.add_marker(make_marker_ext("tests/c.rs", MarkerSeverity::Error, "e2", 3, Some("clippy")));
+        let mut pipeline = MarkerFilterPipeline::new();
+        pipeline.add_filter(MarkerFilter { severity: Some(MarkerSeverity::Error), ..Default::default() });
+        pipeline.add_filter(MarkerFilter { uri_pattern: Some("src/".into()), ..Default::default() });
+        let results = pipeline.apply(&svc.markers);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].message, "e1");
+    }
+
+    #[test]
+    fn filter_pipeline_empty_passes_all() {
+        let mut svc = MarkersService::new();
+        svc.add_marker(make_marker("a.rs", MarkerSeverity::Error, "e1"));
+        svc.add_marker(make_marker("b.rs", MarkerSeverity::Warning, "w1"));
+        let pipeline = MarkerFilterPipeline::new();
+        assert_eq!(pipeline.filter_count(), 0);
+        let results = pipeline.apply(&svc.markers);
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn severity_stats_empty_service() {
+        let svc = MarkersService::new();
+        let stats = compute_severity_stats(&svc);
+        assert_eq!(stats.len(), 4);
+        for s in &stats {
+            assert_eq!(s.count, 0);
+            assert_eq!(s.affected_files, 0);
+        }
     }
 }

@@ -415,6 +415,127 @@ impl Default for SharedTerminalManager {
 }
 
 // ---------------------------------------------------------------------------
+// Terminal output history and session statistics
+// ---------------------------------------------------------------------------
+
+/// Tracks terminal output history and provides search capabilities.
+#[derive(Debug, Clone)]
+pub struct TerminalOutputHistory {
+    lines: Vec<String>,
+    max_lines: usize,
+}
+
+impl TerminalOutputHistory {
+    /// Create a new output history with the given maximum line capacity.
+    pub fn new(max_lines: usize) -> Self {
+        Self {
+            lines: Vec::new(),
+            max_lines,
+        }
+    }
+
+    /// Append raw output data, splitting into lines.
+    pub fn append(&mut self, data: &str) {
+        for line in data.lines() {
+            self.lines.push(line.to_string());
+            if self.lines.len() > self.max_lines {
+                self.lines.remove(0);
+            }
+        }
+    }
+
+    /// Search the history for lines containing the given substring.
+    pub fn search(&self, query: &str) -> Vec<(usize, &str)> {
+        self.lines
+            .iter()
+            .enumerate()
+            .filter(|(_, line)| line.contains(query))
+            .map(|(i, line)| (i, line.as_str()))
+            .collect()
+    }
+
+    /// Return the total number of lines in the history.
+    pub fn line_count(&self) -> usize {
+        self.lines.len()
+    }
+
+    /// Return all lines in the history.
+    pub fn lines(&self) -> &[String] {
+        &self.lines
+    }
+
+    /// Clear all stored output.
+    pub fn clear(&mut self) {
+        self.lines.clear();
+    }
+
+    /// Return the last N lines.
+    pub fn tail(&self, n: usize) -> &[String] {
+        let start = self.lines.len().saturating_sub(n);
+        &self.lines[start..]
+    }
+}
+
+/// Statistics about a terminal session.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerminalSessionStats {
+    pub total_bytes_written: u64,
+    pub total_bytes_read: u64,
+    pub resize_count: u32,
+    pub current_cols: u16,
+    pub current_rows: u16,
+}
+
+impl TerminalSessionStats {
+    /// Create stats initialized with the given terminal dimensions.
+    pub fn new(cols: u16, rows: u16) -> Self {
+        Self {
+            total_bytes_written: 0,
+            total_bytes_read: 0,
+            resize_count: 0,
+            current_cols: cols,
+            current_rows: rows,
+        }
+    }
+
+    /// Record bytes written to the terminal.
+    pub fn record_write(&mut self, bytes: u64) {
+        self.total_bytes_written += bytes;
+    }
+
+    /// Record bytes read from the terminal.
+    pub fn record_read(&mut self, bytes: u64) {
+        self.total_bytes_read += bytes;
+    }
+
+    /// Record a resize event with new dimensions.
+    pub fn record_resize(&mut self, cols: u16, rows: u16) {
+        self.resize_count += 1;
+        self.current_cols = cols;
+        self.current_rows = rows;
+    }
+
+    /// Total bytes transferred (read + written).
+    pub fn total_bytes(&self) -> u64 {
+        self.total_bytes_written + self.total_bytes_read
+    }
+}
+
+impl fmt::Display for TerminalSessionStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SessionStats(written={}, read={}, resizes={}, {}x{})",
+            self.total_bytes_written,
+            self.total_bytes_read,
+            self.resize_count,
+            self.current_cols,
+            self.current_rows,
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -710,5 +831,75 @@ mod tests {
             text.contains("CUSTOM_VALUE"),
             "expected CUSTOM_VALUE in output, got: {text:?}"
         );
+    }
+
+    // -- TerminalOutputHistory tests ----------------------------------------
+
+    #[test]
+    fn output_history_append_and_search() {
+        let mut hist = TerminalOutputHistory::new(100);
+        hist.append("first line\nsecond line\nthird line");
+        assert_eq!(hist.line_count(), 3);
+        let results = hist.search("second");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, 1);
+        assert_eq!(results[0].1, "second line");
+    }
+
+    #[test]
+    fn output_history_max_lines() {
+        let mut hist = TerminalOutputHistory::new(3);
+        hist.append("a\nb\nc\nd\ne");
+        assert_eq!(hist.line_count(), 3);
+        assert_eq!(hist.lines()[0], "c");
+    }
+
+    #[test]
+    fn output_history_tail() {
+        let mut hist = TerminalOutputHistory::new(100);
+        hist.append("line1\nline2\nline3\nline4\nline5");
+        let tail = hist.tail(2);
+        assert_eq!(tail.len(), 2);
+        assert_eq!(tail[0], "line4");
+        assert_eq!(tail[1], "line5");
+    }
+
+    #[test]
+    fn output_history_clear() {
+        let mut hist = TerminalOutputHistory::new(100);
+        hist.append("data\nmore data");
+        hist.clear();
+        assert_eq!(hist.line_count(), 0);
+        assert!(hist.search("data").is_empty());
+    }
+
+    #[test]
+    fn session_stats_tracking() {
+        let mut stats = TerminalSessionStats::new(80, 24);
+        assert_eq!(stats.total_bytes(), 0);
+        stats.record_write(100);
+        stats.record_read(50);
+        assert_eq!(stats.total_bytes_written, 100);
+        assert_eq!(stats.total_bytes_read, 50);
+        assert_eq!(stats.total_bytes(), 150);
+        stats.record_resize(120, 40);
+        assert_eq!(stats.resize_count, 1);
+        assert_eq!(stats.current_cols, 120);
+        assert_eq!(stats.current_rows, 40);
+    }
+
+    #[test]
+    fn session_stats_display() {
+        let stats = TerminalSessionStats::new(80, 24);
+        let s = format!("{stats}");
+        assert!(s.contains("80x24"));
+        assert!(s.contains("written=0"));
+    }
+
+    #[test]
+    fn output_history_search_no_match() {
+        let mut hist = TerminalOutputHistory::new(100);
+        hist.append("hello\nworld");
+        assert!(hist.search("zzz").is_empty());
     }
 }

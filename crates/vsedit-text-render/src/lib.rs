@@ -522,6 +522,85 @@ pub fn truncate_with_ellipsis(text: &str, max_width: usize, ellipsis: &str) -> S
     result
 }
 
+// ── Line truncation with configurable ellipsis ──
+
+/// Truncate a line to fit within `max_width` display columns, adding an
+/// ellipsis string when truncation occurs.  Unlike [`truncate_with_ellipsis`],
+/// this function also handles tab expansion during measurement.
+pub fn truncate_line_with_ellipsis(text: &str, max_width: usize, tab_size: u32, ellipsis: &str) -> String {
+    let text_width = display_width(text, tab_size);
+    if text_width <= max_width {
+        return text.to_string();
+    }
+    let ell_width = UnicodeWidthStr::width(ellipsis);
+    if max_width <= ell_width {
+        return truncate_to_width(text, max_width, tab_size);
+    }
+    let target = max_width - ell_width;
+    let mut result = truncate_to_width(text, target, tab_size);
+    // Remove the built-in '…' if truncate_to_width appended one
+    if result.ends_with('…') {
+        result.pop();
+    }
+    result.push_str(ellipsis);
+    result
+}
+
+// ── Bidirectional text hints ──
+
+/// Hint about the dominant text direction of a string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BidiHint {
+    LeftToRight,
+    RightToLeft,
+    Neutral,
+}
+
+/// Determine a simple bidirectional hint for `text` by checking whether it
+/// starts with a known RTL Unicode block character.
+pub fn detect_bidi_hint(text: &str) -> BidiHint {
+    for ch in text.chars() {
+        if ch.is_whitespace() {
+            continue;
+        }
+        let cp = ch as u32;
+        // Arabic (0600-06FF), Hebrew (0590-05FF), Arabic Supplement/Extended
+        if (0x0590..=0x05FF).contains(&cp)
+            || (0x0600..=0x06FF).contains(&cp)
+            || (0xFB50..=0xFDFF).contains(&cp)
+            || (0xFE70..=0xFEFF).contains(&cp)
+        {
+            return BidiHint::RightToLeft;
+        }
+        return BidiHint::LeftToRight;
+    }
+    BidiHint::Neutral
+}
+
+// ── Control character visualization ──
+
+/// Replace ASCII control characters (0x00–0x1F except \t, \n, \r) with their
+/// Unicode Control Pictures (U+2400 range) for display.
+pub fn visualize_control_chars(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        if ch != '\t' && ch != '\n' && ch != '\r' && ch.is_control() {
+            let replacement = char::from_u32(0x2400 + ch as u32).unwrap_or('?');
+            out.push(replacement);
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+/// Count the number of control characters in a string (excluding tab, LF, CR).
+pub fn count_control_chars(text: &str) -> usize {
+    text.chars()
+        .filter(|&c| c != '\t' && c != '\n' && c != '\r' && c.is_control())
+        .count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -760,5 +839,54 @@ mod tests {
         // "你好世界" is 8 columns; truncate to 6 with "…" (1 col)
         let result = truncate_with_ellipsis("你好世界", 6, "…");
         assert_eq!(result, "你好…");
+    }
+
+    #[test]
+    fn truncate_line_with_ellipsis_no_truncation() {
+        assert_eq!(truncate_line_with_ellipsis("short", 10, 4, "..."), "short");
+    }
+
+    #[test]
+    fn truncate_line_with_ellipsis_truncates() {
+        let result = truncate_line_with_ellipsis("hello world foo", 10, 4, "...");
+        assert!(result.ends_with("..."));
+        assert!(display_width(&result, 4) <= 10);
+    }
+
+    #[test]
+    fn detect_bidi_hint_ltr() {
+        assert_eq!(detect_bidi_hint("hello"), BidiHint::LeftToRight);
+    }
+
+    #[test]
+    fn detect_bidi_hint_rtl() {
+        assert_eq!(detect_bidi_hint("\u{0627}\u{0644}"), BidiHint::RightToLeft);
+    }
+
+    #[test]
+    fn detect_bidi_hint_neutral() {
+        assert_eq!(detect_bidi_hint(""), BidiHint::Neutral);
+        assert_eq!(detect_bidi_hint("   "), BidiHint::Neutral);
+    }
+
+    #[test]
+    fn visualize_control_chars_replaces() {
+        let input = "a\x01b\x02c";
+        let output = visualize_control_chars(input);
+        assert_eq!(output, "a\u{2401}b\u{2402}c");
+    }
+
+    #[test]
+    fn visualize_control_chars_preserves_tab_and_newline() {
+        let input = "a\tb\nc";
+        let output = visualize_control_chars(input);
+        assert_eq!(output, "a\tb\nc");
+    }
+
+    #[test]
+    fn count_control_chars_works() {
+        assert_eq!(count_control_chars("abc"), 0);
+        assert_eq!(count_control_chars("a\x01\x02b"), 2);
+        assert_eq!(count_control_chars("a\tb\n"), 0); // tab and LF excluded
     }
 }

@@ -355,6 +355,123 @@ impl StatusBarSnapshot {
     }
 }
 
+/// A group of related status bar items.
+#[derive(Debug, Clone)]
+pub struct StatusBarGroup {
+    pub group_id: String,
+    pub entry_ids: Vec<String>,
+}
+
+impl StatusBarGroup {
+    /// Create a new empty group.
+    pub fn new(group_id: impl Into<String>) -> Self {
+        Self {
+            group_id: group_id.into(),
+            entry_ids: Vec::new(),
+        }
+    }
+
+    /// Add an entry ID to the group.
+    pub fn add(&mut self, entry_id: impl Into<String>) {
+        self.entry_ids.push(entry_id.into());
+    }
+
+    /// Check if the group contains a given entry ID.
+    pub fn contains(&self, entry_id: &str) -> bool {
+        self.entry_ids.iter().any(|id| id == entry_id)
+    }
+
+    /// Number of entries in the group.
+    pub fn len(&self) -> usize {
+        self.entry_ids.len()
+    }
+
+    /// Returns true if the group is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entry_ids.is_empty()
+    }
+}
+
+/// Layout metrics for a status bar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusBarLayout {
+    pub left_count: usize,
+    pub right_count: usize,
+    pub total_visible: usize,
+    pub total_hidden: usize,
+    pub left_text_width: usize,
+    pub right_text_width: usize,
+}
+
+impl StatusBar {
+    /// Compute layout metrics for the current status bar state.
+    pub fn compute_layout(&self) -> StatusBarLayout {
+        let mut left_count = 0;
+        let mut right_count = 0;
+        let mut total_visible = 0;
+        let mut total_hidden = 0;
+        let mut left_text_width = 0;
+        let mut right_text_width = 0;
+
+        for entry in &self.entries {
+            if entry.visible {
+                total_visible += 1;
+                match entry.alignment {
+                    StatusBarAlignment::Left => {
+                        left_count += 1;
+                        left_text_width += entry.text.len();
+                    }
+                    StatusBarAlignment::Right => {
+                        right_count += 1;
+                        right_text_width += entry.text.len();
+                    }
+                }
+            } else {
+                total_hidden += 1;
+            }
+        }
+
+        StatusBarLayout {
+            left_count,
+            right_count,
+            total_visible,
+            total_hidden,
+            left_text_width,
+            right_text_width,
+        }
+    }
+
+    /// Set visibility for all entries in the given group.
+    pub fn set_group_visibility(&mut self, group: &StatusBarGroup, visible: bool) {
+        for entry_id in &group.entry_ids {
+            self.set_visibility(entry_id, visible);
+        }
+    }
+
+    /// Get all tooltips currently set on visible entries.
+    pub fn collect_tooltips(&self) -> Vec<(&str, &str)> {
+        self.entries
+            .iter()
+            .filter(|e| e.visible && e.tooltip.is_some())
+            .map(|e| (e.id.as_str(), e.tooltip.as_deref().unwrap()))
+            .collect()
+    }
+
+    /// Clear all tooltips from all entries.
+    pub fn clear_tooltips(&mut self) {
+        for entry in &mut self.entries {
+            entry.tooltip = None;
+        }
+    }
+
+    /// Toggle visibility for all entries in the bar.
+    pub fn toggle_all_visibility(&mut self) {
+        for entry in &mut self.entries {
+            entry.visible = !entry.visible;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -712,5 +829,85 @@ mod tests {
         bar.reorder(&["missing", "b", "a"]);
         let ids: Vec<&str> = bar.get_all_entries().iter().map(|e| e.id.as_str()).collect();
         assert_eq!(ids, vec!["b", "a"]);
+    }
+
+    #[test]
+    fn status_bar_group_basic() {
+        let mut group = StatusBarGroup::new("git-group");
+        assert!(group.is_empty());
+        group.add("branch");
+        group.add("status");
+        assert_eq!(group.len(), 2);
+        assert!(group.contains("branch"));
+        assert!(!group.contains("missing"));
+    }
+
+    #[test]
+    fn compute_layout_metrics() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("l1", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("l2", StatusBarAlignment::Left, 1));
+        bar.add_entry(make_entry("r1", StatusBarAlignment::Right, 0));
+        bar.set_visibility("l2", false);
+        let layout = bar.compute_layout();
+        assert_eq!(layout.left_count, 1);
+        assert_eq!(layout.right_count, 1);
+        assert_eq!(layout.total_visible, 2);
+        assert_eq!(layout.total_hidden, 1);
+    }
+
+    #[test]
+    fn set_group_visibility_toggles() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("a", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("b", StatusBarAlignment::Left, 1));
+        bar.add_entry(make_entry("c", StatusBarAlignment::Right, 0));
+        let mut group = StatusBarGroup::new("ab");
+        group.add("a");
+        group.add("b");
+        bar.set_group_visibility(&group, false);
+        assert!(!bar.get_entry("a").unwrap().visible);
+        assert!(!bar.get_entry("b").unwrap().visible);
+        assert!(bar.get_entry("c").unwrap().visible);
+    }
+
+    #[test]
+    fn collect_and_clear_tooltips() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(
+            StatusBarEntry::builder("t1", "text", StatusBarAlignment::Left)
+                .tooltip("tip1")
+                .build(),
+        );
+        bar.add_entry(make_entry("t2", StatusBarAlignment::Left, 0));
+        let tips = bar.collect_tooltips();
+        assert_eq!(tips.len(), 1);
+        assert_eq!(tips[0], ("t1", "tip1"));
+        bar.clear_tooltips();
+        assert!(bar.collect_tooltips().is_empty());
+    }
+
+    #[test]
+    fn toggle_all_visibility() {
+        let mut bar = StatusBar::new();
+        bar.add_entry(make_entry("a", StatusBarAlignment::Left, 0));
+        bar.add_entry(make_entry("b", StatusBarAlignment::Right, 1));
+        assert_eq!(bar.visible_count(), 2);
+        bar.toggle_all_visibility();
+        assert_eq!(bar.visible_count(), 0);
+        bar.toggle_all_visibility();
+        assert_eq!(bar.visible_count(), 2);
+    }
+
+    #[test]
+    fn compute_layout_empty_bar() {
+        let bar = StatusBar::new();
+        let layout = bar.compute_layout();
+        assert_eq!(layout.left_count, 0);
+        assert_eq!(layout.right_count, 0);
+        assert_eq!(layout.total_visible, 0);
+        assert_eq!(layout.total_hidden, 0);
+        assert_eq!(layout.left_text_width, 0);
+        assert_eq!(layout.right_text_width, 0);
     }
 }

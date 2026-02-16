@@ -347,6 +347,126 @@ pub fn sort_viewparts_by_priority(parts: &mut [PrioritizedViewPart]) {
     parts.sort_by(|a, b| a.priority.cmp(&b.priority));
 }
 
+// ---------------------------------------------------------------------------
+// View zone overlap detection
+// ---------------------------------------------------------------------------
+
+/// A pair of overlapping view zone IDs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewZoneOverlap {
+    pub zone_a: u64,
+    pub zone_b: u64,
+}
+
+/// Detect overlapping view zones.
+///
+/// Two zones overlap if they occupy the same line range. A zone starting at
+/// `after_line` occupies lines `after_line+1 ..= after_line+height_in_lines`.
+pub fn detect_view_zone_overlaps(zones: &[ViewZone]) -> Vec<ViewZoneOverlap> {
+    let mut overlaps = Vec::new();
+    for i in 0..zones.len() {
+        let a_start = zones[i].after_line + 1;
+        let a_end = zones[i].after_line + zones[i].height_in_lines;
+        for j in (i + 1)..zones.len() {
+            let b_start = zones[j].after_line + 1;
+            let b_end = zones[j].after_line + zones[j].height_in_lines;
+            if a_start <= b_end && b_start <= a_end {
+                overlaps.push(ViewZoneOverlap {
+                    zone_a: zones[i].id,
+                    zone_b: zones[j].id,
+                });
+            }
+        }
+    }
+    overlaps
+}
+
+// ---------------------------------------------------------------------------
+// Widget layout computation
+// ---------------------------------------------------------------------------
+
+/// Computed layout for a widget.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WidgetLayout {
+    pub top: u32,
+    pub left: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Compute the bounding layout for an overlay widget given editor dimensions.
+pub fn compute_overlay_layout(
+    widget: &OverlayWidget,
+    editor_width: u32,
+    editor_height: u32,
+) -> WidgetLayout {
+    let content_width = widget.content.len() as u32;
+    let width = content_width.min(editor_width.saturating_sub(widget.position_left));
+    let height = 1_u32.min(editor_height.saturating_sub(widget.position_top));
+    WidgetLayout {
+        top: widget.position_top,
+        left: widget.position_left,
+        width,
+        height,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Breadcrumb path resolution
+// ---------------------------------------------------------------------------
+
+/// Resolve the breadcrumb trail for a given file path by splitting segments.
+pub fn resolve_breadcrumb_path(file_path: &str) -> BreadcrumbBar {
+    let mut bar = BreadcrumbBar::new();
+    let segments: Vec<&str> = file_path.split('/').filter(|s| !s.is_empty()).collect();
+    for (i, seg) in segments.iter().enumerate() {
+        let kind = if i == segments.len() - 1 {
+            BreadcrumbKind::File
+        } else {
+            BreadcrumbKind::Module
+        };
+        bar.push(BreadcrumbItem {
+            label: seg.to_string(),
+            kind,
+            uri: format!("file:///{}", segments[..=i].join("/")),
+        });
+    }
+    bar
+}
+
+// ---------------------------------------------------------------------------
+// Glyph margin configuration
+// ---------------------------------------------------------------------------
+
+/// Configuration for the glyph margin column.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GlyphMarginConfig {
+    pub enabled: bool,
+    pub width_chars: u32,
+    pub decorations_enabled: bool,
+}
+
+impl Default for GlyphMarginConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            width_chars: 2,
+            decorations_enabled: true,
+        }
+    }
+}
+
+impl GlyphMarginConfig {
+    /// Returns the effective pixel-equivalent width (chars × char_width).
+    pub fn effective_width(&self, char_width: u32) -> u32 {
+        if self.enabled {
+            self.width_chars * char_width
+        } else {
+            0
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -718,5 +838,83 @@ mod tests {
         assert!(ViewPartPriority::High < ViewPartPriority::Normal);
         assert!(ViewPartPriority::Normal < ViewPartPriority::Low);
         assert!(ViewPartPriority::High < ViewPartPriority::Low);
+    }
+
+    #[test]
+    fn detect_no_overlaps() {
+        let zones = vec![
+            ViewZone { id: 1, after_line: 5, height_in_lines: 3, content: None },
+            ViewZone { id: 2, after_line: 20, height_in_lines: 2, content: None },
+        ];
+        assert!(detect_view_zone_overlaps(&zones).is_empty());
+    }
+
+    #[test]
+    fn detect_overlapping_zones() {
+        let zones = vec![
+            ViewZone { id: 1, after_line: 5, height_in_lines: 5, content: None },
+            ViewZone { id: 2, after_line: 8, height_in_lines: 3, content: None },
+        ];
+        let overlaps = detect_view_zone_overlaps(&zones);
+        assert_eq!(overlaps.len(), 1);
+        assert_eq!(overlaps[0].zone_a, 1);
+        assert_eq!(overlaps[0].zone_b, 2);
+    }
+
+    #[test]
+    fn compute_overlay_layout_basic() {
+        let widget = OverlayWidget {
+            id: "test".into(),
+            position_top: 5,
+            position_left: 10,
+            content: "Hello World".into(),
+            visible: true,
+        };
+        let layout = compute_overlay_layout(&widget, 80, 24);
+        assert_eq!(layout.top, 5);
+        assert_eq!(layout.left, 10);
+        assert_eq!(layout.width, 11);
+        assert_eq!(layout.height, 1);
+    }
+
+    #[test]
+    fn compute_overlay_layout_clamps_width() {
+        let widget = OverlayWidget {
+            id: "wide".into(),
+            position_top: 0,
+            position_left: 75,
+            content: "A very long content string".into(),
+            visible: true,
+        };
+        let layout = compute_overlay_layout(&widget, 80, 24);
+        assert_eq!(layout.width, 5); // 80 - 75
+    }
+
+    #[test]
+    fn resolve_breadcrumb_path_basic() {
+        let bar = resolve_breadcrumb_path("src/editor/main.rs");
+        assert_eq!(bar.items.len(), 3);
+        assert_eq!(bar.items[0].label, "src");
+        assert_eq!(bar.items[0].kind, BreadcrumbKind::Module);
+        assert_eq!(bar.items[2].label, "main.rs");
+        assert_eq!(bar.items[2].kind, BreadcrumbKind::File);
+        assert_eq!(bar.get_path_string(), "src / editor / main.rs");
+    }
+
+    #[test]
+    fn glyph_margin_config_default() {
+        let cfg = GlyphMarginConfig::default();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.width_chars, 2);
+        assert!(cfg.decorations_enabled);
+    }
+
+    #[test]
+    fn glyph_margin_effective_width() {
+        let cfg = GlyphMarginConfig::default();
+        assert_eq!(cfg.effective_width(8), 16);
+
+        let disabled = GlyphMarginConfig { enabled: false, ..Default::default() };
+        assert_eq!(disabled.effective_width(8), 0);
     }
 }

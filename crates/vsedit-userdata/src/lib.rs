@@ -440,6 +440,201 @@ impl fmt::Display for UserDataStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Storage quota tracking
+// ---------------------------------------------------------------------------
+
+/// Tracks storage usage against a configurable quota.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StorageQuota {
+    pub max_bytes: usize,
+    pub used_bytes: usize,
+}
+
+impl StorageQuota {
+    pub fn new(max_bytes: usize) -> Self {
+        Self { max_bytes, used_bytes: 0 }
+    }
+
+    pub fn remaining(&self) -> usize {
+        self.max_bytes.saturating_sub(self.used_bytes)
+    }
+
+    pub fn usage_percent(&self) -> f64 {
+        if self.max_bytes == 0 {
+            return 100.0;
+        }
+        (self.used_bytes as f64 / self.max_bytes as f64) * 100.0
+    }
+
+    pub fn would_exceed(&self, additional: usize) -> bool {
+        self.used_bytes + additional > self.max_bytes
+    }
+
+    pub fn record_usage(&mut self, bytes: usize) {
+        self.used_bytes += bytes;
+    }
+
+    pub fn release_usage(&mut self, bytes: usize) {
+        self.used_bytes = self.used_bytes.saturating_sub(bytes);
+    }
+
+    pub fn is_exceeded(&self) -> bool {
+        self.used_bytes > self.max_bytes
+    }
+}
+
+impl fmt::Display for StorageQuota {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{} bytes ({:.1}%)", self.used_bytes, self.max_bytes, self.usage_percent())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Data migration versioning
+// ---------------------------------------------------------------------------
+
+/// Tracks data migration versions applied to user data.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MigrationRecord {
+    pub version: u32,
+    pub description: String,
+    pub applied: bool,
+}
+
+/// Manages a sequence of migrations.
+pub struct MigrationTracker {
+    migrations: Vec<MigrationRecord>,
+}
+
+impl MigrationTracker {
+    pub fn new() -> Self {
+        Self { migrations: Vec::new() }
+    }
+
+    pub fn add_migration(&mut self, version: u32, description: String) {
+        self.migrations.push(MigrationRecord { version, description, applied: false });
+    }
+
+    pub fn mark_applied(&mut self, version: u32) -> bool {
+        for m in &mut self.migrations {
+            if m.version == version {
+                m.applied = true;
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn pending_migrations(&self) -> Vec<&MigrationRecord> {
+        self.migrations.iter().filter(|m| !m.applied).collect()
+    }
+
+    pub fn current_version(&self) -> Option<u32> {
+        self.migrations.iter().filter(|m| m.applied).map(|m| m.version).max()
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.migrations.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Data export/import summary
+// ---------------------------------------------------------------------------
+
+/// Summary of a data export or import operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DataTransferSummary {
+    pub profiles_transferred: usize,
+    pub settings_transferred: usize,
+    pub extensions_transferred: usize,
+    pub total_bytes: usize,
+    pub errors: Vec<String>,
+}
+
+impl DataTransferSummary {
+    pub fn new() -> Self {
+        Self {
+            profiles_transferred: 0,
+            settings_transferred: 0,
+            extensions_transferred: 0,
+            total_bytes: 0,
+            errors: Vec::new(),
+        }
+    }
+
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.profiles_transferred == 0
+            && self.settings_transferred == 0
+            && self.extensions_transferred == 0
+    }
+}
+
+impl fmt::Display for DataTransferSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} profiles, {} settings, {} extensions, {} bytes",
+            self.profiles_transferred, self.settings_transferred,
+            self.extensions_transferred, self.total_bytes
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Data integrity verification
+// ---------------------------------------------------------------------------
+
+/// Result of verifying user data integrity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IntegrityReport {
+    pub checked_paths: usize,
+    pub missing_paths: Vec<String>,
+    pub corrupted_paths: Vec<String>,
+}
+
+impl IntegrityReport {
+    pub fn is_healthy(&self) -> bool {
+        self.missing_paths.is_empty() && self.corrupted_paths.is_empty()
+    }
+
+    pub fn total_issues(&self) -> usize {
+        self.missing_paths.len() + self.corrupted_paths.len()
+    }
+}
+
+impl fmt::Display for IntegrityReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "checked {} paths: {} missing, {} corrupted",
+            self.checked_paths, self.missing_paths.len(), self.corrupted_paths.len()
+        )
+    }
+}
+
+/// Verify integrity of user data paths by checking that all standard paths
+/// exist in a given set of known paths.
+pub fn verify_integrity(user_path: &UserDataPath, existing_paths: &[&str]) -> IntegrityReport {
+    let standard = user_path.standard_paths();
+    let mut missing = Vec::new();
+    for p in &standard {
+        if !existing_paths.contains(&p.as_str()) {
+            missing.push(p.clone());
+        }
+    }
+    IntegrityReport {
+        checked_paths: standard.len(),
+        missing_paths: missing,
+        corrupted_paths: Vec::new(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -742,5 +937,78 @@ mod tests {
             namespaces_count: 2,
         };
         assert_eq!(format!("{stats}"), "5 entries, 128 bytes, 2 namespaces");
+    }
+
+    #[test]
+    fn storage_quota_tracking() {
+        let mut quota = StorageQuota::new(1000);
+        assert_eq!(quota.remaining(), 1000);
+        assert!(!quota.is_exceeded());
+        assert!(!quota.would_exceed(500));
+        assert!(quota.would_exceed(1001));
+        quota.record_usage(600);
+        assert_eq!(quota.remaining(), 400);
+        assert!((quota.usage_percent() - 60.0).abs() < 0.1);
+        quota.release_usage(200);
+        assert_eq!(quota.remaining(), 600);
+        assert!(quota.to_string().contains("400/1000"));
+    }
+
+    #[test]
+    fn storage_quota_zero_max() {
+        let quota = StorageQuota::new(0);
+        assert_eq!(quota.usage_percent(), 100.0);
+        assert!(quota.would_exceed(1));
+    }
+
+    #[test]
+    fn migration_tracker_lifecycle() {
+        let mut tracker = MigrationTracker::new();
+        tracker.add_migration(1, "initial schema".into());
+        tracker.add_migration(2, "add profiles".into());
+        tracker.add_migration(3, "add tags".into());
+        assert_eq!(tracker.total_count(), 3);
+        assert_eq!(tracker.pending_migrations().len(), 3);
+        assert!(tracker.current_version().is_none());
+        assert!(tracker.mark_applied(1));
+        assert!(tracker.mark_applied(2));
+        assert_eq!(tracker.current_version(), Some(2));
+        assert_eq!(tracker.pending_migrations().len(), 1);
+        assert!(!tracker.mark_applied(99));
+    }
+
+    #[test]
+    fn data_transfer_summary_basic() {
+        let mut summary = DataTransferSummary::new();
+        assert!(summary.is_empty());
+        assert!(!summary.has_errors());
+        summary.profiles_transferred = 2;
+        summary.settings_transferred = 5;
+        summary.extensions_transferred = 10;
+        summary.total_bytes = 4096;
+        assert!(!summary.is_empty());
+        assert!(summary.to_string().contains("2 profiles"));
+        summary.errors.push("failed to export theme".into());
+        assert!(summary.has_errors());
+    }
+
+    #[test]
+    fn integrity_report_healthy() {
+        let p = UserDataPath::new("/data");
+        let paths = p.standard_paths();
+        let existing: Vec<&str> = paths.iter().map(|s| s.as_str()).collect();
+        let report = verify_integrity(&p, &existing);
+        assert!(report.is_healthy());
+        assert_eq!(report.total_issues(), 0);
+        assert_eq!(report.checked_paths, 6);
+    }
+
+    #[test]
+    fn integrity_report_missing_paths() {
+        let p = UserDataPath::new("/data");
+        let report = verify_integrity(&p, &[]);
+        assert!(!report.is_healthy());
+        assert_eq!(report.missing_paths.len(), 6);
+        assert!(report.to_string().contains("6 missing"));
     }
 }

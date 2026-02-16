@@ -551,6 +551,101 @@ pub fn extract_code_blocks(tokens: &[MarkdownToken]) -> Vec<(Option<String>, Str
 // Tests
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Heading outline for document structure
+// ---------------------------------------------------------------------------
+
+/// An entry in a document outline derived from headings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutlineEntry {
+    pub level: u8,
+    pub text: String,
+    pub line_number: usize,
+}
+
+/// Build an outline from a multi-line Markdown document by extracting headings
+/// and tracking their line numbers.
+pub fn build_outline(text: &str) -> Vec<OutlineEntry> {
+    let mut entries = Vec::new();
+    for (line_idx, line) in text.lines().enumerate() {
+        if line.starts_with('#') {
+            let level = line.chars().take_while(|&c| c == '#').count().min(6) as u8;
+            let content = line[level as usize..].trim().to_string();
+            entries.push(OutlineEntry {
+                level,
+                text: content,
+                line_number: line_idx + 1,
+            });
+        }
+    }
+    entries
+}
+
+// ---------------------------------------------------------------------------
+// Link collection with line tracking
+// ---------------------------------------------------------------------------
+
+/// A link found in the document together with its location.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FoundLink {
+    pub label: String,
+    pub url: String,
+    pub line_number: usize,
+}
+
+/// Collect all inline links from a multi-line Markdown document.
+pub fn collect_links(text: &str) -> Vec<FoundLink> {
+    let mut links = Vec::new();
+    for (line_idx, line) in text.lines().enumerate() {
+        let tokens = tokenize_inline(line);
+        for token in tokens {
+            if let MarkdownToken::Link(label, url) = token {
+                links.push(FoundLink {
+                    label,
+                    url,
+                    line_number: line_idx + 1,
+                });
+            }
+        }
+    }
+    links
+}
+
+// ---------------------------------------------------------------------------
+// Block-level structure detection
+// ---------------------------------------------------------------------------
+
+/// The structural kind of a Markdown line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BlockKind {
+    Heading(u8),
+    ListItem,
+    CodeFence,
+    BlankLine,
+    Paragraph,
+}
+
+/// Classify each line of a document into its block-level structure.
+pub fn detect_block_structure(text: &str) -> Vec<BlockKind> {
+    text.lines()
+        .map(|line| {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                BlockKind::BlankLine
+            } else if trimmed.starts_with("```") {
+                BlockKind::CodeFence
+            } else if line.starts_with('#') {
+                let level = line.chars().take_while(|&c| c == '#').count().min(6) as u8;
+                BlockKind::Heading(level)
+            } else if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
+                BlockKind::ListItem
+            } else {
+                BlockKind::Paragraph
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -760,5 +855,47 @@ mod tests {
     fn compute_stats_empty_tokens() {
         let stats = compute_stats(&[]);
         assert_eq!(stats, MarkdownStats::default());
+    }
+
+    #[test]
+    fn build_outline_extracts_headings_with_line_numbers() {
+        let doc = "# Intro\nsome text\n## Details\nmore text\n### Deep";
+        let outline = build_outline(doc);
+        assert_eq!(outline.len(), 3);
+        assert_eq!(outline[0], OutlineEntry { level: 1, text: "Intro".into(), line_number: 1 });
+        assert_eq!(outline[1], OutlineEntry { level: 2, text: "Details".into(), line_number: 3 });
+        assert_eq!(outline[2], OutlineEntry { level: 3, text: "Deep".into(), line_number: 5 });
+    }
+
+    #[test]
+    fn build_outline_empty_doc() {
+        assert!(build_outline("no headings here").is_empty());
+    }
+
+    #[test]
+    fn collect_links_finds_all_links() {
+        let doc = "see [a](http://a.com)\nnormal line\n[b](http://b.com) end";
+        let links = collect_links(doc);
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0], FoundLink { label: "a".into(), url: "http://a.com".into(), line_number: 1 });
+        assert_eq!(links[1], FoundLink { label: "b".into(), url: "http://b.com".into(), line_number: 3 });
+    }
+
+    #[test]
+    fn collect_links_empty_doc() {
+        assert!(collect_links("no links").is_empty());
+    }
+
+    #[test]
+    fn detect_block_structure_classifies_lines() {
+        let doc = "# Title\n\n- item\n```\ncode\n```\nparagraph";
+        let blocks = detect_block_structure(doc);
+        assert_eq!(blocks[0], BlockKind::Heading(1));
+        assert_eq!(blocks[1], BlockKind::BlankLine);
+        assert_eq!(blocks[2], BlockKind::ListItem);
+        assert_eq!(blocks[3], BlockKind::CodeFence);
+        assert_eq!(blocks[4], BlockKind::Paragraph);
+        assert_eq!(blocks[5], BlockKind::CodeFence);
+        assert_eq!(blocks[6], BlockKind::Paragraph);
     }
 }

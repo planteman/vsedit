@@ -378,6 +378,90 @@ impl LogService {
     }
 }
 
+// ── Log Rotation Management ──
+
+/// Configuration for log rotation based on entry count.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RotationConfig {
+    /// Maximum number of entries before rotation.
+    pub max_entries: usize,
+    /// Number of entries to keep after rotation (most recent).
+    pub keep_entries: usize,
+}
+
+impl RotationConfig {
+    pub fn new(max_entries: usize, keep_entries: usize) -> Self {
+        Self {
+            max_entries,
+            keep_entries: keep_entries.min(max_entries),
+        }
+    }
+}
+
+/// Apply rotation to a log service: if entries exceed `config.max_entries`,
+/// keep only the most recent `config.keep_entries`.
+pub fn rotate_log(service: &mut LogService, config: &RotationConfig) -> usize {
+    let len = service.entries.len();
+    if len <= config.max_entries {
+        return 0;
+    }
+    let remove_count = len - config.keep_entries;
+    service.entries.drain(..remove_count);
+    remove_count
+}
+
+// ── Log Level Filtering Utilities ──
+
+/// Parse a log level from a case-insensitive string.
+pub fn parse_log_level(s: &str) -> Result<LogLevel, LogError> {
+    match s.to_uppercase().as_str() {
+        "TRACE" => Ok(LogLevel::Trace),
+        "DEBUG" => Ok(LogLevel::Debug),
+        "INFO" => Ok(LogLevel::Info),
+        "WARN" | "WARNING" => Ok(LogLevel::Warning),
+        "ERROR" => Ok(LogLevel::Error),
+        "CRITICAL" | "FATAL" => Ok(LogLevel::Critical),
+        _ => Err(LogError::InvalidLevel(s.to_string())),
+    }
+}
+
+// ── Structured Log Entry Formatting ──
+
+/// Format a slice of log entries as a newline-delimited JSON string.
+pub fn format_entries_ndjson(entries: &[LogEntry]) -> String {
+    let mut out = String::new();
+    for entry in entries {
+        out.push_str(&LogFormatter::format_json(entry));
+        out.push('\n');
+    }
+    out
+}
+
+// ── Log Search / Grep ──
+
+/// Search entries whose message matches a simple case-insensitive substring.
+pub fn grep_entries<'a>(entries: &'a [LogEntry], pattern: &str) -> Vec<&'a LogEntry> {
+    let lower = pattern.to_lowercase();
+    entries
+        .iter()
+        .filter(|e| e.message.to_lowercase().contains(&lower))
+        .collect()
+}
+
+/// Search entries whose message or source matches a substring (case-insensitive).
+pub fn grep_entries_all_fields<'a>(entries: &'a [LogEntry], pattern: &str) -> Vec<&'a LogEntry> {
+    let lower = pattern.to_lowercase();
+    entries
+        .iter()
+        .filter(|e| {
+            e.message.to_lowercase().contains(&lower)
+                || e.source
+                    .as_ref()
+                    .map_or(false, |s| s.to_lowercase().contains(&lower))
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -763,5 +847,75 @@ mod tests {
         assert_eq!(stats.error_count, 1);
         assert_eq!(stats.critical_count, 1);
         assert_eq!(stats.unique_sources, 2);
+    }
+
+    #[test]
+    fn test_rotate_log_removes_old_entries() {
+        let mut svc = LogService::new(LogLevel::Trace);
+        for i in 0..10 {
+            svc.info(format!("msg{}", i));
+        }
+        let config = RotationConfig::new(5, 3);
+        let removed = rotate_log(&mut svc, &config);
+        assert_eq!(removed, 7);
+        assert_eq!(svc.entry_count(), 3);
+        assert_eq!(svc.get_entries()[0].message, "msg7");
+    }
+
+    #[test]
+    fn test_rotate_log_no_op_when_under_limit() {
+        let mut svc = LogService::new(LogLevel::Trace);
+        svc.info("a");
+        svc.info("b");
+        let config = RotationConfig::new(10, 5);
+        let removed = rotate_log(&mut svc, &config);
+        assert_eq!(removed, 0);
+        assert_eq!(svc.entry_count(), 2);
+    }
+
+    #[test]
+    fn test_parse_log_level_valid() {
+        assert_eq!(parse_log_level("trace").unwrap(), LogLevel::Trace);
+        assert_eq!(parse_log_level("DEBUG").unwrap(), LogLevel::Debug);
+        assert_eq!(parse_log_level("Info").unwrap(), LogLevel::Info);
+        assert_eq!(parse_log_level("WARN").unwrap(), LogLevel::Warning);
+        assert_eq!(parse_log_level("warning").unwrap(), LogLevel::Warning);
+        assert_eq!(parse_log_level("error").unwrap(), LogLevel::Error);
+        assert_eq!(parse_log_level("CRITICAL").unwrap(), LogLevel::Critical);
+        assert_eq!(parse_log_level("fatal").unwrap(), LogLevel::Critical);
+    }
+
+    #[test]
+    fn test_parse_log_level_invalid() {
+        assert!(parse_log_level("unknown").is_err());
+    }
+
+    #[test]
+    fn test_format_entries_ndjson() {
+        let entries = vec![
+            LogEntry { level: LogLevel::Info, message: "a".into(), source: None, timestamp: 1 },
+            LogEntry { level: LogLevel::Error, message: "b".into(), source: Some("x".into()), timestamp: 2 },
+        ];
+        let ndjson = format_entries_ndjson(&entries);
+        let lines: Vec<&str> = ndjson.trim().split('\n').collect();
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains("\"level\":\"INFO\""));
+        assert!(lines[1].contains("\"level\":\"ERROR\""));
+    }
+
+    #[test]
+    fn test_grep_entries_case_insensitive() {
+        let entries = sample_entries();
+        let results = grep_entries(&entries, "CONNECT");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].message, "connection failed");
+        assert_eq!(results[1].message, "connected");
+    }
+
+    #[test]
+    fn test_grep_entries_all_fields() {
+        let entries = sample_entries();
+        let results = grep_entries_all_fields(&entries, "NETWORK");
+        assert_eq!(results.len(), 2); // both entries with source "network"
     }
 }

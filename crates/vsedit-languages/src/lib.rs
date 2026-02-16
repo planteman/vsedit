@@ -154,6 +154,178 @@ pub fn bulk_detect<'a>(
 }
 
 // ---------------------------------------------------------------------------
+// Language contribution scoring
+// ---------------------------------------------------------------------------
+
+/// Score representing how strongly a language matches a given file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanguageMatchScore {
+    pub language_id: String,
+    pub extension_match: bool,
+    pub filename_match: bool,
+    pub first_line_match: bool,
+}
+
+impl LanguageMatchScore {
+    /// Compute a numeric score (higher = better match).
+    pub fn score(&self) -> u32 {
+        let mut s = 0u32;
+        if self.filename_match {
+            s += 10;
+        }
+        if self.extension_match {
+            s += 5;
+        }
+        if self.first_line_match {
+            s += 3;
+        }
+        s
+    }
+}
+
+/// Score all registered languages against a filename and optional first line.
+pub fn score_languages(svc: &LanguageService, filename: &str, first_line: Option<&str>) -> Vec<LanguageMatchScore> {
+    let basename = filename.rsplit('/').next().unwrap_or(filename);
+    let ext = basename.rfind('.').map(|i| &basename[i..]);
+
+    let mut scores = Vec::new();
+    for id in svc.get_registered_language_ids() {
+        if let Some(lang) = svc.get_language(id) {
+            let filename_match = lang.filenames.iter().any(|f| f.eq_ignore_ascii_case(basename));
+            let extension_match = ext.map_or(false, |e| {
+                lang.extensions.iter().any(|le| le.eq_ignore_ascii_case(e))
+            });
+            let first_line_match = first_line.map_or(false, |fl| {
+                svc.get_language_id_by_first_line(fl) == Some(id)
+            });
+            if filename_match || extension_match || first_line_match {
+                scores.push(LanguageMatchScore {
+                    language_id: id.to_string(),
+                    extension_match,
+                    filename_match,
+                    first_line_match,
+                });
+            }
+        }
+    }
+    scores.sort_by(|a, b| b.score().cmp(&a.score()));
+    scores
+}
+
+// ---------------------------------------------------------------------------
+// Extension-to-language conflict resolution
+// ---------------------------------------------------------------------------
+
+/// Describes a conflict where multiple languages claim the same extension.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtensionConflict {
+    pub extension: String,
+    pub language_ids: Vec<String>,
+}
+
+/// Find all file extensions that are registered by more than one language.
+pub fn find_extension_conflicts(svc: &LanguageService) -> Vec<ExtensionConflict> {
+    let mut ext_map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    for id in svc.get_registered_language_ids() {
+        if let Some(lang) = svc.get_language(id) {
+            for ext in &lang.extensions {
+                let lower = ext.to_lowercase();
+                ext_map.entry(lower).or_default().push(id.to_string());
+            }
+        }
+    }
+    let mut conflicts: Vec<ExtensionConflict> = ext_map
+        .into_iter()
+        .filter(|(_, ids)| ids.len() > 1)
+        .map(|(extension, language_ids)| ExtensionConflict { extension, language_ids })
+        .collect();
+    conflicts.sort_by(|a, b| a.extension.cmp(&b.extension));
+    conflicts
+}
+
+// ---------------------------------------------------------------------------
+// Shebang parsing enhancement
+// ---------------------------------------------------------------------------
+
+/// Parsed components of a shebang line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShebangInfo {
+    pub interpreter_path: String,
+    pub interpreter_name: String,
+    pub args: Vec<String>,
+}
+
+/// Parse a shebang line into its components.
+/// Returns `None` if the line doesn't start with `#!`.
+pub fn parse_shebang(line: &str) -> Option<ShebangInfo> {
+    let trimmed = line.trim();
+    if !trimmed.starts_with("#!") {
+        return None;
+    }
+    let rest = trimmed[2..].trim();
+    let parts: Vec<&str> = rest.split_whitespace().collect();
+    if parts.is_empty() {
+        return None;
+    }
+
+    // Handle `#!/usr/bin/env <interpreter>` form
+    let (interpreter_path, interpreter_name, args) = if parts[0].ends_with("/env") && parts.len() > 1 {
+        let name = parts[1].to_string();
+        let args: Vec<String> = parts[2..].iter().map(|s| s.to_string()).collect();
+        (parts[0].to_string(), name, args)
+    } else {
+        let path = parts[0].to_string();
+        let name = path.rsplit('/').next().unwrap_or(&path).to_string();
+        let args: Vec<String> = parts[1..].iter().map(|s| s.to_string()).collect();
+        (path, name, args)
+    };
+
+    Some(ShebangInfo { interpreter_path, interpreter_name, args })
+}
+
+// ---------------------------------------------------------------------------
+// Language inheritance chain
+// ---------------------------------------------------------------------------
+
+/// Describes the inheritance chain for a language based on shared editing config.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LanguageInheritance {
+    pub language_id: String,
+    pub parent_id: Option<String>,
+    pub shared_comment_style: bool,
+}
+
+/// Determine potential parent languages based on shared comment styles.
+pub fn find_language_parent(svc: &LanguageService, lang_id: &str) -> Option<LanguageInheritance> {
+    let cfg = svc.get_edit_config(lang_id)?;
+    let line_comment = &cfg.comments.line_comment;
+    let block_comment = &cfg.comments.block_comment;
+
+    for other_id in svc.get_registered_language_ids() {
+        if other_id == lang_id {
+            continue;
+        }
+        if let Some(other_cfg) = svc.get_edit_config(other_id) {
+            if &other_cfg.comments.line_comment == line_comment
+                && &other_cfg.comments.block_comment == block_comment
+            {
+                return Some(LanguageInheritance {
+                    language_id: lang_id.to_string(),
+                    parent_id: Some(other_id.to_string()),
+                    shared_comment_style: true,
+                });
+            }
+        }
+    }
+
+    Some(LanguageInheritance {
+        language_id: lang_id.to_string(),
+        parent_id: None,
+        shared_comment_style: false,
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -750,5 +922,98 @@ mod tests {
         assert_eq!(results[1].1, Some("python"));
         assert_eq!(results[2].1, Some("css"));
         assert_eq!(results[3].1, Some("makefile"));
+    }
+
+    // -- score_languages ----------------------------------------------------
+
+    #[test]
+    fn score_languages_rust_file() {
+        let svc = make_registry();
+        let scores = score_languages(&svc, "main.rs", None);
+        assert!(!scores.is_empty());
+        assert_eq!(scores[0].language_id, "rust");
+        assert!(scores[0].extension_match);
+        assert!(scores[0].score() >= 5);
+    }
+
+    #[test]
+    fn score_languages_with_first_line() {
+        let svc = make_registry();
+        let scores = score_languages(&svc, "script", Some("#!/usr/bin/env python3"));
+        assert!(scores.iter().any(|s| s.language_id == "python" && s.first_line_match));
+    }
+
+    #[test]
+    fn score_languages_no_match() {
+        let svc = make_registry();
+        let scores = score_languages(&svc, "unknown.xyz", None);
+        assert!(scores.is_empty());
+    }
+
+    // -- find_extension_conflicts -------------------------------------------
+
+    #[test]
+    fn extension_conflicts_custom() {
+        let mut svc = LanguageService::new();
+        svc.register(LanguageDefinition {
+            id: "lang_a".into(), name: "A".into(),
+            extensions: vec![".shared".into()], filenames: vec![],
+            aliases: vec![], mime_types: vec![], first_line: None,
+        });
+        svc.register(LanguageDefinition {
+            id: "lang_b".into(), name: "B".into(),
+            extensions: vec![".shared".into(), ".unique".into()], filenames: vec![],
+            aliases: vec![], mime_types: vec![], first_line: None,
+        });
+        let conflicts = find_extension_conflicts(&svc);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].extension, ".shared");
+        assert_eq!(conflicts[0].language_ids.len(), 2);
+    }
+
+    // -- parse_shebang ------------------------------------------------------
+
+    #[test]
+    fn parse_shebang_env_form() {
+        let info = parse_shebang("#!/usr/bin/env python3").unwrap();
+        assert_eq!(info.interpreter_name, "python3");
+        assert_eq!(info.interpreter_path, "/usr/bin/env");
+        assert!(info.args.is_empty());
+    }
+
+    #[test]
+    fn parse_shebang_direct_form() {
+        let info = parse_shebang("#!/bin/bash -x").unwrap();
+        assert_eq!(info.interpreter_name, "bash");
+        assert_eq!(info.interpreter_path, "/bin/bash");
+        assert_eq!(info.args, vec!["-x"]);
+    }
+
+    #[test]
+    fn parse_shebang_not_a_shebang() {
+        assert!(parse_shebang("hello world").is_none());
+        assert!(parse_shebang("").is_none());
+    }
+
+    // -- find_language_parent -----------------------------------------------
+
+    #[test]
+    fn language_inheritance_finds_parent() {
+        let svc = make_registry();
+        let result = find_language_parent(&svc, "typescript");
+        assert!(result.is_some());
+        let inh = result.unwrap();
+        assert_eq!(inh.language_id, "typescript");
+        // TypeScript and JavaScript share // and /* */ comment style
+        if let Some(parent) = &inh.parent_id {
+            assert!(inh.shared_comment_style);
+            assert!(!parent.is_empty());
+        }
+    }
+
+    #[test]
+    fn language_inheritance_unknown_language() {
+        let svc = make_registry();
+        assert!(find_language_parent(&svc, "nonexistent").is_none());
     }
 }

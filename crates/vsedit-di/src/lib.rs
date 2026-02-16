@@ -415,6 +415,124 @@ pub fn validate_service_id(id: &str) -> bool {
 // Tests
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Service lifecycle
+// ---------------------------------------------------------------------------
+
+/// Represents the lifecycle phase of a service.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ServiceLifecycle {
+    /// Service has been registered but not yet created.
+    Registered,
+    /// Service has been created / resolved.
+    Active,
+    /// Service has been disposed.
+    Disposed,
+}
+
+impl fmt::Display for ServiceLifecycle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Registered => write!(f, "Registered"),
+            Self::Active => write!(f, "Active"),
+            Self::Disposed => write!(f, "Disposed"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Circular dependency detection
+// ---------------------------------------------------------------------------
+
+/// Checks for circular dependencies in a dependency graph represented as
+/// adjacency lists. Keys are service names, values are their dependencies.
+pub fn detect_circular_dependency(
+    graph: &HashMap<String, Vec<String>>,
+) -> Option<Vec<String>> {
+    enum State { Unvisited, InProgress, Done }
+    let mut states: HashMap<&str, State> = HashMap::new();
+    let mut path: Vec<String> = Vec::new();
+
+    for key in graph.keys() {
+        states.insert(key.as_str(), State::Unvisited);
+    }
+
+    fn visit<'a>(
+        node: &'a str,
+        graph: &'a HashMap<String, Vec<String>>,
+        states: &mut HashMap<&'a str, State>,
+        path: &mut Vec<String>,
+    ) -> Option<Vec<String>> {
+        match states.get(node) {
+            Some(State::InProgress) => {
+                path.push(node.to_string());
+                return Some(path.clone());
+            }
+            Some(State::Done) => return None,
+            _ => {}
+        }
+        states.insert(node, State::InProgress);
+        path.push(node.to_string());
+        if let Some(deps) = graph.get(node) {
+            for dep in deps {
+                if let Some(cycle) = visit(dep, graph, states, path) {
+                    return Some(cycle);
+                }
+            }
+        }
+        path.pop();
+        states.insert(node, State::Done);
+        None
+    }
+
+    for key in graph.keys() {
+        if matches!(states.get(key.as_str()), Some(State::Unvisited)) {
+            if let Some(cycle) = visit(key.as_str(), graph, &mut states, &mut path) {
+                return Some(cycle);
+            }
+        }
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
+// Container statistics (extended)
+// ---------------------------------------------------------------------------
+
+/// Extended diagnostic information about the container.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContainerDiagnostics {
+    pub service_count: usize,
+    pub factory_count: usize,
+    pub instance_count: usize,
+    pub is_disposed: bool,
+}
+
+impl ContainerDiagnostics {
+    /// Collect diagnostics from a [`ServiceCollection`].
+    pub fn from_collection(collection: &ServiceCollection) -> Self {
+        let map = unsafe { &*collection.services.get() };
+        let factory_count = map.values().filter(|e| matches!(e, ServiceEntry::Factory(_))).count();
+        let instance_count = map.values().filter(|e| matches!(e, ServiceEntry::Instance(_))).count();
+        Self {
+            service_count: map.len(),
+            factory_count,
+            instance_count,
+            is_disposed: collection.is_disposed(),
+        }
+    }
+}
+
+impl fmt::Display for ContainerDiagnostics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "services={}, factories={}, instances={}, disposed={}",
+            self.service_count, self.factory_count, self.instance_count, self.is_disposed
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -732,5 +850,93 @@ mod tests {
         // Exactly 128 is fine
         let ok_id = "A".repeat(128);
         assert!(validate_service_id(&ok_id));
+    }
+
+    #[test]
+    fn service_lifecycle_display() {
+        assert_eq!(ServiceLifecycle::Registered.to_string(), "Registered");
+        assert_eq!(ServiceLifecycle::Active.to_string(), "Active");
+        assert_eq!(ServiceLifecycle::Disposed.to_string(), "Disposed");
+    }
+
+    #[test]
+    fn service_lifecycle_equality() {
+        assert_eq!(ServiceLifecycle::Registered, ServiceLifecycle::Registered);
+        assert_ne!(ServiceLifecycle::Active, ServiceLifecycle::Disposed);
+    }
+
+    #[test]
+    fn detect_circular_dependency_none() {
+        let mut graph = HashMap::new();
+        graph.insert("A".into(), vec!["B".into()]);
+        graph.insert("B".into(), vec!["C".into()]);
+        graph.insert("C".into(), vec![]);
+        assert!(detect_circular_dependency(&graph).is_none());
+    }
+
+    #[test]
+    fn detect_circular_dependency_found() {
+        let mut graph = HashMap::new();
+        graph.insert("A".into(), vec!["B".into()]);
+        graph.insert("B".into(), vec!["C".into()]);
+        graph.insert("C".into(), vec!["A".into()]);
+        let cycle = detect_circular_dependency(&graph);
+        assert!(cycle.is_some());
+        let path = cycle.unwrap();
+        assert!(path.len() >= 3);
+    }
+
+    #[test]
+    fn detect_circular_dependency_self_loop() {
+        let mut graph = HashMap::new();
+        graph.insert("A".into(), vec!["A".into()]);
+        let cycle = detect_circular_dependency(&graph);
+        assert!(cycle.is_some());
+    }
+
+    #[test]
+    fn container_diagnostics_empty() {
+        let sc = ServiceCollection::new();
+        let diag = ContainerDiagnostics::from_collection(&sc);
+        assert_eq!(diag.service_count, 0);
+        assert_eq!(diag.factory_count, 0);
+        assert_eq!(diag.instance_count, 0);
+        assert!(!diag.is_disposed);
+    }
+
+    #[test]
+    fn container_diagnostics_with_services() {
+        let mut sc = ServiceCollection::new();
+        sc.register(ConfigService { value: 1 });
+        sc.register_factory(|_| LogService { prefix: "test".into() });
+        let diag = ContainerDiagnostics::from_collection(&sc);
+        assert_eq!(diag.service_count, 2);
+        assert_eq!(diag.factory_count, 1);
+        assert_eq!(diag.instance_count, 1);
+    }
+
+    #[test]
+    fn container_diagnostics_display() {
+        let diag = ContainerDiagnostics {
+            service_count: 5,
+            factory_count: 2,
+            instance_count: 3,
+            is_disposed: false,
+        };
+        let s = format!("{}", diag);
+        assert!(s.contains("services=5"));
+        assert!(s.contains("factories=2"));
+    }
+
+    #[test]
+    fn container_diagnostics_after_resolve() {
+        let mut sc = ServiceCollection::new();
+        sc.register_factory(|_| LogService { prefix: "x".into() });
+        let diag_before = ContainerDiagnostics::from_collection(&sc);
+        assert_eq!(diag_before.factory_count, 1);
+        let _ = sc.get::<LogService>();
+        let diag_after = ContainerDiagnostics::from_collection(&sc);
+        assert_eq!(diag_after.factory_count, 0);
+        assert_eq!(diag_after.instance_count, 1);
     }
 }

@@ -390,6 +390,117 @@ impl StatusBarService {
 }
 
 // ---------------------------------------------------------------------------
+// Sort items by priority
+// ---------------------------------------------------------------------------
+
+/// Sort a mutable slice of status bar items by priority (highest first).
+pub fn sort_items_by_priority(items: &mut [StatusBarItem]) {
+    items.sort_by(|a, b| b.priority.cmp(&a.priority));
+}
+
+// ---------------------------------------------------------------------------
+// Item group management
+// ---------------------------------------------------------------------------
+
+/// A named group of status bar item IDs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusBarGroup {
+    pub name: String,
+    pub item_ids: Vec<String>,
+}
+
+impl StatusBarGroup {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            item_ids: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, id: impl Into<String>) {
+        self.item_ids.push(id.into());
+    }
+
+    pub fn remove(&mut self, id: &str) {
+        self.item_ids.retain(|i| i != id);
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.item_ids.iter().any(|i| i == id)
+    }
+
+    pub fn len(&self) -> usize {
+        self.item_ids.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.item_ids.is_empty()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Status bar width computation
+// ---------------------------------------------------------------------------
+
+/// Compute the total display width needed for a slice of items.
+///
+/// Each item contributes its text length plus a separator of `sep_width` chars
+/// (no trailing separator).
+pub fn compute_status_bar_width(items: &[StatusBarItem], sep_width: usize) -> usize {
+    if items.is_empty() {
+        return 0;
+    }
+    let text_width: usize = items.iter().map(|i| i.text.len()).sum();
+    let separators = (items.len() - 1) * sep_width;
+    text_width + separators
+}
+
+// ---------------------------------------------------------------------------
+// Item animation state
+// ---------------------------------------------------------------------------
+
+/// Animation state for a status bar item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnimationPhase {
+    Idle,
+    FadingIn,
+    Visible,
+    FadingOut,
+}
+
+/// Tracks animation state for a status bar item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ItemAnimationState {
+    pub item_id: String,
+    pub phase: AnimationPhase,
+    pub elapsed_ms: u64,
+    pub duration_ms: u64,
+}
+
+impl ItemAnimationState {
+    pub fn new(item_id: impl Into<String>, duration_ms: u64) -> Self {
+        Self {
+            item_id: item_id.into(),
+            phase: AnimationPhase::Idle,
+            elapsed_ms: 0,
+            duration_ms,
+        }
+    }
+
+    /// Returns the progress ratio (0.0 to 1.0).
+    pub fn progress(&self) -> f64 {
+        if self.duration_ms == 0 {
+            return 1.0;
+        }
+        (self.elapsed_ms as f64 / self.duration_ms as f64).min(1.0)
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.elapsed_ms >= self.duration_ms
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -719,5 +830,70 @@ mod tests {
         let right = svc.get_right_items();
         assert_eq!(right.len(), 1);
         assert_eq!(right[0].id, "builder.item");
+    }
+
+    #[test]
+    fn test_sort_items_by_priority() {
+        let mut items = vec![
+            make_item("low", StatusBarAlignment::Left, 10),
+            make_item("high", StatusBarAlignment::Left, 100),
+            make_item("mid", StatusBarAlignment::Left, 50),
+        ];
+        sort_items_by_priority(&mut items);
+        assert_eq!(items[0].id, "high");
+        assert_eq!(items[1].id, "mid");
+        assert_eq!(items[2].id, "low");
+    }
+
+    #[test]
+    fn test_status_bar_group() {
+        let mut group = StatusBarGroup::new("editor");
+        assert!(group.is_empty());
+        group.add("line");
+        group.add("col");
+        assert_eq!(group.len(), 2);
+        assert!(group.contains("line"));
+        assert!(!group.contains("missing"));
+        group.remove("line");
+        assert_eq!(group.len(), 1);
+        assert!(!group.contains("line"));
+    }
+
+    #[test]
+    fn test_compute_status_bar_width() {
+        let items = vec![
+            make_item("a", StatusBarAlignment::Left, 1),
+            make_item("bb", StatusBarAlignment::Left, 2),
+            make_item("ccc", StatusBarAlignment::Left, 3),
+        ];
+        // texts: "a"(1) + "bb"(2) + "ccc"(3) = 6, seps: 2*3 = 6 → 12
+        assert_eq!(compute_status_bar_width(&items, 3), 12);
+    }
+
+    #[test]
+    fn test_compute_status_bar_width_empty() {
+        assert_eq!(compute_status_bar_width(&[], 3), 0);
+    }
+
+    #[test]
+    fn test_animation_state_progress() {
+        let mut anim = ItemAnimationState::new("item1", 200);
+        assert_eq!(anim.phase, AnimationPhase::Idle);
+        assert!((anim.progress() - 0.0).abs() < f64::EPSILON);
+        assert!(!anim.is_complete());
+
+        anim.elapsed_ms = 100;
+        assert!((anim.progress() - 0.5).abs() < f64::EPSILON);
+
+        anim.elapsed_ms = 300;
+        assert!((anim.progress() - 1.0).abs() < f64::EPSILON);
+        assert!(anim.is_complete());
+    }
+
+    #[test]
+    fn test_animation_state_zero_duration() {
+        let anim = ItemAnimationState::new("fast", 0);
+        assert!((anim.progress() - 1.0).abs() < f64::EPSILON);
+        assert!(anim.is_complete());
     }
 }

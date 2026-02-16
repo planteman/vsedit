@@ -415,6 +415,61 @@ impl LocalHistoryService {
 // Tests
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// History pruning by age/count combined
+// ---------------------------------------------------------------------------
+
+impl LocalHistoryService {
+    /// Prune entries by both age and per-file count.
+    ///
+    /// First removes entries older than `max_age` relative to `current_time`,
+    /// then enforces the per-file count limit on remaining entries.
+    pub fn prune_combined(&mut self, max_age: u64, current_time: u64) {
+        self.prune_by_age(max_age, current_time);
+        let uris: Vec<String> = self.get_unique_uris();
+        for uri in uris {
+            self.prune(&uri);
+        }
+    }
+
+    /// Estimate the total storage size including content strings.
+    ///
+    /// Sums `size_bytes` fields plus the in-memory length of stored content.
+    pub fn estimate_storage_size(&self) -> u64 {
+        let mut total = self.total_size_bytes();
+        for e in &self.entries {
+            if let Some(ref c) = e.content {
+                total += c.len() as u64;
+            }
+        }
+        total
+    }
+
+    /// Search entries whose stored content contains the given needle.
+    pub fn search_by_content(&self, needle: &str) -> Vec<&HistoryEntry> {
+        self.entries
+            .iter()
+            .filter(|e| {
+                e.content
+                    .as_ref()
+                    .map_or(false, |c| c.contains(needle))
+            })
+            .collect()
+    }
+
+    /// Compute diffs between consecutive entries for a URI.
+    ///
+    /// Returns diffs ordered from oldest pair to newest pair.
+    pub fn compute_consecutive_diffs(&self, uri: &str) -> Vec<HistoryDiff> {
+        let mut entries: Vec<&HistoryEntry> = self.entries.iter().filter(|e| e.uri == uri).collect();
+        entries.sort_by_key(|e| e.timestamp);
+        entries
+            .windows(2)
+            .map(|pair| compute_diff(pair[0], pair[1]))
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -788,5 +843,73 @@ mod tests {
         let stats1 = svc.get_stats();
         let stats2 = svc.get_stats();
         assert_eq!(stats1, stats2);
+    }
+
+    #[test]
+    fn prune_combined_removes_old_then_limits() {
+        let mut svc = LocalHistoryService::new(2);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h3", HistorySource::Auto);
+        // timestamps 1, 2, 3; max_entries_per_file=2 already pruned h1
+        svc.add_entry("file:///b.rs", "b1", HistorySource::Auto);
+        svc.prune_combined(1, 4); // cutoff=3, keeps timestamp >= 3
+        let a_history = svc.get_history("file:///a.rs");
+        assert_eq!(a_history.len(), 1);
+        assert_eq!(a_history[0].content_hash, "h3");
+    }
+
+    #[test]
+    fn estimate_storage_size_includes_content() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.entries[0].size_bytes = 50;
+        svc.entries[0].content = Some("hello world".to_string());
+        let size = svc.estimate_storage_size();
+        assert_eq!(size, 50 + 11); // 11 bytes for "hello world"
+    }
+
+    #[test]
+    fn search_by_content_finds_matching() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Auto);
+        svc.entries[0].content = Some("fn main() {}".to_string());
+        svc.entries[1].content = Some("fn helper() {}".to_string());
+        let results = svc.search_by_content("main");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].content_hash, "h1");
+    }
+
+    #[test]
+    fn search_by_content_no_content() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        let results = svc.search_by_content("anything");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn compute_consecutive_diffs_for_uri() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h3", HistorySource::Auto);
+        svc.entries[0].size_bytes = 100;
+        svc.entries[1].size_bytes = 150;
+        svc.entries[2].size_bytes = 120;
+        let diffs = svc.compute_consecutive_diffs("file:///a.rs");
+        assert_eq!(diffs.len(), 2);
+        assert!(diffs[0].hash_changed);
+        assert_eq!(diffs[0].size_delta, 50);
+        assert_eq!(diffs[1].size_delta, -30);
+    }
+
+    #[test]
+    fn compute_consecutive_diffs_single_entry() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        let diffs = svc.compute_consecutive_diffs("file:///a.rs");
+        assert!(diffs.is_empty());
     }
 }

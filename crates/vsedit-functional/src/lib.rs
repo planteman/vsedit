@@ -425,6 +425,99 @@ impl<S: fmt::Debug, A> fmt::Debug for Reducer<S, A> {
     }
 }
 
+/// Compose a vector of functions left-to-right into a single function.
+///
+/// `pipe_all([f, g, h])(x)` = `h(g(f(x)))`.
+/// Returns the identity if the slice is empty.
+pub fn pipe_all<T: Clone + 'static>(
+    fns: Vec<Box<dyn Fn(T) -> T>>,
+) -> Box<dyn Fn(T) -> T> {
+    Box::new(move |mut val| {
+        for f in &fns {
+            val = f(val);
+        }
+        val
+    })
+}
+
+/// Combine two predicates with logical AND.
+pub fn pred_and<T>(
+    p1: impl Fn(&T) -> bool + 'static,
+    p2: impl Fn(&T) -> bool + 'static,
+) -> Box<dyn Fn(&T) -> bool> {
+    Box::new(move |x| p1(x) && p2(x))
+}
+
+/// Combine two predicates with logical OR.
+pub fn pred_or<T>(
+    p1: impl Fn(&T) -> bool + 'static,
+    p2: impl Fn(&T) -> bool + 'static,
+) -> Box<dyn Fn(&T) -> bool> {
+    Box::new(move |x| p1(x) || p2(x))
+}
+
+/// Negate a predicate.
+pub fn pred_not<T>(p: impl Fn(&T) -> bool + 'static) -> Box<dyn Fn(&T) -> bool> {
+    Box::new(move |x| !p(x))
+}
+
+/// Partition items into three groups based on two predicates.
+///
+/// Returns `(first_match, second_match, neither)`.
+pub fn partition3<T>(
+    items: impl IntoIterator<Item = T>,
+    p1: impl Fn(&T) -> bool,
+    p2: impl Fn(&T) -> bool,
+) -> (Vec<T>, Vec<T>, Vec<T>) {
+    let mut a = Vec::new();
+    let mut b = Vec::new();
+    let mut c = Vec::new();
+    for item in items {
+        if p1(&item) {
+            a.push(item);
+        } else if p2(&item) {
+            b.push(item);
+        } else {
+            c.push(item);
+        }
+    }
+    (a, b, c)
+}
+
+/// Memoize a function with a bounded cache (LRU-style eviction by insertion order).
+///
+/// When the cache exceeds `capacity`, the oldest entry is removed.
+pub fn memoize_bounded<A, R, F>(mut f: F, capacity: usize) -> impl FnMut(A) -> R
+where
+    A: Eq + std::hash::Hash + Clone,
+    R: Clone,
+    F: FnMut(&A) -> R,
+{
+    let mut cache: HashMap<A, R> = HashMap::new();
+    let mut order: Vec<A> = Vec::new();
+    move |arg: A| {
+        if let Some(cached) = cache.get(&arg) {
+            return cached.clone();
+        }
+        let result = f(&arg);
+        if order.len() >= capacity && !order.is_empty() {
+            let evicted = order.remove(0);
+            cache.remove(&evicted);
+        }
+        order.push(arg.clone());
+        cache.insert(arg, result.clone());
+        result
+    }
+}
+
+/// Apply a function to each element, collecting only the `Some` results.
+pub fn filter_map_collect<T, R>(
+    items: impl IntoIterator<Item = T>,
+    f: impl Fn(T) -> Option<R>,
+) -> Vec<R> {
+    items.into_iter().filter_map(f).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -717,5 +810,76 @@ mod tests {
         let r = Reducer::new(0_i32, |s, a: i32| s + a);
         let dbg = format!("{:?}", r);
         assert!(dbg.contains("Reducer"));
+    }
+
+    #[test]
+    fn test_pipe_all_empty() {
+        let p = pipe_all::<i32>(vec![]);
+        assert_eq!(p(42), 42);
+    }
+
+    #[test]
+    fn test_pipe_all_multiple() {
+        let fns: Vec<Box<dyn Fn(i32) -> i32>> = vec![
+            Box::new(|x| x + 1),
+            Box::new(|x| x * 2),
+            Box::new(|x| x - 3),
+        ];
+        let p = pipe_all(fns);
+        assert_eq!(p(5), 9); // (5+1)*2-3 = 9
+    }
+
+    #[test]
+    fn test_pred_and() {
+        let p = pred_and(|x: &i32| *x > 0, |x: &i32| *x < 10);
+        assert!(p(&5));
+        assert!(!p(&-1));
+        assert!(!p(&15));
+    }
+
+    #[test]
+    fn test_pred_or() {
+        let p = pred_or(|x: &i32| *x < 0, |x: &i32| *x > 100);
+        assert!(p(&-5));
+        assert!(p(&200));
+        assert!(!p(&50));
+    }
+
+    #[test]
+    fn test_pred_not() {
+        let p = pred_not(|x: &i32| *x > 0);
+        assert!(p(&-1));
+        assert!(p(&0));
+        assert!(!p(&1));
+    }
+
+    #[test]
+    fn test_partition3() {
+        let (neg, big, rest) = partition3(
+            vec![-2, -1, 0, 5, 50, 100],
+            |x| *x < 0,
+            |x| *x >= 50,
+        );
+        assert_eq!(neg, vec![-2, -1]);
+        assert_eq!(big, vec![50, 100]);
+        assert_eq!(rest, vec![0, 5]);
+    }
+
+    #[test]
+    fn test_memoize_bounded() {
+        let mut f = memoize_bounded(|x: &i32| x * x, 2);
+        assert_eq!(f(3), 9);
+        assert_eq!(f(4), 16);
+        assert_eq!(f(3), 9); // still cached
+        assert_eq!(f(5), 25); // evicts oldest (3)
+        assert_eq!(f(3), 9); // recomputed
+    }
+
+    #[test]
+    fn test_filter_map_collect() {
+        let result = filter_map_collect(vec![1, 2, 3, 4, 5], |x| {
+            if x % 2 == 0 { Some(x * 10) } else { None }
+        });
+        assert_eq!(result, vec![20, 40]);
     }
 }

@@ -423,6 +423,121 @@ impl Default for EditorTabService {
 }
 
 // ---------------------------------------------------------------------------
+// Tab pinning and reordering
+// ---------------------------------------------------------------------------
+
+impl EditorTabService {
+    /// Pin a tab by id. Pinned tabs are marked via a naming convention
+    /// (title prefixed with a pin marker) and moved to the front.
+    pub fn pin_tab(&mut self, id: usize) -> bool {
+        let Some(pos) = self.tabs.iter().position(|t| t.id == id) else {
+            return false;
+        };
+        if self.tabs[pos].title.starts_with('\u{1F4CC}') {
+            return false; // already pinned
+        }
+        self.tabs[pos].title = format!("\u{1F4CC}{}", self.tabs[pos].title);
+        // Move pinned tab to front (after other pinned tabs).
+        let first_unpinned = self
+            .tabs
+            .iter()
+            .position(|t| !t.title.starts_with('\u{1F4CC}'))
+            .unwrap_or(self.tabs.len());
+        if pos > first_unpinned {
+            let tab = self.tabs.remove(pos);
+            self.tabs.insert(first_unpinned, tab);
+            // Adjust active index.
+            if let Some(ref mut active) = self.active_tab {
+                if *active == pos {
+                    *active = first_unpinned;
+                } else if *active >= first_unpinned && *active < pos {
+                    *active += 1;
+                }
+            }
+        }
+        true
+    }
+
+    /// Unpin a tab by id.
+    pub fn unpin_tab(&mut self, id: usize) -> bool {
+        if let Some(tab) = self.tabs.iter_mut().find(|t| t.id == id) {
+            if tab.title.starts_with('\u{1F4CC}') {
+                tab.title = tab.title.trim_start_matches('\u{1F4CC}').to_string();
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if a tab is pinned.
+    pub fn is_pinned(&self, id: usize) -> bool {
+        self.tabs
+            .iter()
+            .find(|t| t.id == id)
+            .map_or(false, |t| t.title.starts_with('\u{1F4CC}'))
+    }
+
+    /// Move a tab from one index to another.
+    pub fn reorder_tab(&mut self, from: usize, to: usize) -> bool {
+        if from >= self.tabs.len() || to >= self.tabs.len() || from == to {
+            return false;
+        }
+        let tab = self.tabs.remove(from);
+        self.tabs.insert(to, tab);
+        // Update active index to follow the move.
+        if let Some(ref mut active) = self.active_tab {
+            if *active == from {
+                *active = to;
+            } else if from < *active && to >= *active {
+                *active -= 1;
+            } else if from > *active && to <= *active {
+                *active += 1;
+            }
+        }
+        true
+    }
+
+    /// Return indices of all pinned tabs.
+    pub fn pinned_tab_indices(&self) -> Vec<usize> {
+        self.tabs
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| t.title.starts_with('\u{1F4CC}'))
+            .map(|(i, _)| i)
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Editor group splitting statistics
+// ---------------------------------------------------------------------------
+
+/// Statistics about editor groups.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GroupStats {
+    pub group_count: usize,
+    pub total_tabs: usize,
+    pub max_tabs_in_group: usize,
+    pub empty_groups: usize,
+}
+
+impl EditorService {
+    /// Compute statistics across all editor groups.
+    pub fn group_stats(&self) -> GroupStats {
+        let group_count = self.groups.len();
+        let total_tabs: usize = self.groups.iter().map(|g| g.count()).sum();
+        let max_tabs_in_group = self.groups.iter().map(|g| g.count()).max().unwrap_or(0);
+        let empty_groups = self.groups.iter().filter(|g| g.count() == 0).count();
+        GroupStats {
+            group_count,
+            total_tabs,
+            max_tabs_in_group,
+            empty_groups,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -777,5 +892,73 @@ mod tests {
         svc.open_tab(Some(PathBuf::from("/b.rs")), "b");
         svc.set_active_tab(id_a);
         assert_eq!(svc.get_active_tab().unwrap().id, id_a);
+    }
+
+    #[test]
+    fn tab_pin_and_unpin() {
+        let mut svc = EditorTabService::new();
+        let id = svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        assert!(!svc.is_pinned(id));
+        assert!(svc.pin_tab(id));
+        assert!(svc.is_pinned(id));
+        // Pinning again returns false.
+        assert!(!svc.pin_tab(id));
+        assert!(svc.unpin_tab(id));
+        assert!(!svc.is_pinned(id));
+    }
+
+    #[test]
+    fn tab_reorder() {
+        let mut svc = EditorTabService::new();
+        svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        svc.open_tab(Some(PathBuf::from("/b.rs")), "b");
+        svc.open_tab(Some(PathBuf::from("/c.rs")), "c");
+        assert!(svc.reorder_tab(2, 0));
+        assert_eq!(svc.get_tabs()[0].title, "c.rs");
+        assert_eq!(svc.get_tabs()[1].title, "a.rs");
+        assert_eq!(svc.get_tabs()[2].title, "b.rs");
+    }
+
+    #[test]
+    fn tab_reorder_out_of_bounds() {
+        let mut svc = EditorTabService::new();
+        svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        assert!(!svc.reorder_tab(0, 5));
+        assert!(!svc.reorder_tab(0, 0));
+    }
+
+    #[test]
+    fn pinned_tab_indices() {
+        let mut svc = EditorTabService::new();
+        let id_a = svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        svc.open_tab(Some(PathBuf::from("/b.rs")), "b");
+        let id_c = svc.open_tab(Some(PathBuf::from("/c.rs")), "c");
+        svc.pin_tab(id_a);
+        svc.pin_tab(id_c);
+        let pinned = svc.pinned_tab_indices();
+        assert_eq!(pinned.len(), 2);
+    }
+
+    #[test]
+    fn group_stats_computation() {
+        let mut svc = EditorService::new();
+        svc.open_editor(make_input("/a.rs"), None);
+        svc.open_editor(make_input("/b.rs"), None);
+        let g1 = svc.add_group();
+        svc.open_editor(make_input("/c.rs"), Some(g1));
+        let stats = svc.group_stats();
+        assert_eq!(stats.group_count, 2);
+        assert_eq!(stats.total_tabs, 3);
+        assert_eq!(stats.max_tabs_in_group, 2);
+        assert_eq!(stats.empty_groups, 0);
+    }
+
+    #[test]
+    fn group_stats_empty_groups() {
+        let mut svc = EditorService::new();
+        svc.add_group();
+        let stats = svc.group_stats();
+        assert_eq!(stats.empty_groups, 2);
+        assert_eq!(stats.total_tabs, 0);
     }
 }
