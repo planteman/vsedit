@@ -1,9 +1,263 @@
 //! Undo/redo stack service.
 //!
 //! Provides a generic [`UndoRedoStack<T>`] that tracks past and future states
-//! for undo/redo operations.
+//! for undo/redo operations, plus [`UndoRedoService`] with cursor-aware
+//! grouped undo/redo matching VS Code's `UndoRedoService`.
 
 use std::fmt;
+
+// ---------------------------------------------------------------------------
+// CursorState
+// ---------------------------------------------------------------------------
+
+/// Cursor state stored alongside each undo group, matching VS Code's
+/// `ICursorStateComputer` return type.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CursorState {
+    /// Cursor positions (one per cursor in multi-cursor mode).
+    pub positions: Vec<CursorPosition>,
+    /// Selections (one per cursor).
+    pub selections: Vec<CursorSelection>,
+}
+
+/// A single 1-based cursor position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CursorPosition {
+    pub line: u32,
+    pub column: u32,
+}
+
+impl CursorPosition {
+    pub fn new(line: u32, column: u32) -> Self {
+        Self { line, column }
+    }
+}
+
+/// A selection range for one cursor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CursorSelection {
+    pub anchor_line: u32,
+    pub anchor_column: u32,
+    pub active_line: u32,
+    pub active_column: u32,
+}
+
+impl CursorSelection {
+    pub fn new(
+        anchor_line: u32,
+        anchor_column: u32,
+        active_line: u32,
+        active_column: u32,
+    ) -> Self {
+        Self {
+            anchor_line,
+            anchor_column,
+            active_line,
+            active_column,
+        }
+    }
+
+    pub fn collapsed(line: u32, column: u32) -> Self {
+        Self::new(line, column, line, column)
+    }
+}
+
+impl CursorState {
+    pub fn single(line: u32, column: u32) -> Self {
+        Self {
+            positions: vec![CursorPosition::new(line, column)],
+            selections: vec![CursorSelection::collapsed(line, column)],
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// UndoRedoGroup — a grouped set of edits forming one undo step
+// ---------------------------------------------------------------------------
+
+/// A group of edits that form a single undo step, analogous to VS Code's
+/// `StackElement`.
+#[derive(Debug, Clone)]
+pub struct UndoRedoGroup<T> {
+    /// Unique group id.
+    pub id: u64,
+    /// The edits in this group.
+    pub edits: Vec<T>,
+    /// Cursor state *before* the group was applied.
+    pub cursor_before: Option<CursorState>,
+    /// Cursor state *after* the group was applied.
+    pub cursor_after: Option<CursorState>,
+}
+
+// ---------------------------------------------------------------------------
+// UndoRedoService — grouped undo/redo with cursor restoration
+// ---------------------------------------------------------------------------
+
+/// Grouped undo/redo service with cursor state tracking.
+///
+/// Each undo step is an [`UndoRedoGroup`] containing one or more edits plus
+/// cursor state before/after. Supports open/close grouping for compound
+/// operations (e.g. type + auto-close bracket = one undo step).
+#[derive(Debug)]
+pub struct UndoRedoService<T> {
+    past: Vec<UndoRedoGroup<T>>,
+    future: Vec<UndoRedoGroup<T>>,
+    next_group_id: u64,
+    /// While > 0, edits are accumulated into the current open group.
+    open_group_depth: u32,
+    /// The group being built while open.
+    building_group: Option<UndoRedoGroup<T>>,
+}
+
+impl<T: Clone> UndoRedoService<T> {
+    pub fn new() -> Self {
+        Self {
+            past: Vec::new(),
+            future: Vec::new(),
+            next_group_id: 1,
+            open_group_depth: 0,
+            building_group: None,
+        }
+    }
+
+    /// Open a new undo group. Edits pushed while the group is open are
+    /// collected into a single undo step. Calls may be nested.
+    pub fn open_group(&mut self, cursor_before: Option<CursorState>) {
+        if self.open_group_depth == 0 {
+            let id = self.next_group_id;
+            self.next_group_id += 1;
+            self.building_group = Some(UndoRedoGroup {
+                id,
+                edits: Vec::new(),
+                cursor_before,
+                cursor_after: None,
+            });
+        }
+        self.open_group_depth += 1;
+    }
+
+    /// Close the current undo group. When all nested opens are matched, the
+    /// group is pushed to the undo stack.
+    pub fn close_group(&mut self, cursor_after: Option<CursorState>) {
+        if self.open_group_depth == 0 {
+            return;
+        }
+        self.open_group_depth -= 1;
+        if self.open_group_depth == 0 {
+            if let Some(mut group) = self.building_group.take() {
+                group.cursor_after = cursor_after;
+                self.past.push(group);
+                self.future.clear();
+            }
+        }
+    }
+
+    /// Push a single edit. If a group is open it is appended; otherwise a
+    /// new single-edit group is created.
+    pub fn push_edit(
+        &mut self,
+        edit: T,
+        cursor_before: Option<CursorState>,
+        cursor_after: Option<CursorState>,
+    ) {
+        if self.open_group_depth > 0 {
+            if let Some(ref mut g) = self.building_group {
+                g.edits.push(edit);
+            }
+        } else {
+            let id = self.next_group_id;
+            self.next_group_id += 1;
+            self.past.push(UndoRedoGroup {
+                id,
+                edits: vec![edit],
+                cursor_before,
+                cursor_after,
+            });
+            self.future.clear();
+        }
+    }
+
+    /// Push an already-formed group.
+    pub fn push_group(&mut self, mut group: UndoRedoGroup<T>) {
+        group.id = self.next_group_id;
+        self.next_group_id += 1;
+        self.past.push(group);
+        self.future.clear();
+    }
+
+    /// Undo the last group, returning it with cursor state for restoration.
+    pub fn undo(&mut self) -> Option<&UndoRedoGroup<T>> {
+        let group = self.past.pop()?;
+        self.future.push(group);
+        self.future.last()
+    }
+
+    /// Redo the last undone group.
+    pub fn redo(&mut self) -> Option<&UndoRedoGroup<T>> {
+        let group = self.future.pop()?;
+        self.past.push(group);
+        self.past.last()
+    }
+
+    /// Get cursor state to restore after an undo.
+    pub fn undo_with_cursor(&mut self) -> Option<CursorState> {
+        let group = self.past.pop()?;
+        let cursor = group.cursor_before.clone();
+        self.future.push(group);
+        cursor
+    }
+
+    /// Get cursor state to restore after a redo.
+    pub fn redo_with_cursor(&mut self) -> Option<CursorState> {
+        let group = self.future.pop()?;
+        let cursor = group.cursor_after.clone();
+        self.past.push(group);
+        cursor
+    }
+
+    pub fn can_undo(&self) -> bool {
+        !self.past.is_empty()
+    }
+
+    pub fn can_redo(&self) -> bool {
+        !self.future.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.past.clear();
+        self.future.clear();
+        self.open_group_depth = 0;
+        self.building_group = None;
+    }
+
+    pub fn undo_count(&self) -> usize {
+        self.past.len()
+    }
+
+    pub fn redo_count(&self) -> usize {
+        self.future.len()
+    }
+
+    /// Peek at the last undo group.
+    pub fn peek_undo(&self) -> Option<&UndoRedoGroup<T>> {
+        self.past.last()
+    }
+
+    /// Returns true if a group is currently open.
+    pub fn is_group_open(&self) -> bool {
+        self.open_group_depth > 0
+    }
+}
+
+impl<T: Clone> Default for UndoRedoService<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
 
 /// Errors returned by fallible undo/redo operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -680,5 +934,162 @@ mod tests {
         let c = UndoEntry::new("y", 1, 100);
         assert_eq!(a, b);
         assert_ne!(a, c);
+    }
+
+    // -- UndoRedoService tests -----------------------------------------------
+
+    #[test]
+    fn service_push_edit_and_undo() {
+        let mut svc = UndoRedoService::<String>::new();
+        svc.push_edit("edit1".into(), None, None);
+        svc.push_edit("edit2".into(), None, None);
+        assert_eq!(svc.undo_count(), 2);
+        let g = svc.undo().unwrap();
+        assert_eq!(g.edits, vec!["edit2".to_string()]);
+        assert_eq!(svc.undo_count(), 1);
+    }
+
+    #[test]
+    fn service_redo_after_undo() {
+        let mut svc = UndoRedoService::<i32>::new();
+        svc.push_edit(1, None, None);
+        svc.undo();
+        assert!(svc.can_redo());
+        let g = svc.redo().unwrap();
+        assert_eq!(g.edits, vec![1]);
+        assert!(!svc.can_redo());
+    }
+
+    #[test]
+    fn service_open_close_group() {
+        let mut svc = UndoRedoService::<String>::new();
+        svc.open_group(None);
+        svc.push_edit("a".into(), None, None);
+        svc.push_edit("b".into(), None, None);
+        svc.close_group(None);
+        // Both edits are in one group
+        assert_eq!(svc.undo_count(), 1);
+        let g = svc.undo().unwrap();
+        assert_eq!(g.edits.len(), 2);
+    }
+
+    #[test]
+    fn service_nested_groups() {
+        let mut svc = UndoRedoService::<i32>::new();
+        svc.open_group(None);
+        svc.push_edit(1, None, None);
+        svc.open_group(None);
+        svc.push_edit(2, None, None);
+        svc.close_group(None);
+        svc.push_edit(3, None, None);
+        svc.close_group(None);
+        assert_eq!(svc.undo_count(), 1);
+        let g = svc.undo().unwrap();
+        assert_eq!(g.edits, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn service_cursor_state_roundtrip() {
+        let mut svc = UndoRedoService::<i32>::new();
+        let before = CursorState::single(1, 1);
+        let after = CursorState::single(1, 5);
+        svc.push_edit(42, Some(before.clone()), Some(after.clone()));
+
+        let restored = svc.undo_with_cursor().unwrap();
+        assert_eq!(restored, before);
+
+        let restored = svc.redo_with_cursor().unwrap();
+        assert_eq!(restored, after);
+    }
+
+    #[test]
+    fn service_clear() {
+        let mut svc = UndoRedoService::<i32>::new();
+        svc.push_edit(1, None, None);
+        svc.push_edit(2, None, None);
+        svc.undo();
+        svc.clear();
+        assert!(!svc.can_undo());
+        assert!(!svc.can_redo());
+    }
+
+    #[test]
+    fn service_push_clears_redo() {
+        let mut svc = UndoRedoService::<i32>::new();
+        svc.push_edit(1, None, None);
+        svc.undo();
+        assert!(svc.can_redo());
+        svc.push_edit(2, None, None);
+        assert!(!svc.can_redo());
+    }
+
+    #[test]
+    fn service_is_group_open() {
+        let mut svc = UndoRedoService::<i32>::new();
+        assert!(!svc.is_group_open());
+        svc.open_group(None);
+        assert!(svc.is_group_open());
+        svc.close_group(None);
+        assert!(!svc.is_group_open());
+    }
+
+    #[test]
+    fn service_undo_empty_returns_none() {
+        let mut svc = UndoRedoService::<i32>::new();
+        assert!(svc.undo().is_none());
+        assert!(svc.undo_with_cursor().is_none());
+    }
+
+    #[test]
+    fn service_redo_empty_returns_none() {
+        let mut svc = UndoRedoService::<i32>::new();
+        assert!(svc.redo().is_none());
+        assert!(svc.redo_with_cursor().is_none());
+    }
+
+    #[test]
+    fn cursor_state_single() {
+        let cs = CursorState::single(3, 7);
+        assert_eq!(cs.positions.len(), 1);
+        assert_eq!(cs.positions[0].line, 3);
+        assert_eq!(cs.positions[0].column, 7);
+    }
+
+    #[test]
+    fn cursor_selection_collapsed() {
+        let sel = CursorSelection::collapsed(2, 4);
+        assert_eq!(sel.anchor_line, 2);
+        assert_eq!(sel.anchor_column, 4);
+        assert_eq!(sel.active_line, 2);
+        assert_eq!(sel.active_column, 4);
+    }
+
+    #[test]
+    fn service_push_group() {
+        let mut svc = UndoRedoService::<i32>::new();
+        let group = UndoRedoGroup {
+            id: 0,
+            edits: vec![10, 20, 30],
+            cursor_before: Some(CursorState::single(1, 1)),
+            cursor_after: Some(CursorState::single(1, 4)),
+        };
+        svc.push_group(group);
+        assert_eq!(svc.undo_count(), 1);
+        let g = svc.peek_undo().unwrap();
+        assert_eq!(g.edits.len(), 3);
+    }
+
+    #[test]
+    fn service_group_with_cursor_in_open_close() {
+        let mut svc = UndoRedoService::<&str>::new();
+        let before = CursorState::single(1, 1);
+        let after = CursorState::single(1, 10);
+        svc.open_group(Some(before.clone()));
+        svc.push_edit("type a", None, None);
+        svc.push_edit("auto-close bracket", None, None);
+        svc.close_group(Some(after.clone()));
+
+        let restored = svc.undo_with_cursor().unwrap();
+        assert_eq!(restored, before);
     }
 }

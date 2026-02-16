@@ -3,45 +3,282 @@
 //! This crate is the Rust equivalent of VS Code's `vs/editor/common/model/textModel.ts`.
 //! It provides the [`TextModel`] struct which owns the document text, supports efficient
 //! editing, position/offset conversion, undo/redo, search, and fires change events.
+//!
+//! Additional features matching VS Code's text buffer:
+//! - Line ending detection/normalization (LF, CRLF)
+//! - Encoding detection/conversion (UTF-8, UTF-8 BOM, UTF-16LE/BE, Latin1, etc.)
+//! - Large file detection and truncated preview
+//! - Grouped undo/redo with cursor state restoration
+//! - Content change events with version tracking
+//! - Immutable snapshots for async operations
 
 use std::cell::UnsafeCell;
+use std::path::Path;
 
 use regex::Regex;
 use ropey::Rope;
 use vsedit_editor_types::{ITextModel, Position, Range};
 use vsedit_events::Emitter;
-use vsedit_undoredo::UndoRedoStack;
+use vsedit_undoredo::{CursorState, UndoRedoGroup, UndoRedoService, UndoRedoStack};
 
 // ---------------------------------------------------------------------------
-// ModelContentChangedEvent
+// LineEnding
 // ---------------------------------------------------------------------------
 
-/// Describes a content change applied to a [`TextModel`].
+/// Line ending style, matching VS Code's `EndOfLineSequence`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LineEnding {
+    /// Unix-style `\n`.
+    LF,
+    /// Windows-style `\r\n`.
+    CRLF,
+}
+
+impl LineEnding {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LineEnding::LF => "\n",
+            LineEnding::CRLF => "\r\n",
+        }
+    }
+}
+
+/// Result of line ending detection — may be uniform or mixed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DetectedLineEnding {
+    LF,
+    CRLF,
+    Mixed,
+}
+
+/// Detect the predominant line ending in `text`.
+pub fn detect_line_ending(text: &str) -> DetectedLineEnding {
+    let mut lf_count = 0u32;
+    let mut crlf_count = 0u32;
+    let bytes = text.as_bytes();
+    let len = bytes.len();
+    let mut i = 0;
+    while i < len {
+        if bytes[i] == b'\r' && i + 1 < len && bytes[i + 1] == b'\n' {
+            crlf_count += 1;
+            i += 2;
+        } else if bytes[i] == b'\n' {
+            lf_count += 1;
+            i += 1;
+        } else {
+            i += 1;
+        }
+    }
+    if lf_count > 0 && crlf_count > 0 {
+        DetectedLineEnding::Mixed
+    } else if crlf_count > 0 {
+        DetectedLineEnding::CRLF
+    } else {
+        DetectedLineEnding::LF
+    }
+}
+
+/// Normalize all line endings in `text` to `target`.
+pub fn normalize_line_endings(text: &str, target: LineEnding) -> String {
+    // First normalize everything to LF, then convert to target.
+    let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+    match target {
+        LineEnding::LF => normalized,
+        LineEnding::CRLF => normalized.replace('\n', "\r\n"),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Encoding
+// ---------------------------------------------------------------------------
+
+/// Text encoding, matching VS Code's supported encodings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Encoding {
+    UTF8,
+    UTF8BOM,
+    UTF16LE,
+    UTF16BE,
+    Latin1,
+    ShiftJIS,
+    GBK,
+}
+
+/// Detect encoding from raw bytes by checking BOM markers, then falling back
+/// to UTF-8.
+pub fn detect_encoding(bytes: &[u8]) -> Encoding {
+    if bytes.len() >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF {
+        return Encoding::UTF8BOM;
+    }
+    if bytes.len() >= 2 {
+        if bytes[0] == 0xFF && bytes[1] == 0xFE {
+            return Encoding::UTF16LE;
+        }
+        if bytes[0] == 0xFE && bytes[1] == 0xFF {
+            return Encoding::UTF16BE;
+        }
+    }
+    // Try UTF-8 validation
+    if std::str::from_utf8(bytes).is_ok() {
+        return Encoding::UTF8;
+    }
+    // Fallback to Latin1 for arbitrary byte sequences
+    Encoding::Latin1
+}
+
+/// Decode bytes to a String using the given encoding.
+pub fn decode_text(bytes: &[u8], encoding: Encoding) -> String {
+    match encoding {
+        Encoding::UTF8 => String::from_utf8_lossy(bytes).into_owned(),
+        Encoding::UTF8BOM => {
+            let start = if bytes.len() >= 3
+                && bytes[0] == 0xEF
+                && bytes[1] == 0xBB
+                && bytes[2] == 0xBF
+            {
+                3
+            } else {
+                0
+            };
+            String::from_utf8_lossy(&bytes[start..]).into_owned()
+        }
+        Encoding::UTF16LE => {
+            let start = if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE {
+                2
+            } else {
+                0
+            };
+            let u16s: Vec<u16> = bytes[start..]
+                .chunks_exact(2)
+                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                .collect();
+            String::from_utf16_lossy(&u16s)
+        }
+        Encoding::UTF16BE => {
+            let start = if bytes.len() >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF {
+                2
+            } else {
+                0
+            };
+            let u16s: Vec<u16> = bytes[start..]
+                .chunks_exact(2)
+                .map(|c| u16::from_be_bytes([c[0], c[1]]))
+                .collect();
+            String::from_utf16_lossy(&u16s)
+        }
+        Encoding::Latin1 => bytes.iter().map(|&b| b as char).collect(),
+        // ShiftJIS and GBK: lossy fallback — full codec support would
+        // require the `encoding_rs` crate. For now treat as Latin1.
+        Encoding::ShiftJIS | Encoding::GBK => bytes.iter().map(|&b| b as char).collect(),
+    }
+}
+
+/// Encode a String to bytes using the given encoding.
+pub fn encode_text(text: &str, encoding: Encoding) -> Vec<u8> {
+    match encoding {
+        Encoding::UTF8 => text.as_bytes().to_vec(),
+        Encoding::UTF8BOM => {
+            let mut out = vec![0xEF, 0xBB, 0xBF];
+            out.extend_from_slice(text.as_bytes());
+            out
+        }
+        Encoding::UTF16LE => {
+            let mut out = vec![0xFF, 0xFE]; // BOM
+            for unit in text.encode_utf16() {
+                out.extend_from_slice(&unit.to_le_bytes());
+            }
+            out
+        }
+        Encoding::UTF16BE => {
+            let mut out = vec![0xFE, 0xFF]; // BOM
+            for unit in text.encode_utf16() {
+                out.extend_from_slice(&unit.to_be_bytes());
+            }
+            out
+        }
+        Encoding::Latin1 | Encoding::ShiftJIS | Encoding::GBK => {
+            text.chars().map(|c| c as u8).collect()
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Large file support
+// ---------------------------------------------------------------------------
+
+/// 50 MB threshold matching VS Code's large file limit.
+const LARGE_FILE_THRESHOLD: u64 = 50 * 1024 * 1024;
+
+/// Returns true if the file at `path` exceeds 50 MB.
+pub fn is_large_file(path: &Path) -> bool {
+    std::fs::metadata(path)
+        .map(|m| m.len() > LARGE_FILE_THRESHOLD)
+        .unwrap_or(false)
+}
+
+// ---------------------------------------------------------------------------
+// ContentChange & ModelContentChangedEvent
+// ---------------------------------------------------------------------------
+
+/// A single content change within an edit, matching VS Code's
+/// `IModelContentChange`.
 #[derive(Debug, Clone)]
-pub struct ModelContentChangedEvent {
+pub struct ContentChange {
     /// The range that was replaced (in the old document).
     pub range: Range,
     /// The text that was inserted.
     pub text: String,
-    /// The length of the text that was replaced.
+    /// Byte offset of the range start in the old document.
+    pub range_offset: usize,
+    /// Byte length of the range in the old document.
     pub range_length: usize,
 }
 
+/// Event fired after content changes, matching VS Code's
+/// `IModelContentChangedEvent`.
+#[derive(Debug, Clone)]
+pub struct ModelContentChangedEvent {
+    /// Individual content changes.
+    pub changes: Vec<ContentChange>,
+    /// The version id after this change.
+    pub version_id: u64,
+    /// True if this change was produced by an undo operation.
+    pub is_undo: bool,
+    /// True if this change was produced by a redo operation.
+    pub is_redo: bool,
+}
+
 // ---------------------------------------------------------------------------
-// EditOperation (for undo/redo)
+// EditOperation
 // ---------------------------------------------------------------------------
 
-/// A single reversible edit operation.
+/// A single reversible edit operation, public for grouped undo/redo.
 #[derive(Debug, Clone)]
-struct EditOperation {
+pub struct EditOperation {
     /// The range in the *new* document that was affected.
-    range_after: Range,
-    /// The text that was inserted (to reverse, delete this text).
-    text_inserted: String,
-    /// The text that was replaced (to reverse, re-insert this text).
-    text_replaced: String,
+    pub range_after: Range,
+    /// The text that was inserted.
+    pub text_inserted: String,
+    /// The text that was replaced.
+    pub text_replaced: String,
     /// The range in the *old* document that was replaced.
-    range_before: Range,
+    pub range_before: Range,
+    /// Whether to force move markers past the edit.
+    pub force_move_markers: bool,
+}
+
+// ---------------------------------------------------------------------------
+// ModelSnapshot
+// ---------------------------------------------------------------------------
+
+/// An immutable snapshot of the model for async operations, matching VS Code's
+/// `ITextSnapshot`.
+#[derive(Debug, Clone)]
+pub struct ModelSnapshot {
+    pub text: String,
+    pub version_id: u64,
+    pub line_ending: LineEnding,
+    pub encoding: Encoding,
 }
 
 // ---------------------------------------------------------------------------
@@ -55,26 +292,101 @@ struct EditOperation {
 pub struct TextModel {
     rope: Rope,
     /// Cached line content for `get_line_content` (returns `&str`).
-    /// Uses `UnsafeCell` so `get_line_content` can return `&str` from `&self`.
     line_cache: UnsafeCell<(u32, String)>,
     on_did_change_content_emitter: Emitter<ModelContentChangedEvent>,
+    /// Legacy flat undo stack (kept for backward compatibility).
     undo_stack: UndoRedoStack<EditOperation>,
+    /// Grouped undo/redo service with cursor state.
+    undo_service: UndoRedoService<EditOperation>,
+    /// Monotonically increasing version id.
+    version_id: u64,
+    /// Alternative version id that accounts for undo/redo returning to a
+    /// previous state.
+    alternative_version_id: u64,
+    /// Detected/configured line ending.
+    line_ending: LineEnding,
+    /// Detected/configured encoding.
+    encoding: Encoding,
 }
 
 impl TextModel {
     /// Create a new `TextModel` from a string.
     pub fn new(content: &str) -> Self {
+        let eol = match detect_line_ending(content) {
+            DetectedLineEnding::CRLF => LineEnding::CRLF,
+            _ => LineEnding::LF,
+        };
         Self {
             rope: Rope::from_str(content),
             line_cache: UnsafeCell::new((0, String::new())),
             on_did_change_content_emitter: Emitter::new(),
             undo_stack: UndoRedoStack::new(),
+            undo_service: UndoRedoService::new(),
+            version_id: 1,
+            alternative_version_id: 1,
+            line_ending: eol,
+            encoding: Encoding::UTF8,
         }
     }
 
     /// Create an empty `TextModel`.
     pub fn empty() -> Self {
         Self::new("")
+    }
+
+    /// Create a `TextModel` from raw bytes, auto-detecting encoding.
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let enc = detect_encoding(bytes);
+        let text = decode_text(bytes, enc);
+        let mut model = Self::new(&text);
+        model.encoding = enc;
+        model
+    }
+
+    // -- Versioning ---------------------------------------------------------
+
+    /// Returns the current version id, incremented on each edit.
+    pub fn get_version_id(&self) -> u64 {
+        self.version_id
+    }
+
+    /// Returns the alternative version id that includes undo/redo state.
+    pub fn get_alternative_version_id(&self) -> u64 {
+        self.alternative_version_id
+    }
+
+    /// Create an immutable snapshot of the current model state.
+    pub fn create_snapshot(&self) -> ModelSnapshot {
+        ModelSnapshot {
+            text: self.get_value(),
+            version_id: self.version_id,
+            line_ending: self.line_ending,
+            encoding: self.encoding,
+        }
+    }
+
+    // -- Line ending --------------------------------------------------------
+
+    /// Get the current line ending mode.
+    pub fn get_eol(&self) -> LineEnding {
+        self.line_ending
+    }
+
+    /// Set the line ending mode (used for subsequent insertions and save).
+    pub fn set_eol(&mut self, eol: LineEnding) {
+        self.line_ending = eol;
+    }
+
+    // -- Encoding -----------------------------------------------------------
+
+    /// Get the current encoding.
+    pub fn get_encoding(&self) -> Encoding {
+        self.encoding
+    }
+
+    /// Set the encoding.
+    pub fn set_encoding(&mut self, enc: Encoding) {
+        self.encoding = enc;
     }
 
     // -- Event accessor -----------------------------------------------------
@@ -101,6 +413,20 @@ impl TextModel {
         self.rope.slice(start_char..end_char).to_string()
     }
 
+    // -- Large file helpers --------------------------------------------------
+
+    /// Create a truncated model showing only the first `max_lines` lines.
+    pub fn truncated_model(&self, max_lines: u32) -> TextModel {
+        let lc = self.get_line_count();
+        if lc <= max_lines {
+            return TextModel::new(&self.get_value());
+        }
+        let end_pos = Position::new(max_lines + 1, 1);
+        let end_valid = self.validate_position(end_pos);
+        let text = self.get_value_in_range(Range::from_positions(Position::new(1, 1), end_valid));
+        TextModel::new(&text)
+    }
+
     // -- Position / offset conversion ----------------------------------------
 
     /// Convert a byte offset to a 1-based `Position`.
@@ -110,7 +436,6 @@ impl TextModel {
         let line_idx = self.rope.char_to_line(char_idx);
         let line_start_char = self.rope.line_to_char(line_idx);
         let col_chars = char_idx - line_start_char;
-        // Convert char offset within line back to byte offset within line
         let line_slice = self.rope.line(line_idx);
         let col_bytes = if col_chars == 0 {
             0
@@ -133,7 +458,6 @@ impl TextModel {
         let line_idx = (pos.line - 1) as usize;
         let line_start_char = self.rope.line_to_char(line_idx);
         let line_slice = self.rope.line(line_idx);
-        // Column is 1-based byte offset; convert to char offset
         let col_bytes = (pos.column - 1) as usize;
         let mut chars_count = 0;
         let mut bytes_count = 0;
@@ -169,28 +493,29 @@ impl TextModel {
 
     // -- Edit operations -----------------------------------------------------
 
-    /// Replace the text in `range` with `text`.
-    pub fn apply_edit(&mut self, range: Range, text: &str) {
+    /// Internal: apply an edit to the rope without pushing to undo stacks.
+    /// Returns the EditOperation and ContentChange.
+    fn apply_edit_raw(&mut self, range: Range, text: &str) -> (EditOperation, ContentChange) {
         let range = self.validate_range(range);
         let replaced_text = self.get_value_in_range(range);
         let range_length = replaced_text.len();
+        let range_offset = self.position_to_offset(range.start);
 
-        let start_offset = self.position_to_offset(range.start);
+        let start_offset = range_offset;
         let end_offset = self.position_to_offset(range.end);
         let start_char = self.rope.byte_to_char(start_offset);
         let end_char = self.rope.byte_to_char(end_offset);
 
-        // Perform the edit on the rope
         self.rope.remove(start_char..end_char);
         if !text.is_empty() {
             self.rope.insert(start_char, text);
         }
 
         // Invalidate line cache
-        // SAFETY: No outstanding references to the cache exist during mutation.
-        unsafe { (*self.line_cache.get()).0 = 0; }
+        unsafe {
+            (*self.line_cache.get()).0 = 0;
+        }
 
-        // Compute the range after edit for undo
         let end_after = self.offset_to_position(start_offset + text.len());
         let range_after = Range::from_positions(range.start, end_after);
 
@@ -199,13 +524,33 @@ impl TextModel {
             text_inserted: text.to_string(),
             text_replaced: replaced_text,
             range_before: range,
+            force_move_markers: false,
         };
-        self.undo_stack.push(edit_op);
 
-        let event = ModelContentChangedEvent {
+        let change = ContentChange {
             range,
             text: text.to_string(),
+            range_offset,
             range_length,
+        };
+
+        (edit_op, change)
+    }
+
+    /// Replace the text in `range` with `text`.
+    pub fn apply_edit(&mut self, range: Range, text: &str) {
+        let (edit_op, change) = self.apply_edit_raw(range, text);
+
+        self.undo_stack.push(edit_op.clone());
+        self.undo_service.push_edit(edit_op, None, None);
+        self.version_id += 1;
+        self.alternative_version_id += 1;
+
+        let event = ModelContentChangedEvent {
+            changes: vec![change],
+            version_id: self.version_id,
+            is_undo: false,
+            is_redo: false,
         };
         self.on_did_change_content_emitter.fire(&event);
     }
@@ -221,30 +566,83 @@ impl TextModel {
         self.apply_edit(range, "");
     }
 
+    /// Apply a batch of [`EditOperation`] structs atomically as a single undo
+    /// group, with optional cursor state.
+    pub fn apply_edits(&mut self, edits: &[EditOperation]) {
+        self.push_edit_operations_with_cursor(
+            &edits
+                .iter()
+                .map(|e| (e.range_before, e.text_inserted.clone()))
+                .collect::<Vec<_>>(),
+            None,
+            None,
+        );
+    }
+
     /// Apply a batch of edits and push to the undo stack.
     ///
     /// Edits are applied in reverse order (bottom-to-top) so that earlier
     /// ranges remain valid.
     pub fn push_edit_operations(&mut self, edits: &[(Range, String)]) {
+        self.push_edit_operations_with_cursor(edits, None, None);
+    }
+
+    /// Apply a batch of edits with cursor state, grouped as a single undo
+    /// step.
+    pub fn push_edit_operations_with_cursor(
+        &mut self,
+        edits: &[(Range, String)],
+        cursor_before: Option<CursorState>,
+        cursor_after: Option<CursorState>,
+    ) {
         let mut sorted: Vec<(Range, String)> = edits.to_vec();
         sorted.sort_by(|a, b| b.0.start.cmp(&a.0.start));
-        for (range, text) in sorted {
-            self.apply_edit(range, &text);
+
+        self.undo_service.open_group(cursor_before);
+
+        let mut changes = Vec::with_capacity(sorted.len());
+        for (range, text) in &sorted {
+            let (edit_op, change) = self.apply_edit_raw(*range, text);
+            self.undo_stack.push(edit_op.clone());
+            self.undo_service.push_edit(edit_op, None, None);
+            changes.push(change);
         }
+
+        self.undo_service.close_group(cursor_after);
+        self.version_id += 1;
+        self.alternative_version_id += 1;
+
+        let event = ModelContentChangedEvent {
+            changes,
+            version_id: self.version_id,
+            is_undo: false,
+            is_redo: false,
+        };
+        self.on_did_change_content_emitter.fire(&event);
+    }
+
+    // -- Grouped undo operations --------------------------------------------
+
+    /// Open an undo group. All edits until `close_undo_group` are a single
+    /// undo step.
+    pub fn open_undo_group(&mut self, cursor_before: Option<CursorState>) {
+        self.undo_service.open_group(cursor_before);
+    }
+
+    /// Close the current undo group.
+    pub fn close_undo_group(&mut self, cursor_after: Option<CursorState>) {
+        self.undo_service.close_group(cursor_after);
     }
 
     // -- Undo / Redo ---------------------------------------------------------
 
-    /// Undo the last edit operation.
+    /// Undo the last edit operation (legacy, returns bool).
     pub fn undo(&mut self) -> bool {
-        // We need to pop from our stack without going through apply_edit
-        // (which would push another undo entry).
         let op = match self.undo_stack.undo() {
             Some(op) => op,
             None => return false,
         };
 
-        // Reverse the edit: replace the inserted text with the original text
         let start_offset = self.position_to_offset(op.range_after.start);
         let end_offset = self.position_to_offset(op.range_after.end);
         let start_char = self.rope.byte_to_char(start_offset);
@@ -254,25 +652,36 @@ impl TextModel {
         if !op.text_replaced.is_empty() {
             self.rope.insert(start_char, &op.text_replaced);
         }
-        unsafe { (*self.line_cache.get()).0 = 0; }
+        unsafe {
+            (*self.line_cache.get()).0 = 0;
+        }
 
-        let event = ModelContentChangedEvent {
+        self.version_id += 1;
+        self.alternative_version_id += 1;
+
+        let change = ContentChange {
             range: op.range_after,
             text: op.text_replaced.clone(),
+            range_offset: start_offset,
             range_length: op.text_inserted.len(),
+        };
+        let event = ModelContentChangedEvent {
+            changes: vec![change],
+            version_id: self.version_id,
+            is_undo: true,
+            is_redo: false,
         };
         self.on_did_change_content_emitter.fire(&event);
         true
     }
 
-    /// Redo the last undone edit operation.
+    /// Redo the last undone edit operation (legacy, returns bool).
     pub fn redo(&mut self) -> bool {
         let op = match self.undo_stack.redo() {
             Some(op) => op,
             None => return false,
         };
 
-        // Re-apply the edit
         let start_offset = self.position_to_offset(op.range_before.start);
         let end_offset = self.position_to_offset(op.range_before.end);
         let start_char = self.rope.byte_to_char(start_offset);
@@ -282,23 +691,75 @@ impl TextModel {
         if !op.text_inserted.is_empty() {
             self.rope.insert(start_char, &op.text_inserted);
         }
-        unsafe { (*self.line_cache.get()).0 = 0; }
+        unsafe {
+            (*self.line_cache.get()).0 = 0;
+        }
 
-        let event = ModelContentChangedEvent {
+        self.version_id += 1;
+        self.alternative_version_id += 1;
+
+        let change = ContentChange {
             range: op.range_before,
             text: op.text_inserted.clone(),
+            range_offset: start_offset,
             range_length: op.text_replaced.len(),
+        };
+        let event = ModelContentChangedEvent {
+            changes: vec![change],
+            version_id: self.version_id,
+            is_undo: false,
+            is_redo: true,
         };
         self.on_did_change_content_emitter.fire(&event);
         true
     }
 
+    /// Undo using the grouped service, returning cursor state to restore.
+    pub fn undo_grouped(&mut self) -> Option<CursorState> {
+        let group = self.undo_service.undo()?.clone();
+        // Reverse edits in reverse order
+        for op in group.edits.iter().rev() {
+            let start_offset = self.position_to_offset(op.range_after.start);
+            let end_offset = self.position_to_offset(op.range_after.end);
+            let start_char = self.rope.byte_to_char(start_offset);
+            let end_char = self.rope.byte_to_char(end_offset);
+            self.rope.remove(start_char..end_char);
+            if !op.text_replaced.is_empty() {
+                self.rope.insert(start_char, &op.text_replaced);
+            }
+        }
+        unsafe {
+            (*self.line_cache.get()).0 = 0;
+        }
+        self.version_id += 1;
+        self.alternative_version_id += 1;
+        group.cursor_before.clone()
+    }
+
+    /// Redo using the grouped service, returning cursor state to restore.
+    pub fn redo_grouped(&mut self) -> Option<CursorState> {
+        let group = self.undo_service.redo()?.clone();
+        for op in &group.edits {
+            let start_offset = self.position_to_offset(op.range_before.start);
+            let end_offset = self.position_to_offset(op.range_before.end);
+            let start_char = self.rope.byte_to_char(start_offset);
+            let end_char = self.rope.byte_to_char(end_offset);
+            self.rope.remove(start_char..end_char);
+            if !op.text_inserted.is_empty() {
+                self.rope.insert(start_char, &op.text_inserted);
+            }
+        }
+        unsafe {
+            (*self.line_cache.get()).0 = 0;
+        }
+        self.version_id += 1;
+        self.alternative_version_id += 1;
+        group.cursor_after.clone()
+    }
+
     // -- Search --------------------------------------------------------------
 
     /// Find all matches of a search string in the document.
-    ///
-    /// When `is_regex` is `true`, `search_string` is treated as a regular
-    /// expression pattern.
     pub fn find_matches(
         &self,
         search_string: &str,
@@ -332,12 +793,7 @@ impl TextModel {
 
     // -- Internal helpers ----------------------------------------------------
 
-    /// Cache and return the line content (without trailing newline) for the
-    /// given 1-based line number.
     fn cache_line(&self, line_number: u32) {
-        // SAFETY: This is the only method that writes to the cache through
-        // `&self`. It is never called concurrently (single-threaded access
-        // enforced by the borrow checker on `&mut self` for mutations).
         let cache = unsafe { &mut *self.line_cache.get() };
         if cache.0 == line_number {
             return;
@@ -345,7 +801,6 @@ impl TextModel {
         let line_idx = (line_number - 1) as usize;
         let line_slice = self.rope.line(line_idx);
         let mut s = line_slice.to_string();
-        // Strip trailing newline characters
         if s.ends_with("\r\n") {
             s.truncate(s.len() - 2);
         } else if s.ends_with('\n') || s.ends_with('\r') {
@@ -366,9 +821,6 @@ impl ITextModel for TextModel {
 
     fn get_line_content(&self, line_number: u32) -> &str {
         self.cache_line(line_number);
-        // SAFETY: The cache is only mutated by `cache_line` (which we just
-        // called) or by `&mut self` methods. Since we hold `&self`, no
-        // `&mut self` method can run, so the pointer is stable.
         unsafe { (*self.line_cache.get()).1.as_str() }
     }
 
@@ -677,7 +1129,7 @@ mod tests {
 
         let evts = events.lock().unwrap();
         assert_eq!(evts.len(), 1);
-        assert_eq!(evts[0].text, " world");
+        assert_eq!(evts[0].changes[0].text, " world");
     }
 
     // -- Search --------------------------------------------------------------
@@ -734,5 +1186,346 @@ mod tests {
         let model = TextModel::new("hello");
         let matches = model.find_matches("[invalid", true, true);
         assert!(matches.is_empty());
+    }
+
+    // -- Line ending detection ----------------------------------------------
+
+    #[test]
+    fn detect_lf() {
+        assert_eq!(detect_line_ending("hello\nworld\n"), DetectedLineEnding::LF);
+    }
+
+    #[test]
+    fn detect_crlf() {
+        assert_eq!(
+            detect_line_ending("hello\r\nworld\r\n"),
+            DetectedLineEnding::CRLF
+        );
+    }
+
+    #[test]
+    fn detect_mixed() {
+        assert_eq!(
+            detect_line_ending("hello\nworld\r\n"),
+            DetectedLineEnding::Mixed
+        );
+    }
+
+    #[test]
+    fn detect_no_newlines() {
+        assert_eq!(detect_line_ending("hello"), DetectedLineEnding::LF);
+    }
+
+    #[test]
+    fn normalize_to_lf() {
+        assert_eq!(
+            normalize_line_endings("a\r\nb\r\n", LineEnding::LF),
+            "a\nb\n"
+        );
+    }
+
+    #[test]
+    fn normalize_to_crlf() {
+        assert_eq!(
+            normalize_line_endings("a\nb\n", LineEnding::CRLF),
+            "a\r\nb\r\n"
+        );
+    }
+
+    #[test]
+    fn normalize_mixed_to_lf() {
+        assert_eq!(
+            normalize_line_endings("a\r\nb\nc\r\n", LineEnding::LF),
+            "a\nb\nc\n"
+        );
+    }
+
+    #[test]
+    fn model_detects_crlf() {
+        let model = TextModel::new("hello\r\nworld\r\n");
+        assert_eq!(model.get_eol(), LineEnding::CRLF);
+    }
+
+    #[test]
+    fn model_set_eol() {
+        let mut model = TextModel::new("hello\nworld");
+        assert_eq!(model.get_eol(), LineEnding::LF);
+        model.set_eol(LineEnding::CRLF);
+        assert_eq!(model.get_eol(), LineEnding::CRLF);
+    }
+
+    #[test]
+    fn line_ending_as_str() {
+        assert_eq!(LineEnding::LF.as_str(), "\n");
+        assert_eq!(LineEnding::CRLF.as_str(), "\r\n");
+    }
+
+    // -- Encoding -----------------------------------------------------------
+
+    #[test]
+    fn detect_utf8_bom() {
+        let bytes = b"\xEF\xBB\xBFhello";
+        assert_eq!(detect_encoding(bytes), Encoding::UTF8BOM);
+    }
+
+    #[test]
+    fn detect_utf16le_bom() {
+        let bytes = b"\xFF\xFEh\x00";
+        assert_eq!(detect_encoding(bytes), Encoding::UTF16LE);
+    }
+
+    #[test]
+    fn detect_utf16be_bom() {
+        let bytes = b"\xFE\xFF\x00h";
+        assert_eq!(detect_encoding(bytes), Encoding::UTF16BE);
+    }
+
+    #[test]
+    fn detect_plain_utf8() {
+        assert_eq!(detect_encoding(b"hello world"), Encoding::UTF8);
+    }
+
+    #[test]
+    fn detect_latin1_fallback() {
+        let bytes: &[u8] = &[0xFF, 0xFD, 0x80, 0x81];
+        assert_eq!(detect_encoding(bytes), Encoding::Latin1);
+    }
+
+    #[test]
+    fn decode_utf8_bom() {
+        let bytes = b"\xEF\xBB\xBFhello";
+        assert_eq!(decode_text(bytes, Encoding::UTF8BOM), "hello");
+    }
+
+    #[test]
+    fn encode_utf8_bom_roundtrip() {
+        let text = "hello world";
+        let encoded = encode_text(text, Encoding::UTF8BOM);
+        assert_eq!(&encoded[..3], &[0xEF, 0xBB, 0xBF]);
+        assert_eq!(decode_text(&encoded, Encoding::UTF8BOM), text);
+    }
+
+    #[test]
+    fn encode_decode_utf16le() {
+        let text = "ABC";
+        let encoded = encode_text(text, Encoding::UTF16LE);
+        assert_eq!(&encoded[..2], &[0xFF, 0xFE]); // BOM
+        let decoded = decode_text(&encoded, Encoding::UTF16LE);
+        assert_eq!(decoded, text);
+    }
+
+    #[test]
+    fn encode_decode_utf16be() {
+        let text = "ABC";
+        let encoded = encode_text(text, Encoding::UTF16BE);
+        assert_eq!(&encoded[..2], &[0xFE, 0xFF]); // BOM
+        let decoded = decode_text(&encoded, Encoding::UTF16BE);
+        assert_eq!(decoded, text);
+    }
+
+    #[test]
+    fn encode_decode_latin1() {
+        let text = "caf";
+        let encoded = encode_text(text, Encoding::Latin1);
+        let decoded = decode_text(&encoded, Encoding::Latin1);
+        assert_eq!(decoded, text);
+    }
+
+    #[test]
+    fn model_from_bytes_utf8bom() {
+        let bytes = b"\xEF\xBB\xBFhello";
+        let model = TextModel::from_bytes(bytes);
+        assert_eq!(model.get_value(), "hello");
+        assert_eq!(model.get_encoding(), Encoding::UTF8BOM);
+    }
+
+    // -- Version ID ---------------------------------------------------------
+
+    #[test]
+    fn version_id_increments() {
+        let mut model = TextModel::new("hello");
+        let v1 = model.get_version_id();
+        model.insert(Position::new(1, 6), " world");
+        let v2 = model.get_version_id();
+        assert!(v2 > v1);
+    }
+
+    #[test]
+    fn alternative_version_id_increments() {
+        let mut model = TextModel::new("hello");
+        let v1 = model.get_alternative_version_id();
+        model.insert(Position::new(1, 6), "!");
+        let v2 = model.get_alternative_version_id();
+        assert!(v2 > v1);
+        model.undo();
+        let v3 = model.get_alternative_version_id();
+        assert!(v3 > v2);
+    }
+
+    // -- Snapshot -----------------------------------------------------------
+
+    #[test]
+    fn snapshot_captures_state() {
+        let model = TextModel::new("hello");
+        let snap = model.create_snapshot();
+        assert_eq!(snap.text, "hello");
+        assert_eq!(snap.version_id, model.get_version_id());
+        assert_eq!(snap.encoding, Encoding::UTF8);
+    }
+
+    #[test]
+    fn snapshot_immutable_after_edit() {
+        let mut model = TextModel::new("hello");
+        let snap = model.create_snapshot();
+        model.insert(Position::new(1, 6), " world");
+        assert_eq!(snap.text, "hello");
+        assert_eq!(model.get_value(), "hello world");
+    }
+
+    // -- Truncated model ----------------------------------------------------
+
+    #[test]
+    fn truncated_model_limits_lines() {
+        let model = TextModel::new("a\nb\nc\nd\ne");
+        let truncated = model.truncated_model(3);
+        assert!(truncated.get_line_count() <= 4);
+    }
+
+    #[test]
+    fn truncated_model_small_file_unchanged() {
+        let model = TextModel::new("a\nb");
+        let truncated = model.truncated_model(10);
+        assert_eq!(truncated.get_value(), "a\nb");
+    }
+
+    // -- Content change event fields ----------------------------------------
+
+    #[test]
+    fn event_contains_version_and_flags() {
+        let mut model = TextModel::new("abc");
+        let events: Arc<Mutex<Vec<ModelContentChangedEvent>>> =
+            Arc::new(Mutex::new(Vec::new()));
+        let ec = events.clone();
+        let _h = model.on_did_change_content().on(move |e| {
+            ec.lock().unwrap().push(e.clone());
+        });
+
+        model.insert(Position::new(1, 4), "d");
+        model.undo();
+        model.redo();
+
+        let evts = events.lock().unwrap();
+        assert_eq!(evts.len(), 3);
+        assert!(!evts[0].is_undo && !evts[0].is_redo);
+        assert!(evts[1].is_undo && !evts[1].is_redo);
+        assert!(!evts[2].is_undo && evts[2].is_redo);
+        // Version ids are monotonically increasing
+        assert!(evts[1].version_id > evts[0].version_id);
+        assert!(evts[2].version_id > evts[1].version_id);
+    }
+
+    #[test]
+    fn content_change_has_range_offset() {
+        let mut model = TextModel::new("hello\nworld");
+        let events: Arc<Mutex<Vec<ModelContentChangedEvent>>> =
+            Arc::new(Mutex::new(Vec::new()));
+        let ec = events.clone();
+        let _h = model.on_did_change_content().on(move |e| {
+            ec.lock().unwrap().push(e.clone());
+        });
+
+        model.insert(Position::new(2, 1), "X");
+        let evts = events.lock().unwrap();
+        assert_eq!(evts[0].changes[0].range_offset, 6);
+    }
+
+    // -- Grouped undo/redo with cursor state --------------------------------
+
+    #[test]
+    fn grouped_undo_redo_with_cursor() {
+        let mut model = TextModel::new("hello");
+        let cursor_before =
+            vsedit_undoredo::CursorState::single(1, 6);
+        let cursor_after =
+            vsedit_undoredo::CursorState::single(1, 8);
+
+        model.push_edit_operations_with_cursor(
+            &[(Range::new(1, 6, 1, 6), "()".to_string())],
+            Some(cursor_before.clone()),
+            Some(cursor_after.clone()),
+        );
+
+        assert_eq!(model.get_value(), "hello()");
+
+        let restored = model.undo_grouped();
+        assert_eq!(model.get_value(), "hello");
+        assert_eq!(restored, Some(cursor_before));
+
+        let restored = model.redo_grouped();
+        assert_eq!(model.get_value(), "hello()");
+        assert_eq!(restored, Some(cursor_after));
+    }
+
+    #[test]
+    fn open_close_undo_group() {
+        let mut model = TextModel::new("abc");
+        model.open_undo_group(None);
+        model.apply_edit(Range::new(1, 4, 1, 4), "d");
+        model.apply_edit(Range::new(1, 5, 1, 5), "e");
+        model.close_undo_group(None);
+
+        assert_eq!(model.get_value(), "abcde");
+        // The grouped service should have one group with multiple edits
+        // Undo via legacy still works per-edit
+        model.undo();
+        assert_eq!(model.get_value(), "abcd");
+        model.undo();
+        assert_eq!(model.get_value(), "abc");
+    }
+
+    // -- EditOperation struct -----------------------------------------------
+
+    #[test]
+    fn edit_operation_force_move_markers() {
+        let op = EditOperation {
+            range_after: Range::new(1, 1, 1, 5),
+            text_inserted: "test".into(),
+            text_replaced: "".into(),
+            range_before: Range::new(1, 1, 1, 1),
+            force_move_markers: true,
+        };
+        assert!(op.force_move_markers);
+    }
+
+    // -- apply_edits (batch EditOperation) ----------------------------------
+
+    #[test]
+    fn apply_edits_batch() {
+        let mut model = TextModel::new("aabbcc");
+        let edits = vec![
+            EditOperation {
+                range_before: Range::new(1, 1, 1, 3),
+                range_after: Range::new(1, 1, 1, 3),
+                text_inserted: "AA".into(),
+                text_replaced: "".into(),
+                force_move_markers: false,
+            },
+            EditOperation {
+                range_before: Range::new(1, 5, 1, 7),
+                range_after: Range::new(1, 5, 1, 7),
+                text_inserted: "CC".into(),
+                text_replaced: "".into(),
+                force_move_markers: false,
+            },
+        ];
+        model.apply_edits(&edits);
+        assert_eq!(model.get_value(), "AAbbCC");
+    }
+
+    // -- Large file ---------------------------------------------------------
+
+    #[test]
+    fn is_large_file_nonexistent() {
+        assert!(!is_large_file(Path::new("/nonexistent/path/file.txt")));
     }
 }
