@@ -180,6 +180,10 @@ pub struct CliArgs {
     pub disable_extensions: bool,
     /// Verbose output.
     pub verbose: bool,
+    /// Start in 3-way merge mode.
+    pub merge: bool,
+    /// Override display locale (e.g. "en-US").
+    pub locale: Option<String>,
 }
 
 impl CliArgs {
@@ -193,6 +197,16 @@ impl CliArgs {
         if self.diff && self.paths.len() != 2 {
             return Err(EnvironmentError::ConflictingFlags(
                 "diff mode requires exactly two paths".into(),
+            ));
+        }
+        if self.merge && self.paths.len() != 3 {
+            return Err(EnvironmentError::ConflictingFlags(
+                "merge mode requires exactly three paths (mine, base, theirs)".into(),
+            ));
+        }
+        if self.diff && self.merge {
+            return Err(EnvironmentError::ConflictingFlags(
+                "cannot specify both --diff and --merge".into(),
             ));
         }
         if let Some((line, col)) = self.goto {
@@ -301,6 +315,16 @@ impl CliArgsBuilder {
 
     pub fn user_data_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.inner.user_data_dir = Some(dir.into());
+        self
+    }
+
+    pub fn merge(mut self, enabled: bool) -> Self {
+        self.inner.merge = enabled;
+        self
+    }
+
+    pub fn locale(mut self, locale: impl Into<String>) -> Self {
+        self.inner.locale = Some(locale.into());
         self
     }
 

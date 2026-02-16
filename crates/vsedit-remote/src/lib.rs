@@ -522,6 +522,147 @@ impl ConnectionCapabilities {
 }
 
 // ---------------------------------------------------------------------------
+// SSH authentication methods
+// ---------------------------------------------------------------------------
+
+/// Authentication method for SSH connections.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SshAuthMethod {
+    Password,
+    PublicKey { key_path: String },
+    Agent,
+}
+
+impl fmt::Display for SshAuthMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SshAuthMethod::Password => write!(f, "Password"),
+            SshAuthMethod::PublicKey { key_path } => write!(f, "PublicKey({})", key_path),
+            SshAuthMethod::Agent => write!(f, "Agent"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RemoteConnectionManager – named connection management by id
+// ---------------------------------------------------------------------------
+
+/// Manages named remote connections by string identifier.
+pub struct RemoteConnectionManager {
+    connections: std::collections::HashMap<String, RemoteConnection>,
+}
+
+impl RemoteConnectionManager {
+    pub fn new() -> Self {
+        Self {
+            connections: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Register a connection under the given id. Returns `false` if the id is already taken.
+    pub fn connect(&mut self, id: impl Into<String>, conn: RemoteConnection) -> bool {
+        let id = id.into();
+        if self.connections.contains_key(&id) {
+            return false;
+        }
+        self.connections.insert(id, conn);
+        true
+    }
+
+    /// Remove and return the connection with the given id.
+    pub fn disconnect(&mut self, id: &str) -> Option<RemoteConnection> {
+        self.connections.remove(id)
+    }
+
+    /// List all connection ids.
+    pub fn list_connections(&self) -> Vec<&str> {
+        self.connections.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Get a reference to a connection by id.
+    pub fn get(&self, id: &str) -> Option<&RemoteConnection> {
+        self.connections.get(id)
+    }
+
+    /// Number of managed connections.
+    pub fn len(&self) -> usize {
+        self.connections.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.connections.is_empty()
+    }
+}
+
+impl Default for RemoteConnectionManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RemoteEnvironment – describes the remote OS environment
+// ---------------------------------------------------------------------------
+
+/// Information about the remote machine's environment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteEnvironment {
+    pub os: String,
+    pub home_dir: String,
+    pub temp_dir: String,
+}
+
+impl RemoteEnvironment {
+    pub fn new(os: impl Into<String>, home_dir: impl Into<String>, temp_dir: impl Into<String>) -> Self {
+        Self {
+            os: os.into(),
+            home_dir: home_dir.into(),
+            temp_dir: temp_dir.into(),
+        }
+    }
+}
+
+impl fmt::Display for RemoteEnvironment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "OS={}, home={}, tmp={}", self.os, self.home_dir, self.temp_dir)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PortForwardingConfig – describes a single port forwarding rule
+// ---------------------------------------------------------------------------
+
+/// Configuration for a single port forwarding rule.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PortForwardingConfig {
+    pub local_port: u16,
+    pub remote_port: u16,
+    pub remote_host: String,
+}
+
+impl PortForwardingConfig {
+    pub fn new(local_port: u16, remote_port: u16, remote_host: impl Into<String>) -> Result<Self, RemoteError> {
+        if local_port == 0 {
+            return Err(RemoteError::InvalidPort(local_port));
+        }
+        if remote_port == 0 {
+            return Err(RemoteError::InvalidPort(remote_port));
+        }
+        Ok(Self {
+            local_port,
+            remote_port,
+            remote_host: remote_host.into(),
+        })
+    }
+}
+
+impl fmt::Display for PortForwardingConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "localhost:{} -> {}:{}", self.local_port, self.remote_host, self.remote_port)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Session duration tracking
 // ---------------------------------------------------------------------------
 
@@ -987,5 +1128,90 @@ mod tests {
         session.stop(2000);
         assert!(!session.is_running());
         assert_eq!(session.elapsed(9999), 1000);
+    }
+
+    // ---------------------------------------------------------------
+    // SSH auth, connection manager, remote env, port forwarding tests
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn ssh_auth_method_display() {
+        assert_eq!(format!("{}", SshAuthMethod::Password), "Password");
+        assert_eq!(
+            format!("{}", SshAuthMethod::PublicKey { key_path: "~/.ssh/id_rsa".into() }),
+            "PublicKey(~/.ssh/id_rsa)"
+        );
+        assert_eq!(format!("{}", SshAuthMethod::Agent), "Agent");
+    }
+
+    #[test]
+    fn connection_manager_connect_disconnect() {
+        let mut mgr = RemoteConnectionManager::new();
+        assert!(mgr.is_empty());
+        assert!(mgr.connect("dev", sample_conn()));
+        assert_eq!(mgr.len(), 1);
+        assert!(!mgr.connect("dev", sample_conn())); // duplicate id
+        assert_eq!(mgr.len(), 1);
+        assert!(mgr.get("dev").is_some());
+        let removed = mgr.disconnect("dev");
+        assert!(removed.is_some());
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn connection_manager_list_connections() {
+        let mut mgr = RemoteConnectionManager::new();
+        mgr.connect("a", sample_conn());
+        mgr.connect("b", sample_conn());
+        let mut ids = mgr.list_connections();
+        ids.sort();
+        assert_eq!(ids, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn connection_manager_disconnect_unknown() {
+        let mut mgr = RemoteConnectionManager::new();
+        assert!(mgr.disconnect("nope").is_none());
+    }
+
+    #[test]
+    fn remote_environment_new_and_display() {
+        let env = RemoteEnvironment::new("Linux", "/home/user", "/tmp");
+        assert_eq!(env.os, "Linux");
+        assert_eq!(env.home_dir, "/home/user");
+        assert_eq!(env.temp_dir, "/tmp");
+        let s = format!("{env}");
+        assert!(s.contains("Linux"));
+        assert!(s.contains("/home/user"));
+        assert!(s.contains("/tmp"));
+    }
+
+    #[test]
+    fn port_forwarding_valid() {
+        let pf = PortForwardingConfig::new(8080, 80, "remote.io").unwrap();
+        assert_eq!(pf.local_port, 8080);
+        assert_eq!(pf.remote_port, 80);
+        assert_eq!(pf.remote_host, "remote.io");
+        let s = format!("{pf}");
+        assert!(s.contains("localhost:8080"));
+        assert!(s.contains("remote.io:80"));
+    }
+
+    #[test]
+    fn port_forwarding_zero_local_port() {
+        let pf = PortForwardingConfig::new(0, 80, "remote.io");
+        assert_eq!(pf, Err(RemoteError::InvalidPort(0)));
+    }
+
+    #[test]
+    fn port_forwarding_zero_remote_port() {
+        let pf = PortForwardingConfig::new(8080, 0, "remote.io");
+        assert_eq!(pf, Err(RemoteError::InvalidPort(0)));
+    }
+
+    #[test]
+    fn connection_manager_default() {
+        let mgr = RemoteConnectionManager::default();
+        assert!(mgr.is_empty());
     }
 }

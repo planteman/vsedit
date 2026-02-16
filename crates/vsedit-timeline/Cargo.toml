@@ -1,0 +1,8 @@
+[package]
+name = "vsedit-timeline"
+description = "Git-based timeline provider"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]

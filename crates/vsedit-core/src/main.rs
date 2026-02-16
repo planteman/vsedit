@@ -34,6 +34,8 @@ use vsedit_editor_widget::EditorWidget;
 use vsedit_environment::EnvironmentService;
 use vsedit_ext_host::ExtensionHostManager;
 use vsedit_ext_mgmt::scan_installed_extensions;
+use vsedit_ext_testing::TestBridge;
+use vsedit_ext_timeline::TimelineBridge;
 use vsedit_input::{InputEvent, from_crossterm_key, key_input_to_chord};
 use vsedit_keybinding_svc::{
     KeybindingMatch, KeybindingResolver, load_keybindings_json, register_default_keybindings,
@@ -41,9 +43,12 @@ use vsedit_keybinding_svc::{
 use vsedit_lifecycle_svc::{LifecyclePhase, LifecycleService, ShutdownReason};
 use vsedit_notification_svc::NotificationService;
 use vsedit_platform::Platform;
+use vsedit_accessibility::ScreenReaderSupport;
+use vsedit_remote::RemoteService;
 use vsedit_state::{StateScope, StateService};
 use vsedit_theme::dark_plus;
 use vsedit_tui::{restore_terminal, setup_terminal};
+use vsedit_userdatasync::{SyncResource, SyncService};
 use vsedit_workbench::{FocusedPart, Workbench, WorkbenchAction};
 use vsedit_workspace::Workspace;
 
@@ -62,6 +67,10 @@ struct Cli {
     /// Open a diff view between two files.
     #[arg(long, num_args = 2, value_names = ["FILE1", "FILE2"])]
     diff: Vec<PathBuf>,
+
+    /// Open a 3-way merge editor (mine, base, theirs).
+    #[arg(long, num_args = 3, value_names = ["MINE", "BASE", "THEIRS"])]
+    merge: Vec<PathBuf>,
 
     /// Open a file at line:col (e.g. --goto src/main.rs:10:5).
     #[arg(long, value_name = "FILE:LINE:COL")]
@@ -103,6 +112,10 @@ struct Cli {
     #[arg(long, value_name = "DIR")]
     extensions_dir: Option<PathBuf>,
 
+    /// Set the display language locale (e.g. en-US, de, ja).
+    #[arg(long, value_name = "LOCALE")]
+    locale: Option<String>,
+
     /// Enable verbose output.
     #[arg(long)]
     verbose: bool,
@@ -127,6 +140,11 @@ struct AppState {
     backup_service: BackupService,
     ext_host: ExtensionHostManager,
     env_service: EnvironmentService,
+    timeline_bridge: TimelineBridge,
+    test_bridge: TestBridge,
+    sync_service: SyncService,
+    screen_reader: ScreenReaderSupport,
+    remote_service: RemoteService,
     _workspace: Workspace,
     file_path: Option<PathBuf>,
 }
@@ -325,6 +343,48 @@ async fn run() -> io::Result<()> {
     let backup_dir = env_svc.paths.user_data.join("backups");
     let backup_service = BackupService::new(backup_dir.to_string_lossy().to_string());
 
+    // ── 13a. Timeline service ──────────────────────────────────────────
+    let timeline_bridge = TimelineBridge::new();
+    vsedit_ext_timeline::register();
+    tracing::info!("Timeline service initialized");
+
+    // ── 13b. Testing service ───────────────────────────────────────────
+    let test_bridge = TestBridge::new();
+    tracing::info!("Testing service initialized");
+
+    // ── 13c. Settings sync service ─────────────────────────────────────
+    let mut sync_service = SyncService::new();
+    sync_service.add_resource(SyncResource::Settings);
+    sync_service.add_resource(SyncResource::Keybindings);
+    sync_service.add_resource(SyncResource::Snippets);
+    sync_service.add_resource(SyncResource::Extensions);
+    sync_service.add_resource(SyncResource::GlobalState);
+    tracing::info!(
+        "Settings sync service initialized ({} resources)",
+        sync_service.resource_count()
+    );
+
+    // ── 13d. Accessibility support ─────────────────────────────────────
+    let mut screen_reader = ScreenReaderSupport::new();
+    let sr_detected = ScreenReaderSupport::detect_from_env();
+    screen_reader.set_active(sr_detected);
+    if sr_detected {
+        tracing::info!("Screen reader detected — accessibility mode enabled");
+    } else {
+        tracing::info!("Accessibility support ready (no screen reader detected)");
+    }
+
+    // ── 13e. Remote development readiness ──────────────────────────────
+    let remote_service = RemoteService::new();
+    if remote_service.is_remote() {
+        tracing::info!(
+            "Remote session active ({} connections)",
+            remote_service.connection_count()
+        );
+    } else {
+        tracing::info!("Local session — remote service on standby");
+    }
+
     // ── 14. Workbench & editor ─────────────────────────────────────────
     let mut workbench = Workbench::new();
     workbench.start();
@@ -392,6 +452,11 @@ async fn run() -> io::Result<()> {
         backup_service,
         ext_host,
         env_service: env_svc,
+        timeline_bridge,
+        test_bridge,
+        sync_service,
+        screen_reader,
+        remote_service,
         _workspace: workspace,
         file_path,
     };
@@ -428,6 +493,9 @@ fn cli_to_env_args(cli: &Cli) -> vsedit_environment::CliArgs {
     if !cli.diff.is_empty() {
         paths.extend(cli.diff.iter().cloned());
     }
+    if !cli.merge.is_empty() {
+        paths.extend(cli.merge.iter().cloned());
+    }
 
     let goto = cli.goto.as_ref().and_then(|g| parse_goto_arg(g));
 
@@ -443,6 +511,8 @@ fn cli_to_env_args(cli: &Cli) -> vsedit_environment::CliArgs {
         user_data_dir: cli.user_data_dir.clone(),
         disable_extensions: cli.disable_extensions,
         verbose: cli.verbose,
+        merge: !cli.merge.is_empty(),
+        locale: cli.locale.clone(),
     }
 }
 

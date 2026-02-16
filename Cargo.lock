@@ -2997,6 +2997,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "vsedit-accessibility",
  "vsedit-backup",
  "vsedit-commands",
  "vsedit-configuration",
@@ -3007,6 +3008,8 @@ dependencies = [
  "vsedit-environment",
  "vsedit-ext-host",
  "vsedit-ext-mgmt",
+ "vsedit-ext-testing",
+ "vsedit-ext-timeline",
  "vsedit-input",
  "vsedit-keybinding-svc",
  "vsedit-lifecycle-svc",
@@ -3014,10 +3017,12 @@ dependencies = [
  "vsedit-notification-svc",
  "vsedit-platform",
  "vsedit-product",
+ "vsedit-remote",
  "vsedit-state",
  "vsedit-theme",
  "vsedit-tui",
  "vsedit-uri",
+ "vsedit-userdatasync",
  "vsedit-workbench",
  "vsedit-workspace",
 ]
@@ -4205,6 +4210,10 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "vsedit-timeline"
+version = "0.1.0"
 
 [[package]]
 name = "vsedit-tokens"

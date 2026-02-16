@@ -179,6 +179,7 @@ members = [
     "crates/vsedit-terminal-plat",
     "crates/vsedit-terminal-view",
     "crates/vsedit-test-view",
+    "crates/vsedit-timeline",
     "crates/vsedit-text-model",
     "crates/vsedit-text-render",
     "crates/vsedit-theme",
