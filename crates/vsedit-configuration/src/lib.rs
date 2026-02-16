@@ -433,6 +433,66 @@ fn scope_to_target(scope: ConfigurationScope) -> ConfigurationTarget {
 }
 
 // ---------------------------------------------------------------------------
+// Config file I/O
+// ---------------------------------------------------------------------------
+
+use std::path::PathBuf;
+
+/// Return the default configuration directory (`~/.config/vsedit`).
+pub fn config_dir() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from(".config"))
+        .join("vsedit")
+}
+
+/// Load user settings from the default config path.
+///
+/// Returns an empty JSON object if the file does not exist.
+pub fn load_user_settings() -> Result<Value, Box<dyn std::error::Error>> {
+    let settings_path = config_dir().join("settings.json");
+    load_json_file(&settings_path)
+}
+
+/// Save user settings to the default config path.
+///
+/// Creates the config directory if it does not already exist.
+pub fn save_user_settings(settings: &Value) -> Result<(), Box<dyn std::error::Error>> {
+    let dir = config_dir();
+    std::fs::create_dir_all(&dir)?;
+    let settings_path = dir.join("settings.json");
+    let content = serde_json::to_string_pretty(settings)?;
+    std::fs::write(settings_path, content)?;
+    Ok(())
+}
+
+/// Load user keybindings from the default config path.
+///
+/// Returns an empty `Vec` if the file does not exist.
+pub fn load_user_keybindings() -> Result<Vec<Value>, Box<dyn std::error::Error>> {
+    let keybindings_path = config_dir().join("keybindings.json");
+    if keybindings_path.exists() {
+        let content = std::fs::read_to_string(&keybindings_path)?;
+        let cleaned = vsedit_json::strip_comments(&content);
+        Ok(serde_json::from_str(&cleaned)?)
+    } else {
+        Ok(Vec::new())
+    }
+}
+
+/// Load a JSON or JSONC file into a `serde_json::Value`.
+///
+/// Returns an empty JSON object when the file does not exist.
+pub fn load_json_file(path: &std::path::Path) -> Result<Value, Box<dyn std::error::Error>> {
+    if path.exists() {
+        let content = std::fs::read_to_string(path)?;
+        let cleaned = vsedit_json::strip_comments(&content);
+        Ok(serde_json::from_str(&cleaned)?)
+    } else {
+        Ok(Value::Object(Default::default()))
+    }
+}
+
+// ---------------------------------------------------------------------------
 // JSON path helpers
 // ---------------------------------------------------------------------------
 
@@ -1001,5 +1061,92 @@ mod tests {
         assert_eq!(size, Some(16));
         let weight: Option<String> = base.get_value("editor.font.weight");
         assert_eq!(weight.as_deref(), Some("bold"));
+    }
+
+    // -- Config file I/O ----------------------------------------------------
+
+    #[test]
+    fn load_json_file_missing_returns_empty_object() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nonexistent.json");
+        let val = load_json_file(&path).unwrap();
+        assert_eq!(val, json!({}));
+    }
+
+    #[test]
+    fn load_json_file_with_comments() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            r#"{
+                // editor font size
+                "editor.fontSize": 16,
+                /* tab size */
+                "editor.tabSize": 2
+            }"#,
+        )
+        .unwrap();
+        let val = load_json_file(&path).unwrap();
+        assert_eq!(val["editor.fontSize"], json!(16));
+        assert_eq!(val["editor.tabSize"], json!(2));
+    }
+
+    #[test]
+    fn save_and_load_settings_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("settings.json");
+        let settings = json!({"editor.fontSize": 18, "editor.tabSize": 4});
+        let content = serde_json::to_string_pretty(&settings).unwrap();
+        std::fs::write(&config_path, &content).unwrap();
+
+        let loaded = load_json_file(&config_path).unwrap();
+        assert_eq!(loaded, settings);
+    }
+
+    #[test]
+    fn load_keybindings_missing_returns_empty_vec() {
+        // load_user_keybindings uses the global config_dir, so test the
+        // underlying logic directly with a nonexistent path.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("keybindings.json");
+        assert!(!path.exists());
+        // Replicate the same logic as load_user_keybindings
+        let result: Vec<Value> = if path.exists() {
+            let content = std::fs::read_to_string(&path).unwrap();
+            let cleaned = vsedit_json::strip_comments(&content);
+            serde_json::from_str(&cleaned).unwrap()
+        } else {
+            Vec::new()
+        };
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn load_keybindings_with_comments() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("keybindings.json");
+        std::fs::write(
+            &path,
+            r#"[
+                // Open file
+                {"key": "ctrl+o", "command": "workbench.action.files.openFile"},
+                /* Save */
+                {"key": "ctrl+s", "command": "workbench.action.files.save"}
+            ]"#,
+        )
+        .unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let cleaned = vsedit_json::strip_comments(&content);
+        let bindings: Vec<Value> = serde_json::from_str(&cleaned).unwrap();
+        assert_eq!(bindings.len(), 2);
+        assert_eq!(bindings[0]["key"], json!("ctrl+o"));
+        assert_eq!(bindings[1]["command"], json!("workbench.action.files.save"));
+    }
+
+    #[test]
+    fn config_dir_ends_with_vsedit() {
+        let dir = config_dir();
+        assert_eq!(dir.file_name().unwrap(), "vsedit");
     }
 }

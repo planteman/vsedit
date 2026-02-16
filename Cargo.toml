@@ -272,6 +272,8 @@ globset = "0.4"
 unicode-width = "0.2"
 unicode-segmentation = "1"
 keyring = "3"
+dirs = "5"
+syntect = "5"
 
 [profile.release]
 lto = true
