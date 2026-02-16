@@ -1069,6 +1069,111 @@ impl TaskExporter {
 // Tests
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Extended TaskQueue and TaskResult methods
+// ---------------------------------------------------------------------------
+
+impl TaskQueue {
+    /// Remove and return all tasks (regardless of status), draining the queue.
+    pub fn drain(&mut self) -> Vec<QueuedTask> {
+        self.tasks.drain(..).collect()
+    }
+
+    /// Find a task by its id without removing it.
+    pub fn find(&self, id: &str) -> Option<&QueuedTask> {
+        self.tasks.iter().find(|t| t.id == id)
+    }
+
+    /// Cancel all pending tasks. Returns the number of tasks cancelled.
+    pub fn cancel_all(&mut self) -> usize {
+        let mut count = 0;
+        for task in &mut self.tasks {
+            if task.status == TaskRunStatus::Pending {
+                task.status = TaskRunStatus::Cancelled;
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Return the set of distinct priorities present among pending tasks,
+    /// ordered highest to lowest.
+    pub fn priorities(&self) -> Vec<TaskPriority> {
+        let mut prios: Vec<TaskPriority> = self
+            .tasks
+            .iter()
+            .filter(|t| t.status == TaskRunStatus::Pending)
+            .map(|t| t.priority)
+            .collect();
+        prios.sort_by(|a, b| b.cmp(a));
+        prios.dedup();
+        prios
+    }
+
+    /// Re-queue a terminal task by resetting its status to Pending.
+    ///
+    /// Returns an error if the task is not found or is not in a terminal state.
+    pub fn requeue(&mut self, id: &str) -> Result<(), TaskError> {
+        let entry = self
+            .tasks
+            .iter_mut()
+            .find(|t| t.id == id)
+            .ok_or_else(|| TaskError::NotFound(id.to_string()))?;
+        if !entry.status.is_terminal() {
+            return Err(TaskError::InvalidConfig(format!(
+                "task '{}' is not in a terminal state ({})",
+                id, entry.status
+            )));
+        }
+        entry.status = TaskRunStatus::Pending;
+        entry.sequence = self.next_seq;
+        self.next_seq += 1;
+        Ok(())
+    }
+
+    /// Sort internal tasks by priority (highest first), preserving FIFO
+    /// within each priority level.
+    pub fn sort_by_priority(&mut self) {
+        self.tasks
+            .sort_by(|a, b| b.priority.cmp(&a.priority).then(a.sequence.cmp(&b.sequence)));
+    }
+
+    /// Count the number of tasks with a given status.
+    pub fn count_by_status(&self, status: TaskRunStatus) -> usize {
+        self.tasks.iter().filter(|t| t.status == status).count()
+    }
+}
+
+impl TaskResult {
+    /// Merge two results, combining stdout/stderr and summing duration.
+    ///
+    /// The exit code is the first non-zero exit code, or 0 if both succeeded.
+    /// Status is `Completed` only if both are successful.
+    pub fn merge(&self, other: &TaskResult) -> TaskResult {
+        let exit_code = if self.exit_code != 0 {
+            self.exit_code
+        } else {
+            other.exit_code
+        };
+        let stdout = if self.stdout.is_empty() {
+            other.stdout.clone()
+        } else if other.stdout.is_empty() {
+            self.stdout.clone()
+        } else {
+            format!("{}\n{}", self.stdout, other.stdout)
+        };
+        let stderr = if self.stderr.is_empty() {
+            other.stderr.clone()
+        } else if other.stderr.is_empty() {
+            self.stderr.clone()
+        } else {
+            format!("{}\n{}", self.stderr, other.stderr)
+        };
+        let duration_ms = self.duration_ms + other.duration_ms;
+        TaskResult::new(exit_code, stdout, stderr, duration_ms)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1639,5 +1744,109 @@ mod tests {
         assert_eq!(json["version"], "2.0.0");
         assert!(json["tasks"].is_array());
         assert_eq!(json["tasks"][0]["label"], "build release");
+    }
+
+    // -- New functionality tests --
+
+    #[test]
+    fn task_queue_drain() {
+        let mut q = TaskQueue::new();
+        q.enqueue("a", "Task A", TaskPriority::Normal);
+        q.enqueue("b", "Task B", TaskPriority::High);
+        let all = q.drain();
+        assert_eq!(all.len(), 2);
+        assert!(q.is_empty());
+    }
+
+    #[test]
+    fn task_queue_find() {
+        let mut q = TaskQueue::new();
+        q.enqueue("build", "Build Project", TaskPriority::Normal);
+        assert!(q.find("build").is_some());
+        assert_eq!(q.find("build").unwrap().label, "Build Project");
+        assert!(q.find("missing").is_none());
+    }
+
+    #[test]
+    fn task_queue_cancel_all() {
+        let mut q = TaskQueue::new();
+        q.enqueue("a", "A", TaskPriority::Low);
+        q.enqueue("b", "B", TaskPriority::High);
+        q.enqueue("c", "C", TaskPriority::Normal);
+        let count = q.cancel_all();
+        assert_eq!(count, 3);
+        assert_eq!(q.pending_tasks().len(), 0);
+    }
+
+    #[test]
+    fn task_queue_priorities() {
+        let mut q = TaskQueue::new();
+        q.enqueue("a", "A", TaskPriority::Low);
+        q.enqueue("b", "B", TaskPriority::Critical);
+        q.enqueue("c", "C", TaskPriority::Low);
+        let prios = q.priorities();
+        assert_eq!(prios, vec![TaskPriority::Critical, TaskPriority::Low]);
+    }
+
+    #[test]
+    fn task_result_merge_both_success() {
+        let r1 = TaskResult::new(0, "out1".into(), String::new(), 100);
+        let r2 = TaskResult::new(0, "out2".into(), String::new(), 200);
+        let merged = r1.merge(&r2);
+        assert_eq!(merged.exit_code, 0);
+        assert!(merged.is_success());
+        assert_eq!(merged.duration_ms, 300);
+        assert!(merged.stdout.contains("out1"));
+        assert!(merged.stdout.contains("out2"));
+    }
+
+    #[test]
+    fn task_result_merge_one_failed() {
+        let r1 = TaskResult::new(0, "ok".into(), String::new(), 50);
+        let r2 = TaskResult::new(1, String::new(), "error".into(), 50);
+        let merged = r1.merge(&r2);
+        assert_eq!(merged.exit_code, 1);
+        assert!(!merged.is_success());
+    }
+
+    #[test]
+    fn task_queue_requeue() {
+        let mut q = TaskQueue::new();
+        q.enqueue("a", "A", TaskPriority::Normal);
+        q.cancel("a").unwrap();
+        assert!(q.pending_tasks().is_empty());
+        q.requeue("a").unwrap();
+        assert_eq!(q.pending_tasks().len(), 1);
+    }
+
+    #[test]
+    fn task_queue_requeue_not_terminal_fails() {
+        let mut q = TaskQueue::new();
+        q.enqueue("a", "A", TaskPriority::Normal);
+        assert!(q.requeue("a").is_err());
+    }
+
+    #[test]
+    fn task_queue_sort_by_priority() {
+        let mut q = TaskQueue::new();
+        q.enqueue("a", "A", TaskPriority::Low);
+        q.enqueue("b", "B", TaskPriority::Critical);
+        q.enqueue("c", "C", TaskPriority::Normal);
+        q.sort_by_priority();
+        let all = q.drain();
+        assert_eq!(all[0].priority, TaskPriority::Critical);
+        assert_eq!(all[1].priority, TaskPriority::Normal);
+        assert_eq!(all[2].priority, TaskPriority::Low);
+    }
+
+    #[test]
+    fn task_queue_count_by_status() {
+        let mut q = TaskQueue::new();
+        q.enqueue("a", "A", TaskPriority::Normal);
+        q.enqueue("b", "B", TaskPriority::Normal);
+        q.enqueue("c", "C", TaskPriority::Normal);
+        q.cancel("b").unwrap();
+        assert_eq!(q.count_by_status(TaskRunStatus::Pending), 2);
+        assert_eq!(q.count_by_status(TaskRunStatus::Cancelled), 1);
     }
 }

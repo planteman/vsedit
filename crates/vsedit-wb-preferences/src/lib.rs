@@ -914,6 +914,92 @@ pub fn resolve_layered(key: &str, layers: &[&HashMap<String, String>], default: 
     default.to_string()
 }
 
+// ---------------------------------------------------------------------------
+// Extended PreferencesService methods
+// ---------------------------------------------------------------------------
+
+impl PreferencesService {
+    /// Validate all current overrides against the supplied rules map.
+    ///
+    /// Returns a list of `(key, error_message)` for every override that
+    /// fails validation.  Keys not present in the rules map are skipped.
+    pub fn validate(&self, rules: &HashMap<String, Vec<ValidationRule>>) -> Vec<(String, String)> {
+        let mut errors = Vec::new();
+        for (key, value) in &self.overrides {
+            if let Some(key_rules) = rules.get(key) {
+                for rule in key_rules {
+                    if let Err(msg) = rule.validate(value) {
+                        errors.push((key.clone(), msg));
+                    }
+                }
+            }
+        }
+        errors
+    }
+
+    /// Bulk-set multiple overrides at once.
+    ///
+    /// Returns the number of overrides actually written (including updates).
+    pub fn bulk_set(&mut self, pairs: &[(&str, &str)]) -> usize {
+        let mut count = 0;
+        for (key, value) in pairs {
+            self.overrides.insert((*key).to_string(), (*value).to_string());
+            count += 1;
+        }
+        count
+    }
+
+    /// Compute the diff between the current overrides and a previous snapshot.
+    ///
+    /// Returns `(added, changed, removed)` key lists.
+    pub fn diff(
+        &self,
+        previous: &HashMap<String, String>,
+    ) -> (Vec<String>, Vec<String>, Vec<String>) {
+        let mut added = Vec::new();
+        let mut changed = Vec::new();
+        let mut removed = Vec::new();
+
+        for (key, val) in &self.overrides {
+            match previous.get(key) {
+                Some(old_val) if old_val != val => changed.push(key.clone()),
+                None => added.push(key.clone()),
+                _ => {}
+            }
+        }
+        for key in previous.keys() {
+            if !self.overrides.contains_key(key) {
+                removed.push(key.clone());
+            }
+        }
+        (added, changed, removed)
+    }
+
+    /// Snapshot the current overrides as an owned map.
+    pub fn snapshot_overrides(&self) -> HashMap<String, String> {
+        self.overrides.clone()
+    }
+}
+
+impl PreferenceDescriptor {
+    /// Returns `true` if this descriptor matches the given scope.
+    pub fn matches_scope(&self, scope: PreferenceScope) -> bool {
+        self.scope == scope
+    }
+
+    /// Returns `true` if the key starts with the given prefix.
+    pub fn has_prefix(&self, prefix: &str) -> bool {
+        self.key.starts_with(prefix)
+    }
+}
+
+impl PreferenceScope {
+    /// Returns `true` for scopes that are file-specific.
+    pub fn is_resource_level(&self) -> bool {
+        matches!(self, PreferenceScope::Resource | PreferenceScope::Language)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1638,5 +1724,98 @@ mod tests {
         assert_eq!(result, "light");
         let result_missing = resolve_layered("font", &[&global, &workspace], "monospace");
         assert_eq!(result_missing, "monospace");
+    }
+
+    // -- New functionality tests --
+
+    #[test]
+    fn validate_overrides_catches_errors() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("editor.fontSize", "14", PreferenceScope::Window));
+        svc.set_override("editor.fontSize", "abc");
+        let mut rules = HashMap::new();
+        rules.insert(
+            "editor.fontSize".to_string(),
+            vec![ValidationRule::NumericRange(8.0, 72.0)],
+        );
+        let errors = svc.validate(&rules);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].0, "editor.fontSize");
+    }
+
+    #[test]
+    fn validate_overrides_passes() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("editor.fontSize", "14", PreferenceScope::Window));
+        svc.set_override("editor.fontSize", "16");
+        let mut rules = HashMap::new();
+        rules.insert(
+            "editor.fontSize".to_string(),
+            vec![ValidationRule::NumericRange(8.0, 72.0)],
+        );
+        let errors = svc.validate(&rules);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn bulk_set_overrides() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("a", "1", PreferenceScope::Window));
+        svc.register(desc("b", "2", PreferenceScope::Window));
+        let count = svc.bulk_set(&[("a", "10"), ("b", "20")]);
+        assert_eq!(count, 2);
+        assert_eq!(svc.get_value("a"), "10");
+        assert_eq!(svc.get_value("b"), "20");
+    }
+
+    #[test]
+    fn diff_detects_changes() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("a", "1", PreferenceScope::Window));
+        svc.register(desc("b", "2", PreferenceScope::Window));
+        svc.set_override("a", "10");
+        let prev = svc.snapshot_overrides();
+
+        svc.set_override("a", "99"); // changed
+        svc.set_override("b", "20"); // added
+        let (added, changed, removed) = svc.diff(&prev);
+        assert!(added.contains(&"b".to_string()));
+        assert!(changed.contains(&"a".to_string()));
+        assert!(removed.is_empty());
+    }
+
+    #[test]
+    fn diff_detects_removed() {
+        let mut svc = PreferencesService::new();
+        svc.register(desc("x", "0", PreferenceScope::Window));
+        svc.set_override("x", "1");
+        let prev = svc.snapshot_overrides();
+        svc.reset("x");
+        let (added, changed, removed) = svc.diff(&prev);
+        assert!(added.is_empty());
+        assert!(changed.is_empty());
+        assert!(removed.contains(&"x".to_string()));
+    }
+
+    #[test]
+    fn descriptor_matches_scope() {
+        let d = desc("a", "1", PreferenceScope::Window);
+        assert!(d.matches_scope(PreferenceScope::Window));
+        assert!(!d.matches_scope(PreferenceScope::Machine));
+    }
+
+    #[test]
+    fn descriptor_has_prefix() {
+        let d = desc("editor.fontSize", "14", PreferenceScope::Window);
+        assert!(d.has_prefix("editor."));
+        assert!(!d.has_prefix("terminal."));
+    }
+
+    #[test]
+    fn scope_is_resource_level() {
+        assert!(PreferenceScope::Resource.is_resource_level());
+        assert!(PreferenceScope::Language.is_resource_level());
+        assert!(!PreferenceScope::Window.is_resource_level());
+        assert!(!PreferenceScope::Application.is_resource_level());
     }
 }

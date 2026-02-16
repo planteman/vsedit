@@ -1142,6 +1142,162 @@ impl std::fmt::Display for TableOfContents {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Extended Markdown methods
+// ---------------------------------------------------------------------------
+
+/// Escape special Markdown characters in a plain-text string.
+///
+/// Characters escaped: `\`, `` ` ``, `*`, `_`, `{`, `}`, `[`, `]`, `(`, `)`,
+/// `#`, `+`, `-`, `.`, `!`, `|`.
+pub fn escape_markdown(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        if "\\`*_{}[]()#+-.!|".contains(ch) {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out
+}
+
+/// Remove backslash escapes from a Markdown string.
+///
+/// A backslash followed by a special character is replaced with just the
+/// character.
+pub fn unescape_markdown(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+    while i < len {
+        if chars[i] == '\\' && i + 1 < len && "\\`*_{}[]()#+-.!|".contains(chars[i + 1]) {
+            out.push(chars[i + 1]);
+            i += 2;
+        } else {
+            out.push(chars[i]);
+            i += 1;
+        }
+    }
+    out
+}
+
+impl MarkdownConfig {
+    /// Create a config with hard line breaks enabled.
+    pub fn with_hard_breaks() -> Self {
+        Self {
+            hard_line_breaks: true,
+            smart_quotes: false,
+        }
+    }
+
+    /// Create a config with smart quotes enabled.
+    pub fn with_smart_quotes() -> Self {
+        Self {
+            hard_line_breaks: false,
+            smart_quotes: true,
+        }
+    }
+
+    /// Return a config with both features enabled.
+    pub fn all_features() -> Self {
+        Self {
+            hard_line_breaks: true,
+            smart_quotes: true,
+        }
+    }
+
+    /// Returns `true` if no features are enabled.
+    pub fn is_default(&self) -> bool {
+        !self.hard_line_breaks && !self.smart_quotes
+    }
+}
+
+impl MarkdownTable {
+    /// Add a data row. Returns `Err` if the row length doesn't match the
+    /// header count.
+    pub fn add_row(&mut self, row: Vec<String>) -> Result<(), String> {
+        if row.len() != self.headers.len() {
+            return Err(format!(
+                "expected {} columns, got {}",
+                self.headers.len(),
+                row.len()
+            ));
+        }
+        self.rows.push(row);
+        Ok(())
+    }
+
+    /// Remove the data row at `index`. Returns the removed row, or `None` if
+    /// out of bounds.
+    pub fn remove_row(&mut self, index: usize) -> Option<Vec<String>> {
+        if index < self.rows.len() {
+            Some(self.rows.remove(index))
+        } else {
+            None
+        }
+    }
+
+    /// Render the table with columns padded to uniform widths.
+    pub fn render_aligned(&self) -> String {
+        let col_count = self.headers.len();
+        let mut widths = vec![0usize; col_count];
+        for (i, h) in self.headers.iter().enumerate() {
+            widths[i] = widths[i].max(h.len());
+        }
+        for row in &self.rows {
+            for (i, cell) in row.iter().enumerate() {
+                if i < col_count {
+                    widths[i] = widths[i].max(cell.len());
+                }
+            }
+        }
+        let mut out = String::new();
+        // Header
+        out.push_str("| ");
+        for (i, h) in self.headers.iter().enumerate() {
+            out.push_str(&format!("{:<width$}", h, width = widths[i]));
+            if i + 1 < col_count {
+                out.push_str(" | ");
+            }
+        }
+        out.push_str(" |\n| ");
+        // Separator
+        for (i, &w) in widths.iter().enumerate() {
+            out.push_str(&"-".repeat(w));
+            if i + 1 < col_count {
+                out.push_str(" | ");
+            }
+        }
+        out.push_str(" |\n");
+        // Data rows
+        for row in &self.rows {
+            out.push_str("| ");
+            for (i, cell) in row.iter().enumerate() {
+                let w = if i < col_count { widths[i] } else { cell.len() };
+                out.push_str(&format!("{:<width$}", cell, width = w));
+                if i + 1 < col_count {
+                    out.push_str(" | ");
+                }
+            }
+            out.push_str(" |\n");
+        }
+        out
+    }
+}
+
+impl MarkdownStats {
+    /// Total non-text tokens (headings + links + code_blocks + list_items).
+    pub fn structural_count(&self) -> usize {
+        self.headings + self.links + self.code_blocks + self.list_items
+    }
+
+    /// Returns `true` if there are no tokens at all.
+    pub fn is_empty(&self) -> bool {
+        self.total_tokens == 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1639,5 +1795,111 @@ mod tests {
         let entry = TocEntry { level: 3, title: "Sub-section".into() };
         let s = format!("{entry}");
         assert!(s.contains("    - Sub-section"));
+    }
+
+    // -- New functionality tests --
+
+    #[test]
+    fn escape_markdown_special_chars() {
+        let escaped = escape_markdown("Hello *world* [link](url)");
+        assert!(escaped.contains("\\*"));
+        assert!(escaped.contains("\\["));
+        assert!(escaped.contains("\\]"));
+        assert!(escaped.contains("\\("));
+    }
+
+    #[test]
+    fn unescape_markdown_roundtrip() {
+        let original = "Hello *bold* and `code`";
+        let escaped = escape_markdown(original);
+        let unescaped = unescape_markdown(&escaped);
+        assert_eq!(unescaped, original);
+    }
+
+    #[test]
+    fn unescape_markdown_plain_backslash() {
+        let result = unescape_markdown("no special \\x here");
+        assert_eq!(result, "no special \\x here");
+    }
+
+    #[test]
+    fn markdown_config_with_hard_breaks() {
+        let cfg = MarkdownConfig::with_hard_breaks();
+        assert!(cfg.hard_line_breaks);
+        assert!(!cfg.smart_quotes);
+    }
+
+    #[test]
+    fn markdown_config_is_default() {
+        assert!(MarkdownConfig::default().is_default());
+        assert!(!MarkdownConfig::all_features().is_default());
+    }
+
+    #[test]
+    fn table_add_row_ok() {
+        let mut table = MarkdownTable {
+            headers: vec!["A".into(), "B".into()],
+            rows: vec![],
+        };
+        assert!(table.add_row(vec!["1".into(), "2".into()]).is_ok());
+        assert_eq!(table.row_count(), 1);
+    }
+
+    #[test]
+    fn table_add_row_wrong_columns() {
+        let mut table = MarkdownTable {
+            headers: vec!["A".into(), "B".into()],
+            rows: vec![],
+        };
+        assert!(table.add_row(vec!["1".into()]).is_err());
+    }
+
+    #[test]
+    fn table_remove_row() {
+        let mut table = MarkdownTable {
+            headers: vec!["A".into()],
+            rows: vec![vec!["1".into()], vec!["2".into()], vec!["3".into()]],
+        };
+        let removed = table.remove_row(1);
+        assert_eq!(removed, Some(vec!["2".into()]));
+        assert_eq!(table.row_count(), 2);
+        assert!(table.remove_row(99).is_none());
+    }
+
+    #[test]
+    fn table_render_aligned() {
+        let table = MarkdownTable {
+            headers: vec!["Name".into(), "Age".into()],
+            rows: vec![
+                vec!["Alice".into(), "30".into()],
+                vec!["Bob".into(), "25".into()],
+            ],
+        };
+        let rendered = table.render_aligned();
+        assert!(rendered.contains("Alice"));
+        assert!(rendered.contains("---"));
+        // Headers and data should be present
+        assert!(rendered.lines().count() >= 4);
+    }
+
+    #[test]
+    fn markdown_stats_structural_count() {
+        let stats = MarkdownStats {
+            headings: 2,
+            links: 3,
+            code_blocks: 1,
+            list_items: 4,
+            paragraphs: 5,
+            total_tokens: 15,
+        };
+        assert_eq!(stats.structural_count(), 10);
+        assert!(!stats.is_empty());
+    }
+
+    #[test]
+    fn markdown_stats_empty() {
+        let stats = MarkdownStats::default();
+        assert!(stats.is_empty());
+        assert_eq!(stats.structural_count(), 0);
     }
 }

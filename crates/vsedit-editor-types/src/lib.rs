@@ -896,6 +896,119 @@ pub fn range_intersection(a: &Range, b: &Range) -> Option<Range> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Extended Position, Range, Selection methods
+// ---------------------------------------------------------------------------
+
+impl Position {
+    /// Clamp this position so it falls within the bounds of a document
+    /// with the given line count and maximum column per line.
+    ///
+    /// Both `max_line` and `max_column` are inclusive upper bounds.
+    pub fn clamp_to_bounds(&self, max_line: u32, max_column: u32) -> Position {
+        let line = self.line.clamp(1, max_line.max(1));
+        let column = self.column.clamp(1, max_column.max(1));
+        Position { line, column }
+    }
+
+    /// Compute the Manhattan distance between two positions.
+    ///
+    /// This is the sum of the absolute differences of their line and column
+    /// coordinates: `|a.line - b.line| + |a.column - b.column|`.
+    pub fn manhattan_distance(&self, other: &Position) -> u32 {
+        self.line.abs_diff(other.line) + self.column.abs_diff(other.column)
+    }
+}
+
+impl Range {
+    /// Shift the entire range by `line_delta` lines and `column_delta` columns
+    /// without changing its size.
+    ///
+    /// This is equivalent to translating both start and end by the same delta,
+    /// but differs from `translate` only in name to distinguish intent: shift
+    /// preserves shape whereas translate may clamp independently.
+    pub fn shift(&self, line_delta: i32, column_delta: i32) -> Range {
+        Range {
+            start: self.start.translate(line_delta, column_delta),
+            end: self.end.translate(line_delta, column_delta),
+        }
+    }
+
+    /// Returns `true` if this range overlaps (touches) the given 1-based line number.
+    pub fn overlaps_line(&self, line: u32) -> bool {
+        self.start.line <= line && line <= self.end.line
+    }
+
+    /// Decompose a multi-line range into a vector of single-line ranges.
+    ///
+    /// Each returned range covers one line from column 1 to
+    /// `columns_per_line`, except the first and last lines which preserve the
+    /// original start/end columns.  `columns_per_line` is used as the end
+    /// column for intermediate lines.
+    pub fn to_single_line_ranges(&self, columns_per_line: u32) -> Vec<Range> {
+        if self.is_empty() {
+            return vec![*self];
+        }
+        let mut result = Vec::new();
+        for line in self.start.line..=self.end.line {
+            let start_col = if line == self.start.line { self.start.column } else { 1 };
+            let end_col = if line == self.end.line { self.end.column } else { columns_per_line };
+            result.push(Range {
+                start: Position::new(line, start_col),
+                end: Position::new(line, end_col),
+            });
+        }
+        result
+    }
+}
+
+impl Selection {
+    /// Swap the anchor and active positions, reversing the direction.
+    pub fn swap_anchor(&self) -> Selection {
+        Selection {
+            anchor: self.active,
+            active: self.anchor,
+        }
+    }
+
+    /// Collapse the selection so both anchor and active are at the start
+    /// of the current range.
+    pub fn collapse_to_start(&self) -> Selection {
+        let range = self.as_range();
+        Selection {
+            anchor: range.start,
+            active: range.start,
+        }
+    }
+
+    /// Collapse the selection so both anchor and active are at the end
+    /// of the current range.
+    pub fn collapse_to_end(&self) -> Selection {
+        let range = self.as_range();
+        Selection {
+            anchor: range.end,
+            active: range.end,
+        }
+    }
+
+    /// Returns `true` if the selection spans more than one line.
+    pub fn is_multi_line(&self) -> bool {
+        self.as_range().start.line != self.as_range().end.line
+    }
+
+    /// Extend the selection so it covers entire lines.
+    pub fn extend_to_full_lines(&self, max_column: u32) -> Selection {
+        let range = self.as_range();
+        let start = Position::new(range.start.line, 1);
+        let end = Position::new(range.end.line, max_column);
+        if self.is_reversed() {
+            Selection { anchor: end, active: start }
+        } else {
+            Selection { anchor: start, active: end }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1638,5 +1751,120 @@ mod tests {
         let b = Range::new(3, 1, 4, 1);
         assert!(!a.touches(&b));
         assert!(a.merge(&b).is_none());
+    }
+
+    // -- New functionality tests --
+
+    #[test]
+    fn position_clamp_within_bounds() {
+        let p = Position::new(5, 10);
+        let clamped = p.clamp_to_bounds(100, 80);
+        assert_eq!(clamped, Position::new(5, 10));
+    }
+
+    #[test]
+    fn position_clamp_exceeds_bounds() {
+        let p = Position::new(200, 50);
+        let clamped = p.clamp_to_bounds(100, 20);
+        assert_eq!(clamped, Position::new(100, 20));
+    }
+
+    #[test]
+    fn position_manhattan_distance_same() {
+        let a = Position::new(3, 7);
+        assert_eq!(a.manhattan_distance(&a), 0);
+    }
+
+    #[test]
+    fn position_manhattan_distance_different() {
+        let a = Position::new(1, 1);
+        let b = Position::new(4, 6);
+        assert_eq!(a.manhattan_distance(&b), 8); // 3 + 5
+    }
+
+    #[test]
+    fn range_shift_positive() {
+        let r = Range::new(1, 1, 1, 10);
+        let shifted = r.shift(5, 3);
+        assert_eq!(shifted.start, Position::new(6, 4));
+        assert_eq!(shifted.end, Position::new(6, 13));
+    }
+
+    #[test]
+    fn range_overlaps_line_true() {
+        let r = Range::new(2, 1, 5, 10);
+        assert!(r.overlaps_line(3));
+        assert!(r.overlaps_line(2));
+        assert!(r.overlaps_line(5));
+    }
+
+    #[test]
+    fn range_overlaps_line_false() {
+        let r = Range::new(2, 1, 5, 10);
+        assert!(!r.overlaps_line(1));
+        assert!(!r.overlaps_line(6));
+    }
+
+    #[test]
+    fn range_to_single_line_ranges_single() {
+        let r = Range::new(3, 5, 3, 15);
+        let lines = r.to_single_line_ranges(80);
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0], r);
+    }
+
+    #[test]
+    fn range_to_single_line_ranges_multi() {
+        let r = Range::new(1, 5, 3, 10);
+        let lines = r.to_single_line_ranges(80);
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines[0].start, Position::new(1, 5));
+        assert_eq!(lines[0].end, Position::new(1, 80));
+        assert_eq!(lines[1].start, Position::new(2, 1));
+        assert_eq!(lines[1].end, Position::new(2, 80));
+        assert_eq!(lines[2].start, Position::new(3, 1));
+        assert_eq!(lines[2].end, Position::new(3, 10));
+    }
+
+    #[test]
+    fn selection_swap_anchor() {
+        let sel = Selection::new(1, 1, 3, 5);
+        let swapped = sel.swap_anchor();
+        assert_eq!(swapped.anchor, Position::new(3, 5));
+        assert_eq!(swapped.active, Position::new(1, 1));
+    }
+
+    #[test]
+    fn selection_collapse_to_start() {
+        let sel = Selection::new(5, 10, 1, 1);
+        let collapsed = sel.collapse_to_start();
+        assert_eq!(collapsed.anchor, Position::new(1, 1));
+        assert_eq!(collapsed.active, Position::new(1, 1));
+        assert!(collapsed.is_empty_selection());
+    }
+
+    #[test]
+    fn selection_collapse_to_end() {
+        let sel = Selection::new(1, 1, 5, 10);
+        let collapsed = sel.collapse_to_end();
+        assert_eq!(collapsed.anchor, Position::new(5, 10));
+        assert_eq!(collapsed.active, Position::new(5, 10));
+        assert!(collapsed.is_empty_selection());
+    }
+
+    #[test]
+    fn selection_is_multi_line() {
+        let single = Selection::new(1, 1, 1, 10);
+        assert!(!single.is_multi_line());
+        let multi = Selection::new(1, 1, 3, 5);
+        assert!(multi.is_multi_line());
+    }
+
+    #[test]
+    fn selection_extend_to_full_lines() {
+        let sel = Selection::new(2, 5, 4, 10);
+        let extended = sel.extend_to_full_lines(80);
+        assert_eq!(extended.anchor, Position::new(2, 1));
+        assert_eq!(extended.active, Position::new(4, 80));
     }
 }

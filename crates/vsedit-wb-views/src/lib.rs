@@ -1038,6 +1038,87 @@ impl Default for ViewLayoutConstraint {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Extended ViewsRegistry methods
+// ---------------------------------------------------------------------------
+
+impl ViewsRegistry {
+    /// Unregister a view by id, returning the removed descriptor if found.
+    pub fn unregister_view(&mut self, id: &str) -> Option<ViewDescriptor> {
+        let pos = self.views.iter().position(|v| v.id == id)?;
+        let removed = self.views.remove(pos);
+        self.on_did_change.fire(&());
+        Some(removed)
+    }
+
+    /// Move a view to a new position (order) within its current container.
+    ///
+    /// Returns `false` if the view was not found.
+    pub fn move_view(&mut self, view_id: &str, new_order: i32) -> bool {
+        if let Some(view) = self.views.iter_mut().find(|v| v.id == view_id) {
+            view.order = new_order;
+            self.on_did_change.fire(&());
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Find views whose name contains the given substring (case-insensitive).
+    pub fn find_view_by_name(&self, needle: &str) -> Vec<&ViewDescriptor> {
+        let lower = needle.to_lowercase();
+        self.views
+            .iter()
+            .filter(|v| v.name.to_lowercase().contains(&lower))
+            .collect()
+    }
+
+    /// Return the number of containers at a given location.
+    pub fn container_count_at(&self, location: ViewContainerLocation) -> usize {
+        self.containers
+            .iter()
+            .filter(|c| c.location == location)
+            .count()
+    }
+
+    /// Return all views sorted by their name alphabetically.
+    pub fn views_sorted_by_name(&self) -> Vec<&ViewDescriptor> {
+        let mut sorted: Vec<&ViewDescriptor> = self.views.iter().collect();
+        sorted.sort_by(|a, b| a.name.cmp(&b.name));
+        sorted
+    }
+}
+
+impl ViewVisibility {
+    /// Set all tracked views to visible.
+    pub fn show_all(&mut self) {
+        for val in self.visibility.values_mut() {
+            *val = true;
+        }
+    }
+
+    /// Set all tracked views to hidden.
+    pub fn hide_all(&mut self) {
+        for val in self.visibility.values_mut() {
+            *val = false;
+        }
+    }
+
+    /// Return the total number of tracked view entries.
+    pub fn tracked_count(&self) -> usize {
+        self.visibility.len()
+    }
+}
+
+impl ViewDescriptor {
+    /// Compare two view descriptors by order, breaking ties alphabetically by name.
+    pub fn cmp_by_order_then_name(&self, other: &ViewDescriptor) -> std::cmp::Ordering {
+        self.order
+            .cmp(&other.order)
+            .then_with(|| self.name.cmp(&other.name))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1638,5 +1719,103 @@ mod tests {
         assert!(!c.satisfies(5, 100));
         assert!(!c.satisfies(100, 5));
         assert!(!c.satisfies(201, 100));
+    }
+
+    // -- New functionality tests --
+
+    #[test]
+    fn unregister_view_returns_descriptor() {
+        let mut reg = ViewsRegistry::new();
+        reg.register_container(make_container("c1", ViewContainerLocation::Sidebar, 0));
+        reg.register_view(make_view("v1", "c1", 0));
+        reg.register_view(make_view("v2", "c1", 1));
+        let removed = reg.unregister_view("v1");
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().id, "v1");
+        assert_eq!(reg.view_count(), 1);
+    }
+
+    #[test]
+    fn unregister_view_not_found() {
+        let mut reg = ViewsRegistry::new();
+        assert!(reg.unregister_view("missing").is_none());
+    }
+
+    #[test]
+    fn move_view_changes_order() {
+        let mut reg = ViewsRegistry::new();
+        reg.register_container(make_container("c1", ViewContainerLocation::Sidebar, 0));
+        reg.register_view(make_view("v1", "c1", 0));
+        assert!(reg.move_view("v1", 10));
+        assert_eq!(reg.get_view("v1").unwrap().order, 10);
+    }
+
+    #[test]
+    fn find_view_by_name_case_insensitive() {
+        let mut reg = ViewsRegistry::new();
+        reg.register_container(make_container("c1", ViewContainerLocation::Sidebar, 0));
+        let mut v = make_view("v1", "c1", 0);
+        v.name = "File Explorer".into();
+        reg.register_view(v);
+        let results = reg.find_view_by_name("explorer");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "v1");
+    }
+
+    #[test]
+    fn container_count_at_location() {
+        let mut reg = ViewsRegistry::new();
+        reg.register_container(make_container("c1", ViewContainerLocation::Sidebar, 0));
+        reg.register_container(make_container("c2", ViewContainerLocation::Sidebar, 1));
+        reg.register_container(make_container("c3", ViewContainerLocation::Panel, 0));
+        assert_eq!(reg.container_count_at(ViewContainerLocation::Sidebar), 2);
+        assert_eq!(reg.container_count_at(ViewContainerLocation::Panel), 1);
+        assert_eq!(reg.container_count_at(ViewContainerLocation::AuxiliaryBar), 0);
+    }
+
+    #[test]
+    fn views_sorted_by_name() {
+        let mut reg = ViewsRegistry::new();
+        reg.register_container(make_container("c1", ViewContainerLocation::Sidebar, 0));
+        let mut va = make_view("va", "c1", 1);
+        va.name = "Zzz".into();
+        let mut vb = make_view("vb", "c1", 0);
+        vb.name = "Aaa".into();
+        reg.register_view(va);
+        reg.register_view(vb);
+        let sorted = reg.views_sorted_by_name();
+        assert_eq!(sorted[0].name, "Aaa");
+        assert_eq!(sorted[1].name, "Zzz");
+    }
+
+    #[test]
+    fn visibility_show_all() {
+        let mut vis = ViewVisibility::new();
+        vis.set_visible("a", false);
+        vis.set_visible("b", false);
+        vis.set_visible("c", true);
+        vis.show_all();
+        assert!(vis.is_visible("a"));
+        assert!(vis.is_visible("b"));
+        assert!(vis.is_visible("c"));
+    }
+
+    #[test]
+    fn visibility_hide_all() {
+        let mut vis = ViewVisibility::new();
+        vis.set_visible("a", true);
+        vis.set_visible("b", true);
+        vis.hide_all();
+        assert!(!vis.is_visible("a"));
+        assert!(!vis.is_visible("b"));
+    }
+
+    #[test]
+    fn view_descriptor_cmp_by_order_then_name() {
+        let v1 = ViewDescriptor::new("a", "Beta", "c1").with_order(1);
+        let v2 = ViewDescriptor::new("b", "Alpha", "c1").with_order(1);
+        let v3 = ViewDescriptor::new("c", "Gamma", "c1").with_order(0);
+        assert_eq!(v3.cmp_by_order_then_name(&v1), std::cmp::Ordering::Less);
+        assert_eq!(v2.cmp_by_order_then_name(&v1), std::cmp::Ordering::Less);
     }
 }

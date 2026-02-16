@@ -945,6 +945,106 @@ impl Default for BackupVerifier {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Extended BackupService methods
+// ---------------------------------------------------------------------------
+
+impl BackupPolicy {
+    /// Validate the policy settings, returning errors for any invalid values.
+    pub fn validate(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        if self.max_backups_per_file == 0 {
+            errors.push("max_backups_per_file must be at least 1".to_string());
+        }
+        if self.max_total_size == 0 {
+            errors.push("max_total_size must be at least 1 byte".to_string());
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+
+impl BackupEntry {
+    /// Compute the age of this backup in seconds relative to `now`.
+    ///
+    /// If `now` is less than the entry's timestamp, returns 0.
+    pub fn age_seconds(&self, now: u64) -> u64 {
+        now.saturating_sub(self.timestamp)
+    }
+
+    /// Returns `true` if this entry backs up the same original file as `other`.
+    pub fn same_file(&self, other: &BackupEntry) -> bool {
+        self.original_path == other.original_path
+    }
+}
+
+impl BackupService {
+    /// Return aggregate stats for the service.
+    pub fn stats(&self) -> BackupStats {
+        self.get_backup_stats()
+    }
+
+    /// Remove all backup entries, returning the count of entries purged.
+    pub fn purge_all(&mut self) -> usize {
+        let count = self.entries.len();
+        self.entries.clear();
+        count
+    }
+
+    /// Find all backups whose timestamp falls within `[start, end]` (inclusive).
+    pub fn find_by_timestamp(&self, start: u64, end: u64) -> Vec<&BackupEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.timestamp >= start && e.timestamp <= end)
+            .collect()
+    }
+
+    /// Remove duplicate backups for the same original file that have identical sizes,
+    /// keeping only the most recent one.  Returns the number of entries removed.
+    pub fn deduplicate(&mut self) -> usize {
+        let mut seen: std::collections::HashMap<(&str, u64), u64> = std::collections::HashMap::new();
+        // First pass: find the newest timestamp for each (path, size) pair.
+        for entry in &self.entries {
+            let key = (entry.original_path.as_str(), entry.size);
+            let ts = seen.entry(key).or_insert(0);
+            if entry.timestamp > *ts {
+                *ts = entry.timestamp;
+            }
+        }
+        // Collect the best timestamps keyed by (path_owned, size).
+        let best: std::collections::HashMap<(String, u64), u64> = seen
+            .into_iter()
+            .map(|((p, s), ts)| ((p.to_string(), s), ts))
+            .collect();
+        let before = self.entries.len();
+        self.entries.retain(|e| {
+            best.get(&(e.original_path.clone(), e.size))
+                .map_or(true, |&ts| e.timestamp == ts)
+        });
+        before - self.entries.len()
+    }
+
+    /// Count backups for a specific file.
+    pub fn count_for_file(&self, path: &str) -> usize {
+        self.entries.iter().filter(|e| e.original_path == path).count()
+    }
+
+    /// Return distinct original paths that have backups.
+    pub fn backed_up_files(&self) -> Vec<&str> {
+        let mut paths: Vec<&str> = self
+            .entries
+            .iter()
+            .map(|e| e.original_path.as_str())
+            .collect();
+        paths.sort();
+        paths.dedup();
+        paths
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1639,5 +1739,105 @@ mod tests {
                 actual: 999
             }
         );
+    }
+
+    // -- New functionality tests --
+
+    #[test]
+    fn backup_policy_validate_ok() {
+        let policy = BackupPolicy::default();
+        assert!(policy.validate().is_ok());
+    }
+
+    #[test]
+    fn backup_policy_validate_zero_backups() {
+        let policy = BackupPolicy {
+            max_backups_per_file: 0,
+            max_total_size: 1024,
+            auto_prune: false,
+        };
+        let errs = policy.validate().unwrap_err();
+        assert_eq!(errs.len(), 1);
+        assert!(errs[0].contains("max_backups_per_file"));
+    }
+
+    #[test]
+    fn backup_entry_age_seconds() {
+        let entry = BackupEntry {
+            original_path: "/a.txt".into(),
+            backup_path: "/b/a.bak".into(),
+            timestamp: 100,
+            size: 10,
+        };
+        assert_eq!(entry.age_seconds(150), 50);
+        assert_eq!(entry.age_seconds(50), 0); // now before timestamp
+    }
+
+    #[test]
+    fn backup_service_purge_all() {
+        let mut svc = BackupService::new("/backups");
+        svc.create_backup("/a.txt", "hello");
+        svc.create_backup("/b.txt", "world");
+        assert_eq!(svc.purge_all(), 2);
+        assert!(svc.is_entries_empty());
+    }
+
+    #[test]
+    fn backup_service_find_by_timestamp() {
+        let mut svc = BackupService::new("/backups");
+        svc.create_backup("/a.txt", "v1"); // ts=1
+        svc.create_backup("/a.txt", "v2"); // ts=2
+        svc.create_backup("/a.txt", "v3"); // ts=3
+        let found = svc.find_by_timestamp(2, 3);
+        assert_eq!(found.len(), 2);
+    }
+
+    #[test]
+    fn backup_service_deduplicate() {
+        let mut svc = BackupService::new("/backups");
+        // Two backups of same file with same size => dedup keeps latest
+        svc.create_backup("/a.txt", "hello"); // ts=1, size=5
+        svc.create_backup("/a.txt", "hello"); // ts=2, size=5
+        svc.create_backup("/a.txt", "hello"); // ts=3, size=5
+        let removed = svc.deduplicate();
+        assert_eq!(removed, 2);
+        assert_eq!(svc.count_for_file("/a.txt"), 1);
+        assert_eq!(svc.list_backups("/a.txt")[0].timestamp, 3);
+    }
+
+    #[test]
+    fn backup_service_backed_up_files() {
+        let mut svc = BackupService::new("/backups");
+        svc.create_backup("/a.txt", "v1");
+        svc.create_backup("/b.txt", "v2");
+        svc.create_backup("/a.txt", "v3");
+        let files = svc.backed_up_files();
+        assert_eq!(files.len(), 2);
+        assert!(files.contains(&"/a.txt"));
+        assert!(files.contains(&"/b.txt"));
+    }
+
+    #[test]
+    fn backup_entry_same_file() {
+        let e1 = BackupEntry {
+            original_path: "/a.txt".into(),
+            backup_path: "/b/a.1.bak".into(),
+            timestamp: 1,
+            size: 10,
+        };
+        let e2 = BackupEntry {
+            original_path: "/a.txt".into(),
+            backup_path: "/b/a.2.bak".into(),
+            timestamp: 2,
+            size: 20,
+        };
+        let e3 = BackupEntry {
+            original_path: "/c.txt".into(),
+            backup_path: "/b/c.1.bak".into(),
+            timestamp: 3,
+            size: 10,
+        };
+        assert!(e1.same_file(&e2));
+        assert!(!e1.same_file(&e3));
     }
 }
