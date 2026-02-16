@@ -444,6 +444,200 @@ pub fn register() {
     // Registration will connect RPC handlers when extension host starts
 }
 
+// ── Reactions ──
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CommentReaction {
+    pub emoji: String,
+    pub count: u32,
+    pub reacted_by: Vec<String>,
+}
+
+impl CommentReaction {
+    pub fn new(emoji: impl Into<String>) -> Self {
+        Self {
+            emoji: emoji.into(),
+            count: 0,
+            reacted_by: Vec::new(),
+        }
+    }
+
+    pub fn add_reaction(&mut self, author: impl Into<String>) {
+        let author = author.into();
+        if !self.reacted_by.contains(&author) {
+            self.reacted_by.push(author);
+            self.count += 1;
+        }
+    }
+
+    pub fn remove_reaction(&mut self, author: &str) -> bool {
+        if let Some(pos) = self.reacted_by.iter().position(|a| a == author) {
+            self.reacted_by.remove(pos);
+            self.count -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn has_reacted(&self, author: &str) -> bool {
+        self.reacted_by.iter().any(|a| a == author)
+    }
+}
+
+// ── Markdown Rendering ──
+
+/// Basic markdown to plain-text rendering for display.
+pub fn comment_markdown_render(body: &str) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    for line in body.lines() {
+        let trimmed = line.trim_start();
+        // Blockquote
+        if trimmed.starts_with("> ") {
+            let rest = &trimmed[2..];
+            lines.push(format!("│ {rest}"));
+            continue;
+        }
+        // Heading
+        if trimmed.starts_with("# ") {
+            let rest = &trimmed[2..];
+            lines.push(rest.to_uppercase());
+            continue;
+        }
+        // Bullet lists
+        if trimmed.starts_with("- ") {
+            let rest = &trimmed[2..];
+            lines.push(format!("• {rest}"));
+            continue;
+        }
+        if trimmed.starts_with("* ") {
+            let rest = &trimmed[2..];
+            lines.push(format!("• {rest}"));
+            continue;
+        }
+        // Inline formatting
+        let mut s = line.to_string();
+        // Bold: **text** or __text__
+        while let Some(start) = s.find("**") {
+            if let Some(end) = s[start + 2..].find("**") {
+                let inner = s[start + 2..start + 2 + end].to_string();
+                s = format!("{}{}{}", &s[..start], inner, &s[start + 2 + end + 2..]);
+            } else {
+                break;
+            }
+        }
+        while let Some(start) = s.find("__") {
+            if let Some(end) = s[start + 2..].find("__") {
+                let inner = s[start + 2..start + 2 + end].to_string();
+                s = format!("{}{}{}", &s[..start], inner, &s[start + 2 + end + 2..]);
+            } else {
+                break;
+            }
+        }
+        // Italic: *text* or _text_
+        while let Some(start) = s.find('*') {
+            if let Some(end) = s[start + 1..].find('*') {
+                let inner = s[start + 1..start + 1 + end].to_string();
+                s = format!("{}{}{}", &s[..start], inner, &s[start + 1 + end + 1..]);
+            } else {
+                break;
+            }
+        }
+        while let Some(start) = s.find('_') {
+            if let Some(end) = s[start + 1..].find('_') {
+                let inner = s[start + 1..start + 1 + end].to_string();
+                s = format!("{}{}{}", &s[..start], inner, &s[start + 1 + end + 1..]);
+            } else {
+                break;
+            }
+        }
+        // Inline code: `code`
+        while let Some(start) = s.find('`') {
+            if let Some(end) = s[start + 1..].find('`') {
+                let inner = s[start + 1..start + 1 + end].to_string();
+                s = format!("{}{}{}", &s[..start], inner, &s[start + 1 + end + 1..]);
+            } else {
+                break;
+            }
+        }
+        // Links: [text](url)
+        while let Some(start) = s.find('[') {
+            if let Some(end_bracket) = s[start + 1..].find("](") {
+                let text = &s[start + 1..start + 1 + end_bracket];
+                let url_start = start + 1 + end_bracket + 2;
+                if let Some(end_paren) = s[url_start..].find(')') {
+                    let url = &s[url_start..url_start + end_paren];
+                    let replacement = format!("{text} ({url})");
+                    s = format!("{}{replacement}{}", &s[..start], &s[url_start + end_paren + 1..]);
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        lines.push(s);
+    }
+    lines.join("\n")
+}
+
+// ── Draft ──
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CommentDraft {
+    pub thread_id: Option<String>,
+    pub body: String,
+    pub author: String,
+    pub uri: Option<String>,
+    pub line: Option<u32>,
+    pub created_at: u64,
+}
+
+impl CommentDraft {
+    pub fn new(author: impl Into<String>) -> Self {
+        Self {
+            thread_id: None,
+            body: String::new(),
+            author: author.into(),
+            uri: None,
+            line: None,
+            created_at: 0,
+        }
+    }
+
+    pub fn with_body(mut self, body: impl Into<String>) -> Self {
+        self.body = body.into();
+        self
+    }
+
+    pub fn with_thread_id(mut self, id: impl Into<String>) -> Self {
+        self.thread_id = Some(id.into());
+        self
+    }
+
+    pub fn with_uri(mut self, uri: impl Into<String>) -> Self {
+        self.uri = Some(uri.into());
+        self
+    }
+
+    pub fn with_line(mut self, line: u32) -> Self {
+        self.line = Some(line);
+        self
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.body.is_empty()
+    }
+
+    pub fn to_comment(&self, id: impl Into<String>) -> Comment {
+        Comment::new(id, &self.body, &self.author)
+    }
+
+    pub fn is_reply(&self) -> bool {
+        self.thread_id.is_some()
+    }
+}
+
 /// Accumulated statistics for ext-comments operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtCommentsStats {
@@ -1003,5 +1197,114 @@ mod tests {
     fn ext_comments_is_ascii_printable() {
         assert!(ExtCommentsValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtCommentsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn test_reaction_new() {
+        let r = CommentReaction::new("👍");
+        assert_eq!(r.emoji, "👍");
+        assert_eq!(r.count, 0);
+        assert!(r.reacted_by.is_empty());
+    }
+
+    #[test]
+    fn test_reaction_add_remove() {
+        let mut r = CommentReaction::new("👍");
+        r.add_reaction("alice");
+        assert_eq!(r.count, 1);
+        assert!(r.remove_reaction("alice"));
+        assert_eq!(r.count, 0);
+        assert!(!r.remove_reaction("alice"));
+    }
+
+    #[test]
+    fn test_reaction_has_reacted() {
+        let mut r = CommentReaction::new("👍");
+        r.add_reaction("bob");
+        assert!(r.has_reacted("bob"));
+        assert!(!r.has_reacted("alice"));
+    }
+
+    #[test]
+    fn test_reaction_no_duplicate() {
+        let mut r = CommentReaction::new("👍");
+        r.add_reaction("alice");
+        r.add_reaction("alice");
+        assert_eq!(r.count, 1);
+        assert_eq!(r.reacted_by.len(), 1);
+    }
+
+    #[test]
+    fn test_markdown_bold() {
+        assert_eq!(comment_markdown_render("**bold**"), "bold");
+        assert_eq!(comment_markdown_render("__bold__"), "bold");
+    }
+
+    #[test]
+    fn test_markdown_italic() {
+        assert_eq!(comment_markdown_render("*italic*"), "italic");
+        assert_eq!(comment_markdown_render("_italic_"), "italic");
+    }
+
+    #[test]
+    fn test_markdown_code() {
+        assert_eq!(comment_markdown_render("`code`"), "code");
+    }
+
+    #[test]
+    fn test_markdown_heading() {
+        assert_eq!(comment_markdown_render("# Heading"), "HEADING");
+    }
+
+    #[test]
+    fn test_markdown_bullet() {
+        assert_eq!(comment_markdown_render("- item"), "• item");
+        assert_eq!(comment_markdown_render("* item"), "• item");
+    }
+
+    #[test]
+    fn test_markdown_link() {
+        assert_eq!(
+            comment_markdown_render("[text](https://example.com)"),
+            "text (https://example.com)"
+        );
+    }
+
+    #[test]
+    fn test_markdown_blockquote() {
+        assert_eq!(comment_markdown_render("> text"), "│ text");
+    }
+
+    #[test]
+    fn test_draft_new() {
+        let d = CommentDraft::new("alice");
+        assert_eq!(d.author, "alice");
+        assert!(d.body.is_empty());
+        assert!(d.thread_id.is_none());
+    }
+
+    #[test]
+    fn test_draft_to_comment() {
+        let d = CommentDraft::new("alice").with_body("hello");
+        let c = d.to_comment("c1");
+        assert_eq!(c.id, "c1");
+        assert_eq!(c.body, "hello");
+        assert_eq!(c.author.name, "alice");
+    }
+
+    #[test]
+    fn test_draft_is_reply() {
+        let d = CommentDraft::new("alice");
+        assert!(!d.is_reply());
+        let d = d.with_thread_id("t1");
+        assert!(d.is_reply());
+    }
+
+    #[test]
+    fn test_draft_is_empty() {
+        let d = CommentDraft::new("alice");
+        assert!(d.is_empty());
+        let d = d.with_body("hello");
+        assert!(!d.is_empty());
     }
 }

@@ -348,6 +348,98 @@ impl fmt::Display for PathComponents {
     }
 }
 
+/// Consistent cross-platform path normalization: converts all separators to
+/// forward slashes, resolves `.`/`..`, collapses repeated slashes, and removes
+/// trailing slash (unless root).
+pub fn path_normalize(path: &str) -> String {
+    if path.is_empty() {
+        return String::new();
+    }
+    let fwd = to_forward_slashes(path);
+    // Collapse repeated slashes (preserve leading // for UNC)
+    let mut result = String::with_capacity(fwd.len());
+    let mut prev_slash = false;
+    let chars: Vec<char> = fwd.chars().collect();
+    for (i, &c) in chars.iter().enumerate() {
+        if c == '/' {
+            if prev_slash && i > 1 {
+                continue;
+            }
+            prev_slash = true;
+        } else {
+            prev_slash = false;
+        }
+        result.push(c);
+    }
+    // Resolve . and .. segments
+    let normalized = normalize(&result);
+    let mut out = to_forward_slashes(&normalized);
+    // Remove trailing slash unless it's just "/"
+    if out.len() > 1 && out.ends_with('/') {
+        out.pop();
+    }
+    out
+}
+
+/// Find the shared base directory of a list of paths.
+pub fn path_common_prefix(paths: &[&str]) -> String {
+    if paths.is_empty() {
+        return String::new();
+    }
+    if paths.len() == 1 {
+        return path_normalize(paths[0]);
+    }
+    let normalized: Vec<String> = paths.iter().map(|p| path_normalize(p)).collect();
+    let first_parts: Vec<&str> = normalized[0].split('/').collect();
+    let mut common_len = first_parts.len();
+    for path in &normalized[1..] {
+        let parts: Vec<&str> = path.split('/').collect();
+        common_len = common_len.min(parts.len());
+        for i in 0..common_len {
+            if first_parts[i] != parts[i] {
+                common_len = i;
+                break;
+            }
+        }
+    }
+    if common_len == 0 {
+        return String::new();
+    }
+    first_parts[..common_len].join("/")
+}
+
+/// Compute relative path from one absolute path to another.
+pub fn relative_to(from: &str, to: &str) -> Result<String, PathError> {
+    let from_norm = path_normalize(from);
+    let to_norm = path_normalize(to);
+    if from_norm.is_empty() {
+        return Err(PathError::EmptyPath);
+    }
+    if to_norm.is_empty() {
+        return Err(PathError::EmptyPath);
+    }
+    let from_parts: Vec<&str> = from_norm.split('/').filter(|s| !s.is_empty()).collect();
+    let to_parts: Vec<&str> = to_norm.split('/').filter(|s| !s.is_empty()).collect();
+    let common = from_parts
+        .iter()
+        .zip(to_parts.iter())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let ups = from_parts.len() - common;
+    let mut result_parts: Vec<&str> = Vec::new();
+    for _ in 0..ups {
+        result_parts.push("..");
+    }
+    for part in &to_parts[common..] {
+        result_parts.push(part);
+    }
+    if result_parts.is_empty() {
+        Ok(".".to_string())
+    } else {
+        Ok(result_parts.join("/"))
+    }
+}
+
 /// Accumulated statistics for path operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PathStats {
@@ -992,5 +1084,80 @@ mod tests {
     fn path_is_ascii_printable() {
         assert!(PathValidator::is_ascii_printable("Hello World 123"));
         assert!(!PathValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn path_normalize_resolves_dots() {
+        assert_eq!(path_normalize("/a/b/../c"), "/a/c");
+        assert_eq!(path_normalize("/a/./b/./c"), "/a/b/c");
+    }
+
+    #[test]
+    fn path_normalize_collapses_slashes() {
+        assert_eq!(path_normalize("/a//b///c"), "/a/b/c");
+    }
+
+    #[test]
+    fn path_normalize_removes_trailing_slash() {
+        assert_eq!(path_normalize("/a/b/c/"), "/a/b/c");
+    }
+
+    #[test]
+    fn path_normalize_preserves_root() {
+        assert_eq!(path_normalize("/"), "/");
+    }
+
+    #[test]
+    fn path_normalize_empty() {
+        assert_eq!(path_normalize(""), "");
+    }
+
+    #[test]
+    fn path_normalize_backslashes() {
+        assert_eq!(path_normalize("a\\b\\c"), "a/b/c");
+    }
+
+    #[test]
+    fn path_common_prefix_multiple() {
+        assert_eq!(path_common_prefix(&["/a/b/c", "/a/b/d", "/a/b/e"]), "/a/b");
+    }
+
+    #[test]
+    fn path_common_prefix_single() {
+        assert_eq!(path_common_prefix(&["/a/b/c"]), "/a/b/c");
+    }
+
+    #[test]
+    fn path_common_prefix_empty() {
+        assert_eq!(path_common_prefix(&[]), "");
+    }
+
+    #[test]
+    fn path_common_prefix_no_common() {
+        assert_eq!(path_common_prefix(&["a/b", "c/d"]), "");
+    }
+
+    #[test]
+    fn relative_to_sibling() {
+        let r = relative_to("/a/b", "/a/c").unwrap();
+        assert_eq!(r, "../c");
+    }
+
+    #[test]
+    fn relative_to_child() {
+        let r = relative_to("/a", "/a/b/c").unwrap();
+        assert_eq!(r, "b/c");
+    }
+
+    #[test]
+    fn relative_to_same() {
+        let r = relative_to("/a/b", "/a/b").unwrap();
+        assert_eq!(r, ".");
+    }
+
+    #[test]
+    fn relative_to_empty_err() {
+        assert!(relative_to("", "/a").is_err());
+        assert!(relative_to("/a", "").is_err());
     }
 }

@@ -449,6 +449,198 @@ impl std::fmt::Debug for Barrier {
 }
 
 // ---------------------------------------------------------------------------
+// RunOnceScheduler – delayed single execution
+// ---------------------------------------------------------------------------
+
+/// A scheduler that delays a single execution, cancelling any previous pending one.
+pub struct RunOnceScheduler {
+    delay: Duration,
+    pending: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
+}
+
+impl RunOnceScheduler {
+    /// Create a new scheduler with the given delay.
+    pub fn new(delay: Duration) -> Self {
+        Self {
+            delay,
+            pending: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// Schedule a function to execute after the delay, cancelling any pending execution.
+    pub fn schedule<F>(&self, func: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        let mut pending = self.pending.lock().unwrap();
+        if let Some(handle) = pending.take() {
+            handle.abort();
+        }
+        let delay = self.delay;
+        *pending = Some(tokio::spawn(async move {
+            sleep(delay).await;
+            func();
+        }));
+    }
+
+    /// Cancel any pending execution.
+    pub fn cancel(&self) {
+        let mut pending = self.pending.lock().unwrap();
+        if let Some(handle) = pending.take() {
+            handle.abort();
+        }
+    }
+
+    /// Check if there is a pending execution.
+    pub fn is_pending(&self) -> bool {
+        let pending = self.pending.lock().unwrap();
+        pending
+            .as_ref()
+            .map(|h| !h.is_finished())
+            .unwrap_or(false)
+    }
+}
+
+impl fmt::Debug for RunOnceScheduler {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RunOnceScheduler")
+            .field("delay", &self.delay)
+            .field("is_pending", &self.is_pending())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IntervalRunner – periodic task execution
+// ---------------------------------------------------------------------------
+
+/// Runs a function repeatedly at a configurable interval.
+pub struct IntervalRunner {
+    interval: Arc<Mutex<Duration>>,
+    running: Arc<std::sync::atomic::AtomicBool>,
+    handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
+}
+
+impl IntervalRunner {
+    /// Create a new interval runner with the given interval.
+    pub fn new(interval: Duration) -> Self {
+        Self {
+            interval: Arc::new(Mutex::new(interval)),
+            running: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            handle: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    /// Start running `func` repeatedly at the configured interval.
+    pub fn start<F>(&self, func: F)
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        self.stop();
+        self.running
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let running = self.running.clone();
+        let interval = self.interval.clone();
+        let handle = tokio::spawn(async move {
+            while running.load(std::sync::atomic::Ordering::SeqCst) {
+                let dur = { *interval.lock().unwrap() };
+                sleep(dur).await;
+                if running.load(std::sync::atomic::Ordering::SeqCst) {
+                    func();
+                }
+            }
+        });
+        let mut h = self.handle.lock().unwrap();
+        *h = Some(handle);
+    }
+
+    /// Stop the runner.
+    pub fn stop(&self) {
+        self.running
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        let mut h = self.handle.lock().unwrap();
+        if let Some(handle) = h.take() {
+            handle.abort();
+        }
+    }
+
+    /// Check if the runner is currently active.
+    pub fn is_running(&self) -> bool {
+        self.running
+            .load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Update the interval for the next tick.
+    pub fn set_interval(&self, duration: Duration) {
+        let mut interval = self.interval.lock().unwrap();
+        *interval = duration;
+    }
+}
+
+impl fmt::Debug for IntervalRunner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("IntervalRunner")
+            .field("interval", &*self.interval.lock().unwrap())
+            .field("is_running", &self.is_running())
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RateLimiter – token-bucket rate limiter
+// ---------------------------------------------------------------------------
+
+/// A simple token-bucket rate limiter.
+pub struct RateLimiter {
+    capacity: u32,
+    tokens: Arc<Mutex<u32>>,
+    refill_rate: Duration,
+}
+
+impl RateLimiter {
+    /// Create a new rate limiter with the given capacity and refill rate.
+    pub fn new(capacity: u32, refill_rate: Duration) -> Self {
+        Self {
+            capacity,
+            tokens: Arc::new(Mutex::new(capacity)),
+            refill_rate,
+        }
+    }
+
+    /// Try to acquire a token. Returns `true` if a token was available.
+    pub fn try_acquire(&self) -> bool {
+        let mut tokens = self.tokens.lock().unwrap();
+        if *tokens > 0 {
+            *tokens -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Return the number of available tokens.
+    pub fn available(&self) -> u32 {
+        *self.tokens.lock().unwrap()
+    }
+
+    /// Reset tokens to full capacity.
+    pub fn reset(&self) {
+        let mut tokens = self.tokens.lock().unwrap();
+        *tokens = self.capacity;
+    }
+}
+
+impl fmt::Debug for RateLimiter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RateLimiter")
+            .field("capacity", &self.capacity)
+            .field("available", &self.available())
+            .field("refill_rate", &self.refill_rate)
+            .finish()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -860,6 +1052,87 @@ mod tests {
         let queue = AsyncQueue::<i32>::new(8);
         let dbg = format!("{:?}", queue);
         assert!(dbg.contains("AsyncQueue"));
+    }
+
+    // ---- RunOnceScheduler / IntervalRunner / RateLimiter tests ----
+
+    #[test]
+    fn test_run_once_scheduler_creates() {
+        let scheduler = RunOnceScheduler::new(Duration::from_millis(100));
+        assert!(!scheduler.is_pending());
+    }
+
+    #[tokio::test]
+    async fn test_run_once_scheduler_cancel() {
+        let scheduler = RunOnceScheduler::new(Duration::from_secs(10));
+        scheduler.schedule(|| {});
+        scheduler.cancel();
+        // After cancel the handle is taken, so is_pending returns false.
+        assert!(!scheduler.is_pending());
+    }
+
+    #[tokio::test]
+    async fn test_run_once_scheduler_is_pending_after_schedule() {
+        let scheduler = RunOnceScheduler::new(Duration::from_secs(10));
+        scheduler.schedule(|| {});
+        assert!(scheduler.is_pending());
+        scheduler.cancel();
+    }
+
+    #[tokio::test]
+    async fn test_interval_runner_start_stop() {
+        let runner = IntervalRunner::new(Duration::from_millis(50));
+        runner.start(|| {});
+        assert!(runner.is_running());
+        runner.stop();
+        assert!(!runner.is_running());
+    }
+
+    #[test]
+    fn test_interval_runner_not_running_initially() {
+        let runner = IntervalRunner::new(Duration::from_millis(100));
+        assert!(!runner.is_running());
+    }
+
+    #[test]
+    fn test_interval_runner_set_interval() {
+        let runner = IntervalRunner::new(Duration::from_millis(100));
+        runner.set_interval(Duration::from_millis(200));
+        let interval = *runner.interval.lock().unwrap();
+        assert_eq!(interval, Duration::from_millis(200));
+    }
+
+    #[test]
+    fn test_rate_limiter_acquire() {
+        let limiter = RateLimiter::new(3, Duration::from_millis(100));
+        assert!(limiter.try_acquire());
+        assert!(limiter.try_acquire());
+        assert!(limiter.try_acquire());
+    }
+
+    #[test]
+    fn test_rate_limiter_exhausted() {
+        let limiter = RateLimiter::new(1, Duration::from_millis(100));
+        assert!(limiter.try_acquire());
+        assert!(!limiter.try_acquire());
+    }
+
+    #[test]
+    fn test_rate_limiter_reset() {
+        let limiter = RateLimiter::new(2, Duration::from_millis(100));
+        limiter.try_acquire();
+        limiter.try_acquire();
+        assert!(!limiter.try_acquire());
+        limiter.reset();
+        assert!(limiter.try_acquire());
+    }
+
+    #[test]
+    fn test_rate_limiter_available() {
+        let limiter = RateLimiter::new(5, Duration::from_millis(100));
+        assert_eq!(limiter.available(), 5);
+        limiter.try_acquire();
+        assert_eq!(limiter.available(), 4);
     }
 
     #[test]

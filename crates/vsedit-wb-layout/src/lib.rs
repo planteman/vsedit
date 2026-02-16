@@ -248,6 +248,184 @@ impl Default for WorkbenchLayout {
 }
 
 // ---------------------------------------------------------------------------
+// SplitDirection / LayoutSplit
+// ---------------------------------------------------------------------------
+
+/// Direction for splitting an editor area.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SplitDirection {
+    Horizontal,
+    Vertical,
+}
+
+/// Manages splitting an editor area into multiple panes.
+#[derive(Debug, Clone)]
+pub struct LayoutSplit {
+    pub direction: SplitDirection,
+    pub ratios: Vec<f32>,
+    pub min_size: u16,
+    pub max_size: Option<u16>,
+}
+
+impl LayoutSplit {
+    /// Create a split with `pane_count` equally-sized panes.
+    pub fn new(direction: SplitDirection, pane_count: usize) -> Self {
+        let count = pane_count.max(1);
+        let ratio = 1.0 / count as f32;
+        Self {
+            direction,
+            ratios: vec![ratio; count],
+            min_size: 1,
+            max_size: None,
+        }
+    }
+
+    /// Create a split with custom ratios.
+    pub fn with_ratios(direction: SplitDirection, ratios: Vec<f32>) -> Self {
+        Self {
+            direction,
+            ratios,
+            min_size: 1,
+            max_size: None,
+        }
+    }
+
+    /// Compute rectangles for each pane within the given area.
+    pub fn split_rect(&self, area: Rect) -> Vec<Rect> {
+        if self.ratios.is_empty() {
+            return vec![area];
+        }
+
+        let total: f32 = self.ratios.iter().sum();
+        let count = self.ratios.len();
+        let mut rects = Vec::with_capacity(count);
+
+        match self.direction {
+            SplitDirection::Horizontal => {
+                let mut x = area.x;
+                for (i, &r) in self.ratios.iter().enumerate() {
+                    let frac = r / total;
+                    let w = if i == count - 1 {
+                        area.width.saturating_sub(x - area.x)
+                    } else {
+                        (area.width as f32 * frac).round() as u16
+                    };
+                    let mut w = w.max(self.min_size);
+                    if let Some(max) = self.max_size {
+                        w = w.min(max);
+                    }
+                    rects.push(Rect::new(x, area.y, w, area.height));
+                    x = x.saturating_add(w);
+                }
+            }
+            SplitDirection::Vertical => {
+                let mut y = area.y;
+                for (i, &r) in self.ratios.iter().enumerate() {
+                    let frac = r / total;
+                    let h = if i == count - 1 {
+                        area.height.saturating_sub(y - area.y)
+                    } else {
+                        (area.height as f32 * frac).round() as u16
+                    };
+                    let mut h = h.max(self.min_size);
+                    if let Some(max) = self.max_size {
+                        h = h.min(max);
+                    }
+                    rects.push(Rect::new(area.x, y, area.width, h));
+                    y = y.saturating_add(h);
+                }
+            }
+        }
+
+        rects
+    }
+
+    /// Add a pane and rebalance ratios equally.
+    pub fn add_pane(&mut self) {
+        let new_count = self.ratios.len() + 1;
+        let ratio = 1.0 / new_count as f32;
+        self.ratios = vec![ratio; new_count];
+    }
+
+    /// Remove a pane at `index` and rebalance. Returns `false` if index is
+    /// invalid or only one pane remains.
+    pub fn remove_pane(&mut self, index: usize) -> bool {
+        if index >= self.ratios.len() || self.ratios.len() <= 1 {
+            return false;
+        }
+        self.ratios.remove(index);
+        let new_count = self.ratios.len();
+        let ratio = 1.0 / new_count as f32;
+        self.ratios = vec![ratio; new_count];
+        true
+    }
+
+    /// Number of panes.
+    pub fn pane_count(&self) -> usize {
+        self.ratios.len()
+    }
+
+    /// Set the minimum size per pane.
+    pub fn set_min_size(&mut self, min: u16) {
+        self.min_size = min;
+    }
+
+    /// Set the optional maximum size per pane.
+    pub fn set_max_size(&mut self, max: Option<u16>) {
+        self.max_size = max;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// panel_resize
+// ---------------------------------------------------------------------------
+
+/// Resize a panel by `delta`, clamping to `[min, max]`.
+pub fn resize_panel(current: u16, delta: i16, min: u16, max: u16) -> u16 {
+    let result = current as i32 + delta as i32;
+    (result.max(min as i32).min(max as i32)) as u16
+}
+
+// ---------------------------------------------------------------------------
+// LayoutState / serialization helpers
+// ---------------------------------------------------------------------------
+
+/// Serializable snapshot of workbench layout state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LayoutState {
+    pub sidebar_width: u16,
+    pub panel_height: u16,
+    pub sidebar_visible: bool,
+    pub panel_visible: bool,
+    pub menubar_visible: bool,
+    pub activity_bar_visible: bool,
+}
+
+/// Extract a [`LayoutState`] from a [`WorkbenchLayout`].
+pub fn layout_serialize(layout: &WorkbenchLayout) -> LayoutState {
+    LayoutState {
+        sidebar_width: layout.get_sidebar_width(),
+        panel_height: layout.get_panel_height(),
+        sidebar_visible: layout.is_part_visible(Part::Sidebar),
+        panel_visible: layout.is_part_visible(Part::Panel),
+        menubar_visible: layout.is_part_visible(Part::Menubar),
+        activity_bar_visible: layout.is_part_visible(Part::ActivityBar),
+    }
+}
+
+/// Create a [`WorkbenchLayout`] from a persisted [`LayoutState`].
+pub fn layout_deserialize(state: &LayoutState) -> WorkbenchLayout {
+    let mut layout = WorkbenchLayout::new();
+    layout.set_sidebar_width(state.sidebar_width);
+    layout.set_panel_height(state.panel_height);
+    layout.set_part_visible(Part::Sidebar, state.sidebar_visible);
+    layout.set_part_visible(Part::Panel, state.panel_visible);
+    layout.set_part_visible(Part::Menubar, state.menubar_visible);
+    layout.set_part_visible(Part::ActivityBar, state.activity_bar_visible);
+    layout
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -712,6 +890,132 @@ mod tests {
     #[test]
     fn ne_part_diff() {
         assert_ne!(Part::Titlebar, Part::Menubar);
+    }
+
+    #[test]
+    fn test_split_direction_eq() {
+        assert_eq!(SplitDirection::Horizontal, SplitDirection::Horizontal);
+        assert_eq!(SplitDirection::Vertical, SplitDirection::Vertical);
+        assert_ne!(SplitDirection::Horizontal, SplitDirection::Vertical);
+    }
+
+    #[test]
+    fn test_layout_split_equal_horizontal() {
+        let split = LayoutSplit::new(SplitDirection::Horizontal, 3);
+        assert_eq!(split.pane_count(), 3);
+        let rects = split.split_rect(rect(0, 0, 90, 30));
+        assert_eq!(rects.len(), 3);
+        assert_eq!(rects[0].x, 0);
+        assert_eq!(rects[0].width, 30);
+        assert_eq!(rects[1].x, 30);
+        assert_eq!(rects[1].width, 30);
+        assert_eq!(rects[2].x, 60);
+        assert_eq!(rects[2].width, 30);
+        for r in &rects {
+            assert_eq!(r.height, 30);
+        }
+    }
+
+    #[test]
+    fn test_layout_split_equal_vertical() {
+        let split = LayoutSplit::new(SplitDirection::Vertical, 2);
+        let rects = split.split_rect(rect(0, 0, 80, 40));
+        assert_eq!(rects.len(), 2);
+        assert_eq!(rects[0].y, 0);
+        assert_eq!(rects[0].height, 20);
+        assert_eq!(rects[1].y, 20);
+        assert_eq!(rects[1].height, 20);
+        for r in &rects {
+            assert_eq!(r.width, 80);
+        }
+    }
+
+    #[test]
+    fn test_layout_split_custom_ratios() {
+        let split = LayoutSplit::with_ratios(SplitDirection::Horizontal, vec![0.25, 0.75]);
+        let rects = split.split_rect(rect(0, 0, 100, 10));
+        assert_eq!(rects.len(), 2);
+        assert_eq!(rects[0].width, 25);
+        // Last pane gets remainder
+        assert_eq!(rects[1].width, 75);
+    }
+
+    #[test]
+    fn test_layout_split_add_pane() {
+        let mut split = LayoutSplit::new(SplitDirection::Horizontal, 2);
+        assert_eq!(split.pane_count(), 2);
+        split.add_pane();
+        assert_eq!(split.pane_count(), 3);
+        let sum: f32 = split.ratios.iter().sum();
+        assert!((sum - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_layout_split_remove_pane() {
+        let mut split = LayoutSplit::new(SplitDirection::Vertical, 3);
+        assert!(split.remove_pane(1));
+        assert_eq!(split.pane_count(), 2);
+        // Cannot remove when only 1 pane left
+        assert!(split.remove_pane(0));
+        assert_eq!(split.pane_count(), 1);
+        assert!(!split.remove_pane(0));
+    }
+
+    #[test]
+    fn test_layout_split_min_constraint() {
+        let mut split = LayoutSplit::new(SplitDirection::Horizontal, 4);
+        split.set_min_size(10);
+        let rects = split.split_rect(rect(0, 0, 20, 10));
+        // Each pane should be at least min_size
+        for r in &rects {
+            assert!(r.width >= 10);
+        }
+    }
+
+    #[test]
+    fn test_panel_resize_clamp_min() {
+        assert_eq!(resize_panel(10, -20, 5, 50), 5);
+    }
+
+    #[test]
+    fn test_panel_resize_clamp_max() {
+        assert_eq!(resize_panel(40, 30, 5, 50), 50);
+    }
+
+    #[test]
+    fn test_panel_resize_normal() {
+        assert_eq!(resize_panel(20, 5, 5, 50), 25);
+        assert_eq!(resize_panel(20, -5, 5, 50), 15);
+    }
+
+    #[test]
+    fn test_layout_serialize_deserialize_roundtrip() {
+        let mut layout = WorkbenchLayout::new();
+        layout.set_sidebar_width(42);
+        layout.set_panel_height(15);
+        let state = layout_serialize(&layout);
+        let restored = layout_deserialize(&state);
+        let state2 = layout_serialize(&restored);
+        assert_eq!(state, state2);
+    }
+
+    #[test]
+    fn test_layout_state_preserves_visibility() {
+        let mut layout = WorkbenchLayout::new();
+        layout.set_part_visible(Part::Sidebar, false);
+        layout.set_part_visible(Part::Panel, false);
+        layout.set_part_visible(Part::Menubar, false);
+        layout.set_part_visible(Part::ActivityBar, false);
+        let state = layout_serialize(&layout);
+        assert!(!state.sidebar_visible);
+        assert!(!state.panel_visible);
+        assert!(!state.menubar_visible);
+        assert!(!state.activity_bar_visible);
+        let restored = layout_deserialize(&state);
+        assert!(!restored.is_part_visible(Part::Sidebar));
+        assert!(!restored.is_part_visible(Part::Panel));
+        assert!(!restored.is_part_visible(Part::Menubar));
+        assert!(!restored.is_part_visible(Part::ActivityBar));
     }
 
     #[test]

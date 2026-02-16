@@ -236,6 +236,172 @@ pub trait WelcomeContentProvider {
     }
 }
 
+/// Renders a welcome section as a list of formatted text lines.
+pub struct WelcomeSectionRenderer;
+
+impl WelcomeSectionRenderer {
+    /// Render a section header and its items.
+    pub fn render_section(section: &WelcomeSection) -> Vec<String> {
+        let mut lines = Vec::new();
+        lines.push(format!("── {} ──", section.title));
+        lines.push(String::new());
+        for item in &section.items {
+            let icon = item.icon.as_deref().unwrap_or("•");
+            lines.push(format!("  {icon} {}", item.title));
+            if !item.description.is_empty() {
+                lines.push(format!("    {}", item.description));
+            }
+        }
+        lines.push(String::new());
+        lines
+    }
+
+    /// Render an entire welcome page.
+    pub fn render_page(page: &WelcomePage) -> Vec<String> {
+        let mut lines = Vec::new();
+        lines.push("Welcome to VSEdit".to_string());
+        lines.push("=".repeat(40));
+        lines.push(String::new());
+        for section in &page.sections {
+            lines.extend(Self::render_section(section));
+        }
+        lines
+    }
+
+    /// Render a walkthrough with progress.
+    pub fn render_walkthrough(wt: &WelcomeWalkthrough) -> Vec<String> {
+        let mut lines = Vec::new();
+        let pct = wt.completion_percentage();
+        lines.push(format!("{} ({:.0}% complete)", wt.title, pct));
+        lines.push(String::new());
+        for step in &wt.steps {
+            let check = if step.completed { "✓" } else { "○" };
+            lines.push(format!("  [{check}] {}", step.title));
+            lines.push(format!("      {}", step.description));
+        }
+        lines
+    }
+}
+
+/// A recently opened workspace.
+#[derive(Debug, Clone)]
+pub struct RecentWorkspace {
+    pub path: String,
+    pub name: String,
+    pub last_opened: u64,
+    pub pinned: bool,
+}
+
+/// Manages a list of recent workspaces.
+pub struct RecentWorkspaceList {
+    workspaces: Vec<RecentWorkspace>,
+    max_items: usize,
+}
+
+impl RecentWorkspaceList {
+    pub fn new(max_items: usize) -> Self {
+        Self {
+            workspaces: Vec::new(),
+            max_items,
+        }
+    }
+
+    pub fn add(&mut self, workspace: RecentWorkspace) {
+        // Remove existing entry for same path
+        self.workspaces.retain(|w| w.path != workspace.path);
+        self.workspaces.insert(0, workspace);
+        // Sort: pinned first, then by last_opened descending
+        self.workspaces.sort_by(|a, b| {
+            b.pinned.cmp(&a.pinned).then(b.last_opened.cmp(&a.last_opened))
+        });
+        // Enforce max, but never remove pinned items
+        while self.workspaces.len() > self.max_items {
+            if let Some(pos) = self.workspaces.iter().rposition(|w| !w.pinned) {
+                self.workspaces.remove(pos);
+            } else {
+                break;
+            }
+        }
+    }
+
+    pub fn list(&self) -> &[RecentWorkspace] {
+        &self.workspaces
+    }
+
+    pub fn pinned(&self) -> Vec<&RecentWorkspace> {
+        self.workspaces.iter().filter(|w| w.pinned).collect()
+    }
+
+    pub fn unpinned(&self) -> Vec<&RecentWorkspace> {
+        self.workspaces.iter().filter(|w| !w.pinned).collect()
+    }
+
+    pub fn remove(&mut self, path: &str) -> bool {
+        let before = self.workspaces.len();
+        self.workspaces.retain(|w| w.path != path);
+        self.workspaces.len() < before
+    }
+
+    pub fn toggle_pin(&mut self, path: &str) -> bool {
+        if let Some(ws) = self.workspaces.iter_mut().find(|w| w.path == path) {
+            ws.pinned = !ws.pinned;
+            // Re-sort
+            self.workspaces.sort_by(|a, b| {
+                b.pinned.cmp(&a.pinned).then(b.last_opened.cmp(&a.last_opened))
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn count(&self) -> usize {
+        self.workspaces.len()
+    }
+
+    pub fn clear_unpinned(&mut self) {
+        self.workspaces.retain(|w| w.pinned);
+    }
+}
+
+impl Default for RecentWorkspaceList {
+    fn default() -> Self {
+        Self::new(10)
+    }
+}
+
+/// A keybinding hint for the welcome page.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeybindingHint {
+    pub action: String,
+    pub shortcut: String,
+}
+
+/// Generate platform-specific keybinding hints for the welcome page.
+/// `is_mac` controls whether to show Cmd vs Ctrl.
+pub fn welcome_keybinding_hints(is_mac: bool) -> Vec<KeybindingHint> {
+    let modifier = if is_mac { "Cmd" } else { "Ctrl" };
+    vec![
+        KeybindingHint { action: "Quick Open".into(), shortcut: format!("{modifier}+P") },
+        KeybindingHint { action: "Command Palette".into(), shortcut: format!("{modifier}+Shift+P") },
+        KeybindingHint { action: "Toggle Terminal".into(), shortcut: format!("{modifier}+`") },
+        KeybindingHint { action: "Find in Files".into(), shortcut: format!("{modifier}+Shift+F") },
+        KeybindingHint { action: "Open Settings".into(), shortcut: format!("{modifier}+,") },
+        KeybindingHint { action: "New File".into(), shortcut: format!("{modifier}+N") },
+        KeybindingHint { action: "Save".into(), shortcut: format!("{modifier}+S") },
+        KeybindingHint { action: "Close Editor".into(), shortcut: format!("{modifier}+W") },
+    ]
+}
+
+/// Format keybinding hints as a displayable text block.
+pub fn format_keybinding_hints(hints: &[KeybindingHint]) -> Vec<String> {
+    let max_action_len = hints.iter().map(|h| h.action.len()).max().unwrap_or(0);
+    hints
+        .iter()
+        .map(|h| format!("  {:<width$}  {}", h.action, h.shortcut, width = max_action_len))
+        .collect()
+}
+
 /// Accumulated statistics for welcome operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WelcomeStats {
@@ -993,5 +1159,117 @@ mod tests {
     fn welcome_is_ascii_printable() {
         assert!(WelcomeValidator::is_ascii_printable("Hello World 123"));
         assert!(!WelcomeValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn render_section_basic() {
+        let section = WelcomeSection {
+            title: "Start".to_string(),
+            items: vec![WelcomeItem {
+                id: "1".into(), title: "New File".into(),
+                description: "Create a new file".into(),
+                icon: None, command: None,
+            }],
+        };
+        let lines = WelcomeSectionRenderer::render_section(&section);
+        assert!(lines[0].contains("Start"));
+        assert!(lines.iter().any(|l| l.contains("New File")));
+    }
+
+    #[test]
+    fn render_page_has_header() {
+        let page = WelcomePage::new();
+        let lines = WelcomeSectionRenderer::render_page(&page);
+        assert!(lines[0].contains("Welcome"));
+    }
+
+    #[test]
+    fn render_walkthrough_progress() {
+        let wt = WelcomeWalkthrough {
+            id: "wt1".into(), title: "Getting Started".into(),
+            steps: vec![
+                WalkthroughStep { id: "s1".into(), title: "Step 1".into(), description: "Do thing 1".into(), completed: true },
+                WalkthroughStep { id: "s2".into(), title: "Step 2".into(), description: "Do thing 2".into(), completed: false },
+            ],
+        };
+        let lines = WelcomeSectionRenderer::render_walkthrough(&wt);
+        assert!(lines[0].contains("50%"));
+        assert!(lines.iter().any(|l| l.contains("✓")));
+        assert!(lines.iter().any(|l| l.contains("○")));
+    }
+
+    #[test]
+    fn recent_workspace_add_and_list() {
+        let mut list = RecentWorkspaceList::new(5);
+        list.add(RecentWorkspace { path: "/a".into(), name: "A".into(), last_opened: 10, pinned: false });
+        list.add(RecentWorkspace { path: "/b".into(), name: "B".into(), last_opened: 20, pinned: false });
+        assert_eq!(list.count(), 2);
+        assert_eq!(list.list()[0].path, "/b"); // most recent first
+    }
+
+    #[test]
+    fn recent_workspace_dedup() {
+        let mut list = RecentWorkspaceList::new(5);
+        list.add(RecentWorkspace { path: "/a".into(), name: "A".into(), last_opened: 10, pinned: false });
+        list.add(RecentWorkspace { path: "/a".into(), name: "A".into(), last_opened: 20, pinned: false });
+        assert_eq!(list.count(), 1);
+    }
+
+    #[test]
+    fn recent_workspace_pinned_first() {
+        let mut list = RecentWorkspaceList::new(5);
+        list.add(RecentWorkspace { path: "/a".into(), name: "A".into(), last_opened: 30, pinned: false });
+        list.add(RecentWorkspace { path: "/b".into(), name: "B".into(), last_opened: 10, pinned: true });
+        assert_eq!(list.list()[0].path, "/b"); // pinned first
+    }
+
+    #[test]
+    fn recent_workspace_max_items() {
+        let mut list = RecentWorkspaceList::new(2);
+        list.add(RecentWorkspace { path: "/a".into(), name: "A".into(), last_opened: 1, pinned: false });
+        list.add(RecentWorkspace { path: "/b".into(), name: "B".into(), last_opened: 2, pinned: false });
+        list.add(RecentWorkspace { path: "/c".into(), name: "C".into(), last_opened: 3, pinned: false });
+        assert_eq!(list.count(), 2);
+    }
+
+    #[test]
+    fn recent_workspace_toggle_pin() {
+        let mut list = RecentWorkspaceList::new(5);
+        list.add(RecentWorkspace { path: "/a".into(), name: "A".into(), last_opened: 10, pinned: false });
+        assert!(list.toggle_pin("/a"));
+        assert!(list.list()[0].pinned);
+    }
+
+    #[test]
+    fn recent_workspace_clear_unpinned() {
+        let mut list = RecentWorkspaceList::new(5);
+        list.add(RecentWorkspace { path: "/a".into(), name: "A".into(), last_opened: 10, pinned: true });
+        list.add(RecentWorkspace { path: "/b".into(), name: "B".into(), last_opened: 20, pinned: false });
+        list.clear_unpinned();
+        assert_eq!(list.count(), 1);
+        assert_eq!(list.list()[0].path, "/a");
+    }
+
+    #[test]
+    fn keybinding_hints_linux() {
+        let hints = welcome_keybinding_hints(false);
+        assert!(hints.iter().any(|h| h.shortcut.contains("Ctrl")));
+        assert!(!hints.iter().any(|h| h.shortcut.contains("Cmd")));
+    }
+
+    #[test]
+    fn keybinding_hints_mac() {
+        let hints = welcome_keybinding_hints(true);
+        assert!(hints.iter().any(|h| h.shortcut.contains("Cmd")));
+    }
+
+    #[test]
+    fn format_hints_alignment() {
+        let hints = welcome_keybinding_hints(false);
+        let formatted = format_keybinding_hints(&hints);
+        assert!(formatted.len() >= 8);
+        for line in &formatted {
+            assert!(line.starts_with("  "));
+        }
     }
 }

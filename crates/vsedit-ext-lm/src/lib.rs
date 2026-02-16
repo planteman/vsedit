@@ -239,6 +239,170 @@ impl ConversationHistory {
     }
 }
 
+/// A structured request for AI completion.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LanguageModelRequest {
+    pub model_id: String,
+    pub messages: Vec<LanguageModelMessage>,
+    pub options: LanguageModelRequestOptions,
+    pub request_id: String,
+}
+
+impl LanguageModelRequest {
+    pub fn new(model_id: &str, messages: Vec<LanguageModelMessage>) -> Self {
+        Self {
+            model_id: model_id.to_string(),
+            messages,
+            options: LanguageModelRequestOptions::default(),
+            request_id: format!("req_{}", Self::simple_id()),
+        }
+    }
+
+    fn simple_id() -> u64 {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(1);
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    }
+
+    pub fn with_options(mut self, options: LanguageModelRequestOptions) -> Self {
+        self.options = options;
+        self
+    }
+
+    /// Estimate total tokens for this request using TokenCounter.
+    pub fn estimated_tokens(&self) -> usize {
+        self.messages
+            .iter()
+            .map(|m| {
+                let content = match m {
+                    LanguageModelMessage::System { content } => content,
+                    LanguageModelMessage::User { content } => content,
+                    LanguageModelMessage::Assistant { content } => content,
+                };
+                TokenCounter::count_tokens(content)
+            })
+            .sum()
+    }
+
+    /// Check if this request would exceed the given model's token limit.
+    pub fn exceeds_limit(&self, model: &LanguageModelChat) -> bool {
+        self.estimated_tokens() > model.max_input_tokens as usize
+    }
+}
+
+/// Aggregated response with streaming support.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LanguageModelResponse {
+    pub request_id: String,
+    pub chunks: Vec<String>,
+    pub is_complete: bool,
+    pub total_tokens_used: usize,
+}
+
+impl LanguageModelResponse {
+    pub fn new(request_id: &str) -> Self {
+        Self {
+            request_id: request_id.to_string(),
+            chunks: Vec::new(),
+            is_complete: false,
+            total_tokens_used: 0,
+        }
+    }
+
+    pub fn append_chunk(&mut self, chunk: &str) {
+        self.chunks.push(chunk.to_string());
+        self.total_tokens_used += TokenCounter::count_tokens(chunk);
+    }
+
+    pub fn complete(&mut self) {
+        self.is_complete = true;
+    }
+
+    /// Get the full assembled text.
+    pub fn full_text(&self) -> String {
+        self.chunks.join("")
+    }
+
+    pub fn chunk_count(&self) -> usize {
+        self.chunks.len()
+    }
+}
+
+/// Estimate total token usage for a request, including per-message overhead.
+/// Each message has ~4 tokens of overhead (role, delimiters).
+pub fn token_estimate(messages: &[LanguageModelMessage], overhead_per_message: usize) -> usize {
+    messages
+        .iter()
+        .map(|m| {
+            let content = match m {
+                LanguageModelMessage::System { content } => content,
+                LanguageModelMessage::User { content } => content,
+                LanguageModelMessage::Assistant { content } => content,
+            };
+            TokenCounter::count_tokens(content) + overhead_per_message
+        })
+        .sum()
+}
+
+/// A registered language model backend.
+#[derive(Debug, Clone)]
+pub struct LanguageModelProviderInfo {
+    pub id: String,
+    pub display_name: String,
+    pub models: Vec<String>,
+}
+
+/// Registry for multiple language model providers.
+pub struct LanguageModelProviderRegistry {
+    providers: Vec<LanguageModelProviderInfo>,
+}
+
+impl LanguageModelProviderRegistry {
+    pub fn new() -> Self {
+        Self {
+            providers: Vec::new(),
+        }
+    }
+
+    pub fn register(&mut self, provider: LanguageModelProviderInfo) {
+        if !self.providers.iter().any(|p| p.id == provider.id) {
+            self.providers.push(provider);
+        }
+    }
+
+    pub fn unregister(&mut self, id: &str) -> bool {
+        let before = self.providers.len();
+        self.providers.retain(|p| p.id != id);
+        self.providers.len() < before
+    }
+
+    pub fn get(&self, id: &str) -> Option<&LanguageModelProviderInfo> {
+        self.providers.iter().find(|p| p.id == id)
+    }
+
+    pub fn list(&self) -> &[LanguageModelProviderInfo] {
+        &self.providers
+    }
+
+    pub fn count(&self) -> usize {
+        self.providers.len()
+    }
+
+    /// Find providers that offer a specific model.
+    pub fn find_by_model(&self, model_id: &str) -> Vec<&LanguageModelProviderInfo> {
+        self.providers
+            .iter()
+            .filter(|p| p.models.iter().any(|m| m == model_id))
+            .collect()
+    }
+}
+
+impl Default for LanguageModelProviderRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Accumulated statistics for ext-lm operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtLmStats {
@@ -993,5 +1157,130 @@ mod tests {
     fn ext_lm_is_ascii_printable() {
         assert!(ExtLmValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtLmValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn lm_request_new_has_id() {
+        let req = LanguageModelRequest::new(
+            "model-1",
+            vec![LanguageModelMessage::User {
+                content: "Hello".to_string(),
+            }],
+        );
+        assert!(req.request_id.starts_with("req_"));
+        assert_eq!(req.model_id, "model-1");
+    }
+
+    #[test]
+    fn lm_request_estimated_tokens() {
+        let req = LanguageModelRequest::new(
+            "m",
+            vec![LanguageModelMessage::User {
+                content: "one two three".to_string(),
+            }],
+        );
+        assert_eq!(req.estimated_tokens(), 3);
+    }
+
+    #[test]
+    fn lm_request_exceeds_limit() {
+        let model = LanguageModelChat {
+            id: "m".into(),
+            name: "M".into(),
+            vendor: "v".into(),
+            family: "f".into(),
+            version: "1".into(),
+            max_input_tokens: 2,
+        };
+        let req = LanguageModelRequest::new(
+            "m",
+            vec![LanguageModelMessage::User {
+                content: "one two three".to_string(),
+            }],
+        );
+        assert!(req.exceeds_limit(&model));
+    }
+
+    #[test]
+    fn lm_response_streaming() {
+        let mut resp = LanguageModelResponse::new("req_1");
+        resp.append_chunk("Hello ");
+        resp.append_chunk("World");
+        resp.complete();
+        assert_eq!(resp.full_text(), "Hello World");
+        assert!(resp.is_complete);
+        assert_eq!(resp.chunk_count(), 2);
+    }
+
+    #[test]
+    fn token_estimate_with_overhead() {
+        let msgs = vec![
+            LanguageModelMessage::User {
+                content: "hello world".to_string(),
+            },
+            LanguageModelMessage::System {
+                content: "you are helpful".to_string(),
+            },
+        ];
+        let est = token_estimate(&msgs, 4);
+        // "hello world" = 2 tokens + 4 overhead = 6
+        // "you are helpful" = 3 tokens + 4 overhead = 7
+        assert_eq!(est, 13);
+    }
+
+    #[test]
+    fn provider_registry_register_and_find() {
+        let mut reg = LanguageModelProviderRegistry::new();
+        reg.register(LanguageModelProviderInfo {
+            id: "openai".into(),
+            display_name: "OpenAI".into(),
+            models: vec!["gpt-4".into(), "gpt-3.5".into()],
+        });
+        assert_eq!(reg.count(), 1);
+        assert!(reg.get("openai").is_some());
+    }
+
+    #[test]
+    fn provider_registry_no_duplicate() {
+        let mut reg = LanguageModelProviderRegistry::new();
+        let p = LanguageModelProviderInfo {
+            id: "a".into(),
+            display_name: "A".into(),
+            models: vec![],
+        };
+        reg.register(p.clone());
+        reg.register(p);
+        assert_eq!(reg.count(), 1);
+    }
+
+    #[test]
+    fn provider_registry_find_by_model() {
+        let mut reg = LanguageModelProviderRegistry::new();
+        reg.register(LanguageModelProviderInfo {
+            id: "p1".into(),
+            display_name: "P1".into(),
+            models: vec!["m1".into()],
+        });
+        reg.register(LanguageModelProviderInfo {
+            id: "p2".into(),
+            display_name: "P2".into(),
+            models: vec!["m2".into()],
+        });
+        let found = reg.find_by_model("m1");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].id, "p1");
+    }
+
+    #[test]
+    fn provider_registry_unregister() {
+        let mut reg = LanguageModelProviderRegistry::new();
+        reg.register(LanguageModelProviderInfo {
+            id: "x".into(),
+            display_name: "X".into(),
+            models: vec![],
+        });
+        assert!(reg.unregister("x"));
+        assert_eq!(reg.count(), 0);
+        assert!(!reg.unregister("x"));
     }
 }

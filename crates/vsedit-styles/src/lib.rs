@@ -373,6 +373,152 @@ pub fn blend_colors(a: Color, b: Color, factor: f32) -> Option<Color> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// StyleProperty, StyleRule, StyleSheet — CSS-like style system
+// ---------------------------------------------------------------------------
+
+/// A single style property value.
+#[derive(Debug, Clone, PartialEq)]
+pub enum StyleProperty {
+    ColorValue(Color),
+    ModifierValue(Modifier),
+    StringValue(String),
+    NumberValue(f64),
+}
+
+/// A style rule binding a selector to a set of properties.
+#[derive(Debug, Clone)]
+pub struct StyleRule {
+    pub selector: String,
+    pub properties: HashMap<String, StyleProperty>,
+}
+
+impl StyleRule {
+    pub fn new(selector: impl Into<String>) -> Self {
+        Self {
+            selector: selector.into(),
+            properties: HashMap::new(),
+        }
+    }
+
+    pub fn set(&mut self, key: impl Into<String>, value: StyleProperty) {
+        self.properties.insert(key.into(), value);
+    }
+
+    pub fn get(&self, key: &str) -> Option<&StyleProperty> {
+        self.properties.get(key)
+    }
+
+    pub fn has(&self, key: &str) -> bool {
+        self.properties.contains_key(key)
+    }
+
+    pub fn property_count(&self) -> usize {
+        self.properties.len()
+    }
+
+    pub fn remove(&mut self, key: &str) -> bool {
+        self.properties.remove(key).is_some()
+    }
+}
+
+/// A collection of style rules, keyed by selector.
+#[derive(Debug, Clone)]
+pub struct StyleSheet {
+    pub rules: Vec<StyleRule>,
+}
+
+impl StyleSheet {
+    pub fn new() -> Self {
+        Self { rules: Vec::new() }
+    }
+
+    pub fn add_rule(&mut self, rule: StyleRule) {
+        self.rules.push(rule);
+    }
+
+    pub fn find_rule(&self, selector: &str) -> Option<&StyleRule> {
+        self.rules.iter().find(|r| r.selector == selector)
+    }
+
+    pub fn find_rule_mut(&mut self, selector: &str) -> Option<&mut StyleRule> {
+        self.rules.iter_mut().find(|r| r.selector == selector)
+    }
+
+    pub fn remove_rule(&mut self, selector: &str) -> bool {
+        let before = self.rules.len();
+        self.rules.retain(|r| r.selector != selector);
+        self.rules.len() < before
+    }
+
+    pub fn rule_count(&self) -> usize {
+        self.rules.len()
+    }
+
+    pub fn selectors(&self) -> Vec<&str> {
+        self.rules.iter().map(|r| r.selector.as_str()).collect()
+    }
+
+    /// Merge another stylesheet into this one. Rules with matching selectors
+    /// have their properties overwritten; new selectors are appended.
+    pub fn merge(&mut self, other: &StyleSheet) {
+        for other_rule in &other.rules {
+            if let Some(existing) = self.find_rule_mut(&other_rule.selector) {
+                for (k, v) in &other_rule.properties {
+                    existing.set(k.clone(), v.clone());
+                }
+            } else {
+                self.rules.push(other_rule.clone());
+            }
+        }
+    }
+}
+
+impl Default for StyleSheet {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Resolve styles by cascading multiple sheets: later sheets override earlier
+/// ones for the same selector. Returns the merged properties.
+pub fn style_cascade(sheets: &[&StyleSheet], selector: &str) -> HashMap<String, StyleProperty> {
+    let mut merged = HashMap::new();
+    for sheet in sheets {
+        if let Some(rule) = sheet.find_rule(selector) {
+            for (k, v) in &rule.properties {
+                merged.insert(k.clone(), v.clone());
+            }
+        }
+    }
+    merged
+}
+
+/// Compare two style rules and return the differences.
+/// Each entry is (property_name, old_value, new_value). Only properties that
+/// differ between the two rules are included.
+pub fn style_diff(
+    old: &StyleRule,
+    new: &StyleRule,
+) -> Vec<(String, Option<StyleProperty>, Option<StyleProperty>)> {
+    let mut result = Vec::new();
+    let mut all_keys: Vec<&String> = old.properties.keys().collect();
+    for k in new.properties.keys() {
+        if !all_keys.contains(&k) {
+            all_keys.push(k);
+        }
+    }
+    all_keys.sort();
+    for key in all_keys {
+        let old_val = old.properties.get(key);
+        let new_val = new.properties.get(key);
+        if old_val != new_val {
+            result.push((key.clone(), old_val.cloned(), new_val.cloned()));
+        }
+    }
+    result
+}
+
 /// Accumulated statistics for styles operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StylesStats {
@@ -858,6 +1004,196 @@ mod tests {
     #[test]
     fn blend_colors_non_rgb() {
         assert!(blend_colors(Color::Red, Color::Rgb(0, 0, 0), 0.5).is_none());
+    }
+
+    #[test]
+    fn test_style_property_eq() {
+        assert_eq!(
+            StyleProperty::ColorValue(Color::Red),
+            StyleProperty::ColorValue(Color::Red)
+        );
+        assert_ne!(
+            StyleProperty::ColorValue(Color::Red),
+            StyleProperty::ColorValue(Color::Blue)
+        );
+        assert_eq!(
+            StyleProperty::NumberValue(1.5),
+            StyleProperty::NumberValue(1.5)
+        );
+        assert_eq!(
+            StyleProperty::StringValue("a".into()),
+            StyleProperty::StringValue("a".into())
+        );
+        assert_eq!(
+            StyleProperty::ModifierValue(Modifier::BOLD),
+            StyleProperty::ModifierValue(Modifier::BOLD)
+        );
+    }
+
+    #[test]
+    fn test_style_rule_set_get() {
+        let mut rule = StyleRule::new("editor.background");
+        rule.set("color", StyleProperty::ColorValue(Color::Red));
+        assert!(rule.has("color"));
+        assert_eq!(
+            rule.get("color"),
+            Some(&StyleProperty::ColorValue(Color::Red))
+        );
+        assert_eq!(rule.property_count(), 1);
+        assert!(!rule.has("missing"));
+        assert_eq!(rule.get("missing"), None);
+    }
+
+    #[test]
+    fn test_style_rule_remove() {
+        let mut rule = StyleRule::new("test");
+        rule.set("a", StyleProperty::NumberValue(1.0));
+        assert!(rule.remove("a"));
+        assert!(!rule.has("a"));
+        assert!(!rule.remove("a"));
+        assert_eq!(rule.property_count(), 0);
+    }
+
+    #[test]
+    fn test_stylesheet_add_find() {
+        let mut sheet = StyleSheet::new();
+        let mut rule = StyleRule::new("editor.bg");
+        rule.set("color", StyleProperty::ColorValue(Color::Black));
+        sheet.add_rule(rule);
+        assert_eq!(sheet.rule_count(), 1);
+        assert!(sheet.find_rule("editor.bg").is_some());
+        assert!(sheet.find_rule("missing").is_none());
+    }
+
+    #[test]
+    fn test_stylesheet_remove_rule() {
+        let mut sheet = StyleSheet::new();
+        sheet.add_rule(StyleRule::new("a"));
+        sheet.add_rule(StyleRule::new("b"));
+        assert!(sheet.remove_rule("a"));
+        assert_eq!(sheet.rule_count(), 1);
+        assert!(!sheet.remove_rule("a"));
+    }
+
+    #[test]
+    fn test_stylesheet_merge() {
+        let mut base = StyleSheet::new();
+        let mut r1 = StyleRule::new("editor.bg");
+        r1.set("color", StyleProperty::ColorValue(Color::Black));
+        r1.set("opacity", StyleProperty::NumberValue(1.0));
+        base.add_rule(r1);
+
+        let mut overlay = StyleSheet::new();
+        let mut r2 = StyleRule::new("editor.bg");
+        r2.set("color", StyleProperty::ColorValue(Color::White));
+        overlay.add_rule(r2);
+        overlay.add_rule(StyleRule::new("sidebar.fg"));
+
+        base.merge(&overlay);
+        assert_eq!(base.rule_count(), 2);
+        let merged = base.find_rule("editor.bg").unwrap();
+        assert_eq!(
+            merged.get("color"),
+            Some(&StyleProperty::ColorValue(Color::White))
+        );
+        assert_eq!(
+            merged.get("opacity"),
+            Some(&StyleProperty::NumberValue(1.0))
+        );
+    }
+
+    #[test]
+    fn test_stylesheet_selectors() {
+        let mut sheet = StyleSheet::new();
+        sheet.add_rule(StyleRule::new("a"));
+        sheet.add_rule(StyleRule::new("b"));
+        let mut sels = sheet.selectors();
+        sels.sort();
+        assert_eq!(sels, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_style_cascade_single_sheet() {
+        let mut sheet = StyleSheet::new();
+        let mut rule = StyleRule::new("editor.bg");
+        rule.set("color", StyleProperty::ColorValue(Color::Red));
+        sheet.add_rule(rule);
+
+        let result = style_cascade(&[&sheet], "editor.bg");
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result.get("color"),
+            Some(&StyleProperty::ColorValue(Color::Red))
+        );
+    }
+
+    #[test]
+    fn test_style_cascade_override() {
+        let mut s1 = StyleSheet::new();
+        let mut r1 = StyleRule::new("bg");
+        r1.set("color", StyleProperty::ColorValue(Color::Red));
+        r1.set("size", StyleProperty::NumberValue(10.0));
+        s1.add_rule(r1);
+
+        let mut s2 = StyleSheet::new();
+        let mut r2 = StyleRule::new("bg");
+        r2.set("color", StyleProperty::ColorValue(Color::Blue));
+        s2.add_rule(r2);
+
+        let result = style_cascade(&[&s1, &s2], "bg");
+        assert_eq!(
+            result.get("color"),
+            Some(&StyleProperty::ColorValue(Color::Blue))
+        );
+        assert_eq!(
+            result.get("size"),
+            Some(&StyleProperty::NumberValue(10.0))
+        );
+    }
+
+    #[test]
+    fn test_style_cascade_missing_selector() {
+        let sheet = StyleSheet::new();
+        let result = style_cascade(&[&sheet], "nonexistent");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_style_diff_same_rule() {
+        let mut a = StyleRule::new("x");
+        a.set("color", StyleProperty::ColorValue(Color::Red));
+        let b = a.clone();
+        let diff = style_diff(&a, &b);
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn test_style_diff_changed_properties() {
+        let mut old = StyleRule::new("x");
+        old.set("color", StyleProperty::ColorValue(Color::Red));
+        let mut new = StyleRule::new("x");
+        new.set("color", StyleProperty::ColorValue(Color::Blue));
+        let diff = style_diff(&old, &new);
+        assert_eq!(diff.len(), 1);
+        assert_eq!(diff[0].0, "color");
+        assert_eq!(diff[0].1, Some(StyleProperty::ColorValue(Color::Red)));
+        assert_eq!(diff[0].2, Some(StyleProperty::ColorValue(Color::Blue)));
+    }
+
+    #[test]
+    fn test_style_diff_added_removed_props() {
+        let mut old = StyleRule::new("x");
+        old.set("a", StyleProperty::NumberValue(1.0));
+        let mut new = StyleRule::new("x");
+        new.set("b", StyleProperty::StringValue("hello".into()));
+        let diff = style_diff(&old, &new);
+        assert_eq!(diff.len(), 2);
+        let a_entry = diff.iter().find(|d| d.0 == "a").unwrap();
+        assert_eq!(a_entry.1, Some(StyleProperty::NumberValue(1.0)));
+        assert_eq!(a_entry.2, None);
+        let b_entry = diff.iter().find(|d| d.0 == "b").unwrap();
+        assert_eq!(b_entry.1, None);
+        assert_eq!(b_entry.2, Some(StyleProperty::StringValue("hello".into())));
     }
 
     #[test]

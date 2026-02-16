@@ -249,6 +249,173 @@ impl Default for TunnelWorkbenchService {
     }
 }
 
+/// Represents an active port forwarding connection with metadata.
+#[derive(Debug, Clone)]
+pub struct TunnelConnection {
+    pub tunnel_id: u64,
+    pub local_port: u16,
+    pub remote_port: u16,
+    pub remote_host: String,
+    pub protocol: TunnelProtocol,
+    pub bytes_in: u64,
+    pub bytes_out: u64,
+    pub connected_since: u64,
+}
+
+impl TunnelConnection {
+    pub fn new(tunnel_id: u64, local_port: u16, remote_host: &str, remote_port: u16, protocol: TunnelProtocol) -> Self {
+        Self {
+            tunnel_id,
+            local_port,
+            remote_port,
+            remote_host: remote_host.to_string(),
+            protocol,
+            bytes_in: 0,
+            bytes_out: 0,
+            connected_since: 0,
+        }
+    }
+
+    pub fn total_bytes(&self) -> u64 {
+        self.bytes_in + self.bytes_out
+    }
+
+    pub fn record_inbound(&mut self, bytes: u64) {
+        self.bytes_in += bytes;
+    }
+
+    pub fn record_outbound(&mut self, bytes: u64) {
+        self.bytes_out += bytes;
+    }
+
+    /// Format as "local_port -> remote_host:remote_port (protocol)"
+    pub fn display_address(&self) -> String {
+        let proto = match self.protocol {
+            TunnelProtocol::Http => "HTTP",
+            TunnelProtocol::Https => "HTTPS",
+            TunnelProtocol::Tcp => "TCP",
+        };
+        format!("{} -> {}:{} ({})", self.local_port, self.remote_host, self.remote_port, proto)
+    }
+}
+
+impl fmt::Display for TunnelConnection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.display_address())
+    }
+}
+
+/// Discovers available tunnels from a set of port ranges.
+#[derive(Debug, Clone)]
+pub struct TunnelDiscovery {
+    discovered: Vec<DiscoveredPort>,
+    scan_ranges: Vec<(u16, u16)>,
+}
+
+/// A discovered open port.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiscoveredPort {
+    pub port: u16,
+    pub process_name: Option<String>,
+    pub suggested_label: Option<String>,
+}
+
+impl TunnelDiscovery {
+    pub fn new() -> Self {
+        Self {
+            discovered: Vec::new(),
+            scan_ranges: vec![(3000, 3100), (8000, 8100), (5000, 5100)],
+        }
+    }
+
+    pub fn add_scan_range(&mut self, start: u16, end: u16) {
+        if start <= end {
+            self.scan_ranges.push((start, end));
+        }
+    }
+
+    pub fn scan_ranges(&self) -> &[(u16, u16)] {
+        &self.scan_ranges
+    }
+
+    /// Manually report a discovered port.
+    pub fn report_port(&mut self, port: u16, process_name: Option<&str>, label: Option<&str>) {
+        if !self.discovered.iter().any(|d| d.port == port) {
+            self.discovered.push(DiscoveredPort {
+                port,
+                process_name: process_name.map(|s| s.to_string()),
+                suggested_label: label.map(|s| s.to_string()),
+            });
+        }
+    }
+
+    pub fn discovered_ports(&self) -> &[DiscoveredPort] {
+        &self.discovered
+    }
+
+    pub fn clear(&mut self) {
+        self.discovered.clear();
+    }
+
+    /// Check if a port is in any of the scan ranges.
+    pub fn in_scan_range(&self, port: u16) -> bool {
+        self.scan_ranges.iter().any(|(start, end)| port >= *start && port <= *end)
+    }
+
+    /// Create a tunnel descriptor from a discovered port.
+    pub fn to_descriptor(&self, port: u16, privacy: TunnelPrivacy) -> Option<TunnelDescriptor> {
+        let discovered = self.discovered.iter().find(|d| d.port == port)?;
+        Some(TunnelDescriptor {
+            remote_address: format!("localhost:{port}"),
+            local_port: port,
+            privacy,
+            protocol: TunnelProtocol::Http,
+            label: discovered.suggested_label.clone(),
+        })
+    }
+}
+
+impl Default for TunnelDiscovery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Format a single tunnel for status bar display.
+pub fn tunnel_status_display(tunnel: &ManagedTunnel) -> String {
+    let state_icon = match tunnel.state {
+        TunnelState::Connecting => "⟳",
+        TunnelState::Connected => "●",
+        TunnelState::Closed => "○",
+        TunnelState::Error(_) => "✗",
+    };
+    let label = tunnel.descriptor.label.as_deref().unwrap_or("tunnel");
+    let proto = match tunnel.descriptor.protocol {
+        TunnelProtocol::Http => "HTTP",
+        TunnelProtocol::Https => "HTTPS",
+        TunnelProtocol::Tcp => "TCP",
+    };
+    format!("{state_icon} {label} :{} ({proto})", tunnel.descriptor.local_port)
+}
+
+/// Format a summary line for all active tunnels (for status bar).
+pub fn tunnel_status_summary(service: &TunnelWorkbenchService) -> String {
+    let active = service.get_active_tunnels();
+    if active.is_empty() {
+        return "No active tunnels".to_string();
+    }
+    let count = active.len();
+    let total_bytes: u64 = active.iter().map(|t| t.bytes_transferred).sum();
+    let bytes_display = if total_bytes < 1024 {
+        format!("{total_bytes} B")
+    } else if total_bytes < 1024 * 1024 {
+        format!("{:.1} KB", total_bytes as f64 / 1024.0)
+    } else {
+        format!("{:.1} MB", total_bytes as f64 / (1024.0 * 1024.0))
+    };
+    format!("{count} tunnel(s) active, {bytes_display} transferred")
+}
+
 /// Accumulated statistics for wb-tunnel operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WbTunnelStats {
@@ -993,5 +1160,101 @@ mod tests {
     fn wb_tunnel_is_ascii_printable() {
         assert!(WbTunnelValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbTunnelValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn connection_total_bytes() {
+        let mut conn = TunnelConnection::new(1, 3000, "remote.host", 80, TunnelProtocol::Http);
+        conn.record_inbound(100);
+        conn.record_outbound(200);
+        assert_eq!(conn.total_bytes(), 300);
+    }
+
+    #[test]
+    fn connection_display_address() {
+        let conn = TunnelConnection::new(1, 8080, "example.com", 443, TunnelProtocol::Https);
+        assert_eq!(conn.display_address(), "8080 -> example.com:443 (HTTPS)");
+    }
+
+    #[test]
+    fn connection_display_trait() {
+        let conn = TunnelConnection::new(1, 3000, "localhost", 3000, TunnelProtocol::Tcp);
+        let s = format!("{conn}");
+        assert!(s.contains("TCP"));
+        assert!(s.contains("3000"));
+    }
+
+    #[test]
+    fn discovery_report_and_query() {
+        let mut disc = TunnelDiscovery::new();
+        disc.report_port(3000, Some("node"), Some("Frontend"));
+        disc.report_port(8080, None, None);
+        assert_eq!(disc.discovered_ports().len(), 2);
+    }
+
+    #[test]
+    fn discovery_no_duplicates() {
+        let mut disc = TunnelDiscovery::new();
+        disc.report_port(3000, None, None);
+        disc.report_port(3000, None, None);
+        assert_eq!(disc.discovered_ports().len(), 1);
+    }
+
+    #[test]
+    fn discovery_in_scan_range() {
+        let disc = TunnelDiscovery::new();
+        assert!(disc.in_scan_range(3000));
+        assert!(disc.in_scan_range(8050));
+        assert!(!disc.in_scan_range(9999));
+    }
+
+    #[test]
+    fn discovery_to_descriptor() {
+        let mut disc = TunnelDiscovery::new();
+        disc.report_port(3000, None, Some("Web"));
+        let desc = disc.to_descriptor(3000, TunnelPrivacy::Private).unwrap();
+        assert_eq!(desc.local_port, 3000);
+        assert_eq!(desc.label, Some("Web".to_string()));
+    }
+
+    #[test]
+    fn status_display_connected() {
+        let mut svc = TunnelWorkbenchService::new();
+        let id = svc.create_tunnel(TunnelDescriptor {
+            remote_address: "localhost:3000".into(),
+            local_port: 3000,
+            privacy: TunnelPrivacy::Private,
+            protocol: TunnelProtocol::Http,
+            label: Some("Web".into()),
+        });
+        svc.set_state(id, TunnelState::Connected);
+        let t = svc.get_tunnel(id).unwrap();
+        let s = tunnel_status_display(t);
+        assert!(s.contains("●"));
+        assert!(s.contains("Web"));
+        assert!(s.contains("3000"));
+    }
+
+    #[test]
+    fn status_summary_no_tunnels() {
+        let svc = TunnelWorkbenchService::new();
+        assert_eq!(tunnel_status_summary(&svc), "No active tunnels");
+    }
+
+    #[test]
+    fn status_summary_with_tunnels() {
+        let mut svc = TunnelWorkbenchService::new();
+        let id = svc.create_tunnel(TunnelDescriptor {
+            remote_address: "localhost:3000".into(),
+            local_port: 3000,
+            privacy: TunnelPrivacy::Private,
+            protocol: TunnelProtocol::Http,
+            label: None,
+        });
+        svc.set_state(id, TunnelState::Connected);
+        svc.record_transfer(id, 2048);
+        let s = tunnel_status_summary(&svc);
+        assert!(s.contains("1 tunnel(s) active"));
+        assert!(s.contains("KB"));
     }
 }

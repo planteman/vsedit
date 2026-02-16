@@ -621,6 +621,212 @@ pub fn validate_input(value: &str, min_len: usize, max_len: usize) -> Option<Str
     }
 }
 
+// ---------------------------------------------------------------------------
+// Confirm dialog with selectable options
+// ---------------------------------------------------------------------------
+
+/// A value associated with a confirm option.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConfirmValue {
+    Yes,
+    No,
+    Cancel,
+    Custom(String),
+}
+
+/// A single option in a confirm dialog.
+#[derive(Debug, Clone)]
+pub struct ConfirmOption {
+    pub label: String,
+    pub value: ConfirmValue,
+}
+
+/// State for a yes/no/cancel confirmation dialog.
+pub struct ConfirmDialog {
+    pub message: String,
+    pub detail: Option<String>,
+    pub severity: Severity,
+    pub options: Vec<ConfirmOption>,
+    pub selected: usize,
+}
+
+impl ConfirmDialog {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            detail: None,
+            severity: Severity::Info,
+            options: Vec::new(),
+            selected: 0,
+        }
+    }
+
+    pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+
+    pub fn with_severity(mut self, severity: Severity) -> Self {
+        self.severity = severity;
+        self
+    }
+
+    pub fn yes_no(mut self) -> Self {
+        self.options = vec![
+            ConfirmOption { label: "Yes".into(), value: ConfirmValue::Yes },
+            ConfirmOption { label: "No".into(), value: ConfirmValue::No },
+        ];
+        self
+    }
+
+    pub fn yes_no_cancel(mut self) -> Self {
+        self.options = vec![
+            ConfirmOption { label: "Yes".into(), value: ConfirmValue::Yes },
+            ConfirmOption { label: "No".into(), value: ConfirmValue::No },
+            ConfirmOption { label: "Cancel".into(), value: ConfirmValue::Cancel },
+        ];
+        self
+    }
+
+    pub fn add_option(mut self, label: impl Into<String>, value: ConfirmValue) -> Self {
+        self.options.push(ConfirmOption {
+            label: label.into(),
+            value,
+        });
+        self
+    }
+
+    pub fn select_next(&mut self) {
+        if !self.options.is_empty() {
+            self.selected = (self.selected + 1) % self.options.len();
+        }
+    }
+
+    pub fn select_prev(&mut self) {
+        if !self.options.is_empty() {
+            self.selected = if self.selected == 0 {
+                self.options.len() - 1
+            } else {
+                self.selected - 1
+            };
+        }
+    }
+
+    pub fn confirm(&self) -> &ConfirmOption {
+        &self.options[self.selected]
+    }
+
+    pub fn option_count(&self) -> usize {
+        self.options.len()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Input validator
+// ---------------------------------------------------------------------------
+
+/// Validates input dialog text against configurable constraints.
+pub struct InputValidator {
+    pub min_length: Option<usize>,
+    pub max_length: Option<usize>,
+    pub pattern: Option<String>,
+    pub required: bool,
+    pub forbidden_chars: Vec<char>,
+}
+
+impl InputValidator {
+    pub fn new() -> Self {
+        Self {
+            min_length: None,
+            max_length: None,
+            pattern: None,
+            required: false,
+            forbidden_chars: Vec::new(),
+        }
+    }
+
+    pub fn with_min_length(mut self, n: usize) -> Self {
+        self.min_length = Some(n);
+        self
+    }
+
+    pub fn with_max_length(mut self, n: usize) -> Self {
+        self.max_length = Some(n);
+        self
+    }
+
+    pub fn with_required(mut self, required: bool) -> Self {
+        self.required = required;
+        self
+    }
+
+    pub fn with_forbidden_chars(mut self, chars: Vec<char>) -> Self {
+        self.forbidden_chars = chars;
+        self
+    }
+
+    pub fn validate(&self, input: &str) -> Result<(), String> {
+        if self.required && input.is_empty() {
+            return Err("Input is required".into());
+        }
+        if let Some(min) = self.min_length {
+            if input.len() < min {
+                return Err(format!(
+                    "Input too short: minimum {} characters required, got {}",
+                    min,
+                    input.len()
+                ));
+            }
+        }
+        if let Some(max) = self.max_length {
+            if input.len() > max {
+                return Err(format!(
+                    "Input too long: maximum {} characters allowed, got {}",
+                    max,
+                    input.len()
+                ));
+            }
+        }
+        for c in &self.forbidden_chars {
+            if input.contains(*c) {
+                return Err(format!("Input contains forbidden character: '{}'", c));
+            }
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Platform enum and button layout
+// ---------------------------------------------------------------------------
+
+/// Target platform, used for platform-specific dialog behaviour.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Platform {
+    Windows,
+    MacOS,
+    Linux,
+}
+
+/// Returns buttons in platform-appropriate order.
+///
+/// On macOS the primary/confirm button goes last (rightmost).
+/// On Windows and Linux the primary button goes first (leftmost).
+/// The first element of `buttons` is treated as the primary button.
+pub fn dialog_button_layout(buttons: &[String], platform: Platform) -> Vec<String> {
+    if buttons.is_empty() {
+        return Vec::new();
+    }
+    match platform {
+        Platform::MacOS => {
+            let mut result: Vec<String> = buttons[1..].to_vec();
+            result.push(buttons[0].clone());
+            result
+        }
+        Platform::Windows | Platform::Linux => buttons.to_vec(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1002,5 +1208,135 @@ mod tests {
         let opts = InputDialogOptions::new("Enter value");
         let state = show_input_dialog(opts);
         assert!(state.input_text.is_empty());
+    }
+
+    // --- ConfirmDialog tests ---
+
+    #[test]
+    fn test_confirm_dialog_yes_no() {
+        let dialog = ConfirmDialog::new("Save changes?").yes_no();
+        assert_eq!(dialog.option_count(), 2);
+        assert_eq!(dialog.options[0].value, ConfirmValue::Yes);
+        assert_eq!(dialog.options[1].value, ConfirmValue::No);
+        assert_eq!(dialog.confirm().value, ConfirmValue::Yes);
+    }
+
+    #[test]
+    fn test_confirm_dialog_yes_no_cancel() {
+        let dialog = ConfirmDialog::new("Save?").yes_no_cancel();
+        assert_eq!(dialog.option_count(), 3);
+        assert_eq!(dialog.options[0].value, ConfirmValue::Yes);
+        assert_eq!(dialog.options[1].value, ConfirmValue::No);
+        assert_eq!(dialog.options[2].value, ConfirmValue::Cancel);
+    }
+
+    #[test]
+    fn test_confirm_dialog_navigation() {
+        let mut dialog = ConfirmDialog::new("Navigate?").yes_no_cancel();
+        assert_eq!(dialog.selected, 0);
+        dialog.select_next();
+        assert_eq!(dialog.selected, 1);
+        dialog.select_next();
+        assert_eq!(dialog.selected, 2);
+        dialog.select_next();
+        assert_eq!(dialog.selected, 0); // wraps
+        dialog.select_prev();
+        assert_eq!(dialog.selected, 2); // wraps back
+    }
+
+    #[test]
+    fn test_confirm_dialog_custom_option() {
+        let dialog = ConfirmDialog::new("Choose")
+            .add_option("Save All", ConfirmValue::Custom("save_all".into()))
+            .add_option("Discard", ConfirmValue::Custom("discard".into()))
+            .with_detail("Pick an action")
+            .with_severity(Severity::Warning);
+        assert_eq!(dialog.option_count(), 2);
+        assert_eq!(dialog.detail, Some("Pick an action".into()));
+        assert_eq!(dialog.severity, Severity::Warning);
+        assert_eq!(dialog.confirm().label, "Save All");
+    }
+
+    #[test]
+    fn test_confirm_value_eq() {
+        assert_eq!(ConfirmValue::Yes, ConfirmValue::Yes);
+        assert_ne!(ConfirmValue::Yes, ConfirmValue::No);
+        assert_ne!(ConfirmValue::Cancel, ConfirmValue::No);
+        assert_eq!(
+            ConfirmValue::Custom("a".into()),
+            ConfirmValue::Custom("a".into())
+        );
+        assert_ne!(
+            ConfirmValue::Custom("a".into()),
+            ConfirmValue::Custom("b".into())
+        );
+    }
+
+    // --- InputValidator tests ---
+
+    #[test]
+    fn test_input_validator_required() {
+        let v = InputValidator::new().with_required(true);
+        assert!(v.validate("").is_err());
+        assert!(v.validate("ok").is_ok());
+    }
+
+    #[test]
+    fn test_input_validator_min_length() {
+        let v = InputValidator::new().with_min_length(3);
+        assert!(v.validate("ab").is_err());
+        assert!(v.validate("abc").is_ok());
+    }
+
+    #[test]
+    fn test_input_validator_max_length() {
+        let v = InputValidator::new().with_max_length(5);
+        assert!(v.validate("hello").is_ok());
+        assert!(v.validate("toolong").is_err());
+    }
+
+    #[test]
+    fn test_input_validator_forbidden_chars() {
+        let v = InputValidator::new().with_forbidden_chars(vec!['/', '\\']);
+        assert!(v.validate("hello").is_ok());
+        assert!(v.validate("a/b").is_err());
+        assert!(v.validate("a\\b").is_err());
+    }
+
+    #[test]
+    fn test_input_validator_all_pass() {
+        let v = InputValidator::new()
+            .with_required(true)
+            .with_min_length(2)
+            .with_max_length(10)
+            .with_forbidden_chars(vec!['@']);
+        assert!(v.validate("hello").is_ok());
+        assert!(v.validate("").is_err());
+        assert!(v.validate("x").is_err());
+        assert!(v.validate("way too long string").is_err());
+        assert!(v.validate("h@llo").is_err());
+    }
+
+    // --- Platform / button layout tests ---
+
+    #[test]
+    fn test_button_layout_macos() {
+        let buttons = vec!["OK".into(), "Cancel".into()];
+        let layout = dialog_button_layout(&buttons, Platform::MacOS);
+        assert_eq!(layout, vec!["Cancel", "OK"]);
+    }
+
+    #[test]
+    fn test_button_layout_linux() {
+        let buttons = vec!["OK".into(), "Cancel".into()];
+        let layout = dialog_button_layout(&buttons, Platform::Linux);
+        assert_eq!(layout, vec!["OK", "Cancel"]);
+    }
+
+    #[test]
+    fn test_button_layout_windows() {
+        let buttons = vec!["Save".into(), "Don't Save".into(), "Cancel".into()];
+        let layout = dialog_button_layout(&buttons, Platform::Windows);
+        assert_eq!(layout, vec!["Save", "Don't Save", "Cancel"]);
     }
 }

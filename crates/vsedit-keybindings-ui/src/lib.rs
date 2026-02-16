@@ -276,6 +276,188 @@ impl Default for KeybindingRegistry {
     }
 }
 
+/// A row in the keybinding editor table, ready for display.
+#[derive(Debug, Clone)]
+pub struct KeybindingTableRow {
+    pub command: String,
+    pub keybinding_label: String,
+    pub when_clause: String,
+    pub source_label: String,
+    pub has_conflict: bool,
+}
+
+impl KeybindingTableRow {
+    /// Build a table row from a binding and conflict status.
+    pub fn from_binding(binding: &Keybinding, has_conflict: bool) -> Self {
+        Self {
+            command: binding.command.clone(),
+            keybinding_label: format_key_combo(&binding.key, &binding.modifiers),
+            when_clause: binding.when_clause.clone().unwrap_or_default(),
+            source_label: match binding.source {
+                KeybindingSource::Default => "Default".to_string(),
+                KeybindingSource::User => "User".to_string(),
+                KeybindingSource::Extension => "Extension".to_string(),
+            },
+            has_conflict,
+        }
+    }
+
+    /// Returns a formatted display string for the row.
+    pub fn display_line(&self) -> String {
+        let conflict_marker = if self.has_conflict { " ⚠" } else { "" };
+        format!(
+            "{:<30} {:<20} {:<20} [{}]{}",
+            self.command, self.keybinding_label, self.when_clause, self.source_label, conflict_marker
+        )
+    }
+}
+
+/// Build table rows from a registry, marking conflicts.
+pub fn build_table_rows(registry: &KeybindingRegistry) -> Vec<KeybindingTableRow> {
+    let conflicts = registry.find_conflicts();
+    let conflict_keys: Vec<(KeyCode, Modifiers)> = conflicts
+        .iter()
+        .flat_map(|c| c.bindings.iter().map(|b| (b.key.clone(), b.modifiers.clone())))
+        .collect();
+    registry
+        .get_all_bindings()
+        .iter()
+        .map(|b| {
+            let has_conflict = conflict_keys.iter().any(|(k, m)| k == &b.key && m == &b.modifiers);
+            KeybindingTableRow::from_binding(b, has_conflict)
+        })
+        .collect()
+}
+
+/// Result of a conflict check.
+#[derive(Debug, Clone)]
+pub struct ConflictCheckResult {
+    pub has_conflicts: bool,
+    pub conflict_count: usize,
+    pub conflicting_commands: Vec<(String, String)>,
+}
+
+/// Check a proposed new binding against an existing registry for conflicts.
+pub fn keybinding_conflict_check(
+    registry: &KeybindingRegistry,
+    key: &KeyCode,
+    modifiers: &Modifiers,
+    when_clause: Option<&str>,
+) -> ConflictCheckResult {
+    let existing = registry.find_by_key(key, modifiers);
+    let mut conflicting_commands = Vec::new();
+    for binding in &existing {
+        // Two bindings conflict if they share the same key+modifiers and
+        // either has no when-clause or they share the same when-clause.
+        let when_overlaps = match (&binding.when_clause, when_clause) {
+            (None, _) | (_, None) => true,
+            (Some(a), Some(b)) => a == b,
+        };
+        if when_overlaps {
+            conflicting_commands.push((
+                binding.command.clone(),
+                format_key_combo(&binding.key, &binding.modifiers),
+            ));
+        }
+    }
+    ConflictCheckResult {
+        has_conflicts: !conflicting_commands.is_empty(),
+        conflict_count: conflicting_commands.len(),
+        conflicting_commands,
+    }
+}
+
+/// State machine for recording a keybinding sequence from user input.
+#[derive(Debug, Clone)]
+pub struct KeybindingRecorder {
+    keys: Vec<(KeyCode, Modifiers)>,
+    max_chords: usize,
+    recording: bool,
+}
+
+impl KeybindingRecorder {
+    pub fn new() -> Self {
+        Self {
+            keys: Vec::new(),
+            max_chords: 2,
+            recording: false,
+        }
+    }
+
+    pub fn start(&mut self) {
+        self.keys.clear();
+        self.recording = true;
+    }
+
+    pub fn stop(&mut self) {
+        self.recording = false;
+    }
+
+    pub fn is_recording(&self) -> bool {
+        self.recording
+    }
+
+    /// Record a key press. Returns true if the recording is now complete
+    /// (reached max_chords).
+    pub fn record_key(&mut self, key: KeyCode, modifiers: Modifiers) -> bool {
+        if !self.recording {
+            return false;
+        }
+        // Don't record bare modifier keys
+        if matches!(key, KeyCode::Char(_) | KeyCode::Enter | KeyCode::Escape |
+            KeyCode::Tab | KeyCode::Space | KeyCode::F(_) | KeyCode::Delete |
+            KeyCode::Home | KeyCode::End | KeyCode::PageUp | KeyCode::PageDown |
+            KeyCode::Backspace | KeyCode::ArrowUp | KeyCode::ArrowDown |
+            KeyCode::ArrowLeft | KeyCode::ArrowRight) {
+            self.keys.push((key, modifiers));
+        }
+        if self.keys.len() >= self.max_chords {
+            self.recording = false;
+            return true;
+        }
+        false
+    }
+
+    pub fn recorded_keys(&self) -> &[(KeyCode, Modifiers)] {
+        &self.keys
+    }
+
+    pub fn clear(&mut self) {
+        self.keys.clear();
+    }
+
+    /// Format the recorded sequence as a human-readable string.
+    pub fn format(&self) -> String {
+        self.keys
+            .iter()
+            .map(|(k, m)| format_key_combo(k, m))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    pub fn set_max_chords(&mut self, max: usize) {
+        self.max_chords = max.max(1);
+    }
+
+    /// Convert a single-chord recording to a Keybinding.
+    pub fn to_keybinding(&self, command: &str) -> Option<Keybinding> {
+        let (key, modifiers) = self.keys.first()?;
+        Some(Keybinding {
+            key: key.clone(),
+            modifiers: modifiers.clone(),
+            command: command.to_string(),
+            when_clause: None,
+            source: KeybindingSource::User,
+        })
+    }
+}
+
+impl Default for KeybindingRecorder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Accumulated statistics for keybindings-ui operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct KeybindingsUiStats {
@@ -993,5 +1175,98 @@ mod tests {
     fn keybindings_ui_is_ascii_printable() {
         assert!(KeybindingsUiValidator::is_ascii_printable("Hello World 123"));
         assert!(!KeybindingsUiValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn table_row_from_binding() {
+        let b = Keybinding {
+            key: KeyCode::Char('s'), modifiers: Modifiers { ctrl: true, shift: false, alt: false, meta: false },
+            command: "editor.save".to_string(), when_clause: None, source: KeybindingSource::User,
+        };
+        let row = KeybindingTableRow::from_binding(&b, false);
+        assert_eq!(row.command, "editor.save");
+        assert_eq!(row.keybinding_label, "Ctrl+S");
+        assert!(!row.has_conflict);
+    }
+
+    #[test]
+    fn table_row_display_with_conflict() {
+        let b = Keybinding {
+            key: KeyCode::Char('c'), modifiers: Modifiers { ctrl: true, shift: false, alt: false, meta: false },
+            command: "editor.copy".to_string(), when_clause: Some("editorFocus".to_string()), source: KeybindingSource::Default,
+        };
+        let row = KeybindingTableRow::from_binding(&b, true);
+        let line = row.display_line();
+        assert!(line.contains("⚠"));
+        assert!(line.contains("editor.copy"));
+    }
+
+    #[test]
+    fn build_table_rows_marks_conflicts() {
+        let mut reg = KeybindingRegistry::new();
+        let mods = Modifiers { ctrl: true, shift: false, alt: false, meta: false };
+        reg.add(Keybinding { key: KeyCode::Char('s'), modifiers: mods.clone(), command: "save".into(), when_clause: None, source: KeybindingSource::Default });
+        reg.add(Keybinding { key: KeyCode::Char('s'), modifiers: mods.clone(), command: "other".into(), when_clause: None, source: KeybindingSource::User });
+        let rows = build_table_rows(&reg);
+        assert!(rows.iter().all(|r| r.has_conflict));
+    }
+
+    #[test]
+    fn conflict_check_finds_overlap() {
+        let mut reg = KeybindingRegistry::new();
+        let mods = Modifiers { ctrl: true, shift: false, alt: false, meta: false };
+        reg.add(Keybinding { key: KeyCode::Char('p'), modifiers: mods.clone(), command: "palette".into(), when_clause: None, source: KeybindingSource::Default });
+        let result = keybinding_conflict_check(&reg, &KeyCode::Char('p'), &mods, None);
+        assert!(result.has_conflicts);
+        assert_eq!(result.conflict_count, 1);
+    }
+
+    #[test]
+    fn conflict_check_no_overlap_different_when() {
+        let mut reg = KeybindingRegistry::new();
+        let mods = Modifiers { ctrl: true, shift: false, alt: false, meta: false };
+        reg.add(Keybinding { key: KeyCode::Char('p'), modifiers: mods.clone(), command: "palette".into(), when_clause: Some("editorFocus".into()), source: KeybindingSource::Default });
+        let result = keybinding_conflict_check(&reg, &KeyCode::Char('p'), &mods, Some("terminalFocus"));
+        assert!(!result.has_conflicts);
+    }
+
+    #[test]
+    fn recorder_single_key() {
+        let mut rec = KeybindingRecorder::new();
+        rec.start();
+        assert!(rec.is_recording());
+        let complete = rec.record_key(KeyCode::Char('a'), Modifiers::none());
+        assert!(!complete);
+        assert_eq!(rec.recorded_keys().len(), 1);
+        assert_eq!(rec.format(), "A");
+    }
+
+    #[test]
+    fn recorder_chord_completes() {
+        let mut rec = KeybindingRecorder::new();
+        rec.start();
+        rec.record_key(KeyCode::Char('k'), Modifiers { ctrl: true, shift: false, alt: false, meta: false });
+        let done = rec.record_key(KeyCode::Char('s'), Modifiers::none());
+        assert!(done);
+        assert!(!rec.is_recording());
+        assert_eq!(rec.format(), "Ctrl+K S");
+    }
+
+    #[test]
+    fn recorder_to_keybinding() {
+        let mut rec = KeybindingRecorder::new();
+        rec.start();
+        rec.record_key(KeyCode::F(5), Modifiers::none());
+        let kb = rec.to_keybinding("debug.run").unwrap();
+        assert_eq!(kb.command, "debug.run");
+        assert_eq!(kb.key, KeyCode::F(5));
+    }
+
+    #[test]
+    fn recorder_not_recording_ignores() {
+        let mut rec = KeybindingRecorder::new();
+        let done = rec.record_key(KeyCode::Char('x'), Modifiers::none());
+        assert!(!done);
+        assert!(rec.recorded_keys().is_empty());
     }
 }

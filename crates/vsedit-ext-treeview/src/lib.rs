@@ -275,6 +275,164 @@ pub fn register() {
     // Registration will connect RPC handlers when extension host starts
 }
 
+/// Options for revealing a node in a tree view.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TreeViewReveal {
+    pub item_id: String,
+    pub select: bool,
+    pub focus: bool,
+    pub expand: bool,
+}
+
+impl TreeViewReveal {
+    pub fn new(item_id: &str) -> Self {
+        Self {
+            item_id: item_id.to_string(),
+            select: true,
+            focus: false,
+            expand: false,
+        }
+    }
+
+    pub fn with_select(mut self, select: bool) -> Self {
+        self.select = select;
+        self
+    }
+
+    pub fn with_focus(mut self, focus: bool) -> Self {
+        self.focus = focus;
+        self
+    }
+
+    pub fn with_expand(mut self, expand: bool) -> Self {
+        self.expand = expand;
+        self
+    }
+
+    /// Validate that the item_id exists in the given tree. Returns the path of ancestor IDs.
+    pub fn find_path(&self, items: &[TreeItem]) -> Option<Vec<String>> {
+        fn find_path_inner(items: &[TreeItem], target: &str, path: &mut Vec<String>) -> bool {
+            for item in items {
+                path.push(item.id.clone());
+                if item.id == target {
+                    return true;
+                }
+                if find_path_inner(&item.children, target, path) {
+                    return true;
+                }
+                path.pop();
+            }
+            false
+        }
+        let mut path = Vec::new();
+        if find_path_inner(items, &self.item_id, &mut path) {
+            Some(path)
+        } else {
+            None
+        }
+    }
+}
+
+/// Manages drag-and-drop state for a tree view.
+#[derive(Debug, Clone)]
+pub struct TreeViewDragDrop {
+    pub drag_sources: Vec<String>,
+    pub drop_targets: Vec<String>,
+    drag_mime_types: Vec<String>,
+    drop_mime_types: Vec<String>,
+}
+
+impl TreeViewDragDrop {
+    pub fn new() -> Self {
+        Self {
+            drag_sources: Vec::new(),
+            drop_targets: Vec::new(),
+            drag_mime_types: Vec::new(),
+            drop_mime_types: Vec::new(),
+        }
+    }
+
+    pub fn register_drag_source(&mut self, item_id: &str) {
+        if !self.drag_sources.contains(&item_id.to_string()) {
+            self.drag_sources.push(item_id.to_string());
+        }
+    }
+
+    pub fn register_drop_target(&mut self, item_id: &str) {
+        if !self.drop_targets.contains(&item_id.to_string()) {
+            self.drop_targets.push(item_id.to_string());
+        }
+    }
+
+    pub fn add_drag_mime_type(&mut self, mime: &str) {
+        if !self.drag_mime_types.contains(&mime.to_string()) {
+            self.drag_mime_types.push(mime.to_string());
+        }
+    }
+
+    pub fn add_drop_mime_type(&mut self, mime: &str) {
+        if !self.drop_mime_types.contains(&mime.to_string()) {
+            self.drop_mime_types.push(mime.to_string());
+        }
+    }
+
+    pub fn can_drag(&self, item_id: &str) -> bool {
+        self.drag_sources.iter().any(|s| s == item_id)
+    }
+
+    pub fn can_drop_on(&self, item_id: &str) -> bool {
+        self.drop_targets.iter().any(|t| t == item_id)
+    }
+
+    /// Check if a drag source can be dropped on a target (validates both are registered).
+    pub fn validate_drop(&self, source_id: &str, target_id: &str) -> bool {
+        self.can_drag(source_id) && self.can_drop_on(target_id) && source_id != target_id
+    }
+
+    pub fn drag_mime_types(&self) -> &[String] {
+        &self.drag_mime_types
+    }
+
+    pub fn drop_mime_types(&self) -> &[String] {
+        &self.drop_mime_types
+    }
+}
+
+impl Default for TreeViewDragDrop {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Search a tree recursively for items whose label contains the query (case-insensitive).
+/// Returns a flat list of matching items (cloned).
+pub fn tree_view_search(items: &[TreeItem], query: &str) -> Vec<TreeItem> {
+    let query_lower = query.to_lowercase();
+    let mut results = Vec::new();
+    for item in items {
+        if item.label.to_lowercase().contains(&query_lower) {
+            results.push(item.clone());
+        }
+        results.extend(tree_view_search(&item.children, query));
+    }
+    results
+}
+
+/// Filter a tree, keeping only items matching the predicate plus their ancestors.
+/// Returns a new tree with non-matching leaf nodes removed.
+pub fn tree_view_filter(items: &[TreeItem], predicate: &dyn Fn(&TreeItem) -> bool) -> Vec<TreeItem> {
+    let mut result = Vec::new();
+    for item in items {
+        let filtered_children = tree_view_filter(&item.children, predicate);
+        if predicate(item) || !filtered_children.is_empty() {
+            let mut cloned = item.clone();
+            cloned.children = filtered_children;
+            result.push(cloned);
+        }
+    }
+    result
+}
+
 /// Accumulated statistics for ext-treeview operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtTreeviewStats {
@@ -993,5 +1151,130 @@ mod tests {
     fn ext_treeview_is_ascii_printable() {
         assert!(ExtTreeviewValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtTreeviewValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    fn make_test_tree() -> Vec<TreeItem> {
+        vec![
+            TreeItem {
+                id: "root".into(), label: "Root".into(),
+                description: None, tooltip: None, icon_id: None,
+                collapsible_state: TreeItemCollapsibleState::Expanded,
+                command: None, context_value: None,
+                children: vec![
+                    TreeItem {
+                        id: "child1".into(), label: "Alpha File".into(),
+                        description: None, tooltip: None, icon_id: None,
+                        collapsible_state: TreeItemCollapsibleState::None,
+                        command: None, context_value: None, children: vec![],
+                    },
+                    TreeItem {
+                        id: "child2".into(), label: "Beta Folder".into(),
+                        description: None, tooltip: None, icon_id: None,
+                        collapsible_state: TreeItemCollapsibleState::Collapsed,
+                        command: None, context_value: None,
+                        children: vec![
+                            TreeItem {
+                                id: "grandchild".into(), label: "Gamma Item".into(),
+                                description: None, tooltip: None, icon_id: None,
+                                collapsible_state: TreeItemCollapsibleState::None,
+                                command: None, context_value: None, children: vec![],
+                            },
+                        ],
+                    },
+                ],
+            },
+        ]
+    }
+
+    #[test]
+    fn reveal_find_path_root() {
+        let tree = make_test_tree();
+        let reveal = TreeViewReveal::new("root");
+        let path = reveal.find_path(&tree).unwrap();
+        assert_eq!(path, vec!["root"]);
+    }
+
+    #[test]
+    fn reveal_find_path_deep() {
+        let tree = make_test_tree();
+        let reveal = TreeViewReveal::new("grandchild");
+        let path = reveal.find_path(&tree).unwrap();
+        assert_eq!(path, vec!["root", "child2", "grandchild"]);
+    }
+
+    #[test]
+    fn reveal_find_path_not_found() {
+        let tree = make_test_tree();
+        let reveal = TreeViewReveal::new("nonexistent");
+        assert!(reveal.find_path(&tree).is_none());
+    }
+
+    #[test]
+    fn reveal_builder_pattern() {
+        let reveal = TreeViewReveal::new("x").with_focus(true).with_expand(true);
+        assert!(reveal.focus);
+        assert!(reveal.expand);
+        assert!(reveal.select);
+    }
+
+    #[test]
+    fn drag_drop_register_and_validate() {
+        let mut dd = TreeViewDragDrop::new();
+        dd.register_drag_source("item1");
+        dd.register_drop_target("item2");
+        assert!(dd.can_drag("item1"));
+        assert!(!dd.can_drag("item2"));
+        assert!(dd.can_drop_on("item2"));
+        assert!(dd.validate_drop("item1", "item2"));
+    }
+
+    #[test]
+    fn drag_drop_no_self_drop() {
+        let mut dd = TreeViewDragDrop::new();
+        dd.register_drag_source("a");
+        dd.register_drop_target("a");
+        assert!(!dd.validate_drop("a", "a"));
+    }
+
+    #[test]
+    fn drag_drop_no_duplicates() {
+        let mut dd = TreeViewDragDrop::new();
+        dd.register_drag_source("x");
+        dd.register_drag_source("x");
+        assert_eq!(dd.drag_sources.len(), 1);
+    }
+
+    #[test]
+    fn search_finds_matching_items() {
+        let tree = make_test_tree();
+        let results = tree_view_search(&tree, "alpha");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "child1");
+    }
+
+    #[test]
+    fn search_case_insensitive() {
+        let tree = make_test_tree();
+        let results = tree_view_search(&tree, "GAMMA");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "grandchild");
+    }
+
+    #[test]
+    fn search_no_match() {
+        let tree = make_test_tree();
+        let results = tree_view_search(&tree, "zzz");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn filter_keeps_matching_and_ancestors() {
+        let tree = make_test_tree();
+        let filtered = tree_view_filter(&tree, &|item| item.id == "grandchild");
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].id, "root");
+        assert_eq!(filtered[0].children.len(), 1);
+        assert_eq!(filtered[0].children[0].id, "child2");
+        assert_eq!(filtered[0].children[0].children.len(), 1);
     }
 }

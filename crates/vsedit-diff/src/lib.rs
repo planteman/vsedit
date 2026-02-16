@@ -535,6 +535,183 @@ impl Default for DiffValidator {
     }
 }
 
+/// Type of change represented by a [`DiffHunk`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiffHunkType {
+    /// Lines were added.
+    Add,
+    /// Lines were deleted.
+    Delete,
+    /// Lines were modified (replaced).
+    Modify,
+}
+
+/// A rich hunk representation carrying the actual line content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiffHunk {
+    pub change_type: DiffHunkType,
+    pub original_lines: Vec<String>,
+    pub modified_lines: Vec<String>,
+    pub original_start: u32,
+    pub modified_start: u32,
+}
+
+/// Compute rich [`DiffHunk`]s from two texts using `similar::TextDiff`.
+pub fn compute_diff_hunks(original: &str, modified: &str) -> Vec<DiffHunk> {
+    let diff = TextDiff::from_lines(original, modified);
+    let mut hunks: Vec<DiffHunk> = Vec::new();
+
+    // Collect contiguous groups of non-equal changes.
+    let mut del_lines: Vec<String> = Vec::new();
+    let mut ins_lines: Vec<String> = Vec::new();
+    let mut del_start: u32 = 0;
+    let mut ins_start: u32 = 0;
+    let mut orig_idx: u32 = 1;
+    let mut mod_idx: u32 = 1;
+
+    let flush =
+        |hunks: &mut Vec<DiffHunk>,
+         del_lines: &mut Vec<String>,
+         ins_lines: &mut Vec<String>,
+         del_start: u32,
+         ins_start: u32| {
+            if del_lines.is_empty() && ins_lines.is_empty() {
+                return;
+            }
+            let change_type = match (del_lines.is_empty(), ins_lines.is_empty()) {
+                (true, false) => DiffHunkType::Add,
+                (false, true) => DiffHunkType::Delete,
+                _ => DiffHunkType::Modify,
+            };
+            hunks.push(DiffHunk {
+                change_type,
+                original_lines: std::mem::take(del_lines),
+                modified_lines: std::mem::take(ins_lines),
+                original_start: del_start,
+                modified_start: ins_start,
+            });
+        };
+
+    for change in diff.iter_all_changes() {
+        match change.tag() {
+            ChangeTag::Equal => {
+                flush(&mut hunks, &mut del_lines, &mut ins_lines, del_start, ins_start);
+                orig_idx += 1;
+                mod_idx += 1;
+            }
+            ChangeTag::Delete => {
+                if del_lines.is_empty() && ins_lines.is_empty() {
+                    del_start = orig_idx;
+                    ins_start = mod_idx;
+                }
+                if del_lines.is_empty() {
+                    del_start = orig_idx;
+                }
+                del_lines.push(change.to_string_lossy().to_string());
+                orig_idx += 1;
+            }
+            ChangeTag::Insert => {
+                if del_lines.is_empty() && ins_lines.is_empty() {
+                    del_start = orig_idx;
+                    ins_start = mod_idx;
+                }
+                if ins_lines.is_empty() {
+                    ins_start = mod_idx;
+                }
+                ins_lines.push(change.to_string_lossy().to_string());
+                mod_idx += 1;
+            }
+        }
+    }
+    flush(&mut hunks, &mut del_lines, &mut ins_lines, del_start, ins_start);
+    hunks
+}
+
+/// Generate a unified diff string from [`DiffHunk`]s with the given number of
+/// context lines. Context is not expanded from the original text; only hunk
+/// content is emitted.
+pub fn unified_diff_format(hunks: &[DiffHunk], _context_lines: usize) -> String {
+    let mut out = String::new();
+    for hunk in hunks {
+        let orig_count = hunk.original_lines.len();
+        let mod_count = hunk.modified_lines.len();
+        out.push_str(&format!(
+            "@@ -{},{} +{},{} @@\n",
+            hunk.original_start, orig_count, hunk.modified_start, mod_count,
+        ));
+        for line in &hunk.original_lines {
+            out.push('-');
+            out.push_str(line);
+            if !line.ends_with('\n') {
+                out.push('\n');
+            }
+        }
+        for line in &hunk.modified_lines {
+            out.push('+');
+            out.push_str(line);
+            if !line.ends_with('\n') {
+                out.push('\n');
+            }
+        }
+    }
+    out
+}
+
+/// Apply [`DiffHunk`]s to the original text to produce the modified text.
+///
+/// Hunks are applied in reverse order of their original position so that
+/// earlier indices remain valid while later hunks are processed.
+pub fn diff_apply(original: &str, hunks: &[DiffHunk]) -> Result<String, String> {
+    let mut lines: Vec<String> = original.lines().map(|l| l.to_string()).collect();
+
+    // Sort hunks by original_start descending so removals/insertions don't
+    // shift indices that still need processing.
+    let mut sorted: Vec<&DiffHunk> = hunks.iter().collect();
+    sorted.sort_by(|a, b| b.original_start.cmp(&a.original_start));
+
+    for hunk in &sorted {
+        let start = (hunk.original_start as usize).saturating_sub(1);
+        match hunk.change_type {
+            DiffHunkType::Add => {
+                let insert_at = start;
+                for (i, line) in hunk.modified_lines.iter().enumerate() {
+                    lines.insert(insert_at + i, line.trim_end_matches('\n').to_string());
+                }
+            }
+            DiffHunkType::Delete => {
+                let count = hunk.original_lines.len();
+                if start + count > lines.len() {
+                    return Err(format!(
+                        "Delete hunk at line {} extends past end of file",
+                        hunk.original_start
+                    ));
+                }
+                lines.drain(start..start + count);
+            }
+            DiffHunkType::Modify => {
+                let count = hunk.original_lines.len();
+                if start + count > lines.len() {
+                    return Err(format!(
+                        "Modify hunk at line {} extends past end of file",
+                        hunk.original_start
+                    ));
+                }
+                lines.drain(start..start + count);
+                for (i, line) in hunk.modified_lines.iter().enumerate() {
+                    lines.insert(start + i, line.trim_end_matches('\n').to_string());
+                }
+            }
+        }
+    }
+
+    // Reconstruct with trailing newline if original had one.
+    let mut result = lines.join("\n");
+    if original.ends_with('\n') && !result.ends_with('\n') {
+        result.push('\n');
+    }
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -665,6 +842,121 @@ mod tests {
     #[test]
     fn ne_diffchangekind_diff() {
         assert_ne!(DiffChangeKind::Insert, DiffChangeKind::Delete);
+    }
+
+    #[test]
+    fn test_diff_hunk_type_eq() {
+        assert_eq!(DiffHunkType::Add, DiffHunkType::Add);
+        assert_eq!(DiffHunkType::Delete, DiffHunkType::Delete);
+        assert_eq!(DiffHunkType::Modify, DiffHunkType::Modify);
+        assert_ne!(DiffHunkType::Add, DiffHunkType::Delete);
+    }
+
+    #[test]
+    fn test_compute_diff_hunks_no_changes() {
+        let hunks = compute_diff_hunks("hello\nworld\n", "hello\nworld\n");
+        assert!(hunks.is_empty());
+    }
+
+    #[test]
+    fn test_compute_diff_hunks_addition() {
+        let hunks = compute_diff_hunks("a\nc\n", "a\nb\nc\n");
+        assert_eq!(hunks.len(), 1);
+        assert_eq!(hunks[0].change_type, DiffHunkType::Add);
+        assert!(hunks[0].original_lines.is_empty());
+        assert_eq!(hunks[0].modified_lines.len(), 1);
+    }
+
+    #[test]
+    fn test_compute_diff_hunks_deletion() {
+        let hunks = compute_diff_hunks("a\nb\nc\n", "a\nc\n");
+        assert_eq!(hunks.len(), 1);
+        assert_eq!(hunks[0].change_type, DiffHunkType::Delete);
+        assert_eq!(hunks[0].original_lines.len(), 1);
+        assert!(hunks[0].modified_lines.is_empty());
+    }
+
+    #[test]
+    fn test_compute_diff_hunks_modification() {
+        let hunks = compute_diff_hunks("a\nb\nc\n", "a\nx\nc\n");
+        assert_eq!(hunks.len(), 1);
+        assert_eq!(hunks[0].change_type, DiffHunkType::Modify);
+        assert_eq!(hunks[0].original_lines.len(), 1);
+        assert_eq!(hunks[0].modified_lines.len(), 1);
+    }
+
+    #[test]
+    fn test_compute_diff_hunks_multiple() {
+        let hunks = compute_diff_hunks("a\nb\nc\nd\ne\n", "a\nx\nc\nd\ny\n");
+        assert!(hunks.len() >= 2);
+    }
+
+    #[test]
+    fn test_unified_diff_format_basic() {
+        let hunks = compute_diff_hunks("a\nb\nc\n", "a\nx\nc\n");
+        let output = unified_diff_format(&hunks, 0);
+        assert!(output.contains("@@"));
+        assert!(output.contains("-b\n"));
+        assert!(output.contains("+x\n"));
+    }
+
+    #[test]
+    fn test_unified_diff_format_context() {
+        let hunks = compute_diff_hunks("a\nb\nc\n", "a\nx\nc\n");
+        let output = unified_diff_format(&hunks, 3);
+        assert!(output.contains("@@"));
+    }
+
+    #[test]
+    fn test_diff_apply_add() {
+        let original = "a\nc\n";
+        let hunks = vec![DiffHunk {
+            change_type: DiffHunkType::Add,
+            original_lines: vec![],
+            modified_lines: vec!["b\n".to_string()],
+            original_start: 2,
+            modified_start: 2,
+        }];
+        let result = diff_apply(original, &hunks).unwrap();
+        assert!(result.contains("b"));
+    }
+
+    #[test]
+    fn test_diff_apply_delete() {
+        let original = "a\nb\nc\n";
+        let hunks = vec![DiffHunk {
+            change_type: DiffHunkType::Delete,
+            original_lines: vec!["b\n".to_string()],
+            modified_lines: vec![],
+            original_start: 2,
+            modified_start: 2,
+        }];
+        let result = diff_apply(original, &hunks).unwrap();
+        assert!(!result.contains("b"));
+    }
+
+    #[test]
+    fn test_diff_apply_modify() {
+        let original = "a\nb\nc\n";
+        let hunks = vec![DiffHunk {
+            change_type: DiffHunkType::Modify,
+            original_lines: vec!["b\n".to_string()],
+            modified_lines: vec!["x\n".to_string()],
+            original_start: 2,
+            modified_start: 2,
+        }];
+        let result = diff_apply(original, &hunks).unwrap();
+        assert!(result.contains("x"));
+        assert!(!result.contains("b"));
+    }
+
+    #[test]
+    fn test_diff_apply_roundtrip() {
+        let original = "line1\nline2\nline3\nline4\n";
+        let modified = "line1\nchanged\nline3\nnew\nline4\n";
+        let hunks = compute_diff_hunks(original, modified);
+        let result = diff_apply(original, &hunks).unwrap();
+        assert_eq!(result, modified);
     }
 
     #[test]

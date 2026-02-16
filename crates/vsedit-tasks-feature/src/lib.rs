@@ -310,6 +310,223 @@ impl Default for TaskService {
     }
 }
 
+// ── Task Runner ─────────────────────────────────────────────────────────
+
+/// Tracks the execution lifecycle of a task.
+#[derive(Debug, Clone)]
+pub struct TaskRunResult {
+    pub task_name: String,
+    pub exit_code: i32,
+    pub stdout: String,
+    pub stderr: String,
+    pub duration_ms: u64,
+}
+
+impl TaskRunResult {
+    pub fn success(&self) -> bool {
+        self.exit_code == 0
+    }
+
+    pub fn has_output(&self) -> bool {
+        !self.stdout.is_empty() || !self.stderr.is_empty()
+    }
+
+    pub fn combined_output(&self) -> String {
+        if self.stderr.is_empty() {
+            self.stdout.clone()
+        } else if self.stdout.is_empty() {
+            self.stderr.clone()
+        } else {
+            format!("{}\n{}", self.stdout, self.stderr)
+        }
+    }
+}
+
+/// A task runner that can simulate execution and track results.
+pub struct TaskRunner {
+    results: Vec<TaskRunResult>,
+    running_tasks: Vec<String>,
+}
+
+impl TaskRunner {
+    pub fn new() -> Self {
+        Self {
+            results: Vec::new(),
+            running_tasks: Vec::new(),
+        }
+    }
+
+    /// Start a task (marks it as running).
+    pub fn start(&mut self, task: &Task) -> Result<(), TaskError> {
+        if self.running_tasks.contains(&task.name) {
+            return Err(TaskError::AlreadyRunning(task.name.clone()));
+        }
+        self.running_tasks.push(task.name.clone());
+        Ok(())
+    }
+
+    /// Complete a running task with a result.
+    pub fn complete(&mut self, result: TaskRunResult) -> Result<(), TaskError> {
+        let pos = self
+            .running_tasks
+            .iter()
+            .position(|n| n == &result.task_name);
+        match pos {
+            Some(i) => {
+                self.running_tasks.remove(i);
+                self.results.push(result);
+                Ok(())
+            }
+            None => Err(TaskError::TaskNotFound(result.task_name.clone())),
+        }
+    }
+
+    pub fn is_running(&self, name: &str) -> bool {
+        self.running_tasks.iter().any(|n| n == name)
+    }
+
+    pub fn running_count(&self) -> usize {
+        self.running_tasks.len()
+    }
+
+    pub fn history(&self) -> &[TaskRunResult] {
+        &self.results
+    }
+
+    pub fn last_result(&self) -> Option<&TaskRunResult> {
+        self.results.last()
+    }
+
+    pub fn success_count(&self) -> usize {
+        self.results.iter().filter(|r| r.success()).count()
+    }
+
+    pub fn failure_count(&self) -> usize {
+        self.results.iter().filter(|r| !r.success()).count()
+    }
+}
+
+impl Default for TaskRunner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ── Task Auto-Detection ─────────────────────────────────────────────────
+
+/// Detected task from a build file.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DetectedTask {
+    pub name: String,
+    pub command: String,
+    pub source_file: String,
+    pub group: TaskGroup,
+}
+
+/// Auto-detect tasks from package.json content.
+pub fn detect_from_package_json(content: &str) -> Vec<DetectedTask> {
+    let mut tasks = Vec::new();
+    if let Some(scripts_start) = content.find("\"scripts\"") {
+        if let Some(brace_start) = content[scripts_start..].find('{') {
+            let rest = &content[scripts_start + brace_start + 1..];
+            if let Some(brace_end) = rest.find('}') {
+                let scripts_block = &rest[..brace_end];
+                for line in scripts_block.lines() {
+                    let trimmed = line.trim().trim_end_matches(',');
+                    if let Some(colon) = trimmed.find(':') {
+                        let key = trimmed[..colon].trim().trim_matches('"');
+                        let val = trimmed[colon + 1..].trim().trim_matches('"');
+                        if !key.is_empty() && !val.is_empty() {
+                            let group = if key.contains("build") {
+                                TaskGroup::Build
+                            } else if key.contains("test") {
+                                TaskGroup::Test
+                            } else if key.contains("clean") {
+                                TaskGroup::Clean
+                            } else {
+                                TaskGroup::None
+                            };
+                            tasks.push(DetectedTask {
+                                name: format!("npm: {key}"),
+                                command: format!("npm run {key}"),
+                                source_file: "package.json".to_string(),
+                                group,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    tasks
+}
+
+/// Auto-detect tasks from Makefile content.
+pub fn detect_from_makefile(content: &str) -> Vec<DetectedTask> {
+    let mut tasks = Vec::new();
+    for line in content.lines() {
+        if let Some(colon_pos) = line.find(':') {
+            let target = line[..colon_pos].trim();
+            if !target.is_empty()
+                && !target.starts_with('\t')
+                && !target.starts_with(' ')
+                && !target.starts_with('#')
+                && !target.starts_with('.')
+                && !target.contains('=')
+            {
+                let group = if target == "build" || target == "all" {
+                    TaskGroup::Build
+                } else if target == "test" || target == "check" {
+                    TaskGroup::Test
+                } else if target == "clean" {
+                    TaskGroup::Clean
+                } else {
+                    TaskGroup::None
+                };
+                tasks.push(DetectedTask {
+                    name: format!("make: {target}"),
+                    command: format!("make {target}"),
+                    source_file: "Makefile".to_string(),
+                    group,
+                });
+            }
+        }
+    }
+    tasks
+}
+
+/// Auto-detect tasks from Cargo.toml content.
+pub fn detect_from_cargo_toml(content: &str) -> Vec<DetectedTask> {
+    let mut tasks = Vec::new();
+    if content.contains("[package]") {
+        tasks.push(DetectedTask {
+            name: "cargo: build".to_string(),
+            command: "cargo build".to_string(),
+            source_file: "Cargo.toml".to_string(),
+            group: TaskGroup::Build,
+        });
+        tasks.push(DetectedTask {
+            name: "cargo: test".to_string(),
+            command: "cargo test".to_string(),
+            source_file: "Cargo.toml".to_string(),
+            group: TaskGroup::Test,
+        });
+        tasks.push(DetectedTask {
+            name: "cargo: clean".to_string(),
+            command: "cargo clean".to_string(),
+            source_file: "Cargo.toml".to_string(),
+            group: TaskGroup::Clean,
+        });
+        tasks.push(DetectedTask {
+            name: "cargo: check".to_string(),
+            command: "cargo check".to_string(),
+            source_file: "Cargo.toml".to_string(),
+            group: TaskGroup::Build,
+        });
+    }
+    tasks
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────
 
 /// Accumulated statistics for tasks-feature operations.
@@ -993,5 +1210,128 @@ mod tests {
     fn tasks_feature_is_ascii_printable() {
         assert!(TasksFeatureValidator::is_ascii_printable("Hello World 123"));
         assert!(!TasksFeatureValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn runner_start_and_complete() {
+        let mut runner = TaskRunner::new();
+        let task = TaskBuilder::new("build", "make build")
+            .group(TaskGroup::Build)
+            .build();
+        runner.start(&task).unwrap();
+        assert!(runner.is_running("build"));
+        runner
+            .complete(TaskRunResult {
+                task_name: "build".to_string(),
+                exit_code: 0,
+                stdout: "OK".to_string(),
+                stderr: String::new(),
+                duration_ms: 100,
+            })
+            .unwrap();
+        assert!(!runner.is_running("build"));
+        assert_eq!(runner.success_count(), 1);
+    }
+
+    #[test]
+    fn runner_already_running() {
+        let mut runner = TaskRunner::new();
+        let task = TaskBuilder::new("t", "cmd").build();
+        runner.start(&task).unwrap();
+        assert!(runner.start(&task).is_err());
+    }
+
+    #[test]
+    fn runner_complete_unknown_fails() {
+        let mut runner = TaskRunner::new();
+        let result = runner.complete(TaskRunResult {
+            task_name: "ghost".into(),
+            exit_code: 0,
+            stdout: String::new(),
+            stderr: String::new(),
+            duration_ms: 0,
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn run_result_combined_output() {
+        let r = TaskRunResult {
+            task_name: "t".into(),
+            exit_code: 1,
+            stdout: "out".into(),
+            stderr: "err".into(),
+            duration_ms: 0,
+        };
+        assert!(!r.success());
+        assert_eq!(r.combined_output(), "out\nerr");
+    }
+
+    #[test]
+    fn detect_package_json_scripts() {
+        let content = r#"{
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "lint": "eslint"
+  }
+}"#;
+        let tasks = detect_from_package_json(content);
+        assert_eq!(tasks.len(), 3);
+        assert!(tasks
+            .iter()
+            .any(|t| t.name == "npm: build" && t.group == TaskGroup::Build));
+        assert!(tasks
+            .iter()
+            .any(|t| t.name == "npm: test" && t.group == TaskGroup::Test));
+    }
+
+    #[test]
+    fn detect_makefile_targets() {
+        let content =
+            "all: main.o\n\tgcc -o main main.o\nclean:\n\trm -f main\ntest:\n\t./run_tests\n";
+        let tasks = detect_from_makefile(content);
+        assert!(tasks
+            .iter()
+            .any(|t| t.name == "make: all" && t.group == TaskGroup::Build));
+        assert!(tasks
+            .iter()
+            .any(|t| t.name == "make: clean" && t.group == TaskGroup::Clean));
+        assert!(tasks
+            .iter()
+            .any(|t| t.name == "make: test" && t.group == TaskGroup::Test));
+    }
+
+    #[test]
+    fn detect_cargo_toml() {
+        let content = "[package]\nname = \"myapp\"\nversion = \"0.1.0\"\n";
+        let tasks = detect_from_cargo_toml(content);
+        assert!(tasks.len() >= 3);
+        assert!(tasks.iter().any(|t| t.name == "cargo: build"));
+        assert!(tasks.iter().any(|t| t.name == "cargo: test"));
+    }
+
+    #[test]
+    fn detect_empty_package_json() {
+        let tasks = detect_from_package_json("{}");
+        assert!(tasks.is_empty());
+    }
+
+    #[test]
+    fn runner_failure_count() {
+        let mut runner = TaskRunner::new();
+        let task = TaskBuilder::new("t", "cmd").build();
+        runner.start(&task).unwrap();
+        runner
+            .complete(TaskRunResult {
+                task_name: "t".into(),
+                exit_code: 1,
+                stdout: String::new(),
+                stderr: "fail".into(),
+                duration_ms: 50,
+            })
+            .unwrap();
+        assert_eq!(runner.failure_count(), 1);
+        assert_eq!(runner.success_count(), 0);
     }
 }

@@ -329,6 +329,164 @@ impl fmt::Display for ExtensionEntry {
     }
 }
 
+/// Check if a version string matches the X.Y.Z pattern where each component is a number.
+pub fn validate_semver(version: &str) -> bool {
+    let parts: Vec<&str> = version.split('.').collect();
+    parts.len() == 3 && parts.iter().all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+}
+
+/// Validator for extension manifests, returning all validation errors at once.
+pub struct ExtensionManifestValidator;
+
+impl ExtensionManifestValidator {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn validate(&self, manifest: &ExtensionManifest) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
+        if manifest.identifier.id.is_empty() {
+            errors.push("id must not be empty".to_string());
+        } else if !manifest.identifier.id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+            errors.push("id must contain only lowercase alphanumeric characters and hyphens".to_string());
+        }
+        if manifest.name.is_empty() {
+            errors.push("name must not be empty".to_string());
+        }
+        if manifest.publisher.is_empty() {
+            errors.push("publisher must not be empty".to_string());
+        }
+        if !validate_semver(&manifest.identifier.version) {
+            errors.push("version must match X.Y.Z pattern".to_string());
+        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
+    }
+}
+
+impl Default for ExtensionManifestValidator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActivationEvent {
+    OnLanguage(String),
+    OnCommand(String),
+    OnFileSystem(String),
+    OnStartupFinished,
+    Star,
+    OnView(String),
+    WorkspaceContains(String),
+}
+
+impl ActivationEvent {
+    pub fn parse(s: &str) -> Option<Self> {
+        if s == "*" {
+            return Some(ActivationEvent::Star);
+        }
+        if s == "onStartupFinished" {
+            return Some(ActivationEvent::OnStartupFinished);
+        }
+        if let Some(rest) = s.strip_prefix("onLanguage:") {
+            return Some(ActivationEvent::OnLanguage(rest.to_string()));
+        }
+        if let Some(rest) = s.strip_prefix("onCommand:") {
+            return Some(ActivationEvent::OnCommand(rest.to_string()));
+        }
+        if let Some(rest) = s.strip_prefix("onFileSystem:") {
+            return Some(ActivationEvent::OnFileSystem(rest.to_string()));
+        }
+        if let Some(rest) = s.strip_prefix("onView:") {
+            return Some(ActivationEvent::OnView(rest.to_string()));
+        }
+        if let Some(rest) = s.strip_prefix("workspaceContains:") {
+            return Some(ActivationEvent::WorkspaceContains(rest.to_string()));
+        }
+        None
+    }
+}
+
+/// Check if a manifest's activation_events list matches the given event.
+pub fn extension_activate_by_event(manifest: &ExtensionManifest, event: &ActivationEvent) -> bool {
+    manifest.activation_events.iter().any(|raw| {
+        ActivationEvent::parse(raw).as_ref() == Some(event)
+    })
+}
+
+/// Resolves extension dependency ordering via topological sort.
+pub struct ExtensionDependencyResolver {
+    extensions: Vec<(String, Vec<String>)>,
+}
+
+impl ExtensionDependencyResolver {
+    pub fn new() -> Self {
+        Self { extensions: Vec::new() }
+    }
+
+    pub fn add_extension(&mut self, id: impl Into<String>, deps: Vec<String>) {
+        self.extensions.push((id.into(), deps));
+    }
+
+    pub fn has_extension(&self, id: &str) -> bool {
+        self.extensions.iter().any(|(eid, _)| eid == id)
+    }
+
+    pub fn resolve_order(&self) -> Result<Vec<String>, ExtensionError> {
+        use std::collections::{HashMap, HashSet, VecDeque};
+
+        let mut in_degree: HashMap<&str, usize> = HashMap::new();
+        let mut dependents: HashMap<&str, Vec<&str>> = HashMap::new();
+        let known: HashSet<&str> = self.extensions.iter().map(|(id, _)| id.as_str()).collect();
+
+        for (id, _) in &self.extensions {
+            in_degree.entry(id.as_str()).or_insert(0);
+        }
+
+        for (id, deps) in &self.extensions {
+            for dep in deps {
+                if !known.contains(dep.as_str()) {
+                    return Err(ExtensionError::DependencyMissing(dep.clone()));
+                }
+                dependents.entry(dep.as_str()).or_default().push(id.as_str());
+                *in_degree.entry(id.as_str()).or_insert(0) += 1;
+            }
+        }
+
+        let mut queue: VecDeque<&str> = in_degree.iter()
+            .filter(|(_, deg)| **deg == 0)
+            .map(|(&id, _)| id)
+            .collect();
+        let mut result = Vec::new();
+
+        while let Some(id) = queue.pop_front() {
+            result.push(id.to_string());
+            if let Some(deps) = dependents.get(id) {
+                for &dep in deps {
+                    if let Some(deg) = in_degree.get_mut(dep) {
+                        *deg -= 1;
+                        if *deg == 0 {
+                            queue.push_back(dep);
+                        }
+                    }
+                }
+            }
+        }
+
+        if result.len() != self.extensions.len() {
+            return Err(ExtensionError::DependencyMissing("circular dependency detected".to_string()));
+        }
+
+        Ok(result)
+    }
+}
+
+impl Default for ExtensionDependencyResolver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Accumulated statistics for extensions-plat operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExtensionsPlatStats {
@@ -860,6 +1018,145 @@ mod tests {
         let s = format!("{entry}");
         assert!(s.contains("test.ext.a"));
         assert!(s.contains("1.0.0"));
+    }
+
+    #[test]
+    fn test_validate_semver_valid() {
+        assert!(validate_semver("1.0.0"));
+        assert!(validate_semver("0.0.0"));
+        assert!(validate_semver("10.20.30"));
+    }
+
+    #[test]
+    fn test_validate_semver_invalid() {
+        assert!(!validate_semver("1.0"));
+        assert!(!validate_semver("abc"));
+        assert!(!validate_semver("1.2.x"));
+        assert!(!validate_semver(""));
+        assert!(!validate_semver("1.2.3.4"));
+    }
+
+    #[test]
+    fn test_manifest_validator_valid() {
+        let v = ExtensionManifestValidator::new();
+        let m = ExtensionManifest {
+            identifier: ExtensionIdentifier { id: "my-ext".into(), version: "1.0.0".into() },
+            name: "My Extension".into(),
+            publisher: "acme".into(),
+            description: None,
+            kind: ExtensionKind::UI,
+            activation_events: Vec::new(),
+            contributes: Vec::new(),
+        };
+        assert!(v.validate(&m).is_ok());
+    }
+
+    #[test]
+    fn test_manifest_validator_empty_name() {
+        let v = ExtensionManifestValidator::new();
+        let m = ExtensionManifest {
+            identifier: ExtensionIdentifier { id: "my-ext".into(), version: "1.0.0".into() },
+            name: "".into(),
+            publisher: "acme".into(),
+            description: None,
+            kind: ExtensionKind::UI,
+            activation_events: Vec::new(),
+            contributes: Vec::new(),
+        };
+        let errs = v.validate(&m).unwrap_err();
+        assert!(errs.iter().any(|e| e.contains("name")));
+    }
+
+    #[test]
+    fn test_manifest_validator_bad_version() {
+        let v = ExtensionManifestValidator::new();
+        let m = ExtensionManifest {
+            identifier: ExtensionIdentifier { id: "my-ext".into(), version: "bad".into() },
+            name: "My Extension".into(),
+            publisher: "acme".into(),
+            description: None,
+            kind: ExtensionKind::UI,
+            activation_events: Vec::new(),
+            contributes: Vec::new(),
+        };
+        let errs = v.validate(&m).unwrap_err();
+        assert!(errs.iter().any(|e| e.contains("version")));
+    }
+
+    #[test]
+    fn test_manifest_validator_bad_id() {
+        let v = ExtensionManifestValidator::new();
+        let m = ExtensionManifest {
+            identifier: ExtensionIdentifier { id: "BAD_ID!".into(), version: "1.0.0".into() },
+            name: "My Extension".into(),
+            publisher: "acme".into(),
+            description: None,
+            kind: ExtensionKind::UI,
+            activation_events: Vec::new(),
+            contributes: Vec::new(),
+        };
+        let errs = v.validate(&m).unwrap_err();
+        assert!(errs.iter().any(|e| e.contains("id")));
+    }
+
+    #[test]
+    fn test_activation_event_parse_language() {
+        let ev = ActivationEvent::parse("onLanguage:rust").unwrap();
+        assert_eq!(ev, ActivationEvent::OnLanguage("rust".to_string()));
+    }
+
+    #[test]
+    fn test_activation_event_parse_command() {
+        let ev = ActivationEvent::parse("onCommand:myext.doThing").unwrap();
+        assert_eq!(ev, ActivationEvent::OnCommand("myext.doThing".to_string()));
+    }
+
+    #[test]
+    fn test_activation_event_parse_star() {
+        let ev = ActivationEvent::parse("*").unwrap();
+        assert_eq!(ev, ActivationEvent::Star);
+    }
+
+    #[test]
+    fn test_activation_event_parse_invalid() {
+        assert!(ActivationEvent::parse("unknown:foo").is_none());
+        assert!(ActivationEvent::parse("").is_none());
+    }
+
+    #[test]
+    fn test_activate_by_event_matches() {
+        let m = make_manifest_full("a", "A", "pub", vec!["onLanguage:rust", "onCommand:start"]);
+        assert!(extension_activate_by_event(&m, &ActivationEvent::OnLanguage("rust".to_string())));
+        assert!(extension_activate_by_event(&m, &ActivationEvent::OnCommand("start".to_string())));
+    }
+
+    #[test]
+    fn test_activate_by_event_no_match() {
+        let m = make_manifest_full("a", "A", "pub", vec!["onLanguage:rust"]);
+        assert!(!extension_activate_by_event(&m, &ActivationEvent::OnLanguage("python".to_string())));
+        assert!(!extension_activate_by_event(&m, &ActivationEvent::Star));
+    }
+
+    #[test]
+    fn test_dep_resolver_simple_order() {
+        let mut resolver = ExtensionDependencyResolver::new();
+        resolver.add_extension("base", vec![]);
+        resolver.add_extension("mid", vec!["base".to_string()]);
+        resolver.add_extension("top", vec!["mid".to_string()]);
+        let order = resolver.resolve_order().unwrap();
+        let base_pos = order.iter().position(|x| x == "base").unwrap();
+        let mid_pos = order.iter().position(|x| x == "mid").unwrap();
+        let top_pos = order.iter().position(|x| x == "top").unwrap();
+        assert!(base_pos < mid_pos);
+        assert!(mid_pos < top_pos);
+    }
+
+    #[test]
+    fn test_dep_resolver_detects_missing() {
+        let mut resolver = ExtensionDependencyResolver::new();
+        resolver.add_extension("ext-a", vec!["nonexistent".to_string()]);
+        let err = resolver.resolve_order().unwrap_err();
+        assert_eq!(err, ExtensionError::DependencyMissing("nonexistent".to_string()));
     }
 
     #[test]

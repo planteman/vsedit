@@ -635,9 +635,372 @@ impl Default for ExtWorkspaceValidator {
     }
 }
 
+// ── Folder watcher ──
+
+/// Tracks workspace folder changes.
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceFolderWatcher {
+    folders: Vec<String>,
+}
+
+impl WorkspaceFolderWatcher {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_folder(&mut self, uri: impl Into<String>) {
+        self.folders.push(uri.into());
+    }
+
+    pub fn remove_folder(&mut self, uri: &str) -> bool {
+        if let Some(pos) = self.folders.iter().position(|f| f == uri) {
+            self.folders.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn has_folder(&self, uri: &str) -> bool {
+        self.folders.iter().any(|f| f == uri)
+    }
+
+    pub fn folder_count(&self) -> usize {
+        self.folders.len()
+    }
+
+    pub fn folders(&self) -> &[String] {
+        &self.folders
+    }
+
+    /// Returns `(added, removed)` compared to another watcher.
+    pub fn diff(&self, other: &Self) -> (Vec<String>, Vec<String>) {
+        let added: Vec<String> = other
+            .folders
+            .iter()
+            .filter(|f| !self.folders.contains(f))
+            .cloned()
+            .collect();
+        let removed: Vec<String> = self
+            .folders
+            .iter()
+            .filter(|f| !other.folders.contains(f))
+            .cloned()
+            .collect();
+        (added, removed)
+    }
+}
+
+// ── Workspace symbol ──
+
+/// A symbol found in the workspace.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceSymbol {
+    pub name: String,
+    pub kind: String,
+    pub uri: String,
+    pub line: u32,
+    pub col: u32,
+}
+
+// ── Symbol index ──
+
+/// Cross-file symbol lookup index.
+#[derive(Debug, Clone, Default)]
+pub struct WorkspaceSymbolIndex {
+    symbols: Vec<WorkspaceSymbol>,
+}
+
+impl WorkspaceSymbolIndex {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add_symbol(&mut self, sym: WorkspaceSymbol) {
+        self.symbols.push(sym);
+    }
+
+    /// Case-insensitive substring search on symbol name.
+    pub fn search(&self, query: &str) -> Vec<&WorkspaceSymbol> {
+        let q = query.to_lowercase();
+        self.symbols
+            .iter()
+            .filter(|s| s.name.to_lowercase().contains(&q))
+            .collect()
+    }
+
+    pub fn search_by_kind(&self, kind: &str) -> Vec<&WorkspaceSymbol> {
+        self.symbols.iter().filter(|s| s.kind == kind).collect()
+    }
+
+    pub fn symbols_in_file(&self, uri: &str) -> Vec<&WorkspaceSymbol> {
+        self.symbols.iter().filter(|s| s.uri == uri).collect()
+    }
+
+    pub fn symbol_count(&self) -> usize {
+        self.symbols.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.symbols.clear();
+    }
+}
+
+// ── Multi-file edit builder ──
+
+/// Builder for batching multi-file edits with validation.
+#[derive(Debug, Clone, Default)]
+pub struct MultiFileEditBuilder {
+    edits: HashMap<String, Vec<TextEditEntry>>,
+    creates: Vec<String>,
+    deletes: Vec<String>,
+    renames: Vec<RenameEntry>,
+}
+
+impl MultiFileEditBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn replace_text(
+        &mut self,
+        uri: impl Into<String>,
+        start_line: u32,
+        start_col: u32,
+        end_line: u32,
+        end_col: u32,
+        new_text: impl Into<String>,
+    ) -> &mut Self {
+        self.edits.entry(uri.into()).or_default().push(TextEditEntry {
+            start_line,
+            start_col,
+            end_line,
+            end_col,
+            new_text: new_text.into(),
+        });
+        self
+    }
+
+    pub fn create_file(&mut self, uri: impl Into<String>) -> &mut Self {
+        self.creates.push(uri.into());
+        self
+    }
+
+    pub fn delete_file(&mut self, uri: impl Into<String>) -> &mut Self {
+        self.deletes.push(uri.into());
+        self
+    }
+
+    pub fn rename_file(
+        &mut self,
+        old: impl Into<String>,
+        new: impl Into<String>,
+    ) -> &mut Self {
+        self.renames.push(RenameEntry {
+            old_uri: old.into(),
+            new_uri: new.into(),
+        });
+        self
+    }
+
+    pub fn edit_count(&self) -> usize {
+        self.edits.values().map(|v| v.len()).sum::<usize>()
+            + self.creates.len()
+            + self.deletes.len()
+            + self.renames.len()
+    }
+
+    pub fn file_count(&self) -> usize {
+        let mut uris: Vec<&str> = self.edits.keys().map(|s| s.as_str()).collect();
+        for r in &self.renames {
+            uris.push(&r.old_uri);
+            uris.push(&r.new_uri);
+        }
+        for c in &self.creates {
+            uris.push(c);
+        }
+        for d in &self.deletes {
+            uris.push(d);
+        }
+        uris.sort();
+        uris.dedup();
+        uris.len()
+    }
+
+    pub fn has_edits_for(&self, uri: &str) -> bool {
+        self.edits.contains_key(uri)
+    }
+
+    /// Consume the builder and produce a [`WorkspaceEdit`].
+    pub fn build(self) -> Result<WorkspaceEdit, WorkspaceError> {
+        if self.edits.is_empty()
+            && self.creates.is_empty()
+            && self.deletes.is_empty()
+            && self.renames.is_empty()
+        {
+            return Err(WorkspaceError::EmptyEdit);
+        }
+        Ok(WorkspaceEdit {
+            text_edits: self.edits,
+            renames: self.renames,
+            creates: self.creates,
+            deletes: self.deletes,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_folder_watcher_add_remove() {
+        let mut w = WorkspaceFolderWatcher::new();
+        w.add_folder("file:///a");
+        w.add_folder("file:///b");
+        assert_eq!(w.folder_count(), 2);
+        assert!(w.remove_folder("file:///a"));
+        assert_eq!(w.folder_count(), 1);
+        assert!(!w.remove_folder("file:///missing"));
+    }
+
+    #[test]
+    fn test_folder_watcher_has_folder() {
+        let mut w = WorkspaceFolderWatcher::new();
+        w.add_folder("file:///x");
+        assert!(w.has_folder("file:///x"));
+        assert!(!w.has_folder("file:///y"));
+    }
+
+    #[test]
+    fn test_folder_watcher_diff() {
+        let mut a = WorkspaceFolderWatcher::new();
+        a.add_folder("file:///1");
+        a.add_folder("file:///2");
+        let mut b = WorkspaceFolderWatcher::new();
+        b.add_folder("file:///2");
+        b.add_folder("file:///3");
+        let (added, removed) = a.diff(&b);
+        assert_eq!(added, vec!["file:///3".to_string()]);
+        assert_eq!(removed, vec!["file:///1".to_string()]);
+    }
+
+    #[test]
+    fn test_symbol_index_search() {
+        let mut idx = WorkspaceSymbolIndex::new();
+        idx.add_symbol(WorkspaceSymbol {
+            name: "MyFunction".into(),
+            kind: "function".into(),
+            uri: "file:///a.rs".into(),
+            line: 1,
+            col: 0,
+        });
+        idx.add_symbol(WorkspaceSymbol {
+            name: "OtherStruct".into(),
+            kind: "struct".into(),
+            uri: "file:///b.rs".into(),
+            line: 10,
+            col: 0,
+        });
+        let results = idx.search("myfunc");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "MyFunction");
+    }
+
+    #[test]
+    fn test_symbol_index_search_by_kind() {
+        let mut idx = WorkspaceSymbolIndex::new();
+        idx.add_symbol(WorkspaceSymbol {
+            name: "Foo".into(),
+            kind: "struct".into(),
+            uri: "file:///a.rs".into(),
+            line: 1,
+            col: 0,
+        });
+        idx.add_symbol(WorkspaceSymbol {
+            name: "bar".into(),
+            kind: "function".into(),
+            uri: "file:///a.rs".into(),
+            line: 5,
+            col: 0,
+        });
+        assert_eq!(idx.search_by_kind("struct").len(), 1);
+        assert_eq!(idx.search_by_kind("function").len(), 1);
+        assert_eq!(idx.search_by_kind("enum").len(), 0);
+    }
+
+    #[test]
+    fn test_symbol_index_symbols_in_file() {
+        let mut idx = WorkspaceSymbolIndex::new();
+        idx.add_symbol(WorkspaceSymbol {
+            name: "A".into(),
+            kind: "struct".into(),
+            uri: "file:///a.rs".into(),
+            line: 1,
+            col: 0,
+        });
+        idx.add_symbol(WorkspaceSymbol {
+            name: "B".into(),
+            kind: "struct".into(),
+            uri: "file:///b.rs".into(),
+            line: 1,
+            col: 0,
+        });
+        assert_eq!(idx.symbols_in_file("file:///a.rs").len(), 1);
+        assert_eq!(idx.symbols_in_file("file:///c.rs").len(), 0);
+    }
+
+    #[test]
+    fn test_symbol_index_clear() {
+        let mut idx = WorkspaceSymbolIndex::new();
+        idx.add_symbol(WorkspaceSymbol {
+            name: "X".into(),
+            kind: "function".into(),
+            uri: "file:///a.rs".into(),
+            line: 1,
+            col: 0,
+        });
+        assert_eq!(idx.symbol_count(), 1);
+        idx.clear();
+        assert_eq!(idx.symbol_count(), 0);
+    }
+
+    #[test]
+    fn test_multi_file_edit_builder_basic() {
+        let mut b = MultiFileEditBuilder::new();
+        b.replace_text("file:///a.rs", 0, 0, 0, 5, "hello");
+        let edit = b.build().unwrap();
+        assert_eq!(edit.text_edits.len(), 1);
+        assert_eq!(edit.text_edits["file:///a.rs"][0].new_text, "hello");
+    }
+
+    #[test]
+    fn test_multi_file_edit_builder_empty_error() {
+        let b = MultiFileEditBuilder::new();
+        assert_eq!(b.build().unwrap_err(), WorkspaceError::EmptyEdit);
+    }
+
+    #[test]
+    fn test_multi_file_edit_builder_has_edits() {
+        let mut b = MultiFileEditBuilder::new();
+        b.replace_text("file:///a.rs", 0, 0, 0, 5, "x");
+        assert!(b.has_edits_for("file:///a.rs"));
+        assert!(!b.has_edits_for("file:///b.rs"));
+    }
+
+    #[test]
+    fn test_multi_file_edit_builder_file_ops() {
+        let mut b = MultiFileEditBuilder::new();
+        b.create_file("file:///new.rs")
+            .delete_file("file:///old.rs")
+            .rename_file("file:///src.rs", "file:///dst.rs");
+        assert_eq!(b.edit_count(), 3);
+        let edit = b.build().unwrap();
+        assert_eq!(edit.creates, vec!["file:///new.rs".to_string()]);
+        assert_eq!(edit.deletes, vec!["file:///old.rs".to_string()]);
+        assert_eq!(edit.renames.len(), 1);
+    }
 
     #[test]
     fn proxy_id() {

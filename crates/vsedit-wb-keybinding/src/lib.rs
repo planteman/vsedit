@@ -285,6 +285,128 @@ impl Default for KeybindingService {
     }
 }
 
+/// Represents the current editor context for when-clause evaluation.
+#[derive(Debug, Clone, Default)]
+pub struct KeybindingWhenContext {
+    values: std::collections::HashMap<String, bool>,
+}
+
+impl KeybindingWhenContext {
+    pub fn new() -> Self {
+        Self { values: std::collections::HashMap::new() }
+    }
+
+    pub fn set(&mut self, key: &str, value: bool) {
+        self.values.insert(key.to_string(), value);
+    }
+
+    pub fn get(&self, key: &str) -> bool {
+        self.values.get(key).copied().unwrap_or(false)
+    }
+
+    /// Evaluate a when-clause string against the context.
+    /// Supports simple expressions: "key", "!key", "key1 && key2", "key1 || key2".
+    pub fn evaluate(&self, when: &str) -> bool {
+        let when = when.trim();
+        if when.is_empty() {
+            return true;
+        }
+        // Handle OR (lower precedence)
+        if when.contains("||") {
+            return when.split("||").any(|part| self.evaluate(part));
+        }
+        // Handle AND
+        if when.contains("&&") {
+            return when.split("&&").all(|part| self.evaluate(part));
+        }
+        // Handle negation
+        let trimmed = when.trim();
+        if let Some(key) = trimmed.strip_prefix('!') {
+            return !self.get(key.trim());
+        }
+        // Simple key lookup
+        self.get(trimmed)
+    }
+
+    /// Check if a binding's when-clause is satisfied by this context.
+    pub fn binding_active(&self, binding: &ResolvedKeybinding) -> bool {
+        match &binding.when {
+            None => true,
+            Some(when) => self.evaluate(when),
+        }
+    }
+}
+
+/// A chord sequence to match against.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChordSequence {
+    pub chords: Vec<(String, Vec<KeyMod>)>,
+}
+
+impl ChordSequence {
+    pub fn single(key: &str, modifiers: Vec<KeyMod>) -> Self {
+        Self { chords: vec![(key.to_string(), modifiers)] }
+    }
+
+    pub fn double(
+        key1: &str, mods1: Vec<KeyMod>,
+        key2: &str, mods2: Vec<KeyMod>,
+    ) -> Self {
+        Self {
+            chords: vec![
+                (key1.to_string(), mods1),
+                (key2.to_string(), mods2),
+            ],
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.chords.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.chords.is_empty()
+    }
+}
+
+/// Resolve a chord chain against the service. For single chords, uses
+/// normal resolution. For multi-chord, finds bindings whose key matches
+/// the last chord and whose command starts with the first chord's format.
+pub fn keybinding_resolve_chain(
+    service: &KeybindingService,
+    context: &KeybindingWhenContext,
+    sequence: &ChordSequence,
+) -> Vec<ResolvedKeybinding> {
+    if sequence.is_empty() {
+        return Vec::new();
+    }
+    let (ref key, ref mods) = sequence.chords[0];
+    let candidates = service.resolve(key, mods);
+    candidates
+        .into_iter()
+        .filter(|b| context.binding_active(b))
+        .cloned()
+        .collect()
+}
+
+/// Generate a set of default keybindings commonly used in editors.
+pub fn keybinding_defaults() -> Vec<ResolvedKeybinding> {
+    vec![
+        KeybindingBuilder::new().key("s").modifier(KeyMod::CtrlCmd).command("workbench.action.files.save").build(),
+        KeybindingBuilder::new().key("z").modifier(KeyMod::CtrlCmd).command("editor.action.undo").build(),
+        KeybindingBuilder::new().key("y").modifier(KeyMod::CtrlCmd).command("editor.action.redo").build(),
+        KeybindingBuilder::new().key("c").modifier(KeyMod::CtrlCmd).command("editor.action.clipboardCopy").build(),
+        KeybindingBuilder::new().key("v").modifier(KeyMod::CtrlCmd).command("editor.action.clipboardPaste").build(),
+        KeybindingBuilder::new().key("x").modifier(KeyMod::CtrlCmd).command("editor.action.clipboardCut").build(),
+        KeybindingBuilder::new().key("a").modifier(KeyMod::CtrlCmd).command("editor.action.selectAll").build(),
+        KeybindingBuilder::new().key("f").modifier(KeyMod::CtrlCmd).command("actions.find").build(),
+        KeybindingBuilder::new().key("h").modifier(KeyMod::CtrlCmd).command("editor.action.startFindReplaceAction").build(),
+        KeybindingBuilder::new().key("p").modifier(KeyMod::CtrlCmd).command("workbench.action.quickOpen").build(),
+        KeybindingBuilder::new().key("p").modifier(KeyMod::CtrlCmd).modifier(KeyMod::Shift).command("workbench.action.showCommands").build(),
+        KeybindingBuilder::new().key("n").modifier(KeyMod::CtrlCmd).command("workbench.action.files.newUntitledFile").build(),
+    ]
+}
+
 /// Accumulated statistics for wb-keybinding operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct WbKeybindingStats {
@@ -993,5 +1115,99 @@ mod tests {
     fn wb_keybinding_is_ascii_printable() {
         assert!(WbKeybindingValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbKeybindingValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn when_context_simple_true() {
+        let mut ctx = KeybindingWhenContext::new();
+        ctx.set("editorFocus", true);
+        assert!(ctx.evaluate("editorFocus"));
+    }
+
+    #[test]
+    fn when_context_simple_false() {
+        let ctx = KeybindingWhenContext::new();
+        assert!(!ctx.evaluate("editorFocus"));
+    }
+
+    #[test]
+    fn when_context_negation() {
+        let mut ctx = KeybindingWhenContext::new();
+        ctx.set("editorFocus", true);
+        assert!(!ctx.evaluate("!editorFocus"));
+        assert!(ctx.evaluate("!terminalFocus"));
+    }
+
+    #[test]
+    fn when_context_and() {
+        let mut ctx = KeybindingWhenContext::new();
+        ctx.set("editorFocus", true);
+        ctx.set("editorHasSelection", true);
+        assert!(ctx.evaluate("editorFocus && editorHasSelection"));
+        ctx.set("editorHasSelection", false);
+        assert!(!ctx.evaluate("editorFocus && editorHasSelection"));
+    }
+
+    #[test]
+    fn when_context_or() {
+        let mut ctx = KeybindingWhenContext::new();
+        ctx.set("editorFocus", true);
+        assert!(ctx.evaluate("editorFocus || terminalFocus"));
+        assert!(!ctx.evaluate("terminalFocus || panelFocus"));
+    }
+
+    #[test]
+    fn when_context_empty_is_true() {
+        let ctx = KeybindingWhenContext::new();
+        assert!(ctx.evaluate(""));
+    }
+
+    #[test]
+    fn when_context_binding_active() {
+        let mut ctx = KeybindingWhenContext::new();
+        ctx.set("editorFocus", true);
+        let b = KeybindingBuilder::new().key("s").modifier(KeyMod::CtrlCmd)
+            .command("save").when("editorFocus").build();
+        assert!(ctx.binding_active(&b));
+    }
+
+    #[test]
+    fn chord_sequence_single() {
+        let seq = ChordSequence::single("k", vec![KeyMod::CtrlCmd]);
+        assert_eq!(seq.len(), 1);
+    }
+
+    #[test]
+    fn chord_sequence_double() {
+        let seq = ChordSequence::double("k", vec![KeyMod::CtrlCmd], "s", vec![]);
+        assert_eq!(seq.len(), 2);
+    }
+
+    #[test]
+    fn resolve_chain_basic() {
+        let mut svc = KeybindingService::new();
+        svc.register(KeybindingBuilder::new().key("s").modifier(KeyMod::CtrlCmd).command("save").build());
+        let ctx = KeybindingWhenContext::new();
+        let seq = ChordSequence::single("s", vec![KeyMod::CtrlCmd]);
+        let results = keybinding_resolve_chain(&svc, &ctx, &seq);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].command, "save");
+    }
+
+    #[test]
+    fn resolve_chain_filtered_by_context() {
+        let mut svc = KeybindingService::new();
+        svc.register(KeybindingBuilder::new().key("s").modifier(KeyMod::CtrlCmd).command("save").when("editorFocus").build());
+        let ctx = KeybindingWhenContext::new(); // editorFocus is false
+        let seq = ChordSequence::single("s", vec![KeyMod::CtrlCmd]);
+        let results = keybinding_resolve_chain(&svc, &ctx, &seq);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn defaults_has_save() {
+        let defaults = keybinding_defaults();
+        assert!(defaults.iter().any(|b| b.command == "workbench.action.files.save"));
+        assert!(defaults.len() >= 10);
     }
 }

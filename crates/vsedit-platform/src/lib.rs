@@ -327,6 +327,162 @@ pub fn supports_kitty_graphics() -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// Shell Detection
+// ---------------------------------------------------------------------------
+
+/// The default shell for the current platform.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlatformShell {
+    pub path: String,
+    pub name: String,
+    pub args: Vec<String>,
+}
+
+impl PlatformShell {
+    /// Detect the default shell for the current platform.
+    pub fn detect() -> Self {
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(comspec) = env::var("COMSPEC") {
+                let name = PathBuf::from(&comspec)
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "cmd".to_string());
+                return Self {
+                    path: comspec,
+                    name,
+                    args: vec!["/C".to_string()],
+                };
+            }
+            Self {
+                path: "cmd.exe".to_string(),
+                name: "cmd".to_string(),
+                args: vec!["/C".to_string()],
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let shell_path = env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+            let name = PathBuf::from(&shell_path)
+                .file_name()
+                .map(|s| s.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "sh".to_string());
+            Self {
+                path: shell_path,
+                name,
+                args: vec!["-c".to_string()],
+            }
+        }
+    }
+
+    /// Returns true if the shell is a known POSIX-like shell.
+    pub fn is_posix(&self) -> bool {
+        matches!(self.name.as_str(), "sh" | "bash" | "zsh" | "dash" | "fish" | "ksh" | "ash")
+    }
+
+    /// Returns the shell invocation command for running a string command.
+    pub fn command_for(&self, cmd: &str) -> Vec<String> {
+        let mut result = vec![self.path.clone()];
+        result.extend(self.args.clone());
+        result.push(cmd.to_string());
+        result
+    }
+}
+
+impl fmt::Display for PlatformShell {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ({})", self.name, self.path)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Locale Parsing
+// ---------------------------------------------------------------------------
+
+/// Parsed locale information.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlatformLocale {
+    pub language: String,
+    pub country: Option<String>,
+    pub encoding: Option<String>,
+}
+
+impl PlatformLocale {
+    /// Detect the system locale from environment variables.
+    pub fn detect() -> Self {
+        let raw = locale();
+        Self::parse(&raw)
+    }
+
+    /// Parse a locale string like "en_US.UTF-8".
+    pub fn parse(raw: &str) -> Self {
+        let (lang_country, encoding) = if let Some(dot_pos) = raw.find('.') {
+            (&raw[..dot_pos], Some(raw[dot_pos + 1..].to_string()))
+        } else {
+            (raw, None)
+        };
+        let (language, country) = if let Some(underscore_pos) = lang_country.find('_') {
+            (
+                lang_country[..underscore_pos].to_string(),
+                Some(lang_country[underscore_pos + 1..].to_string()),
+            )
+        } else {
+            (lang_country.to_string(), None)
+        };
+        Self {
+            language,
+            country,
+            encoding,
+        }
+    }
+
+    /// Returns the BCP 47 language tag (e.g. "en-US").
+    pub fn to_bcp47(&self) -> String {
+        match &self.country {
+            Some(c) => format!("{}-{}", self.language, c),
+            None => self.language.clone(),
+        }
+    }
+}
+
+impl fmt::Display for PlatformLocale {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.language)?;
+        if let Some(c) = &self.country {
+            write!(f, "_{c}")?;
+        }
+        if let Some(e) = &self.encoding {
+            write!(f, ".{e}")?;
+        }
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Temp Directory
+// ---------------------------------------------------------------------------
+
+/// Returns the platform-appropriate temporary directory.
+///
+/// On Windows: checks `TEMP`, then `TMP`, falls back to `C:\Temp`.
+/// On Unix: checks `TMPDIR`, falls back to `/tmp`.
+pub fn platform_temp_dir() -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        env::var_os("TEMP")
+            .or_else(|| env::var_os("TMP"))
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("C:\\Temp"))
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        env::var_os("TMPDIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -992,5 +1148,85 @@ mod tests {
     fn platform_is_ascii_printable() {
         assert!(PlatformValidator::is_ascii_printable("Hello World 123"));
         assert!(!PlatformValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn shell_detect_returns_valid() {
+        let shell = PlatformShell::detect();
+        assert!(!shell.path.is_empty());
+        assert!(!shell.name.is_empty());
+        assert!(!shell.args.is_empty());
+    }
+
+    #[test]
+    fn shell_is_posix_known() {
+        let shell = PlatformShell { path: "/bin/bash".into(), name: "bash".into(), args: vec!["-c".into()] };
+        assert!(shell.is_posix());
+    }
+
+    #[test]
+    fn shell_is_posix_unknown() {
+        let shell = PlatformShell { path: "cmd.exe".into(), name: "cmd".into(), args: vec!["/C".into()] };
+        assert!(!shell.is_posix());
+    }
+
+    #[test]
+    fn shell_command_for() {
+        let shell = PlatformShell { path: "/bin/sh".into(), name: "sh".into(), args: vec!["-c".into()] };
+        let cmd = shell.command_for("echo hi");
+        assert_eq!(cmd, vec!["/bin/sh", "-c", "echo hi"]);
+    }
+
+    #[test]
+    fn shell_display() {
+        let shell = PlatformShell { path: "/bin/zsh".into(), name: "zsh".into(), args: vec!["-c".into()] };
+        assert_eq!(format!("{shell}"), "zsh (/bin/zsh)");
+    }
+
+    #[test]
+    fn locale_parse_full() {
+        let loc = PlatformLocale::parse("en_US.UTF-8");
+        assert_eq!(loc.language, "en");
+        assert_eq!(loc.country, Some("US".to_string()));
+        assert_eq!(loc.encoding, Some("UTF-8".to_string()));
+    }
+
+    #[test]
+    fn locale_parse_no_encoding() {
+        let loc = PlatformLocale::parse("fr_FR");
+        assert_eq!(loc.language, "fr");
+        assert_eq!(loc.country, Some("FR".to_string()));
+        assert_eq!(loc.encoding, None);
+    }
+
+    #[test]
+    fn locale_parse_language_only() {
+        let loc = PlatformLocale::parse("ja");
+        assert_eq!(loc.language, "ja");
+        assert_eq!(loc.country, None);
+    }
+
+    #[test]
+    fn locale_to_bcp47() {
+        let loc = PlatformLocale::parse("en_US.UTF-8");
+        assert_eq!(loc.to_bcp47(), "en-US");
+    }
+
+    #[test]
+    fn locale_to_bcp47_no_country() {
+        let loc = PlatformLocale::parse("en");
+        assert_eq!(loc.to_bcp47(), "en");
+    }
+
+    #[test]
+    fn locale_display() {
+        let loc = PlatformLocale::parse("de_DE.UTF-8");
+        assert_eq!(format!("{loc}"), "de_DE.UTF-8");
+    }
+
+    #[test]
+    fn temp_dir_exists() {
+        let dir = platform_temp_dir();
+        assert!(!dir.as_os_str().is_empty());
     }
 }

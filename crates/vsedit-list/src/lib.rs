@@ -411,6 +411,217 @@ impl std::fmt::Display for ListOptions {
 }
 
 // ---------------------------------------------------------------------------
+// Virtual list
+// ---------------------------------------------------------------------------
+
+/// A virtual list that only renders a viewport window over a large collection.
+#[derive(Debug, Clone)]
+pub struct VirtualList<T> {
+    pub items: Vec<T>,
+    pub viewport_start: usize,
+    pub viewport_size: usize,
+}
+
+impl<T> VirtualList<T> {
+    pub fn new(items: Vec<T>, viewport_size: usize) -> Self {
+        Self {
+            items,
+            viewport_start: 0,
+            viewport_size,
+        }
+    }
+
+    pub fn total_count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn visible_items(&self) -> &[T] {
+        let end = (self.viewport_start + self.viewport_size).min(self.items.len());
+        &self.items[self.viewport_start..end]
+    }
+
+    pub fn scroll_to(&mut self, index: usize) {
+        let max_start = self.items.len().saturating_sub(self.viewport_size);
+        self.viewport_start = index.min(max_start);
+    }
+
+    pub fn scroll_down(&mut self, count: usize) {
+        let max_start = self.items.len().saturating_sub(self.viewport_size);
+        self.viewport_start = (self.viewport_start + count).min(max_start);
+    }
+
+    pub fn scroll_up(&mut self, count: usize) {
+        self.viewport_start = self.viewport_start.saturating_sub(count);
+    }
+
+    pub fn is_visible(&self, index: usize) -> bool {
+        let end = (self.viewport_start + self.viewport_size).min(self.items.len());
+        index >= self.viewport_start && index < end
+    }
+
+    pub fn ensure_visible(&mut self, index: usize) {
+        if index < self.viewport_start {
+            self.viewport_start = index;
+        } else if index >= self.viewport_start + self.viewport_size {
+            self.viewport_start = index + 1 - self.viewport_size;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard navigation
+// ---------------------------------------------------------------------------
+
+/// Keyboard navigation state for a list.
+#[derive(Debug, Clone)]
+pub struct ListKeyNav {
+    focused: usize,
+    total: usize,
+}
+
+impl ListKeyNav {
+    pub fn new(total: usize) -> Self {
+        Self { focused: 0, total }
+    }
+
+    pub fn move_up(&mut self) {
+        if self.total > 0 && self.focused > 0 {
+            self.focused -= 1;
+        }
+    }
+
+    pub fn move_down(&mut self) {
+        if self.total > 0 && self.focused + 1 < self.total {
+            self.focused += 1;
+        }
+    }
+
+    pub fn home(&mut self) {
+        self.focused = 0;
+    }
+
+    pub fn end(&mut self) {
+        if self.total > 0 {
+            self.focused = self.total - 1;
+        }
+    }
+
+    pub fn page_up(&mut self, page_size: usize) {
+        self.focused = self.focused.saturating_sub(page_size);
+    }
+
+    pub fn page_down(&mut self, page_size: usize) {
+        if self.total > 0 {
+            self.focused = (self.focused + page_size).min(self.total - 1);
+        }
+    }
+
+    pub fn focused(&self) -> usize {
+        self.focused
+    }
+
+    pub fn set_total(&mut self, total: usize) {
+        self.total = total;
+        if total == 0 {
+            self.focused = 0;
+        } else if self.focused >= total {
+            self.focused = total - 1;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-select
+// ---------------------------------------------------------------------------
+
+/// Selection state supporting click, ctrl-click, and shift-click patterns.
+#[derive(Debug, Clone)]
+pub struct ListMultiSelect {
+    selected: std::collections::BTreeSet<usize>,
+    anchor: Option<usize>,
+    total: usize,
+}
+
+impl ListMultiSelect {
+    pub fn new(total: usize) -> Self {
+        Self {
+            selected: std::collections::BTreeSet::new(),
+            anchor: None,
+            total,
+        }
+    }
+
+    pub fn click(&mut self, index: usize) {
+        self.selected.clear();
+        if index < self.total {
+            self.selected.insert(index);
+            self.anchor = Some(index);
+        }
+    }
+
+    pub fn ctrl_click(&mut self, index: usize) {
+        if index >= self.total {
+            return;
+        }
+        if self.selected.contains(&index) {
+            self.selected.remove(&index);
+        } else {
+            self.selected.insert(index);
+        }
+        self.anchor = Some(index);
+    }
+
+    pub fn shift_click(&mut self, index: usize) {
+        if index >= self.total {
+            return;
+        }
+        let anchor = self.anchor.unwrap_or(0);
+        let (lo, hi) = if anchor <= index {
+            (anchor, index)
+        } else {
+            (index, anchor)
+        };
+        self.selected.clear();
+        for i in lo..=hi {
+            self.selected.insert(i);
+        }
+    }
+
+    pub fn select_all(&mut self) {
+        for i in 0..self.total {
+            self.selected.insert(i);
+        }
+    }
+
+    pub fn deselect_all(&mut self) {
+        self.selected.clear();
+        self.anchor = None;
+    }
+
+    pub fn is_selected(&self, index: usize) -> bool {
+        self.selected.contains(&index)
+    }
+
+    pub fn selected_count(&self) -> usize {
+        self.selected.len()
+    }
+
+    pub fn selected_indices(&self) -> Vec<usize> {
+        self.selected.iter().copied().collect()
+    }
+
+    pub fn set_total(&mut self, total: usize) {
+        self.total = total;
+        self.selected.retain(|&i| i < total);
+        if let Some(a) = self.anchor {
+            if a >= total {
+                self.anchor = None;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -859,6 +1070,146 @@ mod tests {
         assert_eq!(format!("{e3}"), "validation error: bad");
         // Verify it implements std::error::Error
         let _: &dyn std::error::Error = &e1;
+    }
+
+    #[test]
+    fn test_virtual_list_viewport() {
+        let vl = VirtualList::new(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 3);
+        assert_eq!(vl.total_count(), 10);
+        assert_eq!(vl.visible_items(), &[0, 1, 2]);
+    }
+
+    #[test]
+    fn test_virtual_list_scroll_down_up() {
+        let mut vl = VirtualList::new(vec![0, 1, 2, 3, 4], 3);
+        vl.scroll_down(2);
+        assert_eq!(vl.visible_items(), &[2, 3, 4]);
+        vl.scroll_up(1);
+        assert_eq!(vl.visible_items(), &[1, 2, 3]);
+    }
+
+    #[test]
+    fn test_virtual_list_scroll_to() {
+        let mut vl = VirtualList::new(vec![0, 1, 2, 3, 4], 3);
+        vl.scroll_to(100);
+        assert_eq!(vl.viewport_start, 2); // clamped to max
+        vl.scroll_to(1);
+        assert_eq!(vl.viewport_start, 1);
+    }
+
+    #[test]
+    fn test_virtual_list_ensure_visible() {
+        let mut vl = VirtualList::new(vec![0, 1, 2, 3, 4, 5], 3);
+        vl.ensure_visible(4);
+        assert_eq!(vl.viewport_start, 2);
+        assert!(vl.is_visible(4));
+        vl.ensure_visible(0);
+        assert_eq!(vl.viewport_start, 0);
+    }
+
+    #[test]
+    fn test_virtual_list_is_visible() {
+        let vl = VirtualList::new(vec![0, 1, 2, 3, 4], 3);
+        assert!(vl.is_visible(0));
+        assert!(vl.is_visible(2));
+        assert!(!vl.is_visible(3));
+    }
+
+    #[test]
+    fn test_key_nav_up_down() {
+        let mut nav = ListKeyNav::new(5);
+        assert_eq!(nav.focused(), 0);
+        nav.move_down();
+        assert_eq!(nav.focused(), 1);
+        nav.move_up();
+        assert_eq!(nav.focused(), 0);
+        nav.move_up(); // stays at 0
+        assert_eq!(nav.focused(), 0);
+    }
+
+    #[test]
+    fn test_key_nav_home_end() {
+        let mut nav = ListKeyNav::new(10);
+        nav.move_down();
+        nav.move_down();
+        nav.home();
+        assert_eq!(nav.focused(), 0);
+        nav.end();
+        assert_eq!(nav.focused(), 9);
+    }
+
+    #[test]
+    fn test_key_nav_page_up_down() {
+        let mut nav = ListKeyNav::new(20);
+        nav.page_down(5);
+        assert_eq!(nav.focused(), 5);
+        nav.page_down(100);
+        assert_eq!(nav.focused(), 19);
+        nav.page_up(10);
+        assert_eq!(nav.focused(), 9);
+        nav.page_up(100);
+        assert_eq!(nav.focused(), 0);
+    }
+
+    #[test]
+    fn test_key_nav_set_total() {
+        let mut nav = ListKeyNav::new(10);
+        nav.end(); // focused = 9
+        nav.set_total(5);
+        assert_eq!(nav.focused(), 4); // clamped
+        nav.set_total(0);
+        assert_eq!(nav.focused(), 0);
+    }
+
+    #[test]
+    fn test_multi_select_click() {
+        let mut ms = ListMultiSelect::new(5);
+        ms.click(2);
+        assert!(ms.is_selected(2));
+        assert_eq!(ms.selected_count(), 1);
+        ms.click(3);
+        assert!(!ms.is_selected(2));
+        assert!(ms.is_selected(3));
+    }
+
+    #[test]
+    fn test_multi_select_ctrl_click() {
+        let mut ms = ListMultiSelect::new(5);
+        ms.ctrl_click(1);
+        ms.ctrl_click(3);
+        assert_eq!(ms.selected_count(), 2);
+        assert!(ms.is_selected(1));
+        assert!(ms.is_selected(3));
+        ms.ctrl_click(1); // toggle off
+        assert!(!ms.is_selected(1));
+        assert_eq!(ms.selected_count(), 1);
+    }
+
+    #[test]
+    fn test_multi_select_shift_click() {
+        let mut ms = ListMultiSelect::new(10);
+        ms.click(2); // anchor at 2
+        ms.shift_click(5);
+        assert_eq!(ms.selected_indices(), vec![2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn test_multi_select_select_all() {
+        let mut ms = ListMultiSelect::new(4);
+        ms.select_all();
+        assert_eq!(ms.selected_count(), 4);
+        ms.deselect_all();
+        assert_eq!(ms.selected_count(), 0);
+    }
+
+    #[test]
+    fn test_multi_select_set_total_prunes() {
+        let mut ms = ListMultiSelect::new(10);
+        ms.click(8);
+        ms.ctrl_click(9);
+        assert_eq!(ms.selected_count(), 2);
+        ms.set_total(5);
+        assert_eq!(ms.selected_count(), 0); // both pruned
     }
 
     #[test]

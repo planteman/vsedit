@@ -474,6 +474,195 @@ fn ensure_trailing_slash(path: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// WorkspaceFileIndex
+// ---------------------------------------------------------------------------
+
+/// Fast file lookup index for a workspace.
+pub struct WorkspaceFileIndex {
+    pub files: Vec<String>,
+    pub root: String,
+}
+
+impl WorkspaceFileIndex {
+    /// Create a new empty file index rooted at the given path.
+    pub fn new(root: impl Into<String>) -> Self {
+        Self {
+            files: Vec::new(),
+            root: root.into(),
+        }
+    }
+
+    /// Add a file path to the index.
+    pub fn add_file(&mut self, path: impl Into<String>) {
+        self.files.push(path.into());
+    }
+
+    /// Remove a file path from the index. Returns `true` if the file was found.
+    pub fn remove_file(&mut self, path: &str) -> bool {
+        if let Some(pos) = self.files.iter().position(|f| f == path) {
+            self.files.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check whether the index contains a given file path.
+    pub fn contains(&self, path: &str) -> bool {
+        self.files.iter().any(|f| f == path)
+    }
+
+    /// Return the number of indexed files.
+    pub fn file_count(&self) -> usize {
+        self.files.len()
+    }
+
+    /// Return all indexed file paths.
+    pub fn files(&self) -> &[String] {
+        &self.files
+    }
+
+    /// Return file paths that end with the given extension (e.g. `"rs"`).
+    pub fn files_with_extension(&self, ext: &str) -> Vec<&str> {
+        let suffix = format!(".{ext}");
+        self.files
+            .iter()
+            .filter(|f| f.ends_with(&suffix))
+            .map(String::as_str)
+            .collect()
+    }
+
+    /// Remove all files from the index.
+    pub fn clear(&mut self) {
+        self.files.clear();
+    }
+
+    /// Return files matching a glob pattern.
+    pub fn search_glob(&self, pattern: &str) -> Vec<&str> {
+        self.files
+            .iter()
+            .filter(|f| workspace_glob_match(pattern, f))
+            .map(String::as_str)
+            .collect()
+    }
+
+    /// Return files that do NOT match any of the exclusion patterns.
+    pub fn exclude(&self, patterns: &[&str]) -> Vec<&str> {
+        self.files
+            .iter()
+            .filter(|f| !workspace_exclude_pattern(patterns, f))
+            .map(String::as_str)
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Glob helpers
+// ---------------------------------------------------------------------------
+
+/// Simple glob matching supporting `*`, `**`, and `?`.
+///
+/// - `*` matches any sequence of characters within a single path segment
+///   (i.e. not `/`).
+/// - `**` matches any sequence of characters across segment boundaries.
+/// - `?` matches exactly one non-`/` character.
+pub fn workspace_glob_match(pattern: &str, path: &str) -> bool {
+    glob_match_recursive(pattern.as_bytes(), path.as_bytes())
+}
+
+fn glob_match_recursive(pat: &[u8], text: &[u8]) -> bool {
+    let mut pi = 0;
+    let mut ti = 0;
+
+    // Positions for backtracking on single `*`.
+    let mut star_pi: Option<usize> = None;
+    let mut star_ti: usize = 0;
+
+    while ti < text.len() {
+        if pi < pat.len() && pat[pi] == b'*' {
+            // Check for `**`
+            if pi + 1 < pat.len() && pat[pi + 1] == b'*' {
+                // `**` – try matching the rest of the pattern against every
+                // possible suffix of the text (greedy across `/`).
+                let rest = pi + 2;
+                // Skip an optional `/` after `**`.
+                let rest = if rest < pat.len() && pat[rest] == b'/' {
+                    rest + 1
+                } else {
+                    rest
+                };
+                // If `**` is at the end of the pattern, it matches everything.
+                if rest >= pat.len() {
+                    return true;
+                }
+                for start in ti..=text.len() {
+                    if glob_match_recursive(&pat[rest..], &text[start..]) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            // Single `*` – matches anything except `/`.
+            star_pi = Some(pi);
+            star_ti = ti;
+            pi += 1;
+            continue;
+        }
+
+        if pi < pat.len() && pat[pi] == b'?' {
+            if text[ti] == b'/' {
+                // `?` must not cross segments.
+                if let Some(sp) = star_pi {
+                    pi = sp + 1;
+                    star_ti += 1;
+                    ti = star_ti;
+                    continue;
+                }
+                return false;
+            }
+            pi += 1;
+            ti += 1;
+            continue;
+        }
+
+        if pi < pat.len() && pat[pi] == text[ti] {
+            pi += 1;
+            ti += 1;
+            continue;
+        }
+
+        // Mismatch – backtrack to last `*` if possible.
+        if let Some(sp) = star_pi {
+            if text[ti] == b'/' {
+                // `*` cannot cross `/`.
+                return false;
+            }
+            pi = sp + 1;
+            star_ti += 1;
+            ti = star_ti;
+            continue;
+        }
+
+        return false;
+    }
+
+    // Consume trailing `*` / `**` in pattern.
+    while pi < pat.len() && pat[pi] == b'*' {
+        pi += 1;
+    }
+
+    pi == pat.len()
+}
+
+/// Returns `true` if `path` matches any of the given exclusion patterns.
+pub fn workspace_exclude_pattern(patterns: &[&str], path: &str) -> bool {
+    patterns
+        .iter()
+        .any(|pat| workspace_glob_match(pat, path))
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -691,6 +880,132 @@ mod tests {
             WorkspaceType::Empty,
             WorkspaceType::SingleFolder(PathBuf::from("/tmp"))
         );
+    }
+
+    // -- File index and glob tests --
+
+    #[test]
+    fn test_file_index_add_contains() {
+        let mut idx = WorkspaceFileIndex::new("/project");
+        idx.add_file("src/main.rs");
+        idx.add_file("src/lib.rs");
+        assert!(idx.contains("src/main.rs"));
+        assert!(idx.contains("src/lib.rs"));
+        assert!(!idx.contains("src/other.rs"));
+        assert_eq!(idx.file_count(), 2);
+    }
+
+    #[test]
+    fn test_file_index_remove() {
+        let mut idx = WorkspaceFileIndex::new("/project");
+        idx.add_file("a.rs");
+        idx.add_file("b.rs");
+        assert!(idx.remove_file("a.rs"));
+        assert!(!idx.contains("a.rs"));
+        assert!(idx.contains("b.rs"));
+        assert!(!idx.remove_file("nonexistent.rs"));
+        assert_eq!(idx.file_count(), 1);
+    }
+
+    #[test]
+    fn test_file_index_files_with_extension() {
+        let mut idx = WorkspaceFileIndex::new("/project");
+        idx.add_file("main.rs");
+        idx.add_file("lib.rs");
+        idx.add_file("readme.md");
+        idx.add_file("config.toml");
+        let rs_files = idx.files_with_extension("rs");
+        assert_eq!(rs_files.len(), 2);
+        assert!(rs_files.contains(&"main.rs"));
+        assert!(rs_files.contains(&"lib.rs"));
+        assert!(idx.files_with_extension("py").is_empty());
+    }
+
+    #[test]
+    fn test_file_index_clear() {
+        let mut idx = WorkspaceFileIndex::new("/project");
+        idx.add_file("a.rs");
+        idx.add_file("b.rs");
+        idx.clear();
+        assert_eq!(idx.file_count(), 0);
+        assert!(idx.files().is_empty());
+    }
+
+    #[test]
+    fn test_glob_match_star() {
+        assert!(workspace_glob_match("*.rs", "main.rs"));
+        assert!(workspace_glob_match("src/*.rs", "src/main.rs"));
+        assert!(!workspace_glob_match("*.rs", "src/main.rs"));
+        assert!(!workspace_glob_match("*.rs", "main.txt"));
+    }
+
+    #[test]
+    fn test_glob_match_double_star() {
+        assert!(workspace_glob_match("**/*.rs", "src/main.rs"));
+        assert!(workspace_glob_match("**/*.rs", "a/b/c/main.rs"));
+        assert!(workspace_glob_match("src/**", "src/a/b/c.rs"));
+        assert!(workspace_glob_match("**", "anything/at/all"));
+    }
+
+    #[test]
+    fn test_glob_match_question_mark() {
+        assert!(workspace_glob_match("?.rs", "a.rs"));
+        assert!(!workspace_glob_match("?.rs", "ab.rs"));
+        assert!(!workspace_glob_match("?", "/"));
+    }
+
+    #[test]
+    fn test_glob_match_no_match() {
+        assert!(!workspace_glob_match("*.rs", "main.txt"));
+        assert!(!workspace_glob_match("src/*.rs", "lib/main.rs"));
+        assert!(!workspace_glob_match("foo", "bar"));
+    }
+
+    #[test]
+    fn test_glob_match_exact() {
+        assert!(workspace_glob_match("main.rs", "main.rs"));
+        assert!(workspace_glob_match("src/lib.rs", "src/lib.rs"));
+        assert!(!workspace_glob_match("main.rs", "other.rs"));
+    }
+
+    #[test]
+    fn test_exclude_pattern_single() {
+        assert!(workspace_exclude_pattern(&["*.log"], "debug.log"));
+        assert!(!workspace_exclude_pattern(&["*.log"], "main.rs"));
+    }
+
+    #[test]
+    fn test_exclude_pattern_multiple() {
+        let patterns = &["*.log", ".git/**", "node_modules/**"];
+        assert!(workspace_exclude_pattern(patterns, "app.log"));
+        assert!(workspace_exclude_pattern(patterns, ".git/config"));
+        assert!(workspace_exclude_pattern(patterns, "node_modules/foo/index.js"));
+        assert!(!workspace_exclude_pattern(patterns, "src/main.rs"));
+    }
+
+    #[test]
+    fn test_file_index_search_glob() {
+        let mut idx = WorkspaceFileIndex::new("/project");
+        idx.add_file("src/main.rs");
+        idx.add_file("src/lib.rs");
+        idx.add_file("tests/test.rs");
+        idx.add_file("README.md");
+        let results = idx.search_glob("src/*.rs");
+        assert_eq!(results.len(), 2);
+        assert!(results.contains(&"src/main.rs"));
+        assert!(results.contains(&"src/lib.rs"));
+    }
+
+    #[test]
+    fn test_file_index_exclude() {
+        let mut idx = WorkspaceFileIndex::new("/project");
+        idx.add_file("src/main.rs");
+        idx.add_file("build.log");
+        idx.add_file(".git/config");
+        idx.add_file("node_modules/foo/index.js");
+        let kept = idx.exclude(&["*.log", ".git/**", "node_modules/**"]);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0], "src/main.rs");
     }
 
     // -- New tests for requested features --

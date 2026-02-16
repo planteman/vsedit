@@ -228,6 +228,168 @@ impl InlineCompletionRegistry {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Ghost text position & rendering
+// ---------------------------------------------------------------------------
+
+/// Where ghost text renders relative to the cursor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GhostTextPosition {
+    /// Render ghost text immediately after the cursor on the same line.
+    AfterCursor,
+    /// Render ghost text starting on the next line.
+    NextLine,
+    /// Render ghost text below the cursor, indented to the cursor column.
+    BelowCursor,
+}
+
+/// Renders gray ghost text with position tracking.
+pub struct InlineCompletionGhost {
+    text_lines: Vec<String>,
+    position: GhostTextPosition,
+    cursor_line: u32,
+    cursor_col: u32,
+    visible: bool,
+}
+
+impl InlineCompletionGhost {
+    /// Creates a new ghost from raw text at the given cursor location.
+    pub fn new(text: &str, cursor_line: u32, cursor_col: u32) -> Self {
+        let text_lines: Vec<String> = text.split('\n').map(String::from).collect();
+        let position = if text_lines.len() > 1 {
+            GhostTextPosition::NextLine
+        } else {
+            GhostTextPosition::AfterCursor
+        };
+        Self {
+            text_lines,
+            position,
+            cursor_line,
+            cursor_col,
+            visible: true,
+        }
+    }
+
+    /// Returns the current ghost text position.
+    pub fn position(&self) -> GhostTextPosition {
+        self.position
+    }
+
+    /// Returns the number of lines in the ghost text.
+    pub fn line_count(&self) -> usize {
+        self.text_lines.len()
+    }
+
+    /// Returns the first line of ghost text.
+    pub fn first_line(&self) -> &str {
+        &self.text_lines[0]
+    }
+
+    /// Produces render-ready lines according to the current position mode.
+    pub fn render_lines(&self) -> Vec<String> {
+        let indent = " ".repeat(self.cursor_col as usize);
+        match self.position {
+            GhostTextPosition::AfterCursor => {
+                vec![format!("{}{}", indent, self.text_lines[0])]
+            }
+            GhostTextPosition::NextLine => self.text_lines.clone(),
+            GhostTextPosition::BelowCursor => {
+                self.text_lines
+                    .iter()
+                    .map(|l| format!("{}{}", indent, l))
+                    .collect()
+            }
+        }
+    }
+
+    /// Overrides the position mode.
+    pub fn set_position(&mut self, pos: GhostTextPosition) {
+        self.position = pos;
+    }
+
+    /// Returns whether the ghost text is visible.
+    pub fn is_visible(&self) -> bool {
+        self.visible
+    }
+
+    /// Makes the ghost text visible.
+    pub fn show(&mut self) {
+        self.visible = true;
+    }
+
+    /// Hides the ghost text.
+    pub fn hide(&mut self) {
+        self.visible = false;
+    }
+
+    /// Joins all lines back into a single string.
+    pub fn text(&self) -> String {
+        self.text_lines.join("\n")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Accept inline completion
+// ---------------------------------------------------------------------------
+
+/// The result of accepting an inline completion.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcceptResult {
+    /// The full document text after applying the completion.
+    pub new_text: String,
+    /// The cursor line after the insertion.
+    pub new_cursor_line: u32,
+    /// The cursor column after the insertion.
+    pub new_cursor_col: u32,
+}
+
+/// Applies the current session completion at the given cursor position.
+pub fn accept_inline_completion(
+    session: &InlineCompletionSession,
+    document_text: &str,
+    cursor_line: u32,
+    cursor_col: u32,
+) -> Option<AcceptResult> {
+    let item = session.current()?;
+    let mut lines: Vec<String> = document_text.split('\n').map(String::from).collect();
+    let line_idx = cursor_line as usize;
+    if line_idx >= lines.len() {
+        return None;
+    }
+    let line = &lines[line_idx];
+    let col = cursor_col as usize;
+    let before = &line[..col.min(line.len())];
+    let after = &line[col.min(line.len())..];
+
+    let insert_parts: Vec<&str> = item.insert_text.split('\n').collect();
+    let mut new_cursor_line = cursor_line;
+    let new_cursor_col;
+
+    if insert_parts.len() == 1 {
+        lines[line_idx] = format!("{}{}{}", before, insert_parts[0], after);
+        new_cursor_col = (col + insert_parts[0].len()) as u32;
+    } else {
+        let first = format!("{}{}", before, insert_parts[0]);
+        let last_insert = insert_parts[insert_parts.len() - 1];
+        let last = format!("{}{}", last_insert, after);
+        let mut replacement: Vec<String> = Vec::with_capacity(insert_parts.len());
+        replacement.push(first);
+        for part in &insert_parts[1..insert_parts.len() - 1] {
+            replacement.push((*part).to_string());
+        }
+        replacement.push(last);
+        new_cursor_line += (insert_parts.len() - 1) as u32;
+        new_cursor_col = last_insert.len() as u32;
+        lines.splice(line_idx..=line_idx, replacement);
+    }
+
+    Some(AcceptResult {
+        new_text: lines.join("\n"),
+        new_cursor_line,
+        new_cursor_col,
+    })
+}
+
 /// Accumulated statistics for inline-complete operations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InlineCompleteStats {
@@ -992,5 +1154,115 @@ mod tests {
     fn inline_complete_is_ascii_printable() {
         assert!(InlineCompleteValidator::is_ascii_printable("Hello World 123"));
         assert!(!InlineCompleteValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // GhostTextPosition / InlineCompletionGhost tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn ghost_position_single_line_after_cursor() {
+        let ghost = InlineCompletionGhost::new("hello", 5, 10);
+        assert_eq!(ghost.position(), GhostTextPosition::AfterCursor);
+        assert_eq!(ghost.line_count(), 1);
+        assert_eq!(ghost.first_line(), "hello");
+    }
+
+    #[test]
+    fn ghost_position_multiline_next_line() {
+        let ghost = InlineCompletionGhost::new("line1\nline2\nline3", 5, 10);
+        assert_eq!(ghost.position(), GhostTextPosition::NextLine);
+        assert_eq!(ghost.line_count(), 3);
+    }
+
+    #[test]
+    fn ghost_render_after_cursor() {
+        let ghost = InlineCompletionGhost::new("world", 0, 5);
+        let lines = ghost.render_lines();
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0], "     world");
+    }
+
+    #[test]
+    fn ghost_render_next_line() {
+        let ghost = InlineCompletionGhost::new("a\nb", 0, 3);
+        let lines = ghost.render_lines();
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0], "a");
+        assert_eq!(lines[1], "b");
+    }
+
+    #[test]
+    fn ghost_render_below_cursor() {
+        let mut ghost = InlineCompletionGhost::new("x\ny", 0, 4);
+        ghost.set_position(GhostTextPosition::BelowCursor);
+        let lines = ghost.render_lines();
+        assert_eq!(lines[0], "    x");
+        assert_eq!(lines[1], "    y");
+    }
+
+    #[test]
+    fn ghost_visibility() {
+        let mut ghost = InlineCompletionGhost::new("hi", 0, 0);
+        assert!(ghost.is_visible());
+        ghost.hide();
+        assert!(!ghost.is_visible());
+        ghost.show();
+        assert!(ghost.is_visible());
+    }
+
+    #[test]
+    fn ghost_text_roundtrip() {
+        let ghost = InlineCompletionGhost::new("a\nb\nc", 0, 0);
+        assert_eq!(ghost.text(), "a\nb\nc");
+    }
+
+    // -----------------------------------------------------------------------
+    // accept_inline_completion tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn accept_completion_single_line() {
+        let item = InlineCompletionItem {
+            insert_text: "World".to_string(),
+            range_start_line: 0,
+            range_start_col: 5,
+            range_end_line: 0,
+            range_end_col: 5,
+            filter_text: None,
+            command: None,
+        };
+        let list = InlineCompletionList { items: vec![item] };
+        let session = InlineCompletionSession::new(list);
+        let result = accept_inline_completion(&session, "Hello", 0, 5).unwrap();
+        assert_eq!(result.new_text, "HelloWorld");
+        assert_eq!(result.new_cursor_line, 0);
+        assert_eq!(result.new_cursor_col, 10);
+    }
+
+    #[test]
+    fn accept_completion_multiline() {
+        let item = InlineCompletionItem {
+            insert_text: "B\nC".to_string(),
+            range_start_line: 0,
+            range_start_col: 1,
+            range_end_line: 0,
+            range_end_col: 1,
+            filter_text: None,
+            command: None,
+        };
+        let list = InlineCompletionList { items: vec![item] };
+        let session = InlineCompletionSession::new(list);
+        let result = accept_inline_completion(&session, "A", 0, 1).unwrap();
+        assert_eq!(result.new_text, "AB\nC");
+        assert_eq!(result.new_cursor_line, 1);
+        assert_eq!(result.new_cursor_col, 1);
+    }
+
+    #[test]
+    fn accept_completion_empty_session() {
+        let list = InlineCompletionList { items: vec![] };
+        let session = InlineCompletionSession::new(list);
+        assert!(accept_inline_completion(&session, "Hello", 0, 5).is_none());
     }
 }
