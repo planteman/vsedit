@@ -257,6 +257,249 @@ impl SecretStorage for InMemorySecretStorage {
 /// Backward-compatible alias.
 pub type SecretStorageService = InMemorySecretStorage;
 
+// ---------------------------------------------------------------------------
+// EncryptedFileStore
+// ---------------------------------------------------------------------------
+
+use serde::{Serialize, Deserialize};
+
+/// XOR-based obfuscation + base64 encoding for simple file-based secret storage.
+fn xor_encrypt(data: &[u8], key: &[u8]) -> Vec<u8> {
+    data.iter()
+        .enumerate()
+        .map(|(i, b)| b ^ key[i % key.len()])
+        .collect()
+}
+
+fn base64_encode(data: &[u8]) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::new();
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
+        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        result.push(CHARS[((triple >> 18) & 0x3F) as usize] as char);
+        result.push(CHARS[((triple >> 12) & 0x3F) as usize] as char);
+        if chunk.len() > 1 {
+            result.push(CHARS[((triple >> 6) & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(CHARS[(triple & 0x3F) as usize] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
+}
+
+fn base64_decode(s: &str) -> Result<Vec<u8>, String> {
+    fn char_val(c: u8) -> Result<u8, String> {
+        match c {
+            b'A'..=b'Z' => Ok(c - b'A'),
+            b'a'..=b'z' => Ok(c - b'a' + 26),
+            b'0'..=b'9' => Ok(c - b'0' + 52),
+            b'+' => Ok(62),
+            b'/' => Ok(63),
+            _ => Err(format!("invalid base64 character: {}", c as char)),
+        }
+    }
+    let bytes: Vec<u8> = s.bytes().filter(|&b| b != b'=').collect();
+    let mut result = Vec::new();
+    for chunk in bytes.chunks(4) {
+        if chunk.is_empty() { break; }
+        let vals: Vec<u8> = chunk.iter().map(|&b| char_val(b)).collect::<Result<_, _>>()?;
+        let n = vals.len();
+        if n >= 2 {
+            result.push((vals[0] << 2) | (vals[1] >> 4));
+        }
+        if n >= 3 {
+            result.push((vals[1] << 4) | (vals[2] >> 2));
+        }
+        if n >= 4 {
+            result.push((vals[2] << 6) | vals[3]);
+        }
+    }
+    Ok(result)
+}
+
+/// Serializable on-disk format for the encrypted secrets file.
+#[derive(Serialize, Deserialize, Default)]
+struct SecretsFile {
+    secrets: HashMap<String, String>,
+}
+
+/// File-based encrypted secret storage.
+///
+/// Stores secrets in a JSON file with XOR + base64 obfuscation.
+/// This is *not* cryptographically secure — it is a functional fallback
+/// when no system keyring is available.
+#[derive(Debug)]
+pub struct EncryptedFileStore {
+    path: std::path::PathBuf,
+    key: Vec<u8>,
+    cache: HashMap<String, String>,
+}
+
+impl EncryptedFileStore {
+    /// Create a new file store at `path` using `user_key` for XOR encryption.
+    pub fn new(path: impl Into<std::path::PathBuf>, user_key: &str) -> Self {
+        let path = path.into();
+        let key = if user_key.is_empty() {
+            b"vsedit-default-key".to_vec()
+        } else {
+            user_key.as_bytes().to_vec()
+        };
+        let mut store = Self {
+            path,
+            key,
+            cache: HashMap::new(),
+        };
+        store.load_from_disk();
+        store
+    }
+
+    /// Default path: `~/.config/vsedit/secrets.json`.
+    pub fn default_path() -> Option<std::path::PathBuf> {
+        dirs::config_dir().map(|d| d.join("vsedit").join("secrets.json"))
+    }
+
+    fn load_from_disk(&mut self) {
+        if let Ok(contents) = std::fs::read_to_string(&self.path) {
+            if let Ok(file) = serde_json::from_str::<SecretsFile>(&contents) {
+                self.cache.clear();
+                for (k, encoded) in &file.secrets {
+                    if let Ok(encrypted) = base64_decode(encoded) {
+                        let decrypted = xor_encrypt(&encrypted, &self.key);
+                        if let Ok(value) = String::from_utf8(decrypted) {
+                            self.cache.insert(k.clone(), value);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn save_to_disk(&self) -> Result<(), SecretStorageError> {
+        let mut file = SecretsFile::default();
+        for (k, v) in &self.cache {
+            let encrypted = xor_encrypt(v.as_bytes(), &self.key);
+            file.secrets.insert(k.clone(), base64_encode(&encrypted));
+        }
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                SecretStorageError::Other(format!("cannot create directory: {e}"))
+            })?;
+        }
+        let json = serde_json::to_string_pretty(&file)
+            .map_err(|e| SecretStorageError::Other(format!("serialization error: {e}")))?;
+        std::fs::write(&self.path, json)
+            .map_err(|e| SecretStorageError::Other(format!("write error: {e}")))?;
+        Ok(())
+    }
+
+    /// Return the file path used by this store.
+    pub fn path(&self) -> &std::path::Path {
+        &self.path
+    }
+}
+
+impl SecretStorage for EncryptedFileStore {
+    fn get(&self, key: &str) -> Option<String> {
+        self.cache.get(key).cloned()
+    }
+
+    fn store(&mut self, key: &str, value: &str) -> Result<(), SecretStorageError> {
+        validate_key(key)?;
+        self.cache.insert(key.to_string(), value.to_string());
+        self.save_to_disk()
+    }
+
+    fn delete(&mut self, key: &str) -> Result<bool, SecretStorageError> {
+        let removed = self.cache.remove(key).is_some();
+        if removed {
+            self.save_to_disk()?;
+        }
+        Ok(removed)
+    }
+
+    fn keys(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self.cache.keys().cloned().collect();
+        keys.sort();
+        keys
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SecretService
+// ---------------------------------------------------------------------------
+
+/// High-level secret service that tries keyring first, then falls back to
+/// file-based encrypted storage.
+#[derive(Debug)]
+pub struct SecretService {
+    keyring: KeyringSecretStorage,
+    file_store: EncryptedFileStore,
+}
+
+impl SecretService {
+    /// Create a new `SecretService`.
+    pub fn new(
+        service_name: &str,
+        file_path: impl Into<std::path::PathBuf>,
+        user_key: &str,
+    ) -> Self {
+        Self {
+            keyring: KeyringSecretStorage::new(service_name),
+            file_store: EncryptedFileStore::new(file_path, user_key),
+        }
+    }
+
+    /// Store a secret, trying keyring first.
+    pub fn store_secret(&mut self, key: &str, value: &str) -> Result<(), SecretStorageError> {
+        validate_key(key)?;
+        if self.keyring.is_keyring_available() {
+            self.keyring.store(key, value)
+        } else {
+            self.file_store.store(key, value)
+        }
+    }
+
+    /// Retrieve a secret, trying keyring first.
+    pub fn get_secret(&self, key: &str) -> Option<String> {
+        if self.keyring.is_keyring_available() {
+            self.keyring.get(key)
+        } else {
+            self.file_store.get(key)
+        }
+    }
+
+    /// Delete a secret, trying keyring first.
+    pub fn delete_secret(&mut self, key: &str) -> Result<bool, SecretStorageError> {
+        if self.keyring.is_keyring_available() {
+            self.keyring.delete(key)
+        } else {
+            self.file_store.delete(key)
+        }
+    }
+
+    /// List all keys from the active backend.
+    pub fn list_keys(&self) -> Vec<String> {
+        if self.keyring.is_keyring_available() {
+            self.keyring.keys()
+        } else {
+            self.file_store.keys()
+        }
+    }
+
+    /// Whether the keyring backend is being used.
+    pub fn is_using_keyring(&self) -> bool {
+        self.keyring.is_keyring_available()
+    }
+}
+
 /// Keyring-backed secret storage stub.
 ///
 /// In a real implementation this would wrap the system keyring (e.g., via
@@ -987,5 +1230,141 @@ mod tests {
     fn secrets_is_ascii_printable() {
         assert!(SecretsValidator::is_ascii_printable("Hello World 123"));
         assert!(!SecretsValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- EncryptedFileStore tests ----------------------------------------------
+
+    #[test]
+    fn encrypted_file_store_roundtrip() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("secrets.json");
+        let mut store = EncryptedFileStore::new(&path, "test-key");
+        store.store("token", "my-secret-value").unwrap();
+        assert_eq!(store.get("token"), Some("my-secret-value".to_string()));
+
+        // Re-open from disk
+        let store2 = EncryptedFileStore::new(&path, "test-key");
+        assert_eq!(store2.get("token"), Some("my-secret-value".to_string()));
+    }
+
+    #[test]
+    fn encrypted_file_store_delete() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("secrets.json");
+        let mut store = EncryptedFileStore::new(&path, "key");
+        store.store("a", "1").unwrap();
+        assert_eq!(store.delete("a").unwrap(), true);
+        assert_eq!(store.get("a"), None);
+        assert_eq!(store.delete("a").unwrap(), false);
+    }
+
+    #[test]
+    fn encrypted_file_store_keys() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("secrets.json");
+        let mut store = EncryptedFileStore::new(&path, "key");
+        store.store("z-key", "1").unwrap();
+        store.store("a-key", "2").unwrap();
+        assert_eq!(store.keys(), vec!["a-key", "z-key"]);
+    }
+
+    #[test]
+    fn encrypted_file_store_wrong_key_returns_nothing() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("secrets.json");
+        let mut store = EncryptedFileStore::new(&path, "correct-key");
+        store.store("token", "secret").unwrap();
+
+        // Opening with wrong key should not recover the value correctly
+        let store2 = EncryptedFileStore::new(&path, "wrong-key");
+        let val = store2.get("token");
+        // The value will be garbage (decrypted with wrong key), so it won't
+        // match the original. It may or may not be valid UTF-8.
+        assert_ne!(val, Some("secret".to_string()));
+    }
+
+    #[test]
+    fn encrypted_file_store_validates_key() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("secrets.json");
+        let mut store = EncryptedFileStore::new(&path, "key");
+        assert!(store.store("", "val").is_err());
+        assert!(store.store("has space", "val").is_err());
+    }
+
+    #[test]
+    fn encrypted_file_store_default_key() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("secrets.json");
+        let mut store = EncryptedFileStore::new(&path, "");
+        store.store("tok", "val").unwrap();
+        assert_eq!(store.get("tok"), Some("val".to_string()));
+    }
+
+    #[test]
+    fn encrypted_file_store_path() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("secrets.json");
+        let store = EncryptedFileStore::new(&path, "key");
+        assert_eq!(store.path(), path.as_path());
+    }
+
+    #[test]
+    fn encrypted_file_store_default_path() {
+        let p = EncryptedFileStore::default_path();
+        // Should return Some on most systems
+        if let Some(path) = p {
+            assert!(path.ends_with("vsedit/secrets.json") || path.ends_with("vsedit\\secrets.json"));
+        }
+    }
+
+    // -- SecretService tests ---------------------------------------------------
+
+    #[test]
+    fn secret_service_falls_back_to_file() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("secrets.json");
+        let mut svc = SecretService::new("vsedit-test", &path, "key");
+        assert!(!svc.is_using_keyring());
+        svc.store_secret("api-token", "abc123").unwrap();
+        assert_eq!(svc.get_secret("api-token"), Some("abc123".to_string()));
+    }
+
+    #[test]
+    fn secret_service_delete() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("secrets.json");
+        let mut svc = SecretService::new("vsedit-test", &path, "key");
+        svc.store_secret("k", "v").unwrap();
+        assert_eq!(svc.delete_secret("k").unwrap(), true);
+        assert_eq!(svc.get_secret("k"), None);
+    }
+
+    #[test]
+    fn secret_service_list_keys() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("secrets.json");
+        let mut svc = SecretService::new("vsedit-test", &path, "key");
+        svc.store_secret("beta", "2").unwrap();
+        svc.store_secret("alpha", "1").unwrap();
+        assert_eq!(svc.list_keys(), vec!["alpha", "beta"]);
+    }
+
+    #[test]
+    fn secret_service_validates_key() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let path = tmp.path().join("secrets.json");
+        let mut svc = SecretService::new("vsedit-test", &path, "key");
+        assert!(svc.store_secret("", "val").is_err());
+    }
+
+    // -- base64 roundtrip test -------------------------------------------------
+
+    #[test]
+    fn base64_roundtrip() {
+        let original = b"Hello, vsedit secrets!";
+        let encoded = base64_encode(original);
+        let decoded = base64_decode(&encoded).unwrap();
+        assert_eq!(decoded, original);
     }
 }

@@ -734,6 +734,345 @@ impl Default for ExtHostValidator {
     }
 }
 
+// ---------------------------------------------------------------------------
+// ExtensionScanner
+// ---------------------------------------------------------------------------
+
+/// Scans a directory tree for extensions by locating `package.json` files.
+///
+/// Unlike the low-level [`scan_extensions`] function this struct retains the
+/// root path and provides a higher-level API for repeated scans.
+pub struct ExtensionScanner {
+    root: std::path::PathBuf,
+}
+
+impl ExtensionScanner {
+    /// Create a scanner rooted at `path`.
+    pub fn new(path: impl Into<std::path::PathBuf>) -> Self {
+        Self { root: path.into() }
+    }
+
+    /// Scan the root directory for extensions.
+    pub fn scan_directory(&self) -> Vec<ExtensionDescription> {
+        scanner::scan_extensions(&self.root)
+    }
+
+    /// Return the root path being scanned.
+    pub fn root(&self) -> &std::path::Path {
+        &self.root
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActivationEventHandler
+// ---------------------------------------------------------------------------
+
+/// Activation event kinds understood by the extension host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActivationEvent {
+    /// `onLanguage:X`
+    OnLanguage(String),
+    /// `onCommand:X`
+    OnCommand(String),
+    /// `workspaceContains:X`
+    WorkspaceContains(String),
+    /// `onStartupFinished`
+    OnStartupFinished,
+    /// `*` — always activate
+    Star,
+    /// An unrecognised activation event string.
+    Unknown(String),
+}
+
+impl ActivationEvent {
+    /// Parse a raw activation event string.
+    pub fn parse(raw: &str) -> Self {
+        if raw == "*" {
+            return Self::Star;
+        }
+        if raw == "onStartupFinished" {
+            return Self::OnStartupFinished;
+        }
+        if let Some(lang) = raw.strip_prefix("onLanguage:") {
+            return Self::OnLanguage(lang.to_string());
+        }
+        if let Some(cmd) = raw.strip_prefix("onCommand:") {
+            return Self::OnCommand(cmd.to_string());
+        }
+        if let Some(pat) = raw.strip_prefix("workspaceContains:") {
+            return Self::WorkspaceContains(pat.to_string());
+        }
+        Self::Unknown(raw.to_string())
+    }
+}
+
+/// Decides which extensions should activate in response to events.
+pub struct ActivationEventHandler {
+    extensions: Vec<ExtensionDescription>,
+    activated: std::collections::HashSet<String>,
+}
+
+impl ActivationEventHandler {
+    pub fn new() -> Self {
+        Self {
+            extensions: Vec::new(),
+            activated: std::collections::HashSet::new(),
+        }
+    }
+
+    /// Register an extension for activation tracking.
+    pub fn register(&mut self, ext: ExtensionDescription) {
+        self.extensions.push(ext);
+    }
+
+    /// Check whether a specific extension should activate for the given event.
+    pub fn should_activate(&self, event: &ActivationEvent, ext: &ExtensionDescription) -> bool {
+        ext.activation_events.iter().any(|raw| {
+            let parsed = ActivationEvent::parse(raw);
+            parsed == ActivationEvent::Star || parsed == *event
+        })
+    }
+
+    /// Return all registered extensions that are waiting to be activated
+    /// (i.e. not yet marked as activated).
+    pub fn pending_activations(&self) -> Vec<&ExtensionDescription> {
+        self.extensions
+            .iter()
+            .filter(|ext| !self.activated.contains(&ext.id))
+            .collect()
+    }
+
+    /// Mark an extension as activated.
+    pub fn mark_activated(&mut self, id: &str) {
+        self.activated.insert(id.to_string());
+    }
+
+    /// Return all extensions that should activate for the given event and
+    /// have not yet been activated.
+    pub fn extensions_to_activate(&self, event: &ActivationEvent) -> Vec<&ExtensionDescription> {
+        self.extensions
+            .iter()
+            .filter(|ext| {
+                !self.activated.contains(&ext.id) && self.should_activate(event, ext)
+            })
+            .collect()
+    }
+}
+
+impl Default for ActivationEventHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ContributionPointRegistry
+// ---------------------------------------------------------------------------
+
+/// A command contribution entry.
+#[derive(Debug, Clone)]
+pub struct CommandContribution {
+    pub extension_id: String,
+    pub command: String,
+    pub title: String,
+    pub category: Option<String>,
+}
+
+/// A language contribution entry.
+#[derive(Debug, Clone)]
+pub struct LanguageContribution {
+    pub extension_id: String,
+    pub id: String,
+    pub extensions: Vec<String>,
+    pub aliases: Vec<String>,
+}
+
+/// A snippet contribution entry.
+#[derive(Debug, Clone)]
+pub struct SnippetContribution {
+    pub extension_id: String,
+    pub language: String,
+    pub path: String,
+}
+
+/// A debugger contribution entry.
+#[derive(Debug, Clone)]
+pub struct DebuggerContribution {
+    pub extension_id: String,
+    pub debugger_type: String,
+    pub label: String,
+}
+
+/// A view contribution entry.
+#[derive(Debug, Clone)]
+pub struct ViewContribution {
+    pub extension_id: String,
+    pub id: String,
+    pub name: String,
+}
+
+/// Tracks what extensions contribute across all registered extensions.
+#[derive(Debug, Default)]
+pub struct ContributionPointRegistry {
+    commands: Vec<CommandContribution>,
+    languages: Vec<LanguageContribution>,
+    themes: Vec<ContributedTheme>,
+    snippets: Vec<SnippetContribution>,
+    grammars: Vec<ContributedGrammar>,
+    debuggers: Vec<DebuggerContribution>,
+    views: Vec<ViewContribution>,
+}
+
+impl ContributionPointRegistry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register all contributions from an extension's `contributes` JSON
+    /// section. Falls back gracefully when fields are missing.
+    pub fn register_contributions(&mut self, ext_id: &str, contributes: &serde_json::Value) {
+        if let Some(cmds) = contributes.get("commands").and_then(|v| v.as_array()) {
+            for cmd in cmds {
+                if let (Some(command), Some(title)) =
+                    (cmd.get("command").and_then(|v| v.as_str()),
+                     cmd.get("title").and_then(|v| v.as_str()))
+                {
+                    self.commands.push(CommandContribution {
+                        extension_id: ext_id.to_string(),
+                        command: command.to_string(),
+                        title: title.to_string(),
+                        category: cmd.get("category").and_then(|v| v.as_str()).map(String::from),
+                    });
+                }
+            }
+        }
+        if let Some(langs) = contributes.get("languages").and_then(|v| v.as_array()) {
+            for lang in langs {
+                if let Some(id) = lang.get("id").and_then(|v| v.as_str()) {
+                    let extensions = lang.get("extensions")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                        .unwrap_or_default();
+                    let aliases = lang.get("aliases")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                        .unwrap_or_default();
+                    self.languages.push(LanguageContribution {
+                        extension_id: ext_id.to_string(),
+                        id: id.to_string(),
+                        extensions,
+                        aliases,
+                    });
+                }
+            }
+        }
+        if let Some(themes) = contributes.get("themes").and_then(|v| v.as_array()) {
+            for t in themes {
+                if let (Some(label), Some(ui_theme), Some(path)) = (
+                    t.get("label").and_then(|v| v.as_str()),
+                    t.get("uiTheme").and_then(|v| v.as_str()),
+                    t.get("path").and_then(|v| v.as_str()),
+                ) {
+                    self.themes.push(ContributedTheme {
+                        label: label.to_string(),
+                        ui_theme: ui_theme.to_string(),
+                        path: path.to_string(),
+                    });
+                }
+            }
+        }
+        if let Some(snippets) = contributes.get("snippets").and_then(|v| v.as_array()) {
+            for s in snippets {
+                if let (Some(language), Some(path)) = (
+                    s.get("language").and_then(|v| v.as_str()),
+                    s.get("path").and_then(|v| v.as_str()),
+                ) {
+                    self.snippets.push(SnippetContribution {
+                        extension_id: ext_id.to_string(),
+                        language: language.to_string(),
+                        path: path.to_string(),
+                    });
+                }
+            }
+        }
+        if let Some(grams) = contributes.get("grammars").and_then(|v| v.as_array()) {
+            for g in grams {
+                if let (Some(language), Some(scope_name), Some(path)) = (
+                    g.get("language").and_then(|v| v.as_str()),
+                    g.get("scopeName").and_then(|v| v.as_str()),
+                    g.get("path").and_then(|v| v.as_str()),
+                ) {
+                    self.grammars.push(ContributedGrammar {
+                        language: language.to_string(),
+                        scope_name: scope_name.to_string(),
+                        path: path.to_string(),
+                    });
+                }
+            }
+        }
+        if let Some(debuggers) = contributes.get("debuggers").and_then(|v| v.as_array()) {
+            for d in debuggers {
+                if let (Some(dtype), Some(label)) = (
+                    d.get("type").and_then(|v| v.as_str()),
+                    d.get("label").and_then(|v| v.as_str()),
+                ) {
+                    self.debuggers.push(DebuggerContribution {
+                        extension_id: ext_id.to_string(),
+                        debugger_type: dtype.to_string(),
+                        label: label.to_string(),
+                    });
+                }
+            }
+        }
+        if let Some(views_obj) = contributes.get("views").and_then(|v| v.as_object()) {
+            for (_container, entries) in views_obj {
+                if let Some(arr) = entries.as_array() {
+                    for v in arr {
+                        if let (Some(id), Some(name)) = (
+                            v.get("id").and_then(|v| v.as_str()),
+                            v.get("name").and_then(|v| v.as_str()),
+                        ) {
+                            self.views.push(ViewContribution {
+                                extension_id: ext_id.to_string(),
+                                id: id.to_string(),
+                                name: name.to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn get_commands(&self) -> &[CommandContribution] {
+        &self.commands
+    }
+
+    pub fn get_languages(&self) -> &[LanguageContribution] {
+        &self.languages
+    }
+
+    pub fn get_themes(&self) -> &[ContributedTheme] {
+        &self.themes
+    }
+
+    pub fn get_snippets(&self) -> &[SnippetContribution] {
+        &self.snippets
+    }
+
+    pub fn get_grammars(&self) -> &[ContributedGrammar] {
+        &self.grammars
+    }
+
+    pub fn get_debuggers(&self) -> &[DebuggerContribution] {
+        &self.debuggers
+    }
+
+    pub fn get_views(&self) -> &[ViewContribution] {
+        &self.views
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1060,5 +1399,312 @@ mod tests {
     fn ext_host_is_ascii_printable() {
         assert!(ExtHostValidator::is_ascii_printable("Hello World 123"));
         assert!(!ExtHostValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -- ExtensionScanner tests ------------------------------------------------
+
+    #[test]
+    fn scanner_empty_dir() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let scanner = ExtensionScanner::new(tmp.path());
+        assert!(scanner.scan_directory().is_empty());
+        assert_eq!(scanner.root(), tmp.path());
+    }
+
+    #[test]
+    fn scanner_finds_extension() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let ext_dir = tmp.path().join("my-ext");
+        std::fs::create_dir(&ext_dir).unwrap();
+        std::fs::write(
+            ext_dir.join("package.json"),
+            r#"{"name":"my-ext","publisher":"test","version":"1.0.0"}"#,
+        ).unwrap();
+        let scanner = ExtensionScanner::new(tmp.path());
+        let exts = scanner.scan_directory();
+        assert_eq!(exts.len(), 1);
+        assert_eq!(exts[0].id, "test.my-ext");
+    }
+
+    #[test]
+    fn scanner_nonexistent_dir() {
+        let scanner = ExtensionScanner::new("/tmp/vsedit-scanner-does-not-exist-999");
+        assert!(scanner.scan_directory().is_empty());
+    }
+
+    // -- ActivationEvent tests -------------------------------------------------
+
+    #[test]
+    fn parse_activation_event_on_language() {
+        assert_eq!(
+            ActivationEvent::parse("onLanguage:rust"),
+            ActivationEvent::OnLanguage("rust".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_activation_event_on_command() {
+        assert_eq!(
+            ActivationEvent::parse("onCommand:editor.action.format"),
+            ActivationEvent::OnCommand("editor.action.format".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_activation_event_workspace_contains() {
+        assert_eq!(
+            ActivationEvent::parse("workspaceContains:Cargo.toml"),
+            ActivationEvent::WorkspaceContains("Cargo.toml".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_activation_event_star() {
+        assert_eq!(ActivationEvent::parse("*"), ActivationEvent::Star);
+    }
+
+    #[test]
+    fn parse_activation_event_startup_finished() {
+        assert_eq!(
+            ActivationEvent::parse("onStartupFinished"),
+            ActivationEvent::OnStartupFinished
+        );
+    }
+
+    #[test]
+    fn parse_activation_event_unknown() {
+        assert_eq!(
+            ActivationEvent::parse("onSomethingElse"),
+            ActivationEvent::Unknown("onSomethingElse".to_string())
+        );
+    }
+
+    #[test]
+    fn activation_handler_should_activate_language() {
+        let handler = ActivationEventHandler::new();
+        let ext = ExtensionDescription {
+            id: "ext-a".into(),
+            name: "a".into(),
+            display_name: "A".into(),
+            version: "0.1.0".into(),
+            publisher: "test".into(),
+            main: None,
+            activation_events: vec!["onLanguage:rust".into()],
+            contributes: ExtensionContributions::default(),
+            extension_kind: ExtensionKind::Both,
+            is_builtin: false,
+            location: VsUri::file("/ext/a"),
+        };
+        let event = ActivationEvent::OnLanguage("rust".into());
+        assert!(handler.should_activate(&event, &ext));
+        let wrong = ActivationEvent::OnLanguage("python".into());
+        assert!(!handler.should_activate(&wrong, &ext));
+    }
+
+    #[test]
+    fn activation_handler_star_matches_all() {
+        let handler = ActivationEventHandler::new();
+        let ext = ExtensionDescription {
+            id: "ext-star".into(),
+            name: "star".into(),
+            display_name: "Star".into(),
+            version: "0.1.0".into(),
+            publisher: "test".into(),
+            main: None,
+            activation_events: vec!["*".into()],
+            contributes: ExtensionContributions::default(),
+            extension_kind: ExtensionKind::Both,
+            is_builtin: false,
+            location: VsUri::file("/ext/star"),
+        };
+        assert!(handler.should_activate(&ActivationEvent::OnLanguage("anything".into()), &ext));
+        assert!(handler.should_activate(&ActivationEvent::OnStartupFinished, &ext));
+    }
+
+    #[test]
+    fn activation_handler_pending_and_mark() {
+        let mut handler = ActivationEventHandler::new();
+        handler.register(ExtensionDescription {
+            id: "ext-1".into(),
+            name: "one".into(),
+            display_name: "One".into(),
+            version: "0.1.0".into(),
+            publisher: "test".into(),
+            main: None,
+            activation_events: vec!["onLanguage:rust".into()],
+            contributes: ExtensionContributions::default(),
+            extension_kind: ExtensionKind::Both,
+            is_builtin: false,
+            location: VsUri::file("/ext/1"),
+        });
+        assert_eq!(handler.pending_activations().len(), 1);
+        handler.mark_activated("ext-1");
+        assert_eq!(handler.pending_activations().len(), 0);
+    }
+
+    #[test]
+    fn activation_handler_extensions_to_activate() {
+        let mut handler = ActivationEventHandler::new();
+        handler.register(ExtensionDescription {
+            id: "ext-rust".into(),
+            name: "rust".into(),
+            display_name: "Rust".into(),
+            version: "0.1.0".into(),
+            publisher: "test".into(),
+            main: None,
+            activation_events: vec!["onLanguage:rust".into()],
+            contributes: ExtensionContributions::default(),
+            extension_kind: ExtensionKind::Both,
+            is_builtin: false,
+            location: VsUri::file("/ext/rust"),
+        });
+        handler.register(ExtensionDescription {
+            id: "ext-py".into(),
+            name: "py".into(),
+            display_name: "Python".into(),
+            version: "0.1.0".into(),
+            publisher: "test".into(),
+            main: None,
+            activation_events: vec!["onLanguage:python".into()],
+            contributes: ExtensionContributions::default(),
+            extension_kind: ExtensionKind::Both,
+            is_builtin: false,
+            location: VsUri::file("/ext/py"),
+        });
+        let event = ActivationEvent::OnLanguage("rust".into());
+        let to_activate = handler.extensions_to_activate(&event);
+        assert_eq!(to_activate.len(), 1);
+        assert_eq!(to_activate[0].id, "ext-rust");
+    }
+
+    // -- ContributionPointRegistry tests ---------------------------------------
+
+    #[test]
+    fn registry_register_commands() {
+        let mut reg = ContributionPointRegistry::new();
+        let json: serde_json::Value = serde_json::from_str(r#"{
+            "commands": [
+                {"command": "ext.hello", "title": "Hello", "category": "Greet"},
+                {"command": "ext.bye", "title": "Goodbye"}
+            ]
+        }"#).unwrap();
+        reg.register_contributions("test-ext", &json);
+        let cmds = reg.get_commands();
+        assert_eq!(cmds.len(), 2);
+        assert_eq!(cmds[0].command, "ext.hello");
+        assert_eq!(cmds[0].title, "Hello");
+        assert_eq!(cmds[0].category.as_deref(), Some("Greet"));
+        assert_eq!(cmds[1].category, None);
+        assert_eq!(cmds[0].extension_id, "test-ext");
+    }
+
+    #[test]
+    fn registry_register_languages() {
+        let mut reg = ContributionPointRegistry::new();
+        let json: serde_json::Value = serde_json::from_str(r#"{
+            "languages": [
+                {"id": "rust", "extensions": [".rs"], "aliases": ["Rust"]}
+            ]
+        }"#).unwrap();
+        reg.register_contributions("rust-ext", &json);
+        let langs = reg.get_languages();
+        assert_eq!(langs.len(), 1);
+        assert_eq!(langs[0].id, "rust");
+        assert_eq!(langs[0].extensions, vec![".rs"]);
+        assert_eq!(langs[0].aliases, vec!["Rust"]);
+    }
+
+    #[test]
+    fn registry_register_themes() {
+        let mut reg = ContributionPointRegistry::new();
+        let json: serde_json::Value = serde_json::from_str(r#"{
+            "themes": [
+                {"label": "Dark", "uiTheme": "vs-dark", "path": "./dark.json"}
+            ]
+        }"#).unwrap();
+        reg.register_contributions("theme-ext", &json);
+        assert_eq!(reg.get_themes().len(), 1);
+        assert_eq!(reg.get_themes()[0].label, "Dark");
+    }
+
+    #[test]
+    fn registry_register_grammars() {
+        let mut reg = ContributionPointRegistry::new();
+        let json: serde_json::Value = serde_json::from_str(r#"{
+            "grammars": [
+                {"language": "rust", "scopeName": "source.rust", "path": "./rust.json"}
+            ]
+        }"#).unwrap();
+        reg.register_contributions("gram-ext", &json);
+        assert_eq!(reg.get_grammars().len(), 1);
+        assert_eq!(reg.get_grammars()[0].scope_name, "source.rust");
+    }
+
+    #[test]
+    fn registry_register_snippets() {
+        let mut reg = ContributionPointRegistry::new();
+        let json: serde_json::Value = serde_json::from_str(r#"{
+            "snippets": [
+                {"language": "rust", "path": "./snippets/rust.json"}
+            ]
+        }"#).unwrap();
+        reg.register_contributions("snip-ext", &json);
+        assert_eq!(reg.get_snippets().len(), 1);
+        assert_eq!(reg.get_snippets()[0].language, "rust");
+    }
+
+    #[test]
+    fn registry_register_debuggers() {
+        let mut reg = ContributionPointRegistry::new();
+        let json: serde_json::Value = serde_json::from_str(r#"{
+            "debuggers": [
+                {"type": "lldb", "label": "LLDB Debugger"}
+            ]
+        }"#).unwrap();
+        reg.register_contributions("dbg-ext", &json);
+        assert_eq!(reg.get_debuggers().len(), 1);
+        assert_eq!(reg.get_debuggers()[0].debugger_type, "lldb");
+    }
+
+    #[test]
+    fn registry_register_views() {
+        let mut reg = ContributionPointRegistry::new();
+        let json: serde_json::Value = serde_json::from_str(r#"{
+            "views": {
+                "explorer": [
+                    {"id": "myView", "name": "My View"}
+                ]
+            }
+        }"#).unwrap();
+        reg.register_contributions("view-ext", &json);
+        assert_eq!(reg.get_views().len(), 1);
+        assert_eq!(reg.get_views()[0].id, "myView");
+        assert_eq!(reg.get_views()[0].name, "My View");
+    }
+
+    #[test]
+    fn registry_empty_contributes() {
+        let mut reg = ContributionPointRegistry::new();
+        let json: serde_json::Value = serde_json::from_str(r#"{}"#).unwrap();
+        reg.register_contributions("empty-ext", &json);
+        assert!(reg.get_commands().is_empty());
+        assert!(reg.get_languages().is_empty());
+        assert!(reg.get_themes().is_empty());
+    }
+
+    #[test]
+    fn registry_multiple_extensions() {
+        let mut reg = ContributionPointRegistry::new();
+        let json1: serde_json::Value = serde_json::from_str(r#"{
+            "commands": [{"command": "a.cmd", "title": "A"}]
+        }"#).unwrap();
+        let json2: serde_json::Value = serde_json::from_str(r#"{
+            "commands": [{"command": "b.cmd", "title": "B"}]
+        }"#).unwrap();
+        reg.register_contributions("ext-a", &json1);
+        reg.register_contributions("ext-b", &json2);
+        assert_eq!(reg.get_commands().len(), 2);
+        assert_eq!(reg.get_commands()[0].extension_id, "ext-a");
+        assert_eq!(reg.get_commands()[1].extension_id, "ext-b");
     }
 }

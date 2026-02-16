@@ -4032,6 +4032,12 @@ dependencies = [
 [[package]]
 name = "vsedit-secrets"
 version = "0.1.0"
+dependencies = [
+ "dirs",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
 
 [[package]]
 name = "vsedit-settings-ui"
@@ -4155,6 +4161,14 @@ dependencies = [
 [[package]]
 name = "vsedit-telemetry"
 version = "0.1.0"
+
+[[package]]
+name = "vsedit-terminal"
+version = "0.1.0"
+dependencies = [
+ "vsedit-events",
+ "vsedit-lifecycle",
+]
 
 [[package]]
 name = "vsedit-terminal-plat"
