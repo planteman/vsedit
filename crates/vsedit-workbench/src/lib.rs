@@ -12,6 +12,13 @@ use ratatui::Frame;
 
 use vsedit_quickinput::fuzzy_match;
 
+use vsedit_debug_view::DebugView;
+use vsedit_output::OutputPanel;
+use vsedit_problems::{Problem, ProblemSeverity, ProblemsPanel};
+use vsedit_scm_view::{ScmGroup, ScmView};
+use vsedit_search_view::SearchView;
+use vsedit_terminal_view::TerminalView;
+
 use vsedit_commands::{CommandRegistration, CommandRegistry};
 use vsedit_contextkey::{ContextKeyValue, IContext};
 use vsedit_editor_svc::EditorTabService;
@@ -26,6 +33,71 @@ use vsedit_wb_layout::WorkbenchLayout;
 use vsedit_wb_statusbar::{register_default_items, StatusBarService};
 use vsedit_wb_textmate::{syntect_to_ratatui_color, TextMateService};
 use vsedit_wb_views::{register_default_containers, ViewContainerLocation, ViewsRegistry};
+
+// ---------------------------------------------------------------------------
+// ActivePanelView
+// ---------------------------------------------------------------------------
+
+/// Which sub-view is active inside the bottom panel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActivePanelView {
+    Terminal,
+    Problems,
+    Output,
+    DebugConsole,
+}
+
+impl ActivePanelView {
+    fn label(&self) -> &'static str {
+        match self {
+            Self::Terminal => "TERMINAL",
+            Self::Problems => "PROBLEMS",
+            Self::Output => "OUTPUT",
+            Self::DebugConsole => "DEBUG CONSOLE",
+        }
+    }
+
+    fn all() -> &'static [ActivePanelView] {
+        &[
+            ActivePanelView::Terminal,
+            ActivePanelView::Problems,
+            ActivePanelView::Output,
+            ActivePanelView::DebugConsole,
+        ]
+    }
+
+    fn next(&self) -> Self {
+        match self {
+            Self::Terminal => Self::Problems,
+            Self::Problems => Self::Output,
+            Self::Output => Self::DebugConsole,
+            Self::DebugConsole => Self::Terminal,
+        }
+    }
+
+    fn prev(&self) -> Self {
+        match self {
+            Self::Terminal => Self::DebugConsole,
+            Self::Problems => Self::Terminal,
+            Self::Output => Self::Problems,
+            Self::DebugConsole => Self::Output,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ActiveSidebarPanel
+// ---------------------------------------------------------------------------
+
+/// Which view is active inside the sidebar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActiveSidebarPanel {
+    Explorer,
+    Search,
+    SourceControl,
+    Debug,
+    Extensions,
+}
 
 // ---------------------------------------------------------------------------
 // FocusedPart
@@ -138,6 +210,26 @@ pub struct Workbench {
     pub tab_service: EditorTabService,
     /// Optional file explorer for the sidebar.
     pub explorer: Option<ExplorerView>,
+    /// Which sidebar panel is active.
+    pub active_sidebar: ActiveSidebarPanel,
+    /// Search view for the sidebar.
+    pub search_view: SearchView,
+    /// Source control view for the sidebar.
+    pub scm_view: ScmView,
+    /// SCM groups cache for rendering.
+    pub scm_groups: Vec<ScmGroup>,
+    /// SCM branch name cache.
+    pub scm_branch: Option<String>,
+    /// Debug view for the sidebar.
+    pub debug_view: DebugView,
+    /// Which sub-view is active in the bottom panel.
+    pub active_panel: ActivePanelView,
+    /// Terminal panel view.
+    pub terminal_view: TerminalView,
+    /// Problems panel view.
+    pub problems_panel: ProblemsPanel,
+    /// Output panel view.
+    pub output_panel: OutputPanel,
 }
 
 impl Workbench {
@@ -209,6 +301,80 @@ impl Workbench {
             when: None,
             weight: KeybindingWeight::WorkbenchContrib,
         });
+        // Panel keybindings
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, false, false, false, KeyCode::Backquote,
+            )),
+            command: "workbench.action.terminal.toggleTerminal".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+        });
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, true, false, false, KeyCode::KeyM,
+            )),
+            command: "workbench.action.problems.focus".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+        });
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, true, false, false, KeyCode::KeyU,
+            )),
+            command: "workbench.action.output.focus".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+        });
+        // Sidebar panel keybindings
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, true, false, false, KeyCode::KeyE,
+            )),
+            command: "workbench.view.explorer".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+        });
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, true, false, false, KeyCode::KeyF,
+            )),
+            command: "workbench.view.search".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+        });
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, true, false, false, KeyCode::KeyG,
+            )),
+            command: "workbench.view.scm".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+        });
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, true, false, false, KeyCode::KeyD,
+            )),
+            command: "workbench.view.debug".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+        });
+        keybindings.add_rule(KeybindingRule {
+            keybinding: vsedit_keybindings::Keybinding::new(KeyCodeChord::new(
+                true, true, false, false, KeyCode::KeyX,
+            )),
+            command: "workbench.view.extensions".into(),
+            args: None,
+            when: None,
+            weight: KeybindingWeight::WorkbenchContrib,
+        });
 
         let mut views = ViewsRegistry::new();
         register_default_containers(&mut views);
@@ -230,6 +396,16 @@ impl Workbench {
             commands.register("workbench.action.nextEditor", Box::new(|_| Ok(None))),
             commands.register("workbench.action.previousEditor", Box::new(|_| Ok(None))),
             commands.register("workbench.action.closeActiveEditor", Box::new(|_| Ok(None))),
+            commands.register("workbench.action.terminal.toggleTerminal", Box::new(|_| Ok(None))),
+            commands.register("workbench.action.problems.focus", Box::new(|_| Ok(None))),
+            commands.register("workbench.action.output.focus", Box::new(|_| Ok(None))),
+            commands.register("workbench.action.panel.nextTab", Box::new(|_| Ok(None))),
+            commands.register("workbench.action.panel.previousTab", Box::new(|_| Ok(None))),
+            commands.register("workbench.view.explorer", Box::new(|_| Ok(None))),
+            commands.register("workbench.view.search", Box::new(|_| Ok(None))),
+            commands.register("workbench.view.scm", Box::new(|_| Ok(None))),
+            commands.register("workbench.view.debug", Box::new(|_| Ok(None))),
+            commands.register("workbench.view.extensions", Box::new(|_| Ok(None))),
         ];
 
         let mut context = WorkbenchContext::new();
@@ -260,6 +436,16 @@ impl Workbench {
             saved_focus: FocusedPart::Editor,
             tab_service: EditorTabService::new(),
             explorer: None,
+            active_sidebar: ActiveSidebarPanel::Explorer,
+            search_view: SearchView::new(),
+            scm_view: ScmView::new(),
+            scm_groups: Vec::new(),
+            scm_branch: None,
+            debug_view: DebugView::new(),
+            active_panel: ActivePanelView::Terminal,
+            terminal_view: TerminalView::new(),
+            problems_panel: ProblemsPanel::new(),
+            output_panel: OutputPanel::new(),
         }
     }
 
@@ -330,6 +516,23 @@ impl Workbench {
             let icons: Vec<Line> = containers
                 .iter()
                 .map(|c| {
+                    let is_active = match (self.active_sidebar, c.id.as_str()) {
+                        (ActiveSidebarPanel::Explorer, "workbench.view.explorer") => true,
+                        (ActiveSidebarPanel::Search, "workbench.view.search") => true,
+                        (ActiveSidebarPanel::SourceControl, "workbench.view.scm") => true,
+                        (ActiveSidebarPanel::Debug, "workbench.view.debug") => true,
+                        (ActiveSidebarPanel::Extensions, "workbench.view.extensions") => true,
+                        _ => false,
+                    };
+                    let badge = match c.id.as_str() {
+                        "workbench.view.scm" => {
+                            let n: usize = self.scm_groups.iter()
+                                .map(|g| g.changes.len())
+                                .sum();
+                            if n > 0 { format!(" {n}") } else { String::new() }
+                        }
+                        _ => String::new(),
+                    };
                     let icon_char = match c.id.as_str() {
                         "workbench.view.explorer" => "📁",
                         "workbench.view.search" => "🔍",
@@ -338,7 +541,13 @@ impl Workbench {
                         "workbench.view.extensions" => "⊞",
                         _ => "·",
                     };
-                    Line::from(icon_char)
+                    let text = format!("{icon_char}{badge}");
+                    let style = if is_active {
+                        Style::default().fg(Color::White).bg(Color::DarkGray)
+                    } else {
+                        Style::default().fg(Color::Gray).bg(Color::DarkGray)
+                    };
+                    Line::from(Span::styled(text, style))
                 })
                 .collect();
             let activity = Paragraph::new(icons).style(Style::default().bg(Color::DarkGray));
@@ -347,17 +556,13 @@ impl Workbench {
 
         // Sidebar
         if let Some(sb) = result.sidebar {
-            let active_title = self
-                .views
-                .get_active_container(ViewContainerLocation::Sidebar)
-                .and_then(|id| {
-                    self.views
-                        .get_containers(ViewContainerLocation::Sidebar)
-                        .into_iter()
-                        .find(|c| c.id == id)
-                        .map(|c| c.title.to_uppercase())
-                })
-                .unwrap_or_else(|| "EXPLORER".to_string());
+            let active_title = match self.active_sidebar {
+                ActiveSidebarPanel::Explorer => "EXPLORER".to_string(),
+                ActiveSidebarPanel::Search => "SEARCH".to_string(),
+                ActiveSidebarPanel::SourceControl => "SOURCE CONTROL".to_string(),
+                ActiveSidebarPanel::Debug => "RUN AND DEBUG".to_string(),
+                ActiveSidebarPanel::Extensions => "EXTENSIONS".to_string(),
+            };
 
             let block = Block::default().borders(Borders::RIGHT);
             let inner = block.inner(sb);
@@ -374,15 +579,40 @@ impl Workbench {
                 ));
                 frame.render_widget(title_para, title_area);
 
-                if let Some(ref explorer) = self.explorer {
-                    if inner.height > 1 {
-                        let tree_area = Rect::new(
-                            inner.x,
-                            inner.y + 1,
-                            inner.width,
-                            inner.height - 1,
-                        );
-                        explorer.render(tree_area, frame.buffer_mut());
+                if inner.height > 1 {
+                    let content_area = Rect::new(
+                        inner.x,
+                        inner.y + 1,
+                        inner.width,
+                        inner.height - 1,
+                    );
+                    match self.active_sidebar {
+                        ActiveSidebarPanel::Explorer => {
+                            if let Some(ref explorer) = self.explorer {
+                                explorer.render(content_area, frame.buffer_mut());
+                            }
+                        }
+                        ActiveSidebarPanel::Search => {
+                            self.search_view.render(content_area, frame.buffer_mut());
+                        }
+                        ActiveSidebarPanel::SourceControl => {
+                            self.scm_view.render(
+                                &self.scm_groups,
+                                self.scm_branch.as_deref(),
+                                content_area,
+                                frame.buffer_mut(),
+                            );
+                        }
+                        ActiveSidebarPanel::Debug => {
+                            self.debug_view.render(content_area, frame.buffer_mut());
+                        }
+                        ActiveSidebarPanel::Extensions => {
+                            let stub = Paragraph::new(Span::styled(
+                                " No extensions installed",
+                                Style::default().fg(Color::DarkGray),
+                            ));
+                            frame.render_widget(stub, content_area);
+                        }
                     }
                 }
             }
@@ -489,10 +719,7 @@ impl Workbench {
 
         // Panel
         if let Some(panel) = result.panel {
-            let panel_widget = Paragraph::new("TERMINAL")
-                .block(Block::default().borders(Borders::TOP))
-                .style(Style::default().bg(Color::Black));
-            frame.render_widget(panel_widget, panel);
+            self.render_panel(frame, panel);
         }
 
         // Statusbar
@@ -602,6 +829,60 @@ impl Workbench {
         }
     }
 
+    /// Render the bottom panel with tab bar and active sub-view.
+    fn render_panel(&self, frame: &mut Frame, area: Rect) {
+        let block = Block::default().borders(Borders::TOP);
+        let inner = block.inner(area);
+        frame.render_widget(block.style(Style::default().bg(Color::Black)), area);
+
+        if inner.height < 2 || inner.width < 10 {
+            return;
+        }
+
+        // Tab bar row
+        let tab_area = Rect::new(inner.x, inner.y, inner.width, 1);
+        let mut tab_spans: Vec<Span> = Vec::new();
+        for view in ActivePanelView::all() {
+            let style = if *view == self.active_panel {
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD)
+                    .bg(Color::DarkGray)
+            } else {
+                Style::default().fg(Color::Gray)
+            };
+            tab_spans.push(Span::styled(format!(" {} ", view.label()), style));
+        }
+        frame.render_widget(Paragraph::new(Line::from(tab_spans)), tab_area);
+
+        // Content area below tab bar
+        let content_area = Rect::new(
+            inner.x,
+            inner.y + 1,
+            inner.width,
+            inner.height.saturating_sub(1),
+        );
+
+        match self.active_panel {
+            ActivePanelView::Terminal => {
+                self.terminal_view.render(content_area, frame.buffer_mut());
+            }
+            ActivePanelView::Problems => {
+                self.problems_panel.render(content_area, frame.buffer_mut());
+            }
+            ActivePanelView::Output => {
+                self.output_panel.render(content_area, frame.buffer_mut());
+            }
+            ActivePanelView::DebugConsole => {
+                let stub = Paragraph::new(Span::styled(
+                    "Debug Console (not connected)",
+                    Style::default().fg(Color::DarkGray),
+                ));
+                frame.render_widget(stub, content_area);
+            }
+        }
+    }
+
     /// Handle an input event, returning the resulting action.
     pub fn handle_input(&mut self, input: InputEvent) -> WorkbenchAction {
         match input {
@@ -614,6 +895,21 @@ impl Workbench {
         // When command palette is focused, handle keys directly.
         if self.focused == FocusedPart::CommandPalette {
             return self.handle_palette_key(key);
+        }
+
+        // When panel is focused, Left/Right switch panel tabs.
+        if self.focused == FocusedPart::Panel && !key.ctrl && !key.alt && !key.meta {
+            match key.key_code {
+                KeyCode::RightArrow => {
+                    self.active_panel = self.active_panel.next();
+                    return WorkbenchAction::None;
+                }
+                KeyCode::LeftArrow => {
+                    self.active_panel = self.active_panel.prev();
+                    return WorkbenchAction::None;
+                }
+                _ => {}
+            }
         }
 
         let chord = key_input_to_chord(key);
@@ -629,6 +925,10 @@ impl Workbench {
             ResolveResult::MoreChordsNeeded => WorkbenchAction::WaitingForChord,
             ResolveResult::NoMatch => {
                 self.pending_chords.clear();
+                // Route unbound keys to sidebar when focused
+                if self.focused == FocusedPart::Sidebar {
+                    self.handle_sidebar_key(&key);
+                }
                 WorkbenchAction::None
             }
         }
@@ -677,6 +977,54 @@ impl Workbench {
                     self.tab_service.close_tab(id);
                     self.sync_active_tab_to_editor();
                 }
+            }
+            "workbench.view.explorer" => {
+                self.set_active_sidebar(ActiveSidebarPanel::Explorer);
+            }
+            "workbench.view.search" => {
+                self.set_active_sidebar(ActiveSidebarPanel::Search);
+            }
+            "workbench.view.scm" => {
+                self.set_active_sidebar(ActiveSidebarPanel::SourceControl);
+            }
+            "workbench.view.debug" => {
+                self.set_active_sidebar(ActiveSidebarPanel::Debug);
+            }
+            "workbench.view.extensions" => {
+                self.set_active_sidebar(ActiveSidebarPanel::Extensions);
+            }
+            "workbench.action.terminal.toggleTerminal" => {
+                if self.focused == FocusedPart::Panel
+                    && self.active_panel == ActivePanelView::Terminal
+                {
+                    self.focused = FocusedPart::Editor;
+                } else {
+                    self.active_panel = ActivePanelView::Terminal;
+                    self.focused = FocusedPart::Panel;
+                    if !self.layout.is_part_visible(vsedit_wb_layout::Part::Panel) {
+                        self.layout.toggle_panel();
+                    }
+                }
+            }
+            "workbench.action.problems.focus" => {
+                self.active_panel = ActivePanelView::Problems;
+                self.focused = FocusedPart::Panel;
+                if !self.layout.is_part_visible(vsedit_wb_layout::Part::Panel) {
+                    self.layout.toggle_panel();
+                }
+            }
+            "workbench.action.output.focus" => {
+                self.active_panel = ActivePanelView::Output;
+                self.focused = FocusedPart::Panel;
+                if !self.layout.is_part_visible(vsedit_wb_layout::Part::Panel) {
+                    self.layout.toggle_panel();
+                }
+            }
+            "workbench.action.panel.nextTab" => {
+                self.active_panel = self.active_panel.next();
+            }
+            "workbench.action.panel.previousTab" => {
+                self.active_panel = self.active_panel.prev();
             }
             _ => {
                 let _ = self.commands.execute(command_id, vec![]);
@@ -814,6 +1162,90 @@ impl Workbench {
         }
     }
 
+    /// Switch the sidebar to the given panel, opening it if hidden.
+    pub fn set_active_sidebar(&mut self, panel: ActiveSidebarPanel) {
+        self.active_sidebar = panel;
+        let view_id = match panel {
+            ActiveSidebarPanel::Explorer => "workbench.view.explorer",
+            ActiveSidebarPanel::Search => "workbench.view.search",
+            ActiveSidebarPanel::SourceControl => "workbench.view.scm",
+            ActiveSidebarPanel::Debug => "workbench.view.debug",
+            ActiveSidebarPanel::Extensions => "workbench.view.extensions",
+        };
+        self.views.set_active_container(ViewContainerLocation::Sidebar, view_id);
+        if !self.layout.is_part_visible(vsedit_wb_layout::Part::Sidebar) {
+            self.layout.toggle_sidebar();
+        }
+        self.focused = FocusedPart::Sidebar;
+    }
+
+    /// Handle Up/Down/Enter keys when sidebar is focused.
+    pub fn handle_sidebar_key(&mut self, key: &KeyInput) {
+        use vsedit_keycodes::KeyCode as KC;
+        match self.active_sidebar {
+            ActiveSidebarPanel::Explorer => {
+                if let Some(ref mut explorer) = self.explorer {
+                    match key.key_code {
+                        KC::UpArrow => explorer.move_up(),
+                        KC::DownArrow => explorer.move_down(),
+                        KC::Enter => { explorer.toggle_expand(); }
+                        _ => {}
+                    }
+                }
+            }
+            ActiveSidebarPanel::Search => {
+                match key.key_code {
+                    KC::UpArrow => self.search_view.select_previous(),
+                    KC::DownArrow => self.search_view.select_next(),
+                    _ => {}
+                }
+            }
+            ActiveSidebarPanel::SourceControl => {
+                match key.key_code {
+                    KC::UpArrow => {
+                        self.scm_view.selected_index =
+                            self.scm_view.selected_index.saturating_sub(1);
+                    }
+                    KC::DownArrow => {
+                        let total: usize = self.scm_groups.iter()
+                            .map(|g| g.visible_rows())
+                            .sum();
+                        if total > 0 {
+                            self.scm_view.selected_index =
+                                (self.scm_view.selected_index + 1).min(total - 1);
+                        }
+                    }
+                    KC::Enter => {
+                        // Toggle group expansion
+                        let mut idx = 0usize;
+                        for group in &mut self.scm_groups {
+                            if idx == self.scm_view.selected_index {
+                                group.toggle_expanded();
+                                break;
+                            }
+                            idx += 1;
+                            if group.is_expanded {
+                                idx += group.changes.len();
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            ActiveSidebarPanel::Debug => {
+                match key.key_code {
+                    KC::UpArrow => self.debug_view.select_previous(),
+                    KC::DownArrow => self.debug_view.select_next(),
+                    KC::Enter => self.debug_view.next_section(),
+                    _ => {}
+                }
+            }
+            ActiveSidebarPanel::Extensions => {
+                // Stub — no interactive elements yet
+            }
+        }
+    }
+
     /// Open a file as a new tab and set it as the active editor content.
     pub fn open_file(&mut self, path: &Path, content: &str) {
         self.tab_service.open_tab(Some(path.to_path_buf()), content);
@@ -839,6 +1271,50 @@ impl Workbench {
             self.file_path = None;
             self.is_modified = false;
         }
+    }
+
+    /// Add a diagnostic problem to the problems panel.
+    pub fn add_problem(
+        &mut self,
+        severity: ProblemSeverity,
+        message: &str,
+        file: &str,
+        line: u32,
+        col: u32,
+    ) {
+        self.problems_panel.problems.push(Problem::new(
+            severity, message, "", file, line, col,
+        ));
+        self.update_problem_status();
+    }
+
+    /// Append text to an output channel, creating it if needed.
+    pub fn append_output(&mut self, channel: &str, text: &str) {
+        let idx = self
+            .output_panel
+            .channels
+            .iter()
+            .position(|c| c.name == channel);
+        let idx = match idx {
+            Some(i) => i,
+            None => self.output_panel.create_channel(channel),
+        };
+        self.output_panel.append_line(idx, text);
+    }
+
+    /// Return counts of (errors, warnings, info) across all problems.
+    pub fn get_problem_count(&self) -> (usize, usize, usize) {
+        let errors = self.problems_panel.count_by_severity(ProblemSeverity::Error);
+        let warnings = self.problems_panel.count_by_severity(ProblemSeverity::Warning);
+        let info = self.problems_panel.count_by_severity(ProblemSeverity::Info);
+        (errors, warnings, info)
+    }
+
+    /// Update the statusbar with current problem counts.
+    fn update_problem_status(&mut self) {
+        let (e, w, i) = self.get_problem_count();
+        self.statusbar
+            .update_item("statusbar.problems", &format!("✖ {} ⚠ {} ℹ {}", e, w, i));
     }
 }
 
@@ -1303,6 +1779,138 @@ mod tests {
         assert_eq!(
             action,
             WorkbenchAction::ExecuteCommand("workbench.action.closeActiveEditor".to_string())
+        );
+    }
+
+    // -- Bottom panel tests -------------------------------------------------
+
+    #[test]
+    fn default_active_panel_is_terminal() {
+        let wb = Workbench::new();
+        assert_eq!(wb.active_panel, ActivePanelView::Terminal);
+    }
+
+    #[test]
+    fn toggle_terminal_focuses_panel() {
+        let mut wb = Workbench::new();
+        wb.execute_command("workbench.action.terminal.toggleTerminal");
+        assert_eq!(wb.focused, FocusedPart::Panel);
+        assert_eq!(wb.active_panel, ActivePanelView::Terminal);
+        // Toggle again returns focus to editor.
+        wb.execute_command("workbench.action.terminal.toggleTerminal");
+        assert_eq!(wb.focused, FocusedPart::Editor);
+    }
+
+    #[test]
+    fn focus_problems_panel_via_command() {
+        let mut wb = Workbench::new();
+        wb.execute_command("workbench.action.problems.focus");
+        assert_eq!(wb.focused, FocusedPart::Panel);
+        assert_eq!(wb.active_panel, ActivePanelView::Problems);
+    }
+
+    #[test]
+    fn focus_output_panel_via_command() {
+        let mut wb = Workbench::new();
+        wb.execute_command("workbench.action.output.focus");
+        assert_eq!(wb.focused, FocusedPart::Panel);
+        assert_eq!(wb.active_panel, ActivePanelView::Output);
+    }
+
+    #[test]
+    fn add_problem_and_get_count() {
+        let mut wb = Workbench::new();
+        wb.add_problem(ProblemSeverity::Error, "oops", "main.rs", 1, 1);
+        wb.add_problem(ProblemSeverity::Warning, "warn", "lib.rs", 2, 5);
+        wb.add_problem(ProblemSeverity::Info, "info", "lib.rs", 3, 1);
+        assert_eq!(wb.get_problem_count(), (1, 1, 1));
+        assert_eq!(wb.problems_panel.problems.len(), 3);
+    }
+
+    #[test]
+    fn append_output_creates_channel() {
+        let mut wb = Workbench::new();
+        wb.append_output("Git", "commit abc");
+        wb.append_output("Git", "push ok");
+        wb.append_output("Rust", "building...");
+        assert_eq!(wb.output_panel.channels.len(), 2);
+        assert_eq!(wb.output_panel.channels[0].content.len(), 2);
+        assert_eq!(wb.output_panel.channels[1].content.len(), 1);
+    }
+
+    #[test]
+    fn panel_arrow_keys_switch_tabs() {
+        let mut wb = Workbench::new();
+        wb.focused = FocusedPart::Panel;
+        assert_eq!(wb.active_panel, ActivePanelView::Terminal);
+        wb.handle_input(make_key(KeyCode::RightArrow, false, false));
+        assert_eq!(wb.active_panel, ActivePanelView::Problems);
+        wb.handle_input(make_key(KeyCode::LeftArrow, false, false));
+        assert_eq!(wb.active_panel, ActivePanelView::Terminal);
+        // Left from Terminal wraps to DebugConsole.
+        wb.handle_input(make_key(KeyCode::LeftArrow, false, false));
+        assert_eq!(wb.active_panel, ActivePanelView::DebugConsole);
+    }
+
+    #[test]
+    fn panel_commands_registered() {
+        let wb = Workbench::new();
+        assert!(wb.commands.has("workbench.action.terminal.toggleTerminal"));
+        assert!(wb.commands.has("workbench.action.problems.focus"));
+        assert!(wb.commands.has("workbench.action.output.focus"));
+        assert!(wb.commands.has("workbench.action.panel.nextTab"));
+        assert!(wb.commands.has("workbench.action.panel.previousTab"));
+    }
+
+    #[test]
+    fn render_with_panel_content_does_not_panic() {
+        let mut wb = Workbench::new();
+        wb.add_problem(ProblemSeverity::Error, "e", "a.rs", 1, 1);
+        wb.append_output("Test", "line");
+        wb.terminal_view.add_tab("bash");
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        // Render each panel view to verify none panic.
+        for panel in ActivePanelView::all() {
+            wb.active_panel = *panel;
+            terminal.draw(|frame| wb.render(frame)).unwrap();
+        }
+    }
+
+    #[test]
+    fn keybinding_ctrl_backtick_toggles_terminal() {
+        let mut wb = Workbench::new();
+        let action = wb.handle_input(make_key(KeyCode::Backquote, true, false));
+        assert_eq!(
+            action,
+            WorkbenchAction::ExecuteCommand(
+                "workbench.action.terminal.toggleTerminal".to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn keybinding_ctrl_shift_m_focuses_problems() {
+        let mut wb = Workbench::new();
+        let action = wb.handle_input(make_key(KeyCode::KeyM, true, true));
+        assert_eq!(
+            action,
+            WorkbenchAction::ExecuteCommand(
+                "workbench.action.problems.focus".to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn keybinding_ctrl_shift_u_focuses_output() {
+        let mut wb = Workbench::new();
+        let action = wb.handle_input(make_key(KeyCode::KeyU, true, true));
+        assert_eq!(
+            action,
+            WorkbenchAction::ExecuteCommand(
+                "workbench.action.output.focus".to_string()
+            )
         );
     }
 }

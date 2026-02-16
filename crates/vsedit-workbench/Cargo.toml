@@ -20,5 +20,11 @@ vsedit-wb-statusbar = { path = "../vsedit-wb-statusbar" }
 vsedit-wb-textmate = { path = "../vsedit-wb-textmate" }
 vsedit-wb-views = { path = "../vsedit-wb-views" }
 vsedit-quickinput = { path = "../vsedit-quickinput" }
+vsedit-terminal-view = { path = "../vsedit-terminal-view" }
+vsedit-problems = { path = "../vsedit-problems" }
+vsedit-output = { path = "../vsedit-output" }
+vsedit-search-view = { path = "../vsedit-search-view" }
+vsedit-scm-view = { path = "../vsedit-scm-view" }
+vsedit-debug-view = { path = "../vsedit-debug-view" }
 ratatui = { workspace = true }
 
