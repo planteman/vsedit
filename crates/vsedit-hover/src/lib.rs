@@ -513,6 +513,391 @@ impl Default for HoverFilter {
     }
 }
 
+// ---------------------------------------------------------------------------
+// MarkdownString — terminal-renderable styled text
+// ---------------------------------------------------------------------------
+
+/// A styled text span for terminal rendering of markdown content.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StyledSpan {
+    Plain(String),
+    Bold(String),
+    Italic(String),
+    BoldItalic(String),
+    InlineCode(String),
+    CodeBlock { code: String, language: Option<String> },
+    Link { text: String, url: String },
+    Heading { level: u8, text: String },
+    ListItem(String),
+    Separator,
+}
+
+/// A line of styled spans ready for terminal rendering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StyledLine {
+    pub spans: Vec<StyledSpan>,
+}
+
+impl StyledLine {
+    pub fn new() -> Self {
+        Self { spans: Vec::new() }
+    }
+
+    pub fn push(&mut self, span: StyledSpan) {
+        self.spans.push(span);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.spans.is_empty()
+    }
+
+    /// Compute the approximate display width of this line.
+    pub fn display_width(&self) -> usize {
+        self.spans.iter().map(|s| match s {
+            StyledSpan::Plain(t)
+            | StyledSpan::Bold(t)
+            | StyledSpan::Italic(t)
+            | StyledSpan::BoldItalic(t)
+            | StyledSpan::InlineCode(t)
+            | StyledSpan::ListItem(t) => t.len(),
+            StyledSpan::CodeBlock { code, .. } => code.lines().map(|l| l.len()).max().unwrap_or(0),
+            StyledSpan::Link { text, url } => text.len() + url.len() + 3,
+            StyledSpan::Heading { text, .. } => text.len(),
+            StyledSpan::Separator => 3,
+        }).sum()
+    }
+}
+
+impl Default for StyledLine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Parse markdown text into styled lines for terminal rendering.
+///
+/// Handles: `**bold**`, `*italic*`, `` `code` ``, `[text](url)`, headings,
+/// list items, fenced code blocks, and separators (`---`).
+pub fn parse_markdown_to_styled(markdown: &str) -> Vec<StyledLine> {
+    let mut lines = Vec::new();
+    let src_lines: Vec<&str> = markdown.lines().collect();
+    let len = src_lines.len();
+    let mut i = 0;
+
+    while i < len {
+        let line = src_lines[i];
+
+        // Fenced code block
+        if line.trim_start().starts_with("```") {
+            let lang = line.trim_start().trim_start_matches('`').trim();
+            let language = if lang.is_empty() { None } else { Some(lang.to_string()) };
+            let mut code = String::new();
+            i += 1;
+            while i < len && !src_lines[i].trim_start().starts_with("```") {
+                if !code.is_empty() {
+                    code.push('\n');
+                }
+                code.push_str(src_lines[i]);
+                i += 1;
+            }
+            let mut sl = StyledLine::new();
+            sl.push(StyledSpan::CodeBlock { code, language });
+            lines.push(sl);
+            i += 1;
+            continue;
+        }
+
+        // Separator
+        if line.trim() == "---" || line.trim() == "***" || line.trim() == "___" {
+            let mut sl = StyledLine::new();
+            sl.push(StyledSpan::Separator);
+            lines.push(sl);
+            i += 1;
+            continue;
+        }
+
+        // Heading
+        if line.starts_with('#') {
+            let level = line.chars().take_while(|&c| c == '#').count().min(6) as u8;
+            let text = line[level as usize..].trim().to_string();
+            let mut sl = StyledLine::new();
+            sl.push(StyledSpan::Heading { level, text });
+            lines.push(sl);
+            i += 1;
+            continue;
+        }
+
+        // List item
+        let trimmed = line.trim_start();
+        if (trimmed.starts_with("- ") || trimmed.starts_with("* ")) && trimmed.len() > 2 {
+            let content = trimmed[2..].to_string();
+            let mut sl = StyledLine::new();
+            sl.push(StyledSpan::ListItem(content));
+            lines.push(sl);
+            i += 1;
+            continue;
+        }
+
+        // Inline formatting
+        lines.push(parse_inline_styled(line));
+        i += 1;
+    }
+
+    lines
+}
+
+/// Parse inline markdown formatting into styled spans.
+fn parse_inline_styled(text: &str) -> StyledLine {
+    let mut line = StyledLine::new();
+    let chars: Vec<char> = text.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+    let mut buf = String::new();
+
+    while i < len {
+        // Bold: **...**
+        if i + 1 < len && chars[i] == '*' && chars[i + 1] == '*' {
+            if let Some(end) = find_double_delim(&chars, i + 2, '*') {
+                if !buf.is_empty() {
+                    line.push(StyledSpan::Plain(std::mem::take(&mut buf)));
+                }
+                let content: String = chars[i + 2..end].iter().collect();
+                line.push(StyledSpan::Bold(content));
+                i = end + 2;
+                continue;
+            }
+        }
+
+        // Italic: *...*
+        if chars[i] == '*' {
+            if let Some(end) = find_single_delim(&chars, i + 1, '*') {
+                if !buf.is_empty() {
+                    line.push(StyledSpan::Plain(std::mem::take(&mut buf)));
+                }
+                let content: String = chars[i + 1..end].iter().collect();
+                line.push(StyledSpan::Italic(content));
+                i = end + 1;
+                continue;
+            }
+        }
+
+        // Inline code: `...`
+        if chars[i] == '`' {
+            if let Some(end) = find_single_delim(&chars, i + 1, '`') {
+                if !buf.is_empty() {
+                    line.push(StyledSpan::Plain(std::mem::take(&mut buf)));
+                }
+                let content: String = chars[i + 1..end].iter().collect();
+                line.push(StyledSpan::InlineCode(content));
+                i = end + 1;
+                continue;
+            }
+        }
+
+        // Link: [text](url)
+        if chars[i] == '[' {
+            if let Some(cb) = find_single_delim(&chars, i + 1, ']') {
+                if cb + 1 < len && chars[cb + 1] == '(' {
+                    if let Some(cp) = find_single_delim(&chars, cb + 2, ')') {
+                        if !buf.is_empty() {
+                            line.push(StyledSpan::Plain(std::mem::take(&mut buf)));
+                        }
+                        let text: String = chars[i + 1..cb].iter().collect();
+                        let url: String = chars[cb + 2..cp].iter().collect();
+                        line.push(StyledSpan::Link { text, url });
+                        i = cp + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        buf.push(chars[i]);
+        i += 1;
+    }
+
+    if !buf.is_empty() {
+        line.push(StyledSpan::Plain(buf));
+    }
+    line
+}
+
+fn find_double_delim(chars: &[char], from: usize, delim: char) -> Option<usize> {
+    let len = chars.len();
+    let mut j = from;
+    while j + 1 < len {
+        if chars[j] == delim && chars[j + 1] == delim {
+            return Some(j);
+        }
+        j += 1;
+    }
+    None
+}
+
+fn find_single_delim(chars: &[char], from: usize, delim: char) -> Option<usize> {
+    chars.iter().enumerate().skip(from).find_map(|(j, &c)| if c == delim { Some(j) } else { None })
+}
+
+/// Render hover contents to styled lines for terminal display.
+///
+/// Each content block is rendered into styled lines, separated by `---`.
+pub fn render_hover_styled(hover: &Hover) -> Vec<StyledLine> {
+    let mut result = Vec::new();
+    for (i, content) in hover.contents.iter().enumerate() {
+        if i > 0 {
+            let mut sep = StyledLine::new();
+            sep.push(StyledSpan::Separator);
+            result.push(sep);
+        }
+        match content {
+            HoverContent::Text(t) => {
+                for line in t.lines() {
+                    let mut sl = StyledLine::new();
+                    sl.push(StyledSpan::Plain(line.to_string()));
+                    result.push(sl);
+                }
+            }
+            HoverContent::Markdown(md) => {
+                result.extend(parse_markdown_to_styled(md));
+            }
+            HoverContent::Code { value, language } => {
+                let mut sl = StyledLine::new();
+                sl.push(StyledSpan::CodeBlock {
+                    code: value.clone(),
+                    language: language.clone(),
+                });
+                result.push(sl);
+            }
+        }
+    }
+    result
+}
+
+// ---------------------------------------------------------------------------
+// HoverWidget — floating overlay dimensions and layout
+// ---------------------------------------------------------------------------
+
+/// Computed layout for a hover tooltip overlay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HoverWidget {
+    /// X position (column) of the overlay origin.
+    pub x: u16,
+    /// Y position (row) of the overlay origin.
+    pub y: u16,
+    /// Width of the overlay in columns.
+    pub width: u16,
+    /// Height of the overlay in rows.
+    pub height: u16,
+}
+
+impl HoverWidget {
+    /// Compute overlay dimensions from styled lines, anchoring at the cursor.
+    ///
+    /// `cursor_x` / `cursor_y` are the cursor position in the terminal.
+    /// `max_width` / `max_height` are the available terminal area.
+    /// `prefer_above` positions the overlay above the cursor when possible.
+    pub fn compute(
+        styled_lines: &[StyledLine],
+        cursor_x: u16,
+        cursor_y: u16,
+        max_width: u16,
+        max_height: u16,
+        prefer_above: bool,
+    ) -> Self {
+        let content_width = styled_lines
+            .iter()
+            .map(|l| l.display_width() as u16)
+            .max()
+            .unwrap_or(0)
+            .min(max_width.saturating_sub(2)) // leave border room
+            .max(10);
+        let content_height = (styled_lines.len() as u16)
+            .min(max_height.saturating_sub(2))
+            .max(1);
+
+        let width = content_width + 2; // 1-char padding each side
+        let height = content_height + 2;
+
+        let x = if cursor_x + width <= max_width {
+            cursor_x
+        } else {
+            max_width.saturating_sub(width)
+        };
+
+        let y = if prefer_above && cursor_y >= height + 1 {
+            cursor_y - height - 1
+        } else if cursor_y + 2 + height <= max_height {
+            cursor_y + 1
+        } else {
+            cursor_y.saturating_sub(height + 1)
+        };
+
+        Self { x, y, width, height }
+    }
+
+    /// Returns the area rectangle as `(x, y, width, height)`.
+    pub fn area(&self) -> (u16, u16, u16, u16) {
+        (self.x, self.y, self.width, self.height)
+    }
+}
+
+/// Render hover result into a plain-text representation suitable for a
+/// terminal overlay.  Returns lines of text.
+pub fn render_hover(hover: &Hover, max_width: u16) -> Vec<String> {
+    let styled = render_hover_styled(hover);
+    let max_w = max_width as usize;
+    let mut output = Vec::new();
+
+    for sl in &styled {
+        let mut line_text = String::new();
+        for span in &sl.spans {
+            match span {
+                StyledSpan::Plain(t) => line_text.push_str(t),
+                StyledSpan::Bold(t) => line_text.push_str(t),
+                StyledSpan::Italic(t) => line_text.push_str(t),
+                StyledSpan::BoldItalic(t) => line_text.push_str(t),
+                StyledSpan::InlineCode(t) => {
+                    line_text.push('`');
+                    line_text.push_str(t);
+                    line_text.push('`');
+                }
+                StyledSpan::CodeBlock { code, .. } => {
+                    for code_line in code.lines() {
+                        line_text.push_str(code_line);
+                    }
+                }
+                StyledSpan::Link { text, url } => {
+                    line_text.push_str(text);
+                    line_text.push_str(" (");
+                    line_text.push_str(url);
+                    line_text.push(')');
+                }
+                StyledSpan::Heading { text, .. } => line_text.push_str(text),
+                StyledSpan::ListItem(t) => {
+                    line_text.push_str("• ");
+                    line_text.push_str(t);
+                }
+                StyledSpan::Separator => line_text.push_str("───"),
+            }
+        }
+        // Word-wrap long lines
+        if line_text.len() > max_w && max_w > 0 {
+            let mut remaining = line_text.as_str();
+            while remaining.len() > max_w {
+                output.push(remaining[..max_w].to_string());
+                remaining = &remaining[max_w..];
+            }
+            if !remaining.is_empty() {
+                output.push(remaining.to_string());
+            }
+        } else {
+            output.push(line_text);
+        }
+    }
+
+    output
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -862,5 +1247,126 @@ mod tests {
         let filter = HoverFilter::new();
         assert!(filter.accepts(&Hover::text("anything")));
         assert!(filter.accepts(&Hover::code("x", Some("go"))));
+    }
+
+    // -----------------------------------------------------------------------
+    // MarkdownString / styled rendering tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_inline_bold() {
+        let lines = parse_markdown_to_styled("hello **world**");
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].spans.contains(&StyledSpan::Bold("world".into())));
+    }
+
+    #[test]
+    fn parse_inline_italic() {
+        let lines = parse_markdown_to_styled("*emphasis*");
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].spans.contains(&StyledSpan::Italic("emphasis".into())));
+    }
+
+    #[test]
+    fn parse_inline_code() {
+        let lines = parse_markdown_to_styled("use `cargo build`");
+        assert!(lines[0].spans.contains(&StyledSpan::InlineCode("cargo build".into())));
+    }
+
+    #[test]
+    fn parse_inline_link() {
+        let lines = parse_markdown_to_styled("[docs](https://example.com)");
+        assert!(lines[0].spans.contains(&StyledSpan::Link {
+            text: "docs".into(),
+            url: "https://example.com".into(),
+        }));
+    }
+
+    #[test]
+    fn parse_heading() {
+        let lines = parse_markdown_to_styled("## API Reference");
+        assert!(lines[0].spans.contains(&StyledSpan::Heading {
+            level: 2,
+            text: "API Reference".into(),
+        }));
+    }
+
+    #[test]
+    fn parse_code_block() {
+        let md = "```rust\nfn main() {}\n```";
+        let lines = parse_markdown_to_styled(md);
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].spans.contains(&StyledSpan::CodeBlock {
+            code: "fn main() {}".into(),
+            language: Some("rust".into()),
+        }));
+    }
+
+    #[test]
+    fn parse_list_item() {
+        let lines = parse_markdown_to_styled("- item one");
+        assert!(lines[0].spans.contains(&StyledSpan::ListItem("item one".into())));
+    }
+
+    #[test]
+    fn parse_separator() {
+        let lines = parse_markdown_to_styled("---");
+        assert!(lines[0].spans.contains(&StyledSpan::Separator));
+    }
+
+    #[test]
+    fn styled_line_display_width() {
+        let mut sl = StyledLine::new();
+        sl.push(StyledSpan::Plain("hello".into()));
+        sl.push(StyledSpan::Bold("world".into()));
+        assert_eq!(sl.display_width(), 10);
+    }
+
+    #[test]
+    fn render_hover_styled_multiple_contents() {
+        let hover = Hover::text("description")
+            .add_content(HoverContent::Markdown("**bold**".into()));
+        let styled = render_hover_styled(&hover);
+        assert!(styled.len() >= 3); // text + separator + markdown
+    }
+
+    #[test]
+    fn render_hover_wraps_long_lines() {
+        let hover = Hover::text("a".repeat(100));
+        let output = render_hover(&hover, 40);
+        assert!(output.len() > 1);
+        assert!(output[0].len() <= 40);
+    }
+
+    #[test]
+    fn hover_widget_compute_basic() {
+        let lines = vec![StyledLine::new()];
+        let widget = HoverWidget::compute(&lines, 10, 5, 80, 24, true);
+        assert!(widget.width > 0);
+        assert!(widget.height > 0);
+    }
+
+    #[test]
+    fn hover_widget_prefer_above() {
+        let mut sl = StyledLine::new();
+        sl.push(StyledSpan::Plain("test".into()));
+        let lines = vec![sl];
+        let widget = HoverWidget::compute(&lines, 10, 15, 80, 24, true);
+        // Should position above cursor when there's room
+        assert!(widget.y < 15);
+    }
+
+    #[test]
+    fn hover_widget_area_tuple() {
+        let w = HoverWidget { x: 5, y: 3, width: 20, height: 10 };
+        assert_eq!(w.area(), (5, 3, 20, 10));
+    }
+
+    #[test]
+    fn render_hover_code_content() {
+        let hover = Hover::code("let x = 1;", Some("rust"));
+        let output = render_hover(&hover, 80);
+        assert!(!output.is_empty());
+        assert!(output.iter().any(|l| l.contains("let x = 1;")));
     }
 }

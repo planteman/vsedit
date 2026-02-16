@@ -312,6 +312,227 @@ pub fn compute_param_hint_stats(help: &SignatureHelp) -> ParamHintStats {
     }
 }
 
+// ---------------------------------------------------------------------------
+// SignatureHelpWidget — rendering helpers
+// ---------------------------------------------------------------------------
+
+/// Render a signature help result to displayable lines.
+///
+/// The active parameter is wrapped in `[brackets]` for emphasis.
+/// Includes overload navigation hint when multiple signatures exist.
+pub fn render_signature_help(help: &SignatureHelp, max_width: u16) -> Vec<String> {
+    let mut output = Vec::new();
+
+    if help.signatures.is_empty() {
+        return output;
+    }
+
+    let sig = match help.active_signature_info() {
+        Some(s) => s,
+        None => return output,
+    };
+
+    // Overload indicator
+    if help.signatures.len() > 1 {
+        output.push(format!(
+            "{}/{} overloads (↑/↓ to switch)",
+            help.active_signature + 1,
+            help.signatures.len()
+        ));
+    }
+
+    // Build the signature line with active parameter highlighted
+    let active_idx = sig.active_parameter.unwrap_or(help.active_parameter) as usize;
+    let mut sig_line = String::new();
+    sig_line.push_str(&sig.label);
+    sig_line.push('(');
+    for (i, param) in sig.parameters.iter().enumerate() {
+        if i > 0 {
+            sig_line.push_str(", ");
+        }
+        if i == active_idx {
+            sig_line.push('[');
+            sig_line.push_str(&param.label);
+            sig_line.push(']');
+        } else {
+            sig_line.push_str(&param.label);
+        }
+    }
+    sig_line.push(')');
+
+    // Word-wrap the signature line
+    let max_w = max_width as usize;
+    if sig_line.len() > max_w && max_w > 0 {
+        let mut remaining = sig_line.as_str();
+        while remaining.len() > max_w {
+            output.push(remaining[..max_w].to_string());
+            remaining = &remaining[max_w..];
+        }
+        if !remaining.is_empty() {
+            output.push(remaining.to_string());
+        }
+    } else {
+        output.push(sig_line);
+    }
+
+    // Show active parameter documentation if available
+    if let Some(param) = sig.parameters.get(active_idx) {
+        if let Some(ref doc) = param.documentation {
+            output.push(format!("  {}", doc));
+        }
+    }
+
+    // Show signature documentation
+    if let Some(ref doc) = sig.documentation {
+        output.push(String::new());
+        output.push(doc.clone());
+    }
+
+    output
+}
+
+/// Check whether a character should trigger signature help.
+pub fn should_trigger(ch: char, config: &SignatureHelpConfig) -> bool {
+    config.enabled && config.trigger_characters.contains(&ch)
+}
+
+/// Check whether a character should re-trigger signature help.
+pub fn should_retrigger(ch: char, config: &SignatureHelpConfig) -> bool {
+    config.enabled && config.retrigger_characters.contains(&ch)
+}
+
+/// Check whether a character should dismiss signature help.
+pub fn should_dismiss(ch: char) -> bool {
+    ch == ')' || ch == ';'
+}
+
+/// Computed layout for the signature help overlay.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SignatureHelpWidget {
+    pub x: u16,
+    pub y: u16,
+    pub width: u16,
+    pub height: u16,
+}
+
+impl SignatureHelpWidget {
+    /// Compute overlay position above the cursor.
+    pub fn compute(
+        lines: &[String],
+        cursor_x: u16,
+        cursor_y: u16,
+        max_width: u16,
+        max_height: u16,
+    ) -> Self {
+        let content_width = lines
+            .iter()
+            .map(|l| l.len() as u16)
+            .max()
+            .unwrap_or(0)
+            .min(max_width.saturating_sub(2))
+            .max(10);
+        let content_height = (lines.len() as u16)
+            .min(max_height.saturating_sub(2))
+            .max(1);
+
+        let width = content_width + 2;
+        let height = content_height + 2;
+
+        let x = if cursor_x + width <= max_width {
+            cursor_x
+        } else {
+            max_width.saturating_sub(width)
+        };
+
+        // Prefer showing above cursor
+        let y = if cursor_y >= height + 1 {
+            cursor_y - height - 1
+        } else {
+            cursor_y + 1
+        };
+
+        Self { x, y, width, height }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Parameter type extraction
+// ---------------------------------------------------------------------------
+
+/// Extract the type portion from a parameter label like "x: i32" → "i32".
+pub fn extract_parameter_type(label: &str) -> Option<&str> {
+    let colon_pos = label.find(':')?;
+    let type_part = label[colon_pos + 1..].trim();
+    if type_part.is_empty() { None } else { Some(type_part) }
+}
+
+/// Extract the name portion from a parameter label like "x: i32" → "x".
+pub fn extract_parameter_name(label: &str) -> &str {
+    match label.find(':') {
+        Some(pos) => label[..pos].trim(),
+        None => label.trim(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Overload ranking
+// ---------------------------------------------------------------------------
+
+/// Rank an overload based on how many parameters match the provided argument count.
+/// Returns a score where higher is better.
+pub fn rank_overload(sig: &SignatureInformation, arg_count: usize) -> i32 {
+    let param_count = sig.parameters.len();
+    if param_count == arg_count {
+        100
+    } else if arg_count < param_count {
+        50 - (param_count as i32 - arg_count as i32)
+    } else {
+        0
+    }
+}
+
+/// Sort signatures by relevance to the given argument count.
+/// Returns indices sorted from best to worst match.
+pub fn rank_overloads(signatures: &[SignatureInformation], arg_count: usize) -> Vec<usize> {
+    let mut indexed: Vec<(usize, i32)> = signatures.iter()
+        .enumerate()
+        .map(|(i, s)| (i, rank_overload(s, arg_count)))
+        .collect();
+    indexed.sort_by(|a, b| b.1.cmp(&a.1));
+    indexed.into_iter().map(|(i, _)| i).collect()
+}
+
+// ---------------------------------------------------------------------------
+// Signature formatting
+// ---------------------------------------------------------------------------
+
+/// Format a signature with the active parameter highlighted using brackets.
+pub fn format_signature_with_highlight(sig: &SignatureInformation, active_param: u32) -> String {
+    let mut result = format!("{}(", sig.label);
+    for (i, p) in sig.parameters.iter().enumerate() {
+        if i > 0 {
+            result.push_str(", ");
+        }
+        if i as u32 == active_param {
+            result.push('[');
+            result.push_str(&p.label);
+            result.push(']');
+        } else {
+            result.push_str(&p.label);
+        }
+    }
+    result.push(')');
+    result
+}
+
+/// Compute the character range of the active parameter within the signature label.
+pub fn active_parameter_range(sig: &SignatureInformation, active_param: u32) -> Option<(usize, usize)> {
+    let param = sig.parameters.get(active_param as usize)?;
+    let label_str = format!("{}", sig);
+    let start = label_str.find(&param.label)?;
+    Some((start, start + param.label.len()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -731,5 +952,106 @@ mod tests {
         assert_eq!(stats.total_signatures, 2);
         assert_eq!(stats.total_parameters, 3); // 2 + 1
         assert_eq!(stats.active_hints, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Rendering & trigger tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn render_signature_help_basic() {
+        let help = SignatureHelp {
+            signatures: vec![sample_signature()],
+            active_signature: 0,
+            active_parameter: 0,
+        };
+        let lines = render_signature_help(&help, 80);
+        assert!(!lines.is_empty());
+        // Active param should be highlighted with brackets
+        assert!(lines.iter().any(|l| l.contains("[x: i32]")));
+    }
+
+    #[test]
+    fn render_signature_help_second_param() {
+        let help = SignatureHelp {
+            signatures: vec![sample_signature()],
+            active_signature: 0,
+            active_parameter: 1,
+        };
+        let lines = render_signature_help(&help, 80);
+        assert!(lines.iter().any(|l| l.contains("[y: &str]")));
+    }
+
+    #[test]
+    fn render_signature_help_overloads() {
+        let help = two_signature_help();
+        let lines = render_signature_help(&help, 80);
+        assert!(lines.iter().any(|l| l.contains("1/2 overloads")));
+    }
+
+    #[test]
+    fn render_signature_help_empty() {
+        let help = SignatureHelp {
+            signatures: vec![],
+            active_signature: 0,
+            active_parameter: 0,
+        };
+        let lines = render_signature_help(&help, 80);
+        assert!(lines.is_empty());
+    }
+
+    #[test]
+    fn render_signature_help_with_docs() {
+        let help = SignatureHelp {
+            signatures: vec![sample_signature()],
+            active_signature: 0,
+            active_parameter: 0,
+        };
+        let lines = render_signature_help(&help, 80);
+        // sample_signature has documentation for param 0
+        assert!(lines.iter().any(|l| l.contains("The x value")));
+    }
+
+    #[test]
+    fn should_trigger_open_paren() {
+        let cfg = SignatureHelpConfig::default();
+        assert!(should_trigger('(', &cfg));
+        assert!(should_trigger(',', &cfg));
+        assert!(!should_trigger(')', &cfg));
+        assert!(!should_trigger('a', &cfg));
+    }
+
+    #[test]
+    fn should_retrigger_comma() {
+        let cfg = SignatureHelpConfig::default();
+        assert!(should_retrigger(',', &cfg));
+        assert!(!should_retrigger('(', &cfg));
+    }
+
+    #[test]
+    fn should_dismiss_chars() {
+        assert!(should_dismiss(')'));
+        assert!(should_dismiss(';'));
+        assert!(!should_dismiss(','));
+        assert!(!should_dismiss('a'));
+    }
+
+    #[test]
+    fn signature_help_widget_compute() {
+        let lines = vec!["fn foo(x: i32, y: &str)".to_string()];
+        let widget = SignatureHelpWidget::compute(&lines, 10, 15, 80, 24);
+        assert!(widget.width > 0);
+        assert!(widget.height > 0);
+        assert!(widget.y < 15); // should be above cursor
+    }
+
+    #[test]
+    fn should_trigger_disabled() {
+        let cfg = SignatureHelpConfig {
+            enabled: false,
+            ..SignatureHelpConfig::default()
+        };
+        assert!(!should_trigger('(', &cfg));
+        assert!(!should_retrigger(',', &cfg));
     }
 }

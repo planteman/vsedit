@@ -306,7 +306,8 @@ pub fn hex_to_color_with_alpha(hex: &str) -> Option<Color> {
 }
 
 /// Attempts to parse a color string in multiple formats:
-/// `#RGB`, `#RRGGBB`, `#RRGGBBAA`, or `rgb(R, G, B)`.
+/// `#RGB`, `#RRGGBB`, `#RRGGBBAA`, `rgb(R, G, B)`, `hsl(H, S%, L%)`,
+/// or a CSS named color.
 pub fn parse_color(input: &str) -> Option<Color> {
     let input = input.trim();
     if input.starts_with('#') {
@@ -332,7 +333,135 @@ pub fn parse_color(input: &str) -> Option<Color> {
             1.0,
         ));
     }
-    None
+    if input.starts_with("hsl(") && input.ends_with(')') {
+        return parse_hsl_string(input);
+    }
+    parse_named_color(input)
+}
+
+/// Parse an `hsl(H, S%, L%)` string into a [`Color`].
+pub fn parse_hsl_string(input: &str) -> Option<Color> {
+    let inner = input.strip_prefix("hsl(")?.strip_suffix(')')?;
+    let parts: Vec<&str> = inner.split(',').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let h: f64 = parts[0].trim().parse().ok()?;
+    let s_str = parts[1].trim().strip_suffix('%')?;
+    let s: f64 = s_str.parse::<f64>().ok()? / 100.0;
+    let l_str = parts[2].trim().strip_suffix('%')?;
+    let l: f64 = l_str.parse::<f64>().ok()? / 100.0;
+    Some(hsl_to_rgb(&HslColor::new(h, s, l, 1.0)))
+}
+
+/// Parse a CSS named color into a [`Color`].
+pub fn parse_named_color(name: &str) -> Option<Color> {
+    let (r, g, b) = match name.to_ascii_lowercase().as_str() {
+        "black" => (0, 0, 0),
+        "white" => (255, 255, 255),
+        "red" => (255, 0, 0),
+        "green" => (0, 128, 0),
+        "blue" => (0, 0, 255),
+        "yellow" => (255, 255, 0),
+        "cyan" | "aqua" => (0, 255, 255),
+        "magenta" | "fuchsia" => (255, 0, 255),
+        "orange" => (255, 165, 0),
+        "purple" => (128, 0, 128),
+        "pink" => (255, 192, 203),
+        "brown" => (165, 42, 42),
+        "gray" | "grey" => (128, 128, 128),
+        "silver" => (192, 192, 192),
+        "navy" => (0, 0, 128),
+        "teal" => (0, 128, 128),
+        "maroon" => (128, 0, 0),
+        "olive" => (128, 128, 0),
+        "lime" => (0, 255, 0),
+        "coral" => (255, 127, 80),
+        "salmon" => (250, 128, 114),
+        "gold" => (255, 215, 0),
+        "ivory" => (255, 255, 240),
+        "indigo" => (75, 0, 130),
+        "violet" => (238, 130, 238),
+        "khaki" => (240, 230, 140),
+        "crimson" => (220, 20, 60),
+        "turquoise" => (64, 224, 208),
+        _ => return None,
+    };
+    Some(Color::new(
+        f64::from(r) / 255.0,
+        f64::from(g) / 255.0,
+        f64::from(b) / 255.0,
+        1.0,
+    ))
+}
+
+// ---------------------------------------------------------------------------
+// Inline color swatch — terminal rendering
+// ---------------------------------------------------------------------------
+
+/// Render a color as a terminal inline swatch using a block character.
+///
+/// Returns a string like `"█"` that should be printed with the appropriate
+/// terminal foreground color set to the given color. The returned tuple is
+/// `(swatch_char, r8, g8, b8)` where the RGB values are 0-255.
+pub fn color_swatch(color: &Color) -> (char, u8, u8, u8) {
+    let r = (color.r.clamp(0.0, 1.0) * 255.0).round() as u8;
+    let g = (color.g.clamp(0.0, 1.0) * 255.0).round() as u8;
+    let b = (color.b.clamp(0.0, 1.0) * 255.0).round() as u8;
+    ('█', r, g, b)
+}
+
+/// Scan a line of text for color values and return their positions and colors.
+pub fn find_colors_in_line(line: &str, line_number: u32) -> Vec<ColorInformation> {
+    let mut results = Vec::new();
+    let bytes = line.as_bytes();
+    let len = line.len();
+    let mut i = 0;
+
+    while i < len {
+        // Hex colors: #RGB, #RRGGBB, #RRGGBBAA
+        if bytes[i] == b'#' {
+            for try_len in &[9usize, 7, 4] {
+                // #RRGGBBAA=9, #RRGGBB=7, #RGB=4
+                if i + try_len <= len {
+                    let candidate = &line[i..i + try_len];
+                    if let Some(color) = parse_color(candidate) {
+                        results.push(ColorInformation {
+                            start_line: line_number,
+                            start_col: i as u32,
+                            end_line: line_number,
+                            end_col: (i + try_len) as u32,
+                            color,
+                        });
+                        i += try_len;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // rgb(...) or hsl(...)
+        if i + 4 < len && (line[i..].starts_with("rgb(") || line[i..].starts_with("hsl(")) {
+            if let Some(close) = line[i..].find(')') {
+                let candidate = &line[i..i + close + 1];
+                if let Some(color) = parse_color(candidate) {
+                    results.push(ColorInformation {
+                        start_line: line_number,
+                        start_col: i as u32,
+                        end_line: line_number,
+                        end_col: (i + close + 1) as u32,
+                        color,
+                    });
+                    i += close + 1;
+                    continue;
+                }
+            }
+        }
+
+        i += 1;
+    }
+
+    results
 }
 
 // ---------------------------------------------------------------------------
@@ -989,5 +1118,122 @@ mod tests {
     fn colorpicker_is_ascii_printable() {
         assert!(ColorpickerValidator::is_ascii_printable("Hello World 123"));
         assert!(!ColorpickerValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    // -----------------------------------------------------------------------
+    // HSL parsing, named colors, swatch, line scanning
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_hsl_string_basic() {
+        let c = parse_color("hsl(0, 100%, 50%)").unwrap();
+        assert!((c.r - 1.0).abs() < 0.02);
+        assert!(c.g.abs() < 0.02);
+        assert!(c.b.abs() < 0.02);
+    }
+
+    #[test]
+    fn parse_hsl_string_blue() {
+        let c = parse_color("hsl(240, 100%, 50%)").unwrap();
+        assert!(c.r.abs() < 0.02);
+        assert!(c.g.abs() < 0.02);
+        assert!((c.b - 1.0).abs() < 0.02);
+    }
+
+    #[test]
+    fn parse_hsl_invalid() {
+        assert!(parse_color("hsl(360, 50%)").is_none());
+        assert!(parse_color("hsl()").is_none());
+    }
+
+    #[test]
+    fn parse_named_color_red() {
+        let c = parse_color("red").unwrap();
+        assert!((c.r - 1.0).abs() < 0.01);
+        assert!(c.g.abs() < 0.01);
+    }
+
+    #[test]
+    fn parse_named_color_case_insensitive() {
+        assert!(parse_color("Blue").is_some());
+        assert!(parse_color("CYAN").is_some());
+    }
+
+    #[test]
+    fn parse_named_color_unknown() {
+        assert!(parse_color("chartreuse").is_none());
+        assert!(parse_color("not_a_color").is_none());
+    }
+
+    #[test]
+    fn parse_named_aliases() {
+        let aqua = parse_color("aqua").unwrap();
+        let cyan = parse_color("cyan").unwrap();
+        assert!((aqua.r - cyan.r).abs() < 0.01);
+        assert!((aqua.g - cyan.g).abs() < 0.01);
+        assert!((aqua.b - cyan.b).abs() < 0.01);
+    }
+
+    #[test]
+    fn color_swatch_returns_block() {
+        let c = Color::new(1.0, 0.0, 0.0, 1.0);
+        let (ch, r, g, b) = color_swatch(&c);
+        assert_eq!(ch, '█');
+        assert_eq!(r, 255);
+        assert_eq!(g, 0);
+        assert_eq!(b, 0);
+    }
+
+    #[test]
+    fn color_swatch_clamps() {
+        let c = Color::new(2.0, -1.0, 0.5, 1.0);
+        let (_, r, g, b) = color_swatch(&c);
+        assert_eq!(r, 255);
+        assert_eq!(g, 0);
+        assert_eq!(b, 128);
+    }
+
+    #[test]
+    fn find_colors_in_line_hex() {
+        let colors = find_colors_in_line("color: #FF0000;", 1);
+        assert_eq!(colors.len(), 1);
+        assert!((colors[0].color.r - 1.0).abs() < 0.01);
+        assert_eq!(colors[0].start_col, 7);
+    }
+
+    #[test]
+    fn find_colors_in_line_rgb() {
+        let colors = find_colors_in_line("background: rgb(0, 255, 0);", 1);
+        assert_eq!(colors.len(), 1);
+        assert!((colors[0].color.g - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn find_colors_in_line_hsl() {
+        let colors = find_colors_in_line("border: hsl(120, 100%, 50%);", 1);
+        assert_eq!(colors.len(), 1);
+        assert!((colors[0].color.g - 1.0).abs() < 0.02);
+    }
+
+    #[test]
+    fn find_colors_in_line_multiple() {
+        let colors = find_colors_in_line("#FF0000 and #00FF00", 1);
+        assert_eq!(colors.len(), 2);
+    }
+
+    #[test]
+    fn find_colors_in_line_no_colors() {
+        let colors = find_colors_in_line("no colors here", 1);
+        assert!(colors.is_empty());
+    }
+
+    #[test]
+    fn parse_color_still_works_for_existing_formats() {
+        // Ensure backward compatibility
+        assert!(parse_color("#FF0000").is_some());
+        assert!(parse_color("#F00").is_some());
+        assert!(parse_color("#FF000080").is_some());
+        assert!(parse_color("rgb(255, 0, 0)").is_some());
+        assert!(parse_color("invalid").is_none());
     }
 }

@@ -466,6 +466,237 @@ pub fn highlight_merge(highlights: &[DocumentHighlight]) -> Vec<DocumentHighligh
     merged
 }
 
+// ---------------------------------------------------------------------------
+// Debounce — cursor-move debouncing for auto-update
+// ---------------------------------------------------------------------------
+
+/// Tracks cursor moves and determines when to re-compute highlights.
+#[derive(Debug, Clone)]
+pub struct HighlightDebounce {
+    /// Debounce interval in milliseconds.
+    pub delay_ms: u64,
+    /// Last cursor position that triggered a highlight update.
+    last_line: u32,
+    last_column: u32,
+    /// Timestamp (in ms) of the last cursor move.
+    last_move_ms: u64,
+    /// Whether we have a pending (un-fired) update.
+    pending: bool,
+}
+
+impl HighlightDebounce {
+    pub fn new(delay_ms: u64) -> Self {
+        Self {
+            delay_ms,
+            last_line: 0,
+            last_column: 0,
+            last_move_ms: 0,
+            pending: false,
+        }
+    }
+
+    /// Record a cursor move. Returns `true` if the position actually changed.
+    pub fn cursor_moved(&mut self, line: u32, column: u32, now_ms: u64) -> bool {
+        if line == self.last_line && column == self.last_column {
+            return false;
+        }
+        self.last_line = line;
+        self.last_column = column;
+        self.last_move_ms = now_ms;
+        self.pending = true;
+        true
+    }
+
+    /// Check whether enough time has elapsed since the last move to fire.
+    /// Returns `true` at most once per debounce window; clears the pending
+    /// flag when it fires.
+    pub fn should_update(&mut self, now_ms: u64) -> bool {
+        if !self.pending {
+            return false;
+        }
+        if now_ms.saturating_sub(self.last_move_ms) >= self.delay_ms {
+            self.pending = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Current pending cursor position.
+    pub fn position(&self) -> (u32, u32) {
+        (self.last_line, self.last_column)
+    }
+
+    /// Whether an update is pending.
+    pub fn is_pending(&self) -> bool {
+        self.pending
+    }
+
+    /// Cancel any pending update.
+    pub fn cancel(&mut self) {
+        self.pending = false;
+    }
+}
+
+impl Default for HighlightDebounce {
+    fn default() -> Self {
+        Self::new(150) // 150ms default debounce
+    }
+}
+
+/// Configuration for document highlight rendering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HighlightRenderConfig {
+    /// Background color index for read highlights (256-color terminal).
+    pub read_bg: u8,
+    /// Background color index for write highlights.
+    pub write_bg: u8,
+    /// Background color index for text highlights.
+    pub text_bg: u8,
+    /// Debounce delay in milliseconds.
+    pub debounce_ms: u64,
+}
+
+impl Default for HighlightRenderConfig {
+    fn default() -> Self {
+        Self {
+            read_bg: 238,  // dark gray
+            write_bg: 52,  // dark red
+            text_bg: 236,  // very dark gray
+            debounce_ms: 150,
+        }
+    }
+}
+
+impl HighlightRenderConfig {
+    /// Return the background color index for a given highlight kind.
+    pub fn bg_for_kind(&self, kind: DocumentHighlightKind) -> u8 {
+        match kind {
+            DocumentHighlightKind::Read => self.read_bg,
+            DocumentHighlightKind::Write => self.write_bg,
+            DocumentHighlightKind::Text => self.text_bg,
+        }
+    }
+}
+
+/// Category of a symbol for highlight classification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SymbolCategory {
+    Variable,
+    Function,
+    Type,
+    Keyword,
+    Literal,
+    Unknown,
+}
+
+impl std::fmt::Display for SymbolCategory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Variable => write!(f, "variable"),
+            Self::Function => write!(f, "function"),
+            Self::Type => write!(f, "type"),
+            Self::Keyword => write!(f, "keyword"),
+            Self::Literal => write!(f, "literal"),
+            Self::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
+/// Categorize a word based on simple heuristics.
+pub fn categorize_symbol(word: &str) -> SymbolCategory {
+    const KEYWORDS: &[&str] = &[
+        "fn", "let", "mut", "if", "else", "match", "for", "while", "loop",
+        "return", "struct", "enum", "impl", "pub", "use", "mod", "const",
+        "static", "trait", "type", "where", "async", "await", "self", "super",
+    ];
+    if KEYWORDS.contains(&word) {
+        return SymbolCategory::Keyword;
+    }
+    if word.chars().next().map_or(false, |c| c.is_uppercase()) {
+        return SymbolCategory::Type;
+    }
+    if word.chars().all(|c| c.is_ascii_digit() || c == '_') && !word.is_empty() {
+        return SymbolCategory::Literal;
+    }
+    SymbolCategory::Variable
+}
+
+/// Priority level for highlight rendering order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct HighlightPriority(pub u32);
+
+impl HighlightPriority {
+    pub const LOW: Self = Self(0);
+    pub const NORMAL: Self = Self(50);
+    pub const HIGH: Self = Self(100);
+}
+
+/// A highlight with an associated priority for rendering order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrioritizedHighlight {
+    pub highlight: DocumentHighlight,
+    pub priority: HighlightPriority,
+}
+
+/// Sort highlights by priority (highest first), breaking ties by position.
+pub fn sort_by_priority(highlights: &mut [PrioritizedHighlight]) {
+    highlights.sort_by(|a, b| {
+        b.priority
+            .cmp(&a.priority)
+            .then_with(|| a.highlight.line.cmp(&b.highlight.line))
+            .then_with(|| a.highlight.start_column.cmp(&b.highlight.start_column))
+    });
+}
+
+/// Tracks highlights for multiple words simultaneously.
+#[derive(Debug, Clone, Default)]
+pub struct MultiWordTracker {
+    entries: Vec<(String, HighlightSet)>,
+}
+
+impl MultiWordTracker {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Add or replace highlights for a word.
+    pub fn set_word(&mut self, word: String, highlights: HighlightSet) {
+        if let Some(entry) = self.entries.iter_mut().find(|(w, _)| *w == word) {
+            entry.1 = highlights;
+        } else {
+            self.entries.push((word, highlights));
+        }
+    }
+
+    /// Remove tracking for a word. Returns true if found.
+    pub fn remove_word(&mut self, word: &str) -> bool {
+        let before = self.entries.len();
+        self.entries.retain(|(w, _)| w != word);
+        self.entries.len() < before
+    }
+
+    /// Get highlights for a specific word.
+    pub fn get_word(&self, word: &str) -> Option<&HighlightSet> {
+        self.entries.iter().find(|(w, _)| w == word).map(|(_, hs)| hs)
+    }
+
+    /// Return the number of tracked words.
+    pub fn word_count(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Return total highlight count across all words.
+    pub fn total_highlights(&self) -> usize {
+        self.entries.iter().map(|(_, hs)| hs.len()).sum()
+    }
+
+    /// Clear all tracked words.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -767,5 +998,78 @@ mod tests {
         ];
         let merged = highlight_merge(&highlights);
         assert_eq!(merged.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // Debounce tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn debounce_new_defaults() {
+        let d = HighlightDebounce::default();
+        assert_eq!(d.delay_ms, 150);
+        assert!(!d.is_pending());
+        assert_eq!(d.position(), (0, 0));
+    }
+
+    #[test]
+    fn debounce_cursor_moved() {
+        let mut d = HighlightDebounce::new(100);
+        assert!(d.cursor_moved(5, 10, 0));
+        assert!(d.is_pending());
+        assert_eq!(d.position(), (5, 10));
+    }
+
+    #[test]
+    fn debounce_same_position_no_change() {
+        let mut d = HighlightDebounce::new(100);
+        d.cursor_moved(5, 10, 0);
+        assert!(!d.cursor_moved(5, 10, 50));
+    }
+
+    #[test]
+    fn debounce_fires_after_delay() {
+        let mut d = HighlightDebounce::new(100);
+        d.cursor_moved(5, 10, 0);
+        assert!(!d.should_update(50));  // too early
+        assert!(d.should_update(100));  // exactly at threshold
+        assert!(!d.should_update(200)); // already fired
+    }
+
+    #[test]
+    fn debounce_cancel() {
+        let mut d = HighlightDebounce::new(100);
+        d.cursor_moved(5, 10, 0);
+        d.cancel();
+        assert!(!d.is_pending());
+        assert!(!d.should_update(200));
+    }
+
+    #[test]
+    fn debounce_multiple_moves_resets_timer() {
+        let mut d = HighlightDebounce::new(100);
+        d.cursor_moved(1, 1, 0);
+        d.cursor_moved(2, 2, 80);
+        assert!(!d.should_update(100)); // 100 - 80 = 20ms, too early
+        assert!(d.should_update(180));  // 180 - 80 = 100ms, fires
+    }
+
+    // -----------------------------------------------------------------------
+    // Highlight render config tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn render_config_defaults() {
+        let cfg = HighlightRenderConfig::default();
+        assert_eq!(cfg.debounce_ms, 150);
+        assert_ne!(cfg.read_bg, cfg.write_bg);
+    }
+
+    #[test]
+    fn render_config_bg_for_kind() {
+        let cfg = HighlightRenderConfig::default();
+        assert_eq!(cfg.bg_for_kind(DocumentHighlightKind::Read), cfg.read_bg);
+        assert_eq!(cfg.bg_for_kind(DocumentHighlightKind::Write), cfg.write_bg);
+        assert_eq!(cfg.bg_for_kind(DocumentHighlightKind::Text), cfg.text_bg);
     }
 }
