@@ -167,7 +167,7 @@ impl EditorWidget {
     }
 
     fn update_renderer(&mut self) {
-        self.renderer.viewport_height = self.viewport_height as u32;
+        self.renderer.viewport.height = self.viewport_height as u32;
         self.renderer.line_number_width =
             EditorRenderer::line_number_width_for(self.model.get_line_count());
     }
