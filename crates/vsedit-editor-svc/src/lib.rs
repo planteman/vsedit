@@ -4,6 +4,8 @@
 //! Manages editor instances within groups (tab strips) and exposes events for
 //! active-editor changes.
 
+use std::path::PathBuf;
+
 use vsedit_events::{Emitter, Event};
 use vsedit_uri::VsUri;
 
@@ -226,6 +228,195 @@ impl EditorService {
 }
 
 impl Default for EditorService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EditorTab
+// ---------------------------------------------------------------------------
+
+/// Represents a single editor tab with file content and cursor state.
+#[derive(Debug, Clone)]
+pub struct EditorTab {
+    pub id: usize,
+    pub file_path: Option<PathBuf>,
+    pub title: String,
+    pub is_modified: bool,
+    pub is_active: bool,
+    pub content: String,
+    pub cursor_line: u32,
+    pub cursor_col: u32,
+}
+
+// ---------------------------------------------------------------------------
+// EditorTabService
+// ---------------------------------------------------------------------------
+
+/// Manages a flat list of editor tabs with active-tab tracking.
+pub struct EditorTabService {
+    tabs: Vec<EditorTab>,
+    active_tab: Option<usize>,
+    next_id: usize,
+}
+
+impl EditorTabService {
+    /// Create a new empty tab service.
+    pub fn new() -> Self {
+        Self {
+            tabs: Vec::new(),
+            active_tab: None,
+            next_id: 0,
+        }
+    }
+
+    /// Open a new tab, returning its id. The new tab becomes active.
+    pub fn open_tab(&mut self, path: Option<PathBuf>, content: &str) -> usize {
+        // If a tab with the same path is already open, activate it.
+        if let Some(ref p) = path {
+            if let Some(pos) = self.tabs.iter().position(|t| t.file_path.as_ref() == Some(p)) {
+                self.set_active_tab_index(pos);
+                return self.tabs[pos].id;
+            }
+        }
+
+        let id = self.next_id;
+        self.next_id += 1;
+
+        let title = path
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| format!("Untitled-{}", id));
+
+        if let Some(active) = self.active_tab {
+            if let Some(t) = self.tabs.get_mut(active) {
+                t.is_active = false;
+            }
+        }
+
+        let tab = EditorTab {
+            id,
+            file_path: path,
+            title,
+            is_modified: false,
+            is_active: true,
+            content: content.to_string(),
+            cursor_line: 1,
+            cursor_col: 1,
+        };
+        self.tabs.push(tab);
+        self.active_tab = Some(self.tabs.len() - 1);
+        id
+    }
+
+    /// Close a tab by id. Returns `true` if closed, `false` if dirty.
+    pub fn close_tab(&mut self, id: usize) -> bool {
+        let Some(pos) = self.tabs.iter().position(|t| t.id == id) else {
+            return true;
+        };
+        if self.tabs[pos].is_modified {
+            return false;
+        }
+        self.tabs.remove(pos);
+
+        if self.tabs.is_empty() {
+            self.active_tab = None;
+        } else if let Some(active) = self.active_tab {
+            if pos == active {
+                let new = pos.min(self.tabs.len() - 1);
+                self.active_tab = Some(new);
+                self.tabs[new].is_active = true;
+            } else if pos < active {
+                self.active_tab = Some(active - 1);
+            }
+        }
+        true
+    }
+
+    /// Return a reference to the active tab.
+    pub fn get_active_tab(&self) -> Option<&EditorTab> {
+        self.active_tab.and_then(|i| self.tabs.get(i))
+    }
+
+    /// Return a mutable reference to the active tab.
+    pub fn get_active_tab_mut(&mut self) -> Option<&mut EditorTab> {
+        self.active_tab.and_then(|i| self.tabs.get_mut(i))
+    }
+
+    /// Set the active tab by id.
+    pub fn set_active_tab(&mut self, id: usize) {
+        if let Some(pos) = self.tabs.iter().position(|t| t.id == id) {
+            self.set_active_tab_index(pos);
+        }
+    }
+
+    /// Switch to the next tab (wrapping).
+    pub fn next_tab(&mut self) {
+        if self.tabs.len() <= 1 {
+            return;
+        }
+        if let Some(active) = self.active_tab {
+            let next = (active + 1) % self.tabs.len();
+            self.set_active_tab_index(next);
+        }
+    }
+
+    /// Switch to the previous tab (wrapping).
+    pub fn previous_tab(&mut self) {
+        if self.tabs.len() <= 1 {
+            return;
+        }
+        if let Some(active) = self.active_tab {
+            let prev = if active == 0 {
+                self.tabs.len() - 1
+            } else {
+                active - 1
+            };
+            self.set_active_tab_index(prev);
+        }
+    }
+
+    /// Set the modified flag on a tab by id.
+    pub fn set_modified(&mut self, id: usize, modified: bool) {
+        if let Some(t) = self.tabs.iter_mut().find(|t| t.id == id) {
+            t.is_modified = modified;
+        }
+    }
+
+    /// Return a slice of all tabs.
+    pub fn get_tabs(&self) -> &[EditorTab] {
+        &self.tabs
+    }
+
+    /// Return the number of open tabs.
+    pub fn tab_count(&self) -> usize {
+        self.tabs.len()
+    }
+
+    /// Update the cursor position for a tab by id.
+    pub fn update_cursor(&mut self, id: usize, line: u32, col: u32) {
+        if let Some(t) = self.tabs.iter_mut().find(|t| t.id == id) {
+            t.cursor_line = line;
+            t.cursor_col = col;
+        }
+    }
+
+    fn set_active_tab_index(&mut self, index: usize) {
+        if let Some(old) = self.active_tab {
+            if let Some(t) = self.tabs.get_mut(old) {
+                t.is_active = false;
+            }
+        }
+        self.active_tab = Some(index);
+        if let Some(t) = self.tabs.get_mut(index) {
+            t.is_active = true;
+        }
+    }
+}
+
+impl Default for EditorTabService {
     fn default() -> Self {
         Self::new()
     }
@@ -459,5 +650,132 @@ mod tests {
         svc.add_group();
         svc.set_active_group(1);
         assert_eq!(svc.get_active_group().id, 1);
+    }
+
+    // -- EditorTabService ---------------------------------------------------
+
+    #[test]
+    fn tab_service_new_is_empty() {
+        let svc = EditorTabService::new();
+        assert_eq!(svc.tab_count(), 0);
+        assert!(svc.get_active_tab().is_none());
+    }
+
+    #[test]
+    fn tab_service_open_tab() {
+        let mut svc = EditorTabService::new();
+        let id = svc.open_tab(Some(PathBuf::from("/a.rs")), "hello");
+        assert_eq!(svc.tab_count(), 1);
+        let tab = svc.get_active_tab().unwrap();
+        assert_eq!(tab.id, id);
+        assert_eq!(tab.title, "a.rs");
+        assert_eq!(tab.content, "hello");
+        assert!(tab.is_active);
+    }
+
+    #[test]
+    fn tab_service_open_multiple_tabs() {
+        let mut svc = EditorTabService::new();
+        svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        svc.open_tab(Some(PathBuf::from("/b.rs")), "b");
+        assert_eq!(svc.tab_count(), 2);
+        assert_eq!(svc.get_active_tab().unwrap().title, "b.rs");
+        assert!(!svc.get_tabs()[0].is_active);
+    }
+
+    #[test]
+    fn tab_service_duplicate_open_activates_existing() {
+        let mut svc = EditorTabService::new();
+        let id1 = svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        svc.open_tab(Some(PathBuf::from("/b.rs")), "b");
+        let id2 = svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        assert_eq!(svc.tab_count(), 2);
+        assert_eq!(id1, id2);
+        assert!(svc.get_tabs()[0].is_active);
+    }
+
+    #[test]
+    fn tab_service_close_tab() {
+        let mut svc = EditorTabService::new();
+        let id = svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        assert!(svc.close_tab(id));
+        assert_eq!(svc.tab_count(), 0);
+        assert!(svc.get_active_tab().is_none());
+    }
+
+    #[test]
+    fn tab_service_close_dirty_tab_returns_false() {
+        let mut svc = EditorTabService::new();
+        let id = svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        svc.set_modified(id, true);
+        assert!(!svc.close_tab(id));
+        assert_eq!(svc.tab_count(), 1);
+    }
+
+    #[test]
+    fn tab_service_close_activates_next() {
+        let mut svc = EditorTabService::new();
+        let id_a = svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        svc.open_tab(Some(PathBuf::from("/b.rs")), "b");
+        svc.open_tab(Some(PathBuf::from("/c.rs")), "c");
+        svc.set_active_tab(id_a);
+        assert!(svc.close_tab(id_a));
+        assert_eq!(svc.get_active_tab().unwrap().title, "b.rs");
+    }
+
+    #[test]
+    fn tab_service_next_tab_wraps() {
+        let mut svc = EditorTabService::new();
+        svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        svc.open_tab(Some(PathBuf::from("/b.rs")), "b");
+        svc.next_tab();
+        assert_eq!(svc.get_active_tab().unwrap().title, "a.rs");
+    }
+
+    #[test]
+    fn tab_service_previous_tab_wraps() {
+        let mut svc = EditorTabService::new();
+        svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        svc.open_tab(Some(PathBuf::from("/b.rs")), "b");
+        svc.set_active_tab(0);
+        svc.previous_tab();
+        assert_eq!(svc.get_active_tab().unwrap().title, "b.rs");
+    }
+
+    #[test]
+    fn tab_service_update_cursor() {
+        let mut svc = EditorTabService::new();
+        let id = svc.open_tab(None, "");
+        svc.update_cursor(id, 10, 5);
+        let tab = svc.get_active_tab().unwrap();
+        assert_eq!(tab.cursor_line, 10);
+        assert_eq!(tab.cursor_col, 5);
+    }
+
+    #[test]
+    fn tab_service_untitled_tab() {
+        let mut svc = EditorTabService::new();
+        let id = svc.open_tab(None, "content");
+        let tab = svc.get_active_tab().unwrap();
+        assert!(tab.title.starts_with("Untitled-"));
+        assert!(tab.file_path.is_none());
+        assert_eq!(tab.id, id);
+    }
+
+    #[test]
+    fn tab_service_get_active_tab_mut() {
+        let mut svc = EditorTabService::new();
+        svc.open_tab(None, "original");
+        svc.get_active_tab_mut().unwrap().content = "changed".to_string();
+        assert_eq!(svc.get_active_tab().unwrap().content, "changed");
+    }
+
+    #[test]
+    fn tab_service_set_active_by_id() {
+        let mut svc = EditorTabService::new();
+        let id_a = svc.open_tab(Some(PathBuf::from("/a.rs")), "a");
+        svc.open_tab(Some(PathBuf::from("/b.rs")), "b");
+        svc.set_active_tab(id_a);
+        assert_eq!(svc.get_active_tab().unwrap().id, id_a);
     }
 }

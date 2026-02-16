@@ -70,7 +70,6 @@ async fn main() -> io::Result<()> {
         &mut workbench,
         &mut controller,
         &file_path,
-        &path_str,
     )
     .await;
 
@@ -84,7 +83,6 @@ async fn run_event_loop(
     workbench: &mut Workbench,
     controller: &mut EditorController,
     file_path: &Option<PathBuf>,
-    path_str: &Option<String>,
 ) -> io::Result<()> {
     let mut event_stream = EventStream::new();
     let mut tick_interval = tokio::time::interval(Duration::from_millis(16));
@@ -102,7 +100,7 @@ async fn run_event_loop(
                 match maybe_event {
                     Some(Ok(event)) => {
                         should_quit = handle_event(
-                            event, workbench, controller, file_path, path_str,
+                            event, workbench, controller, file_path,
                         );
                     }
                     Some(Err(_)) | None => {
@@ -123,7 +121,6 @@ fn handle_event(
     workbench: &mut Workbench,
     controller: &mut EditorController,
     file_path: &Option<PathBuf>,
-    path_str: &Option<String>,
 ) -> bool {
     match event {
         CtEvent::Key(key_event) => {
@@ -140,16 +137,25 @@ fn handle_event(
                             return true;
                         }
                         if cmd == "workbench.action.files.save" {
-                            if let Some(path) = file_path {
+                            let save_path = workbench
+                                .tab_service
+                                .get_active_tab()
+                                .and_then(|t| t.file_path.clone())
+                                .or_else(|| file_path.clone());
+                            if let Some(path) = save_path {
                                 let value = controller.model.get_value();
-                                if let Err(e) = std::fs::write(path, &value) {
+                                if let Err(e) = std::fs::write(&path, &value) {
                                     tracing::error!("Failed to save: {}", e);
                                 } else {
                                     tracing::info!("Saved: {}", path.display());
                                     workbench.is_modified = false;
+                                    if let Some(tab) = workbench.tab_service.get_active_tab() {
+                                        let id = tab.id;
+                                        workbench.tab_service.set_modified(id, false);
+                                    }
                                 }
                             }
-                            sync_state(workbench, controller, path_str);
+                            sync_state(workbench, controller);
                             return false;
                         }
                         workbench.execute_command(cmd);
@@ -163,41 +169,50 @@ fn handle_event(
             if has_ctrl {
                 match key_event.code {
                     KeyCode::Char('s') => {
-                        if let Some(path) = file_path {
+                        let save_path = workbench
+                            .tab_service
+                            .get_active_tab()
+                            .and_then(|t| t.file_path.clone())
+                            .or_else(|| file_path.clone());
+                        if let Some(path) = save_path {
                             let value = controller.model.get_value();
-                            if let Err(e) = std::fs::write(path, &value) {
+                            if let Err(e) = std::fs::write(&path, &value) {
                                 tracing::error!("Failed to save: {}", e);
                             } else {
                                 tracing::info!("Saved: {}", path.display());
                                 workbench.is_modified = false;
+                                if let Some(tab) = workbench.tab_service.get_active_tab() {
+                                    let id = tab.id;
+                                    workbench.tab_service.set_modified(id, false);
+                                }
                             }
                         }
-                        sync_state(workbench, controller, path_str);
+                        sync_state(workbench, controller);
                         return false;
                     }
                     KeyCode::Char('z') => {
                         controller.execute_action(EditorAction::Undo);
-                        sync_state(workbench, controller, path_str);
+                        sync_state(workbench, controller);
                         return false;
                     }
                     KeyCode::Char('y') => {
                         controller.execute_action(EditorAction::Redo);
-                        sync_state(workbench, controller, path_str);
+                        sync_state(workbench, controller);
                         return false;
                     }
                     KeyCode::Char('a') => {
                         controller.execute_action(EditorAction::SelectAll);
-                        sync_state(workbench, controller, path_str);
+                        sync_state(workbench, controller);
                         return false;
                     }
                     KeyCode::Home => {
                         controller.execute_action(EditorAction::MoveCursorDocumentStart);
-                        sync_state(workbench, controller, path_str);
+                        sync_state(workbench, controller);
                         return false;
                     }
                     KeyCode::End => {
                         controller.execute_action(EditorAction::MoveCursorDocumentEnd);
-                        sync_state(workbench, controller, path_str);
+                        sync_state(workbench, controller);
                         return false;
                     }
                     _ => {
@@ -210,16 +225,25 @@ fn handle_event(
                                     return true;
                                 }
                                 if cmd == "workbench.action.files.save" {
-                                    if let Some(path) = file_path {
+                                    let save_path = workbench
+                                        .tab_service
+                                        .get_active_tab()
+                                        .and_then(|t| t.file_path.clone())
+                                        .or_else(|| file_path.clone());
+                                    if let Some(path) = save_path {
                                         let value = controller.model.get_value();
-                                        if let Err(e) = std::fs::write(path, &value) {
+                                        if let Err(e) = std::fs::write(&path, &value) {
                                             tracing::error!("Failed to save: {}", e);
                                         } else {
                                             tracing::info!("Saved: {}", path.display());
                                             workbench.is_modified = false;
+                                            if let Some(tab) = workbench.tab_service.get_active_tab() {
+                                                let id = tab.id;
+                                                workbench.tab_service.set_modified(id, false);
+                                            }
                                         }
                                     }
-                                    sync_state(workbench, controller, path_str);
+                                    sync_state(workbench, controller);
                                     return false;
                                 }
                                 workbench.execute_command(cmd);
@@ -274,8 +298,12 @@ fn handle_event(
             if let Some(action) = editor_action {
                 controller.execute_action(action);
                 workbench.is_modified = true;
+                if let Some(tab) = workbench.tab_service.get_active_tab() {
+                    let id = tab.id;
+                    workbench.tab_service.set_modified(id, true);
+                }
             }
-            sync_state(workbench, controller, path_str);
+            sync_state(workbench, controller);
             false
         }
         CtEvent::Resize(_cols, _rows) => false,
@@ -286,9 +314,18 @@ fn handle_event(
 fn sync_state(
     workbench: &mut Workbench,
     controller: &EditorController,
-    path_str: &Option<String>,
 ) {
-    workbench.set_editor_content(&controller.model.get_value(), path_str.clone());
+    let value = controller.model.get_value();
+    let path_str = workbench
+        .tab_service
+        .get_active_tab()
+        .and_then(|t| t.file_path.as_ref())
+        .map(|p| p.display().to_string());
+    workbench.set_editor_content(&value, path_str);
+    // Update tab content.
+    if let Some(tab) = workbench.tab_service.get_active_tab_mut() {
+        tab.content = value;
+    }
     let pos = controller.cursors.get_primary().position();
     workbench.set_cursor_info(pos.line, pos.column);
 }
