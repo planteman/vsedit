@@ -205,6 +205,190 @@ impl Default for RequestService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Request priority and queue
+// ---------------------------------------------------------------------------
+
+/// Priority levels for requests.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum RequestPriority {
+    Low = 0,
+    Normal = 1,
+    High = 2,
+    Critical = 3,
+}
+
+impl fmt::Display for RequestPriority {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RequestPriority::Low => write!(f, "Low"),
+            RequestPriority::Normal => write!(f, "Normal"),
+            RequestPriority::High => write!(f, "High"),
+            RequestPriority::Critical => write!(f, "Critical"),
+        }
+    }
+}
+
+/// A request with an associated priority.
+#[derive(Debug, Clone)]
+pub struct PrioritizedRequest {
+    pub id: RequestId,
+    pub method: String,
+    pub priority: RequestPriority,
+    pub state: RequestState,
+}
+
+impl fmt::Display for PrioritizedRequest {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PrioritizedRequest(id={}, priority={}, state={})", self.id, self.priority, self.state)
+    }
+}
+
+/// A request queue that processes requests by priority.
+pub struct PriorityRequestQueue {
+    requests: Vec<PrioritizedRequest>,
+    next_id: u64,
+}
+
+impl PriorityRequestQueue {
+    pub fn new() -> Self {
+        Self {
+            requests: Vec::new(),
+            next_id: 1,
+        }
+    }
+
+    /// Enqueue a request with the given priority. Returns its ID.
+    pub fn enqueue(&mut self, method: impl Into<String>, priority: RequestPriority) -> RequestId {
+        let id = RequestId(self.next_id);
+        self.next_id += 1;
+        self.requests.push(PrioritizedRequest {
+            id,
+            method: method.into(),
+            priority,
+            state: RequestState::Pending,
+        });
+        id
+    }
+
+    /// Dequeue the highest-priority pending request (FIFO within same priority).
+    pub fn dequeue(&mut self) -> Option<RequestId> {
+        let mut best_idx: Option<usize> = None;
+        let mut best_prio = None;
+        for (i, req) in self.requests.iter().enumerate() {
+            if req.state != RequestState::Pending {
+                continue;
+            }
+            if best_prio.is_none() || req.priority > best_prio.unwrap() {
+                best_prio = Some(req.priority);
+                best_idx = Some(i);
+            }
+        }
+        if let Some(idx) = best_idx {
+            self.requests[idx].state = RequestState::InProgress;
+            Some(self.requests[idx].id)
+        } else {
+            None
+        }
+    }
+
+    /// Number of pending requests.
+    pub fn pending_count(&self) -> usize {
+        self.requests.iter().filter(|r| r.state == RequestState::Pending).count()
+    }
+
+    /// Total requests tracked.
+    pub fn total_count(&self) -> usize {
+        self.requests.len()
+    }
+
+    /// Mark a request as completed.
+    pub fn complete(&mut self, id: RequestId) {
+        if let Some(req) = self.requests.iter_mut().find(|r| r.id == id) {
+            req.state = RequestState::Completed;
+        }
+    }
+
+    /// Get a request by ID.
+    pub fn get(&self, id: RequestId) -> Option<&PrioritizedRequest> {
+        self.requests.iter().find(|r| r.id == id)
+    }
+}
+
+impl Default for PriorityRequestQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Request statistics
+// ---------------------------------------------------------------------------
+
+/// Aggregated statistics about requests processed by a service.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequestStats {
+    pub total: usize,
+    pub pending: usize,
+    pub in_progress: usize,
+    pub completed: usize,
+    pub cancelled: usize,
+    pub failed: usize,
+}
+
+impl RequestService {
+    /// Compute aggregate statistics across all tracked requests.
+    pub fn stats(&self) -> RequestStats {
+        let mut s = RequestStats {
+            total: self.requests.len(),
+            pending: 0,
+            in_progress: 0,
+            completed: 0,
+            cancelled: 0,
+            failed: 0,
+        };
+        for req in &self.requests {
+            match &req.state {
+                RequestState::Pending => s.pending += 1,
+                RequestState::InProgress => s.in_progress += 1,
+                RequestState::Completed => s.completed += 1,
+                RequestState::Cancelled => s.cancelled += 1,
+                RequestState::Failed(_) => s.failed += 1,
+            }
+        }
+        s
+    }
+
+    /// Find requests whose method contains the given substring.
+    pub fn find_by_method(&self, substring: &str) -> Vec<&Request> {
+        self.requests.iter().filter(|r| r.method.contains(substring)).collect()
+    }
+
+    /// Return the oldest pending request, if any.
+    pub fn oldest_pending(&self) -> Option<&Request> {
+        self.requests.iter().find(|r| r.state == RequestState::Pending)
+    }
+
+    /// Fail all currently in-progress requests with the given reason.
+    pub fn fail_all_in_progress(&mut self, reason: &str) {
+        for req in &mut self.requests {
+            if req.state == RequestState::InProgress {
+                req.state = RequestState::Failed(reason.to_string());
+            }
+        }
+    }
+}
+
+impl fmt::Display for RequestStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "total={} pending={} in_progress={} completed={} cancelled={} failed={}",
+            self.total, self.pending, self.in_progress, self.completed, self.cancelled, self.failed
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -389,5 +573,137 @@ mod tests {
             to: "Pending".into(),
         };
         assert_eq!(format!("{}", e3), "invalid transition for req-1: Completed -> Pending");
+    }
+
+    #[test]
+    fn priority_ordering() {
+        assert!(RequestPriority::Critical > RequestPriority::High);
+        assert!(RequestPriority::High > RequestPriority::Normal);
+        assert!(RequestPriority::Normal > RequestPriority::Low);
+    }
+
+    #[test]
+    fn priority_display() {
+        assert_eq!(format!("{}", RequestPriority::Low), "Low");
+        assert_eq!(format!("{}", RequestPriority::Critical), "Critical");
+    }
+
+    #[test]
+    fn priority_queue_dequeue_order() {
+        let mut q = PriorityRequestQueue::new();
+        let id_low = q.enqueue("low_req", RequestPriority::Low);
+        let id_high = q.enqueue("high_req", RequestPriority::High);
+        let _id_normal = q.enqueue("normal_req", RequestPriority::Normal);
+
+        // Should dequeue highest priority first
+        let dequeued = q.dequeue().unwrap();
+        assert_eq!(dequeued, id_high);
+        assert_eq!(q.pending_count(), 2);
+
+        // Mark it complete, dequeue next
+        q.complete(dequeued);
+        let next = q.dequeue().unwrap();
+        assert_ne!(next, id_low); // normal > low
+    }
+
+    #[test]
+    fn priority_queue_empty_dequeue() {
+        let mut q = PriorityRequestQueue::new();
+        assert!(q.dequeue().is_none());
+    }
+
+    #[test]
+    fn priority_queue_get() {
+        let mut q = PriorityRequestQueue::new();
+        let id = q.enqueue("test", RequestPriority::Normal);
+        let req = q.get(id).unwrap();
+        assert_eq!(req.method, "test");
+        assert_eq!(req.priority, RequestPriority::Normal);
+    }
+
+    #[test]
+    fn priority_queue_complete() {
+        let mut q = PriorityRequestQueue::new();
+        let id = q.enqueue("x", RequestPriority::High);
+        q.dequeue();
+        q.complete(id);
+        let req = q.get(id).unwrap();
+        assert_eq!(req.state, RequestState::Completed);
+    }
+
+    #[test]
+    fn prioritized_request_display() {
+        let pr = PrioritizedRequest {
+            id: RequestId(1),
+            method: "GET".into(),
+            priority: RequestPriority::High,
+            state: RequestState::Pending,
+        };
+        let s = format!("{}", pr);
+        assert!(s.contains("High"));
+        assert!(s.contains("Pending"));
+    }
+
+    #[test]
+    fn request_stats_computation() {
+        let mut svc = RequestService::new();
+        let id1 = svc.create_request("a");
+        let id2 = svc.create_request("b");
+        let id3 = svc.create_request("c");
+        svc.start(id1);
+        svc.complete(id1);
+        svc.cancel(id2);
+        svc.fail(id3, "err");
+        svc.create_request("d"); // pending
+
+        let stats = svc.stats();
+        assert_eq!(stats.total, 4);
+        assert_eq!(stats.completed, 1);
+        assert_eq!(stats.cancelled, 1);
+        assert_eq!(stats.failed, 1);
+        assert_eq!(stats.pending, 1);
+    }
+
+    #[test]
+    fn request_stats_display() {
+        let stats = RequestStats {
+            total: 5, pending: 1, in_progress: 2, completed: 1, cancelled: 0, failed: 1,
+        };
+        let s = format!("{}", stats);
+        assert!(s.contains("total=5"));
+        assert!(s.contains("failed=1"));
+    }
+
+    #[test]
+    fn find_by_method_substring() {
+        let mut svc = RequestService::new();
+        svc.create_request("GET /users");
+        svc.create_request("POST /users");
+        svc.create_request("GET /items");
+        let results = svc.find_by_method("/users");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn oldest_pending_returns_first() {
+        let mut svc = RequestService::new();
+        let id1 = svc.create_request("first");
+        svc.create_request("second");
+        let oldest = svc.oldest_pending().unwrap();
+        assert_eq!(oldest.id, id1);
+    }
+
+    #[test]
+    fn fail_all_in_progress() {
+        let mut svc = RequestService::new();
+        let id1 = svc.create_request("a");
+        let id2 = svc.create_request("b");
+        svc.create_request("c"); // stays pending
+        svc.start(id1);
+        svc.start(id2);
+        svc.fail_all_in_progress("shutdown");
+        assert_eq!(svc.get_state(id1), Some(&RequestState::Failed("shutdown".into())));
+        assert_eq!(svc.get_state(id2), Some(&RequestState::Failed("shutdown".into())));
+        assert_eq!(svc.pending_count(), 1);
     }
 }

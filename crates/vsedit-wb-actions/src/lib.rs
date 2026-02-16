@@ -188,6 +188,167 @@ impl Default for ActionRegistry {
     }
 }
 
+/// Errors related to action operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActionError {
+    NotFound(String),
+    Disabled(String),
+    DuplicateId(String),
+    PreconditionFailed(String),
+}
+
+impl fmt::Display for ActionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotFound(id) => write!(f, "action not found: {id}"),
+            Self::Disabled(id) => write!(f, "action is disabled: {id}"),
+            Self::DuplicateId(id) => write!(f, "duplicate action id: {id}"),
+            Self::PreconditionFailed(msg) => write!(f, "precondition failed: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for ActionError {}
+
+impl Action {
+    /// Check if this action has a keybinding assigned.
+    pub fn has_keybinding(&self) -> bool {
+        self.keybinding.is_some()
+    }
+
+    /// Check if this action has a precondition set.
+    pub fn has_precondition(&self) -> bool {
+        self.precondition.is_some()
+    }
+
+    /// Create a clone of this action with a new ID.
+    pub fn clone_with_id(&self, new_id: impl Into<String>) -> Self {
+        Action {
+            id: new_id.into(),
+            label: self.label.clone(),
+            category: self.category,
+            keybinding: self.keybinding.clone(),
+            precondition: self.precondition.clone(),
+            enabled: self.enabled,
+        }
+    }
+}
+
+impl PartialEq for Action {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl ActionRegistry {
+    /// Register an action, returning an error if an action with the same ID exists.
+    pub fn try_register(&mut self, action: Action) -> Result<(), ActionError> {
+        if self.has_action(&action.id) {
+            return Err(ActionError::DuplicateId(action.id));
+        }
+        self.register(action);
+        Ok(())
+    }
+
+    /// Execute an action by ID: checks it exists and is enabled.
+    pub fn try_execute(&self, id: &str) -> Result<&Action, ActionError> {
+        let action = self
+            .get_action(id)
+            .ok_or_else(|| ActionError::NotFound(id.to_string()))?;
+        if !action.enabled {
+            return Err(ActionError::Disabled(id.to_string()));
+        }
+        Ok(action)
+    }
+
+    /// Return all registered action IDs.
+    pub fn action_ids(&self) -> Vec<&str> {
+        self.actions.iter().map(|a| a.id.as_str()).collect()
+    }
+
+    /// Return all unique categories present in the registry.
+    pub fn unique_categories(&self) -> Vec<ActionCategory> {
+        let mut cats: Vec<ActionCategory> = Vec::new();
+        for action in &self.actions {
+            if !cats.contains(&action.category) {
+                cats.push(action.category);
+            }
+        }
+        cats
+    }
+
+    /// Count actions in a specific category.
+    pub fn count_by_category(&self, category: ActionCategory) -> usize {
+        self.actions
+            .iter()
+            .filter(|a| a.category == category)
+            .count()
+    }
+
+    /// Find all actions that have keybindings.
+    pub fn actions_with_keybindings(&self) -> Vec<&Action> {
+        self.actions
+            .iter()
+            .filter(|a| a.has_keybinding())
+            .collect()
+    }
+
+    /// Find all actions without keybindings.
+    pub fn actions_without_keybindings(&self) -> Vec<&Action> {
+        self.actions
+            .iter()
+            .filter(|a| !a.has_keybinding())
+            .collect()
+    }
+
+    /// Rename an action's label. Returns whether the action was found.
+    pub fn rename_action(&mut self, id: &str, new_label: impl Into<String>) -> bool {
+        if let Some(action) = self.actions.iter_mut().find(|a| a.id == id) {
+            action.label = new_label.into();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Set or update the keybinding for an action.
+    pub fn set_keybinding(&mut self, id: &str, keybinding: impl Into<String>) -> bool {
+        if let Some(action) = self.actions.iter_mut().find(|a| a.id == id) {
+            action.keybinding = Some(keybinding.into());
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Remove the keybinding from an action.
+    pub fn clear_keybinding(&mut self, id: &str) -> bool {
+        if let Some(action) = self.actions.iter_mut().find(|a| a.id == id) {
+            action.keybinding = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get a summary of the registry for display purposes.
+    pub fn summary(&self) -> String {
+        format!(
+            "{} actions ({} enabled, {} with keybindings, {} categories)",
+            self.action_count(),
+            self.get_enabled_actions().len(),
+            self.actions_with_keybindings().len(),
+            self.unique_categories().len(),
+        )
+    }
+}
+
+impl fmt::Display for ActionRegistry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ActionRegistry({} actions)", self.action_count())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328,5 +489,201 @@ mod tests {
     fn display_action_without_keybinding() {
         let action = Action::builder("help", "Show Help", ActionCategory::Help).build();
         assert_eq!(action.to_string(), "Show Help (help)");
+    }
+
+    #[test]
+    fn action_has_keybinding() {
+        let action = Action::builder("save", "Save", ActionCategory::File)
+            .keybinding("Ctrl+S")
+            .build();
+        assert!(action.has_keybinding());
+        let action2 = make_action("open", ActionCategory::File);
+        assert!(!action2.has_keybinding());
+    }
+
+    #[test]
+    fn action_has_precondition() {
+        let action = Action::builder("paste", "Paste", ActionCategory::Edit)
+            .precondition("editorFocus")
+            .build();
+        assert!(action.has_precondition());
+        let action2 = make_action("open", ActionCategory::File);
+        assert!(!action2.has_precondition());
+    }
+
+    #[test]
+    fn action_clone_with_id() {
+        let action = Action::builder("save", "Save", ActionCategory::File)
+            .keybinding("Ctrl+S")
+            .build();
+        let cloned = action.clone_with_id("save_as");
+        assert_eq!(cloned.id, "save_as");
+        assert_eq!(cloned.label, "Save");
+        assert_eq!(cloned.keybinding.as_deref(), Some("Ctrl+S"));
+    }
+
+    #[test]
+    fn action_partial_eq_by_id() {
+        let a1 = make_action("open", ActionCategory::File);
+        let a2 = Action::builder("open", "Different Label", ActionCategory::Edit).build();
+        assert_eq!(a1, a2);
+    }
+
+    #[test]
+    fn try_register_duplicate() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("open", ActionCategory::File));
+        let result = reg.try_register(make_action("open", ActionCategory::Edit));
+        assert_eq!(result, Err(ActionError::DuplicateId("open".to_string())));
+    }
+
+    #[test]
+    fn try_register_success() {
+        let mut reg = ActionRegistry::new();
+        assert!(reg.try_register(make_action("open", ActionCategory::File)).is_ok());
+        assert_eq!(reg.action_count(), 1);
+    }
+
+    #[test]
+    fn try_execute_success() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("open", ActionCategory::File));
+        let action = reg.try_execute("open").unwrap();
+        assert_eq!(action.id, "open");
+    }
+
+    #[test]
+    fn try_execute_not_found() {
+        let reg = ActionRegistry::new();
+        assert_eq!(
+            reg.try_execute("missing"),
+            Err(ActionError::NotFound("missing".to_string()))
+        );
+    }
+
+    #[test]
+    fn try_execute_disabled() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("open", ActionCategory::File));
+        reg.set_enabled("open", false);
+        assert_eq!(
+            reg.try_execute("open"),
+            Err(ActionError::Disabled("open".to_string()))
+        );
+    }
+
+    #[test]
+    fn action_ids_list() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("a", ActionCategory::File));
+        reg.register(make_action("b", ActionCategory::Edit));
+        let ids = reg.action_ids();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&"a"));
+        assert!(ids.contains(&"b"));
+    }
+
+    #[test]
+    fn unique_categories_list() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("a", ActionCategory::File));
+        reg.register(make_action("b", ActionCategory::File));
+        reg.register(make_action("c", ActionCategory::Edit));
+        let cats = reg.unique_categories();
+        assert_eq!(cats.len(), 2);
+    }
+
+    #[test]
+    fn count_by_category_tally() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("a", ActionCategory::File));
+        reg.register(make_action("b", ActionCategory::File));
+        reg.register(make_action("c", ActionCategory::Edit));
+        assert_eq!(reg.count_by_category(ActionCategory::File), 2);
+        assert_eq!(reg.count_by_category(ActionCategory::Edit), 1);
+        assert_eq!(reg.count_by_category(ActionCategory::Debug), 0);
+    }
+
+    #[test]
+    fn actions_with_and_without_keybindings() {
+        let mut reg = ActionRegistry::new();
+        reg.register(
+            Action::builder("save", "Save", ActionCategory::File)
+                .keybinding("Ctrl+S")
+                .build(),
+        );
+        reg.register(make_action("open", ActionCategory::File));
+        assert_eq!(reg.actions_with_keybindings().len(), 1);
+        assert_eq!(reg.actions_without_keybindings().len(), 1);
+    }
+
+    #[test]
+    fn rename_action_label() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("open", ActionCategory::File));
+        assert!(reg.rename_action("open", "Open File"));
+        assert_eq!(reg.get_action("open").unwrap().label, "Open File");
+        assert!(!reg.rename_action("missing", "X"));
+    }
+
+    #[test]
+    fn set_and_clear_keybinding() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("open", ActionCategory::File));
+        assert!(reg.set_keybinding("open", "Ctrl+O"));
+        assert_eq!(
+            reg.get_action("open").unwrap().keybinding.as_deref(),
+            Some("Ctrl+O")
+        );
+        assert!(reg.clear_keybinding("open"));
+        assert!(reg.get_action("open").unwrap().keybinding.is_none());
+    }
+
+    #[test]
+    fn registry_summary() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("a", ActionCategory::File));
+        reg.register(
+            Action::builder("b", "B", ActionCategory::Edit)
+                .keybinding("Ctrl+B")
+                .build(),
+        );
+        let summary = reg.summary();
+        assert!(summary.contains("2 actions"));
+        assert!(summary.contains("1 with keybindings"));
+    }
+
+    #[test]
+    fn registry_display() {
+        let mut reg = ActionRegistry::new();
+        reg.register(make_action("a", ActionCategory::File));
+        let s = format!("{reg}");
+        assert!(s.contains("1 actions"));
+    }
+
+    #[test]
+    fn action_error_display_messages() {
+        assert_eq!(
+            ActionError::NotFound("x".to_string()).to_string(),
+            "action not found: x"
+        );
+        assert_eq!(
+            ActionError::Disabled("y".to_string()).to_string(),
+            "action is disabled: y"
+        );
+        assert_eq!(
+            ActionError::DuplicateId("z".to_string()).to_string(),
+            "duplicate action id: z"
+        );
+        assert_eq!(
+            ActionError::PreconditionFailed("nope".to_string()).to_string(),
+            "precondition failed: nope"
+        );
+    }
+
+    #[test]
+    fn action_error_is_std_error() {
+        let err: Box<dyn std::error::Error> = Box::new(ActionError::NotFound("x".to_string()));
+        assert_eq!(err.to_string(), "action not found: x");
     }
 }

@@ -1,12 +1,602 @@
 //! Terminal panel integration.
 //!
-//! Provides a tabbed terminal emulator view with rendering via ratatui.
+//! Provides a tabbed terminal emulator view with rendering via ratatui,
+//! including PTY output rendering through [`TerminalBuffer`].
+
+use std::collections::HashMap;
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Widget;
+
+pub use vsedit_terminal_plat::{TerminalConfig, TerminalId, TerminalInstance as PtyInstance};
+
+// ---------------------------------------------------------------------------
+// TerminalCell
+// ---------------------------------------------------------------------------
+
+/// A single cell in the terminal grid.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TerminalCell {
+    pub ch: char,
+    pub fg: Color,
+    pub bg: Color,
+    pub bold: bool,
+    pub dim: bool,
+    pub italic: bool,
+    pub underline: bool,
+}
+
+impl Default for TerminalCell {
+    fn default() -> Self {
+        Self {
+            ch: ' ',
+            fg: Color::White,
+            bg: Color::Reset,
+            bold: false,
+            dim: false,
+            italic: false,
+            underline: false,
+        }
+    }
+}
+
+impl TerminalCell {
+    /// Convert this cell's attributes into a ratatui [`Style`].
+    fn to_style(&self) -> Style {
+        let mut style = Style::default().fg(self.fg).bg(self.bg);
+        if self.bold {
+            style = style.add_modifier(Modifier::BOLD);
+        }
+        if self.dim {
+            style = style.add_modifier(Modifier::DIM);
+        }
+        if self.italic {
+            style = style.add_modifier(Modifier::ITALIC);
+        }
+        if self.underline {
+            style = style.add_modifier(Modifier::UNDERLINED);
+        }
+        style
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SGR state (current text attributes for the parser)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone)]
+struct SgrState {
+    fg: Color,
+    bg: Color,
+    bold: bool,
+    dim: bool,
+    italic: bool,
+    underline: bool,
+}
+
+impl Default for SgrState {
+    fn default() -> Self {
+        Self {
+            fg: Color::White,
+            bg: Color::Reset,
+            bold: false,
+            dim: false,
+            italic: false,
+            underline: false,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ANSI parser state machine
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+enum ParserState {
+    Ground,
+    Escape,
+    Csi,
+    OscString,
+}
+
+// ---------------------------------------------------------------------------
+// TerminalBuffer
+// ---------------------------------------------------------------------------
+
+/// Grid-based terminal buffer with ANSI/VT100 escape-sequence parsing.
+///
+/// Call [`TerminalBuffer::process_output`] with raw PTY bytes to update the
+/// cell grid, then use [`TerminalBuffer::render_terminal`] to paint the grid
+/// into a ratatui [`Buffer`].
+#[derive(Debug, Clone)]
+pub struct TerminalBuffer {
+    /// Visible cell grid – `cells[row][col]`.
+    pub cells: Vec<Vec<TerminalCell>>,
+    /// Number of visible columns.
+    pub cols: usize,
+    /// Number of visible rows.
+    pub rows: usize,
+    /// Cursor row (0-based, relative to visible area).
+    pub cursor_row: usize,
+    /// Cursor column (0-based).
+    pub cursor_col: usize,
+    /// Scroll offset for viewing scrollback.
+    pub scroll_offset: usize,
+    /// Scrollback history (oldest first).
+    pub scrollback: Vec<Vec<TerminalCell>>,
+
+    // -- private parser state -----------------------------------------------
+    sgr: SgrState,
+    parser_state: ParserState,
+    csi_params: String,
+}
+
+impl TerminalBuffer {
+    /// Create a new buffer with the given dimensions.
+    pub fn new(cols: usize, rows: usize) -> Self {
+        let cells = vec![vec![TerminalCell::default(); cols]; rows];
+        Self {
+            cells,
+            cols,
+            rows,
+            cursor_row: 0,
+            cursor_col: 0,
+            scroll_offset: 0,
+            scrollback: Vec::new(),
+            sgr: SgrState::default(),
+            parser_state: ParserState::Ground,
+            csi_params: String::new(),
+        }
+    }
+
+    // -- public API ---------------------------------------------------------
+
+    /// Feed raw PTY output bytes into the parser, updating the cell grid.
+    pub fn process_output(&mut self, data: &[u8]) {
+        for &byte in data {
+            match self.parser_state {
+                ParserState::Ground => self.ground(byte),
+                ParserState::Escape => self.escape(byte),
+                ParserState::Csi => self.csi(byte),
+                ParserState::OscString => self.osc(byte),
+            }
+        }
+    }
+
+    /// Render the cell grid into a ratatui buffer, including the cursor.
+    pub fn render_terminal(&self, area: Rect, buf: &mut Buffer) {
+        let view_rows = area.height as usize;
+        let view_cols = area.width as usize;
+
+        // Determine which rows to display (scrollback + visible).
+        let total_rows = self.scrollback.len() + self.rows;
+        let scroll = self.scroll_offset;
+
+        for vy in 0..view_rows {
+            // The row index in the combined scrollback+visible buffer,
+            // counting from the bottom.
+            let logical_row = total_rows.saturating_sub(scroll + view_rows) + vy;
+
+            for vx in 0..view_cols {
+                let x = area.x + vx as u16;
+                let y = area.y + vy as u16;
+                if let Some(ratatui_cell) = buf.cell_mut((x, y)) {
+                    let tcell = self.cell_at_logical(logical_row, vx);
+                    let mut style = tcell.to_style();
+
+                    // Draw cursor as reversed cell.
+                    let is_cursor = scroll == 0
+                        && logical_row == self.scrollback.len() + self.cursor_row
+                        && vx == self.cursor_col;
+                    if is_cursor {
+                        style = style.add_modifier(Modifier::REVERSED);
+                    }
+
+                    ratatui_cell.set_char(tcell.ch);
+                    ratatui_cell.set_style(style);
+                }
+            }
+        }
+    }
+
+    /// Resize the terminal grid. Existing content is preserved where possible.
+    pub fn resize(&mut self, new_cols: usize, new_rows: usize) {
+        if new_cols == 0 || new_rows == 0 {
+            return;
+        }
+
+        // Resize columns in each existing row.
+        for row in &mut self.cells {
+            row.resize(new_cols, TerminalCell::default());
+        }
+        for row in &mut self.scrollback {
+            row.resize(new_cols, TerminalCell::default());
+        }
+
+        // Adjust number of rows.
+        if new_rows > self.rows {
+            let extra = new_rows - self.rows;
+            for _ in 0..extra {
+                self.cells.push(vec![TerminalCell::default(); new_cols]);
+            }
+        } else if new_rows < self.rows {
+            // Move excess top rows into scrollback.
+            let excess = self.rows - new_rows;
+            for _ in 0..excess {
+                if !self.cells.is_empty() {
+                    let row = self.cells.remove(0);
+                    self.scrollback.push(row);
+                }
+            }
+        }
+
+        self.cols = new_cols;
+        self.rows = new_rows;
+        self.cursor_row = self.cursor_row.min(self.rows.saturating_sub(1));
+        self.cursor_col = self.cursor_col.min(self.cols.saturating_sub(1));
+    }
+
+    // -- helpers (private) --------------------------------------------------
+
+    /// Get a cell at a logical row index (scrollback + visible combined).
+    fn cell_at_logical(&self, logical_row: usize, col: usize) -> TerminalCell {
+        let sb_len = self.scrollback.len();
+        if logical_row < sb_len {
+            self.scrollback
+                .get(logical_row)
+                .and_then(|r| r.get(col))
+                .cloned()
+                .unwrap_or_default()
+        } else {
+            let vis_row = logical_row - sb_len;
+            self.cells
+                .get(vis_row)
+                .and_then(|r| r.get(col))
+                .cloned()
+                .unwrap_or_default()
+        }
+    }
+
+    /// Scroll the visible area up by one line.
+    fn scroll_up(&mut self) {
+        if !self.cells.is_empty() {
+            let row = self.cells.remove(0);
+            self.scrollback.push(row);
+            self.cells
+                .push(vec![TerminalCell::default(); self.cols]);
+        }
+    }
+
+    /// Place a printable character at the cursor and advance.
+    fn put_char(&mut self, ch: char) {
+        if self.cursor_col >= self.cols {
+            // Line wrap.
+            self.cursor_col = 0;
+            self.cursor_row += 1;
+            if self.cursor_row >= self.rows {
+                self.scroll_up();
+                self.cursor_row = self.rows - 1;
+            }
+        }
+        if self.cursor_row < self.rows && self.cursor_col < self.cols {
+            let cell = &mut self.cells[self.cursor_row][self.cursor_col];
+            cell.ch = ch;
+            cell.fg = self.sgr.fg;
+            cell.bg = self.sgr.bg;
+            cell.bold = self.sgr.bold;
+            cell.dim = self.sgr.dim;
+            cell.italic = self.sgr.italic;
+            cell.underline = self.sgr.underline;
+        }
+        self.cursor_col += 1;
+    }
+
+    // -- parser states ------------------------------------------------------
+
+    fn ground(&mut self, byte: u8) {
+        match byte {
+            0x1b => {
+                self.parser_state = ParserState::Escape;
+            }
+            b'\n' => {
+                self.cursor_row += 1;
+                if self.cursor_row >= self.rows {
+                    self.scroll_up();
+                    self.cursor_row = self.rows - 1;
+                }
+            }
+            b'\r' => {
+                self.cursor_col = 0;
+            }
+            b'\t' => {
+                let next_tab = (self.cursor_col / 8 + 1) * 8;
+                self.cursor_col = next_tab.min(self.cols.saturating_sub(1));
+            }
+            0x08 => {
+                // Backspace
+                self.cursor_col = self.cursor_col.saturating_sub(1);
+            }
+            0x07 => {
+                // Bell — ignore
+            }
+            b if b >= 0x20 => {
+                // Printable ASCII or start of UTF-8.
+                // For simplicity we handle single-byte chars here.
+                self.put_char(byte as char);
+            }
+            _ => {
+                // Ignore other control characters.
+            }
+        }
+    }
+
+    fn escape(&mut self, byte: u8) {
+        match byte {
+            b'[' => {
+                self.parser_state = ParserState::Csi;
+                self.csi_params.clear();
+            }
+            b']' => {
+                self.parser_state = ParserState::OscString;
+            }
+            _ => {
+                // Unknown escape — return to ground.
+                self.parser_state = ParserState::Ground;
+            }
+        }
+    }
+
+    fn csi(&mut self, byte: u8) {
+        match byte {
+            b'0'..=b'9' | b';' | b'?' => {
+                self.csi_params.push(byte as char);
+            }
+            b'A' => {
+                let n = self.parse_first_param(1);
+                self.cursor_row = self.cursor_row.saturating_sub(n);
+                self.parser_state = ParserState::Ground;
+            }
+            b'B' => {
+                let n = self.parse_first_param(1);
+                self.cursor_row = (self.cursor_row + n).min(self.rows.saturating_sub(1));
+                self.parser_state = ParserState::Ground;
+            }
+            b'C' => {
+                let n = self.parse_first_param(1);
+                self.cursor_col = (self.cursor_col + n).min(self.cols.saturating_sub(1));
+                self.parser_state = ParserState::Ground;
+            }
+            b'D' => {
+                let n = self.parse_first_param(1);
+                self.cursor_col = self.cursor_col.saturating_sub(n);
+                self.parser_state = ParserState::Ground;
+            }
+            b'H' | b'f' => {
+                let params = self.parse_params();
+                let row = params.first().copied().unwrap_or(1).max(1) - 1;
+                let col = params.get(1).copied().unwrap_or(1).max(1) - 1;
+                self.cursor_row = row.min(self.rows.saturating_sub(1));
+                self.cursor_col = col.min(self.cols.saturating_sub(1));
+                self.parser_state = ParserState::Ground;
+            }
+            b'J' => {
+                let n = self.parse_first_param(0);
+                self.erase_in_display(n);
+                self.parser_state = ParserState::Ground;
+            }
+            b'K' => {
+                let n = self.parse_first_param(0);
+                self.erase_in_line(n);
+                self.parser_state = ParserState::Ground;
+            }
+            b'm' => {
+                self.apply_sgr();
+                self.parser_state = ParserState::Ground;
+            }
+            _ => {
+                // Unrecognised final byte — discard sequence.
+                self.parser_state = ParserState::Ground;
+            }
+        }
+    }
+
+    fn osc(&mut self, byte: u8) {
+        // Consume until ST (BEL or ESC \)
+        if byte == 0x07 || byte == 0x9c {
+            self.parser_state = ParserState::Ground;
+        }
+        // For ESC \ we'd need a two-byte check; for simplicity, BEL-only.
+    }
+
+    // -- CSI helpers --------------------------------------------------------
+
+    fn parse_params(&self) -> Vec<usize> {
+        self.csi_params
+            .split(';')
+            .map(|s| s.parse::<usize>().unwrap_or(0))
+            .collect()
+    }
+
+    fn parse_first_param(&self, default: usize) -> usize {
+        self.csi_params
+            .split(';')
+            .next()
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(default)
+    }
+
+    // -- erase operations ---------------------------------------------------
+
+    fn erase_in_display(&mut self, mode: usize) {
+        match mode {
+            0 => {
+                // Erase from cursor to end of screen.
+                self.erase_in_line(0);
+                for r in (self.cursor_row + 1)..self.rows {
+                    self.clear_row(r);
+                }
+            }
+            1 => {
+                // Erase from start to cursor.
+                self.erase_in_line(1);
+                for r in 0..self.cursor_row {
+                    self.clear_row(r);
+                }
+            }
+            2 | 3 => {
+                // Erase entire screen.
+                for r in 0..self.rows {
+                    self.clear_row(r);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn erase_in_line(&mut self, mode: usize) {
+        if self.cursor_row >= self.rows {
+            return;
+        }
+        match mode {
+            0 => {
+                for c in self.cursor_col..self.cols {
+                    self.cells[self.cursor_row][c] = TerminalCell::default();
+                }
+            }
+            1 => {
+                for c in 0..=self.cursor_col.min(self.cols.saturating_sub(1)) {
+                    self.cells[self.cursor_row][c] = TerminalCell::default();
+                }
+            }
+            2 => {
+                self.clear_row(self.cursor_row);
+            }
+            _ => {}
+        }
+    }
+
+    fn clear_row(&mut self, row: usize) {
+        if row < self.rows {
+            for c in 0..self.cols {
+                self.cells[row][c] = TerminalCell::default();
+            }
+        }
+    }
+
+    // -- SGR ----------------------------------------------------------------
+
+    fn apply_sgr(&mut self) {
+        let params = self.parse_params();
+        if params.is_empty() || (params.len() == 1 && params[0] == 0) {
+            self.sgr = SgrState::default();
+            return;
+        }
+
+        let mut i = 0;
+        while i < params.len() {
+            match params[i] {
+                0 => self.sgr = SgrState::default(),
+                1 => self.sgr.bold = true,
+                2 => self.sgr.dim = true,
+                3 => self.sgr.italic = true,
+                4 => self.sgr.underline = true,
+                22 => {
+                    self.sgr.bold = false;
+                    self.sgr.dim = false;
+                }
+                23 => self.sgr.italic = false,
+                24 => self.sgr.underline = false,
+                // Standard foreground colors 30-37
+                n @ 30..=37 => self.sgr.fg = ansi_color(n - 30),
+                39 => self.sgr.fg = Color::White,
+                // Standard background colors 40-47
+                n @ 40..=47 => self.sgr.bg = ansi_color(n - 40),
+                49 => self.sgr.bg = Color::Reset,
+                // Bright foreground 90-97
+                n @ 90..=97 => self.sgr.fg = ansi_bright_color(n - 90),
+                // Bright background 100-107
+                n @ 100..=107 => self.sgr.bg = ansi_bright_color(n - 100),
+                // 256-color and RGB
+                38 => {
+                    if let Some(color) = self.parse_extended_color(&params, &mut i) {
+                        self.sgr.fg = color;
+                    }
+                }
+                48 => {
+                    if let Some(color) = self.parse_extended_color(&params, &mut i) {
+                        self.sgr.bg = color;
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+    }
+
+    fn parse_extended_color(&self, params: &[usize], i: &mut usize) -> Option<Color> {
+        if *i + 1 >= params.len() {
+            return None;
+        }
+        match params[*i + 1] {
+            5 => {
+                // 256-color: 38;5;N
+                if *i + 2 < params.len() {
+                    let n = params[*i + 2] as u8;
+                    *i += 2;
+                    Some(Color::Indexed(n))
+                } else {
+                    None
+                }
+            }
+            2 => {
+                // RGB: 38;2;R;G;B
+                if *i + 4 < params.len() {
+                    let r = params[*i + 2] as u8;
+                    let g = params[*i + 3] as u8;
+                    let b = params[*i + 4] as u8;
+                    *i += 4;
+                    Some(Color::Rgb(r, g, b))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Map standard ANSI color index (0-7) to ratatui color.
+fn ansi_color(idx: usize) -> Color {
+    match idx {
+        0 => Color::Black,
+        1 => Color::Red,
+        2 => Color::Green,
+        3 => Color::Yellow,
+        4 => Color::Blue,
+        5 => Color::Magenta,
+        6 => Color::Cyan,
+        7 => Color::White,
+        _ => Color::White,
+    }
+}
+
+/// Map bright ANSI color index (0-7) to ratatui color.
+fn ansi_bright_color(idx: usize) -> Color {
+    match idx {
+        0 => Color::DarkGray,
+        1 => Color::LightRed,
+        2 => Color::LightGreen,
+        3 => Color::LightYellow,
+        4 => Color::LightBlue,
+        5 => Color::LightMagenta,
+        6 => Color::LightCyan,
+        7 => Color::White,
+        _ => Color::White,
+    }
+}
 
 /// A single terminal tab in the tab bar.
 #[derive(Debug, Clone)]
@@ -34,6 +624,8 @@ pub struct TerminalView {
     pub scroll_offset: usize,
     pub show_search: bool,
     pub search_query: String,
+    /// Per-tab terminal buffers keyed by tab id.
+    pub buffers: HashMap<u64, TerminalBuffer>,
     next_id: u64,
 }
 
@@ -45,12 +637,18 @@ impl TerminalView {
             scroll_offset: 0,
             show_search: false,
             search_query: String::new(),
+            buffers: HashMap::new(),
             next_id: 1,
         }
     }
 
     /// Add a new terminal tab and return its id.
     pub fn add_tab(&mut self, title: impl Into<String>) -> u64 {
+        self.add_tab_with_size(title, 80, 24)
+    }
+
+    /// Add a new terminal tab with a specific grid size and return its id.
+    pub fn add_tab_with_size(&mut self, title: impl Into<String>, cols: usize, rows: usize) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
         let mut tab = TerminalTab::new(id, title);
@@ -60,6 +658,7 @@ impl TerminalView {
             self.active_terminal_id = Some(id);
         }
         self.terminal_tabs.push(tab);
+        self.buffers.insert(id, TerminalBuffer::new(cols, rows));
         id
     }
 
@@ -69,6 +668,7 @@ impl TerminalView {
         let pos = self.terminal_tabs.iter().position(|t| t.id == id);
         if let Some(idx) = pos {
             self.terminal_tabs.remove(idx);
+            self.buffers.remove(&id);
             if was_active {
                 // Activate the nearest remaining tab.
                 let new_idx = idx.min(self.terminal_tabs.len().saturating_sub(1));
@@ -181,6 +781,14 @@ impl TerminalView {
     }
 
     fn render_content(&self, area: Rect, buf: &mut Buffer) {
+        // If we have a buffer for the active tab, render from it.
+        if let Some(id) = self.active_terminal_id {
+            if let Some(tbuf) = self.buffers.get(&id) {
+                tbuf.render_terminal(area, buf);
+                return;
+            }
+        }
+        // Fallback: blank area with label.
         let style = Style::default().fg(Color::White).bg(Color::Black);
         for y in area.y..area.y + area.height {
             for x in area.x..area.x + area.width {
@@ -190,7 +798,6 @@ impl TerminalView {
                 }
             }
         }
-        // Show active terminal indicator
         if let Some(id) = self.active_terminal_id {
             let label = format!("Terminal #{}", id);
             let y = area.y;
@@ -230,6 +837,37 @@ impl TerminalView {
     /// Toggle the `show_search` flag.
     pub fn toggle_show_search(&mut self) {
         self.show_search = !self.show_search;
+    }
+
+    /// Feed raw PTY output into the buffer for a given tab.
+    pub fn process_pty_output(&mut self, tab_id: u64, data: &[u8]) {
+        if let Some(buf) = self.buffers.get_mut(&tab_id) {
+            buf.process_output(data);
+        }
+    }
+
+    /// Feed raw PTY output into the *active* tab's buffer.
+    pub fn process_active_output(&mut self, data: &[u8]) {
+        if let Some(id) = self.active_terminal_id {
+            self.process_pty_output(id, data);
+        }
+    }
+
+    /// Get a reference to the buffer for a tab.
+    pub fn get_buffer(&self, tab_id: u64) -> Option<&TerminalBuffer> {
+        self.buffers.get(&tab_id)
+    }
+
+    /// Get a mutable reference to the buffer for a tab.
+    pub fn get_buffer_mut(&mut self, tab_id: u64) -> Option<&mut TerminalBuffer> {
+        self.buffers.get_mut(&tab_id)
+    }
+
+    /// Resize the terminal buffer for a given tab.
+    pub fn resize_terminal(&mut self, tab_id: u64, cols: u16, rows: u16) {
+        if let Some(buf) = self.buffers.get_mut(&tab_id) {
+            buf.resize(cols as usize, rows as usize);
+        }
     }
 }
 
@@ -617,5 +1255,247 @@ mod tests {
     fn behavior_check_22() {
         let _svc = TerminalView::new();
         assert!(std::mem::size_of::<usize>() > 0);
+    }
+
+    // -- TerminalBuffer tests -----------------------------------------------
+
+    #[test]
+    fn buffer_creation() {
+        let buf = TerminalBuffer::new(80, 24);
+        assert_eq!(buf.cols, 80);
+        assert_eq!(buf.rows, 24);
+        assert_eq!(buf.cells.len(), 24);
+        assert_eq!(buf.cells[0].len(), 80);
+        assert_eq!(buf.cursor_row, 0);
+        assert_eq!(buf.cursor_col, 0);
+        assert!(buf.scrollback.is_empty());
+    }
+
+    #[test]
+    fn buffer_plain_text() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.process_output(b"Hello");
+        assert_eq!(buf.cells[0][0].ch, 'H');
+        assert_eq!(buf.cells[0][1].ch, 'e');
+        assert_eq!(buf.cells[0][2].ch, 'l');
+        assert_eq!(buf.cells[0][3].ch, 'l');
+        assert_eq!(buf.cells[0][4].ch, 'o');
+        assert_eq!(buf.cursor_col, 5);
+        assert_eq!(buf.cursor_row, 0);
+    }
+
+    #[test]
+    fn buffer_ansi_colors() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        // ESC[31m = red foreground, then text, then ESC[0m = reset
+        buf.process_output(b"\x1b[31mRed\x1b[0m");
+        assert_eq!(buf.cells[0][0].ch, 'R');
+        assert_eq!(buf.cells[0][0].fg, Color::Red);
+        assert_eq!(buf.cells[0][1].fg, Color::Red);
+        assert_eq!(buf.cells[0][2].fg, Color::Red);
+    }
+
+    #[test]
+    fn buffer_cursor_movement() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.process_output(b"AB");
+        // ESC[1D = move cursor left 1
+        buf.process_output(b"\x1b[1DX");
+        assert_eq!(buf.cells[0][0].ch, 'A');
+        assert_eq!(buf.cells[0][1].ch, 'X');
+        assert_eq!(buf.cursor_col, 2);
+    }
+
+    #[test]
+    fn buffer_line_wrap() {
+        let mut buf = TerminalBuffer::new(5, 3);
+        buf.process_output(b"ABCDE");
+        // Cursor is at col 5 (past end), next char wraps.
+        buf.process_output(b"F");
+        assert_eq!(buf.cells[0][0].ch, 'A');
+        assert_eq!(buf.cells[0][4].ch, 'E');
+        assert_eq!(buf.cells[1][0].ch, 'F');
+        assert_eq!(buf.cursor_row, 1);
+        assert_eq!(buf.cursor_col, 1);
+    }
+
+    #[test]
+    fn buffer_scrollback() {
+        let mut buf = TerminalBuffer::new(10, 2);
+        buf.process_output(b"Line1\r\nLine2\r\nLine3");
+        // 2-row buffer: Line1 scrolled out, Line2+Line3 visible.
+        assert_eq!(buf.scrollback.len(), 1);
+        assert_eq!(buf.scrollback[0][0].ch, 'L');
+        assert_eq!(buf.scrollback[0][4].ch, '1');
+    }
+
+    #[test]
+    fn buffer_newline() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.process_output(b"A\nB");
+        assert_eq!(buf.cells[0][0].ch, 'A');
+        assert_eq!(buf.cells[1][1].ch, 'B');
+        assert_eq!(buf.cursor_row, 1);
+    }
+
+    #[test]
+    fn buffer_carriage_return() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.process_output(b"Hello\rWorld");
+        // \r resets column to 0, so "World" overwrites "Hello".
+        assert_eq!(buf.cells[0][0].ch, 'W');
+        assert_eq!(buf.cells[0][1].ch, 'o');
+        assert_eq!(buf.cells[0][2].ch, 'r');
+        assert_eq!(buf.cells[0][3].ch, 'l');
+        assert_eq!(buf.cells[0][4].ch, 'd');
+    }
+
+    #[test]
+    fn buffer_tab() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.process_output(b"A\tB");
+        assert_eq!(buf.cells[0][0].ch, 'A');
+        // Tab should advance to column 8.
+        assert_eq!(buf.cells[0][8].ch, 'B');
+    }
+
+    #[test]
+    fn buffer_sgr_bold_italic() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        // ESC[1;3m = bold + italic
+        buf.process_output(b"\x1b[1;3mX\x1b[0m");
+        assert!(buf.cells[0][0].bold);
+        assert!(buf.cells[0][0].italic);
+        assert_eq!(buf.cells[0][0].ch, 'X');
+    }
+
+    #[test]
+    fn buffer_sgr_256_color() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        // ESC[38;5;196m = 256-color red foreground
+        buf.process_output(b"\x1b[38;5;196mZ");
+        assert_eq!(buf.cells[0][0].fg, Color::Indexed(196));
+    }
+
+    #[test]
+    fn buffer_sgr_rgb_color() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        // ESC[38;2;100;200;50m = RGB foreground
+        buf.process_output(b"\x1b[38;2;100;200;50mR");
+        assert_eq!(buf.cells[0][0].fg, Color::Rgb(100, 200, 50));
+    }
+
+    #[test]
+    fn buffer_cell_grid_dimensions() {
+        let buf = TerminalBuffer::new(120, 40);
+        assert_eq!(buf.cells.len(), 40);
+        for row in &buf.cells {
+            assert_eq!(row.len(), 120);
+        }
+    }
+
+    #[test]
+    fn buffer_resize() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.process_output(b"Hello");
+        buf.resize(40, 12);
+        assert_eq!(buf.cols, 40);
+        assert_eq!(buf.rows, 12);
+        assert_eq!(buf.cells.len(), 12);
+        assert_eq!(buf.cells[0].len(), 40);
+        // Shrinking from 24→12 rows moves top 12 rows to scrollback.
+        // "Hello" was on row 0, now in scrollback.
+        assert_eq!(buf.scrollback.len(), 12);
+        assert_eq!(buf.scrollback[0][0].ch, 'H');
+    }
+
+    #[test]
+    fn buffer_resize_grow() {
+        let mut buf = TerminalBuffer::new(10, 5);
+        buf.resize(20, 10);
+        assert_eq!(buf.cols, 20);
+        assert_eq!(buf.rows, 10);
+        assert_eq!(buf.cells.len(), 10);
+        assert_eq!(buf.cells[0].len(), 20);
+    }
+
+    #[test]
+    fn buffer_erase_in_display() {
+        let mut buf = TerminalBuffer::new(10, 3);
+        // Use \r\n to ensure each line starts at column 0.
+        buf.process_output(b"AAAAAAAAAA\r\nBBBBBBBBBB\r\nCCCCCCCCCC");
+        // Move to row 1, col 5 and erase from cursor to end (J=0)
+        buf.process_output(b"\x1b[2;6H\x1b[0J");
+        // Row 0 should be untouched.
+        assert_eq!(buf.cells[0][0].ch, 'A');
+        // Row 1 cols 0-4 should still be B.
+        assert_eq!(buf.cells[1][0].ch, 'B');
+        assert_eq!(buf.cells[1][4].ch, 'B');
+        // Row 1 col 5 should be erased.
+        assert_eq!(buf.cells[1][5].ch, ' ');
+        // Row 2 should be erased.
+        assert_eq!(buf.cells[2][0].ch, ' ');
+    }
+
+    #[test]
+    fn buffer_cursor_position_h() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        // ESC[5;10H = move to row 5, col 10 (1-based)
+        buf.process_output(b"\x1b[5;10HX");
+        assert_eq!(buf.cells[4][9].ch, 'X');
+    }
+
+    #[test]
+    fn buffer_backspace() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        buf.process_output(b"AB\x08C");
+        // Backspace moves cursor left, then C overwrites B.
+        assert_eq!(buf.cells[0][0].ch, 'A');
+        assert_eq!(buf.cells[0][1].ch, 'C');
+    }
+
+    #[test]
+    fn buffer_render_no_panic() {
+        let mut buf = TerminalBuffer::new(20, 5);
+        buf.process_output(b"Hello World\nLine 2\n\x1b[32mGreen\x1b[0m");
+        let area = Rect::new(0, 0, 20, 5);
+        let mut rbuf = Buffer::empty(area);
+        buf.render_terminal(area, &mut rbuf);
+    }
+
+    #[test]
+    fn view_process_pty_output() {
+        let mut v = TerminalView::new();
+        let id = v.add_tab("test");
+        v.process_pty_output(id, b"Hello PTY");
+        let buf = v.get_buffer(id).unwrap();
+        assert_eq!(buf.cells[0][0].ch, 'H');
+        assert_eq!(buf.cells[0][8].ch, 'Y');
+    }
+
+    #[test]
+    fn view_resize_terminal() {
+        let mut v = TerminalView::new();
+        let id = v.add_tab("test");
+        v.resize_terminal(id, 40, 10);
+        let buf = v.get_buffer(id).unwrap();
+        assert_eq!(buf.cols, 40);
+        assert_eq!(buf.rows, 10);
+    }
+
+    #[test]
+    fn buffer_bright_colors() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        // ESC[91m = bright red foreground
+        buf.process_output(b"\x1b[91mX");
+        assert_eq!(buf.cells[0][0].fg, Color::LightRed);
+    }
+
+    #[test]
+    fn buffer_bg_color() {
+        let mut buf = TerminalBuffer::new(80, 24);
+        // ESC[42m = green background
+        buf.process_output(b"\x1b[42mX");
+        assert_eq!(buf.cells[0][0].bg, Color::Green);
     }
 }

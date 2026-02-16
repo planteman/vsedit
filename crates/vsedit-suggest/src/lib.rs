@@ -186,6 +186,237 @@ pub fn kind_icon(kind: CompletionItemKind) -> &'static str {
     }
 }
 
+/// Compute a fuzzy match score. Higher scores indicate better matches.
+/// Returns `None` if the query does not match the target at all.
+pub fn fuzzy_score(query: &str, target: &str) -> Option<i64> {
+    if query.is_empty() {
+        return Some(0);
+    }
+    let query_lower: Vec<char> = query.chars().flat_map(|c| c.to_lowercase()).collect();
+    let target_chars: Vec<char> = target.chars().collect();
+    let target_lower: Vec<char> = target.chars().flat_map(|c| c.to_lowercase()).collect();
+
+    let mut qi = 0;
+    let mut score: i64 = 0;
+    let mut last_match_idx: Option<usize> = None;
+    let mut first_match_idx: Option<usize> = None;
+
+    for (ti, &tc) in target_lower.iter().enumerate() {
+        if qi < query_lower.len() && tc == query_lower[qi] {
+            if first_match_idx.is_none() {
+                first_match_idx = Some(ti);
+            }
+            // Exact case match bonus
+            if target_chars[ti] == query.chars().nth(qi).unwrap_or(' ') {
+                score += 2;
+            } else {
+                score += 1;
+            }
+            // Consecutive match bonus
+            if let Some(last) = last_match_idx {
+                if ti == last + 1 {
+                    score += 5;
+                }
+            }
+            // Word boundary bonus (after _, space, or camelCase)
+            if ti == 0
+                || target_chars[ti - 1] == '_'
+                || target_chars[ti - 1] == ' '
+                || (target_chars[ti - 1].is_lowercase() && target_chars[ti].is_uppercase())
+            {
+                score += 10;
+            }
+            last_match_idx = Some(ti);
+            qi += 1;
+        }
+    }
+
+    if qi < query_lower.len() {
+        return None; // not all query chars matched
+    }
+
+    // Penalise matches that start late in the string
+    if let Some(first) = first_match_idx {
+        score -= first as i64;
+    }
+
+    Some(score)
+}
+
+/// A scored completion item used for ranking.
+#[derive(Debug, Clone)]
+pub struct ScoredCompletion {
+    pub item: CompletionItem,
+    pub score: i64,
+}
+
+impl ScoredCompletion {
+    pub fn new(item: CompletionItem, score: i64) -> Self {
+        Self { item, score }
+    }
+}
+
+impl std::fmt::Display for ScoredCompletion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} (score: {})", self.item, self.score)
+    }
+}
+
+impl PartialEq for ScoredCompletion {
+    fn eq(&self, other: &Self) -> bool {
+        self.score == other.score && self.item.label == other.item.label
+    }
+}
+
+impl CompletionList {
+    /// Score and sort items by fuzzy relevance to `query`.
+    /// Items that don't match are removed.
+    pub fn score_and_sort(&self, query: &str) -> Vec<ScoredCompletion> {
+        let mut scored: Vec<ScoredCompletion> = self
+            .items
+            .iter()
+            .filter_map(|item| {
+                let text = item.get_filter_text();
+                fuzzy_score(query, text).map(|score| ScoredCompletion::new(item.clone(), score))
+            })
+            .collect();
+        scored.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.item.label.cmp(&b.item.label)));
+        scored
+    }
+
+    /// Return only items of the given kind.
+    pub fn filter_by_kind(&self, kind: CompletionItemKind) -> CompletionList {
+        let items = self
+            .items
+            .iter()
+            .filter(|item| item.kind == kind)
+            .cloned()
+            .collect();
+        CompletionList {
+            items,
+            is_incomplete: self.is_incomplete,
+        }
+    }
+
+    /// Merge another completion list into this one, deduplicating by label.
+    pub fn merge(&mut self, other: &CompletionList) {
+        for item in &other.items {
+            if !self.items.iter().any(|existing| existing.label == item.label) {
+                self.items.push(item.clone());
+            }
+        }
+        if other.is_incomplete {
+            self.is_incomplete = true;
+        }
+    }
+
+    /// Remove deprecated items.
+    pub fn remove_deprecated(&self) -> CompletionList {
+        let items = self
+            .items
+            .iter()
+            .filter(|item| !item.deprecated)
+            .cloned()
+            .collect();
+        CompletionList {
+            items,
+            is_incomplete: self.is_incomplete,
+        }
+    }
+
+    /// Limit the list to at most `n` items.
+    pub fn take(&self, n: usize) -> CompletionList {
+        let items = self.items.iter().take(n).cloned().collect();
+        CompletionList {
+            items,
+            is_incomplete: self.is_incomplete || self.items.len() > n,
+        }
+    }
+
+    /// Return unique kinds present in the list.
+    pub fn unique_kinds(&self) -> Vec<CompletionItemKind> {
+        let mut kinds: Vec<CompletionItemKind> = Vec::new();
+        for item in &self.items {
+            if !kinds.contains(&item.kind) {
+                kinds.push(item.kind);
+            }
+        }
+        kinds
+    }
+}
+
+/// Validate a completion item for correctness.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompletionValidationError {
+    EmptyLabel,
+    LabelTooLong(usize),
+    InsertTextEmpty,
+}
+
+impl std::fmt::Display for CompletionValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyLabel => write!(f, "completion label is empty"),
+            Self::LabelTooLong(len) => write!(f, "completion label too long: {len} chars"),
+            Self::InsertTextEmpty => write!(f, "insert text is explicitly set but empty"),
+        }
+    }
+}
+
+/// Maximum label length for validation.
+const MAX_LABEL_LENGTH: usize = 256;
+
+impl CompletionItem {
+    /// Validate this completion item.
+    pub fn validate(&self) -> Result<(), CompletionValidationError> {
+        if self.label.is_empty() {
+            return Err(CompletionValidationError::EmptyLabel);
+        }
+        if self.label.len() > MAX_LABEL_LENGTH {
+            return Err(CompletionValidationError::LabelTooLong(self.label.len()));
+        }
+        if let Some(ref text) = self.insert_text {
+            if text.is_empty() {
+                return Err(CompletionValidationError::InsertTextEmpty);
+            }
+        }
+        Ok(())
+    }
+
+    /// Return the effective sort key for this item.
+    pub fn sort_key(&self) -> &str {
+        self.sort_text.as_deref().unwrap_or(&self.label)
+    }
+
+    /// Check if this item matches a prefix (case-insensitive).
+    pub fn matches_prefix(&self, prefix: &str) -> bool {
+        self.get_filter_text()
+            .to_lowercase()
+            .starts_with(&prefix.to_lowercase())
+    }
+}
+
+impl CompletionList {
+    /// Partition items into (matching, non-matching) based on a prefix.
+    pub fn partition_by_prefix(&self, prefix: &str) -> (CompletionList, CompletionList) {
+        let (matching, rest): (Vec<_>, Vec<_>) = self
+            .items
+            .iter()
+            .cloned()
+            .partition(|item| item.matches_prefix(prefix));
+        (
+            CompletionList {
+                items: matching,
+                is_incomplete: self.is_incomplete,
+            },
+            CompletionList {
+                items: rest,
+                is_incomplete: self.is_incomplete,
+            },
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -303,5 +534,199 @@ mod tests {
         let list = CompletionList::new(vec![]);
         assert!(list.is_empty());
         assert_eq!(list.len(), 0);
+    }
+
+    #[test]
+    fn fuzzy_score_basic_match() {
+        let score = fuzzy_score("fn", "function");
+        assert!(score.is_some());
+        assert!(score.unwrap() > 0);
+    }
+
+    #[test]
+    fn fuzzy_score_no_match() {
+        assert!(fuzzy_score("xyz", "function").is_none());
+    }
+
+    #[test]
+    fn fuzzy_score_empty_query() {
+        assert_eq!(fuzzy_score("", "anything"), Some(0));
+    }
+
+    #[test]
+    fn fuzzy_score_consecutive_bonus() {
+        let consecutive = fuzzy_score("get", "get_value").unwrap();
+        let scattered = fuzzy_score("gev", "get_value").unwrap();
+        assert!(consecutive > scattered);
+    }
+
+    #[test]
+    fn fuzzy_score_case_bonus() {
+        let exact = fuzzy_score("Get", "GetValue").unwrap();
+        let lower = fuzzy_score("get", "GetValue").unwrap();
+        assert!(exact > lower);
+    }
+
+    #[test]
+    fn score_and_sort_ordering() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("xyz_fn", CompletionItemKind::Function),
+            CompletionItem::new("fn_call", CompletionItemKind::Function),
+            CompletionItem::new("my_func", CompletionItemKind::Function),
+        ]);
+        let scored = list.score_and_sort("fn");
+        assert!(!scored.is_empty());
+        // Best match should be first
+        for i in 0..scored.len() - 1 {
+            assert!(scored[i].score >= scored[i + 1].score);
+        }
+    }
+
+    #[test]
+    fn filter_by_kind() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("foo", CompletionItemKind::Function),
+            CompletionItem::new("bar", CompletionItemKind::Variable),
+            CompletionItem::new("baz", CompletionItemKind::Function),
+        ]);
+        let fns = list.filter_by_kind(CompletionItemKind::Function);
+        assert_eq!(fns.len(), 2);
+        assert!(fns.items.iter().all(|i| i.kind == CompletionItemKind::Function));
+    }
+
+    #[test]
+    fn merge_lists_dedup() {
+        let mut list1 = CompletionList::new(vec![
+            CompletionItem::new("foo", CompletionItemKind::Function),
+            CompletionItem::new("bar", CompletionItemKind::Variable),
+        ]);
+        let list2 = CompletionList::new(vec![
+            CompletionItem::new("bar", CompletionItemKind::Variable),
+            CompletionItem::new("baz", CompletionItemKind::Method),
+        ]);
+        list1.merge(&list2);
+        assert_eq!(list1.len(), 3);
+    }
+
+    #[test]
+    fn remove_deprecated_items() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("old_fn", CompletionItemKind::Function).with_deprecated(),
+            CompletionItem::new("new_fn", CompletionItemKind::Function),
+        ]);
+        let clean = list.remove_deprecated();
+        assert_eq!(clean.len(), 1);
+        assert_eq!(clean.items[0].label, "new_fn");
+    }
+
+    #[test]
+    fn take_limits_items() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("a", CompletionItemKind::Text),
+            CompletionItem::new("b", CompletionItemKind::Text),
+            CompletionItem::new("c", CompletionItemKind::Text),
+        ]);
+        let taken = list.take(2);
+        assert_eq!(taken.len(), 2);
+        assert!(taken.is_incomplete);
+    }
+
+    #[test]
+    fn unique_kinds_list() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("a", CompletionItemKind::Function),
+            CompletionItem::new("b", CompletionItemKind::Variable),
+            CompletionItem::new("c", CompletionItemKind::Function),
+        ]);
+        let kinds = list.unique_kinds();
+        assert_eq!(kinds.len(), 2);
+    }
+
+    #[test]
+    fn validate_empty_label() {
+        let item = CompletionItem::new("", CompletionItemKind::Text);
+        assert_eq!(item.validate(), Err(CompletionValidationError::EmptyLabel));
+    }
+
+    #[test]
+    fn validate_long_label() {
+        let long = "x".repeat(300);
+        let item = CompletionItem::new(long, CompletionItemKind::Text);
+        assert!(matches!(item.validate(), Err(CompletionValidationError::LabelTooLong(_))));
+    }
+
+    #[test]
+    fn validate_empty_insert_text() {
+        let item = CompletionItem::new("foo", CompletionItemKind::Text)
+            .with_insert_text("");
+        assert_eq!(item.validate(), Err(CompletionValidationError::InsertTextEmpty));
+    }
+
+    #[test]
+    fn validate_ok() {
+        let item = CompletionItem::new("foo", CompletionItemKind::Text);
+        assert!(item.validate().is_ok());
+    }
+
+    #[test]
+    fn matches_prefix_case_insensitive() {
+        let item = CompletionItem::new("getValue", CompletionItemKind::Method);
+        assert!(item.matches_prefix("get"));
+        assert!(item.matches_prefix("GET"));
+        assert!(!item.matches_prefix("set"));
+    }
+
+    #[test]
+    fn partition_by_prefix_splits() {
+        let list = CompletionList::new(vec![
+            CompletionItem::new("get_value", CompletionItemKind::Method),
+            CompletionItem::new("set_value", CompletionItemKind::Method),
+            CompletionItem::new("get_name", CompletionItemKind::Method),
+        ]);
+        let (matching, rest) = list.partition_by_prefix("get");
+        assert_eq!(matching.len(), 2);
+        assert_eq!(rest.len(), 1);
+    }
+
+    #[test]
+    fn scored_completion_display() {
+        let item = CompletionItem::new("test", CompletionItemKind::Function);
+        let scored = ScoredCompletion::new(item, 42);
+        assert!(format!("{scored}").contains("score: 42"));
+    }
+
+    #[test]
+    fn sort_key_fallback() {
+        let item = CompletionItem::new("foo", CompletionItemKind::Text);
+        assert_eq!(item.sort_key(), "foo");
+        let item2 = CompletionItem::new("foo", CompletionItemKind::Text)
+            .with_sort_text("aaa");
+        assert_eq!(item2.sort_key(), "aaa");
+    }
+
+    #[test]
+    fn validation_error_display() {
+        assert_eq!(
+            CompletionValidationError::EmptyLabel.to_string(),
+            "completion label is empty"
+        );
+        assert!(CompletionValidationError::LabelTooLong(300).to_string().contains("300"));
+        assert_eq!(
+            CompletionValidationError::InsertTextEmpty.to_string(),
+            "insert text is explicitly set but empty"
+        );
+    }
+
+    #[test]
+    fn merge_sets_incomplete_flag() {
+        let mut list1 = CompletionList::new(vec![
+            CompletionItem::new("a", CompletionItemKind::Text),
+        ]);
+        assert!(!list1.is_incomplete);
+        let list2 = CompletionList::incomplete(vec![
+            CompletionItem::new("b", CompletionItemKind::Text),
+        ]);
+        list1.merge(&list2);
+        assert!(list1.is_incomplete);
     }
 }

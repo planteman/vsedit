@@ -215,6 +215,201 @@ impl RenameInputWidget {
     }
 }
 
+// ---------------------------------------------------------------------------
+// RenameEdit helpers
+// ---------------------------------------------------------------------------
+
+impl RenameEdit {
+    /// Span length of the replaced text.
+    pub fn span_length(&self) -> u32 {
+        self.end_column.saturating_sub(self.start_column)
+    }
+
+    /// Whether this edit replaces text in a given file URI.
+    pub fn is_in_file(&self, uri: &str) -> bool {
+        self.uri == uri
+    }
+
+    /// Net character delta introduced by this edit (new length minus old span).
+    pub fn char_delta(&self) -> i64 {
+        self.new_text.len() as i64 - self.span_length() as i64
+    }
+}
+
+impl std::fmt::Display for RenameEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}-{} -> \"{}\"",
+            self.uri, self.line, self.start_column, self.end_column, self.new_text
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenameLocation helpers
+// ---------------------------------------------------------------------------
+
+impl RenameLocation {
+    /// Span length of the located text.
+    pub fn span_length(&self) -> u32 {
+        self.end_column.saturating_sub(self.start_column)
+    }
+
+    /// Whether the location is on a particular line.
+    pub fn is_on_line(&self, line: u32) -> bool {
+        self.line == line
+    }
+}
+
+impl std::fmt::Display for RenameLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}-{} \"{}\"",
+            self.uri, self.line, self.start_column, self.end_column, self.old_text
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// WorkspaceEdit helpers
+// ---------------------------------------------------------------------------
+
+impl WorkspaceEdit {
+    /// Filter edits to only those touching a specific file.
+    pub fn edits_for_file(&self, uri: &str) -> Vec<&RenameEdit> {
+        self.edits.iter().filter(|e| e.uri == uri).collect()
+    }
+
+    /// Merge another WorkspaceEdit into this one.
+    pub fn merge(&mut self, other: WorkspaceEdit) {
+        self.edits.extend(other.edits);
+    }
+
+    /// Sort edits by (uri, line, start_column) for deterministic application.
+    pub fn sort_edits(&mut self) {
+        self.edits
+            .sort_by(|a, b| (&a.uri, a.line, a.start_column).cmp(&(&b.uri, b.line, b.start_column)));
+    }
+
+    /// Return all unique file URIs touched by these edits.
+    pub fn affected_uris(&self) -> Vec<String> {
+        let mut uris: Vec<String> = self.edits.iter().map(|e| e.uri.clone()).collect();
+        uris.sort();
+        uris.dedup();
+        uris
+    }
+}
+
+impl std::fmt::Display for WorkspaceEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WorkspaceEdit({} edits in {} files)", self.edit_count(), self.affected_file_count())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Name validation utilities
+// ---------------------------------------------------------------------------
+
+/// Check whether a candidate name is a valid identifier (ASCII alphanumeric + underscore,
+/// not starting with a digit).
+pub fn is_valid_identifier(name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    let mut chars = name.chars();
+    let first = chars.next().unwrap();
+    if !first.is_ascii_alphabetic() && first != '_' {
+        return false;
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// Classify how a name was changed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RenameKind {
+    /// Only casing changed (e.g. `foo` → `Foo`).
+    CaseChange,
+    /// Completely different name.
+    FullRename,
+    /// Prefix/suffix added.
+    Augmented,
+}
+
+/// Determine the kind of rename from old to new name.
+pub fn classify_rename(old: &str, new: &str) -> RenameKind {
+    if old.eq_ignore_ascii_case(new) {
+        RenameKind::CaseChange
+    } else if new.contains(old) || old.contains(new) {
+        RenameKind::Augmented
+    } else {
+        RenameKind::FullRename
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RenameHistory — undo/redo support
+// ---------------------------------------------------------------------------
+
+/// Tracks performed renames for undo/redo.
+#[derive(Debug, Clone)]
+pub struct RenameHistoryEntry {
+    pub old_name: String,
+    pub new_name: String,
+    pub edit: WorkspaceEdit,
+}
+
+/// Maintains a stack of rename operations.
+#[derive(Debug, Clone)]
+pub struct RenameHistory {
+    entries: Vec<RenameHistoryEntry>,
+    max_entries: usize,
+}
+
+impl RenameHistory {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            max_entries,
+        }
+    }
+
+    pub fn push(&mut self, entry: RenameHistoryEntry) {
+        if self.entries.len() >= self.max_entries {
+            self.entries.remove(0);
+        }
+        self.entries.push(entry);
+    }
+
+    pub fn pop(&mut self) -> Option<RenameHistoryEntry> {
+        self.entries.pop()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    /// Peek at the most recent entry without removing it.
+    pub fn last(&self) -> Option<&RenameHistoryEntry> {
+        self.entries.last()
+    }
+}
+
+impl Default for RenameHistory {
+    fn default() -> Self {
+        Self::new(100)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317,5 +512,201 @@ mod tests {
         let svc = RenameService::new();
         let result = svc.compute_edits("f", 1, 1, "new_name");
         assert_eq!(result, Err(RenameError::NoProvider));
+    }
+
+    #[test]
+    fn rename_edit_span_length() {
+        let edit = RenameEdit {
+            uri: "f.rs".into(),
+            line: 0,
+            start_column: 5,
+            end_column: 10,
+            new_text: "x".into(),
+        };
+        assert_eq!(edit.span_length(), 5);
+    }
+
+    #[test]
+    fn rename_edit_char_delta() {
+        let edit = RenameEdit {
+            uri: "f.rs".into(),
+            line: 0,
+            start_column: 0,
+            end_column: 3,
+            new_text: "longer_name".into(),
+        };
+        assert_eq!(edit.char_delta(), 8);
+    }
+
+    #[test]
+    fn rename_edit_is_in_file() {
+        let edit = RenameEdit {
+            uri: "src/main.rs".into(),
+            line: 1,
+            start_column: 0,
+            end_column: 3,
+            new_text: "x".into(),
+        };
+        assert!(edit.is_in_file("src/main.rs"));
+        assert!(!edit.is_in_file("src/lib.rs"));
+    }
+
+    #[test]
+    fn rename_edit_display() {
+        let edit = RenameEdit {
+            uri: "f.rs".into(),
+            line: 5,
+            start_column: 2,
+            end_column: 8,
+            new_text: "bar".into(),
+        };
+        let s = format!("{}", edit);
+        assert!(s.contains("f.rs"));
+        assert!(s.contains("bar"));
+    }
+
+    #[test]
+    fn rename_location_span_and_line() {
+        let loc = RenameLocation {
+            uri: "x.rs".into(),
+            line: 7,
+            start_column: 0,
+            end_column: 4,
+            old_text: "test".into(),
+        };
+        assert_eq!(loc.span_length(), 4);
+        assert!(loc.is_on_line(7));
+        assert!(!loc.is_on_line(8));
+    }
+
+    #[test]
+    fn rename_location_display() {
+        let loc = RenameLocation {
+            uri: "a.rs".into(),
+            line: 1,
+            start_column: 0,
+            end_column: 3,
+            old_text: "foo".into(),
+        };
+        let s = format!("{}", loc);
+        assert!(s.contains("a.rs"));
+        assert!(s.contains("foo"));
+    }
+
+    #[test]
+    fn workspace_edit_edits_for_file() {
+        let we = WorkspaceEdit {
+            edits: vec![
+                RenameEdit { uri: "a.rs".into(), line: 1, start_column: 0, end_column: 3, new_text: "x".into() },
+                RenameEdit { uri: "b.rs".into(), line: 2, start_column: 0, end_column: 3, new_text: "x".into() },
+                RenameEdit { uri: "a.rs".into(), line: 5, start_column: 0, end_column: 3, new_text: "x".into() },
+            ],
+        };
+        assert_eq!(we.edits_for_file("a.rs").len(), 2);
+        assert_eq!(we.edits_for_file("c.rs").len(), 0);
+    }
+
+    #[test]
+    fn workspace_edit_merge_and_sort() {
+        let mut we1 = WorkspaceEdit {
+            edits: vec![
+                RenameEdit { uri: "b.rs".into(), line: 3, start_column: 0, end_column: 2, new_text: "x".into() },
+            ],
+        };
+        let we2 = WorkspaceEdit {
+            edits: vec![
+                RenameEdit { uri: "a.rs".into(), line: 1, start_column: 0, end_column: 2, new_text: "y".into() },
+            ],
+        };
+        we1.merge(we2);
+        assert_eq!(we1.edit_count(), 2);
+        we1.sort_edits();
+        assert_eq!(we1.edits[0].uri, "a.rs");
+    }
+
+    #[test]
+    fn workspace_edit_affected_uris() {
+        let we = WorkspaceEdit {
+            edits: vec![
+                RenameEdit { uri: "z.rs".into(), line: 1, start_column: 0, end_column: 1, new_text: "a".into() },
+                RenameEdit { uri: "a.rs".into(), line: 1, start_column: 0, end_column: 1, new_text: "b".into() },
+                RenameEdit { uri: "z.rs".into(), line: 2, start_column: 0, end_column: 1, new_text: "c".into() },
+            ],
+        };
+        let uris = we.affected_uris();
+        assert_eq!(uris, vec!["a.rs", "z.rs"]);
+    }
+
+    #[test]
+    fn workspace_edit_display() {
+        let we = WorkspaceEdit::new();
+        let s = format!("{}", we);
+        assert!(s.contains("0 edits"));
+    }
+
+    #[test]
+    fn is_valid_identifier_tests() {
+        assert!(is_valid_identifier("foo"));
+        assert!(is_valid_identifier("_bar"));
+        assert!(is_valid_identifier("a1"));
+        assert!(!is_valid_identifier(""));
+        assert!(!is_valid_identifier("1abc"));
+        assert!(!is_valid_identifier("a-b"));
+        assert!(!is_valid_identifier("a b"));
+    }
+
+    #[test]
+    fn classify_rename_kinds() {
+        assert_eq!(classify_rename("foo", "Foo"), RenameKind::CaseChange);
+        assert_eq!(classify_rename("foo", "fooBar"), RenameKind::Augmented);
+        assert_eq!(classify_rename("fooBar", "foo"), RenameKind::Augmented);
+        assert_eq!(classify_rename("foo", "bar"), RenameKind::FullRename);
+    }
+
+    #[test]
+    fn rename_history_push_pop() {
+        let mut history = RenameHistory::new(3);
+        assert!(history.is_empty());
+
+        for i in 0..3 {
+            history.push(RenameHistoryEntry {
+                old_name: format!("old{}", i),
+                new_name: format!("new{}", i),
+                edit: WorkspaceEdit::new(),
+            });
+        }
+        assert_eq!(history.len(), 3);
+
+        // Push beyond max evicts oldest
+        history.push(RenameHistoryEntry {
+            old_name: "old3".into(),
+            new_name: "new3".into(),
+            edit: WorkspaceEdit::new(),
+        });
+        assert_eq!(history.len(), 3);
+        assert_eq!(history.last().unwrap().old_name, "old3");
+
+        let popped = history.pop().unwrap();
+        assert_eq!(popped.new_name, "new3");
+        assert_eq!(history.len(), 2);
+    }
+
+    #[test]
+    fn rename_history_clear() {
+        let mut history = RenameHistory::default();
+        history.push(RenameHistoryEntry {
+            old_name: "a".into(),
+            new_name: "b".into(),
+            edit: WorkspaceEdit::new(),
+        });
+        assert!(!history.is_empty());
+        history.clear();
+        assert!(history.is_empty());
+    }
+
+    #[test]
+    fn rename_error_display() {
+        assert_eq!(format!("{}", RenameError::EmptyName), "New name cannot be empty");
+        assert_eq!(format!("{}", RenameError::NoProvider), "No rename provider available");
     }
 }

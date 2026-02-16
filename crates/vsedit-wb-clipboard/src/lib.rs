@@ -10,7 +10,7 @@ pub enum SourceMode {
 }
 
 /// A single entry in the clipboard history.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ClipboardEntry {
     pub text: String,
     pub timestamp: u64,
@@ -167,6 +167,179 @@ impl MultiCursorClipboard {
     /// Join multiple selections with an arbitrary separator.
     pub fn merge_lines(selections: &[&str], separator: &str) -> String {
         selections.join(separator)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display impls
+// ---------------------------------------------------------------------------
+
+impl std::fmt::Display for SourceMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SourceMode::Normal => write!(f, "Normal"),
+            SourceMode::Visual => write!(f, "Visual"),
+            SourceMode::VisualLine => write!(f, "VisualLine"),
+            SourceMode::VisualBlock => write!(f, "VisualBlock"),
+        }
+    }
+}
+
+impl std::fmt::Display for ClipboardEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}@{}] {}", self.source_mode, self.timestamp, self.text)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardTransform
+// ---------------------------------------------------------------------------
+
+/// Pure-function text transformations useful for clipboard contents.
+pub struct ClipboardTransform;
+
+impl ClipboardTransform {
+    /// Trim leading and trailing whitespace from every line.
+    pub fn trim_whitespace(text: &str) -> String {
+        text.lines()
+            .map(|l| l.trim())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Remove blank lines from the text.
+    pub fn remove_empty_lines(text: &str) -> String {
+        text.lines()
+            .filter(|l| !l.trim().is_empty())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Sort lines alphabetically.
+    pub fn sort_lines(text: &str) -> String {
+        let mut lines: Vec<&str> = text.lines().collect();
+        lines.sort();
+        lines.join("\n")
+    }
+
+    /// Reverse the order of lines.
+    pub fn reverse_lines(text: &str) -> String {
+        let mut lines: Vec<&str> = text.lines().collect();
+        lines.reverse();
+        lines.join("\n")
+    }
+
+    /// Deduplicate lines, preserving the first occurrence order.
+    pub fn unique_lines(text: &str) -> String {
+        let mut seen = std::collections::HashSet::new();
+        text.lines()
+            .filter(|l| seen.insert(*l))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Count the number of lines.
+    pub fn line_count(text: &str) -> usize {
+        text.lines().count()
+    }
+
+    /// Count the number of characters.
+    pub fn char_count(text: &str) -> usize {
+        text.chars().count()
+    }
+
+    /// Count words (split on whitespace).
+    pub fn word_count(text: &str) -> usize {
+        text.split_whitespace().count()
+    }
+
+    /// Prepend `prefix` to every line.
+    pub fn indent_lines(text: &str, prefix: &str) -> String {
+        text.lines()
+            .map(|l| format!("{prefix}{l}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// Prepend line numbers ("1: ", "2: ", …) to every line.
+    pub fn number_lines(text: &str) -> String {
+        text.lines()
+            .enumerate()
+            .map(|(i, l)| format!("{}: {l}", i + 1))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ClipboardStats
+// ---------------------------------------------------------------------------
+
+/// Aggregate statistics derived from a `ClipboardService`.
+pub struct ClipboardStats {
+    pub entry_count: usize,
+    pub total_bytes: usize,
+    pub avg_bytes: usize,
+    pub longest_entry_bytes: usize,
+    pub shortest_entry_bytes: usize,
+}
+
+impl ClipboardStats {
+    pub fn from_service(svc: &ClipboardService) -> Self {
+        let entries = svc.get_history();
+        let entry_count = entries.len();
+        let total_bytes: usize = entries.iter().map(|e| e.text.len()).sum();
+        let avg_bytes = if entry_count > 0 { total_bytes / entry_count } else { 0 };
+        let longest_entry_bytes = entries.iter().map(|e| e.text.len()).max().unwrap_or(0);
+        let shortest_entry_bytes = entries.iter().map(|e| e.text.len()).min().unwrap_or(0);
+        Self {
+            entry_count,
+            total_bytes,
+            avg_bytes,
+            longest_entry_bytes,
+            shortest_entry_bytes,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional ClipboardService helpers
+// ---------------------------------------------------------------------------
+
+impl ClipboardService {
+    /// Get the entry at a specific index in the history.
+    pub fn get_entry_at(&self, index: usize) -> Option<&ClipboardEntry> {
+        self.history.get(index)
+    }
+
+    /// Return entries whose timestamp is >= `timestamp`.
+    pub fn entries_since(&self, timestamp: u64) -> Vec<&ClipboardEntry> {
+        self.history
+            .iter()
+            .filter(|e| e.timestamp >= timestamp)
+            .collect()
+    }
+
+    /// Return the oldest entry (first in history).
+    pub fn oldest_entry(&self) -> Option<&ClipboardEntry> {
+        self.history.first()
+    }
+
+    /// Return the newest entry (last in history).
+    pub fn newest_entry(&self) -> Option<&ClipboardEntry> {
+        self.history.last()
+    }
+
+    /// Check whether any entry contains the exact text.
+    pub fn contains_text(&self, text: &str) -> bool {
+        self.history.iter().any(|e| e.text == text)
+    }
+
+    /// Remove all entries whose text matches, returning the count removed.
+    pub fn remove_by_text(&mut self, text: &str) -> usize {
+        let before = self.history.len();
+        self.history.retain(|e| e.text != text);
+        before - self.history.len()
     }
 }
 
@@ -335,5 +508,145 @@ mod tests {
     fn undo_last_write_empty() {
         let mut svc = ClipboardService::new(10);
         assert!(svc.undo_last_write().is_none());
+    }
+
+    #[test]
+    fn test_trim_whitespace() {
+        let input = "  hello  \n  world  \n  foo  ";
+        assert_eq!(ClipboardTransform::trim_whitespace(input), "hello\nworld\nfoo");
+    }
+
+    #[test]
+    fn test_remove_empty_lines() {
+        let input = "a\n\nb\n   \nc";
+        assert_eq!(ClipboardTransform::remove_empty_lines(input), "a\nb\nc");
+    }
+
+    #[test]
+    fn test_sort_lines() {
+        let input = "cherry\napple\nbanana";
+        assert_eq!(ClipboardTransform::sort_lines(input), "apple\nbanana\ncherry");
+    }
+
+    #[test]
+    fn test_reverse_lines() {
+        let input = "one\ntwo\nthree";
+        assert_eq!(ClipboardTransform::reverse_lines(input), "three\ntwo\none");
+    }
+
+    #[test]
+    fn test_unique_lines() {
+        let input = "a\nb\na\nc\nb";
+        assert_eq!(ClipboardTransform::unique_lines(input), "a\nb\nc");
+    }
+
+    #[test]
+    fn test_line_count() {
+        assert_eq!(ClipboardTransform::line_count("a\nb\nc"), 3);
+        assert_eq!(ClipboardTransform::line_count(""), 0);
+    }
+
+    #[test]
+    fn test_word_count() {
+        assert_eq!(ClipboardTransform::word_count("hello world foo"), 3);
+        assert_eq!(ClipboardTransform::word_count("  "), 0);
+    }
+
+    #[test]
+    fn test_indent_lines() {
+        let input = "a\nb";
+        assert_eq!(ClipboardTransform::indent_lines(input, ">> "), ">> a\n>> b");
+    }
+
+    #[test]
+    fn test_number_lines() {
+        let input = "foo\nbar\nbaz";
+        assert_eq!(ClipboardTransform::number_lines(input), "1: foo\n2: bar\n3: baz");
+    }
+
+    #[test]
+    fn test_clipboard_stats() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_text("ab".into(), 1);
+        svc.write_text("cdef".into(), 2);
+        svc.write_text("g".into(), 3);
+        let stats = ClipboardStats::from_service(&svc);
+        assert_eq!(stats.entry_count, 3);
+        assert_eq!(stats.total_bytes, 7);
+        assert_eq!(stats.avg_bytes, 2); // 7 / 3 = 2 (integer)
+        assert_eq!(stats.longest_entry_bytes, 4);
+        assert_eq!(stats.shortest_entry_bytes, 1);
+    }
+
+    #[test]
+    fn test_source_mode_display() {
+        assert_eq!(format!("{}", SourceMode::Normal), "Normal");
+        assert_eq!(format!("{}", SourceMode::Visual), "Visual");
+        assert_eq!(format!("{}", SourceMode::VisualLine), "VisualLine");
+        assert_eq!(format!("{}", SourceMode::VisualBlock), "VisualBlock");
+    }
+
+    #[test]
+    fn test_clipboard_entry_display() {
+        let entry = ClipboardEntry {
+            text: "hello".into(),
+            timestamp: 42,
+            source_mode: SourceMode::Normal,
+        };
+        assert_eq!(format!("{entry}"), "[Normal@42] hello");
+    }
+
+    #[test]
+    fn test_get_entry_at() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_text("a".into(), 1);
+        svc.write_text("b".into(), 2);
+        assert_eq!(svc.get_entry_at(0).unwrap().text, "a");
+        assert_eq!(svc.get_entry_at(1).unwrap().text, "b");
+        assert!(svc.get_entry_at(5).is_none());
+    }
+
+    #[test]
+    fn test_entries_since() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_text("old".into(), 10);
+        svc.write_text("mid".into(), 20);
+        svc.write_text("new".into(), 30);
+        let recent = svc.entries_since(20);
+        assert_eq!(recent.len(), 2);
+        assert_eq!(recent[0].text, "mid");
+        assert_eq!(recent[1].text, "new");
+    }
+
+    #[test]
+    fn test_oldest_newest() {
+        let mut svc = ClipboardService::new(10);
+        assert!(svc.oldest_entry().is_none());
+        assert!(svc.newest_entry().is_none());
+        svc.write_text("first".into(), 1);
+        svc.write_text("second".into(), 2);
+        assert_eq!(svc.oldest_entry().unwrap().text, "first");
+        assert_eq!(svc.newest_entry().unwrap().text, "second");
+    }
+
+    #[test]
+    fn test_contains_text() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_text("hello".into(), 1);
+        assert!(svc.contains_text("hello"));
+        assert!(!svc.contains_text("world"));
+    }
+
+    #[test]
+    fn test_remove_by_text() {
+        let mut svc = ClipboardService::new(10);
+        svc.write_text("keep".into(), 1);
+        svc.write_text("remove".into(), 2);
+        svc.write_text("remove".into(), 3);
+        svc.write_text("keep".into(), 4);
+        let removed = svc.remove_by_text("remove");
+        assert_eq!(removed, 2);
+        assert_eq!(svc.history_count(), 2);
+        assert!(!svc.contains_text("remove"));
     }
 }

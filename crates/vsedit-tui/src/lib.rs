@@ -27,6 +27,7 @@
 //! # }
 //! ```
 
+use std::fmt;
 use std::io::{self, Stdout, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -254,6 +255,249 @@ impl Drop for App {
 }
 
 // ---------------------------------------------------------------------------
+// StatusBar — a simple status bar model for the TUI
+// ---------------------------------------------------------------------------
+
+/// Represents a status bar item position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatusBarAlignment {
+    Left,
+    Right,
+}
+
+/// A single item shown in the status bar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatusBarItem {
+    pub id: String,
+    pub text: String,
+    pub tooltip: Option<String>,
+    pub alignment: StatusBarAlignment,
+    pub priority: i32,
+}
+
+impl StatusBarItem {
+    pub fn new(id: impl Into<String>, text: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            text: text.into(),
+            tooltip: None,
+            alignment: StatusBarAlignment::Left,
+            priority: 0,
+        }
+    }
+
+    pub fn with_alignment(mut self, alignment: StatusBarAlignment) -> Self {
+        self.alignment = alignment;
+        self
+    }
+
+    pub fn with_priority(mut self, priority: i32) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn with_tooltip(mut self, tooltip: impl Into<String>) -> Self {
+        self.tooltip = Some(tooltip.into());
+        self
+    }
+}
+
+impl fmt::Display for StatusBarItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.text)
+    }
+}
+
+/// Manages status bar items.
+#[derive(Debug, Default)]
+pub struct StatusBar {
+    items: Vec<StatusBarItem>,
+}
+
+impl StatusBar {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    pub fn add_item(&mut self, item: StatusBarItem) {
+        self.items.push(item);
+    }
+
+    pub fn remove_item(&mut self, id: &str) -> bool {
+        let before = self.items.len();
+        self.items.retain(|i| i.id != id);
+        self.items.len() != before
+    }
+
+    pub fn update_text(&mut self, id: &str, text: impl Into<String>) -> bool {
+        if let Some(item) = self.items.iter_mut().find(|i| i.id == id) {
+            item.text = text.into();
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get_item(&self, id: &str) -> Option<&StatusBarItem> {
+        self.items.iter().find(|i| i.id == id)
+    }
+
+    /// Return left-aligned items sorted by priority (highest first).
+    pub fn left_items(&self) -> Vec<&StatusBarItem> {
+        let mut items: Vec<_> = self
+            .items
+            .iter()
+            .filter(|i| i.alignment == StatusBarAlignment::Left)
+            .collect();
+        items.sort_by(|a, b| b.priority.cmp(&a.priority));
+        items
+    }
+
+    /// Return right-aligned items sorted by priority (highest first).
+    pub fn right_items(&self) -> Vec<&StatusBarItem> {
+        let mut items: Vec<_> = self
+            .items
+            .iter()
+            .filter(|i| i.alignment == StatusBarAlignment::Right)
+            .collect();
+        items.sort_by(|a, b| b.priority.cmp(&a.priority));
+        items
+    }
+
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+
+    /// Render the status bar as a single string: left items | right items.
+    pub fn render_text(&self, width: usize) -> String {
+        let left: String = self
+            .left_items()
+            .iter()
+            .map(|i| i.text.as_str())
+            .collect::<Vec<_>>()
+            .join(" | ");
+        let right: String = self
+            .right_items()
+            .iter()
+            .map(|i| i.text.as_str())
+            .collect::<Vec<_>>()
+            .join(" | ");
+
+        let padding = if left.len() + right.len() < width {
+            width - left.len() - right.len()
+        } else {
+            1
+        };
+        format!("{}{}{}", left, " ".repeat(padding), right)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// KeyBinding helpers
+// ---------------------------------------------------------------------------
+
+/// Represents a parsed key chord.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KeyChord {
+    pub ctrl: bool,
+    pub alt: bool,
+    pub shift: bool,
+    pub key: String,
+}
+
+impl KeyChord {
+    /// Parse a key chord string like "Ctrl+Shift+S".
+    pub fn parse(input: &str) -> Option<Self> {
+        let parts: Vec<&str> = input.split('+').collect();
+        if parts.is_empty() {
+            return None;
+        }
+        let mut ctrl = false;
+        let mut alt = false;
+        let mut shift = false;
+        let mut key = String::new();
+
+        for (i, part) in parts.iter().enumerate() {
+            let lower = part.to_lowercase();
+            if i < parts.len() - 1 {
+                match lower.as_str() {
+                    "ctrl" => ctrl = true,
+                    "alt" => alt = true,
+                    "shift" => shift = true,
+                    _ => return None,
+                }
+            } else {
+                key = part.to_string();
+            }
+        }
+
+        if key.is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            ctrl,
+            alt,
+            shift,
+            key,
+        })
+    }
+
+    /// Check if this chord matches a crossterm KeyEvent.
+    pub fn matches_key_event(&self, event: &KeyEvent) -> bool {
+        let mods = event.modifiers;
+        if self.ctrl != mods.contains(KeyModifiers::CONTROL) {
+            return false;
+        }
+        if self.alt != mods.contains(KeyModifiers::ALT) {
+            return false;
+        }
+        if self.shift != mods.contains(KeyModifiers::SHIFT) {
+            return false;
+        }
+        match event.code {
+            KeyCode::Char(c) => {
+                self.key.len() == 1
+                    && self
+                        .key
+                        .chars()
+                        .next()
+                        .map(|k| k.to_lowercase().eq(c.to_lowercase()))
+                        .unwrap_or(false)
+            }
+            KeyCode::F(n) => self.key == format!("F{n}"),
+            KeyCode::Enter => self.key.eq_ignore_ascii_case("Enter"),
+            KeyCode::Esc => self.key.eq_ignore_ascii_case("Escape") || self.key.eq_ignore_ascii_case("Esc"),
+            KeyCode::Backspace => self.key.eq_ignore_ascii_case("Backspace"),
+            KeyCode::Tab => self.key.eq_ignore_ascii_case("Tab"),
+            KeyCode::Delete => self.key.eq_ignore_ascii_case("Delete"),
+            _ => false,
+        }
+    }
+}
+
+impl fmt::Display for KeyChord {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut parts = Vec::new();
+        if self.ctrl {
+            parts.push("Ctrl");
+        }
+        if self.alt {
+            parts.push("Alt");
+        }
+        if self.shift {
+            parts.push("Shift");
+        }
+        parts.push(&self.key);
+        write!(f, "{}", parts.join("+"))
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -315,5 +559,165 @@ mod tests {
     #[cfg(not(target_os = "linux"))]
     unsafe fn libc_free_isatty(_fd: i32) -> bool {
         false
+    }
+
+    #[test]
+    fn status_bar_item_creation() {
+        let item = StatusBarItem::new("mode", "NORMAL")
+            .with_alignment(StatusBarAlignment::Left)
+            .with_priority(10)
+            .with_tooltip("Current editor mode");
+        assert_eq!(item.id, "mode");
+        assert_eq!(item.text, "NORMAL");
+        assert_eq!(item.alignment, StatusBarAlignment::Left);
+        assert_eq!(item.priority, 10);
+        assert_eq!(item.tooltip.as_deref(), Some("Current editor mode"));
+    }
+
+    #[test]
+    fn status_bar_add_remove() {
+        let mut bar = StatusBar::new();
+        bar.add_item(StatusBarItem::new("a", "Item A"));
+        bar.add_item(StatusBarItem::new("b", "Item B"));
+        assert_eq!(bar.item_count(), 2);
+        assert!(bar.remove_item("a"));
+        assert!(!bar.remove_item("a"));
+        assert_eq!(bar.item_count(), 1);
+    }
+
+    #[test]
+    fn status_bar_update_text() {
+        let mut bar = StatusBar::new();
+        bar.add_item(StatusBarItem::new("mode", "NORMAL"));
+        assert!(bar.update_text("mode", "INSERT"));
+        assert_eq!(bar.get_item("mode").unwrap().text, "INSERT");
+        assert!(!bar.update_text("missing", "X"));
+    }
+
+    #[test]
+    fn status_bar_left_right_items() {
+        let mut bar = StatusBar::new();
+        bar.add_item(
+            StatusBarItem::new("a", "A")
+                .with_alignment(StatusBarAlignment::Left)
+                .with_priority(5),
+        );
+        bar.add_item(
+            StatusBarItem::new("b", "B")
+                .with_alignment(StatusBarAlignment::Right)
+                .with_priority(10),
+        );
+        bar.add_item(
+            StatusBarItem::new("c", "C")
+                .with_alignment(StatusBarAlignment::Left)
+                .with_priority(10),
+        );
+        assert_eq!(bar.left_items().len(), 2);
+        assert_eq!(bar.right_items().len(), 1);
+        // Higher priority first
+        assert_eq!(bar.left_items()[0].id, "c");
+    }
+
+    #[test]
+    fn status_bar_clear() {
+        let mut bar = StatusBar::new();
+        bar.add_item(StatusBarItem::new("a", "X"));
+        bar.clear();
+        assert_eq!(bar.item_count(), 0);
+    }
+
+    #[test]
+    fn status_bar_render_text() {
+        let mut bar = StatusBar::new();
+        bar.add_item(StatusBarItem::new("l", "LEFT").with_alignment(StatusBarAlignment::Left));
+        bar.add_item(StatusBarItem::new("r", "RIGHT").with_alignment(StatusBarAlignment::Right));
+        let rendered = bar.render_text(40);
+        assert!(rendered.contains("LEFT"));
+        assert!(rendered.contains("RIGHT"));
+        assert_eq!(rendered.len(), 40);
+    }
+
+    #[test]
+    fn status_bar_item_display() {
+        let item = StatusBarItem::new("x", "Hello");
+        assert_eq!(format!("{item}"), "Hello");
+    }
+
+    #[test]
+    fn key_chord_parse_simple() {
+        let chord = KeyChord::parse("S").unwrap();
+        assert!(!chord.ctrl);
+        assert!(!chord.alt);
+        assert!(!chord.shift);
+        assert_eq!(chord.key, "S");
+    }
+
+    #[test]
+    fn key_chord_parse_modifiers() {
+        let chord = KeyChord::parse("Ctrl+Shift+S").unwrap();
+        assert!(chord.ctrl);
+        assert!(!chord.alt);
+        assert!(chord.shift);
+        assert_eq!(chord.key, "S");
+    }
+
+    #[test]
+    fn key_chord_parse_all_modifiers() {
+        let chord = KeyChord::parse("Ctrl+Alt+Shift+F5").unwrap();
+        assert!(chord.ctrl);
+        assert!(chord.alt);
+        assert!(chord.shift);
+        assert_eq!(chord.key, "F5");
+    }
+
+    #[test]
+    fn key_chord_parse_empty_returns_none() {
+        assert!(KeyChord::parse("").is_none());
+    }
+
+    #[test]
+    fn key_chord_display() {
+        let chord = KeyChord {
+            ctrl: true,
+            alt: false,
+            shift: true,
+            key: "S".to_string(),
+        };
+        assert_eq!(format!("{chord}"), "Ctrl+Shift+S");
+    }
+
+    #[test]
+    fn key_chord_matches_key_event_basic() {
+        let chord = KeyChord::parse("Ctrl+S").unwrap();
+        let event = KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL);
+        assert!(chord.matches_key_event(&event));
+    }
+
+    #[test]
+    fn key_chord_no_match_wrong_modifier() {
+        let chord = KeyChord::parse("Ctrl+S").unwrap();
+        let event = KeyEvent::new(KeyCode::Char('s'), KeyModifiers::ALT);
+        assert!(!chord.matches_key_event(&event));
+    }
+
+    #[test]
+    fn key_chord_matches_f_key() {
+        let chord = KeyChord::parse("F5").unwrap();
+        let event = KeyEvent::new(KeyCode::F(5), KeyModifiers::NONE);
+        assert!(chord.matches_key_event(&event));
+    }
+
+    #[test]
+    fn key_chord_matches_enter() {
+        let chord = KeyChord::parse("Enter").unwrap();
+        let event = KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+        assert!(chord.matches_key_event(&event));
+    }
+
+    #[test]
+    fn key_chord_matches_escape() {
+        let chord = KeyChord::parse("Escape").unwrap();
+        let event = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
+        assert!(chord.matches_key_event(&event));
     }
 }

@@ -1,5 +1,7 @@
 //! Text file operations.
 
+use std::fmt;
+
 /// The type of a file system entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FileType {
@@ -212,6 +214,206 @@ pub trait FileSystemProvider {
     }
 }
 
+impl PartialEq for FileStat {
+    fn eq(&self, other: &Self) -> bool {
+        self.file_type == other.file_type
+            && self.size == other.size
+            && self.modified == other.modified
+            && self.created == other.created
+            && self.readonly == other.readonly
+    }
+}
+
+impl Eq for FileStat {}
+
+/// Utility methods for working with file paths represented as strings.
+pub struct FilePathUtils;
+
+impl FilePathUtils {
+    /// Get the file extension after the last `.`.
+    pub fn extension(path: &str) -> Option<&str> {
+        let name = Self::file_name(path)?;
+        let dot_pos = name.rfind('.')?;
+        if dot_pos == 0 || dot_pos == name.len() - 1 {
+            return None;
+        }
+        Some(&name[dot_pos + 1..])
+    }
+
+    /// Get the filename after the last `/`.
+    pub fn file_name(path: &str) -> Option<&str> {
+        let trimmed = path.trim_end_matches('/');
+        if trimmed.is_empty() {
+            return None;
+        }
+        match trimmed.rfind('/') {
+            Some(pos) => Some(&trimmed[pos + 1..]),
+            None => Some(trimmed),
+        }
+    }
+
+    /// Get the parent directory (everything before the last `/`).
+    pub fn parent(path: &str) -> Option<&str> {
+        let trimmed = path.trim_end_matches('/');
+        if trimmed.is_empty() {
+            return None;
+        }
+        match trimmed.rfind('/') {
+            Some(0) => Some("/"),
+            Some(pos) => Some(&trimmed[..pos]),
+            None => None,
+        }
+    }
+
+    /// Join a base path with a child segment using `/`.
+    pub fn join(base: &str, child: &str) -> String {
+        if base.ends_with('/') {
+            format!("{}{}", base, child)
+        } else {
+            format!("{}/{}", base, child)
+        }
+    }
+
+    /// Check whether a path is absolute (starts with `/`).
+    pub fn is_absolute(path: &str) -> bool {
+        path.starts_with('/')
+    }
+
+    /// Collapse consecutive `/` to a single `/` and remove trailing `/`.
+    pub fn normalize(path: &str) -> String {
+        let mut result = String::with_capacity(path.len());
+        let mut prev_slash = false;
+        for ch in path.chars() {
+            if ch == '/' {
+                if !prev_slash {
+                    result.push('/');
+                }
+                prev_slash = true;
+            } else {
+                result.push(ch);
+                prev_slash = false;
+            }
+        }
+        if result.len() > 1 && result.ends_with('/') {
+            result.pop();
+        }
+        result
+    }
+
+    /// Count the number of path segments (split on `/`, skip empty).
+    pub fn depth(path: &str) -> usize {
+        path.split('/').filter(|s| !s.is_empty()).count()
+    }
+}
+
+/// Utility methods for formatting and parsing file sizes.
+pub struct FileSizeFormatter;
+
+impl FileSizeFormatter {
+    /// Format a byte count as a human-readable string.
+    pub fn format_bytes(bytes: u64) -> String {
+        const KB: u64 = 1024;
+        const MB: u64 = 1024 * KB;
+        const GB: u64 = 1024 * MB;
+
+        if bytes >= GB {
+            format!("{:.1} GB", bytes as f64 / GB as f64)
+        } else if bytes >= MB {
+            format!("{:.1} MB", bytes as f64 / MB as f64)
+        } else if bytes >= KB {
+            format!("{:.1} KB", bytes as f64 / KB as f64)
+        } else {
+            format!("{} B", bytes)
+        }
+    }
+
+    /// Parse a human-readable size string like "10 KB" back to bytes.
+    pub fn parse_size(s: &str) -> Option<u64> {
+        let s = s.trim();
+        let (num_str, unit) = if let Some(pos) = s.find(|c: char| c.is_alphabetic()) {
+            (s[..pos].trim(), s[pos..].trim())
+        } else {
+            return s.parse::<u64>().ok();
+        };
+
+        let value: f64 = num_str.parse().ok()?;
+        let multiplier: u64 = match unit.to_uppercase().as_str() {
+            "B" => 1,
+            "KB" => 1024,
+            "MB" => 1024 * 1024,
+            "GB" => 1024 * 1024 * 1024,
+            _ => return None,
+        };
+        Some((value * multiplier as f64) as u64)
+    }
+}
+
+impl fmt::Display for FileType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FileType::File => write!(f, "file"),
+            FileType::Directory => write!(f, "directory"),
+            FileType::SymbolicLink => write!(f, "symlink"),
+            FileType::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
+impl fmt::Display for FileEvent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FileEvent::Created(path) => write!(f, "Created: {}", path),
+            FileEvent::Changed(path) => write!(f, "Changed: {}", path),
+            FileEvent::Deleted(path) => write!(f, "Deleted: {}", path),
+        }
+    }
+}
+
+impl FileService {
+    /// Check whether a watcher with the given pattern exists.
+    pub fn has_watcher(&self, pattern: &str) -> bool {
+        self.watchers.iter().any(|w| w.glob_pattern == pattern)
+    }
+
+    /// Return references to all `Created` events.
+    pub fn get_created_events(&self) -> Vec<&FileEvent> {
+        self.events
+            .iter()
+            .filter(|e| matches!(e, FileEvent::Created(_)))
+            .collect()
+    }
+
+    /// Return references to all `Changed` events.
+    pub fn get_changed_events(&self) -> Vec<&FileEvent> {
+        self.events
+            .iter()
+            .filter(|e| matches!(e, FileEvent::Changed(_)))
+            .collect()
+    }
+
+    /// Return references to all `Deleted` events.
+    pub fn get_deleted_events(&self) -> Vec<&FileEvent> {
+        self.events
+            .iter()
+            .filter(|e| matches!(e, FileEvent::Deleted(_)))
+            .collect()
+    }
+
+    /// Collect unique URIs across all events.
+    pub fn unique_event_uris(&self) -> Vec<String> {
+        let mut seen = Vec::new();
+        for event in &self.events {
+            let uri = match event {
+                FileEvent::Created(u) | FileEvent::Changed(u) | FileEvent::Deleted(u) => u,
+            };
+            if !seen.contains(uri) {
+                seen.push(uri.clone());
+            }
+        }
+        seen
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -382,5 +584,142 @@ mod tests {
         assert!(cloned.readonly);
         let debug = format!("{:?}", cloned);
         assert!(debug.contains("FileStat"));
+    }
+
+    #[test]
+    fn test_extension() {
+        assert_eq!(FilePathUtils::extension("main.rs"), Some("rs"));
+        assert_eq!(FilePathUtils::extension("archive.tar.gz"), Some("gz"));
+        assert_eq!(FilePathUtils::extension("no_ext"), None);
+        assert_eq!(FilePathUtils::extension("/path/to/file.txt"), Some("txt"));
+        assert_eq!(FilePathUtils::extension(".hidden"), None);
+    }
+
+    #[test]
+    fn test_file_name() {
+        assert_eq!(FilePathUtils::file_name("/path/to/file.rs"), Some("file.rs"));
+        assert_eq!(FilePathUtils::file_name("file.rs"), Some("file.rs"));
+        assert_eq!(FilePathUtils::file_name("/path/to/dir/"), Some("dir"));
+        assert_eq!(FilePathUtils::file_name("/"), None);
+    }
+
+    #[test]
+    fn test_parent() {
+        assert_eq!(FilePathUtils::parent("/path/to/file.rs"), Some("/path/to"));
+        assert_eq!(FilePathUtils::parent("/file.rs"), Some("/"));
+        assert_eq!(FilePathUtils::parent("file.rs"), None);
+        assert_eq!(FilePathUtils::parent("/"), None);
+    }
+
+    #[test]
+    fn test_join() {
+        assert_eq!(FilePathUtils::join("/path/to", "file.rs"), "/path/to/file.rs");
+        assert_eq!(FilePathUtils::join("/path/to/", "file.rs"), "/path/to/file.rs");
+        assert_eq!(FilePathUtils::join("base", "child"), "base/child");
+    }
+
+    #[test]
+    fn test_is_absolute() {
+        assert!(FilePathUtils::is_absolute("/usr/bin"));
+        assert!(!FilePathUtils::is_absolute("relative/path"));
+        assert!(!FilePathUtils::is_absolute(""));
+    }
+
+    #[test]
+    fn test_normalize() {
+        assert_eq!(FilePathUtils::normalize("/path//to///file"), "/path/to/file");
+        assert_eq!(FilePathUtils::normalize("/path/to/dir/"), "/path/to/dir");
+        assert_eq!(FilePathUtils::normalize("/"), "/");
+        assert_eq!(FilePathUtils::normalize("a//b"), "a/b");
+    }
+
+    #[test]
+    fn test_depth() {
+        assert_eq!(FilePathUtils::depth("/usr/local/bin"), 3);
+        assert_eq!(FilePathUtils::depth("a/b"), 2);
+        assert_eq!(FilePathUtils::depth("/"), 0);
+        assert_eq!(FilePathUtils::depth("single"), 1);
+    }
+
+    #[test]
+    fn test_format_bytes() {
+        assert_eq!(FileSizeFormatter::format_bytes(0), "0 B");
+        assert_eq!(FileSizeFormatter::format_bytes(512), "512 B");
+        assert_eq!(FileSizeFormatter::format_bytes(1024), "1.0 KB");
+        assert_eq!(FileSizeFormatter::format_bytes(1048576), "1.0 MB");
+        assert_eq!(FileSizeFormatter::format_bytes(1073741824), "1.0 GB");
+    }
+
+    #[test]
+    fn test_parse_size() {
+        assert_eq!(FileSizeFormatter::parse_size("100 B"), Some(100));
+        assert_eq!(FileSizeFormatter::parse_size("1 KB"), Some(1024));
+        assert_eq!(FileSizeFormatter::parse_size("1 MB"), Some(1048576));
+        assert_eq!(FileSizeFormatter::parse_size("1 GB"), Some(1073741824));
+        assert_eq!(FileSizeFormatter::parse_size("invalid"), None);
+    }
+
+    #[test]
+    fn test_file_type_display() {
+        assert_eq!(format!("{}", FileType::File), "file");
+        assert_eq!(format!("{}", FileType::Directory), "directory");
+        assert_eq!(format!("{}", FileType::SymbolicLink), "symlink");
+        assert_eq!(format!("{}", FileType::Unknown), "unknown");
+    }
+
+    #[test]
+    fn test_file_event_display() {
+        assert_eq!(
+            format!("{}", FileEvent::Created("a.txt".into())),
+            "Created: a.txt"
+        );
+        assert_eq!(
+            format!("{}", FileEvent::Changed("b.txt".into())),
+            "Changed: b.txt"
+        );
+        assert_eq!(
+            format!("{}", FileEvent::Deleted("c.txt".into())),
+            "Deleted: c.txt"
+        );
+    }
+
+    #[test]
+    fn test_has_watcher() {
+        let mut svc = FileService::new();
+        svc.add_watcher(FileWatcherConfig {
+            glob_pattern: "*.rs".into(),
+            recursive: false,
+            exclude_patterns: vec![],
+        });
+        assert!(svc.has_watcher("*.rs"));
+        assert!(!svc.has_watcher("*.py"));
+    }
+
+    #[test]
+    fn test_get_event_types() {
+        let mut svc = FileService::new();
+        svc.record_event(FileEvent::Created("a.rs".into()));
+        svc.record_event(FileEvent::Changed("b.rs".into()));
+        svc.record_event(FileEvent::Deleted("c.rs".into()));
+        svc.record_event(FileEvent::Created("d.rs".into()));
+
+        assert_eq!(svc.get_created_events().len(), 2);
+        assert_eq!(svc.get_changed_events().len(), 1);
+        assert_eq!(svc.get_deleted_events().len(), 1);
+    }
+
+    #[test]
+    fn test_unique_event_uris() {
+        let mut svc = FileService::new();
+        svc.record_event(FileEvent::Created("a.rs".into()));
+        svc.record_event(FileEvent::Changed("a.rs".into()));
+        svc.record_event(FileEvent::Deleted("b.rs".into()));
+        svc.record_event(FileEvent::Created("c.rs".into()));
+
+        let uris = svc.unique_event_uris();
+        assert_eq!(uris.len(), 3);
+        assert!(uris.contains(&"a.rs".to_string()));
+        assert!(uris.contains(&"b.rs".to_string()));
+        assert!(uris.contains(&"c.rs".to_string()));
     }
 }

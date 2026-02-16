@@ -14,7 +14,7 @@ pub enum ConfigurationScope {
 }
 
 /// A single configuration entry.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConfigurationEntry {
     pub key: String,
     pub value: String,
@@ -173,6 +173,178 @@ impl Default for ConfigurationModel {
     }
 }
 
+/// Errors returned by [`ConfigurationValidator`] methods.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConfigValidationError {
+    EmptyKey,
+    MissingDotSeparator,
+    StartsWithDot,
+    EndsWithDot,
+    ValueTooLong { max: usize, actual: usize },
+}
+
+impl fmt::Display for ConfigValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConfigValidationError::EmptyKey => write!(f, "key must not be empty"),
+            ConfigValidationError::MissingDotSeparator => {
+                write!(f, "key must contain a '.' separator")
+            }
+            ConfigValidationError::StartsWithDot => write!(f, "key must not start with '.'"),
+            ConfigValidationError::EndsWithDot => write!(f, "key must not end with '.'"),
+            ConfigValidationError::ValueTooLong { max, actual } => {
+                write!(f, "value length {} exceeds maximum {}", actual, max)
+            }
+        }
+    }
+}
+
+/// Stateless validator for configuration keys and values.
+pub struct ConfigurationValidator;
+
+impl ConfigurationValidator {
+    /// Validates that `key` is non-empty, contains a `.` separator,
+    /// and does not start or end with `.`.
+    pub fn validate_key(key: &str) -> Result<(), ConfigValidationError> {
+        if key.is_empty() {
+            return Err(ConfigValidationError::EmptyKey);
+        }
+        if key.starts_with('.') {
+            return Err(ConfigValidationError::StartsWithDot);
+        }
+        if key.ends_with('.') {
+            return Err(ConfigValidationError::EndsWithDot);
+        }
+        if !key.contains('.') {
+            return Err(ConfigValidationError::MissingDotSeparator);
+        }
+        Ok(())
+    }
+
+    /// Validates that `value` does not exceed `max_len` bytes.
+    pub fn validate_value(value: &str, max_len: usize) -> Result<(), ConfigValidationError> {
+        if value.len() > max_len {
+            return Err(ConfigValidationError::ValueTooLong {
+                max: max_len,
+                actual: value.len(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Convenience predicate wrapping [`validate_key`].
+    pub fn is_valid_key(key: &str) -> bool {
+        Self::validate_key(key).is_ok()
+    }
+}
+
+/// Represents the difference between two [`ConfigurationModel`]s.
+pub struct ConfigurationDiff {
+    /// Keys present in `new` but absent from `old`.
+    pub added: Vec<String>,
+    /// Keys present in `old` but absent from `new`.
+    pub removed: Vec<String>,
+    /// Keys present in both but with different values.
+    pub changed: Vec<String>,
+}
+
+impl ConfigurationDiff {
+    /// Computes the diff between `old` and `new` models.
+    pub fn compute(old: &ConfigurationModel, new: &ConfigurationModel) -> Self {
+        let old_keys: std::collections::HashSet<&str> =
+            old.entries.keys().map(|k| k.as_str()).collect();
+        let new_keys: std::collections::HashSet<&str> =
+            new.entries.keys().map(|k| k.as_str()).collect();
+
+        let mut added: Vec<String> = new_keys
+            .difference(&old_keys)
+            .map(|k| k.to_string())
+            .collect();
+        added.sort();
+
+        let mut removed: Vec<String> = old_keys
+            .difference(&new_keys)
+            .map(|k| k.to_string())
+            .collect();
+        removed.sort();
+
+        let mut changed: Vec<String> = old_keys
+            .intersection(&new_keys)
+            .filter(|k| {
+                old.entries.get(**k).map(|e| &e.value)
+                    != new.entries.get(**k).map(|e| &e.value)
+            })
+            .map(|k| k.to_string())
+            .collect();
+        changed.sort();
+
+        Self {
+            added,
+            removed,
+            changed,
+        }
+    }
+
+    /// Returns `true` when there are no additions, removals, or changes.
+    pub fn is_empty(&self) -> bool {
+        self.added.is_empty() && self.removed.is_empty() && self.changed.is_empty()
+    }
+
+    /// Total number of added, removed, and changed keys.
+    pub fn total_changes(&self) -> usize {
+        self.added.len() + self.removed.len() + self.changed.len()
+    }
+}
+
+/// Layers multiple [`ConfigurationModel`]s with increasing priority.
+pub struct ConfigurationOverrideModel {
+    layers: Vec<ConfigurationModel>,
+}
+
+impl ConfigurationOverrideModel {
+    pub fn new() -> Self {
+        Self { layers: Vec::new() }
+    }
+
+    /// Adds a layer. Later layers have higher priority.
+    pub fn add_layer(&mut self, model: ConfigurationModel) {
+        self.layers.push(model);
+    }
+
+    /// Resolves `key` by searching layers from highest to lowest priority.
+    pub fn resolve(&self, key: &str) -> Option<&str> {
+        for layer in self.layers.iter().rev() {
+            if let Some(val) = layer.get(key) {
+                return Some(val);
+            }
+        }
+        None
+    }
+
+    pub fn layer_count(&self) -> usize {
+        self.layers.len()
+    }
+
+    /// Returns the union of all keys across every layer.
+    pub fn all_keys(&self) -> Vec<String> {
+        let mut set = std::collections::HashSet::new();
+        for layer in &self.layers {
+            for key in layer.entries.keys() {
+                set.insert(key.clone());
+            }
+        }
+        let mut keys: Vec<String> = set.into_iter().collect();
+        keys.sort();
+        keys
+    }
+}
+
+impl Default for ConfigurationOverrideModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -322,5 +494,173 @@ mod tests {
             description: None,
         };
         assert_eq!(format!("{}", entry), "editor.fontSize = 14 (User)");
+    }
+
+    #[test]
+    fn test_validate_key_valid() {
+        assert!(ConfigurationValidator::validate_key("editor.fontSize").is_ok());
+        assert!(ConfigurationValidator::validate_key("a.b.c").is_ok());
+    }
+
+    #[test]
+    fn test_validate_key_empty() {
+        assert_eq!(
+            ConfigurationValidator::validate_key(""),
+            Err(ConfigValidationError::EmptyKey)
+        );
+    }
+
+    #[test]
+    fn test_validate_key_no_dot() {
+        assert_eq!(
+            ConfigurationValidator::validate_key("nodot"),
+            Err(ConfigValidationError::MissingDotSeparator)
+        );
+    }
+
+    #[test]
+    fn test_validate_key_starts_with_dot() {
+        assert_eq!(
+            ConfigurationValidator::validate_key(".leading"),
+            Err(ConfigValidationError::StartsWithDot)
+        );
+    }
+
+    #[test]
+    fn test_validate_key_ends_with_dot() {
+        assert_eq!(
+            ConfigurationValidator::validate_key("trailing."),
+            Err(ConfigValidationError::EndsWithDot)
+        );
+    }
+
+    #[test]
+    fn test_validate_value_ok() {
+        assert!(ConfigurationValidator::validate_value("hello", 10).is_ok());
+        assert!(ConfigurationValidator::validate_value("exact", 5).is_ok());
+    }
+
+    #[test]
+    fn test_validate_value_too_long() {
+        assert_eq!(
+            ConfigurationValidator::validate_value("toolong", 3),
+            Err(ConfigValidationError::ValueTooLong { max: 3, actual: 7 })
+        );
+    }
+
+    #[test]
+    fn test_config_diff_additions() {
+        let old = ConfigurationModel::new();
+        let mut new = ConfigurationModel::new();
+        new.set("a.b".to_string(), "1".to_string(), ConfigurationScope::User);
+        let diff = ConfigurationDiff::compute(&old, &new);
+        assert_eq!(diff.added, vec!["a.b"]);
+        assert!(diff.removed.is_empty());
+        assert!(diff.changed.is_empty());
+        assert_eq!(diff.total_changes(), 1);
+    }
+
+    #[test]
+    fn test_config_diff_removals() {
+        let mut old = ConfigurationModel::new();
+        old.set("a.b".to_string(), "1".to_string(), ConfigurationScope::User);
+        let new = ConfigurationModel::new();
+        let diff = ConfigurationDiff::compute(&old, &new);
+        assert!(diff.added.is_empty());
+        assert_eq!(diff.removed, vec!["a.b"]);
+        assert!(diff.changed.is_empty());
+    }
+
+    #[test]
+    fn test_config_diff_changes() {
+        let mut old = ConfigurationModel::new();
+        old.set("a.b".to_string(), "1".to_string(), ConfigurationScope::User);
+        let mut new = ConfigurationModel::new();
+        new.set("a.b".to_string(), "2".to_string(), ConfigurationScope::User);
+        let diff = ConfigurationDiff::compute(&old, &new);
+        assert!(diff.added.is_empty());
+        assert!(diff.removed.is_empty());
+        assert_eq!(diff.changed, vec!["a.b"]);
+    }
+
+    #[test]
+    fn test_config_diff_empty() {
+        let mut a = ConfigurationModel::new();
+        a.set("x.y".to_string(), "v".to_string(), ConfigurationScope::Default);
+        let mut b = ConfigurationModel::new();
+        b.set("x.y".to_string(), "v".to_string(), ConfigurationScope::Default);
+        let diff = ConfigurationDiff::compute(&a, &b);
+        assert!(diff.is_empty());
+        assert_eq!(diff.total_changes(), 0);
+    }
+
+    #[test]
+    fn test_override_model_resolve() {
+        let mut base = ConfigurationModel::new();
+        base.set("editor.fontSize".to_string(), "12".to_string(), ConfigurationScope::Default);
+        base.set("editor.tabSize".to_string(), "4".to_string(), ConfigurationScope::Default);
+
+        let mut user = ConfigurationModel::new();
+        user.set("editor.fontSize".to_string(), "16".to_string(), ConfigurationScope::User);
+
+        let mut over = ConfigurationOverrideModel::new();
+        over.add_layer(base);
+        over.add_layer(user);
+
+        assert_eq!(over.resolve("editor.fontSize"), Some("16"));
+        assert_eq!(over.resolve("editor.tabSize"), Some("4"));
+        assert_eq!(over.resolve("missing.key"), None);
+        assert_eq!(over.layer_count(), 2);
+    }
+
+    #[test]
+    fn test_override_model_all_keys() {
+        let mut a = ConfigurationModel::new();
+        a.set("x.a".to_string(), "1".to_string(), ConfigurationScope::Default);
+        a.set("x.b".to_string(), "2".to_string(), ConfigurationScope::Default);
+
+        let mut b = ConfigurationModel::new();
+        b.set("x.b".to_string(), "3".to_string(), ConfigurationScope::User);
+        b.set("x.c".to_string(), "4".to_string(), ConfigurationScope::User);
+
+        let mut over = ConfigurationOverrideModel::new();
+        over.add_layer(a);
+        over.add_layer(b);
+
+        let keys = over.all_keys();
+        assert_eq!(keys, vec!["x.a", "x.b", "x.c"]);
+    }
+
+    #[test]
+    fn test_config_validation_error_display() {
+        assert_eq!(
+            format!("{}", ConfigValidationError::EmptyKey),
+            "key must not be empty"
+        );
+        assert_eq!(
+            format!("{}", ConfigValidationError::MissingDotSeparator),
+            "key must contain a '.' separator"
+        );
+        assert_eq!(
+            format!("{}", ConfigValidationError::StartsWithDot),
+            "key must not start with '.'"
+        );
+        assert_eq!(
+            format!("{}", ConfigValidationError::EndsWithDot),
+            "key must not end with '.'"
+        );
+        assert_eq!(
+            format!("{}", ConfigValidationError::ValueTooLong { max: 5, actual: 10 }),
+            "value length 10 exceeds maximum 5"
+        );
+    }
+
+    #[test]
+    fn test_is_valid_key() {
+        assert!(ConfigurationValidator::is_valid_key("editor.fontSize"));
+        assert!(!ConfigurationValidator::is_valid_key(""));
+        assert!(!ConfigurationValidator::is_valid_key("nodot"));
+        assert!(!ConfigurationValidator::is_valid_key(".leading"));
+        assert!(!ConfigurationValidator::is_valid_key("trailing."));
     }
 }

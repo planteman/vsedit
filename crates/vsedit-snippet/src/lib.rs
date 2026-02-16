@@ -293,6 +293,165 @@ fn expand_element(element: &SnippetElement, variables: &SnippetVariables, out: &
     }
 }
 
+// ---------------------------------------------------------------------------
+// Snippet utilities
+// ---------------------------------------------------------------------------
+
+/// Collect all tabstop indices from a snippet (including placeholders and choices).
+pub fn collect_tabstops(snippet: &Snippet) -> Vec<u32> {
+    let mut indices = Vec::new();
+    for elem in &snippet.elements {
+        collect_tabstops_elem(elem, &mut indices);
+    }
+    indices.sort();
+    indices.dedup();
+    indices
+}
+
+fn collect_tabstops_elem(elem: &SnippetElement, out: &mut Vec<u32>) {
+    match elem {
+        SnippetElement::Tabstop(idx) => out.push(*idx),
+        SnippetElement::Placeholder { index, default } => {
+            out.push(*index);
+            for d in default {
+                collect_tabstops_elem(d, out);
+            }
+        }
+        SnippetElement::Choice { index, .. } => out.push(*index),
+        SnippetElement::Variable { default, .. } => {
+            if let Some(defaults) = default {
+                for d in defaults {
+                    collect_tabstops_elem(d, out);
+                }
+            }
+        }
+        SnippetElement::Text(_) => {}
+    }
+}
+
+/// Count the total number of elements (recursively) in a snippet.
+pub fn element_count(snippet: &Snippet) -> usize {
+    snippet.elements.iter().map(|e| element_count_elem(e)).sum()
+}
+
+fn element_count_elem(elem: &SnippetElement) -> usize {
+    match elem {
+        SnippetElement::Placeholder { default, .. } => {
+            1 + default.iter().map(|d| element_count_elem(d)).sum::<usize>()
+        }
+        SnippetElement::Variable { default: Some(d), .. } => {
+            1 + d.iter().map(|dd| element_count_elem(dd)).sum::<usize>()
+        }
+        _ => 1,
+    }
+}
+
+/// Collect all variable names referenced in a snippet.
+pub fn collect_variables(snippet: &Snippet) -> Vec<String> {
+    let mut names = Vec::new();
+    for elem in &snippet.elements {
+        collect_vars_elem(elem, &mut names);
+    }
+    names.sort();
+    names.dedup();
+    names
+}
+
+fn collect_vars_elem(elem: &SnippetElement, out: &mut Vec<String>) {
+    match elem {
+        SnippetElement::Variable { name, default } => {
+            out.push(name.clone());
+            if let Some(defaults) = default {
+                for d in defaults {
+                    collect_vars_elem(d, out);
+                }
+            }
+        }
+        SnippetElement::Placeholder { default, .. } => {
+            for d in default {
+                collect_vars_elem(d, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// A named snippet definition (as stored in a snippets file).
+#[derive(Debug, Clone)]
+pub struct SnippetDefinition {
+    pub name: String,
+    pub prefix: String,
+    pub body: String,
+    pub description: Option<String>,
+}
+
+impl SnippetDefinition {
+    pub fn new(name: impl Into<String>, prefix: impl Into<String>, body: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            prefix: prefix.into(),
+            body: body.into(),
+            description: None,
+        }
+    }
+
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+
+    /// Parse the body into a Snippet.
+    pub fn parse(&self) -> Snippet {
+        parse_snippet(&self.body)
+    }
+
+    /// Expand the body using the given variables.
+    pub fn expand(&self, variables: &SnippetVariables) -> String {
+        let snippet = self.parse();
+        expand_snippet(&snippet, variables)
+    }
+}
+
+impl std::fmt::Display for SnippetDefinition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}(prefix={})", self.name, self.prefix)
+    }
+}
+
+/// A registry of named snippet definitions.
+#[derive(Debug, Clone, Default)]
+pub struct SnippetRegistry {
+    snippets: Vec<SnippetDefinition>,
+}
+
+impl SnippetRegistry {
+    pub fn new() -> Self {
+        Self { snippets: Vec::new() }
+    }
+
+    pub fn register(&mut self, def: SnippetDefinition) {
+        self.snippets.push(def);
+    }
+
+    /// Find all snippets whose prefix starts with the given text.
+    pub fn find_by_prefix(&self, text: &str) -> Vec<&SnippetDefinition> {
+        self.snippets.iter().filter(|s| s.prefix.starts_with(text)).collect()
+    }
+
+    /// Find a snippet by exact name.
+    pub fn find_by_name(&self, name: &str) -> Option<&SnippetDefinition> {
+        self.snippets.iter().find(|s| s.name == name)
+    }
+
+    pub fn len(&self) -> usize {
+        self.snippets.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.snippets.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,5 +542,106 @@ mod tests {
         let s = parse_snippet("cost is \\$100");
         assert_eq!(s.elements.len(), 1);
         assert!(matches!(&s.elements[0], SnippetElement::Text(t) if t == "cost is $100"));
+    }
+
+    #[test]
+    fn collect_tabstops_simple() {
+        let s = parse_snippet("fn ${1:name}($2) { $0 }");
+        let tabs = collect_tabstops(&s);
+        assert!(tabs.contains(&0));
+        assert!(tabs.contains(&1));
+        assert!(tabs.contains(&2));
+    }
+
+    #[test]
+    fn collect_tabstops_empty() {
+        let s = parse_snippet("plain text only");
+        let tabs = collect_tabstops(&s);
+        assert!(tabs.is_empty());
+    }
+
+    #[test]
+    fn collect_tabstops_choice() {
+        let s = parse_snippet("${1|yes,no|}");
+        let tabs = collect_tabstops(&s);
+        assert_eq!(tabs, vec![1]);
+    }
+
+    #[test]
+    fn element_count_simple() {
+        let s = parse_snippet("hello $1 world");
+        assert!(element_count(&s) >= 3);
+    }
+
+    #[test]
+    fn element_count_nested_placeholder() {
+        let s = parse_snippet("${1:default}");
+        // placeholder(1) + text("default") = 2
+        assert_eq!(element_count(&s), 2);
+    }
+
+    #[test]
+    fn collect_variables_names() {
+        let s = parse_snippet("$TM_FILENAME and ${CLIPBOARD:none}");
+        let vars = collect_variables(&s);
+        assert!(vars.contains(&"TM_FILENAME".to_string()));
+        assert!(vars.contains(&"CLIPBOARD".to_string()));
+    }
+
+    #[test]
+    fn snippet_definition_new_and_display() {
+        let def = SnippetDefinition::new("For Loop", "for", "for ${1:i} in ${2:iter} { $0 }")
+            .with_description("A for loop");
+        assert_eq!(def.name, "For Loop");
+        assert_eq!(def.prefix, "for");
+        assert_eq!(def.description, Some("A for loop".to_string()));
+        let s = format!("{}", def);
+        assert!(s.contains("For Loop"));
+    }
+
+    #[test]
+    fn snippet_definition_expand() {
+        let def = SnippetDefinition::new("test", "tst", "Hello $TM_FILENAME!");
+        let mut vars = SnippetVariables::new();
+        vars.set("TM_FILENAME", "main.rs");
+        let result = def.expand(&vars);
+        assert_eq!(result, "Hello main.rs!");
+    }
+
+    #[test]
+    fn snippet_registry_find_by_prefix() {
+        let mut reg = SnippetRegistry::new();
+        reg.register(SnippetDefinition::new("For Loop", "for", "for $1 {}"));
+        reg.register(SnippetDefinition::new("Function", "fn", "fn $1() {}"));
+        reg.register(SnippetDefinition::new("Foreach", "foreach", "foreach $1 {}"));
+
+        let matches = reg.find_by_prefix("for");
+        assert_eq!(matches.len(), 2); // "for" and "foreach"
+    }
+
+    #[test]
+    fn snippet_registry_find_by_name() {
+        let mut reg = SnippetRegistry::new();
+        reg.register(SnippetDefinition::new("For Loop", "for", "for $1 {}"));
+        assert!(reg.find_by_name("For Loop").is_some());
+        assert!(reg.find_by_name("Missing").is_none());
+    }
+
+    #[test]
+    fn snippet_registry_len() {
+        let mut reg = SnippetRegistry::new();
+        assert!(reg.is_empty());
+        reg.register(SnippetDefinition::new("a", "a", "a"));
+        reg.register(SnippetDefinition::new("b", "b", "b"));
+        assert_eq!(reg.len(), 2);
+    }
+
+    #[test]
+    fn snippet_variables_with_defaults() {
+        let vars = SnippetVariables::new().with_defaults("main.rs", "copied_text");
+        assert_eq!(vars.get("TM_FILENAME"), Some("main.rs"));
+        assert_eq!(vars.get("CLIPBOARD"), Some("copied_text"));
+        assert_eq!(vars.get("TM_FILENAME_BASE"), Some("main"));
+        assert_eq!(vars.get("TM_LINE_NUMBER"), Some("1"));
     }
 }

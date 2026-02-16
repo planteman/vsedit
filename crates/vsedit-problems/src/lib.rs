@@ -280,6 +280,195 @@ impl Default for ProblemsPanel {
     }
 }
 
+impl std::fmt::Display for ProblemSeverity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Error => write!(f, "Error"),
+            Self::Warning => write!(f, "Warning"),
+            Self::Info => write!(f, "Info"),
+            Self::Hint => write!(f, "Hint"),
+        }
+    }
+}
+
+impl std::fmt::Display for SortBy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::File => write!(f, "File"),
+            Self::Severity => write!(f, "Severity"),
+            Self::Message => write!(f, "Message"),
+        }
+    }
+}
+
+impl std::fmt::Display for Problem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}:{}:{} {}", self.severity.icon(), self.file_path, self.line, self.column, self.message)
+    }
+}
+
+impl PartialEq for Problem {
+    fn eq(&self, other: &Self) -> bool {
+        self.severity == other.severity
+            && self.message == other.message
+            && self.file_path == other.file_path
+            && self.line == other.line
+            && self.column == other.column
+            && self.source == other.source
+            && self.code == other.code
+    }
+}
+
+impl Eq for Problem {}
+
+/// Aggregate statistics about problems.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProblemStatistics {
+    pub error_count: usize,
+    pub warning_count: usize,
+    pub info_count: usize,
+    pub hint_count: usize,
+    pub file_count: usize,
+    pub source_count: usize,
+}
+
+impl ProblemStatistics {
+    pub fn total(&self) -> usize {
+        self.error_count + self.warning_count + self.info_count + self.hint_count
+    }
+
+    pub fn has_errors(&self) -> bool {
+        self.error_count > 0
+    }
+}
+
+impl std::fmt::Display for ProblemStatistics {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} errors, {} warnings, {} info, {} hints across {} files",
+            self.error_count, self.warning_count, self.info_count,
+            self.hint_count, self.file_count
+        )
+    }
+}
+
+impl ProblemsPanel {
+    /// Compute aggregate statistics.
+    pub fn statistics(&self) -> ProblemStatistics {
+        let mut sources: Vec<&str> = self.problems.iter().map(|p| p.source.as_str()).collect();
+        sources.sort_unstable();
+        sources.dedup();
+        let mut files: Vec<&str> = self.problems.iter().map(|p| p.file_path.as_str()).collect();
+        files.sort_unstable();
+        files.dedup();
+        ProblemStatistics {
+            error_count: self.count_by_severity(ProblemSeverity::Error),
+            warning_count: self.count_by_severity(ProblemSeverity::Warning),
+            info_count: self.count_by_severity(ProblemSeverity::Info),
+            hint_count: self.count_by_severity(ProblemSeverity::Hint),
+            file_count: files.len(),
+            source_count: sources.len(),
+        }
+    }
+
+    /// Add a problem to the panel.
+    pub fn add_problem(&mut self, problem: Problem) {
+        self.problems.push(problem);
+    }
+
+    /// Remove all problems for a specific file.
+    pub fn clear_file(&mut self, file_path: &str) -> usize {
+        let before = self.problems.len();
+        self.problems.retain(|p| p.file_path != file_path);
+        before - self.problems.len()
+    }
+
+    /// Remove all problems from a specific source.
+    pub fn clear_source(&mut self, source: &str) -> usize {
+        let before = self.problems.len();
+        self.problems.retain(|p| p.source != source);
+        before - self.problems.len()
+    }
+
+    /// Clear all problems.
+    pub fn clear_all(&mut self) {
+        self.problems.clear();
+        self.selected_index = 0;
+        self.scroll_offset = 0;
+    }
+
+    /// Sort problems based on the current sort_by setting.
+    pub fn sort_problems(&mut self) {
+        match self.sort_by {
+            SortBy::File => {
+                self.problems.sort_by(|a, b| {
+                    a.file_path.cmp(&b.file_path)
+                        .then(a.line.cmp(&b.line))
+                        .then(a.column.cmp(&b.column))
+                });
+            }
+            SortBy::Severity => {
+                self.problems.sort_by(|a, b| {
+                    a.severity.cmp(&b.severity)
+                        .then(a.file_path.cmp(&b.file_path))
+                });
+            }
+            SortBy::Message => {
+                self.problems.sort_by(|a, b| a.message.cmp(&b.message));
+            }
+        }
+    }
+
+    /// Get all unique file paths with problems.
+    pub fn affected_files(&self) -> Vec<&str> {
+        let mut files: Vec<&str> = self.problems.iter().map(|p| p.file_path.as_str()).collect();
+        files.sort_unstable();
+        files.dedup();
+        files
+    }
+
+    /// Get all unique sources.
+    pub fn unique_sources(&self) -> Vec<&str> {
+        let mut sources: Vec<&str> = self.problems.iter().map(|p| p.source.as_str()).collect();
+        sources.sort_unstable();
+        sources.dedup();
+        sources
+    }
+
+    /// Get problems at a specific file location.
+    pub fn problems_at_location(&self, file: &str, line: u32) -> Vec<&Problem> {
+        self.problems.iter().filter(|p| p.file_path == file && p.line == line).collect()
+    }
+
+    /// Get the most severe problem overall.
+    pub fn most_severe(&self) -> Option<&Problem> {
+        self.problems.iter().min_by_key(|p| p.severity)
+    }
+
+    /// Check if there are any errors.
+    pub fn has_errors(&self) -> bool {
+        self.problems.iter().any(|p| p.severity == ProblemSeverity::Error)
+    }
+
+    /// Return the total number of problems (unfiltered).
+    pub fn total_count(&self) -> usize {
+        self.problems.len()
+    }
+
+    /// Set the sort order and immediately sort.
+    pub fn set_sort_order(&mut self, sort_by: SortBy) {
+        self.sort_by = sort_by;
+        self.sort_problems();
+    }
+
+    /// Reset selection and scroll to top.
+    pub fn reset_selection(&mut self) {
+        self.selected_index = 0;
+        self.scroll_offset = 0;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,5 +574,157 @@ mod tests {
     fn default_impl() {
         let p = ProblemsPanel::default();
         assert!(p.filter.show_errors);
+    }
+
+    #[test]
+    fn problem_severity_display() {
+        assert_eq!(ProblemSeverity::Error.to_string(), "Error");
+        assert_eq!(ProblemSeverity::Warning.to_string(), "Warning");
+        assert_eq!(ProblemSeverity::Info.to_string(), "Info");
+        assert_eq!(ProblemSeverity::Hint.to_string(), "Hint");
+    }
+
+    #[test]
+    fn sort_by_display() {
+        assert_eq!(SortBy::File.to_string(), "File");
+        assert_eq!(SortBy::Severity.to_string(), "Severity");
+        assert_eq!(SortBy::Message.to_string(), "Message");
+    }
+
+    #[test]
+    fn problem_display() {
+        let p = Problem::new(ProblemSeverity::Error, "bad", "rustc", "a.rs", 1, 2);
+        let display = p.to_string();
+        assert!(display.contains("✖"));
+        assert!(display.contains("a.rs"));
+        assert!(display.contains("bad"));
+    }
+
+    #[test]
+    fn problem_equality() {
+        let a = Problem::new(ProblemSeverity::Error, "msg", "rustc", "a.rs", 1, 1);
+        let b = Problem::new(ProblemSeverity::Error, "msg", "rustc", "a.rs", 1, 1);
+        let c = Problem::new(ProblemSeverity::Warning, "msg", "rustc", "a.rs", 1, 1);
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn statistics() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        let stats = p.statistics();
+        assert_eq!(stats.error_count, 2);
+        assert_eq!(stats.warning_count, 1);
+        assert_eq!(stats.total(), 5);
+        assert!(stats.has_errors());
+        assert!(stats.file_count >= 2);
+    }
+
+    #[test]
+    fn statistics_display() {
+        let stats = ProblemStatistics {
+            error_count: 2, warning_count: 1, info_count: 0, hint_count: 0,
+            file_count: 3, source_count: 2,
+        };
+        let display = stats.to_string();
+        assert!(display.contains("2 errors"));
+        assert!(display.contains("1 warnings"));
+    }
+
+    #[test]
+    fn add_and_clear_problems() {
+        let mut p = ProblemsPanel::new();
+        p.add_problem(Problem::new(ProblemSeverity::Error, "e", "rustc", "a.rs", 1, 1));
+        p.add_problem(Problem::new(ProblemSeverity::Warning, "w", "clippy", "a.rs", 2, 1));
+        assert_eq!(p.total_count(), 2);
+        let cleared = p.clear_file("a.rs");
+        assert_eq!(cleared, 2);
+        assert_eq!(p.total_count(), 0);
+    }
+
+    #[test]
+    fn clear_source() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        let cleared = p.clear_source("clippy");
+        assert_eq!(cleared, 2);
+        assert!(p.problems.iter().all(|prob| prob.source != "clippy"));
+    }
+
+    #[test]
+    fn clear_all() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        p.selected_index = 3;
+        p.clear_all();
+        assert_eq!(p.total_count(), 0);
+        assert_eq!(p.selected_index, 0);
+    }
+
+    #[test]
+    fn sort_by_severity() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        p.set_sort_order(SortBy::Severity);
+        assert_eq!(p.problems[0].severity, ProblemSeverity::Error);
+    }
+
+    #[test]
+    fn sort_by_message() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        p.set_sort_order(SortBy::Message);
+        // alphabetical
+        for i in 1..p.problems.len() {
+            assert!(p.problems[i - 1].message <= p.problems[i].message);
+        }
+    }
+
+    #[test]
+    fn affected_files() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        let files = p.affected_files();
+        assert!(files.contains(&"src/main.rs"));
+        assert!(files.contains(&"src/lib.rs"));
+    }
+
+    #[test]
+    fn unique_sources() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        let sources = p.unique_sources();
+        assert!(sources.contains(&"rustc"));
+        assert!(sources.contains(&"clippy"));
+    }
+
+    #[test]
+    fn problems_at_location() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        let at_10 = p.problems_at_location("src/main.rs", 10);
+        assert_eq!(at_10.len(), 1);
+        assert_eq!(at_10[0].message, "unused variable");
+    }
+
+    #[test]
+    fn most_severe_and_has_errors() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        assert!(p.has_errors());
+        let most = p.most_severe().unwrap();
+        assert_eq!(most.severity, ProblemSeverity::Error);
+    }
+
+    #[test]
+    fn reset_selection() {
+        let mut p = ProblemsPanel::new();
+        p.problems = sample_problems();
+        p.selected_index = 3;
+        p.scroll_offset = 2;
+        p.reset_selection();
+        assert_eq!(p.selected_index, 0);
+        assert_eq!(p.scroll_offset, 0);
     }
 }

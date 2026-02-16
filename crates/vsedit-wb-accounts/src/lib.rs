@@ -149,6 +149,170 @@ impl Default for AccountsService {
     }
 }
 
+/// Errors related to account operations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AccountError {
+    SessionNotFound(String),
+    ProviderNotFound(String),
+    DuplicateSession(String),
+    InvalidToken,
+    MissingScope(String),
+}
+
+impl fmt::Display for AccountError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SessionNotFound(id) => write!(f, "session not found: {id}"),
+            Self::ProviderNotFound(id) => write!(f, "provider not found: {id}"),
+            Self::DuplicateSession(id) => write!(f, "duplicate session: {id}"),
+            Self::InvalidToken => write!(f, "invalid or empty token"),
+            Self::MissingScope(scope) => write!(f, "missing required scope: {scope}"),
+        }
+    }
+}
+
+impl std::error::Error for AccountError {}
+
+impl AccountInfo {
+    /// Create a new AccountInfo with all fields.
+    pub fn new(
+        id: impl Into<String>,
+        label: impl Into<String>,
+        provider_id: impl Into<String>,
+        email: Option<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            provider_id: provider_id.into(),
+            email,
+        }
+    }
+
+    /// Check if an email is set.
+    pub fn has_email(&self) -> bool {
+        self.email.is_some()
+    }
+
+    /// Return the email, falling back to a default string.
+    pub fn email_or_default(&self) -> &str {
+        self.email.as_deref().unwrap_or("(no email)")
+    }
+}
+
+impl AuthSession {
+    /// Create a new auth session.
+    pub fn new(
+        id: impl Into<String>,
+        account: AccountInfo,
+        scopes: Vec<String>,
+        access_token: impl Into<String>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            account,
+            scopes,
+            access_token: access_token.into(),
+        }
+    }
+
+    /// Returns the number of scopes this session has.
+    pub fn scope_count(&self) -> usize {
+        self.scopes.len()
+    }
+
+    /// Check if the access token is non-empty.
+    pub fn has_valid_token(&self) -> bool {
+        !self.access_token.is_empty()
+    }
+
+    /// Return scopes as a comma-separated string.
+    pub fn scopes_display(&self) -> String {
+        self.scopes.join(", ")
+    }
+}
+
+impl PartialEq for AuthSession {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl AccountsService {
+    /// Add a session, returning an error if a session with the same ID exists.
+    pub fn try_add_session(&mut self, session: AuthSession) -> Result<(), AccountError> {
+        if self.sessions.iter().any(|s| s.id == session.id) {
+            return Err(AccountError::DuplicateSession(session.id));
+        }
+        self.sessions.push(session);
+        Ok(())
+    }
+
+    /// Remove a session by ID, returning an error if not found.
+    pub fn try_remove_session(&mut self, id: &str) -> Result<AuthSession, AccountError> {
+        let pos = self
+            .sessions
+            .iter()
+            .position(|s| s.id == id)
+            .ok_or_else(|| AccountError::SessionNotFound(id.to_string()))?;
+        Ok(self.sessions.remove(pos))
+    }
+
+    /// Get all session IDs.
+    pub fn session_ids(&self) -> Vec<&str> {
+        self.sessions.iter().map(|s| s.id.as_str()).collect()
+    }
+
+    /// Find sessions by account email.
+    pub fn find_by_email(&self, email: &str) -> Vec<&AuthSession> {
+        self.sessions
+            .iter()
+            .filter(|s| s.account.email.as_deref() == Some(email))
+            .collect()
+    }
+
+    /// Check if any session has a specific scope across all providers.
+    pub fn any_session_has_scope(&self, scope: &str) -> bool {
+        self.sessions.iter().any(|s| s.has_scope(scope))
+    }
+
+    /// Return the total number of unique scopes across all sessions.
+    pub fn total_unique_scopes(&self) -> usize {
+        let mut all_scopes: Vec<&str> = self
+            .sessions
+            .iter()
+            .flat_map(|s| s.scopes.iter().map(|sc| sc.as_str()))
+            .collect();
+        all_scopes.sort_unstable();
+        all_scopes.dedup();
+        all_scopes.len()
+    }
+
+    /// Validate that a session has a valid (non-empty) token.
+    pub fn validate_session_token(&self, id: &str) -> Result<(), AccountError> {
+        let session = self
+            .sessions
+            .iter()
+            .find(|s| s.id == id)
+            .ok_or_else(|| AccountError::SessionNotFound(id.to_string()))?;
+        if session.access_token.is_empty() {
+            return Err(AccountError::InvalidToken);
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for AccountsService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "AccountsService({} sessions, {} providers)",
+            self.sessions.len(),
+            self.get_unique_providers().len()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -338,5 +502,182 @@ mod tests {
         svc.add_session(make_session("s1", "github"));
         assert!(svc.is_session_valid("s1"));
         assert!(!svc.is_session_valid("missing"));
+    }
+
+    #[test]
+    fn account_info_new_constructor() {
+        let info = AccountInfo::new("a1", "Alice", "github", Some("alice@example.com".to_string()));
+        assert_eq!(info.id, "a1");
+        assert_eq!(info.label, "Alice");
+        assert_eq!(info.provider_id, "github");
+        assert!(info.has_email());
+        assert_eq!(info.email_or_default(), "alice@example.com");
+    }
+
+    #[test]
+    fn account_info_no_email() {
+        let info = AccountInfo::new("a1", "Bob", "github", None);
+        assert!(!info.has_email());
+        assert_eq!(info.email_or_default(), "(no email)");
+    }
+
+    #[test]
+    fn auth_session_new_constructor() {
+        let account = AccountInfo::new("a1", "Alice", "github", None);
+        let session = AuthSession::new("s1", account, vec!["read".to_string()], "tok123");
+        assert_eq!(session.id, "s1");
+        assert_eq!(session.scope_count(), 1);
+        assert!(session.has_valid_token());
+        assert_eq!(session.scopes_display(), "read");
+    }
+
+    #[test]
+    fn auth_session_empty_token() {
+        let account = AccountInfo::new("a1", "Alice", "github", None);
+        let session = AuthSession::new("s1", account, vec![], "");
+        assert!(!session.has_valid_token());
+    }
+
+    #[test]
+    fn auth_session_partial_eq_by_id() {
+        let a1 = AccountInfo::new("a1", "Alice", "github", None);
+        let a2 = AccountInfo::new("a2", "Bob", "azure", None);
+        let s1 = AuthSession::new("s1", a1, vec![], "tok1");
+        let s2 = AuthSession::new("s1", a2, vec![], "tok2");
+        assert_eq!(s1, s2); // same id
+    }
+
+    #[test]
+    fn try_add_duplicate_session() {
+        let mut svc = AccountsService::new();
+        svc.add_session(make_session("s1", "github"));
+        let result = svc.try_add_session(make_session("s1", "azure"));
+        assert_eq!(result, Err(AccountError::DuplicateSession("s1".to_string())));
+    }
+
+    #[test]
+    fn try_add_session_success() {
+        let mut svc = AccountsService::new();
+        assert!(svc.try_add_session(make_session("s1", "github")).is_ok());
+        assert_eq!(svc.session_count(), 1);
+    }
+
+    #[test]
+    fn try_remove_session_success() {
+        let mut svc = AccountsService::new();
+        svc.add_session(make_session("s1", "github"));
+        let removed = svc.try_remove_session("s1").unwrap();
+        assert_eq!(removed.id, "s1");
+        assert_eq!(svc.session_count(), 0);
+    }
+
+    #[test]
+    fn try_remove_session_not_found() {
+        let mut svc = AccountsService::new();
+        assert_eq!(
+            svc.try_remove_session("missing"),
+            Err(AccountError::SessionNotFound("missing".to_string()))
+        );
+    }
+
+    #[test]
+    fn session_ids_list() {
+        let mut svc = AccountsService::new();
+        svc.add_session(make_session("s1", "github"));
+        svc.add_session(make_session("s2", "azure"));
+        let ids = svc.session_ids();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&"s1"));
+        assert!(ids.contains(&"s2"));
+    }
+
+    #[test]
+    fn find_by_email_match() {
+        let mut svc = AccountsService::new();
+        let mut session = make_session("s1", "github");
+        session.account.email = Some("alice@example.com".to_string());
+        svc.add_session(session);
+        svc.add_session(make_session("s2", "github"));
+        let found = svc.find_by_email("alice@example.com");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].id, "s1");
+    }
+
+    #[test]
+    fn any_session_has_scope_check() {
+        let mut svc = AccountsService::new();
+        svc.add_session(make_session("s1", "github")); // has "read" scope
+        assert!(svc.any_session_has_scope("read"));
+        assert!(!svc.any_session_has_scope("admin"));
+    }
+
+    #[test]
+    fn total_unique_scopes_count() {
+        let mut svc = AccountsService::new();
+        svc.add_session(make_session_with_scopes("s1", "github", &["read", "write"]));
+        svc.add_session(make_session_with_scopes("s2", "azure", &["read", "admin"]));
+        assert_eq!(svc.total_unique_scopes(), 3); // read, write, admin
+    }
+
+    #[test]
+    fn validate_session_token_ok() {
+        let mut svc = AccountsService::new();
+        svc.add_session(make_session("s1", "github"));
+        assert!(svc.validate_session_token("s1").is_ok());
+    }
+
+    #[test]
+    fn validate_session_token_not_found() {
+        let svc = AccountsService::new();
+        assert_eq!(
+            svc.validate_session_token("missing"),
+            Err(AccountError::SessionNotFound("missing".to_string()))
+        );
+    }
+
+    #[test]
+    fn validate_session_token_empty() {
+        let mut svc = AccountsService::new();
+        let account = AccountInfo::new("a1", "User", "github", None);
+        let session = AuthSession::new("s1", account, vec![], "");
+        svc.add_session(session);
+        assert_eq!(svc.validate_session_token("s1"), Err(AccountError::InvalidToken));
+    }
+
+    #[test]
+    fn accounts_service_display() {
+        let mut svc = AccountsService::new();
+        svc.add_session(make_session("s1", "github"));
+        svc.add_session(make_session("s2", "azure"));
+        let s = format!("{svc}");
+        assert!(s.contains("2 sessions"));
+        assert!(s.contains("2 providers"));
+    }
+
+    #[test]
+    fn account_error_display_messages() {
+        assert_eq!(
+            AccountError::SessionNotFound("x".to_string()).to_string(),
+            "session not found: x"
+        );
+        assert_eq!(
+            AccountError::ProviderNotFound("y".to_string()).to_string(),
+            "provider not found: y"
+        );
+        assert_eq!(
+            AccountError::DuplicateSession("z".to_string()).to_string(),
+            "duplicate session: z"
+        );
+        assert_eq!(AccountError::InvalidToken.to_string(), "invalid or empty token");
+        assert_eq!(
+            AccountError::MissingScope("admin".to_string()).to_string(),
+            "missing required scope: admin"
+        );
+    }
+
+    #[test]
+    fn account_error_is_std_error() {
+        let err: Box<dyn std::error::Error> = Box::new(AccountError::InvalidToken);
+        assert_eq!(err.to_string(), "invalid or empty token");
     }
 }

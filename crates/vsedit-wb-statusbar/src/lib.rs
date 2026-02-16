@@ -214,6 +214,182 @@ pub fn register_default_items(svc: &mut StatusBarService) {
 }
 
 // ---------------------------------------------------------------------------
+// StatusBarItemBuilder
+// ---------------------------------------------------------------------------
+
+/// A builder for constructing [`StatusBarItem`] instances using the builder
+/// pattern. Provides sensible defaults and a fluent API.
+pub struct StatusBarItemBuilder {
+    id: String,
+    text: String,
+    tooltip: Option<String>,
+    command: Option<String>,
+    alignment: StatusBarAlignment,
+    priority: i32,
+    visible: bool,
+    background_color: Option<String>,
+    foreground_color: Option<String>,
+}
+
+impl StatusBarItemBuilder {
+    /// Create a new builder with the given `id` and sensible defaults.
+    pub fn new(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            text: String::new(),
+            tooltip: None,
+            command: None,
+            alignment: StatusBarAlignment::Left,
+            priority: 0,
+            visible: true,
+            background_color: None,
+            foreground_color: None,
+        }
+    }
+
+    /// Set the display text.
+    pub fn text(mut self, text: impl Into<String>) -> Self {
+        self.text = text.into();
+        self
+    }
+
+    /// Set the tooltip.
+    pub fn tooltip(mut self, tooltip: impl Into<String>) -> Self {
+        self.tooltip = Some(tooltip.into());
+        self
+    }
+
+    /// Set the command to execute when clicked.
+    pub fn command(mut self, command: impl Into<String>) -> Self {
+        self.command = Some(command.into());
+        self
+    }
+
+    /// Set the alignment (Left or Right).
+    pub fn alignment(mut self, alignment: StatusBarAlignment) -> Self {
+        self.alignment = alignment;
+        self
+    }
+
+    /// Set the priority (higher = closer to the edge).
+    pub fn priority(mut self, priority: i32) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    /// Set visibility.
+    pub fn visible(mut self, visible: bool) -> Self {
+        self.visible = visible;
+        self
+    }
+
+    /// Set the background color.
+    pub fn background_color(mut self, color: impl Into<String>) -> Self {
+        self.background_color = Some(color.into());
+        self
+    }
+
+    /// Set the foreground color.
+    pub fn foreground_color(mut self, color: impl Into<String>) -> Self {
+        self.foreground_color = Some(color.into());
+        self
+    }
+
+    /// Consume the builder and produce a [`StatusBarItem`].
+    pub fn build(self) -> StatusBarItem {
+        StatusBarItem {
+            id: self.id,
+            text: self.text,
+            tooltip: self.tooltip,
+            command: self.command,
+            alignment: self.alignment,
+            priority: self.priority,
+            visible: self.visible,
+            background_color: self.background_color,
+            foreground_color: self.foreground_color,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display impls
+// ---------------------------------------------------------------------------
+
+use std::fmt;
+
+impl fmt::Display for StatusBarAlignment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StatusBarAlignment::Left => write!(f, "Left"),
+            StatusBarAlignment::Right => write!(f, "Right"),
+        }
+    }
+}
+
+impl fmt::Display for StatusBarItem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "[{}] {} ({:?}, pri={})",
+            self.id, self.text, self.alignment, self.priority
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional StatusBarService helpers
+// ---------------------------------------------------------------------------
+
+impl StatusBarService {
+    /// Return the total number of items (visible or not).
+    pub fn item_count(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Find an item by its `id`.
+    pub fn get_item(&self, id: &str) -> Option<&StatusBarItem> {
+        self.items.iter().find(|i| i.id == id)
+    }
+
+    /// Find an item mutably by its `id`.
+    pub fn get_item_mut(&mut self, id: &str) -> Option<&mut StatusBarItem> {
+        self.items.iter_mut().find(|i| i.id == id)
+    }
+
+    /// Update the tooltip of an item. Fires the change event.
+    pub fn update_tooltip(&mut self, id: &str, tooltip: &str) {
+        if let Some(item) = self.items.iter_mut().find(|i| i.id == id) {
+            item.tooltip = Some(tooltip.to_string());
+            self.on_did_change.fire(&());
+        }
+    }
+
+    /// Update the background and/or foreground colors of an item.
+    /// Pass `None` to leave a color unchanged.
+    pub fn update_colors(&mut self, id: &str, bg: Option<&str>, fg: Option<&str>) {
+        if let Some(item) = self.items.iter_mut().find(|i| i.id == id) {
+            if let Some(bg) = bg {
+                item.background_color = Some(bg.to_string());
+            }
+            if let Some(fg) = fg {
+                item.foreground_color = Some(fg.to_string());
+            }
+            self.on_did_change.fire(&());
+        }
+    }
+
+    /// Return the number of currently visible items.
+    pub fn visible_count(&self) -> usize {
+        self.items.iter().filter(|i| i.visible).count()
+    }
+
+    /// Return a slice of all items.
+    pub fn get_all_items(&self) -> &[StatusBarItem] {
+        &self.items
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -352,5 +528,196 @@ mod tests {
 
         svc.remove_item("does-not-exist");
         assert_eq!(*count.lock().unwrap(), 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Builder tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_builder_defaults() {
+        let item = StatusBarItemBuilder::new("test.id").build();
+        assert_eq!(item.id, "test.id");
+        assert_eq!(item.text, "");
+        assert!(item.tooltip.is_none());
+        assert!(item.command.is_none());
+        assert_eq!(item.alignment, StatusBarAlignment::Left);
+        assert_eq!(item.priority, 0);
+        assert!(item.visible);
+        assert!(item.background_color.is_none());
+        assert!(item.foreground_color.is_none());
+    }
+
+    #[test]
+    fn test_builder_full_chain() {
+        let item = StatusBarItemBuilder::new("full")
+            .text("Hello")
+            .tooltip("A tooltip")
+            .command("do.something")
+            .alignment(StatusBarAlignment::Right)
+            .priority(42)
+            .visible(false)
+            .background_color("#ff0000")
+            .foreground_color("#00ff00")
+            .build();
+
+        assert_eq!(item.id, "full");
+        assert_eq!(item.text, "Hello");
+        assert_eq!(item.tooltip.as_deref(), Some("A tooltip"));
+        assert_eq!(item.command.as_deref(), Some("do.something"));
+        assert_eq!(item.alignment, StatusBarAlignment::Right);
+        assert_eq!(item.priority, 42);
+        assert!(!item.visible);
+        assert_eq!(item.background_color.as_deref(), Some("#ff0000"));
+        assert_eq!(item.foreground_color.as_deref(), Some("#00ff00"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Display tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_statusbar_item_display() {
+        let item = StatusBarItemBuilder::new("sb.test")
+            .text("branch: main")
+            .priority(10)
+            .build();
+        let display = format!("{}", item);
+        assert_eq!(display, "[sb.test] branch: main (Left, pri=10)");
+    }
+
+    #[test]
+    fn test_statusbar_alignment_display() {
+        assert_eq!(format!("{}", StatusBarAlignment::Left), "Left");
+        assert_eq!(format!("{}", StatusBarAlignment::Right), "Right");
+    }
+
+    // -----------------------------------------------------------------------
+    // Additional StatusBarService method tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_item_count() {
+        let mut svc = StatusBarService::new();
+        assert_eq!(svc.item_count(), 0);
+        svc.add_item(make_item("a", StatusBarAlignment::Left, 1));
+        svc.add_item(make_item("b", StatusBarAlignment::Right, 2));
+        assert_eq!(svc.item_count(), 2);
+        svc.remove_item("a");
+        assert_eq!(svc.item_count(), 1);
+    }
+
+    #[test]
+    fn test_get_item() {
+        let mut svc = StatusBarService::new();
+        svc.add_item(make_item("find_me", StatusBarAlignment::Left, 5));
+        svc.add_item(make_item("other", StatusBarAlignment::Right, 3));
+
+        let found = svc.get_item("find_me");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, "find_me");
+        assert_eq!(found.unwrap().priority, 5);
+
+        assert!(svc.get_item("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_get_item_mut() {
+        let mut svc = StatusBarService::new();
+        svc.add_item(make_item("mut_me", StatusBarAlignment::Left, 1));
+
+        if let Some(item) = svc.get_item_mut("mut_me") {
+            item.text = "mutated".to_string();
+        }
+
+        assert_eq!(svc.get_item("mut_me").unwrap().text, "mutated");
+        assert!(svc.get_item_mut("missing").is_none());
+    }
+
+    #[test]
+    fn test_update_tooltip() {
+        let mut svc = StatusBarService::new();
+        svc.add_item(make_item("tt", StatusBarAlignment::Left, 1));
+        assert!(svc.get_item("tt").unwrap().tooltip.is_none());
+
+        svc.update_tooltip("tt", "new tooltip");
+        assert_eq!(
+            svc.get_item("tt").unwrap().tooltip.as_deref(),
+            Some("new tooltip")
+        );
+    }
+
+    #[test]
+    fn test_update_colors() {
+        let mut svc = StatusBarService::new();
+        svc.add_item(make_item("col", StatusBarAlignment::Left, 1));
+
+        svc.update_colors("col", Some("#000"), None);
+        let item = svc.get_item("col").unwrap();
+        assert_eq!(item.background_color.as_deref(), Some("#000"));
+        assert!(item.foreground_color.is_none());
+
+        svc.update_colors("col", None, Some("#fff"));
+        let item = svc.get_item("col").unwrap();
+        assert_eq!(item.background_color.as_deref(), Some("#000"));
+        assert_eq!(item.foreground_color.as_deref(), Some("#fff"));
+    }
+
+    #[test]
+    fn test_visible_count() {
+        let mut svc = StatusBarService::new();
+        svc.add_item(make_item("v1", StatusBarAlignment::Left, 1));
+        svc.add_item(make_item("v2", StatusBarAlignment::Left, 2));
+        svc.add_item(make_item("v3", StatusBarAlignment::Right, 3));
+        assert_eq!(svc.visible_count(), 3);
+
+        svc.set_visibility("v2", false);
+        assert_eq!(svc.visible_count(), 2);
+
+        svc.set_visibility("v1", false);
+        assert_eq!(svc.visible_count(), 1);
+    }
+
+    #[test]
+    fn test_get_all_items() {
+        let mut svc = StatusBarService::new();
+        assert!(svc.get_all_items().is_empty());
+
+        svc.add_item(make_item("i1", StatusBarAlignment::Left, 10));
+        svc.add_item(make_item("i2", StatusBarAlignment::Right, 20));
+        svc.add_item(make_item("i3", StatusBarAlignment::Left, 30));
+
+        let all = svc.get_all_items();
+        assert_eq!(all.len(), 3);
+        assert_eq!(all[0].id, "i1");
+        assert_eq!(all[1].id, "i2");
+        assert_eq!(all[2].id, "i3");
+    }
+
+    #[test]
+    fn test_builder_produces_valid_item_in_service() {
+        let mut svc = StatusBarService::new();
+        let item = StatusBarItemBuilder::new("builder.item")
+            .text("Built")
+            .alignment(StatusBarAlignment::Right)
+            .priority(55)
+            .tooltip("Built via builder")
+            .command("builder.cmd")
+            .build();
+
+        let id = svc.add_item(item);
+        assert_eq!(id, "builder.item");
+        assert_eq!(svc.item_count(), 1);
+
+        let found = svc.get_item("builder.item").unwrap();
+        assert_eq!(found.text, "Built");
+        assert_eq!(found.alignment, StatusBarAlignment::Right);
+        assert_eq!(found.priority, 55);
+        assert_eq!(found.tooltip.as_deref(), Some("Built via builder"));
+        assert_eq!(found.command.as_deref(), Some("builder.cmd"));
+
+        let right = svc.get_right_items();
+        assert_eq!(right.len(), 1);
+        assert_eq!(right[0].id, "builder.item");
     }
 }

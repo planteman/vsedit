@@ -171,6 +171,158 @@ impl Default for ThemeService {
     }
 }
 
+/// A validated color value in hex format.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColorValue {
+    pub hex: String,
+}
+
+impl ColorValue {
+    /// Create a new `ColorValue` from a hex string.
+    ///
+    /// The string must start with '#' and be either 4 characters (`#RGB`)
+    /// or 7 characters (`#RRGGBB`). Each character after the '#' must be
+    /// a valid hexadecimal digit.
+    pub fn new(hex: impl Into<String>) -> Result<Self, ThemeError> {
+        let hex = hex.into();
+        if !hex.starts_with('#') {
+            return Err(ThemeError::InvalidColor(
+                format!("color must start with '#': {}", hex),
+            ));
+        }
+        let digits = &hex[1..];
+        if digits.len() != 3 && digits.len() != 6 {
+            return Err(ThemeError::InvalidColor(
+                format!("color must have 3 or 6 hex digits after '#': {}", hex),
+            ));
+        }
+        if !digits.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(ThemeError::InvalidColor(
+                format!("color contains non-hex characters: {}", hex),
+            ));
+        }
+        Ok(Self { hex })
+    }
+
+    /// Parse the red component from a 7-character hex color.
+    ///
+    /// For short-form colors (`#RGB`) the digit is expanded (e.g. `A` → `AA`).
+    pub fn red(&self) -> u8 {
+        if self.hex.len() == 7 {
+            u8::from_str_radix(&self.hex[1..3], 16).unwrap_or(0)
+        } else {
+            let ch = &self.hex[1..2];
+            let expanded = format!("{}{}", ch, ch);
+            u8::from_str_radix(&expanded, 16).unwrap_or(0)
+        }
+    }
+
+    /// Parse the green component from a 7-character hex color.
+    ///
+    /// For short-form colors (`#RGB`) the digit is expanded (e.g. `B` → `BB`).
+    pub fn green(&self) -> u8 {
+        if self.hex.len() == 7 {
+            u8::from_str_radix(&self.hex[3..5], 16).unwrap_or(0)
+        } else {
+            let ch = &self.hex[2..3];
+            let expanded = format!("{}{}", ch, ch);
+            u8::from_str_radix(&expanded, 16).unwrap_or(0)
+        }
+    }
+
+    /// Parse the blue component from a 7-character hex color.
+    ///
+    /// For short-form colors (`#RGB`) the digit is expanded (e.g. `C` → `CC`).
+    pub fn blue(&self) -> u8 {
+        if self.hex.len() == 7 {
+            u8::from_str_radix(&self.hex[5..7], 16).unwrap_or(0)
+        } else {
+            let ch = &self.hex[3..4];
+            let expanded = format!("{}{}", ch, ch);
+            u8::from_str_radix(&expanded, 16).unwrap_or(0)
+        }
+    }
+
+    /// Returns `true` when the perceived brightness of the color exceeds 128.
+    ///
+    /// Uses the formula `(r*299 + g*587 + b*114) / 1000`.
+    pub fn is_light(&self) -> bool {
+        let r = self.red() as u32;
+        let g = self.green() as u32;
+        let b = self.blue() as u32;
+        let brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        brightness > 128
+    }
+
+    /// Return the color as an `(R, G, B)` tuple.
+    pub fn to_rgb_tuple(&self) -> (u8, u8, u8) {
+        (self.red(), self.green(), self.blue())
+    }
+}
+
+impl fmt::Display for ColorValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.hex)
+    }
+}
+
+/// Utilities for merging theme data.
+pub struct ThemeMerger;
+
+impl ThemeMerger {
+    /// Merge two color maps. Values in `overlay` take precedence over `base`.
+    pub fn merge_colors(
+        base: &HashMap<String, String>,
+        overlay: &HashMap<String, String>,
+    ) -> HashMap<String, String> {
+        let mut merged = base.clone();
+        for (key, value) in overlay {
+            merged.insert(key.clone(), value.clone());
+        }
+        merged
+    }
+
+    /// Merge two token-color slices by concatenating them, with `overlay`
+    /// entries appended after `base`.
+    pub fn merge_token_colors(
+        base: &[TokenColor],
+        overlay: &[TokenColor],
+    ) -> Vec<TokenColor> {
+        let mut merged = base.to_vec();
+        merged.extend_from_slice(overlay);
+        merged
+    }
+}
+
+impl ColorTheme {
+    /// Returns the number of entries in the color map.
+    pub fn color_count(&self) -> usize {
+        self.colors.len()
+    }
+
+    /// Returns the number of token-color entries.
+    pub fn token_color_count(&self) -> usize {
+        self.token_colors.len()
+    }
+
+    /// Returns `true` if the color map contains the given key.
+    pub fn has_color(&self, key: &str) -> bool {
+        self.colors.contains_key(key)
+    }
+
+    /// Remove a color entry by key, returning the value if it existed.
+    pub fn remove_color(&mut self, key: &str) -> Option<String> {
+        self.colors.remove(key)
+    }
+
+    /// Return a sorted list of all color keys.
+    pub fn color_keys(&self) -> Vec<&str> {
+        let mut keys: Vec<&str> = self.colors.keys().map(|k| k.as_str()).collect();
+        keys.sort();
+        keys
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -346,5 +498,166 @@ mod tests {
         assert_eq!(format!("{}", theme), "Dark+ (Dark)");
         let err = ThemeError::ThemeNotFound("x".into());
         assert_eq!(format!("{}", err), "theme not found: x");
+    }
+
+    #[test]
+    fn test_color_value_valid() {
+        let color = ColorValue::new("#ff00aa").unwrap();
+        assert_eq!(color.hex, "#ff00aa");
+
+        let short = ColorValue::new("#abc").unwrap();
+        assert_eq!(short.hex, "#abc");
+    }
+
+    #[test]
+    fn test_color_value_invalid_no_hash() {
+        let result = ColorValue::new("ff00aa");
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ThemeError::InvalidColor(msg) => {
+                assert!(msg.contains("must start with '#'"));
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_color_value_invalid_length() {
+        let result = ColorValue::new("#ff00a");
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ThemeError::InvalidColor(msg) => {
+                assert!(msg.contains("3 or 6 hex digits"));
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+
+        let result2 = ColorValue::new("#ff");
+        assert!(result2.is_err());
+    }
+
+    #[test]
+    fn test_color_value_rgb_components() {
+        let color = ColorValue::new("#1e90ff").unwrap();
+        assert_eq!(color.red(), 0x1e);
+        assert_eq!(color.green(), 0x90);
+        assert_eq!(color.blue(), 0xff);
+    }
+
+    #[test]
+    fn test_color_value_is_light() {
+        // White is light
+        let white = ColorValue::new("#ffffff").unwrap();
+        assert!(white.is_light());
+
+        // A very light yellow is light
+        let light_yellow = ColorValue::new("#ffffcc").unwrap();
+        assert!(light_yellow.is_light());
+    }
+
+    #[test]
+    fn test_color_value_is_dark_color() {
+        // Black is not light
+        let black = ColorValue::new("#000000").unwrap();
+        assert!(!black.is_light());
+
+        // A dark blue is not light
+        let dark_blue = ColorValue::new("#00008b").unwrap();
+        assert!(!dark_blue.is_light());
+    }
+
+    #[test]
+    fn test_color_value_display() {
+        let color = ColorValue::new("#abcdef").unwrap();
+        assert_eq!(format!("{}", color), "#abcdef");
+
+        let short = ColorValue::new("#abc").unwrap();
+        assert_eq!(format!("{}", short), "#abc");
+    }
+
+    #[test]
+    fn test_color_value_to_rgb_tuple() {
+        let color = ColorValue::new("#ff8040").unwrap();
+        assert_eq!(color.to_rgb_tuple(), (0xff, 0x80, 0x40));
+
+        let black = ColorValue::new("#000000").unwrap();
+        assert_eq!(black.to_rgb_tuple(), (0, 0, 0));
+
+        let white = ColorValue::new("#ffffff").unwrap();
+        assert_eq!(white.to_rgb_tuple(), (255, 255, 255));
+    }
+
+    #[test]
+    fn test_merge_colors() {
+        let mut base = HashMap::new();
+        base.insert("editor.background".into(), "#1e1e1e".into());
+        base.insert("editor.foreground".into(), "#d4d4d4".into());
+
+        let mut overlay = HashMap::new();
+        overlay.insert("editor.background".into(), "#000000".into());
+        overlay.insert("statusBar.background".into(), "#007acc".into());
+
+        let merged = ThemeMerger::merge_colors(&base, &overlay);
+        assert_eq!(merged.len(), 3);
+        assert_eq!(merged.get("editor.background").unwrap(), "#000000");
+        assert_eq!(merged.get("editor.foreground").unwrap(), "#d4d4d4");
+        assert_eq!(merged.get("statusBar.background").unwrap(), "#007acc");
+    }
+
+    #[test]
+    fn test_merge_token_colors() {
+        let base = vec![TokenColor {
+            scope: vec!["keyword".into()],
+            foreground: Some("#569cd6".into()),
+            font_style: None,
+        }];
+        let overlay = vec![TokenColor {
+            scope: vec!["string".into()],
+            foreground: Some("#ce9178".into()),
+            font_style: Some("italic".into()),
+        }];
+
+        let merged = ThemeMerger::merge_token_colors(&base, &overlay);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].scope[0], "keyword");
+        assert_eq!(merged[1].scope[0], "string");
+        assert_eq!(merged[1].font_style.as_deref(), Some("italic"));
+    }
+
+    #[test]
+    fn test_color_count() {
+        let theme = dark_theme();
+        assert_eq!(theme.color_count(), 2);
+        assert_eq!(theme.token_color_count(), 1);
+    }
+
+    #[test]
+    fn test_has_and_remove_color() {
+        let mut theme = dark_theme();
+        assert!(theme.has_color("editor.background"));
+        assert!(!theme.has_color("statusBar.background"));
+
+        let removed = theme.remove_color("editor.background");
+        assert_eq!(removed, Some("#1e1e1e".into()));
+        assert!(!theme.has_color("editor.background"));
+        assert_eq!(theme.color_count(), 1);
+
+        let removed_again = theme.remove_color("editor.background");
+        assert!(removed_again.is_none());
+    }
+
+    #[test]
+    fn test_color_keys_sorted() {
+        let mut theme = dark_theme();
+        theme.set_color("activityBar.background", "#333333");
+        theme.set_color("statusBar.background", "#007acc");
+
+        let keys = theme.color_keys();
+        assert_eq!(keys.len(), 4);
+        // Verify the keys are sorted alphabetically
+        assert_eq!(keys[0], "activityBar.background");
+        assert_eq!(keys[1], "editor.background");
+        assert_eq!(keys[2], "editor.foreground");
+        assert_eq!(keys[3], "statusBar.background");
     }
 }

@@ -254,6 +254,160 @@ where
     }
 }
 
+// ---------------------------------------------------------------------------
+// MapStream adapter
+// ---------------------------------------------------------------------------
+
+/// A stream adapter that transforms each item with a mapping function.
+pub struct MapStream<S, F> {
+    inner: S,
+    mapper: F,
+}
+
+impl<S, F> MapStream<S, F> {
+    pub fn new(inner: S, mapper: F) -> Self {
+        Self { inner, mapper }
+    }
+}
+
+impl<S, F, T> ReadableStream for MapStream<S, F>
+where
+    S: ReadableStream,
+    F: FnMut(S::Item) -> T,
+    Self: Send,
+{
+    type Item = T;
+
+    fn read(&mut self) -> Option<T> {
+        self.inner.read().map(|item| (self.mapper)(item))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ChainStream adapter
+// ---------------------------------------------------------------------------
+
+/// A stream that reads from `first` until exhausted, then reads from `second`.
+pub struct ChainStream<S1, S2> {
+    first: S1,
+    second: S2,
+    first_exhausted: bool,
+}
+
+impl<S1, S2> ChainStream<S1, S2> {
+    pub fn new(first: S1, second: S2) -> Self {
+        Self {
+            first,
+            second,
+            first_exhausted: false,
+        }
+    }
+}
+
+impl<T, S1, S2> ReadableStream for ChainStream<S1, S2>
+where
+    S1: ReadableStream<Item = T>,
+    S2: ReadableStream<Item = T>,
+    Self: Send,
+{
+    type Item = T;
+
+    fn read(&mut self) -> Option<T> {
+        if !self.first_exhausted {
+            if let Some(item) = self.first.read() {
+                return Some(item);
+            }
+            self.first_exhausted = true;
+        }
+        self.second.read()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TakeStream adapter
+// ---------------------------------------------------------------------------
+
+/// A stream that yields at most `limit` items from the inner stream.
+pub struct TakeStream<S> {
+    inner: S,
+    remaining: usize,
+}
+
+impl<S> TakeStream<S> {
+    pub fn new(inner: S, limit: usize) -> Self {
+        Self {
+            inner,
+            remaining: limit,
+        }
+    }
+}
+
+impl<S: ReadableStream> ReadableStream for TakeStream<S>
+where
+    Self: Send,
+{
+    type Item = S::Item;
+
+    fn read(&mut self) -> Option<S::Item> {
+        if self.remaining == 0 {
+            return None;
+        }
+        self.remaining -= 1;
+        self.inner.read()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StringWriter
+// ---------------------------------------------------------------------------
+
+/// A writable stream that collects strings.
+pub struct StringWriter {
+    items: Vec<String>,
+    ended: bool,
+}
+
+impl StringWriter {
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            ended: false,
+        }
+    }
+
+    pub fn items(&self) -> &[String] {
+        &self.items
+    }
+
+    pub fn into_string(self) -> String {
+        self.items.join("")
+    }
+
+    pub fn is_ended(&self) -> bool {
+        self.ended
+    }
+}
+
+impl Default for StringWriter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl WritableStream for StringWriter {
+    type Item = String;
+
+    fn write(&mut self, data: String) {
+        if !self.ended {
+            self.items.push(data);
+        }
+    }
+
+    fn end(&mut self) {
+        self.ended = true;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -386,5 +540,107 @@ mod tests {
         ]);
         let mut filtered = FilterStream::new(inner, |s: &String| s.starts_with('z'));
         assert!(filtered.read().is_none());
+    }
+
+    #[test]
+    fn map_stream_transforms_items() {
+        let inner = StringStream::from_strings(vec![
+            "hello".into(),
+            "world".into(),
+        ]);
+        let mut mapped = MapStream::new(inner, |s: String| s.len());
+        assert_eq!(mapped.read(), Some(5));
+        assert_eq!(mapped.read(), Some(5));
+        assert!(mapped.read().is_none());
+    }
+
+    #[test]
+    fn map_stream_empty() {
+        let inner = StringStream::from_strings(vec![]);
+        let mut mapped = MapStream::new(inner, |s: String| s.to_uppercase());
+        assert!(mapped.read().is_none());
+    }
+
+    #[test]
+    fn chain_stream_concatenates() {
+        let first = StringStream::from_strings(vec!["a".into(), "b".into()]);
+        let second = StringStream::from_strings(vec!["c".into(), "d".into()]);
+        let mut chained = ChainStream::new(first, second);
+        let all = chained.collect_all();
+        assert_eq!(all, vec!["a", "b", "c", "d"]);
+    }
+
+    #[test]
+    fn chain_stream_first_empty() {
+        let first = StringStream::from_strings(vec![]);
+        let second = StringStream::from_strings(vec!["x".into()]);
+        let mut chained = ChainStream::new(first, second);
+        assert_eq!(chained.read(), Some("x".to_string()));
+        assert!(chained.read().is_none());
+    }
+
+    #[test]
+    fn chain_stream_second_empty() {
+        let first = StringStream::from_strings(vec!["y".into()]);
+        let second = StringStream::from_strings(vec![]);
+        let mut chained = ChainStream::new(first, second);
+        assert_eq!(chained.read(), Some("y".to_string()));
+        assert!(chained.read().is_none());
+    }
+
+    #[test]
+    fn take_stream_limits_output() {
+        let inner = StringStream::from_strings(vec![
+            "a".into(), "b".into(), "c".into(), "d".into(),
+        ]);
+        let mut taken = TakeStream::new(inner, 2);
+        assert_eq!(taken.read(), Some("a".to_string()));
+        assert_eq!(taken.read(), Some("b".to_string()));
+        assert!(taken.read().is_none());
+    }
+
+    #[test]
+    fn take_stream_zero_limit() {
+        let inner = StringStream::from_strings(vec!["a".into()]);
+        let mut taken = TakeStream::new(inner, 0);
+        assert!(taken.read().is_none());
+    }
+
+    #[test]
+    fn string_writer_basic() {
+        let mut writer = StringWriter::new();
+        writer.write("hello ".into());
+        writer.write("world".into());
+        assert_eq!(writer.items().len(), 2);
+        assert!(!writer.is_ended());
+        writer.end();
+        assert!(writer.is_ended());
+        // Writes after end are ignored
+        writer.write("ignored".into());
+        assert_eq!(writer.items().len(), 2);
+    }
+
+    #[test]
+    fn string_writer_into_string() {
+        let mut writer = StringWriter::new();
+        writer.write("foo".into());
+        writer.write("bar".into());
+        assert_eq!(writer.into_string(), "foobar");
+    }
+
+    #[test]
+    fn pipe_string_streams() {
+        let mut source = StringStream::from_strings(vec!["x".into(), "y".into()]);
+        let mut dest = StringWriter::new();
+        pipe(&mut source, &mut dest);
+        assert!(dest.is_ended());
+        assert_eq!(dest.into_string(), "xy");
+    }
+
+    #[test]
+    fn buffer_stream_empty_consume() {
+        let stream = BufferStream::empty();
+        let result = stream.consume();
+        assert_eq!(result.len(), 0);
     }
 }

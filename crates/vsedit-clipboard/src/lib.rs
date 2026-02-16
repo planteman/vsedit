@@ -201,6 +201,178 @@ impl ClipboardHistory {
     }
 }
 
+impl std::error::Error for ClipboardError {}
+
+/// Supported clipboard data formats.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClipboardFormat {
+    /// Plain UTF-8 text.
+    PlainText,
+    /// HTML markup.
+    Html,
+    /// Rich text (RTF).
+    RichText,
+    /// Newline-separated file paths.
+    FilePaths,
+}
+
+impl fmt::Display for ClipboardFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ClipboardFormat::PlainText => write!(f, "text/plain"),
+            ClipboardFormat::Html => write!(f, "text/html"),
+            ClipboardFormat::RichText => write!(f, "text/rtf"),
+            ClipboardFormat::FilePaths => write!(f, "text/uri-list"),
+        }
+    }
+}
+
+/// A clipboard item that carries format information.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MultiFormatClipboardItem {
+    /// The format of the data.
+    pub format: ClipboardFormat,
+    /// The raw data as a string.
+    pub data: String,
+    /// Unix timestamp (seconds) when the item was created.
+    pub timestamp: u64,
+    /// Optional source identifier.
+    pub source: Option<String>,
+}
+
+impl MultiFormatClipboardItem {
+    /// Create a new multi-format clipboard item.
+    pub fn new(format: ClipboardFormat, data: impl Into<String>, timestamp: u64) -> Self {
+        Self {
+            format,
+            data: data.into(),
+            timestamp,
+            source: None,
+        }
+    }
+
+    /// Set the source identifier, consuming and returning self.
+    pub fn with_source(mut self, source: String) -> Self {
+        self.source = Some(source);
+        self
+    }
+
+    /// Return the byte length of the data.
+    pub fn data_length(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Return `true` if the format is `PlainText`.
+    pub fn is_plain_text(&self) -> bool {
+        self.format == ClipboardFormat::PlainText
+    }
+}
+
+impl ClipboardHistory {
+    /// Return the most recently added item.
+    pub fn most_recent(&self) -> Option<&ClipboardItem> {
+        self.entries.last()
+    }
+
+    /// Search for items whose text contains the given query (case-sensitive).
+    pub fn search(&self, query: &str) -> Vec<&ClipboardItem> {
+        self.entries
+            .iter()
+            .filter(|item| item.text.contains(query))
+            .collect()
+    }
+
+    /// Remove the item at the given index, returning it if the index was valid.
+    pub fn remove_at(&mut self, index: usize) -> Option<ClipboardItem> {
+        if index < self.entries.len() {
+            Some(self.entries.remove(index))
+        } else {
+            None
+        }
+    }
+
+    /// Return a slice of all entries.
+    pub fn entries(&self) -> &[ClipboardItem] {
+        &self.entries
+    }
+
+    /// Return the maximum number of entries this history will hold.
+    pub fn max_entries(&self) -> usize {
+        self.max_entries
+    }
+
+    /// Return `true` if any entry has exactly the given text.
+    pub fn contains_text(&self, text: &str) -> bool {
+        self.entries.iter().any(|item| item.text == text)
+    }
+
+    /// Remove duplicate text entries, keeping only the latest occurrence.
+    pub fn deduplicate(&mut self) {
+        let mut seen = std::collections::HashSet::new();
+        let mut deduped = Vec::new();
+        for item in self.entries.iter().rev() {
+            if seen.insert(item.text.clone()) {
+                deduped.push(item.clone());
+            }
+        }
+        deduped.reverse();
+        self.entries = deduped;
+    }
+}
+
+/// Watches for clipboard content changes.
+#[derive(Debug, Clone)]
+pub struct ClipboardWatcher {
+    last_content: Option<String>,
+    change_count: u64,
+}
+
+impl ClipboardWatcher {
+    /// Create a new watcher with no prior content.
+    pub fn new() -> Self {
+        Self {
+            last_content: None,
+            change_count: 0,
+        }
+    }
+
+    /// Check whether the current content differs from the last observed content.
+    /// Returns `true` if the content changed, and updates internal state.
+    pub fn check_change(&mut self, current: &str) -> bool {
+        let changed = match &self.last_content {
+            Some(prev) => prev != current,
+            None => true,
+        };
+        if changed {
+            self.last_content = Some(current.to_string());
+            self.change_count += 1;
+        }
+        changed
+    }
+
+    /// Return the number of changes observed so far.
+    pub fn change_count(&self) -> u64 {
+        self.change_count
+    }
+
+    /// Return the last observed content, if any.
+    pub fn last_content(&self) -> Option<&str> {
+        self.last_content.as_deref()
+    }
+
+    /// Reset the watcher to its initial state.
+    pub fn reset(&mut self) {
+        self.last_content = None;
+        self.change_count = 0;
+    }
+}
+
+impl Default for ClipboardWatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316,5 +488,152 @@ mod tests {
         history.clear();
         assert!(history.is_empty());
         assert_eq!(history.len(), 0);
+    }
+
+    #[test]
+    fn test_clipboard_format_display() {
+        assert_eq!(ClipboardFormat::PlainText.to_string(), "text/plain");
+        assert_eq!(ClipboardFormat::Html.to_string(), "text/html");
+        assert_eq!(ClipboardFormat::RichText.to_string(), "text/rtf");
+        assert_eq!(ClipboardFormat::FilePaths.to_string(), "text/uri-list");
+    }
+
+    #[test]
+    fn test_multi_format_item_new() {
+        let item = MultiFormatClipboardItem::new(ClipboardFormat::Html, "<b>hi</b>", 42);
+        assert_eq!(item.format, ClipboardFormat::Html);
+        assert_eq!(item.data, "<b>hi</b>");
+        assert_eq!(item.timestamp, 42);
+        assert!(item.source.is_none());
+    }
+
+    #[test]
+    fn test_multi_format_item_with_source() {
+        let item = MultiFormatClipboardItem::new(ClipboardFormat::PlainText, "hello", 1)
+            .with_source("editor".into());
+        assert_eq!(item.source, Some("editor".to_string()));
+    }
+
+    #[test]
+    fn test_multi_format_item_is_plain_text() {
+        let plain = MultiFormatClipboardItem::new(ClipboardFormat::PlainText, "abc", 1);
+        let html = MultiFormatClipboardItem::new(ClipboardFormat::Html, "abc", 1);
+        assert!(plain.is_plain_text());
+        assert!(!html.is_plain_text());
+    }
+
+    #[test]
+    fn test_history_most_recent() {
+        let mut history = ClipboardHistory::new(5);
+        assert!(history.most_recent().is_none());
+        history.push(ClipboardItem::new("a", 1, None));
+        history.push(ClipboardItem::new("b", 2, None));
+        assert_eq!(history.most_recent().unwrap().text, "b");
+    }
+
+    #[test]
+    fn test_history_search() {
+        let mut history = ClipboardHistory::new(10);
+        history.push(ClipboardItem::new("hello world", 1, None));
+        history.push(ClipboardItem::new("goodbye world", 2, None));
+        history.push(ClipboardItem::new("hello rust", 3, None));
+        let results = history.search("hello");
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].text, "hello world");
+        assert_eq!(results[1].text, "hello rust");
+        assert!(history.search("missing").is_empty());
+    }
+
+    #[test]
+    fn test_history_remove_at() {
+        let mut history = ClipboardHistory::new(5);
+        history.push(ClipboardItem::new("a", 1, None));
+        history.push(ClipboardItem::new("b", 2, None));
+        history.push(ClipboardItem::new("c", 3, None));
+        let removed = history.remove_at(1).unwrap();
+        assert_eq!(removed.text, "b");
+        assert_eq!(history.len(), 2);
+        assert!(history.remove_at(99).is_none());
+    }
+
+    #[test]
+    fn test_history_entries() {
+        let mut history = ClipboardHistory::new(5);
+        history.push(ClipboardItem::new("x", 1, None));
+        history.push(ClipboardItem::new("y", 2, None));
+        let entries = history.entries();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].text, "x");
+        assert_eq!(entries[1].text, "y");
+    }
+
+    #[test]
+    fn test_history_max_entries() {
+        let history = ClipboardHistory::new(42);
+        assert_eq!(history.max_entries(), 42);
+    }
+
+    #[test]
+    fn test_history_contains_text() {
+        let mut history = ClipboardHistory::new(5);
+        history.push(ClipboardItem::new("needle", 1, None));
+        assert!(history.contains_text("needle"));
+        assert!(!history.contains_text("missing"));
+        assert!(!history.contains_text("need")); // partial match should not count
+    }
+
+    #[test]
+    fn test_history_deduplicate() {
+        let mut history = ClipboardHistory::new(10);
+        history.push(ClipboardItem::new("a", 1, None));
+        history.push(ClipboardItem::new("b", 2, None));
+        history.push(ClipboardItem::new("a", 3, None));
+        history.push(ClipboardItem::new("c", 4, None));
+        history.push(ClipboardItem::new("b", 5, None));
+        history.deduplicate();
+        assert_eq!(history.len(), 3);
+        let texts: Vec<&str> = history.entries().iter().map(|e| e.text.as_str()).collect();
+        assert_eq!(texts, vec!["a", "c", "b"]);
+        // the kept items should be the latest occurrences
+        assert_eq!(history.entries()[0].timestamp, 3);
+        assert_eq!(history.entries()[2].timestamp, 5);
+    }
+
+    #[test]
+    fn test_watcher_new() {
+        let watcher = ClipboardWatcher::new();
+        assert_eq!(watcher.change_count(), 0);
+        assert!(watcher.last_content().is_none());
+    }
+
+    #[test]
+    fn test_watcher_check_change() {
+        let mut watcher = ClipboardWatcher::new();
+        assert!(watcher.check_change("first"));
+        assert_eq!(watcher.change_count(), 1);
+        assert!(!watcher.check_change("first")); // same content
+        assert_eq!(watcher.change_count(), 1);
+        assert!(watcher.check_change("second"));
+        assert_eq!(watcher.change_count(), 2);
+        assert_eq!(watcher.last_content(), Some("second"));
+    }
+
+    #[test]
+    fn test_watcher_reset() {
+        let mut watcher = ClipboardWatcher::new();
+        watcher.check_change("a");
+        watcher.check_change("b");
+        assert_eq!(watcher.change_count(), 2);
+        watcher.reset();
+        assert_eq!(watcher.change_count(), 0);
+        assert!(watcher.last_content().is_none());
+        // After reset, any content is considered a change again
+        assert!(watcher.check_change("a"));
+    }
+
+    #[test]
+    fn test_clipboard_error_is_std_error() {
+        let err: Box<dyn std::error::Error> = Box::new(ClipboardError::WriteFailed);
+        assert_eq!(err.to_string(), "clipboard write failed");
     }
 }

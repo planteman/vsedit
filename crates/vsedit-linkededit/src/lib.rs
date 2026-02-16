@@ -228,6 +228,232 @@ pub fn validate_ranges(ranges: &[LinkedEditingRange]) -> bool {
     true
 }
 
+// ---------------------------------------------------------------------------
+// Additional methods on LinkedEditingRange
+// ---------------------------------------------------------------------------
+
+impl LinkedEditingRange {
+    /// Character length of the range when it spans a single line.
+    /// Returns `None` for multi-line ranges.
+    pub fn len(&self) -> Option<u32> {
+        if self.start_line == self.end_line {
+            Some(self.end_col - self.start_col)
+        } else {
+            None
+        }
+    }
+
+    /// Returns `true` when both start and end are on the same line.
+    pub fn is_single_line(&self) -> bool {
+        self.start_line == self.end_line
+    }
+
+    /// Returns `true` when the given `(line, col)` position is inside this range.
+    pub fn contains(&self, line: u32, col: u32) -> bool {
+        range_contains(self, line, col)
+    }
+
+    /// Returns `true` when this range overlaps with `other`.
+    pub fn overlaps(&self, other: &LinkedEditingRange) -> bool {
+        // No overlap if one ends before the other starts.
+        if self.end_line < other.start_line {
+            return false;
+        }
+        if other.end_line < self.start_line {
+            return false;
+        }
+        if self.end_line == other.start_line && self.end_col <= other.start_col {
+            return false;
+        }
+        if other.end_line == self.start_line && other.end_col <= self.start_col {
+            return false;
+        }
+        true
+    }
+}
+
+impl PartialOrd for LinkedEditingRange {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for LinkedEditingRange {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        (self.start_line, self.start_col, self.end_line, self.end_col)
+            .cmp(&(other.start_line, other.start_col, other.end_line, other.end_col))
+    }
+}
+
+impl std::fmt::Display for LinkedEditingRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}:{}-{}:{}",
+            self.start_line, self.start_col, self.end_line, self.end_col
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional methods on LinkedEditingRanges
+// ---------------------------------------------------------------------------
+
+impl LinkedEditingRanges {
+    /// Returns `true` when all ranges are non-overlapping and ordered.
+    pub fn is_valid(&self) -> bool {
+        validate_ranges(&self.ranges)
+    }
+
+    /// Number of ranges in this set.
+    pub fn range_count(&self) -> usize {
+        self.ranges.len()
+    }
+
+    /// Find the index of the first range that contains the given position.
+    pub fn find_at_position(&self, line: u32, col: u32) -> Option<usize> {
+        find_range_at(&self.ranges, line, col)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Additional methods on LinkedEditingSession
+// ---------------------------------------------------------------------------
+
+impl LinkedEditingSession {
+    /// Number of linked ranges in the session.
+    pub fn range_count(&self) -> usize {
+        self.ranges.range_count()
+    }
+
+    /// The optional word pattern constraining edits, if any.
+    pub fn word_pattern(&self) -> Option<&str> {
+        self.ranges.word_pattern.as_deref()
+    }
+
+    /// Extract the current text at the given range index.
+    pub fn text_at_range(&self, index: usize) -> Option<String> {
+        let r = self.ranges.ranges.get(index)?;
+        extract_text(&self.original_text, r)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Range utilities
+// ---------------------------------------------------------------------------
+
+/// Sort a slice of ranges by start position (line, col).
+pub fn sort_ranges(ranges: &mut [LinkedEditingRange]) {
+    ranges.sort();
+}
+
+/// Merge adjacent or overlapping ranges into a minimal set.
+/// The input does **not** need to be sorted; this function sorts first.
+pub fn merge_ranges(ranges: &[LinkedEditingRange]) -> Vec<LinkedEditingRange> {
+    if ranges.is_empty() {
+        return Vec::new();
+    }
+    let mut sorted: Vec<LinkedEditingRange> = ranges.to_vec();
+    sort_ranges(&mut sorted);
+
+    let mut merged: Vec<LinkedEditingRange> = vec![sorted[0]];
+    for r in &sorted[1..] {
+        let last = merged.last_mut().unwrap();
+        // Check if `r` starts before or at the end of `last`.
+        let adjacent_or_overlapping = (r.start_line < last.end_line)
+            || (r.start_line == last.end_line && r.start_col <= last.end_col);
+        if adjacent_or_overlapping {
+            // Extend `last` to cover `r` as well.
+            if r.end_line > last.end_line
+                || (r.end_line == last.end_line && r.end_col > last.end_col)
+            {
+                last.end_line = r.end_line;
+                last.end_col = r.end_col;
+            }
+        } else {
+            merged.push(*r);
+        }
+    }
+    merged
+}
+
+/// Describes how much subsequent text is shifted after replacing a range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RangeShift {
+    /// Index of the range that was replaced.
+    pub range_index: usize,
+    /// Byte delta applied at the replacement site (positive = text grew).
+    pub byte_delta: i64,
+}
+
+/// Compute the byte shifts that result from replacing every range in `ranges`
+/// with `new_text` within `text`.
+///
+/// Returns one `RangeShift` per range, in the order they appear.
+/// Returns `None` if any range is out of bounds.
+pub fn compute_shifts(
+    text: &str,
+    ranges: &[LinkedEditingRange],
+    new_text: &str,
+) -> Option<Vec<RangeShift>> {
+    let new_len = new_text.len() as i64;
+    let mut shifts = Vec::with_capacity(ranges.len());
+    for (i, r) in ranges.iter().enumerate() {
+        let start = offset_of(text, r.start_line, r.start_col)?;
+        let end = offset_of(text, r.end_line, r.end_col)?;
+        if end < start {
+            return None;
+        }
+        let old_len = (end - start) as i64;
+        shifts.push(RangeShift {
+            range_index: i,
+            byte_delta: new_len - old_len,
+        });
+    }
+    Some(shifts)
+}
+
+/// Simple history stack for linked editing undo support.
+#[derive(Debug, Clone)]
+pub struct LinkedEditingHistory {
+    entries: Vec<String>,
+    capacity: usize,
+}
+
+impl LinkedEditingHistory {
+    /// Create a new history with the given maximum capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            capacity,
+        }
+    }
+
+    /// Push a snapshot onto the history. If the history exceeds capacity the
+    /// oldest entry is discarded.
+    pub fn push(&mut self, snapshot: String) {
+        if self.entries.len() == self.capacity {
+            self.entries.remove(0);
+        }
+        self.entries.push(snapshot);
+    }
+
+    /// Pop the most recent snapshot (undo).
+    pub fn pop(&mut self) -> Option<String> {
+        self.entries.pop()
+    }
+
+    /// Number of entries currently in the history.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` when the history is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -390,5 +616,292 @@ mod tests {
         let cfg = LinkedEditingConfig::default();
         assert!(cfg.enabled);
         assert_eq!(cfg.delay_ms, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // New tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn range_len_single_line() {
+        let r = LinkedEditingRange::new(0, 2, 0, 7);
+        assert_eq!(r.len(), Some(5));
+    }
+
+    #[test]
+    fn range_len_multi_line_returns_none() {
+        let r = LinkedEditingRange::new(0, 2, 1, 7);
+        assert_eq!(r.len(), None);
+    }
+
+    #[test]
+    fn range_is_single_line() {
+        assert!(LinkedEditingRange::new(3, 0, 3, 10).is_single_line());
+        assert!(!LinkedEditingRange::new(3, 0, 4, 10).is_single_line());
+    }
+
+    #[test]
+    fn range_contains_method() {
+        let r = LinkedEditingRange::new(1, 5, 1, 10);
+        assert!(r.contains(1, 5));
+        assert!(r.contains(1, 7));
+        assert!(!r.contains(1, 11));
+    }
+
+    #[test]
+    fn range_overlaps() {
+        let a = LinkedEditingRange::new(0, 0, 0, 5);
+        let b = LinkedEditingRange::new(0, 3, 0, 8);
+        assert!(a.overlaps(&b));
+        assert!(b.overlaps(&a));
+    }
+
+    #[test]
+    fn range_no_overlap() {
+        let a = LinkedEditingRange::new(0, 0, 0, 5);
+        let b = LinkedEditingRange::new(0, 5, 0, 10);
+        assert!(!a.overlaps(&b));
+    }
+
+    #[test]
+    fn range_overlaps_multi_line() {
+        let a = LinkedEditingRange::new(0, 0, 1, 5);
+        let b = LinkedEditingRange::new(1, 3, 2, 0);
+        assert!(a.overlaps(&b));
+    }
+
+    #[test]
+    fn ranges_is_valid_method() {
+        let valid = LinkedEditingRanges::new(
+            vec![
+                LinkedEditingRange::new(0, 0, 0, 3),
+                LinkedEditingRange::new(0, 5, 0, 8),
+            ],
+            None,
+        );
+        assert!(valid.is_valid());
+
+        let invalid = LinkedEditingRanges::new(
+            vec![
+                LinkedEditingRange::new(0, 0, 0, 6),
+                LinkedEditingRange::new(0, 5, 0, 8),
+            ],
+            None,
+        );
+        assert!(!invalid.is_valid());
+    }
+
+    #[test]
+    fn ranges_range_count() {
+        let r = LinkedEditingRanges::new(
+            vec![
+                LinkedEditingRange::new(0, 0, 0, 3),
+                LinkedEditingRange::new(0, 5, 0, 8),
+            ],
+            None,
+        );
+        assert_eq!(r.range_count(), 2);
+    }
+
+    #[test]
+    fn ranges_find_at_position_method() {
+        let r = LinkedEditingRanges::new(
+            vec![
+                LinkedEditingRange::new(0, 0, 0, 3),
+                LinkedEditingRange::new(0, 5, 0, 8),
+            ],
+            None,
+        );
+        assert_eq!(r.find_at_position(0, 1), Some(0));
+        assert_eq!(r.find_at_position(0, 6), Some(1));
+        assert_eq!(r.find_at_position(0, 4), None);
+    }
+
+    #[test]
+    fn session_range_count() {
+        let session = LinkedEditingSession::new(
+            "file:///a.html".into(),
+            "<div></div>".into(),
+            LinkedEditingRanges::new(
+                vec![
+                    LinkedEditingRange::new(0, 1, 0, 4),
+                    LinkedEditingRange::new(0, 7, 0, 10),
+                ],
+                None,
+            ),
+        );
+        assert_eq!(session.range_count(), 2);
+    }
+
+    #[test]
+    fn session_word_pattern() {
+        let session = LinkedEditingSession::new(
+            "f".into(),
+            "abc".into(),
+            LinkedEditingRanges::new(
+                vec![LinkedEditingRange::new(0, 0, 0, 3)],
+                Some("ident".into()),
+            ),
+        );
+        assert_eq!(session.word_pattern(), Some("ident"));
+    }
+
+    #[test]
+    fn session_text_at_range() {
+        let session = LinkedEditingSession::new(
+            "f".into(),
+            "<div>hello</div>".into(),
+            LinkedEditingRanges::new(
+                vec![
+                    LinkedEditingRange::new(0, 1, 0, 4),
+                    LinkedEditingRange::new(0, 12, 0, 15),
+                ],
+                None,
+            ),
+        );
+        assert_eq!(session.text_at_range(0), Some("div".into()));
+        assert_eq!(session.text_at_range(1), Some("div".into()));
+        assert_eq!(session.text_at_range(2), None);
+    }
+
+    #[test]
+    fn sort_ranges_works() {
+        let mut ranges = vec![
+            LinkedEditingRange::new(2, 0, 2, 3),
+            LinkedEditingRange::new(0, 0, 0, 3),
+            LinkedEditingRange::new(1, 5, 1, 8),
+        ];
+        sort_ranges(&mut ranges);
+        assert_eq!(ranges[0].start_line, 0);
+        assert_eq!(ranges[1].start_line, 1);
+        assert_eq!(ranges[2].start_line, 2);
+    }
+
+    #[test]
+    fn merge_ranges_overlapping() {
+        let ranges = vec![
+            LinkedEditingRange::new(0, 0, 0, 5),
+            LinkedEditingRange::new(0, 3, 0, 8),
+        ];
+        let merged = merge_ranges(&ranges);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0], LinkedEditingRange::new(0, 0, 0, 8));
+    }
+
+    #[test]
+    fn merge_ranges_adjacent() {
+        let ranges = vec![
+            LinkedEditingRange::new(0, 0, 0, 5),
+            LinkedEditingRange::new(0, 5, 0, 10),
+        ];
+        let merged = merge_ranges(&ranges);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0], LinkedEditingRange::new(0, 0, 0, 10));
+    }
+
+    #[test]
+    fn merge_ranges_disjoint() {
+        let ranges = vec![
+            LinkedEditingRange::new(0, 0, 0, 3),
+            LinkedEditingRange::new(0, 6, 0, 9),
+        ];
+        let merged = merge_ranges(&ranges);
+        assert_eq!(merged.len(), 2);
+    }
+
+    #[test]
+    fn merge_ranges_empty() {
+        let merged = merge_ranges(&[]);
+        assert!(merged.is_empty());
+    }
+
+    #[test]
+    fn compute_shifts_basic() {
+        let text = "<div>hello</div>";
+        let ranges = vec![
+            LinkedEditingRange::new(0, 1, 0, 4),
+            LinkedEditingRange::new(0, 12, 0, 15),
+        ];
+        let shifts = compute_shifts(text, &ranges, "span").unwrap();
+        assert_eq!(shifts.len(), 2);
+        // "div" (3 bytes) -> "span" (4 bytes) => delta = +1
+        assert_eq!(shifts[0].byte_delta, 1);
+        assert_eq!(shifts[1].byte_delta, 1);
+    }
+
+    #[test]
+    fn compute_shifts_shrink() {
+        let text = "<section></section>";
+        let ranges = vec![
+            LinkedEditingRange::new(0, 1, 0, 8),
+            LinkedEditingRange::new(0, 11, 0, 18),
+        ];
+        let shifts = compute_shifts(text, &ranges, "p").unwrap();
+        // "section" (7) -> "p" (1) => delta = -6
+        assert_eq!(shifts[0].byte_delta, -6);
+    }
+
+    #[test]
+    fn compute_shifts_out_of_bounds() {
+        let text = "hi";
+        let ranges = vec![LinkedEditingRange::new(5, 0, 5, 3)];
+        assert!(compute_shifts(text, &ranges, "x").is_none());
+    }
+
+    #[test]
+    fn history_push_pop() {
+        let mut h = LinkedEditingHistory::new(3);
+        assert!(h.is_empty());
+        h.push("a".into());
+        h.push("b".into());
+        assert_eq!(h.len(), 2);
+        assert_eq!(h.pop(), Some("b".into()));
+        assert_eq!(h.pop(), Some("a".into()));
+        assert!(h.is_empty());
+    }
+
+    #[test]
+    fn history_capacity() {
+        let mut h = LinkedEditingHistory::new(2);
+        h.push("a".into());
+        h.push("b".into());
+        h.push("c".into());
+        assert_eq!(h.len(), 2);
+        // oldest ("a") was dropped
+        assert_eq!(h.pop(), Some("c".into()));
+        assert_eq!(h.pop(), Some("b".into()));
+    }
+
+    #[test]
+    fn display_linked_editing_range() {
+        let r = LinkedEditingRange::new(1, 5, 3, 10);
+        assert_eq!(format!("{}", r), "1:5-3:10");
+    }
+
+    #[test]
+    fn ord_linked_editing_range() {
+        let a = LinkedEditingRange::new(0, 0, 0, 5);
+        let b = LinkedEditingRange::new(0, 3, 0, 8);
+        let c = LinkedEditingRange::new(1, 0, 1, 2);
+        assert!(a < b);
+        assert!(b < c);
+        assert!(a < c);
+    }
+
+    #[test]
+    fn range_single_char() {
+        let r = LinkedEditingRange::new(0, 5, 0, 6);
+        assert_eq!(r.len(), Some(1));
+        assert!(r.is_single_line());
+        assert!(r.contains(0, 5));
+        assert!(r.contains(0, 6));
+        assert!(!r.contains(0, 7));
+    }
+
+    #[test]
+    fn range_empty() {
+        let r = LinkedEditingRange::new(0, 5, 0, 5);
+        assert_eq!(r.len(), Some(0));
+        assert!(r.is_single_line());
     }
 }

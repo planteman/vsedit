@@ -182,6 +182,196 @@ impl Default for ExtensionActivationQueue {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Additional activation utilities
+// ---------------------------------------------------------------------------
+
+impl std::fmt::Display for ActivationEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Star => write!(f, "*"),
+            Self::OnLanguage(l) => write!(f, "onLanguage:{l}"),
+            Self::OnCommand(c) => write!(f, "onCommand:{c}"),
+            Self::OnFileSystem(s) => write!(f, "onFileSystem:{s}"),
+            Self::OnView(v) => write!(f, "onView:{v}"),
+            Self::OnUri(u) => write!(f, "onUri:{u}"),
+            Self::WorkspaceContains(g) => write!(f, "workspaceContains:{g}"),
+            Self::OnDebug => write!(f, "onDebug"),
+            Self::OnAuthenticationRequest(p) => write!(f, "onAuthenticationRequest:{p}"),
+            Self::OnStartupFinished => write!(f, "onStartupFinished"),
+        }
+    }
+}
+
+/// Serialize an activation event back to the string form used in package.json.
+pub fn activation_event_to_string(event: &ActivationEvent) -> String {
+    format!("{event}")
+}
+
+/// Parse a list of activation event strings, skipping any unrecognized ones.
+pub fn parse_activation_events(events: &[&str]) -> Vec<ActivationEvent> {
+    events.iter().filter_map(|e| parse_activation_event(e)).collect()
+}
+
+/// Validate that an activation event string is well-formed.
+pub fn validate_activation_event(event: &str) -> Result<ActivationEvent, String> {
+    parse_activation_event(event).ok_or_else(|| format!("unknown activation event: {event}"))
+}
+
+/// An activation dependency graph: extensions can depend on other extensions being activated first.
+#[derive(Debug, Clone, Default)]
+pub struct ActivationDependencyGraph {
+    /// Extension ID → set of extension IDs it depends on.
+    deps: HashMap<String, HashSet<String>>,
+}
+
+impl ActivationDependencyGraph {
+    pub fn new() -> Self {
+        Self { deps: HashMap::new() }
+    }
+
+    /// Add a dependency: `ext_id` depends on `depends_on` being activated first.
+    pub fn add_dependency(&mut self, ext_id: impl Into<String>, depends_on: impl Into<String>) {
+        self.deps.entry(ext_id.into()).or_default().insert(depends_on.into());
+    }
+
+    /// Get the set of dependencies for an extension.
+    pub fn dependencies_of(&self, ext_id: &str) -> HashSet<String> {
+        self.deps.get(ext_id).cloned().unwrap_or_default()
+    }
+
+    /// Check whether all dependencies of `ext_id` are in the `activated` set.
+    pub fn can_activate(&self, ext_id: &str, activated: &HashSet<String>) -> bool {
+        match self.deps.get(ext_id) {
+            None => true,
+            Some(deps) => deps.iter().all(|d| activated.contains(d)),
+        }
+    }
+
+    /// Return all extensions that have no unsatisfied dependencies given the activated set.
+    pub fn ready_to_activate(&self, all_ids: &[String], activated: &HashSet<String>) -> Vec<String> {
+        all_ids
+            .iter()
+            .filter(|id| !activated.contains(id.as_str()) && self.can_activate(id, activated))
+            .cloned()
+            .collect()
+    }
+
+    /// Produce a topological ordering of all extensions, or return an error if there is a cycle.
+    pub fn topological_sort(&self, all_ids: &[String]) -> Result<Vec<String>, String> {
+        let mut in_degree: HashMap<String, usize> = HashMap::new();
+        for id in all_ids {
+            in_degree.entry(id.clone()).or_insert(0);
+        }
+        for (id, deps) in &self.deps {
+            for dep in deps {
+                if all_ids.contains(dep) {
+                    *in_degree.entry(id.clone()).or_insert(0) += 1;
+                }
+            }
+        }
+
+        let mut queue: VecDeque<String> = in_degree
+            .iter()
+            .filter(|(_, deg)| **deg == 0)
+            .map(|(id, _)| id.clone())
+            .collect();
+        queue.make_contiguous().sort();
+
+        let mut result = Vec::new();
+        while let Some(id) = queue.pop_front() {
+            result.push(id.clone());
+            for (ext_id, deps) in &self.deps {
+                if deps.contains(&id) {
+                    if let Some(deg) = in_degree.get_mut(ext_id) {
+                        *deg = deg.saturating_sub(1);
+                        if *deg == 0 {
+                            queue.push_back(ext_id.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        if result.len() == all_ids.len() {
+            Ok(result)
+        } else {
+            Err("cycle detected in activation dependencies".to_string())
+        }
+    }
+
+    /// Number of registered dependency relationships.
+    pub fn total_edges(&self) -> usize {
+        self.deps.values().map(|s| s.len()).sum()
+    }
+}
+
+impl ActivationEventMatcher {
+    /// Register that a language file was opened.
+    pub fn open_language(&mut self, lang: impl Into<String>) {
+        self.open_languages.insert(lang.into());
+    }
+
+    /// Register that a URI scheme is available.
+    pub fn add_scheme(&mut self, scheme: impl Into<String>) {
+        self.open_schemes.insert(scheme.into());
+    }
+
+    /// Register that a file exists in the workspace.
+    pub fn add_workspace_file(&mut self, file: impl Into<String>) {
+        self.workspace_files.insert(file.into());
+    }
+
+    /// Mark startup as finished.
+    pub fn finish_startup(&mut self) {
+        self.startup_finished = true;
+    }
+
+    /// Collect all activation events that currently match.
+    pub fn matching_events(&self, events: &[ActivationEvent]) -> Vec<ActivationEvent> {
+        events.iter().filter(|e| self.should_activate(e)).cloned().collect()
+    }
+}
+
+impl ExtensionActivationQueue {
+    /// Register multiple extensions at once.
+    pub fn register_many(&mut self, entries: Vec<(String, Vec<ActivationEvent>)>) {
+        for (id, events) in entries {
+            self.register(id, events);
+        }
+    }
+
+    /// Drain all pending activations, returning them in order.
+    pub fn drain_pending(&mut self) -> Vec<String> {
+        let mut result = Vec::new();
+        while let Some(id) = self.pop_pending() {
+            result.push(id);
+        }
+        result
+    }
+
+    /// Number of activated extensions.
+    pub fn activated_count(&self) -> usize {
+        self.activated.len()
+    }
+
+    /// Number of registered extensions.
+    pub fn registered_count(&self) -> usize {
+        self.registry.len()
+    }
+
+    /// Get the activation events registered for an extension.
+    pub fn events_for(&self, ext_id: &str) -> Option<&Vec<ActivationEvent>> {
+        self.registry.get(ext_id)
+    }
+
+    /// Reset the queue: clear activated and pending, but keep the registry.
+    pub fn reset(&mut self) {
+        self.activated.clear();
+        self.pending.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -304,5 +494,156 @@ mod tests {
 
         let no_match = ActivationEvent::WorkspaceContains("package.json".into());
         assert!(!m.should_activate(&no_match));
+    }
+
+    #[test]
+    fn activation_event_display_roundtrip() {
+        let events = vec![
+            ActivationEvent::Star,
+            ActivationEvent::OnLanguage("rust".into()),
+            ActivationEvent::OnCommand("save".into()),
+            ActivationEvent::OnFileSystem("ftp".into()),
+            ActivationEvent::OnView("explorer".into()),
+            ActivationEvent::OnUri("vscode".into()),
+            ActivationEvent::WorkspaceContains("*.rs".into()),
+            ActivationEvent::OnDebug,
+            ActivationEvent::OnAuthenticationRequest("github".into()),
+            ActivationEvent::OnStartupFinished,
+        ];
+        for event in &events {
+            let s = activation_event_to_string(event);
+            let parsed = parse_activation_event(&s).unwrap();
+            assert_eq!(&parsed, event);
+        }
+    }
+
+    #[test]
+    fn parse_activation_events_batch() {
+        let input = vec!["onLanguage:rust", "bad", "onCommand:run", "*"];
+        let result = parse_activation_events(&input);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn validate_activation_event_ok() {
+        assert!(validate_activation_event("onLanguage:rust").is_ok());
+    }
+
+    #[test]
+    fn validate_activation_event_err() {
+        let err = validate_activation_event("nonsense").unwrap_err();
+        assert!(err.contains("unknown"));
+    }
+
+    #[test]
+    fn dependency_graph_basic() {
+        let mut g = ActivationDependencyGraph::new();
+        g.add_dependency("ext-b", "ext-a");
+        let activated: HashSet<String> = HashSet::new();
+        assert!(!g.can_activate("ext-b", &activated));
+        let mut activated2: HashSet<String> = HashSet::new();
+        activated2.insert("ext-a".into());
+        assert!(g.can_activate("ext-b", &activated2));
+    }
+
+    #[test]
+    fn dependency_graph_topological_sort() {
+        let mut g = ActivationDependencyGraph::new();
+        g.add_dependency("c", "b");
+        g.add_dependency("b", "a");
+        let ids = vec!["a".into(), "b".into(), "c".into()];
+        let sorted = g.topological_sort(&ids).unwrap();
+        assert_eq!(sorted, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn dependency_graph_ready_to_activate() {
+        let mut g = ActivationDependencyGraph::new();
+        g.add_dependency("b", "a");
+        g.add_dependency("c", "a");
+        let ids = vec!["a".into(), "b".into(), "c".into()];
+        let activated = HashSet::new();
+        let ready = g.ready_to_activate(&ids, &activated);
+        assert_eq!(ready, vec!["a".to_string()]);
+    }
+
+    #[test]
+    fn dependency_graph_total_edges() {
+        let mut g = ActivationDependencyGraph::new();
+        g.add_dependency("b", "a");
+        g.add_dependency("c", "a");
+        g.add_dependency("c", "b");
+        assert_eq!(g.total_edges(), 3);
+    }
+
+    #[test]
+    fn matcher_convenience_methods() {
+        let mut m = ActivationEventMatcher::new();
+        m.open_language("python");
+        m.add_scheme("file");
+        m.add_workspace_file("Makefile");
+        m.finish_startup();
+        assert!(m.should_activate(&ActivationEvent::OnLanguage("python".into())));
+        assert!(m.should_activate(&ActivationEvent::OnFileSystem("file".into())));
+        assert!(m.should_activate(&ActivationEvent::WorkspaceContains("Makefile".into())));
+        assert!(m.should_activate(&ActivationEvent::OnStartupFinished));
+    }
+
+    #[test]
+    fn matcher_matching_events_filter() {
+        let mut m = ActivationEventMatcher::new();
+        m.open_language("rust");
+        let events = vec![
+            ActivationEvent::OnLanguage("rust".into()),
+            ActivationEvent::OnLanguage("python".into()),
+            ActivationEvent::Star,
+        ];
+        let matched = m.matching_events(&events);
+        assert_eq!(matched.len(), 2);
+    }
+
+    #[test]
+    fn queue_register_many() {
+        let mut q = ExtensionActivationQueue::new();
+        q.register_many(vec![
+            ("a".into(), vec![ActivationEvent::Star]),
+            ("b".into(), vec![ActivationEvent::OnDebug]),
+        ]);
+        assert_eq!(q.registered_count(), 2);
+    }
+
+    #[test]
+    fn queue_drain_pending() {
+        let mut q = ExtensionActivationQueue::new();
+        q.register("a".into(), vec![ActivationEvent::Star]);
+        q.register("b".into(), vec![ActivationEvent::Star]);
+        let m = ActivationEventMatcher::new();
+        q.evaluate(&m);
+        let drained = q.drain_pending();
+        assert_eq!(drained.len(), 2);
+        assert_eq!(q.activated_count(), 2);
+        assert_eq!(q.pending_count(), 0);
+    }
+
+    #[test]
+    fn queue_reset() {
+        let mut q = ExtensionActivationQueue::new();
+        q.register("a".into(), vec![ActivationEvent::Star]);
+        let m = ActivationEventMatcher::new();
+        q.evaluate(&m);
+        q.drain_pending();
+        assert_eq!(q.activated_count(), 1);
+        q.reset();
+        assert_eq!(q.activated_count(), 0);
+        assert_eq!(q.pending_count(), 0);
+    }
+
+    #[test]
+    fn queue_events_for() {
+        let mut q = ExtensionActivationQueue::new();
+        q.register("x".into(), vec![ActivationEvent::OnDebug]);
+        let events = q.events_for("x").unwrap();
+        assert_eq!(events.len(), 1);
+        assert!(q.events_for("y").is_none());
     }
 }

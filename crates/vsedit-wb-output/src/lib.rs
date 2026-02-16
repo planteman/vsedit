@@ -217,6 +217,139 @@ impl Default for OutputChannelService {
     }
 }
 
+/// Severity level for output log entries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OutputSeverity {
+    Info,
+    Warning,
+    Error,
+    Debug,
+}
+
+impl fmt::Display for OutputSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OutputSeverity::Info => write!(f, "INFO"),
+            OutputSeverity::Warning => write!(f, "WARNING"),
+            OutputSeverity::Error => write!(f, "ERROR"),
+            OutputSeverity::Debug => write!(f, "DEBUG"),
+        }
+    }
+}
+
+/// A structured log entry associated with an output channel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogEntry {
+    pub severity: OutputSeverity,
+    pub message: String,
+    pub timestamp_ms: u64,
+    pub channel_id: String,
+}
+
+impl fmt::Display for LogEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] {}", self.severity, self.message)
+    }
+}
+
+impl LogEntry {
+    /// Create a new log entry with the given severity and message.
+    pub fn new(
+        severity: OutputSeverity,
+        message: impl Into<String>,
+        channel_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            severity,
+            message: message.into(),
+            timestamp_ms: 0,
+            channel_id: channel_id.into(),
+        }
+    }
+
+    /// Builder method to set the timestamp.
+    pub fn with_timestamp(mut self, ts: u64) -> Self {
+        self.timestamp_ms = ts;
+        self
+    }
+
+    /// Returns `true` if the severity is `Error`.
+    pub fn is_error(&self) -> bool {
+        self.severity == OutputSeverity::Error
+    }
+
+    /// Returns `true` if the severity is `Warning`.
+    pub fn is_warning(&self) -> bool {
+        self.severity == OutputSeverity::Warning
+    }
+
+    /// Returns `true` if this entry's severity is at or above `min_severity`.
+    pub fn matches_filter(&self, min_severity: &OutputSeverity) -> bool {
+        severity_rank(&self.severity) >= severity_rank(min_severity)
+    }
+}
+
+/// Returns a numeric rank for severity ordering: Debug=0, Info=1, Warning=2, Error=3.
+pub fn severity_rank(s: &OutputSeverity) -> u8 {
+    match s {
+        OutputSeverity::Debug => 0,
+        OutputSeverity::Info => 1,
+        OutputSeverity::Warning => 2,
+        OutputSeverity::Error => 3,
+    }
+}
+
+impl OutputChannelService {
+    /// Return all channel ids.
+    pub fn channel_ids(&self) -> Vec<&str> {
+        self.channels.iter().map(|c| c.descriptor.id.as_str()).collect()
+    }
+
+    /// Return only visible channels.
+    pub fn visible_channels(&self) -> Vec<&OutputChannelState> {
+        self.channels.iter().filter(|c| c.visible).collect()
+    }
+
+    /// Sum line counts across all channels.
+    pub fn total_line_count(&self) -> usize {
+        self.channels.iter().map(|c| c.line_count()).sum()
+    }
+
+    /// Return the channel with the most content bytes.
+    pub fn longest_channel(&self) -> Option<&OutputChannelState> {
+        self.channels.iter().max_by_key(|c| c.content.len())
+    }
+
+    /// Clear content from all channels.
+    pub fn clear_all(&mut self) {
+        for ch in &mut self.channels {
+            ch.content.clear();
+        }
+    }
+
+    /// Hide all channels.
+    pub fn hide_all(&mut self) {
+        for ch in &mut self.channels {
+            ch.visible = false;
+        }
+    }
+
+    /// Show all channels.
+    pub fn show_all(&mut self) {
+        for ch in &mut self.channels {
+            ch.visible = true;
+        }
+    }
+
+    /// Return the content of a channel split into lines.
+    pub fn get_content_lines(&self, id: &str) -> Option<Vec<&str>> {
+        self.channels
+            .iter()
+            .find(|c| c.descriptor.id == id)
+            .map(|c| c.content.lines().collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -389,5 +522,173 @@ mod tests {
         svc.append_line("x", "hello world");
         let results = svc.search_content("zzz");
         assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_output_severity_display() {
+        assert_eq!(OutputSeverity::Info.to_string(), "INFO");
+        assert_eq!(OutputSeverity::Warning.to_string(), "WARNING");
+        assert_eq!(OutputSeverity::Error.to_string(), "ERROR");
+        assert_eq!(OutputSeverity::Debug.to_string(), "DEBUG");
+    }
+
+    #[test]
+    fn test_log_entry_new_and_display() {
+        let entry = LogEntry::new(OutputSeverity::Info, "hello", "ch1");
+        assert_eq!(entry.severity, OutputSeverity::Info);
+        assert_eq!(entry.message, "hello");
+        assert_eq!(entry.channel_id, "ch1");
+        assert_eq!(entry.timestamp_ms, 0);
+        assert_eq!(entry.to_string(), "[INFO] hello");
+    }
+
+    #[test]
+    fn test_log_entry_with_timestamp() {
+        let entry = LogEntry::new(OutputSeverity::Warning, "warn", "ch1")
+            .with_timestamp(12345);
+        assert_eq!(entry.timestamp_ms, 12345);
+        assert_eq!(entry.to_string(), "[WARNING] warn");
+    }
+
+    #[test]
+    fn test_log_entry_is_error_and_warning() {
+        let err = LogEntry::new(OutputSeverity::Error, "fail", "ch1");
+        assert!(err.is_error());
+        assert!(!err.is_warning());
+
+        let warn = LogEntry::new(OutputSeverity::Warning, "careful", "ch1");
+        assert!(!warn.is_error());
+        assert!(warn.is_warning());
+
+        let info = LogEntry::new(OutputSeverity::Info, "ok", "ch1");
+        assert!(!info.is_error());
+        assert!(!info.is_warning());
+    }
+
+    #[test]
+    fn test_severity_rank_ordering() {
+        assert!(severity_rank(&OutputSeverity::Debug) < severity_rank(&OutputSeverity::Info));
+        assert!(severity_rank(&OutputSeverity::Info) < severity_rank(&OutputSeverity::Warning));
+        assert!(severity_rank(&OutputSeverity::Warning) < severity_rank(&OutputSeverity::Error));
+        assert_eq!(severity_rank(&OutputSeverity::Debug), 0);
+        assert_eq!(severity_rank(&OutputSeverity::Info), 1);
+        assert_eq!(severity_rank(&OutputSeverity::Warning), 2);
+        assert_eq!(severity_rank(&OutputSeverity::Error), 3);
+    }
+
+    #[test]
+    fn test_log_entry_matches_filter() {
+        let debug_entry = LogEntry::new(OutputSeverity::Debug, "d", "ch1");
+        let info_entry = LogEntry::new(OutputSeverity::Info, "i", "ch1");
+        let warn_entry = LogEntry::new(OutputSeverity::Warning, "w", "ch1");
+        let error_entry = LogEntry::new(OutputSeverity::Error, "e", "ch1");
+
+        // Debug entry only matches Debug filter
+        assert!(debug_entry.matches_filter(&OutputSeverity::Debug));
+        assert!(!debug_entry.matches_filter(&OutputSeverity::Info));
+
+        // Error entry matches all filters
+        assert!(error_entry.matches_filter(&OutputSeverity::Debug));
+        assert!(error_entry.matches_filter(&OutputSeverity::Info));
+        assert!(error_entry.matches_filter(&OutputSeverity::Warning));
+        assert!(error_entry.matches_filter(&OutputSeverity::Error));
+
+        // Info entry matches Debug and Info
+        assert!(info_entry.matches_filter(&OutputSeverity::Debug));
+        assert!(info_entry.matches_filter(&OutputSeverity::Info));
+        assert!(!info_entry.matches_filter(&OutputSeverity::Warning));
+
+        // Warning entry matches Debug, Info, Warning
+        assert!(warn_entry.matches_filter(&OutputSeverity::Warning));
+        assert!(!warn_entry.matches_filter(&OutputSeverity::Error));
+    }
+
+    #[test]
+    fn test_channel_ids() {
+        let mut svc = OutputChannelService::new();
+        svc.create_channel(desc("alpha"));
+        svc.create_channel(desc("beta"));
+        svc.create_channel(desc("gamma"));
+        let ids = svc.channel_ids();
+        assert_eq!(ids, vec!["alpha", "beta", "gamma"]);
+    }
+
+    #[test]
+    fn test_visible_channels() {
+        let mut svc = OutputChannelService::new();
+        svc.create_channel(desc("a"));
+        svc.create_channel(desc("b"));
+        svc.create_channel(desc("c"));
+        assert!(svc.visible_channels().is_empty());
+        svc.show("a");
+        svc.show("c");
+        let visible = svc.visible_channels();
+        assert_eq!(visible.len(), 2);
+        assert_eq!(visible[0].descriptor.id, "a");
+        assert_eq!(visible[1].descriptor.id, "c");
+    }
+
+    #[test]
+    fn test_total_line_count() {
+        let mut svc = OutputChannelService::new();
+        svc.create_channel(desc("a"));
+        svc.create_channel(desc("b"));
+        assert_eq!(svc.total_line_count(), 0);
+        svc.append_line("a", "line1");
+        svc.append_line("a", "line2");
+        svc.append_line("b", "line1");
+        assert_eq!(svc.total_line_count(), 3);
+    }
+
+    #[test]
+    fn test_longest_channel() {
+        let mut svc = OutputChannelService::new();
+        assert!(svc.longest_channel().is_none());
+        svc.create_channel(desc("short"));
+        svc.create_channel(desc("long"));
+        svc.append("short", "hi");
+        svc.append("long", "this is a much longer string");
+        let longest = svc.longest_channel().unwrap();
+        assert_eq!(longest.descriptor.id, "long");
+    }
+
+    #[test]
+    fn test_clear_all() {
+        let mut svc = OutputChannelService::new();
+        svc.create_channel(desc("a"));
+        svc.create_channel(desc("b"));
+        svc.append("a", "data-a");
+        svc.append("b", "data-b");
+        svc.clear_all();
+        assert_eq!(svc.get_content("a"), Some(""));
+        assert_eq!(svc.get_content("b"), Some(""));
+    }
+
+    #[test]
+    fn test_hide_all_and_show_all() {
+        let mut svc = OutputChannelService::new();
+        svc.create_channel(desc("a"));
+        svc.create_channel(desc("b"));
+        svc.show("a");
+        svc.show("b");
+        assert_eq!(svc.visible_channels().len(), 2);
+
+        svc.hide_all();
+        assert!(svc.visible_channels().is_empty());
+
+        svc.show_all();
+        assert_eq!(svc.visible_channels().len(), 2);
+    }
+
+    #[test]
+    fn test_get_content_lines() {
+        let mut svc = OutputChannelService::new();
+        svc.create_channel(desc("ch"));
+        svc.append_line("ch", "first");
+        svc.append_line("ch", "second");
+        svc.append_line("ch", "third");
+        let lines = svc.get_content_lines("ch").unwrap();
+        assert_eq!(lines, vec!["first", "second", "third"]);
+        assert!(svc.get_content_lines("missing").is_none());
     }
 }

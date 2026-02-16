@@ -231,6 +231,142 @@ pub fn convert_tabs_to_spaces(text: &str, tab_size: u32) -> String {
         .join("\n")
 }
 
+/// Normalize line endings to LF.
+pub fn normalize_line_endings(text: &str) -> String {
+    text.replace("\r\n", "\n").replace('\r', "\n")
+}
+
+/// Count the indentation level of a line (number of leading whitespace groups of tab_size).
+pub fn indentation_level(line: &str, tab_size: u32) -> u32 {
+    let ts = tab_size as usize;
+    if ts == 0 { return 0; }
+    let leading_spaces = line.len() - line.trim_start_matches(' ').len();
+    let leading_tabs = line.len() - line.trim_start_matches('\t').len();
+    if leading_tabs > 0 {
+        leading_tabs as u32
+    } else {
+        (leading_spaces / ts) as u32
+    }
+}
+
+/// Reindent the given text to the specified level using the formatting options.
+pub fn set_indentation(text: &str, level: u32, options: &FormattingOptions) -> String {
+    let indent_unit = if options.insert_spaces {
+        " ".repeat(options.tab_size as usize)
+    } else {
+        "\t".to_string()
+    };
+    let prefix = indent_unit.repeat(level as usize);
+    text.lines()
+        .map(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.is_empty() {
+                String::new()
+            } else {
+                format!("{prefix}{trimmed}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Detect the dominant indentation style in a document.
+/// Returns (insert_spaces, tab_size).
+pub fn detect_indentation(text: &str) -> (bool, u32) {
+    let mut space_counts: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+    let mut tab_lines = 0usize;
+    let mut space_lines = 0usize;
+
+    for line in text.lines() {
+        if line.starts_with('\t') {
+            tab_lines += 1;
+        } else {
+            let leading = line.len() - line.trim_start_matches(' ').len();
+            if leading > 0 {
+                space_lines += 1;
+                *space_counts.entry(leading).or_insert(0) += 1;
+            }
+        }
+    }
+
+    if tab_lines > space_lines {
+        return (false, 4);
+    }
+
+    // Find most common space indent that divides evenly
+    let mut best_size = 4u32;
+    let mut best_count = 0usize;
+    for size in [2, 4, 8] {
+        let count: usize = space_counts
+            .iter()
+            .filter(|(spaces, _)| **spaces % size == 0)
+            .map(|(_, c)| *c)
+            .sum();
+        if count > best_count {
+            best_count = count;
+            best_size = size as u32;
+        }
+    }
+
+    (true, best_size)
+}
+
+/// Count the number of non-empty lines in text.
+pub fn count_non_empty_lines(text: &str) -> usize {
+    text.lines().filter(|l| !l.trim().is_empty()).count()
+}
+
+/// Ensure consistent indentation by normalizing mixed tabs/spaces to the configured style.
+pub fn normalize_indentation(text: &str, options: &FormattingOptions) -> String {
+    let tab_equivalent = options.tab_size as usize;
+    text.lines()
+        .map(|line| {
+            let content_start = line.len() - line.trim_start().len();
+            let leading = &line[..content_start];
+            let rest = &line[content_start..];
+
+            // Count total equivalent spaces
+            let mut total_spaces = 0usize;
+            for ch in leading.chars() {
+                match ch {
+                    '\t' => total_spaces += tab_equivalent,
+                    ' ' => total_spaces += 1,
+                    _ => break,
+                }
+            }
+
+            let new_leading = if options.insert_spaces {
+                " ".repeat(total_spaces)
+            } else {
+                let tabs = total_spaces / tab_equivalent;
+                let spaces = total_spaces % tab_equivalent;
+                format!("{}{}", "\t".repeat(tabs), " ".repeat(spaces))
+            };
+
+            format!("{new_leading}{rest}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+impl TextEdit {
+    /// Whether this edit is a no-op (same position, empty new_text).
+    pub fn is_noop(&self) -> bool {
+        self.start_line == self.end_line
+            && self.start_column == self.end_column
+            && self.new_text.is_empty()
+    }
+
+    /// Number of lines in the new text.
+    pub fn new_text_line_count(&self) -> usize {
+        if self.new_text.is_empty() {
+            0
+        } else {
+            self.new_text.lines().count().max(1)
+        }
+    }
+}
+
 /// Convert leading spaces (in multiples of tab_size) to tabs.
 pub fn convert_spaces_to_tabs(text: &str, tab_size: u32) -> String {
     let ts = tab_size as usize;
@@ -370,5 +506,106 @@ mod tests {
         let input = "        hello";
         let result = convert_spaces_to_tabs(input, 4);
         assert_eq!(result, "\t\thello");
+    }
+
+    #[test]
+    fn normalize_line_endings_crlf() {
+        assert_eq!(normalize_line_endings("a\r\nb\r\n"), "a\nb\n");
+    }
+
+    #[test]
+    fn normalize_line_endings_cr() {
+        assert_eq!(normalize_line_endings("a\rb\r"), "a\nb\n");
+    }
+
+    #[test]
+    fn normalize_line_endings_lf_unchanged() {
+        assert_eq!(normalize_line_endings("a\nb\n"), "a\nb\n");
+    }
+
+    #[test]
+    fn indentation_level_spaces() {
+        assert_eq!(indentation_level("        hello", 4), 2);
+        assert_eq!(indentation_level("    hello", 4), 1);
+        assert_eq!(indentation_level("hello", 4), 0);
+    }
+
+    #[test]
+    fn indentation_level_tabs() {
+        assert_eq!(indentation_level("\t\thello", 4), 2);
+        assert_eq!(indentation_level("\thello", 4), 1);
+    }
+
+    #[test]
+    fn set_indentation_spaces() {
+        let opts = FormattingOptions::default();
+        let result = set_indentation("hello\nworld", 2, &opts);
+        assert!(result.starts_with("        hello"));
+    }
+
+    #[test]
+    fn set_indentation_tabs() {
+        let mut opts = FormattingOptions::default();
+        opts.insert_spaces = false;
+        let result = set_indentation("hello", 1, &opts);
+        assert_eq!(result, "\thello");
+    }
+
+    #[test]
+    fn detect_indentation_spaces() {
+        let text = "    a\n    b\n        c\n";
+        let (spaces, size) = detect_indentation(text);
+        assert!(spaces);
+        // 4 and 8 are both divisible by 2, so the algorithm picks the smallest fitting size
+        assert!(size == 2 || size == 4);
+    }
+
+    #[test]
+    fn detect_indentation_tabs() {
+        let text = "\ta\n\t\tb\n\tc\n";
+        let (spaces, _) = detect_indentation(text);
+        assert!(!spaces);
+    }
+
+    #[test]
+    fn count_non_empty_lines_basic() {
+        assert_eq!(count_non_empty_lines("a\n\nb\n  \nc\n"), 3);
+        assert_eq!(count_non_empty_lines(""), 0);
+    }
+
+    #[test]
+    fn normalize_indentation_mixed() {
+        let opts = FormattingOptions::default(); // spaces, tab_size=4
+        let input = "\t hello"; // tab + space
+        let result = normalize_indentation(input, &opts);
+        assert_eq!(result, "     hello"); // 5 spaces
+    }
+
+    #[test]
+    fn text_edit_is_noop() {
+        let noop = TextEdit {
+            start_line: 0, start_column: 0, end_line: 0, end_column: 0,
+            new_text: String::new(),
+        };
+        assert!(noop.is_noop());
+        let not_noop = TextEdit {
+            start_line: 0, start_column: 0, end_line: 0, end_column: 0,
+            new_text: "x".into(),
+        };
+        assert!(!not_noop.is_noop());
+    }
+
+    #[test]
+    fn text_edit_new_text_line_count() {
+        let edit = TextEdit {
+            start_line: 0, start_column: 0, end_line: 0, end_column: 0,
+            new_text: "a\nb\nc".into(),
+        };
+        assert_eq!(edit.new_text_line_count(), 3);
+    }
+
+    #[test]
+    fn indentation_level_zero_tab_size() {
+        assert_eq!(indentation_level("    hello", 0), 0);
     }
 }

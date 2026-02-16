@@ -221,6 +221,196 @@ pub trait HistoryStorageProvider {
 }
 
 // ---------------------------------------------------------------------------
+// HistoryEntry helper methods
+// ---------------------------------------------------------------------------
+
+impl HistoryEntry {
+    /// Returns `true` if this entry was created automatically.
+    pub fn is_auto(&self) -> bool {
+        self.source == HistorySource::Auto
+    }
+
+    /// Returns `true` if this entry was created manually.
+    pub fn is_manual(&self) -> bool {
+        self.source == HistorySource::Manual
+    }
+
+    /// Returns `true` if this entry has a label set.
+    pub fn has_label(&self) -> bool {
+        self.label.is_some()
+    }
+
+    /// Returns `true` if this entry has content stored.
+    pub fn has_content(&self) -> bool {
+        self.content.is_some()
+    }
+
+    /// Returns the age of this entry relative to `current_time`.
+    pub fn age(&self, current_time: u64) -> u64 {
+        current_time.saturating_sub(self.timestamp)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display impls
+// ---------------------------------------------------------------------------
+
+impl std::fmt::Display for HistorySource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HistorySource::Auto => write!(f, "auto"),
+            HistorySource::Manual => write!(f, "manual"),
+            HistorySource::Undo => write!(f, "undo"),
+        }
+    }
+}
+
+impl std::fmt::Display for HistoryEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "[{}] {} @{} ({})",
+            self.source, self.uri, self.timestamp, self.content_hash
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// PartialEq for HistoryStats
+// ---------------------------------------------------------------------------
+
+impl PartialEq for HistoryStats {
+    fn eq(&self, other: &Self) -> bool {
+        self.total_entries == other.total_entries
+            && self.unique_files == other.unique_files
+            && self.total_size == other.total_size
+            && self.entries_per_source == other.entries_per_source
+    }
+}
+
+impl Eq for HistoryStats {}
+
+// ---------------------------------------------------------------------------
+// HistoryDiff
+// ---------------------------------------------------------------------------
+
+/// Represents a diff between two history entries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HistoryDiff {
+    pub uri: String,
+    pub from_timestamp: u64,
+    pub to_timestamp: u64,
+    pub hash_changed: bool,
+    pub size_delta: i64,
+}
+
+/// Compare two history entries and produce a [`HistoryDiff`].
+pub fn compute_diff(a: &HistoryEntry, b: &HistoryEntry) -> HistoryDiff {
+    HistoryDiff {
+        uri: a.uri.clone(),
+        from_timestamp: a.timestamp,
+        to_timestamp: b.timestamp,
+        hash_changed: a.content_hash != b.content_hash,
+        size_delta: b.size_bytes as i64 - a.size_bytes as i64,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HistoryFilter
+// ---------------------------------------------------------------------------
+
+/// Optional filter criteria for querying history entries.
+#[derive(Debug, Clone, Default)]
+pub struct HistoryFilter {
+    pub source: Option<HistorySource>,
+    pub min_timestamp: Option<u64>,
+    pub max_timestamp: Option<u64>,
+    pub label_contains: Option<String>,
+}
+
+impl LocalHistoryService {
+    /// Return entries matching the given filter.
+    pub fn filter_entries(&self, filter: &HistoryFilter) -> Vec<&HistoryEntry> {
+        self.entries
+            .iter()
+            .filter(|e| {
+                if let Some(src) = &filter.source {
+                    if e.source != *src {
+                        return false;
+                    }
+                }
+                if let Some(min) = filter.min_timestamp {
+                    if e.timestamp < min {
+                        return false;
+                    }
+                }
+                if let Some(max) = filter.max_timestamp {
+                    if e.timestamp > max {
+                        return false;
+                    }
+                }
+                if let Some(ref substr) = filter.label_contains {
+                    match &e.label {
+                        Some(label) => {
+                            if !label.contains(substr.as_str()) {
+                                return false;
+                            }
+                        }
+                        None => return false,
+                    }
+                }
+                true
+            })
+            .collect()
+    }
+
+    /// Return the most recent entry for a given URI, or `None`.
+    pub fn get_latest_entry(&self, uri: &str) -> Option<&HistoryEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.uri == uri)
+            .max_by_key(|e| e.timestamp)
+    }
+
+    /// Return entries created by a specific source.
+    pub fn get_entries_by_source(&self, source: HistorySource) -> Vec<&HistoryEntry> {
+        self.entries.iter().filter(|e| e.source == source).collect()
+    }
+
+    /// Search for entries whose label contains the given substring.
+    pub fn search_by_label(&self, needle: &str) -> Vec<&HistoryEntry> {
+        self.entries
+            .iter()
+            .filter(|e| {
+                e.label
+                    .as_ref()
+                    .map_or(false, |l| l.contains(needle))
+            })
+            .collect()
+    }
+
+    /// Remove entries with duplicate content hashes per URI, keeping the
+    /// most recent entry for each unique hash.
+    pub fn compact(&mut self) {
+        let mut seen: HashMap<(String, String), u64> = HashMap::new();
+        for entry in &self.entries {
+            let key = (entry.uri.clone(), entry.content_hash.clone());
+            seen.entry(key)
+                .and_modify(|ts| {
+                    if entry.timestamp > *ts {
+                        *ts = entry.timestamp;
+                    }
+                })
+                .or_insert(entry.timestamp);
+        }
+        self.entries.retain(|e| {
+            let key = (e.uri.clone(), e.content_hash.clone());
+            seen.get(&key) == Some(&e.timestamp)
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -377,5 +567,225 @@ mod tests {
         svc.add_entry("file:///d.rs", "x", HistorySource::Auto);
         svc.clear_all();
         assert_eq!(svc.entry_count(), 0);
+    }
+
+    #[test]
+    fn entry_is_auto_and_is_manual() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Manual);
+        assert!(svc.entries[0].is_auto());
+        assert!(!svc.entries[0].is_manual());
+        assert!(svc.entries[1].is_manual());
+        assert!(!svc.entries[1].is_auto());
+    }
+
+    #[test]
+    fn entry_has_label_and_has_content() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        assert!(!svc.entries[0].has_label());
+        assert!(!svc.entries[0].has_content());
+        svc.entries[0].label = Some("snapshot".to_string());
+        svc.entries[0].content = Some("data".to_string());
+        assert!(svc.entries[0].has_label());
+        assert!(svc.entries[0].has_content());
+    }
+
+    #[test]
+    fn entry_age() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        // timestamp is 1
+        assert_eq!(svc.entries[0].age(10), 9);
+        assert_eq!(svc.entries[0].age(1), 0);
+        // saturating: current_time < timestamp
+        assert_eq!(svc.entries[0].age(0), 0);
+    }
+
+    #[test]
+    fn history_source_display() {
+        assert_eq!(format!("{}", HistorySource::Auto), "auto");
+        assert_eq!(format!("{}", HistorySource::Manual), "manual");
+        assert_eq!(format!("{}", HistorySource::Undo), "undo");
+    }
+
+    #[test]
+    fn history_entry_display() {
+        let entry = HistoryEntry {
+            uri: "file:///x.rs".to_string(),
+            timestamp: 42,
+            content_hash: "abc".to_string(),
+            label: None,
+            source: HistorySource::Manual,
+            content: None,
+            size_bytes: 0,
+        };
+        assert_eq!(format!("{}", entry), "[manual] file:///x.rs @42 (abc)");
+    }
+
+    #[test]
+    fn compute_diff_detects_changes() {
+        let a = HistoryEntry {
+            uri: "file:///a.rs".to_string(),
+            timestamp: 1,
+            content_hash: "aaa".to_string(),
+            label: None,
+            source: HistorySource::Auto,
+            content: None,
+            size_bytes: 100,
+        };
+        let b = HistoryEntry {
+            uri: "file:///a.rs".to_string(),
+            timestamp: 2,
+            content_hash: "bbb".to_string(),
+            label: None,
+            source: HistorySource::Auto,
+            content: None,
+            size_bytes: 150,
+        };
+        let diff = compute_diff(&a, &b);
+        assert!(diff.hash_changed);
+        assert_eq!(diff.size_delta, 50);
+        assert_eq!(diff.from_timestamp, 1);
+        assert_eq!(diff.to_timestamp, 2);
+    }
+
+    #[test]
+    fn compute_diff_no_change() {
+        let a = HistoryEntry {
+            uri: "file:///a.rs".to_string(),
+            timestamp: 1,
+            content_hash: "same".to_string(),
+            label: None,
+            source: HistorySource::Auto,
+            content: None,
+            size_bytes: 100,
+        };
+        let b = HistoryEntry {
+            uri: "file:///a.rs".to_string(),
+            timestamp: 2,
+            content_hash: "same".to_string(),
+            label: None,
+            source: HistorySource::Auto,
+            content: None,
+            size_bytes: 100,
+        };
+        let diff = compute_diff(&a, &b);
+        assert!(!diff.hash_changed);
+        assert_eq!(diff.size_delta, 0);
+    }
+
+    #[test]
+    fn get_latest_entry_returns_most_recent() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Manual);
+        svc.add_entry("file:///b.rs", "h3", HistorySource::Auto);
+        let latest = svc.get_latest_entry("file:///a.rs").unwrap();
+        assert_eq!(latest.content_hash, "h2");
+        assert!(svc.get_latest_entry("file:///missing.rs").is_none());
+    }
+
+    #[test]
+    fn get_entries_by_source() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Manual);
+        svc.add_entry("file:///b.rs", "h3", HistorySource::Auto);
+        let autos = svc.get_entries_by_source(HistorySource::Auto);
+        assert_eq!(autos.len(), 2);
+        let manuals = svc.get_entries_by_source(HistorySource::Manual);
+        assert_eq!(manuals.len(), 1);
+        let undos = svc.get_entries_by_source(HistorySource::Undo);
+        assert!(undos.is_empty());
+    }
+
+    #[test]
+    fn search_by_label_finds_matching() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Manual);
+        svc.label_entry("file:///a.rs", 1, "before refactor");
+        svc.label_entry("file:///a.rs", 2, "after refactor");
+        let results = svc.search_by_label("refactor");
+        assert_eq!(results.len(), 2);
+        let results = svc.search_by_label("before");
+        assert_eq!(results.len(), 1);
+        let results = svc.search_by_label("nonexistent");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn compact_removes_duplicate_hashes() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "same_hash", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "same_hash", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "different", HistorySource::Auto);
+        assert_eq!(svc.entry_count(), 3);
+        svc.compact();
+        assert_eq!(svc.entry_count(), 2);
+        // The kept entry for "same_hash" should be the one with the higher timestamp
+        let kept = svc
+            .entries
+            .iter()
+            .find(|e| e.content_hash == "same_hash")
+            .unwrap();
+        assert_eq!(kept.timestamp, 2);
+    }
+
+    #[test]
+    fn filter_entries_by_source() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Manual);
+        let filter = HistoryFilter {
+            source: Some(HistorySource::Auto),
+            ..Default::default()
+        };
+        let results = svc.filter_entries(&filter);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].content_hash, "h1");
+    }
+
+    #[test]
+    fn filter_entries_by_timestamp_range() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h3", HistorySource::Auto);
+        // timestamps are 1, 2, 3
+        let filter = HistoryFilter {
+            min_timestamp: Some(2),
+            max_timestamp: Some(2),
+            ..Default::default()
+        };
+        let results = svc.filter_entries(&filter);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].content_hash, "h2");
+    }
+
+    #[test]
+    fn filter_entries_by_label() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        svc.add_entry("file:///a.rs", "h2", HistorySource::Auto);
+        svc.label_entry("file:///a.rs", 1, "important save");
+        let filter = HistoryFilter {
+            label_contains: Some("important".to_string()),
+            ..Default::default()
+        };
+        let results = svc.filter_entries(&filter);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].content_hash, "h1");
+    }
+
+    #[test]
+    fn history_stats_partial_eq() {
+        let mut svc = LocalHistoryService::new(10);
+        svc.add_entry("file:///a.rs", "h1", HistorySource::Auto);
+        let stats1 = svc.get_stats();
+        let stats2 = svc.get_stats();
+        assert_eq!(stats1, stats2);
     }
 }

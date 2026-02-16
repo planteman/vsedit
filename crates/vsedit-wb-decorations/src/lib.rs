@@ -14,7 +14,7 @@ pub struct DecorationType {
 }
 
 /// A range within a document where a decoration applies.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DecorationRange {
     pub start_line: u32,
     pub start_col: u32,
@@ -183,6 +183,116 @@ pub trait DecorationProvider {
 
     fn event_uri_filter(&self) -> Option<Vec<String>> {
         None
+    }
+}
+
+use std::fmt;
+
+/// Priority level for decorations, ordered from Low to Critical.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DecorationPriority {
+    Low,
+    Normal,
+    High,
+    Critical,
+}
+
+/// A decoration range paired with a priority and type identifier.
+#[derive(Debug, Clone)]
+pub struct PrioritizedDecoration {
+    pub range: DecorationRange,
+    pub priority: DecorationPriority,
+    pub type_id: String,
+}
+
+/// Utility struct with static methods for sorting and filtering decoration ranges.
+pub struct DecorationSorter;
+
+impl DecorationSorter {
+    /// Sort ranges by start_line, then by start_col.
+    pub fn sort_by_line(ranges: &mut Vec<DecorationRange>) {
+        ranges.sort_by(|a, b| {
+            a.start_line
+                .cmp(&b.start_line)
+                .then(a.start_col.cmp(&b.start_col))
+        });
+    }
+
+    /// Sort prioritized decorations by priority descending (Critical first).
+    pub fn sort_by_priority(items: &mut Vec<PrioritizedDecoration>) {
+        items.sort_by(|a, b| b.priority.cmp(&a.priority));
+    }
+
+    /// Return ranges that overlap with the inclusive line range [start, end].
+    pub fn filter_by_line_range(
+        ranges: &[DecorationRange],
+        start: u32,
+        end: u32,
+    ) -> Vec<DecorationRange> {
+        ranges
+            .iter()
+            .filter(|r| r.start_line <= end && r.end_line >= start)
+            .cloned()
+            .collect()
+    }
+
+    /// Count how many decoration ranges touch each line.
+    pub fn count_by_line(ranges: &[DecorationRange]) -> std::collections::HashMap<u32, usize> {
+        let mut counts = std::collections::HashMap::new();
+        for r in ranges {
+            for line in r.start_line..=r.end_line {
+                *counts.entry(line).or_insert(0) += 1;
+            }
+        }
+        counts
+    }
+}
+
+impl fmt::Display for DecorationRange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "L{}:{}-L{}:{}",
+            self.start_line, self.start_col, self.end_line, self.end_col
+        )
+    }
+}
+
+impl fmt::Display for DecorationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DecorationType({})", self.id)
+    }
+}
+
+impl DecorationService {
+    /// Get a slice of all registered decoration types.
+    pub fn get_types(&self) -> &[DecorationType] {
+        &self.types
+    }
+
+    /// Return the number of registered decoration types.
+    pub fn type_count(&self) -> usize {
+        self.types.len()
+    }
+
+    /// Return the number of decoration sets.
+    pub fn set_count(&self) -> usize {
+        self.sets.len()
+    }
+
+    /// Get all decoration sets whose type_id matches `type_id`.
+    pub fn get_decorations_by_type(&self, type_id: &str) -> Vec<&DecorationSet> {
+        self.sets.iter().filter(|s| s.type_id == type_id).collect()
+    }
+
+    /// Remove all decoration sets for the given URI.
+    pub fn remove_all_for_uri(&mut self, uri: &str) {
+        self.sets.retain(|s| s.uri != uri);
+    }
+
+    /// Check whether any decoration set targets the given URI.
+    pub fn has_decorations(&self, uri: &str) -> bool {
+        self.sets.iter().any(|s| s.uri == uri)
     }
 }
 
@@ -363,5 +473,164 @@ mod tests {
         let provider = TestProvider;
         assert!(provider.event_uri_filter().is_none());
         assert_eq!(provider.provide_decorations("file:///a.rs").len(), 1);
+    }
+
+    #[test]
+    fn test_decoration_priority_ordering() {
+        assert!(DecorationPriority::Low < DecorationPriority::Normal);
+        assert!(DecorationPriority::Normal < DecorationPriority::High);
+        assert!(DecorationPriority::High < DecorationPriority::Critical);
+        assert!(DecorationPriority::Low < DecorationPriority::Critical);
+    }
+
+    #[test]
+    fn test_sort_by_line() {
+        let mut ranges = vec![
+            sample_range_cols(5, 3, 10),
+            sample_range_cols(1, 0, 5),
+            sample_range_cols(1, 2, 8),
+            sample_range_cols(3, 0, 4),
+        ];
+        DecorationSorter::sort_by_line(&mut ranges);
+        assert_eq!(ranges[0].start_line, 1);
+        assert_eq!(ranges[0].start_col, 0);
+        assert_eq!(ranges[1].start_line, 1);
+        assert_eq!(ranges[1].start_col, 2);
+        assert_eq!(ranges[2].start_line, 3);
+        assert_eq!(ranges[3].start_line, 5);
+    }
+
+    #[test]
+    fn test_sort_by_priority() {
+        let mut items = vec![
+            PrioritizedDecoration {
+                range: sample_range(1),
+                priority: DecorationPriority::Low,
+                type_id: "a".into(),
+            },
+            PrioritizedDecoration {
+                range: sample_range(2),
+                priority: DecorationPriority::Critical,
+                type_id: "b".into(),
+            },
+            PrioritizedDecoration {
+                range: sample_range(3),
+                priority: DecorationPriority::Normal,
+                type_id: "c".into(),
+            },
+        ];
+        DecorationSorter::sort_by_priority(&mut items);
+        assert_eq!(items[0].priority, DecorationPriority::Critical);
+        assert_eq!(items[1].priority, DecorationPriority::Normal);
+        assert_eq!(items[2].priority, DecorationPriority::Low);
+    }
+
+    #[test]
+    fn test_filter_by_line_range() {
+        let ranges = vec![
+            sample_range(1),
+            sample_range(5),
+            sample_range(10),
+            sample_range(15),
+        ];
+        let filtered = DecorationSorter::filter_by_line_range(&ranges, 4, 11);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].start_line, 5);
+        assert_eq!(filtered[1].start_line, 10);
+    }
+
+    #[test]
+    fn test_count_by_line() {
+        let ranges = vec![
+            sample_range(1),
+            sample_range(1),
+            sample_range(3),
+        ];
+        let counts = DecorationSorter::count_by_line(&ranges);
+        assert_eq!(counts[&1], 2);
+        assert_eq!(counts[&3], 1);
+        assert!(!counts.contains_key(&2));
+    }
+
+    #[test]
+    fn test_decoration_range_display() {
+        let r = DecorationRange {
+            start_line: 10,
+            start_col: 5,
+            end_line: 12,
+            end_col: 20,
+            hover_message: None,
+        };
+        assert_eq!(format!("{}", r), "L10:5-L12:20");
+    }
+
+    #[test]
+    fn test_decoration_type_display() {
+        let dt = sample_type("error");
+        assert_eq!(format!("{}", dt), "DecorationType(error)");
+    }
+
+    #[test]
+    fn test_get_types() {
+        let mut svc = DecorationService::new();
+        svc.register_type(sample_type("a"));
+        svc.register_type(sample_type("b"));
+        let types = svc.get_types();
+        assert_eq!(types.len(), 2);
+        assert_eq!(types[0].id, "a");
+        assert_eq!(types[1].id, "b");
+    }
+
+    #[test]
+    fn test_type_count_and_set_count() {
+        let mut svc = DecorationService::new();
+        assert_eq!(svc.type_count(), 0);
+        assert_eq!(svc.set_count(), 0);
+        svc.register_type(sample_type("x"));
+        svc.register_type(sample_type("y"));
+        svc.set_decorations("x".into(), "file:///a.rs".into(), vec![sample_range(1)]);
+        assert_eq!(svc.type_count(), 2);
+        assert_eq!(svc.set_count(), 1);
+    }
+
+    #[test]
+    fn test_get_decorations_by_type() {
+        let mut svc = DecorationService::new();
+        svc.set_decorations("err".into(), "file:///a.rs".into(), vec![sample_range(1)]);
+        svc.set_decorations("warn".into(), "file:///a.rs".into(), vec![sample_range(2)]);
+        svc.set_decorations("err".into(), "file:///b.rs".into(), vec![sample_range(3)]);
+        let err_sets = svc.get_decorations_by_type("err");
+        assert_eq!(err_sets.len(), 2);
+        let warn_sets = svc.get_decorations_by_type("warn");
+        assert_eq!(warn_sets.len(), 1);
+    }
+
+    #[test]
+    fn test_remove_all_for_uri() {
+        let mut svc = DecorationService::new();
+        svc.set_decorations("a".into(), "file:///x.rs".into(), vec![sample_range(1)]);
+        svc.set_decorations("b".into(), "file:///x.rs".into(), vec![sample_range(2)]);
+        svc.set_decorations("a".into(), "file:///y.rs".into(), vec![sample_range(3)]);
+        svc.remove_all_for_uri("file:///x.rs");
+        assert!(svc.get_decorations("file:///x.rs").is_empty());
+        assert_eq!(svc.get_decorations("file:///y.rs").len(), 1);
+    }
+
+    #[test]
+    fn test_has_decorations() {
+        let mut svc = DecorationService::new();
+        assert!(!svc.has_decorations("file:///a.rs"));
+        svc.set_decorations("t".into(), "file:///a.rs".into(), vec![sample_range(1)]);
+        assert!(svc.has_decorations("file:///a.rs"));
+        assert!(!svc.has_decorations("file:///b.rs"));
+    }
+
+    #[test]
+    fn test_decoration_range_partial_eq() {
+        let r1 = sample_range_cols(1, 0, 10);
+        let r2 = sample_range_cols(1, 0, 10);
+        let r3 = sample_range_cols(2, 0, 10);
+        assert_eq!(r1, r2);
+        assert_ne!(r1, r3);
     }
 }

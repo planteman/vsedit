@@ -218,6 +218,136 @@ impl StorageService {
     }
 }
 
+impl Storage {
+    /// Get all key-value pairs.
+    pub fn entries(&self) -> Vec<(String, String)> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare("SELECT key, value FROM ItemTable ORDER BY key")
+            .unwrap();
+        stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect()
+    }
+
+    /// Get all values (without keys).
+    pub fn values(&self) -> Vec<String> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare("SELECT value FROM ItemTable ORDER BY key")
+            .unwrap();
+        stmt.query_map([], |row| row.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect()
+    }
+
+    /// Get keys matching a prefix.
+    pub fn keys_with_prefix(&self, prefix: &str) -> Vec<String> {
+        let conn = self.conn.lock().unwrap();
+        let pattern = format!("{}%", prefix);
+        let mut stmt = conn
+            .prepare("SELECT key FROM ItemTable WHERE key LIKE ?1 ORDER BY key")
+            .unwrap();
+        stmt.query_map(params![pattern], |row| row.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect()
+    }
+
+    /// Remove all keys matching a prefix.
+    pub fn remove_prefix(&self, prefix: &str) -> StorageResult<usize> {
+        let conn = self.conn.lock().unwrap();
+        let pattern = format!("{}%", prefix);
+        let count = conn.execute("DELETE FROM ItemTable WHERE key LIKE ?1", params![pattern])?;
+        Ok(count)
+    }
+
+    /// Get a float value.
+    pub fn get_f64(&self, key: &str) -> Option<f64> {
+        self.get(key).and_then(|v| v.parse().ok())
+    }
+
+    /// Set a float value.
+    pub fn set_f64(&self, key: &str, value: f64) -> StorageResult<()> {
+        self.set(key, &value.to_string())
+    }
+
+    /// Set a value only if the key does not already exist. Returns true if set.
+    pub fn set_if_absent(&self, key: &str, value: &str) -> StorageResult<bool> {
+        if self.has(key) {
+            Ok(false)
+        } else {
+            self.set(key, value)?;
+            Ok(true)
+        }
+    }
+
+    /// Increment an integer value by delta, returning the new value. Initializes to delta if missing.
+    pub fn increment(&self, key: &str, delta: i64) -> StorageResult<i64> {
+        let current = self.get_i64(key).unwrap_or(0);
+        let new_val = current + delta;
+        self.set_i64(key, new_val)?;
+        Ok(new_val)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StorageService extras
+// ---------------------------------------------------------------------------
+
+impl StorageService {
+    /// Check if a key exists in a given scope.
+    pub fn has(&self, key: &str, scope: StorageScope) -> bool {
+        self.get(key, scope).is_some()
+    }
+
+    /// Get a boolean from a scope.
+    pub fn get_bool(&self, key: &str, scope: StorageScope) -> Option<bool> {
+        self.get(key, scope).map(|v| v == "true" || v == "1")
+    }
+
+    /// Set a boolean in a scope.
+    pub fn set_bool(&self, key: &str, value: bool, scope: StorageScope) -> StorageResult<()> {
+        self.set(key, if value { "true" } else { "false" }, scope)
+    }
+
+    /// Get an i64 from a scope.
+    pub fn get_i64(&self, key: &str, scope: StorageScope) -> Option<i64> {
+        self.get(key, scope).and_then(|v| v.parse().ok())
+    }
+
+    /// Set an i64 in a scope.
+    pub fn set_i64(&self, key: &str, value: i64, scope: StorageScope) -> StorageResult<()> {
+        self.set(key, &value.to_string(), scope)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Display impls
+// ---------------------------------------------------------------------------
+
+impl std::fmt::Display for StorageScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StorageScope::Profile => write!(f, "Profile"),
+            StorageScope::Workspace => write!(f, "Workspace"),
+        }
+    }
+}
+
+impl std::fmt::Display for StorageTarget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StorageTarget::User => write!(f, "User"),
+            StorageTarget::Machine => write!(f, "Machine"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -323,5 +453,104 @@ mod tests {
             let store = Storage::open(&db_path).unwrap();
             assert_eq!(store.get("persist"), Some("data".to_string()));
         }
+    }
+
+    #[test]
+    fn entries_and_values() {
+        let store = Storage::in_memory().unwrap();
+        store.set("b", "2").unwrap();
+        store.set("a", "1").unwrap();
+        let entries = store.entries();
+        assert_eq!(entries, vec![("a".to_string(), "1".to_string()), ("b".to_string(), "2".to_string())]);
+        let values = store.values();
+        assert_eq!(values, vec!["1", "2"]);
+    }
+
+    #[test]
+    fn keys_with_prefix() {
+        let store = Storage::in_memory().unwrap();
+        store.set("editor.fontSize", "14").unwrap();
+        store.set("editor.tabSize", "4").unwrap();
+        store.set("terminal.fontSize", "12").unwrap();
+        let keys = store.keys_with_prefix("editor.");
+        assert_eq!(keys.len(), 2);
+        assert!(keys.contains(&"editor.fontSize".to_string()));
+        assert!(keys.contains(&"editor.tabSize".to_string()));
+    }
+
+    #[test]
+    fn remove_prefix() {
+        let store = Storage::in_memory().unwrap();
+        store.set("cache.a", "1").unwrap();
+        store.set("cache.b", "2").unwrap();
+        store.set("config.x", "3").unwrap();
+        let removed = store.remove_prefix("cache.").unwrap();
+        assert_eq!(removed, 2);
+        assert_eq!(store.len(), 1);
+        assert!(store.has("config.x"));
+    }
+
+    #[test]
+    fn float_values() {
+        let store = Storage::in_memory().unwrap();
+        store.set_f64("pi", 3.14159).unwrap();
+        let val = store.get_f64("pi").unwrap();
+        assert!((val - 3.14159).abs() < 0.0001);
+    }
+
+    #[test]
+    fn set_if_absent() {
+        let store = Storage::in_memory().unwrap();
+        assert!(store.set_if_absent("key", "first").unwrap());
+        assert!(!store.set_if_absent("key", "second").unwrap());
+        assert_eq!(store.get("key"), Some("first".to_string()));
+    }
+
+    #[test]
+    fn increment_value() {
+        let store = Storage::in_memory().unwrap();
+        assert_eq!(store.increment("counter", 5).unwrap(), 5);
+        assert_eq!(store.increment("counter", 3).unwrap(), 8);
+        assert_eq!(store.increment("counter", -2).unwrap(), 6);
+    }
+
+    #[test]
+    fn storage_service_has() {
+        let global = Storage::in_memory().unwrap();
+        let svc = StorageService::new(global);
+        svc.set("key", "val", StorageScope::Profile).unwrap();
+        assert!(svc.has("key", StorageScope::Profile));
+        assert!(!svc.has("missing", StorageScope::Profile));
+    }
+
+    #[test]
+    fn storage_service_bool_and_i64() {
+        let global = Storage::in_memory().unwrap();
+        let svc = StorageService::new(global);
+        svc.set_bool("flag", true, StorageScope::Profile).unwrap();
+        assert_eq!(svc.get_bool("flag", StorageScope::Profile), Some(true));
+        svc.set_i64("count", 42, StorageScope::Profile).unwrap();
+        assert_eq!(svc.get_i64("count", StorageScope::Profile), Some(42));
+    }
+
+    #[test]
+    fn scope_display() {
+        assert_eq!(format!("{}", StorageScope::Profile), "Profile");
+        assert_eq!(format!("{}", StorageScope::Workspace), "Workspace");
+    }
+
+    #[test]
+    fn target_display() {
+        assert_eq!(format!("{}", StorageTarget::User), "User");
+        assert_eq!(format!("{}", StorageTarget::Machine), "Machine");
+    }
+
+    #[test]
+    fn workspace_scope_without_workspace() {
+        let global = Storage::in_memory().unwrap();
+        let svc = StorageService::new(global);
+        assert!(svc.get("key", StorageScope::Workspace).is_none());
+        assert!(svc.set("key", "val", StorageScope::Workspace).is_ok());
+        assert!(svc.remove("key", StorageScope::Workspace).is_ok());
     }
 }

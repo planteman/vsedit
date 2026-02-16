@@ -69,6 +69,7 @@ impl fmt::Display for ReferenceItem {
 }
 
 /// Model holding all references for a symbol.
+#[derive(Debug, Clone)]
 pub struct ReferencesModel {
     pub title: String,
     pub base_location: Location,
@@ -148,6 +149,198 @@ impl ReferencesModel {
                 (uri, refs)
             })
             .collect()
+    }
+}
+
+/// The kind of reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReferenceKind {
+    Declaration,
+    Definition,
+    Read,
+    Write,
+    Call,
+    Import,
+    Other,
+}
+
+impl fmt::Display for ReferenceKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Declaration => write!(f, "Declaration"),
+            Self::Definition => write!(f, "Definition"),
+            Self::Read => write!(f, "Read"),
+            Self::Write => write!(f, "Write"),
+            Self::Call => write!(f, "Call"),
+            Self::Import => write!(f, "Import"),
+            Self::Other => write!(f, "Other"),
+        }
+    }
+}
+
+/// Result of a reference search with metadata.
+#[derive(Debug, Clone)]
+pub struct ReferenceSearchResult {
+    pub symbol_name: String,
+    pub model: ReferencesModel,
+    pub search_duration_ms: u64,
+    pub include_declaration: bool,
+}
+
+impl ReferenceSearchResult {
+    pub fn new(symbol_name: impl Into<String>, model: ReferencesModel, duration_ms: u64) -> Self {
+        Self {
+            symbol_name: symbol_name.into(),
+            model,
+            search_duration_ms: duration_ms,
+            include_declaration: true,
+        }
+    }
+
+    pub fn without_declaration(mut self) -> Self {
+        self.include_declaration = false;
+        self
+    }
+
+    pub fn summary(&self) -> String {
+        format!(
+            "'{}': {} references in {} files ({}ms)",
+            self.symbol_name,
+            self.model.total_count(),
+            self.model.file_count(),
+            self.search_duration_ms
+        )
+    }
+}
+
+impl Location {
+    /// Return the number of lines this location spans.
+    pub fn line_span(&self) -> u32 {
+        self.end_line - self.start_line + 1
+    }
+
+    /// Return true if this location overlaps with another location in the same file.
+    pub fn overlaps(&self, other: &Location) -> bool {
+        if self.uri != other.uri {
+            return false;
+        }
+        // No overlap if one entirely precedes the other
+        if self.end_line < other.start_line || other.end_line < self.start_line {
+            return false;
+        }
+        if self.end_line == other.start_line && self.end_col < other.start_col {
+            return false;
+        }
+        if other.end_line == self.start_line && other.end_col < self.start_col {
+            return false;
+        }
+        true
+    }
+
+    /// Merge two overlapping locations into a single encompassing location.
+    /// Returns None if they don't overlap or are in different files.
+    pub fn merge(&self, other: &Location) -> Option<Location> {
+        if !self.overlaps(other) {
+            return None;
+        }
+        let start_line = self.start_line.min(other.start_line);
+        let start_col = if self.start_line < other.start_line {
+            self.start_col
+        } else if other.start_line < self.start_line {
+            other.start_col
+        } else {
+            self.start_col.min(other.start_col)
+        };
+        let end_line = self.end_line.max(other.end_line);
+        let end_col = if self.end_line > other.end_line {
+            self.end_col
+        } else if other.end_line > self.end_line {
+            other.end_col
+        } else {
+            self.end_col.max(other.end_col)
+        };
+        Some(Location {
+            uri: self.uri.clone(),
+            start_line,
+            start_col,
+            end_line,
+            end_col,
+        })
+    }
+
+    /// Get the file name (last path component) from the URI.
+    pub fn file_name(&self) -> &str {
+        self.uri.rsplit('/').next().unwrap_or(&self.uri)
+    }
+}
+
+impl ReferencesModel {
+    /// Filter references keeping only those in the specified file.
+    pub fn filter_by_file(&self, uri: &str) -> ReferencesModel {
+        let mut filtered = ReferencesModel::new(self.title.clone(), self.base_location.clone());
+        for r in &self.references {
+            if r.location.uri == uri {
+                filtered.add_reference(r.clone());
+            }
+        }
+        filtered
+    }
+
+    /// Count references per file, returning sorted pairs.
+    pub fn count_per_file(&self) -> Vec<(&str, usize)> {
+        let files = self.unique_files();
+        let mut counts: Vec<(&str, usize)> = files
+            .into_iter()
+            .map(|f| (f, self.references_in_file(f).len()))
+            .collect();
+        counts.sort_by(|a, b| b.1.cmp(&a.1));
+        counts
+    }
+
+    /// Get references sorted by line number within a single file.
+    pub fn sorted_refs_in_file(&self, uri: &str) -> Vec<&ReferenceItem> {
+        let mut refs = self.references_in_file(uri);
+        refs.sort_by_key(|r| (r.location.start_line, r.location.start_col));
+        refs
+    }
+
+    /// Merge consecutive references that are on adjacent lines in the same file.
+    /// Returns groups of related references.
+    pub fn cluster_by_proximity(&self, max_gap: u32) -> Vec<Vec<&ReferenceItem>> {
+        let mut clusters: Vec<Vec<&ReferenceItem>> = Vec::new();
+        for file in self.unique_files() {
+            let sorted = self.sorted_refs_in_file(file);
+            if sorted.is_empty() {
+                continue;
+            }
+            let mut current_cluster: Vec<&ReferenceItem> = vec![sorted[0]];
+            for r in &sorted[1..] {
+                let last = current_cluster.last().unwrap();
+                if r.location.start_line <= last.location.end_line + max_gap {
+                    current_cluster.push(r);
+                } else {
+                    clusters.push(std::mem::take(&mut current_cluster));
+                    current_cluster.push(r);
+                }
+            }
+            if !current_cluster.is_empty() {
+                clusters.push(current_cluster);
+            }
+        }
+        clusters
+    }
+
+    /// Get a flat summary string of all references.
+    pub fn flat_summary(&self) -> String {
+        let mut lines = Vec::new();
+        lines.push(format!("References for '{}' ({})", self.title, self.total_count()));
+        for (file, refs) in self.group_by_file() {
+            lines.push(format!("  {} ({} refs)", file, refs.len()));
+            for r in refs {
+                lines.push(format!("    L{}: {}", r.location.start_line, r.context_line));
+            }
+        }
+        lines.join("\n")
     }
 }
 
@@ -307,5 +500,134 @@ mod tests {
         assert_eq!(groups[0].1.len(), 2);
         assert_eq!(groups[1].0, "b.rs");
         assert_eq!(groups[1].1.len(), 1);
+    }
+
+    #[test]
+    fn reference_kind_display() {
+        assert_eq!(ReferenceKind::Declaration.to_string(), "Declaration");
+        assert_eq!(ReferenceKind::Definition.to_string(), "Definition");
+        assert_eq!(ReferenceKind::Read.to_string(), "Read");
+        assert_eq!(ReferenceKind::Write.to_string(), "Write");
+        assert_eq!(ReferenceKind::Call.to_string(), "Call");
+        assert_eq!(ReferenceKind::Import.to_string(), "Import");
+        assert_eq!(ReferenceKind::Other.to_string(), "Other");
+    }
+
+    #[test]
+    fn location_line_span() {
+        assert_eq!(Location::new("a.rs", 5, 0, 5, 10).line_span(), 1);
+        assert_eq!(Location::new("a.rs", 5, 0, 7, 10).line_span(), 3);
+    }
+
+    #[test]
+    fn location_overlaps() {
+        let a = Location::new("a.rs", 5, 0, 8, 10);
+        let b = Location::new("a.rs", 7, 0, 12, 5);
+        let c = Location::new("a.rs", 10, 0, 15, 5);
+        let d = Location::new("b.rs", 5, 0, 8, 10);
+        assert!(a.overlaps(&b));
+        assert!(b.overlaps(&a));
+        assert!(!a.overlaps(&c));
+        assert!(!a.overlaps(&d)); // different file
+    }
+
+    #[test]
+    fn location_merge() {
+        let a = Location::new("a.rs", 5, 0, 8, 10);
+        let b = Location::new("a.rs", 7, 3, 12, 5);
+        let merged = a.merge(&b).unwrap();
+        assert_eq!(merged.start_line, 5);
+        assert_eq!(merged.start_col, 0);
+        assert_eq!(merged.end_line, 12);
+        assert_eq!(merged.end_col, 5);
+    }
+
+    #[test]
+    fn location_merge_none_for_non_overlapping() {
+        let a = Location::new("a.rs", 1, 0, 3, 10);
+        let b = Location::new("a.rs", 5, 0, 7, 10);
+        assert!(a.merge(&b).is_none());
+    }
+
+    #[test]
+    fn location_file_name() {
+        assert_eq!(Location::new("src/main.rs", 1, 0, 1, 5).file_name(), "main.rs");
+        assert_eq!(Location::new("lib.rs", 1, 0, 1, 5).file_name(), "lib.rs");
+    }
+
+    #[test]
+    fn search_result_summary() {
+        let model = ReferencesModel::new("foo", loc("a.rs", 1, 0));
+        let result = ReferenceSearchResult::new("foo", model, 42);
+        let summary = result.summary();
+        assert!(summary.contains("'foo'"));
+        assert!(summary.contains("42ms"));
+    }
+
+    #[test]
+    fn search_result_without_declaration() {
+        let model = ReferencesModel::new("foo", loc("a.rs", 1, 0));
+        let result = ReferenceSearchResult::new("foo", model, 10).without_declaration();
+        assert!(!result.include_declaration);
+    }
+
+    #[test]
+    fn filter_by_file() {
+        let mut model = ReferencesModel::new("foo", loc("a.rs", 1, 0));
+        model.add_reference(ref_item("a.rs", 10, 0));
+        model.add_reference(ref_item("b.rs", 20, 0));
+        model.add_reference(ref_item("a.rs", 30, 0));
+        let filtered = model.filter_by_file("a.rs");
+        assert_eq!(filtered.total_count(), 2);
+        assert_eq!(filtered.file_count(), 1);
+    }
+
+    #[test]
+    fn count_per_file() {
+        let mut model = ReferencesModel::new("foo", loc("a.rs", 1, 0));
+        model.add_reference(ref_item("a.rs", 10, 0));
+        model.add_reference(ref_item("b.rs", 20, 0));
+        model.add_reference(ref_item("a.rs", 30, 0));
+        let counts = model.count_per_file();
+        assert_eq!(counts[0], ("a.rs", 2));
+        assert_eq!(counts[1], ("b.rs", 1));
+    }
+
+    #[test]
+    fn sorted_refs_in_file() {
+        let mut model = ReferencesModel::new("foo", loc("a.rs", 1, 0));
+        model.add_reference(ref_item("a.rs", 30, 0));
+        model.add_reference(ref_item("a.rs", 10, 5));
+        model.add_reference(ref_item("a.rs", 10, 0));
+        let sorted = model.sorted_refs_in_file("a.rs");
+        assert_eq!(sorted[0].location.start_line, 10);
+        assert_eq!(sorted[0].location.start_col, 0);
+        assert_eq!(sorted[1].location.start_col, 5);
+        assert_eq!(sorted[2].location.start_line, 30);
+    }
+
+    #[test]
+    fn cluster_by_proximity() {
+        let mut model = ReferencesModel::new("foo", loc("a.rs", 1, 0));
+        model.add_reference(ref_item("a.rs", 1, 0));
+        model.add_reference(ref_item("a.rs", 2, 0));
+        model.add_reference(ref_item("a.rs", 3, 0));
+        model.add_reference(ref_item("a.rs", 20, 0));
+        model.add_reference(ref_item("a.rs", 21, 0));
+        let clusters = model.cluster_by_proximity(2);
+        assert_eq!(clusters.len(), 2);
+        assert_eq!(clusters[0].len(), 3);
+        assert_eq!(clusters[1].len(), 2);
+    }
+
+    #[test]
+    fn flat_summary() {
+        let mut model = ReferencesModel::new("my_func", loc("a.rs", 1, 0));
+        model.add_reference(ref_item("a.rs", 10, 0));
+        model.add_reference(ref_item("b.rs", 5, 0));
+        let summary = model.flat_summary();
+        assert!(summary.contains("my_func"));
+        assert!(summary.contains("a.rs"));
+        assert!(summary.contains("b.rs"));
     }
 }

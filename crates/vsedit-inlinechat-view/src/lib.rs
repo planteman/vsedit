@@ -215,6 +215,165 @@ impl Default for InlineChatWidget {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Additional inline chat utilities
+// ---------------------------------------------------------------------------
+
+impl InlineChatEdit {
+    /// Create a new edit spanning a range.
+    pub fn new(start_line: u32, start_col: u32, end_line: u32, end_col: u32, new_text: impl Into<String>) -> Self {
+        Self { start_line, start_col, end_line, end_col, new_text: new_text.into() }
+    }
+
+    /// The number of lines this edit spans in the original document.
+    pub fn original_line_span(&self) -> u32 {
+        self.end_line.saturating_sub(self.start_line) + 1
+    }
+
+    /// The number of lines in the replacement text.
+    pub fn new_text_line_count(&self) -> usize {
+        if self.new_text.is_empty() { 0 } else { self.new_text.lines().count().max(1) }
+    }
+
+    /// Whether this edit is a pure insertion (start == end).
+    pub fn is_insertion(&self) -> bool {
+        self.start_line == self.end_line && self.start_col == self.end_col
+    }
+
+    /// Whether this edit is a pure deletion (empty new_text).
+    pub fn is_deletion(&self) -> bool {
+        self.new_text.is_empty() && !(self.start_line == self.end_line && self.start_col == self.end_col)
+    }
+}
+
+impl PartialEq for InlineChatEdit {
+    fn eq(&self, other: &Self) -> bool {
+        self.start_line == other.start_line
+            && self.start_col == other.start_col
+            && self.end_line == other.end_line
+            && self.end_col == other.end_col
+            && self.new_text == other.new_text
+    }
+}
+
+impl Eq for InlineChatEdit {}
+
+impl PartialEq for InlineChatResponse {
+    fn eq(&self, other: &Self) -> bool {
+        self.text == other.text && self.edits == other.edits
+    }
+}
+
+impl Eq for InlineChatResponse {}
+
+impl InlineChatResponse {
+    /// Create an empty response.
+    pub fn empty() -> Self {
+        Self { text: String::new(), edits: Vec::new() }
+    }
+
+    /// Total number of lines affected by all edits.
+    pub fn total_lines_affected(&self) -> u32 {
+        self.edits.iter().map(|e| e.original_line_span()).sum()
+    }
+
+    /// Whether the response contains any edits.
+    pub fn has_edits(&self) -> bool {
+        !self.edits.is_empty()
+    }
+
+    /// Word count of the response text.
+    pub fn word_count(&self) -> usize {
+        self.text.split_whitespace().count()
+    }
+}
+
+impl PartialEq for InlineChatHistoryEntry {
+    fn eq(&self, other: &Self) -> bool {
+        self.request.prompt == other.request.prompt && self.response.text == other.response.text
+    }
+}
+
+impl InlineChatRequest {
+    /// Number of lines in the selected range.
+    pub fn selection_line_count(&self) -> u32 {
+        self.selection_end_line.saturating_sub(self.selection_start_line) + 1
+    }
+
+    /// Whether the selection covers exactly one line.
+    pub fn is_single_line(&self) -> bool {
+        self.selection_start_line == self.selection_end_line
+    }
+
+    /// Word count of the prompt.
+    pub fn prompt_word_count(&self) -> usize {
+        self.prompt.split_whitespace().count()
+    }
+}
+
+impl PartialEq for InlineChatRequest {
+    fn eq(&self, other: &Self) -> bool {
+        self.prompt == other.prompt
+            && self.selection_start_line == other.selection_start_line
+            && self.selection_end_line == other.selection_end_line
+            && self.uri == other.uri
+    }
+}
+
+impl Eq for InlineChatRequest {}
+
+impl InlineChatWidget {
+    /// Set the state to error.
+    pub fn set_error(&mut self) {
+        self.state = InlineChatState::Error;
+    }
+
+    /// Finish streaming and transition to Done.
+    pub fn finish_streaming(&mut self) -> Result<(), InlineChatError> {
+        if self.state != InlineChatState::Streaming {
+            return Err(InlineChatError::NoActiveRequest);
+        }
+        self.state = InlineChatState::Done;
+        Ok(())
+    }
+
+    /// Get a summary of the current widget state.
+    pub fn summary(&self) -> String {
+        let state = &self.state;
+        let prompt = self.request.as_ref().map_or("none", |r| &r.prompt);
+        let edit_count = self.edit_count();
+        format!("state={state}, prompt=\"{prompt}\", edits={edit_count}")
+    }
+
+    /// Replace the current response entirely.
+    pub fn replace_response(&mut self, resp: InlineChatResponse) {
+        self.response = Some(resp);
+    }
+}
+
+impl InlineChatHistory {
+    /// Get the most recent entry.
+    pub fn last(&self) -> Option<&InlineChatHistoryEntry> {
+        self.entries.last()
+    }
+
+    /// Search history for entries whose prompt contains the query.
+    pub fn search(&self, query: &str) -> Vec<&InlineChatHistoryEntry> {
+        let q = query.to_lowercase();
+        self.entries.iter().filter(|e| e.request.prompt.to_lowercase().contains(&q)).collect()
+    }
+
+    /// Total number of edits across all history entries.
+    pub fn total_edits(&self) -> usize {
+        self.entries.iter().map(|e| e.response.edits.len()).sum()
+    }
+
+    /// Get entry by index.
+    pub fn get(&self, index: usize) -> Option<&InlineChatHistoryEntry> {
+        self.entries.get(index)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,5 +544,175 @@ mod tests {
         assert_eq!(*w.get_state(), InlineChatState::Idle);
         assert!(!w.is_active());
         assert_eq!(w.edit_count(), 0);
+    }
+
+    #[test]
+    fn inline_chat_edit_new() {
+        let e = InlineChatEdit::new(1, 0, 5, 10, "replacement");
+        assert_eq!(e.start_line, 1);
+        assert_eq!(e.end_col, 10);
+        assert_eq!(e.new_text, "replacement");
+    }
+
+    #[test]
+    fn edit_original_line_span() {
+        let e = InlineChatEdit::new(3, 0, 7, 0, "x");
+        assert_eq!(e.original_line_span(), 5);
+    }
+
+    #[test]
+    fn edit_new_text_line_count() {
+        let e = InlineChatEdit::new(0, 0, 0, 0, "a\nb\nc");
+        assert_eq!(e.new_text_line_count(), 3);
+        let e2 = InlineChatEdit::new(0, 0, 0, 5, "");
+        assert_eq!(e2.new_text_line_count(), 0);
+    }
+
+    #[test]
+    fn edit_is_insertion_deletion() {
+        let ins = InlineChatEdit::new(1, 5, 1, 5, "text");
+        assert!(ins.is_insertion());
+        assert!(!ins.is_deletion());
+        let del = InlineChatEdit::new(1, 0, 1, 5, "");
+        assert!(del.is_deletion());
+        assert!(!del.is_insertion());
+    }
+
+    #[test]
+    fn response_empty() {
+        let r = InlineChatResponse::empty();
+        assert!(!r.has_edits());
+        assert_eq!(r.word_count(), 0);
+    }
+
+    #[test]
+    fn response_total_lines_affected() {
+        let r = InlineChatResponse {
+            text: "done".into(),
+            edits: vec![
+                InlineChatEdit::new(1, 0, 3, 0, "x"),
+                InlineChatEdit::new(5, 0, 5, 0, "y"),
+            ],
+        };
+        assert_eq!(r.total_lines_affected(), 4);
+    }
+
+    #[test]
+    fn response_word_count() {
+        let r = InlineChatResponse {
+            text: "hello world foo bar".into(),
+            edits: Vec::new(),
+        };
+        assert_eq!(r.word_count(), 4);
+    }
+
+    #[test]
+    fn request_selection_line_count() {
+        let r = sample_request();
+        assert_eq!(r.selection_line_count(), 11);
+    }
+
+    #[test]
+    fn request_is_single_line() {
+        let r = InlineChatRequest {
+            prompt: "fix".into(),
+            selection_start_line: 5,
+            selection_end_line: 5,
+            uri: "f.rs".into(),
+        };
+        assert!(r.is_single_line());
+        assert!(!sample_request().is_single_line());
+    }
+
+    #[test]
+    fn request_prompt_word_count() {
+        let r = sample_request();
+        assert_eq!(r.prompt_word_count(), 2);
+    }
+
+    #[test]
+    fn widget_set_error() {
+        let mut w = InlineChatWidget::new();
+        w.start_request(sample_request());
+        w.set_error();
+        assert_eq!(*w.get_state(), InlineChatState::Error);
+    }
+
+    #[test]
+    fn widget_finish_streaming() {
+        let mut w = InlineChatWidget::new();
+        w.start_request(sample_request());
+        w.start_streaming().unwrap();
+        w.append_streaming("data").unwrap();
+        assert!(w.finish_streaming().is_ok());
+        assert_eq!(*w.get_state(), InlineChatState::Done);
+    }
+
+    #[test]
+    fn widget_finish_streaming_error() {
+        let mut w = InlineChatWidget::new();
+        assert!(w.finish_streaming().is_err());
+    }
+
+    #[test]
+    fn widget_summary() {
+        let mut w = InlineChatWidget::new();
+        w.start_request(sample_request());
+        let s = w.summary();
+        assert!(s.contains("Waiting"));
+        assert!(s.contains("refactor this"));
+    }
+
+    #[test]
+    fn history_last() {
+        let mut h = InlineChatHistory::new();
+        assert!(h.last().is_none());
+        h.push(sample_request(), sample_response());
+        assert!(h.last().is_some());
+    }
+
+    #[test]
+    fn history_search() {
+        let mut h = InlineChatHistory::new();
+        h.push(sample_request(), sample_response());
+        h.push(
+            InlineChatRequest { prompt: "optimize query".into(), selection_start_line: 1, selection_end_line: 5, uri: "q.rs".into() },
+            InlineChatResponse::empty(),
+        );
+        assert_eq!(h.search("refactor").len(), 1);
+        assert_eq!(h.search("optimize").len(), 1);
+        assert_eq!(h.search("nothing").len(), 0);
+    }
+
+    #[test]
+    fn history_total_edits() {
+        let mut h = InlineChatHistory::new();
+        h.push(sample_request(), sample_response());
+        h.push(sample_request(), InlineChatResponse::empty());
+        assert_eq!(h.total_edits(), 1);
+    }
+
+    #[test]
+    fn history_get_by_index() {
+        let mut h = InlineChatHistory::new();
+        h.push(sample_request(), sample_response());
+        assert!(h.get(0).is_some());
+        assert!(h.get(1).is_none());
+    }
+
+    #[test]
+    fn inline_chat_edit_equality() {
+        let a = InlineChatEdit::new(1, 0, 5, 10, "x");
+        let b = InlineChatEdit::new(1, 0, 5, 10, "x");
+        let c = InlineChatEdit::new(1, 0, 5, 10, "y");
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn request_equality() {
+        let a = sample_request();
+        let b = sample_request();
+        assert_eq!(a, b);
     }
 }

@@ -8,4 +8,5 @@ license.workspace = true
 [dependencies]
 ratatui = { workspace = true }
 vsedit-wb-terminal = { path = "../vsedit-wb-terminal" }
+vsedit-terminal-plat = { path = "../vsedit-terminal-plat" }
 

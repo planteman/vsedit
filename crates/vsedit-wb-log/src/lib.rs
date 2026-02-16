@@ -45,7 +45,7 @@ impl fmt::Display for LogError {
 }
 
 /// A single log entry.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LogEntry {
     pub level: LogLevel,
     pub message: String,
@@ -199,6 +199,182 @@ impl LogService {
 impl Default for LogService {
     fn default() -> Self {
         Self::new(LogLevel::Info)
+    }
+}
+
+/// Filter for selecting log entries by various criteria.
+#[derive(Debug, Clone, Default)]
+pub struct LogFilter {
+    level: Option<LogLevel>,
+    source: Option<String>,
+    message_contains: Option<String>,
+}
+
+impl LogFilter {
+    /// Create a new empty filter that matches all entries.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Only keep entries with this exact level.
+    pub fn with_level(mut self, level: LogLevel) -> Self {
+        self.level = Some(level);
+        self
+    }
+
+    /// Only keep entries whose source matches exactly.
+    pub fn with_source(mut self, source: String) -> Self {
+        self.source = Some(source);
+        self
+    }
+
+    /// Only keep entries whose message contains the substring.
+    pub fn with_message_contains(mut self, substring: String) -> Self {
+        self.message_contains = Some(substring);
+        self
+    }
+
+    /// Apply all configured filter criteria and return matching entries.
+    pub fn apply<'a>(&self, entries: &'a [LogEntry]) -> Vec<&'a LogEntry> {
+        entries
+            .iter()
+            .filter(|e| {
+                if let Some(ref lvl) = self.level {
+                    if e.level != *lvl {
+                        return false;
+                    }
+                }
+                if let Some(ref src) = self.source {
+                    match &e.source {
+                        Some(s) if s == src => {}
+                        _ => return false,
+                    }
+                }
+                if let Some(ref sub) = self.message_contains {
+                    if !e.message.contains(sub.as_str()) {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect()
+    }
+}
+
+/// Aggregate statistics about a collection of log entries.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogStats {
+    pub total: usize,
+    pub trace_count: usize,
+    pub debug_count: usize,
+    pub info_count: usize,
+    pub warning_count: usize,
+    pub error_count: usize,
+    pub critical_count: usize,
+    pub unique_sources: usize,
+}
+
+impl LogStats {
+    /// Compute statistics from a slice of log entries.
+    pub fn from_entries(entries: &[LogEntry]) -> Self {
+        let mut trace_count = 0;
+        let mut debug_count = 0;
+        let mut info_count = 0;
+        let mut warning_count = 0;
+        let mut error_count = 0;
+        let mut critical_count = 0;
+        let mut sources = std::collections::HashSet::new();
+
+        for entry in entries {
+            match entry.level {
+                LogLevel::Trace => trace_count += 1,
+                LogLevel::Debug => debug_count += 1,
+                LogLevel::Info => info_count += 1,
+                LogLevel::Warning => warning_count += 1,
+                LogLevel::Error => error_count += 1,
+                LogLevel::Critical => critical_count += 1,
+            }
+            if let Some(ref src) = entry.source {
+                sources.insert(src.clone());
+            }
+        }
+
+        Self {
+            total: entries.len(),
+            trace_count,
+            debug_count,
+            info_count,
+            warning_count,
+            error_count,
+            critical_count,
+            unique_sources: sources.len(),
+        }
+    }
+}
+
+/// Utilities for formatting log entries in various styles.
+pub struct LogFormatter;
+
+impl LogFormatter {
+    /// Compact format: `[LEVEL] msg`
+    pub fn format_compact(entry: &LogEntry) -> String {
+        format!("[{}] {}", entry.level, entry.message)
+    }
+
+    /// Detailed format: `[LEVEL] [source|unknown] (ts) msg`
+    pub fn format_detailed(entry: &LogEntry) -> String {
+        let src = entry.source.as_deref().unwrap_or("unknown");
+        format!(
+            "[{}] [{}] ({}) {}",
+            entry.level, src, entry.timestamp, entry.message
+        )
+    }
+
+    /// JSON format: `{"level":"X","message":"Y","source":"Z","timestamp":N}`
+    pub fn format_json(entry: &LogEntry) -> String {
+        let src = entry.source.as_deref().unwrap_or("");
+        format!(
+            r#"{{"level":"{}","message":"{}","source":"{}","timestamp":{}}}"#,
+            entry.level, entry.message, src, entry.timestamp
+        )
+    }
+}
+
+impl LogService {
+    /// Return entries whose source matches exactly.
+    pub fn get_entries_by_source(&self, source: &str) -> Vec<&LogEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.source.as_deref() == Some(source))
+            .collect()
+    }
+
+    /// Return a sorted, deduplicated list of all sources present in the log.
+    pub fn unique_sources(&self) -> Vec<String> {
+        let mut sources: Vec<String> = self
+            .entries
+            .iter()
+            .filter_map(|e| e.source.clone())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        sources.sort();
+        sources
+    }
+
+    /// Count entries at Error or Critical level.
+    pub fn error_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.is_error()).count()
+    }
+
+    /// Count entries at Warning level.
+    pub fn warning_count(&self) -> usize {
+        self.entries.iter().filter(|e| e.is_warning()).count()
+    }
+
+    /// Compute aggregate statistics for all current entries.
+    pub fn stats(&self) -> LogStats {
+        LogStats::from_entries(&self.entries)
     }
 }
 
@@ -391,5 +567,201 @@ mod tests {
         assert_eq!(svc.min_level, LogLevel::Info);
         assert!(svc.max_entries.is_none());
         assert_eq!(svc.entry_count(), 0);
+    }
+
+    // --- new tests ---
+
+    fn sample_entries() -> Vec<LogEntry> {
+        vec![
+            LogEntry { level: LogLevel::Info, message: "started".into(), source: Some("app".into()), timestamp: 1 },
+            LogEntry { level: LogLevel::Warning, message: "disk low".into(), source: Some("storage".into()), timestamp: 2 },
+            LogEntry { level: LogLevel::Error, message: "connection failed".into(), source: Some("network".into()), timestamp: 3 },
+            LogEntry { level: LogLevel::Info, message: "connected".into(), source: Some("network".into()), timestamp: 4 },
+            LogEntry { level: LogLevel::Debug, message: "tick".into(), source: None, timestamp: 5 },
+            LogEntry { level: LogLevel::Critical, message: "out of memory".into(), source: Some("app".into()), timestamp: 6 },
+        ]
+    }
+
+    #[test]
+    fn test_log_filter_by_level() {
+        let entries = sample_entries();
+        let filtered = LogFilter::new().with_level(LogLevel::Info).apply(&entries);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].message, "started");
+        assert_eq!(filtered[1].message, "connected");
+    }
+
+    #[test]
+    fn test_log_filter_by_source() {
+        let entries = sample_entries();
+        let filtered = LogFilter::new().with_source("network".into()).apply(&entries);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].message, "connection failed");
+        assert_eq!(filtered[1].message, "connected");
+    }
+
+    #[test]
+    fn test_log_filter_by_message() {
+        let entries = sample_entries();
+        let filtered = LogFilter::new()
+            .with_message_contains("connect".into())
+            .apply(&entries);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].message, "connection failed");
+        assert_eq!(filtered[1].message, "connected");
+    }
+
+    #[test]
+    fn test_log_filter_combined() {
+        let entries = sample_entries();
+        let filtered = LogFilter::new()
+            .with_level(LogLevel::Info)
+            .with_source("network".into())
+            .apply(&entries);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].message, "connected");
+    }
+
+    #[test]
+    fn test_log_stats() {
+        let entries = sample_entries();
+        let stats = LogStats::from_entries(&entries);
+        assert_eq!(stats.total, 6);
+        assert_eq!(stats.trace_count, 0);
+        assert_eq!(stats.debug_count, 1);
+        assert_eq!(stats.info_count, 2);
+        assert_eq!(stats.warning_count, 1);
+        assert_eq!(stats.error_count, 1);
+        assert_eq!(stats.critical_count, 1);
+        assert_eq!(stats.unique_sources, 3);
+    }
+
+    #[test]
+    fn test_format_compact() {
+        let entry = LogEntry {
+            level: LogLevel::Warning,
+            message: "low disk".into(),
+            source: Some("storage".into()),
+            timestamp: 42,
+        };
+        assert_eq!(LogFormatter::format_compact(&entry), "[WARN] low disk");
+    }
+
+    #[test]
+    fn test_format_detailed() {
+        let entry = LogEntry {
+            level: LogLevel::Error,
+            message: "fail".into(),
+            source: Some("net".into()),
+            timestamp: 99,
+        };
+        assert_eq!(
+            LogFormatter::format_detailed(&entry),
+            "[ERROR] [net] (99) fail"
+        );
+
+        let entry_no_src = LogEntry {
+            level: LogLevel::Info,
+            message: "hi".into(),
+            source: None,
+            timestamp: 10,
+        };
+        assert_eq!(
+            LogFormatter::format_detailed(&entry_no_src),
+            "[INFO] [unknown] (10) hi"
+        );
+    }
+
+    #[test]
+    fn test_format_json() {
+        let entry = LogEntry {
+            level: LogLevel::Info,
+            message: "boot".into(),
+            source: Some("sys".into()),
+            timestamp: 7,
+        };
+        assert_eq!(
+            LogFormatter::format_json(&entry),
+            r#"{"level":"INFO","message":"boot","source":"sys","timestamp":7}"#
+        );
+
+        let entry_no_src = LogEntry {
+            level: LogLevel::Debug,
+            message: "x".into(),
+            source: None,
+            timestamp: 0,
+        };
+        assert_eq!(
+            LogFormatter::format_json(&entry_no_src),
+            r#"{"level":"DEBUG","message":"x","source":"","timestamp":0}"#
+        );
+    }
+
+    #[test]
+    fn test_get_entries_by_source() {
+        let mut svc = LogService::new(LogLevel::Trace);
+        svc.log_with_source(LogLevel::Info, "a", "mod1");
+        svc.log_with_source(LogLevel::Warning, "b", "mod2");
+        svc.log_with_source(LogLevel::Error, "c", "mod1");
+        svc.info("no source");
+        let by_mod1 = svc.get_entries_by_source("mod1");
+        assert_eq!(by_mod1.len(), 2);
+        assert_eq!(by_mod1[0].message, "a");
+        assert_eq!(by_mod1[1].message, "c");
+        assert!(svc.get_entries_by_source("missing").is_empty());
+    }
+
+    #[test]
+    fn test_unique_sources() {
+        let mut svc = LogService::new(LogLevel::Trace);
+        svc.log_with_source(LogLevel::Info, "a", "beta");
+        svc.log_with_source(LogLevel::Info, "b", "alpha");
+        svc.log_with_source(LogLevel::Info, "c", "beta");
+        svc.info("no source");
+        let sources = svc.unique_sources();
+        assert_eq!(sources, vec!["alpha".to_string(), "beta".to_string()]);
+    }
+
+    #[test]
+    fn test_error_count() {
+        let mut svc = LogService::new(LogLevel::Trace);
+        svc.info("ok");
+        svc.error("e1");
+        svc.warn("w");
+        svc.error("e2");
+        svc.log(LogLevel::Critical, "c1", None);
+        assert_eq!(svc.error_count(), 3);
+    }
+
+    #[test]
+    fn test_warning_count() {
+        let mut svc = LogService::new(LogLevel::Trace);
+        svc.info("ok");
+        svc.warn("w1");
+        svc.warn("w2");
+        svc.error("e");
+        assert_eq!(svc.warning_count(), 2);
+    }
+
+    #[test]
+    fn test_service_stats() {
+        let mut svc = LogService::new(LogLevel::Trace);
+        svc.trace("t");
+        svc.debug("d");
+        svc.info("i");
+        svc.warn("w");
+        svc.error("e");
+        svc.log(LogLevel::Critical, "c", None);
+        svc.log_with_source(LogLevel::Info, "i2", "src1");
+        svc.log_with_source(LogLevel::Info, "i3", "src2");
+        let stats = svc.stats();
+        assert_eq!(stats.total, 8);
+        assert_eq!(stats.trace_count, 1);
+        assert_eq!(stats.debug_count, 1);
+        assert_eq!(stats.info_count, 3);
+        assert_eq!(stats.warning_count, 1);
+        assert_eq!(stats.error_count, 1);
+        assert_eq!(stats.critical_count, 1);
+        assert_eq!(stats.unique_sources, 2);
     }
 }

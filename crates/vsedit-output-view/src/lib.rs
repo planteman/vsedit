@@ -193,6 +193,166 @@ impl Default for OutputService {
     }
 }
 
+/// Log severity level for structured output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl fmt::Display for LogLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LogLevel::Trace => write!(f, "TRACE"),
+            LogLevel::Debug => write!(f, "DEBUG"),
+            LogLevel::Info => write!(f, "INFO"),
+            LogLevel::Warn => write!(f, "WARN"),
+            LogLevel::Error => write!(f, "ERROR"),
+        }
+    }
+}
+
+/// A structured log entry with level, timestamp and message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogEntry {
+    pub level: LogLevel,
+    pub timestamp_ms: u64,
+    pub message: String,
+    pub source: Option<String>,
+}
+
+impl LogEntry {
+    pub fn new(level: LogLevel, message: impl Into<String>, timestamp_ms: u64) -> Self {
+        Self {
+            level,
+            timestamp_ms,
+            message: message.into(),
+            source: None,
+        }
+    }
+
+    pub fn with_source(mut self, source: impl Into<String>) -> Self {
+        self.source = Some(source.into());
+        self
+    }
+
+    /// Format the entry as a log line.
+    pub fn format(&self) -> String {
+        let src = self.source.as_deref().unwrap_or("unknown");
+        format!("[{} {}] {}: {}", self.timestamp_ms, self.level, src, self.message)
+    }
+}
+
+impl fmt::Display for LogEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.format())
+    }
+}
+
+/// Statistics for an output channel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutputChannelStats {
+    pub total_lines: usize,
+    pub total_chars: usize,
+    pub longest_line_len: usize,
+    pub empty_lines: usize,
+}
+
+impl OutputChannel {
+    /// Compute statistics about the channel's content.
+    pub fn stats(&self) -> OutputChannelStats {
+        let total_lines = self.lines.len();
+        let total_chars: usize = self.lines.iter().map(|l| l.len()).sum();
+        let longest_line_len = self.lines.iter().map(|l| l.len()).max().unwrap_or(0);
+        let empty_lines = self.lines.iter().filter(|l| l.trim().is_empty()).count();
+        OutputChannelStats {
+            total_lines,
+            total_chars,
+            longest_line_len,
+            empty_lines,
+        }
+    }
+
+    /// Return the first `n` lines.
+    pub fn head(&self, n: usize) -> Vec<&str> {
+        self.lines.iter().take(n).map(|s| s.as_str()).collect()
+    }
+
+    /// Filter lines that match a predicate, returning (index, line).
+    pub fn filter_lines<F>(&self, predicate: F) -> Vec<(usize, &str)>
+    where
+        F: Fn(&str) -> bool,
+    {
+        self.lines
+            .iter()
+            .enumerate()
+            .filter(|(_, line)| predicate(line))
+            .map(|(i, line)| (i, line.as_str()))
+            .collect()
+    }
+
+    /// Count occurrences of a pattern across all lines.
+    pub fn count_pattern(&self, pattern: &str) -> usize {
+        self.lines.iter().map(|line| line.matches(pattern).count()).sum()
+    }
+
+    /// Return lines in reverse order.
+    pub fn reversed_lines(&self) -> Vec<&str> {
+        self.lines.iter().rev().map(|s| s.as_str()).collect()
+    }
+
+    /// Truncate to keep only the last `n` lines, removing older lines.
+    pub fn truncate_to_tail(&mut self, n: usize) {
+        if self.lines.len() > n {
+            let start = self.lines.len() - n;
+            self.lines = self.lines.split_off(start);
+        }
+    }
+
+    /// Append a batch of lines at once.
+    pub fn append_lines(&mut self, lines: &[&str]) {
+        for line in lines {
+            self.lines.push(line.to_string());
+        }
+    }
+}
+
+impl OutputService {
+    /// Find all channels containing a specific text pattern.
+    pub fn search_all_channels(&self, pattern: &str) -> Vec<(&OutputChannel, Vec<(usize, &str)>)> {
+        self.channels
+            .iter()
+            .map(|ch| (ch, ch.search(pattern)))
+            .filter(|(_, results)| !results.is_empty())
+            .collect()
+    }
+
+    /// Return total line count across all channels.
+    pub fn total_lines(&self) -> usize {
+        self.channels.iter().map(|ch| ch.line_count()).sum()
+    }
+
+    /// Get visible channels.
+    pub fn visible_channels(&self) -> Vec<&OutputChannel> {
+        self.channels.iter().filter(|ch| ch.visible).collect()
+    }
+
+    /// Hide all channels.
+    pub fn hide_all(&mut self) {
+        for ch in &mut self.channels {
+            ch.hide();
+        }
+    }
+
+    /// Get channel names as a list.
+    pub fn channel_names(&self) -> Vec<&str> {
+        self.channels.iter().map(|ch| ch.name.as_str()).collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,5 +518,169 @@ mod tests {
         svc.clear_all();
         assert_eq!(svc.get_channel("channel-0").unwrap().line_count(), 0);
         assert_eq!(svc.get_channel("channel-1").unwrap().line_count(), 0);
+    }
+
+    #[test]
+    fn log_level_display() {
+        assert_eq!(LogLevel::Trace.to_string(), "TRACE");
+        assert_eq!(LogLevel::Debug.to_string(), "DEBUG");
+        assert_eq!(LogLevel::Info.to_string(), "INFO");
+        assert_eq!(LogLevel::Warn.to_string(), "WARN");
+        assert_eq!(LogLevel::Error.to_string(), "ERROR");
+    }
+
+    #[test]
+    fn log_level_ordering() {
+        assert!(LogLevel::Trace < LogLevel::Debug);
+        assert!(LogLevel::Debug < LogLevel::Info);
+        assert!(LogLevel::Info < LogLevel::Warn);
+        assert!(LogLevel::Warn < LogLevel::Error);
+    }
+
+    #[test]
+    fn log_entry_format() {
+        let entry = LogEntry::new(LogLevel::Error, "something failed", 12345)
+            .with_source("build");
+        assert_eq!(entry.format(), "[12345 ERROR] build: something failed");
+        assert_eq!(entry.to_string(), "[12345 ERROR] build: something failed");
+    }
+
+    #[test]
+    fn log_entry_no_source() {
+        let entry = LogEntry::new(LogLevel::Info, "hello", 100);
+        assert!(entry.format().contains("unknown"));
+    }
+
+    #[test]
+    fn channel_stats() {
+        let mut ch = OutputChannel::new("ch1", "Log");
+        ch.append_line("hello world");
+        ch.append_line("");
+        ch.append_line("short");
+        let stats = ch.stats();
+        assert_eq!(stats.total_lines, 3);
+        assert_eq!(stats.longest_line_len, 11);
+        assert_eq!(stats.empty_lines, 1);
+        assert_eq!(stats.total_chars, 16);
+    }
+
+    #[test]
+    fn channel_stats_empty() {
+        let ch = OutputChannel::new("ch1", "Log");
+        let stats = ch.stats();
+        assert_eq!(stats.total_lines, 0);
+        assert_eq!(stats.longest_line_len, 0);
+    }
+
+    #[test]
+    fn channel_head() {
+        let mut ch = OutputChannel::new("ch1", "Log");
+        ch.append_line("a");
+        ch.append_line("b");
+        ch.append_line("c");
+        assert_eq!(ch.head(2), vec!["a", "b"]);
+        assert_eq!(ch.head(10).len(), 3);
+    }
+
+    #[test]
+    fn channel_filter_lines() {
+        let mut ch = OutputChannel::new("ch1", "Log");
+        ch.append_line("error: fail");
+        ch.append_line("info: ok");
+        ch.append_line("error: crash");
+        let errors = ch.filter_lines(|l| l.starts_with("error"));
+        assert_eq!(errors.len(), 2);
+        assert_eq!(errors[0].0, 0);
+        assert_eq!(errors[1].0, 2);
+    }
+
+    #[test]
+    fn channel_count_pattern() {
+        let mut ch = OutputChannel::new("ch1", "Log");
+        ch.append_line("error error error");
+        ch.append_line("no issues");
+        ch.append_line("error");
+        assert_eq!(ch.count_pattern("error"), 4);
+        assert_eq!(ch.count_pattern("missing"), 0);
+    }
+
+    #[test]
+    fn channel_reversed_lines() {
+        let mut ch = OutputChannel::new("ch1", "Log");
+        ch.append_line("a");
+        ch.append_line("b");
+        ch.append_line("c");
+        assert_eq!(ch.reversed_lines(), vec!["c", "b", "a"]);
+    }
+
+    #[test]
+    fn channel_truncate_to_tail() {
+        let mut ch = OutputChannel::new("ch1", "Log");
+        for i in 0..10 {
+            ch.append_line(&format!("line {i}"));
+        }
+        ch.truncate_to_tail(3);
+        assert_eq!(ch.line_count(), 3);
+        assert_eq!(ch.get_line(0), Some("line 7"));
+    }
+
+    #[test]
+    fn channel_append_lines_batch() {
+        let mut ch = OutputChannel::new("ch1", "Log");
+        ch.append_lines(&["a", "b", "c"]);
+        assert_eq!(ch.line_count(), 3);
+        assert_eq!(ch.get_line(1), Some("b"));
+    }
+
+    #[test]
+    fn service_search_all_channels() {
+        let mut svc = OutputService::new();
+        svc.create_channel("Build");
+        svc.create_channel("Tests");
+        svc.get_channel_mut("channel-0").unwrap().append_line("error: build failed");
+        svc.get_channel_mut("channel-1").unwrap().append_line("all tests passed");
+        let results = svc.search_all_channels("error");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0.name, "Build");
+    }
+
+    #[test]
+    fn service_total_lines() {
+        let mut svc = OutputService::new();
+        svc.create_channel("A");
+        svc.create_channel("B");
+        svc.get_channel_mut("channel-0").unwrap().append_line("x");
+        svc.get_channel_mut("channel-1").unwrap().append_line("y");
+        svc.get_channel_mut("channel-1").unwrap().append_line("z");
+        assert_eq!(svc.total_lines(), 3);
+    }
+
+    #[test]
+    fn service_visible_channels() {
+        let mut svc = OutputService::new();
+        svc.create_channel("A");
+        svc.create_channel("B");
+        svc.get_channel_mut("channel-0").unwrap().show();
+        assert_eq!(svc.visible_channels().len(), 1);
+        assert_eq!(svc.visible_channels()[0].name, "A");
+    }
+
+    #[test]
+    fn service_hide_all() {
+        let mut svc = OutputService::new();
+        svc.create_channel("A");
+        svc.create_channel("B");
+        svc.get_channel_mut("channel-0").unwrap().show();
+        svc.get_channel_mut("channel-1").unwrap().show();
+        svc.hide_all();
+        assert!(svc.visible_channels().is_empty());
+    }
+
+    #[test]
+    fn service_channel_names() {
+        let mut svc = OutputService::new();
+        svc.create_channel("Build");
+        svc.create_channel("Tests");
+        assert_eq!(svc.channel_names(), vec!["Build", "Tests"]);
     }
 }

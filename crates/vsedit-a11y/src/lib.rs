@@ -240,6 +240,189 @@ impl fmt::Display for AriaDescription {
     }
 }
 
+// --- FocusTracker ---
+
+/// Tracks focused element IDs in a focus chain.
+#[derive(Debug, Clone)]
+pub struct FocusTracker {
+    pub focus_chain: Vec<String>,
+    pub current_index: Option<usize>,
+}
+
+impl FocusTracker {
+    pub fn new() -> Self {
+        Self {
+            focus_chain: Vec::new(),
+            current_index: None,
+        }
+    }
+
+    pub fn push(&mut self, id: String) {
+        self.focus_chain.push(id);
+        if self.current_index.is_none() {
+            self.current_index = Some(0);
+        }
+    }
+
+    pub fn focus_next(&mut self) -> Option<&str> {
+        let len = self.focus_chain.len();
+        if len == 0 {
+            return None;
+        }
+        let idx = match self.current_index {
+            Some(i) if i + 1 < len => i + 1,
+            Some(i) => i,
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        Some(&self.focus_chain[idx])
+    }
+
+    pub fn focus_previous(&mut self) -> Option<&str> {
+        let len = self.focus_chain.len();
+        if len == 0 {
+            return None;
+        }
+        let idx = match self.current_index {
+            Some(i) if i > 0 => i - 1,
+            Some(_) => 0,
+            None => 0,
+        };
+        self.current_index = Some(idx);
+        Some(&self.focus_chain[idx])
+    }
+
+    pub fn current_focus(&self) -> Option<&str> {
+        self.current_index
+            .and_then(|i| self.focus_chain.get(i))
+            .map(|s| s.as_str())
+    }
+
+    pub fn clear(&mut self) {
+        self.focus_chain.clear();
+        self.current_index = None;
+    }
+
+    pub fn len(&self) -> usize {
+        self.focus_chain.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.focus_chain.is_empty()
+    }
+
+    pub fn remove(&mut self, id: &str) -> bool {
+        if let Some(pos) = self.focus_chain.iter().position(|s| s == id) {
+            self.focus_chain.remove(pos);
+            if self.focus_chain.is_empty() {
+                self.current_index = None;
+            } else if let Some(ci) = self.current_index {
+                if ci >= self.focus_chain.len() {
+                    self.current_index = Some(self.focus_chain.len() - 1);
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+}
+
+impl Default for FocusTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// --- KeyboardNavigation ---
+
+/// Tracks keyboard navigation state.
+#[derive(Debug, Clone)]
+pub struct KeyboardNavigation {
+    pub tab_index: i32,
+    pub trap_focus: bool,
+    pub skip_links: Vec<String>,
+}
+
+impl KeyboardNavigation {
+    pub fn new() -> Self {
+        Self {
+            tab_index: 0,
+            trap_focus: false,
+            skip_links: Vec::new(),
+        }
+    }
+
+    pub fn set_tab_index(&mut self, index: i32) {
+        self.tab_index = index;
+    }
+
+    pub fn add_skip_link(&mut self, link: String) {
+        self.skip_links.push(link);
+    }
+
+    pub fn is_focus_trapped(&self) -> bool {
+        self.trap_focus
+    }
+
+    pub fn set_trap_focus(&mut self, trapped: bool) {
+        self.trap_focus = trapped;
+    }
+
+    pub fn skip_link_count(&self) -> usize {
+        self.skip_links.len()
+    }
+}
+
+impl Default for KeyboardNavigation {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// --- Display impls ---
+
+impl fmt::Display for Verbosity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Low => write!(f, "Low"),
+            Self::Medium => write!(f, "Medium"),
+            Self::High => write!(f, "High"),
+        }
+    }
+}
+
+impl fmt::Display for AccessibilityConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "AccessibilityConfig(enabled={}, verbosity={}, reduce_motion={})",
+            self.enabled, self.verbosity, self.reduce_motion
+        )
+    }
+}
+
+// --- Extra methods ---
+
+impl Announcement {
+    /// Validate that the announcement message is non-empty.
+    pub fn validate(&self) -> Result<(), AccessibilityError> {
+        if self.message.is_empty() {
+            Err(AccessibilityError::InvalidAnnouncement)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl AccessibilityConfig {
+    /// Builder-style method to set verbosity.
+    pub fn with_verbosity(mut self, v: Verbosity) -> Self {
+        self.verbosity = v;
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -385,5 +568,137 @@ mod tests {
             format!("{}", AccessibilityError::RoleNotSupported(AriaRole::Grid)),
             "role not supported: grid"
         );
+    }
+
+    #[test]
+    fn test_focus_tracker_new_empty() {
+        let ft = FocusTracker::new();
+        assert!(ft.is_empty());
+        assert_eq!(ft.len(), 0);
+        assert!(ft.current_focus().is_none());
+    }
+
+    #[test]
+    fn test_focus_tracker_push_and_navigate() {
+        let mut ft = FocusTracker::new();
+        ft.push("a".to_string());
+        ft.push("b".to_string());
+        ft.push("c".to_string());
+        assert_eq!(ft.len(), 3);
+        assert_eq!(ft.current_focus(), Some("a"));
+        assert_eq!(ft.focus_next(), Some("b"));
+        assert_eq!(ft.focus_next(), Some("c"));
+        assert_eq!(ft.current_focus(), Some("c"));
+    }
+
+    #[test]
+    fn test_focus_tracker_focus_next_wraps() {
+        let mut ft = FocusTracker::new();
+        ft.push("x".to_string());
+        ft.push("y".to_string());
+        // Move to last element
+        ft.focus_next();
+        // Calling focus_next again should NOT wrap, returns last
+        assert_eq!(ft.focus_next(), Some("y"));
+    }
+
+    #[test]
+    fn test_focus_tracker_focus_previous_clamps() {
+        let mut ft = FocusTracker::new();
+        ft.push("a".to_string());
+        ft.push("b".to_string());
+        // Already at index 0
+        assert_eq!(ft.focus_previous(), Some("a"));
+        assert_eq!(ft.focus_previous(), Some("a"));
+    }
+
+    #[test]
+    fn test_focus_tracker_remove() {
+        let mut ft = FocusTracker::new();
+        ft.push("a".to_string());
+        ft.push("b".to_string());
+        ft.push("c".to_string());
+        assert!(ft.remove("b"));
+        assert_eq!(ft.len(), 2);
+        assert!(!ft.remove("z"));
+    }
+
+    #[test]
+    fn test_focus_tracker_clear() {
+        let mut ft = FocusTracker::new();
+        ft.push("a".to_string());
+        ft.push("b".to_string());
+        ft.clear();
+        assert!(ft.is_empty());
+        assert!(ft.current_focus().is_none());
+    }
+
+    #[test]
+    fn test_keyboard_nav_defaults() {
+        let kn = KeyboardNavigation::new();
+        assert_eq!(kn.tab_index, 0);
+        assert!(!kn.is_focus_trapped());
+        assert_eq!(kn.skip_link_count(), 0);
+    }
+
+    #[test]
+    fn test_keyboard_nav_tab_index() {
+        let mut kn = KeyboardNavigation::new();
+        kn.set_tab_index(-1);
+        assert_eq!(kn.tab_index, -1);
+        kn.set_tab_index(5);
+        assert_eq!(kn.tab_index, 5);
+    }
+
+    #[test]
+    fn test_keyboard_nav_skip_links() {
+        let mut kn = KeyboardNavigation::new();
+        kn.add_skip_link("main-content".to_string());
+        kn.add_skip_link("footer".to_string());
+        assert_eq!(kn.skip_link_count(), 2);
+    }
+
+    #[test]
+    fn test_keyboard_nav_trap_focus() {
+        let mut kn = KeyboardNavigation::new();
+        assert!(!kn.is_focus_trapped());
+        kn.set_trap_focus(true);
+        assert!(kn.is_focus_trapped());
+        kn.set_trap_focus(false);
+        assert!(!kn.is_focus_trapped());
+    }
+
+    #[test]
+    fn test_announcement_validate_ok() {
+        let a = Announcement::polite("hello");
+        assert!(a.validate().is_ok());
+    }
+
+    #[test]
+    fn test_announcement_validate_empty() {
+        let a = Announcement::polite("");
+        assert_eq!(a.validate(), Err(AccessibilityError::InvalidAnnouncement));
+    }
+
+    #[test]
+    fn test_verbosity_display() {
+        assert_eq!(format!("{}", Verbosity::Low), "Low");
+        assert_eq!(format!("{}", Verbosity::Medium), "Medium");
+        assert_eq!(format!("{}", Verbosity::High), "High");
+    }
+
+    #[test]
+    fn test_config_display() {
+        let cfg = AccessibilityConfig::default();
+        let s = format!("{cfg}");
+        assert!(s.contains("enabled=true"));
+        assert!(s.contains("verbosity=Medium"));
+        assert!(s.contains("reduce_motion=false"));
+    }
+
+    #[test]
+    fn test_config_with_verbosity() {
+        let cfg = AccessibilityConfig::default().with_verbosity(Verbosity::High);
+        assert_eq!(cfg.verbosity, Verbosity::High);
     }
 }
