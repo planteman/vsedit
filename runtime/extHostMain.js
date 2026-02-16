@@ -1,11 +1,12 @@
 // vsedit Extension Host — runs VS Code extensions unchanged
-// Communicates with Rust main process via Content-Length JSON-RPC over stdin/stdout
+// Communicates with Rust main process via Content-Length framed messages
+// Wire format: { type: "request"|"response"|"event", ... }
 'use strict';
 
 const path = require('path');
 const fs = require('fs');
 
-// ─── JSON-RPC Transport ────────────────────────────────────────────────────────
+// ─── RPC Transport (Content-Length framing, vsedit wire format) ─────────────────
 
 class RpcTransport {
     constructor() {
@@ -42,27 +43,64 @@ class RpcTransport {
     }
 
     _handleMessage(msg) {
-        if (msg.id !== undefined && msg.method) {
-            const handler = this._handlers.get(msg.method);
-            if (handler) {
-                Promise.resolve(handler(msg.params)).then(result => {
-                    this._send({ jsonrpc: '2.0', id: msg.id, result: result ?? null });
-                }).catch(err => {
-                    this._send({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: err.message } });
-                });
-            } else {
-                this._send({ jsonrpc: '2.0', id: msg.id, error: { code: -32601, message: `Unknown method: ${msg.method}` } });
+        switch (msg.type) {
+            case 'request': {
+                // Incoming request from host: { type, id, proxyId, method, args }
+                const key = msg.proxyId ? `${msg.proxyId}/${msg.method}` : msg.method;
+                const handler = this._handlers.get(key) || this._handlers.get(msg.method);
+                if (handler) {
+                    // Extract params: if args has one object element, unwrap it
+                    const params = (msg.args && msg.args.length === 1 && typeof msg.args[0] === 'object' && msg.args[0] !== null)
+                        ? msg.args[0]
+                        : (msg.args || {});
+                    Promise.resolve(handler(params)).then(result => {
+                        this._send({ type: 'response', id: msg.id, result: result ?? null });
+                    }).catch(err => {
+                        this._send({ type: 'response', id: msg.id, error: { message: err.message } });
+                    });
+                } else {
+                    this._send({ type: 'response', id: msg.id, error: { message: `Unknown method: ${key}` } });
+                }
+                break;
             }
-        } else if (msg.id !== undefined) {
-            const pending = this._pendingRequests.get(msg.id);
-            if (pending) {
-                this._pendingRequests.delete(msg.id);
-                if (msg.error) pending.reject(new Error(msg.error.message));
-                else pending.resolve(msg.result);
+            case 'response': {
+                // Response to our outgoing request
+                const pending = this._pendingRequests.get(msg.id);
+                if (pending) {
+                    this._pendingRequests.delete(msg.id);
+                    if (msg.error) pending.reject(new Error(msg.error.message));
+                    else pending.resolve(msg.result);
+                }
+                break;
             }
-        } else if (msg.method) {
-            const handler = this._handlers.get(msg.method);
-            if (handler) handler(msg.params);
+            case 'event': {
+                // Incoming event/notification: { type, proxyId, eventName, data }
+                const key = msg.proxyId ? `${msg.proxyId}/${msg.eventName}` : msg.eventName;
+                const handler = this._handlers.get(key) || this._handlers.get(msg.eventName);
+                if (handler) handler(msg.data);
+                break;
+            }
+            default: {
+                // Fallback: try to handle messages that may not have 'type' field
+                // (e.g., from test tooling)
+                if (msg.id !== undefined && msg.method) {
+                    const handler = this._handlers.get(msg.method);
+                    if (handler) {
+                        Promise.resolve(handler(msg.params || msg.args || {})).then(result => {
+                            this._send({ type: 'response', id: msg.id, result: result ?? null });
+                        }).catch(err => {
+                            this._send({ type: 'response', id: msg.id, error: { message: err.message } });
+                        });
+                    }
+                } else if (msg.id !== undefined) {
+                    const pending = this._pendingRequests.get(msg.id);
+                    if (pending) {
+                        this._pendingRequests.delete(msg.id);
+                        if (msg.error) pending.reject(new Error(msg.error.message));
+                        else pending.resolve(msg.result);
+                    }
+                }
+            }
         }
     }
 
@@ -74,14 +112,32 @@ class RpcTransport {
 
     request(method, params) {
         const id = this._nextId++;
+        // Split 'proxyId/method' convention (e.g. 'mainThread/executeCommand')
+        let proxyId = 'ExtHost';
+        let rpcMethod = method;
+        const slashIdx = method.indexOf('/');
+        if (slashIdx > 0) {
+            proxyId = method.substring(0, slashIdx);
+            rpcMethod = method.substring(slashIdx + 1);
+        }
+        // Convert params object to args array for the wire format
+        const args = params !== undefined ? [params] : [];
         return new Promise((resolve, reject) => {
             this._pendingRequests.set(id, { resolve, reject });
-            this._send({ jsonrpc: '2.0', id, method, params: params ?? {} });
+            this._send({ type: 'request', id, proxyId, method: rpcMethod, args });
         });
     }
 
     notify(method, params) {
-        this._send({ jsonrpc: '2.0', method, params: params ?? {} });
+        // Notifications are sent as events in the wire format
+        let proxyId = 'ExtHost';
+        let eventName = method;
+        const slashIdx = method.indexOf('/');
+        if (slashIdx > 0) {
+            proxyId = method.substring(0, slashIdx);
+            eventName = method.substring(slashIdx + 1);
+        }
+        this._send({ type: 'event', proxyId, eventName, data: params ?? {} });
     }
 
     onRequest(method, handler) { this._handlers.set(method, handler); }
