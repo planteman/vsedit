@@ -739,6 +739,107 @@ impl Disposable for DisposableNone {
 }
 
 // ---------------------------------------------------------------------------
+// DisposableBatch
+// ---------------------------------------------------------------------------
+
+/// A batch container for bulk disposal management.
+pub struct DisposableBatch {
+    items: Vec<Box<dyn Disposable>>,
+    label: String,
+}
+
+impl DisposableBatch {
+    /// Create a new batch with the given label.
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            items: Vec::new(),
+            label: label.into(),
+        }
+    }
+
+    /// Add a disposable item to the batch.
+    pub fn add(&mut self, item: impl Disposable + 'static) {
+        self.items.push(Box::new(item));
+    }
+
+    /// Returns the number of items in the batch.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Returns `true` if the batch contains no items.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Dispose all items and return the count disposed.
+    pub fn dispose_all(&mut self) -> usize {
+        let count = self.items.len();
+        for item in self.items.drain(..) {
+            item.dispose();
+        }
+        count
+    }
+
+    /// Dispose the first `n` items and return the actual count disposed.
+    pub fn dispose_first_n(&mut self, n: usize) -> usize {
+        let actual = n.min(self.items.len());
+        for item in self.items.drain(..actual) {
+            item.dispose();
+        }
+        actual
+    }
+}
+
+// ---------------------------------------------------------------------------
+// lifecycle_phase_name
+// ---------------------------------------------------------------------------
+
+/// Returns a human-readable name for a lifecycle phase number.
+pub fn lifecycle_phase_name(phase: u8) -> &'static str {
+    match phase {
+        0 => "None",
+        1 => "Starting",
+        2 => "Ready",
+        3 => "ShuttingDown",
+        4 => "Disposed",
+        _ => "Unknown",
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DisposableGuard
+// ---------------------------------------------------------------------------
+
+/// An RAII guard that disposes a [`DisposableStore`] when dropped.
+pub struct DisposableGuard {
+    store: DisposableStore,
+}
+
+impl DisposableGuard {
+    /// Create a new guard wrapping the given store.
+    pub fn new(store: DisposableStore) -> Self {
+        Self { store }
+    }
+
+    /// Returns a shared reference to the inner store.
+    pub fn store(&self) -> &DisposableStore {
+        &self.store
+    }
+
+    /// Returns a mutable reference to the inner store.
+    pub fn store_mut(&mut self) -> &mut DisposableStore {
+        &mut self.store
+    }
+}
+
+impl Drop for DisposableGuard {
+    fn drop(&mut self) {
+        self.store.dispose();
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1113,5 +1214,91 @@ mod tests {
         assert_eq!(store.len(), 10);
         store.dispose();
         assert_eq!(count.load(Ordering::SeqCst), 10);
+    }
+
+    // -- DisposableBatch ----------------------------------------------------
+
+    #[test]
+    fn test_disposable_batch_add_and_len() {
+        let mut batch = DisposableBatch::new("test");
+        assert_eq!(batch.len(), 0);
+        let (d1, _) = counted_disposable();
+        let (d2, _) = counted_disposable();
+        batch.add(d1);
+        batch.add(d2);
+        assert_eq!(batch.len(), 2);
+    }
+
+    #[test]
+    fn test_disposable_batch_dispose_all() {
+        let mut batch = DisposableBatch::new("test");
+        let (d1, c1) = counted_disposable();
+        let (d2, c2) = counted_disposable();
+        batch.add(d1);
+        batch.add(d2);
+        let count = batch.dispose_all();
+        assert_eq!(count, 2);
+        assert_eq!(c1.load(Ordering::SeqCst), 1);
+        assert_eq!(c2.load(Ordering::SeqCst), 1);
+        assert_eq!(batch.len(), 0);
+    }
+
+    #[test]
+    fn test_disposable_batch_dispose_first_n() {
+        let mut batch = DisposableBatch::new("test");
+        let (d1, c1) = counted_disposable();
+        let (d2, c2) = counted_disposable();
+        let (d3, c3) = counted_disposable();
+        batch.add(d1);
+        batch.add(d2);
+        batch.add(d3);
+        let count = batch.dispose_first_n(2);
+        assert_eq!(count, 2);
+        assert_eq!(c1.load(Ordering::SeqCst), 1);
+        assert_eq!(c2.load(Ordering::SeqCst), 1);
+        assert_eq!(c3.load(Ordering::SeqCst), 0);
+        assert_eq!(batch.len(), 1);
+        // Request more than available
+        let count = batch.dispose_first_n(5);
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_disposable_batch_empty() {
+        let batch = DisposableBatch::new("empty");
+        assert!(batch.is_empty());
+        assert_eq!(batch.len(), 0);
+    }
+
+    // -- lifecycle_phase_name -----------------------------------------------
+
+    #[test]
+    fn test_lifecycle_phase_name_known() {
+        assert_eq!(lifecycle_phase_name(0), "None");
+        assert_eq!(lifecycle_phase_name(1), "Starting");
+        assert_eq!(lifecycle_phase_name(2), "Ready");
+        assert_eq!(lifecycle_phase_name(3), "ShuttingDown");
+        assert_eq!(lifecycle_phase_name(4), "Disposed");
+    }
+
+    #[test]
+    fn test_lifecycle_phase_name_unknown() {
+        assert_eq!(lifecycle_phase_name(5), "Unknown");
+        assert_eq!(lifecycle_phase_name(255), "Unknown");
+    }
+
+    // -- DisposableGuard ----------------------------------------------------
+
+    #[test]
+    fn test_disposable_guard_drop() {
+        let store = DisposableStore::new();
+        let (d, count) = counted_disposable();
+        store.add(d);
+        {
+            let _guard = DisposableGuard::new(store);
+            assert_eq!(count.load(Ordering::SeqCst), 0);
+        }
+        // After guard is dropped, the store should be disposed.
+        assert_eq!(count.load(Ordering::SeqCst), 1);
     }
 }

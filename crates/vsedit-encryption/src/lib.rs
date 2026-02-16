@@ -680,6 +680,86 @@ impl EncryptionService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Convenience free functions
+// ---------------------------------------------------------------------------
+
+/// Create an `EncryptedPayload` from plaintext and key using a deterministic IV.
+pub fn encrypt_payload(plaintext: &[u8], key: &[u8]) -> EncryptedPayload {
+    // Derive a deterministic IV from key + plaintext
+    let mut iv = vec![0u8; 16];
+    for (i, &b) in key.iter().chain(plaintext.iter()).enumerate() {
+        iv[i % 16] ^= b;
+        iv[i % 16] = iv[i % 16].wrapping_add(b.wrapping_mul(37));
+    }
+    let svc = EncryptionService::new(key.to_vec());
+    svc.encrypt_with_iv(plaintext, &iv)
+}
+
+/// Decrypt an `EncryptedPayload` using the given key.
+pub fn decrypt_payload(payload: &EncryptedPayload, key: &[u8]) -> Result<Vec<u8>, String> {
+    if key.is_empty() {
+        return Err("key must not be empty".to_string());
+    }
+    let svc = EncryptionService::new(key.to_vec());
+    Ok(svc.decrypt_payload(payload))
+}
+
+// ---------------------------------------------------------------------------
+// Audit log
+// ---------------------------------------------------------------------------
+
+/// A single audit log entry.
+#[derive(Debug, Clone)]
+pub struct AuditEntry {
+    pub operation: String,
+    pub timestamp_ns: u64,
+    pub data_size: usize,
+    pub success: bool,
+}
+
+/// Tracks encryption/decryption operations.
+#[derive(Debug)]
+pub struct EncryptionAuditLog {
+    pub entries: Vec<AuditEntry>,
+    counter: u64,
+}
+
+impl EncryptionAuditLog {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            counter: 0,
+        }
+    }
+
+    pub fn log_operation(&mut self, operation: &str, data_size: usize, success: bool) {
+        self.counter += 1;
+        self.entries.push(AuditEntry {
+            operation: operation.to_string(),
+            timestamp_ns: self.counter,
+            data_size,
+            success,
+        });
+    }
+
+    pub fn successful_operations(&self) -> usize {
+        self.entries.iter().filter(|e| e.success).count()
+    }
+
+    pub fn failed_operations(&self) -> usize {
+        self.entries.iter().filter(|e| !e.success).count()
+    }
+
+    pub fn entries_for_operation(&self, op: &str) -> Vec<&AuditEntry> {
+        self.entries.iter().filter(|e| e.operation == op).collect()
+    }
+
+    pub fn total_data_processed(&self) -> usize {
+        self.entries.iter().map(|e| e.data_size).sum()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1102,5 +1182,64 @@ mod tests {
     fn encryption_is_ascii_printable() {
         assert!(EncryptionValidator::is_ascii_printable("Hello World 123"));
         assert!(!EncryptionValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_payload_roundtrip() {
+        let key = b"test-key-123";
+        let plaintext = b"Hello, payload!";
+        let payload = encrypt_payload(plaintext, key);
+        let decrypted = decrypt_payload(&payload, key).unwrap();
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[test]
+    fn test_decrypt_payload_wrong_key() {
+        let key = b"correct-key";
+        let wrong_key = b"wrong-key!!";
+        let plaintext = b"secret data";
+        let payload = encrypt_payload(plaintext, key);
+        let decrypted = decrypt_payload(&payload, wrong_key).unwrap();
+        assert_ne!(decrypted, plaintext.to_vec());
+    }
+
+    #[test]
+    fn test_audit_log_new() {
+        let log = EncryptionAuditLog::new();
+        assert!(log.entries.is_empty());
+        assert_eq!(log.successful_operations(), 0);
+        assert_eq!(log.failed_operations(), 0);
+    }
+
+    #[test]
+    fn test_audit_log_operations() {
+        let mut log = EncryptionAuditLog::new();
+        log.log_operation("encrypt", 100, true);
+        log.log_operation("decrypt", 200, true);
+        log.log_operation("encrypt", 50, false);
+        assert_eq!(log.successful_operations(), 2);
+        assert_eq!(log.failed_operations(), 1);
+        assert_eq!(log.entries.len(), 3);
+    }
+
+    #[test]
+    fn test_audit_log_filter_by_operation() {
+        let mut log = EncryptionAuditLog::new();
+        log.log_operation("encrypt", 100, true);
+        log.log_operation("decrypt", 200, true);
+        log.log_operation("encrypt", 50, false);
+        let encrypts = log.entries_for_operation("encrypt");
+        assert_eq!(encrypts.len(), 2);
+        let decrypts = log.entries_for_operation("decrypt");
+        assert_eq!(decrypts.len(), 1);
+    }
+
+    #[test]
+    fn test_audit_log_total_data() {
+        let mut log = EncryptionAuditLog::new();
+        log.log_operation("encrypt", 100, true);
+        log.log_operation("decrypt", 200, true);
+        log.log_operation("encrypt", 50, false);
+        assert_eq!(log.total_data_processed(), 350);
     }
 }

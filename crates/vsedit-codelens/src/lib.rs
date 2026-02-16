@@ -614,6 +614,150 @@ pub fn group_lenses_by_line(lenses: &[CodeLens]) -> Vec<(u32, Vec<&CodeLens>)> {
     map.into_iter().collect()
 }
 
+// ---------------------------------------------------------------------------
+// CodeLensCommand – predefined command types
+// ---------------------------------------------------------------------------
+
+/// Predefined command types for common code lens actions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CodeLensCommand {
+    ShowReferences { count: u32 },
+    RunTest { test_name: String },
+    ShowImplementations { count: u32 },
+    Debug { target: String },
+    Custom { command_id: String, title: String },
+}
+
+impl CodeLensCommand {
+    /// Convert this predefined command into a [`Command`].
+    pub fn to_command(&self) -> Command {
+        match self {
+            Self::ShowReferences { count } => Command {
+                title: format!("{count} reference{}", if *count == 1 { "" } else { "s" }),
+                command_id: "editor.showReferences".into(),
+                tooltip: "Show all references".into(),
+                arguments: vec![],
+            },
+            Self::RunTest { test_name } => Command {
+                title: format!("▶ Run Test: {test_name}"),
+                command_id: "test.run".into(),
+                tooltip: format!("Run test '{test_name}'"),
+                arguments: vec![test_name.clone()],
+            },
+            Self::ShowImplementations { count } => Command {
+                title: format!("{count} implementation{}", if *count == 1 { "" } else { "s" }),
+                command_id: "editor.showImplementations".into(),
+                tooltip: "Show all implementations".into(),
+                arguments: vec![],
+            },
+            Self::Debug { target } => Command {
+                title: format!("⏵ Debug: {target}"),
+                command_id: "debug.start".into(),
+                tooltip: format!("Start debugging '{target}'"),
+                arguments: vec![target.clone()],
+            },
+            Self::Custom { command_id, title } => Command {
+                title: title.clone(),
+                command_id: command_id.clone(),
+                tooltip: title.clone(),
+                arguments: vec![],
+            },
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// codelens_group_adjacent
+// ---------------------------------------------------------------------------
+
+/// Group lenses that are within `max_gap` lines of each other.
+///
+/// Lenses are sorted by `start_line` first. Adjacent lenses whose start lines
+/// differ by at most `max_gap` are placed in the same group.
+pub fn codelens_group_adjacent(lenses: &[CodeLens], max_gap: u32) -> Vec<Vec<&CodeLens>> {
+    let mut sorted: Vec<&CodeLens> = lenses.iter().collect();
+    sorted.sort_by_key(|l| l.start_line);
+
+    let mut groups: Vec<Vec<&CodeLens>> = Vec::new();
+    for lens in sorted {
+        let start_new = match groups.last() {
+            Some(group) => {
+                let last_line = group.last().unwrap().start_line;
+                lens.start_line.saturating_sub(last_line) > max_gap
+            }
+            None => true,
+        };
+        if start_new {
+            groups.push(vec![lens]);
+        } else {
+            groups.last_mut().unwrap().push(lens);
+        }
+    }
+    groups
+}
+
+// ---------------------------------------------------------------------------
+// CodeLensFilter
+// ---------------------------------------------------------------------------
+
+/// Filter criteria for selecting a subset of code lenses.
+#[derive(Debug, Clone, Default)]
+pub struct CodeLensFilter {
+    pub resolved_only: bool,
+    pub command_ids: Option<Vec<String>>,
+    pub line_range: Option<(u32, u32)>,
+}
+
+impl CodeLensFilter {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn only_resolved(mut self) -> Self {
+        self.resolved_only = true;
+        self
+    }
+
+    pub fn with_command_ids(mut self, ids: Vec<String>) -> Self {
+        self.command_ids = Some(ids);
+        self
+    }
+
+    pub fn with_line_range(mut self, start: u32, end: u32) -> Self {
+        self.line_range = Some((start, end));
+        self
+    }
+
+    /// Apply this filter to a slice of lenses, returning references to those
+    /// that match all criteria.
+    pub fn apply<'a>(&self, lenses: &'a [CodeLens]) -> Vec<&'a CodeLens> {
+        lenses
+            .iter()
+            .filter(|lens| {
+                if self.resolved_only && !lens.is_resolved() {
+                    return false;
+                }
+                if let Some(ids) = &self.command_ids {
+                    match &lens.command {
+                        Some(cmd) => {
+                            if !ids.contains(&cmd.command_id) {
+                                return false;
+                            }
+                        }
+                        None => return false,
+                    }
+                }
+                if let Some((start, end)) = self.line_range {
+                    if lens.start_line < start || lens.start_line > end {
+                        return false;
+                    }
+                }
+                true
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1141,5 +1285,101 @@ mod tests {
         assert_eq!(groups[0].1.len(), 1);
         assert_eq!(groups[1].0, 5);
         assert_eq!(groups[1].1.len(), 2);
+    }
+
+    #[test]
+    fn test_codelens_command_show_references() {
+        let cmd = CodeLensCommand::ShowReferences { count: 5 };
+        let command = cmd.to_command();
+        assert_eq!(command.title, "5 references");
+        assert_eq!(command.command_id, "editor.showReferences");
+        assert_eq!(command.tooltip, "Show all references");
+
+        let single = CodeLensCommand::ShowReferences { count: 1 };
+        assert_eq!(single.to_command().title, "1 reference");
+    }
+
+    #[test]
+    fn test_codelens_command_run_test() {
+        let cmd = CodeLensCommand::RunTest {
+            test_name: "my_test".into(),
+        };
+        let command = cmd.to_command();
+        assert_eq!(command.title, "▶ Run Test: my_test");
+        assert_eq!(command.command_id, "test.run");
+        assert_eq!(command.tooltip, "Run test 'my_test'");
+        assert_eq!(command.arguments, vec!["my_test".to_string()]);
+    }
+
+    #[test]
+    fn test_codelens_command_custom() {
+        let cmd = CodeLensCommand::Custom {
+            command_id: "my.cmd".into(),
+            title: "Do Thing".into(),
+        };
+        let command = cmd.to_command();
+        assert_eq!(command.title, "Do Thing");
+        assert_eq!(command.command_id, "my.cmd");
+        assert_eq!(command.tooltip, "Do Thing");
+    }
+
+    #[test]
+    fn test_group_adjacent_within_gap() {
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 10),
+            CodeLens::new(2, 0, 2, 10),
+            CodeLens::new(3, 0, 3, 10),
+        ];
+        let groups = codelens_group_adjacent(&lenses, 2);
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].len(), 3);
+    }
+
+    #[test]
+    fn test_group_adjacent_separate_groups() {
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 10),
+            CodeLens::new(2, 0, 2, 10),
+            CodeLens::new(10, 0, 10, 10),
+            CodeLens::new(11, 0, 11, 10),
+        ];
+        let groups = codelens_group_adjacent(&lenses, 2);
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].len(), 2);
+        assert_eq!(groups[1].len(), 2);
+        assert_eq!(groups[0][0].start_line, 1);
+        assert_eq!(groups[1][0].start_line, 10);
+    }
+
+    #[test]
+    fn test_filter_resolved_only() {
+        let resolved = CodeLens::new(1, 0, 1, 10).with_command(Command {
+            title: "test".into(),
+            command_id: "cmd".into(),
+            tooltip: "tip".into(),
+            arguments: vec![],
+        });
+        let unresolved = CodeLens::new(2, 0, 2, 10);
+        let lenses = vec![resolved, unresolved];
+
+        let filter = CodeLensFilter::new().only_resolved();
+        let result = filter.apply(&lenses);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].start_line, 1);
+    }
+
+    #[test]
+    fn test_filter_by_line_range() {
+        let lenses = vec![
+            CodeLens::new(1, 0, 1, 10),
+            CodeLens::new(5, 0, 5, 10),
+            CodeLens::new(10, 0, 10, 10),
+            CodeLens::new(15, 0, 15, 10),
+        ];
+        let filter = CodeLensFilter::new().with_line_range(4, 11);
+        let result = filter.apply(&lenses);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].start_line, 5);
+        assert_eq!(result[1].start_line, 10);
     }
 }

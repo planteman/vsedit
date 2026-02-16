@@ -1,5 +1,6 @@
 //! File integrity verification.
 
+use std::collections::HashMap;
 use std::fmt;
 use sha2::{Digest, Sha256};
 use std::io;
@@ -606,6 +607,106 @@ impl Default for ChecksumValidator {
     }
 }
 
+/// A single entry in a [`ChecksumManifest`].
+#[derive(Debug, Clone)]
+pub struct ManifestEntry {
+    pub path: String,
+    pub algorithm: String,
+    pub checksum: String,
+    pub size: u64,
+}
+
+/// Manages a collection of file checksums for integrity verification.
+#[derive(Debug, Clone)]
+pub struct ChecksumManifest {
+    pub entries: HashMap<String, ManifestEntry>,
+}
+
+impl ChecksumManifest {
+    pub fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+        }
+    }
+
+    pub fn add_entry(&mut self, path: &str, algorithm: &str, checksum: &str, size: u64) {
+        self.entries.insert(
+            path.to_string(),
+            ManifestEntry {
+                path: path.to_string(),
+                algorithm: algorithm.to_string(),
+                checksum: checksum.to_string(),
+                size,
+            },
+        );
+    }
+
+    /// Compares the stored checksum for `path` against `actual_checksum`.
+    /// Returns an error if the path is not found.
+    pub fn verify_entry(&self, path: &str, actual_checksum: &str) -> Result<bool, String> {
+        match self.entries.get(path) {
+            Some(entry) => Ok(entry.checksum.eq_ignore_ascii_case(actual_checksum)),
+            None => Err(format!("path not found in manifest: {path}")),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn paths(&self) -> Vec<&str> {
+        self.entries.keys().map(|s| s.as_str()).collect()
+    }
+
+    pub fn remove(&mut self, path: &str) -> bool {
+        self.entries.remove(path).is_some()
+    }
+}
+
+impl Default for ChecksumManifest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Result of comparing two checksum strings.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChecksumComparison {
+    Match,
+    Mismatch { expected: String, actual: String },
+    InvalidFormat(String),
+}
+
+/// Compare two hex checksum strings case-insensitively.
+pub fn checksum_compare(a: &str, b: &str) -> ChecksumComparison {
+    if a.is_empty() || b.is_empty() {
+        return ChecksumComparison::InvalidFormat("checksum string must not be empty".to_string());
+    }
+    if !a.chars().all(|c| c.is_ascii_hexdigit()) {
+        return ChecksumComparison::InvalidFormat(format!("invalid hex: {a}"));
+    }
+    if !b.chars().all(|c| c.is_ascii_hexdigit()) {
+        return ChecksumComparison::InvalidFormat(format!("invalid hex: {b}"));
+    }
+    if a.eq_ignore_ascii_case(b) {
+        ChecksumComparison::Match
+    } else {
+        ChecksumComparison::Mismatch {
+            expected: a.to_string(),
+            actual: b.to_string(),
+        }
+    }
+}
+
+/// Format a checksum in the standard `algorithm:hex` format.
+pub fn checksum_format(checksum: &str, algorithm: &str) -> String {
+    format!("{algorithm}:{checksum}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1130,5 +1231,59 @@ mod tests {
     fn checksum_is_ascii_printable() {
         assert!(ChecksumValidator::is_ascii_printable("Hello World 123"));
         assert!(!ChecksumValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn test_manifest_add_and_verify() {
+        let mut manifest = ChecksumManifest::new();
+        manifest.add_entry("file.txt", "sha256", "abcdef1234567890", 100);
+        assert_eq!(manifest.len(), 1);
+        assert!(!manifest.is_empty());
+        assert_eq!(manifest.verify_entry("file.txt", "abcdef1234567890"), Ok(true));
+    }
+
+    #[test]
+    fn test_manifest_verify_mismatch() {
+        let mut manifest = ChecksumManifest::new();
+        manifest.add_entry("file.txt", "sha256", "abcdef1234567890", 100);
+        assert_eq!(manifest.verify_entry("file.txt", "0000000000000000"), Ok(false));
+    }
+
+    #[test]
+    fn test_manifest_missing_path() {
+        let manifest = ChecksumManifest::new();
+        assert!(manifest.verify_entry("missing.txt", "abc").is_err());
+    }
+
+    #[test]
+    fn test_manifest_remove() {
+        let mut manifest = ChecksumManifest::new();
+        manifest.add_entry("a.txt", "md5", "aaa", 10);
+        manifest.add_entry("b.txt", "md5", "bbb", 20);
+        assert_eq!(manifest.len(), 2);
+        assert!(manifest.remove("a.txt"));
+        assert_eq!(manifest.len(), 1);
+        assert!(!manifest.remove("a.txt"));
+    }
+
+    #[test]
+    fn test_checksum_compare_match() {
+        assert_eq!(checksum_compare("abcdef", "ABCDEF"), ChecksumComparison::Match);
+    }
+
+    #[test]
+    fn test_checksum_compare_mismatch() {
+        assert_eq!(
+            checksum_compare("abcdef", "123456"),
+            ChecksumComparison::Mismatch {
+                expected: "abcdef".to_string(),
+                actual: "123456".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_checksum_format() {
+        assert_eq!(checksum_format("abcdef1234", "sha256"), "sha256:abcdef1234");
     }
 }

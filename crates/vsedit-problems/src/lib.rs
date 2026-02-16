@@ -4,7 +4,7 @@
 //! with filtering and sorting — rendered via ratatui.
 
 use std::fmt;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -17,7 +17,7 @@ use ratatui::widgets::Widget;
 // ---------------------------------------------------------------------------
 
 /// Severity level of a diagnostic problem.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ProblemSeverity {
     Error,
     Warning,
@@ -41,6 +41,17 @@ impl ProblemSeverity {
             Self::Warning => Color::Yellow,
             Self::Info => Color::Blue,
             Self::Hint => Color::Green,
+        }
+    }
+
+    /// Numeric severity level where higher means more severe.
+    /// Error(3) > Warning(2) > Info(1) > Hint(0).
+    pub fn severity_level(&self) -> u8 {
+        match self {
+            Self::Error => 3,
+            Self::Warning => 2,
+            Self::Info => 1,
+            Self::Hint => 0,
         }
     }
 }
@@ -649,6 +660,78 @@ impl ProblemsPanel {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Free functions and ProblemsSummary
+// ---------------------------------------------------------------------------
+
+/// Group diagnostics by their severity level.
+pub fn problems_group_by_severity(diagnostics: &[Problem]) -> HashMap<ProblemSeverity, Vec<&Problem>> {
+    let mut map: HashMap<ProblemSeverity, Vec<&Problem>> = HashMap::new();
+    for d in diagnostics {
+        map.entry(d.severity).or_default().push(d);
+    }
+    map
+}
+
+/// Return only diagnostics at or above the given minimum severity.
+/// Ordering: Error > Warning > Info > Hint.
+pub fn problems_severity_filter(diagnostics: &[Problem], min_severity: ProblemSeverity) -> Vec<&Problem> {
+    let min_level = min_severity.severity_level();
+    diagnostics
+        .iter()
+        .filter(|d| d.severity.severity_level() >= min_level)
+        .collect()
+}
+
+/// Summary statistics for a set of diagnostics.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProblemsSummary {
+    pub total: usize,
+    pub errors: usize,
+    pub warnings: usize,
+    pub infos: usize,
+    pub hints: usize,
+    pub files_affected: usize,
+}
+
+impl ProblemsSummary {
+    /// Build a summary from a slice of diagnostics.
+    pub fn from_diagnostics(diagnostics: &[Problem]) -> Self {
+        let mut errors = 0;
+        let mut warnings = 0;
+        let mut infos = 0;
+        let mut hints = 0;
+        let mut files: HashSet<&str> = HashSet::new();
+        for d in diagnostics {
+            match d.severity {
+                ProblemSeverity::Error => errors += 1,
+                ProblemSeverity::Warning => warnings += 1,
+                ProblemSeverity::Info => infos += 1,
+                ProblemSeverity::Hint => hints += 1,
+            }
+            files.insert(&d.file_path);
+        }
+        Self {
+            total: diagnostics.len(),
+            errors,
+            warnings,
+            infos,
+            hints,
+            files_affected: files.len(),
+        }
+    }
+
+    /// Returns `true` if there is at least one error.
+    pub fn has_errors(&self) -> bool {
+        self.errors > 0
+    }
+
+    /// Returns `true` if there are no diagnostics at all.
+    pub fn is_clean(&self) -> bool {
+        self.total == 0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1118,5 +1201,70 @@ mod tests {
         let p = ProblemsPanel::new();
         assert_eq!(p.error_count(), 0);
         assert_eq!(p.warning_count(), 0);
+    }
+
+    // -- problems_group_by_severity / problems_severity_filter / ProblemsSummary --
+
+    #[test]
+    fn test_group_by_severity() {
+        let problems = sample_problems();
+        let grouped = problems_group_by_severity(&problems);
+        assert_eq!(grouped[&ProblemSeverity::Error].len(), 2);
+        assert_eq!(grouped[&ProblemSeverity::Warning].len(), 1);
+        assert_eq!(grouped[&ProblemSeverity::Info].len(), 1);
+        assert_eq!(grouped[&ProblemSeverity::Hint].len(), 1);
+    }
+
+    #[test]
+    fn test_severity_filter_errors_only() {
+        let problems = sample_problems();
+        let filtered = problems_severity_filter(&problems, ProblemSeverity::Error);
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|p| p.severity == ProblemSeverity::Error));
+    }
+
+    #[test]
+    fn test_severity_filter_warnings_and_above() {
+        let problems = sample_problems();
+        let filtered = problems_severity_filter(&problems, ProblemSeverity::Warning);
+        assert_eq!(filtered.len(), 3); // 2 errors + 1 warning
+        assert!(filtered.iter().all(|p| matches!(p.severity, ProblemSeverity::Error | ProblemSeverity::Warning)));
+    }
+
+    #[test]
+    fn test_summary_from_diagnostics() {
+        let problems = sample_problems();
+        let summary = ProblemsSummary::from_diagnostics(&problems);
+        assert_eq!(summary.total, 5);
+        assert_eq!(summary.errors, 2);
+        assert_eq!(summary.warnings, 1);
+        assert_eq!(summary.infos, 1);
+        assert_eq!(summary.hints, 1);
+        assert_eq!(summary.files_affected, 3); // main.rs, lib.rs, util.rs
+    }
+
+    #[test]
+    fn test_summary_has_errors() {
+        let problems = sample_problems();
+        let summary = ProblemsSummary::from_diagnostics(&problems);
+        assert!(summary.has_errors());
+
+        let no_errors = vec![
+            Problem::new(ProblemSeverity::Warning, "warn", "clippy", "a.rs", 1, 1),
+        ];
+        let summary2 = ProblemsSummary::from_diagnostics(&no_errors);
+        assert!(!summary2.has_errors());
+    }
+
+    #[test]
+    fn test_summary_is_clean() {
+        let empty: Vec<Problem> = vec![];
+        let summary = ProblemsSummary::from_diagnostics(&empty);
+        assert!(summary.is_clean());
+        assert_eq!(summary.total, 0);
+
+        let problems = sample_problems();
+        let summary2 = ProblemsSummary::from_diagnostics(&problems);
+        assert!(!summary2.is_clean());
     }
 }

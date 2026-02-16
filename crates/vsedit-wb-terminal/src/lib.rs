@@ -96,6 +96,7 @@ pub struct TerminalInstance {
     pub shell_type: TerminalShellType,
     pub dimensions: TerminalDimensions,
     pub active: bool,
+    pub group: String,
 }
 
 #[derive(Debug, Clone)]
@@ -210,6 +211,7 @@ impl TerminalWorkbenchService {
             shell_type: self.config.default_shell.clone(),
             dimensions: Self::default_dimensions(),
             active: false,
+            group: "default".into(),
         };
         self.instances.insert(id, instance);
         id
@@ -264,6 +266,37 @@ impl TerminalWorkbenchService {
     /// Returns the active instance id, if any.
     pub fn get_active_instance_id(&self) -> Result<u32, TerminalError> {
         self.active_instance_id.ok_or(TerminalError::NoActiveInstance)
+    }
+
+    /// Creates a new terminal instance by splitting an existing one.
+    /// Copies the shell type, dimensions, and group from the source terminal.
+    pub fn split_terminal(&mut self, source_id: u32) -> Result<u32, TerminalError> {
+        let source = self
+            .instances
+            .get(&source_id)
+            .ok_or(TerminalError::InstanceNotFound(source_id))?
+            .clone();
+        self.instance_count += 1;
+        let new_id = self.instance_count;
+        let instance = TerminalInstance {
+            id: new_id,
+            title: format!("Split of {}", source.title),
+            shell_type: source.shell_type,
+            dimensions: source.dimensions,
+            active: false,
+            group: source.group,
+        };
+        self.instances.insert(new_id, instance);
+        Ok(new_id)
+    }
+
+    /// Moves a terminal instance to the specified group.
+    pub fn move_to_group(&mut self, terminal_id: u32, group: impl Into<String>) -> Result<(), TerminalError> {
+        self.instances
+            .get_mut(&terminal_id)
+            .ok_or(TerminalError::InstanceNotFound(terminal_id))?
+            .group = group.into();
+        Ok(())
     }
 }
 
@@ -648,6 +681,33 @@ pub fn terminal_title_from_process(process_name: &str, args: &[&str]) -> String 
         let truncated: String = full.chars().take(39).collect();
         format!("{truncated}\u{2026}")
     }
+}
+
+/// Result of searching terminal titles.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TerminalSearchResult {
+    pub terminal_id: String,
+    pub line_number: usize,
+    pub content: String,
+    pub match_start: usize,
+    pub match_end: usize,
+}
+
+/// Searches terminal titles for the given query string.
+pub fn search_terminals(service: &TerminalWorkbenchService, query: &str) -> Vec<TerminalSearchResult> {
+    let mut results = Vec::new();
+    for inst in service.instances.values() {
+        if let Some(start) = inst.title.find(query) {
+            results.push(TerminalSearchResult {
+                terminal_id: inst.id.to_string(),
+                line_number: 1,
+                content: inst.title.clone(),
+                match_start: start,
+                match_end: start + query.len(),
+            });
+        }
+    }
+    results
 }
 
 #[cfg(test)]
@@ -1117,5 +1177,60 @@ mod tests {
     fn wb_terminal_is_ascii_printable() {
         assert!(WbTerminalValidator::is_ascii_printable("Hello World 123"));
         assert!(!WbTerminalValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn test_split_terminal_basic() {
+        let mut svc = TerminalWorkbenchService::new();
+        let id = svc.create_instance();
+        svc.rename_instance(id, "Dev").unwrap();
+        let split_id = svc.split_terminal(id).unwrap();
+        let split = svc.get_instance(split_id).unwrap();
+        assert_eq!(split.title, "Split of Dev");
+        assert_eq!(split.shell_type, svc.get_instance(id).unwrap().shell_type);
+        assert_ne!(split_id, id);
+    }
+
+    #[test]
+    fn test_split_terminal_not_found() {
+        let mut svc = TerminalWorkbenchService::new();
+        assert_eq!(svc.split_terminal(999), Err(TerminalError::InstanceNotFound(999)));
+    }
+
+    #[test]
+    fn test_move_to_group() {
+        let mut svc = TerminalWorkbenchService::new();
+        let id = svc.create_instance();
+        assert_eq!(svc.get_instance(id).unwrap().group, "default");
+        svc.move_to_group(id, "editors").unwrap();
+        assert_eq!(svc.get_instance(id).unwrap().group, "editors");
+    }
+
+    #[test]
+    fn test_move_to_group_not_found() {
+        let mut svc = TerminalWorkbenchService::new();
+        assert_eq!(svc.move_to_group(999, "editors"), Err(TerminalError::InstanceNotFound(999)));
+    }
+
+    #[test]
+    fn test_search_terminals_found() {
+        let mut svc = TerminalWorkbenchService::new();
+        let id = svc.create_instance();
+        svc.rename_instance(id, "Dev Server").unwrap();
+        let _id2 = svc.create_instance();
+        let results = search_terminals(&svc, "Dev");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].terminal_id, id.to_string());
+        assert_eq!(results[0].content, "Dev Server");
+        assert_eq!(results[0].match_start, 0);
+        assert_eq!(results[0].match_end, 3);
+    }
+
+    #[test]
+    fn test_search_terminals_not_found() {
+        let mut svc = TerminalWorkbenchService::new();
+        svc.create_instance();
+        let results = search_terminals(&svc, "nonexistent");
+        assert!(results.is_empty());
     }
 }

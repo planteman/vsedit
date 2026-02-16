@@ -688,6 +688,88 @@ impl fmt::Display for PaneDragDrop {
     }
 }
 
+/// Direction for a resize operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResizeDirection {
+    Horizontal,
+    Vertical,
+}
+
+/// Manages resize operations on a pane.
+#[derive(Debug, Clone)]
+pub struct PaneResizeHandle {
+    pub pane_id: String,
+    pub direction: ResizeDirection,
+    pub min_size: u32,
+    pub max_size: u32,
+    pub current_size: u32,
+}
+
+impl PaneResizeHandle {
+    pub fn new(pane_id: impl Into<String>, direction: ResizeDirection, current_size: u32) -> Self {
+        Self {
+            pane_id: pane_id.into(),
+            direction,
+            min_size: 50,
+            max_size: 1000,
+            current_size,
+        }
+    }
+
+    /// Applies delta clamped to min/max, returns new size.
+    pub fn resize(&mut self, delta: i32) -> u32 {
+        let new = (self.current_size as i64 + delta as i64).clamp(self.min_size as i64, self.max_size as i64) as u32;
+        self.current_size = new;
+        new
+    }
+
+    /// Sets to exact size clamped to min/max, returns new size.
+    pub fn resize_to(&mut self, size: u32) -> u32 {
+        let new = size.clamp(self.min_size, self.max_size);
+        self.current_size = new;
+        new
+    }
+
+    pub fn is_at_minimum(&self) -> bool {
+        self.current_size <= self.min_size
+    }
+
+    pub fn is_at_maximum(&self) -> bool {
+        self.current_size >= self.max_size
+    }
+
+    pub fn with_limits(mut self, min: u32, max: u32) -> Self {
+        self.min_size = min;
+        self.max_size = max;
+        self
+    }
+}
+
+/// Swaps the titles and visible status of two panes in the service.
+pub fn pane_swap(service: &mut PaneService, id_a: &str, id_b: &str) -> Result<(), String> {
+    let idx_a = service
+        .panes
+        .iter()
+        .position(|p| p.id == id_a)
+        .ok_or_else(|| format!("pane not found: {id_a}"))?;
+    let idx_b = service
+        .panes
+        .iter()
+        .position(|p| p.id == id_b)
+        .ok_or_else(|| format!("pane not found: {id_b}"))?;
+
+    let title_a = service.panes[idx_a].title.clone();
+    let visible_a = service.panes[idx_a].visible;
+
+    service.panes[idx_a].title = service.panes[idx_b].title.clone();
+    service.panes[idx_a].visible = service.panes[idx_b].visible;
+
+    service.panes[idx_b].title = title_a;
+    service.panes[idx_b].visible = visible_a;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1106,5 +1188,73 @@ mod tests {
         assert!(!drag.commit(&mut panes));
         assert!(!drag.did_move());
         assert_eq!(panes[0].id, "c1");
+    }
+
+    #[test]
+    fn test_resize_handle_basic() {
+        let mut h = PaneResizeHandle::new("p1", ResizeDirection::Horizontal, 200);
+        assert_eq!(h.current_size, 200);
+        assert_eq!(h.resize(50), 250);
+        assert_eq!(h.current_size, 250);
+        assert_eq!(h.resize(-100), 150);
+        assert_eq!(h.current_size, 150);
+    }
+
+    #[test]
+    fn test_resize_handle_clamping() {
+        let mut h = PaneResizeHandle::new("p1", ResizeDirection::Vertical, 100);
+        assert_eq!(h.resize(-200), 50);
+        assert_eq!(h.resize(2000), 1000);
+        let mut h2 = PaneResizeHandle::new("p2", ResizeDirection::Horizontal, 500);
+        assert_eq!(h2.resize_to(10), 50);
+        assert_eq!(h2.resize_to(5000), 1000);
+    }
+
+    #[test]
+    fn test_resize_handle_at_limits() {
+        let mut h = PaneResizeHandle::new("p1", ResizeDirection::Horizontal, 50);
+        assert!(h.is_at_minimum());
+        assert!(!h.is_at_maximum());
+        h.resize_to(1000);
+        assert!(!h.is_at_minimum());
+        assert!(h.is_at_maximum());
+    }
+
+    #[test]
+    fn test_resize_handle_with_limits() {
+        let mut h = PaneResizeHandle::new("p1", ResizeDirection::Vertical, 300)
+            .with_limits(100, 500);
+        assert_eq!(h.min_size, 100);
+        assert_eq!(h.max_size, 500);
+        assert_eq!(h.resize(-300), 100);
+        assert_eq!(h.resize(600), 500);
+    }
+
+    #[test]
+    fn test_pane_swap_success() {
+        let mut svc = PaneService::new();
+        let mut a = pane("a", PaneLocation::Editor);
+        a.title = "Alpha".to_string();
+        a.visible = true;
+        let mut b = pane("b", PaneLocation::Panel);
+        b.title = "Beta".to_string();
+        b.visible = false;
+        svc.add_pane(a);
+        svc.add_pane(b);
+        pane_swap(&mut svc, "a", "b").unwrap();
+        let pa = svc.get_pane("a").unwrap();
+        assert_eq!(pa.title, "Beta");
+        assert!(!pa.visible);
+        let pb = svc.get_pane("b").unwrap();
+        assert_eq!(pb.title, "Alpha");
+        assert!(pb.visible);
+    }
+
+    #[test]
+    fn test_pane_swap_missing_pane() {
+        let mut svc = PaneService::new();
+        svc.add_pane(pane("x", PaneLocation::Editor));
+        assert!(pane_swap(&mut svc, "x", "missing").is_err());
+        assert!(pane_swap(&mut svc, "missing", "x").is_err());
     }
 }

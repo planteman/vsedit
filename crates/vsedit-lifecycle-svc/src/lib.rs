@@ -5,7 +5,7 @@
 
 use std::collections::HashSet;
 use std::fmt;
-use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -113,9 +113,12 @@ pub struct LifecycleService {
     phase_transition_count: AtomicU64,
     shutdown_attempt_count: AtomicU64,
     vetoed_count: AtomicU64,
+    is_shut_down: AtomicBool,
     on_will_shutdown: Emitter<WillShutdownEvent>,
     on_did_shutdown: Emitter<ShutdownReason>,
     on_phase_change: Emitter<LifecyclePhase>,
+    barriers: Mutex<Vec<ShutdownBarrier>>,
+    timeline: Mutex<LifecycleTimeline>,
 }
 
 impl LifecycleService {
@@ -125,9 +128,12 @@ impl LifecycleService {
             phase_transition_count: AtomicU64::new(0),
             shutdown_attempt_count: AtomicU64::new(0),
             vetoed_count: AtomicU64::new(0),
+            is_shut_down: AtomicBool::new(false),
             on_will_shutdown: Emitter::new(),
             on_did_shutdown: Emitter::new(),
             on_phase_change: Emitter::new(),
+            barriers: Mutex::new(Vec::new()),
+            timeline: Mutex::new(LifecycleTimeline::new()),
         }
     }
 
@@ -161,6 +167,7 @@ impl LifecycleService {
             return false;
         }
 
+        self.is_shut_down.store(true, Ordering::Relaxed);
         self.on_did_shutdown.fire(&reason);
         true
     }
@@ -168,6 +175,7 @@ impl LifecycleService {
     /// Force shutdown without checking for vetoes.
     pub fn force_shutdown(&self, reason: ShutdownReason) -> bool {
         self.shutdown_attempt_count.fetch_add(1, Ordering::Relaxed);
+        self.is_shut_down.store(true, Ordering::Relaxed);
         self.on_did_shutdown.fire(&reason);
         true
     }
@@ -228,6 +236,38 @@ impl LifecycleService {
 
     pub fn on_phase_change(&self) -> Event<LifecyclePhase> {
         self.on_phase_change.event()
+    }
+
+    /// Register a shutdown barrier.
+    pub fn register_barrier(&self, barrier: ShutdownBarrier) {
+        self.barriers.lock().unwrap().push(barrier);
+    }
+
+    /// Number of registered barriers.
+    pub fn barrier_count(&self) -> usize {
+        self.barriers.lock().unwrap().len()
+    }
+
+    /// Access the lifecycle timeline.
+    pub fn timeline(&self) -> std::sync::MutexGuard<'_, LifecycleTimeline> {
+        self.timeline.lock().unwrap()
+    }
+
+    /// Returns true if the service has been shut down.
+    pub fn is_shut_down(&self) -> bool {
+        self.is_shut_down.load(Ordering::Relaxed)
+    }
+
+    /// Reset the service from ShutDown back to Starting.
+    /// Only succeeds if the service is currently shut down.
+    pub fn service_restart(&self) -> Result<(), String> {
+        if !self.is_shut_down.load(Ordering::Relaxed) {
+            return Err("service is not shut down".to_string());
+        }
+        self.phase.store(LifecyclePhase::Starting as u8, Ordering::Relaxed);
+        self.is_shut_down.store(false, Ordering::Relaxed);
+        self.timeline.lock().unwrap().clear();
+        Ok(())
     }
 }
 
@@ -621,6 +661,11 @@ impl LifecycleTimeline {
         self.entries.len()
     }
 
+    /// Remove all entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
     /// Formatted summary string.
     pub fn to_summary(&self) -> String {
         let mut lines = Vec::new();
@@ -642,6 +687,31 @@ impl LifecycleTimeline {
 impl Default for LifecycleTimeline {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// HealthStatus
+// ---------------------------------------------------------------------------
+
+/// Health status snapshot from a lifecycle service.
+#[derive(Debug, Clone)]
+pub struct HealthStatus {
+    pub phase_name: String,
+    pub is_healthy: bool,
+    pub uptime_events: usize,
+    pub barrier_count: usize,
+}
+
+/// Check the health of a lifecycle service.
+pub fn lifecycle_health_check(svc: &LifecycleService) -> HealthStatus {
+    let phase = svc.phase();
+    let is_shut_down = svc.is_shut_down();
+    HealthStatus {
+        phase_name: phase_name(phase).to_string(),
+        is_healthy: !is_shut_down,
+        uptime_events: svc.timeline().entry_count(),
+        barrier_count: svc.barrier_count(),
     }
 }
 
@@ -1101,5 +1171,65 @@ mod tests {
     fn lifecycle_svc_is_ascii_printable() {
         assert!(LifecycleSvcValidator::is_ascii_printable("Hello World 123"));
         assert!(!LifecycleSvcValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn test_service_restart_from_shutdown() {
+        let svc = LifecycleService::new();
+        svc.set_phase(LifecyclePhase::Eventually);
+        assert!(svc.request_shutdown(ShutdownReason::Quit));
+        assert!(svc.is_shut_down());
+        assert!(svc.service_restart().is_ok());
+        assert_eq!(svc.phase(), LifecyclePhase::Starting);
+        assert!(!svc.is_shut_down());
+    }
+
+    #[test]
+    fn test_service_restart_not_shutdown_fails() {
+        let svc = LifecycleService::new();
+        let result = svc.service_restart();
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "service is not shut down");
+    }
+
+    #[test]
+    fn test_health_check_healthy() {
+        let svc = LifecycleService::new();
+        svc.set_phase(LifecyclePhase::Ready);
+        let status = lifecycle_health_check(&svc);
+        assert_eq!(status.phase_name, "Ready");
+        assert!(status.is_healthy);
+        assert_eq!(status.uptime_events, 0);
+        assert_eq!(status.barrier_count, 0);
+    }
+
+    #[test]
+    fn test_health_check_shutdown() {
+        let svc = LifecycleService::new();
+        assert!(svc.request_shutdown(ShutdownReason::Quit));
+        let status = lifecycle_health_check(&svc);
+        assert!(!status.is_healthy);
+    }
+
+    #[test]
+    fn test_barrier_count() {
+        let svc = LifecycleService::new();
+        assert_eq!(svc.barrier_count(), 0);
+        svc.register_barrier(ShutdownBarrier::new());
+        assert_eq!(svc.barrier_count(), 1);
+        svc.register_barrier(ShutdownBarrier::new());
+        assert_eq!(svc.barrier_count(), 2);
+    }
+
+    #[test]
+    fn test_health_check_with_barriers() {
+        let svc = LifecycleService::new();
+        svc.register_barrier(ShutdownBarrier::new());
+        svc.register_barrier(ShutdownBarrier::new());
+        svc.timeline().record(StartupPhase::EarlyInit, "init", 10);
+        let status = lifecycle_health_check(&svc);
+        assert!(status.is_healthy);
+        assert_eq!(status.barrier_count, 2);
+        assert_eq!(status.uptime_events, 1);
     }
 }

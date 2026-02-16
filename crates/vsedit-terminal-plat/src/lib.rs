@@ -672,6 +672,140 @@ impl fmt::Display for TerminalSessionStats {
 }
 
 // ---------------------------------------------------------------------------
+// TerminalColorScheme
+// ---------------------------------------------------------------------------
+
+/// Describes a terminal color scheme (foreground, background, cursor, 16-color
+/// ANSI palette).
+#[derive(Debug, Clone)]
+pub struct TerminalColorScheme {
+    pub name: String,
+    pub foreground: String,
+    pub background: String,
+    pub cursor: String,
+    pub palette: Vec<String>,
+}
+
+impl TerminalColorScheme {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self::default_dark_with_name(name)
+    }
+
+    pub fn with_foreground(mut self, fg: impl Into<String>) -> Self {
+        self.foreground = fg.into();
+        self
+    }
+
+    pub fn with_background(mut self, bg: impl Into<String>) -> Self {
+        self.background = bg.into();
+        self
+    }
+
+    pub fn with_cursor(mut self, cursor: impl Into<String>) -> Self {
+        self.cursor = cursor.into();
+        self
+    }
+
+    /// Heuristic: considers the scheme dark if the background hex color starts
+    /// with `#0`, `#1`, `#2`, or `#3`.
+    pub fn is_dark(&self) -> bool {
+        matches!(
+            self.background.get(..2),
+            Some("#0") | Some("#1") | Some("#2") | Some("#3")
+        )
+    }
+
+    pub fn default_dark() -> Self {
+        Self::default_dark_with_name("Dark")
+    }
+
+    pub fn default_light() -> Self {
+        Self {
+            name: "Light".to_string(),
+            foreground: "#000000".to_string(),
+            background: "#ffffff".to_string(),
+            cursor: "#000000".to_string(),
+            palette: vec![
+                "#000000".into(), "#cd3131".into(), "#0dbc79".into(), "#e5e510".into(),
+                "#2472c8".into(), "#bc3fbc".into(), "#11a8cd".into(), "#e5e5e5".into(),
+                "#666666".into(), "#f14c4c".into(), "#23d18b".into(), "#f5f543".into(),
+                "#3b8eea".into(), "#d670d6".into(), "#29b8db".into(), "#ffffff".into(),
+            ],
+        }
+    }
+
+    fn default_dark_with_name(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            foreground: "#d4d4d4".to_string(),
+            background: "#1e1e1e".to_string(),
+            cursor: "#aeafad".to_string(),
+            palette: vec![
+                "#000000".into(), "#cd3131".into(), "#0dbc79".into(), "#e5e510".into(),
+                "#2472c8".into(), "#bc3fbc".into(), "#11a8cd".into(), "#e5e5e5".into(),
+                "#666666".into(), "#f14c4c".into(), "#23d18b".into(), "#f5f543".into(),
+                "#3b8eea".into(), "#d670d6".into(), "#29b8db".into(), "#e5e5e5".into(),
+            ],
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TerminalFontConfig
+// ---------------------------------------------------------------------------
+
+/// Configuration for terminal font rendering.
+#[derive(Debug, Clone)]
+pub struct TerminalFontConfig {
+    pub family: String,
+    pub size: f32,
+    pub line_height: f32,
+    pub weight: u16,
+    pub ligatures: bool,
+}
+
+impl TerminalFontConfig {
+    pub fn new() -> Self {
+        Self {
+            family: "monospace".to_string(),
+            size: 14.0,
+            line_height: 1.2,
+            weight: 400,
+            ligatures: false,
+        }
+    }
+
+    pub fn with_family(mut self, f: impl Into<String>) -> Self {
+        self.family = f.into();
+        self
+    }
+
+    pub fn with_size(mut self, s: f32) -> Self {
+        self.size = s.clamp(6.0, 72.0);
+        self
+    }
+
+    pub fn with_line_height(mut self, h: f32) -> Self {
+        self.line_height = h.clamp(0.5, 3.0);
+        self
+    }
+
+    pub fn with_weight(mut self, w: u16) -> Self {
+        self.weight = w.clamp(100, 900);
+        self
+    }
+
+    pub fn with_ligatures(mut self, enabled: bool) -> Self {
+        self.ligatures = enabled;
+        self
+    }
+
+    pub fn cell_height(&self) -> f32 {
+        self.size * self.line_height
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -1131,5 +1265,83 @@ mod tests {
         let keys = env.keys();
         assert!(keys.contains(&"A".to_string()));
         assert!(keys.contains(&"B".to_string()));
+    }
+
+    // -- TerminalColorScheme tests ------------------------------------------
+
+    #[test]
+    fn test_color_scheme_default_dark() {
+        let scheme = TerminalColorScheme::default_dark();
+        assert_eq!(scheme.name, "Dark");
+        assert_eq!(scheme.foreground, "#d4d4d4");
+        assert_eq!(scheme.background, "#1e1e1e");
+        assert_eq!(scheme.palette.len(), 16);
+        assert!(scheme.is_dark());
+    }
+
+    #[test]
+    fn test_color_scheme_default_light() {
+        let scheme = TerminalColorScheme::default_light();
+        assert_eq!(scheme.name, "Light");
+        assert_eq!(scheme.foreground, "#000000");
+        assert_eq!(scheme.background, "#ffffff");
+        assert_eq!(scheme.palette.len(), 16);
+        assert!(!scheme.is_dark());
+    }
+
+    #[test]
+    fn test_color_scheme_is_dark() {
+        let dark = TerminalColorScheme::new("d").with_background("#0a0a0a");
+        assert!(dark.is_dark());
+        let also_dark = TerminalColorScheme::new("d").with_background("#3f3f3f");
+        assert!(also_dark.is_dark());
+        let light = TerminalColorScheme::new("l").with_background("#f0f0f0");
+        assert!(!light.is_dark());
+    }
+
+    #[test]
+    fn test_color_scheme_builder() {
+        let scheme = TerminalColorScheme::new("Custom")
+            .with_foreground("#aabbcc")
+            .with_background("#112233")
+            .with_cursor("#ddeeff");
+        assert_eq!(scheme.name, "Custom");
+        assert_eq!(scheme.foreground, "#aabbcc");
+        assert_eq!(scheme.background, "#112233");
+        assert_eq!(scheme.cursor, "#ddeeff");
+    }
+
+    // -- TerminalFontConfig tests -------------------------------------------
+
+    #[test]
+    fn test_font_config_defaults() {
+        let fc = TerminalFontConfig::new();
+        assert_eq!(fc.family, "monospace");
+        assert!((fc.size - 14.0).abs() < f32::EPSILON);
+        assert!((fc.line_height - 1.2).abs() < f32::EPSILON);
+        assert_eq!(fc.weight, 400);
+        assert!(!fc.ligatures);
+    }
+
+    #[test]
+    fn test_font_config_clamping() {
+        let fc = TerminalFontConfig::new().with_size(2.0);
+        assert!((fc.size - 6.0).abs() < f32::EPSILON);
+        let fc = TerminalFontConfig::new().with_size(100.0);
+        assert!((fc.size - 72.0).abs() < f32::EPSILON);
+        let fc = TerminalFontConfig::new().with_line_height(0.1);
+        assert!((fc.line_height - 0.5).abs() < f32::EPSILON);
+        let fc = TerminalFontConfig::new().with_line_height(5.0);
+        assert!((fc.line_height - 3.0).abs() < f32::EPSILON);
+        let fc = TerminalFontConfig::new().with_weight(50);
+        assert_eq!(fc.weight, 100);
+        let fc = TerminalFontConfig::new().with_weight(1000);
+        assert_eq!(fc.weight, 900);
+    }
+
+    #[test]
+    fn test_font_config_cell_height() {
+        let fc = TerminalFontConfig::new().with_size(20.0).with_line_height(1.5);
+        assert!((fc.cell_height() - 30.0).abs() < f32::EPSILON);
     }
 }

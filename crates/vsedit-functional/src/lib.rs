@@ -2,8 +2,10 @@
 //!
 //! Equivalent to VS Code's `vs/base/common/functional.ts`.
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::fmt;
+use std::time::Instant;
 
 /// Error type for functional operations that can fail.
 #[derive(Debug, Clone, PartialEq)]
@@ -653,6 +655,83 @@ pub fn take_while_inclusive<T>(
     result
 }
 
+/// Right-to-left function composition: `compose_rtl(f, g)(x)` = `f(g(x))`.
+///
+/// This is the mathematical composition order, as opposed to the left-to-right
+/// [`compose`].
+pub fn compose_rtl<A, B, C, F, G>(f: F, g: G) -> impl Fn(A) -> C
+where
+    F: Fn(B) -> C,
+    G: Fn(A) -> B,
+{
+    move |a| f(g(a))
+}
+
+/// A throttle wrapper that executes immediately on first call, then suppresses
+/// subsequent calls within the cooldown period.
+pub struct Throttled<F> {
+    f: F,
+    cooldown: std::time::Duration,
+    last_call: Cell<Option<Instant>>,
+    calls_made: Cell<usize>,
+    calls_suppressed: Cell<usize>,
+}
+
+impl<F> Throttled<F> {
+    /// Create a new `Throttled` wrapper with the given cooldown in milliseconds.
+    pub fn new(f: F, cooldown_ms: u64) -> Self {
+        Self {
+            f,
+            cooldown: std::time::Duration::from_millis(cooldown_ms),
+            last_call: Cell::new(None),
+            calls_made: Cell::new(0),
+            calls_suppressed: Cell::new(0),
+        }
+    }
+
+    /// Reset the throttle so the next call executes immediately.
+    pub fn reset(&self) {
+        self.last_call.set(None);
+    }
+
+    /// Total number of calls that were actually executed.
+    pub fn calls_made(&self) -> usize {
+        self.calls_made.get()
+    }
+
+    /// Total number of calls that were suppressed.
+    pub fn calls_suppressed(&self) -> usize {
+        self.calls_suppressed.get()
+    }
+}
+
+impl<F> Throttled<F> {
+    /// Invoke the throttled function. The call is executed only if the cooldown
+    /// period has elapsed since the last executed call.
+    pub fn call<A>(&self, arg: A)
+    where
+        F: Fn(A),
+    {
+        let now = Instant::now();
+        let should_call = match self.last_call.get() {
+            None => true,
+            Some(last) => now.duration_since(last) >= self.cooldown,
+        };
+        if should_call {
+            self.last_call.set(Some(now));
+            self.calls_made.set(self.calls_made.get() + 1);
+            (self.f)(arg);
+        } else {
+            self.calls_suppressed.set(self.calls_suppressed.get() + 1);
+        }
+    }
+}
+
+/// Create a new [`Throttled`] wrapper around `f` with the given cooldown.
+pub fn throttle_immediate<F>(f: F, cooldown_ms: u64) -> Throttled<F> {
+    Throttled::new(f, cooldown_ms)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1115,5 +1194,77 @@ mod tests {
     fn take_while_inclusive_includes_boundary() {
         let result = take_while_inclusive(vec![1, 2, 3, 4, 5], |&x| x < 3);
         assert_eq!(result, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_compose_rtl_basic() {
+        let add1 = |x: i32| x + 1;
+        let double = |x: i32| x * 2;
+        // compose_rtl(f, g)(x) = f(g(x)) = double(add1(x))
+        let f = compose_rtl(double, add1);
+        assert_eq!(f(3), 8); // add1(3)=4, double(4)=8
+    }
+
+    #[test]
+    fn test_compose_rtl_vs_compose() {
+        let add1 = |x: i32| x + 1;
+        let double = |x: i32| x * 2;
+        // compose(f, g)(x) = g(f(x)) — left-to-right
+        let ltr = compose(add1, double);
+        // compose_rtl(g, f)(x) = g(f(x)) — same result when args swapped
+        let rtl = compose_rtl(double, add1);
+        assert_eq!(ltr(5), rtl(5));
+    }
+
+    #[test]
+    fn test_throttle_immediate_first_call() {
+        let counter = std::cell::Cell::new(0);
+        let t = throttle_immediate(|_: i32| { counter.set(counter.get() + 1); }, 1000);
+        t.call(1);
+        assert_eq!(counter.get(), 1);
+        assert_eq!(t.calls_made(), 1);
+        assert_eq!(t.calls_suppressed(), 0);
+    }
+
+    #[test]
+    fn test_throttle_immediate_suppresses() {
+        let counter = std::cell::Cell::new(0);
+        let t = throttle_immediate(|_: i32| { counter.set(counter.get() + 1); }, 10_000);
+        t.call(1); // executed
+        t.call(2); // suppressed
+        t.call(3); // suppressed
+        assert_eq!(counter.get(), 1);
+        assert_eq!(t.calls_made(), 1);
+        assert_eq!(t.calls_suppressed(), 2);
+    }
+
+    #[test]
+    fn test_throttle_reset() {
+        let counter = std::cell::Cell::new(0);
+        let t = throttle_immediate(|_: i32| { counter.set(counter.get() + 1); }, 10_000);
+        t.call(1); // executed
+        t.call(2); // suppressed
+        t.reset();
+        t.call(3); // executed (after reset)
+        assert_eq!(counter.get(), 2);
+        assert_eq!(t.calls_made(), 2);
+        assert_eq!(t.calls_suppressed(), 1);
+    }
+
+    #[test]
+    fn test_identity_function() {
+        assert_eq!(identity(42), 42);
+        assert_eq!(identity("hello"), "hello");
+        let v = vec![1, 2, 3];
+        assert_eq!(identity(v.clone()), v);
+    }
+
+    #[test]
+    fn test_constant_function() {
+        let always_five = constant(5);
+        assert_eq!(always_five(), 5);
+        assert_eq!(always_five(), 5);
+        let always_hello = constant(String::from("hello"));
+        assert_eq!(always_hello(), "hello");
     }
 }

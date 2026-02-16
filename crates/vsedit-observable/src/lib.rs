@@ -647,6 +647,138 @@ where
     source.map(f)
 }
 
+// ---------------------------------------------------------------------------
+// observable_combine
+// ---------------------------------------------------------------------------
+
+/// Compute a one-shot combined value from two observables.
+pub fn observable_combine<A, B, C>(
+    a: &ObservableValue<A>,
+    b: &ObservableValue<B>,
+    f: impl Fn(&A, &B) -> C,
+) -> C
+where
+    A: Clone + PartialEq + Send + Sync + 'static,
+    B: Clone + PartialEq + Send + Sync + 'static,
+{
+    let va = a.get();
+    let vb = b.get();
+    f(&va, &vb)
+}
+
+// ---------------------------------------------------------------------------
+// ObservableTransaction
+// ---------------------------------------------------------------------------
+
+/// Batches multiple set operations and applies them atomically on commit.
+pub struct ObservableTransaction {
+    actions: Vec<Box<dyn FnOnce()>>,
+}
+
+impl ObservableTransaction {
+    pub fn new() -> Self {
+        Self {
+            actions: Vec::new(),
+        }
+    }
+
+    /// Queue a deferred mutation.
+    pub fn defer(&mut self, action: impl FnOnce() + 'static) {
+        self.actions.push(Box::new(action));
+    }
+
+    pub fn len(&self) -> usize {
+        self.actions.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.actions.is_empty()
+    }
+
+    /// Execute all deferred actions in order.
+    pub fn commit(self) {
+        for action in self.actions {
+            action();
+        }
+    }
+
+    /// Drop all deferred actions without executing.
+    pub fn rollback(self) {
+        drop(self.actions);
+    }
+}
+
+impl Default for ObservableTransaction {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ObservableHistory
+// ---------------------------------------------------------------------------
+
+/// A single recorded value change.
+#[derive(Debug, Clone)]
+pub struct HistoryEntry<T> {
+    pub value: T,
+    pub sequence: u64,
+}
+
+/// Records value changes with incrementing sequence numbers.
+pub struct ObservableHistory<T> {
+    pub entries: Vec<HistoryEntry<T>>,
+    next_sequence: u64,
+}
+
+impl<T> ObservableHistory<T> {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            next_sequence: 0,
+        }
+    }
+
+    /// Record a value with an incrementing sequence number.
+    pub fn record(&mut self, value: T) {
+        self.entries.push(HistoryEntry {
+            value,
+            sequence: self.next_sequence,
+        });
+        self.next_sequence += 1;
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Return the most recently recorded value, if any.
+    pub fn latest(&self) -> Option<&T> {
+        self.entries.last().map(|e| &e.value)
+    }
+
+    /// Return the value at the given index, if it exists.
+    pub fn at(&self, index: usize) -> Option<&T> {
+        self.entries.get(index).map(|e| &e.value)
+    }
+
+    /// Remove all recorded entries.
+    pub fn clear(&mut self) {
+        self.entries.clear();
+        self.next_sequence = 0;
+    }
+}
+
+impl<T> Default for ObservableHistory<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1117,5 +1249,89 @@ mod tests {
     fn observable_is_ascii_printable() {
         assert!(ObservableValidator::is_ascii_printable("Hello World 123"));
         assert!(!ObservableValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn test_observable_combine_basic() {
+        let a = ObservableValue::new(3);
+        let b = ObservableValue::new(4);
+        let result = observable_combine(&a, &b, |x, y| x + y);
+        assert_eq!(result, 7);
+
+        a.set(10);
+        let result2 = observable_combine(&a, &b, |x, y| x * y);
+        assert_eq!(result2, 40);
+    }
+
+    #[test]
+    fn test_observable_transaction_commit() {
+        let val1 = Arc::new(Mutex::new(1));
+        let val2 = Arc::new(Mutex::new(2));
+
+        let mut tx = ObservableTransaction::new();
+        let v1 = val1.clone();
+        let v2 = val2.clone();
+        tx.defer(move || *v1.lock().unwrap() = 10);
+        tx.defer(move || *v2.lock().unwrap() = 20);
+        assert_eq!(tx.len(), 2);
+
+        tx.commit();
+        assert_eq!(*val1.lock().unwrap(), 10);
+        assert_eq!(*val2.lock().unwrap(), 20);
+    }
+
+    #[test]
+    fn test_observable_transaction_rollback() {
+        let val = Arc::new(Mutex::new(1));
+        let mut tx = ObservableTransaction::new();
+        let v = val.clone();
+        tx.defer(move || *v.lock().unwrap() = 99);
+        tx.rollback();
+        assert_eq!(*val.lock().unwrap(), 1);
+    }
+
+    #[test]
+    fn test_observable_transaction_empty() {
+        let tx = ObservableTransaction::new();
+        assert!(tx.is_empty());
+        assert_eq!(tx.len(), 0);
+        tx.commit(); // should not panic
+    }
+
+    #[test]
+    fn test_observable_history_record() {
+        let mut history = ObservableHistory::new();
+        history.record(10);
+        history.record(20);
+        history.record(30);
+        assert_eq!(history.len(), 3);
+        assert_eq!(history.at(0), Some(&10));
+        assert_eq!(history.at(1), Some(&20));
+        assert_eq!(history.at(2), Some(&30));
+        assert_eq!(history.entries[0].sequence, 0);
+        assert_eq!(history.entries[1].sequence, 1);
+        assert_eq!(history.entries[2].sequence, 2);
+    }
+
+    #[test]
+    fn test_observable_history_latest() {
+        let mut history: ObservableHistory<i32> = ObservableHistory::new();
+        assert_eq!(history.latest(), None);
+        history.record(42);
+        assert_eq!(history.latest(), Some(&42));
+        history.record(99);
+        assert_eq!(history.latest(), Some(&99));
+    }
+
+    #[test]
+    fn test_observable_history_clear() {
+        let mut history = ObservableHistory::new();
+        history.record(1);
+        history.record(2);
+        assert_eq!(history.len(), 2);
+        history.clear();
+        assert_eq!(history.len(), 0);
+        assert!(history.is_empty());
+        assert_eq!(history.latest(), None);
     }
 }

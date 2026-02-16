@@ -1,5 +1,6 @@
 //! Network utilities.
 
+use std::collections::HashMap;
 use std::fmt;
 // ---------------------------------------------------------------------------
 // HTTP method
@@ -697,6 +698,147 @@ impl ConnectionPool {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Network request log
+// ---------------------------------------------------------------------------
+
+/// A single recorded network request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequestLogEntry {
+    pub url: String,
+    pub method: String,
+    pub status_code: u16,
+    pub duration_ms: u64,
+    pub timestamp: u64,
+}
+
+/// Logs network requests for debugging.
+#[derive(Debug, Clone)]
+pub struct NetworkRequestLog {
+    pub entries: Vec<RequestLogEntry>,
+    next_timestamp: u64,
+}
+
+impl NetworkRequestLog {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+            next_timestamp: 0,
+        }
+    }
+
+    pub fn log_request(&mut self, url: &str, method: &str, status_code: u16, duration_ms: u64) {
+        let ts = self.next_timestamp;
+        self.next_timestamp += 1;
+        self.entries.push(RequestLogEntry {
+            url: url.to_string(),
+            method: method.to_string(),
+            status_code,
+            duration_ms,
+            timestamp: ts,
+        });
+    }
+
+    pub fn entries_for_url(&self, url: &str) -> Vec<&RequestLogEntry> {
+        self.entries.iter().filter(|e| e.url == url).collect()
+    }
+
+    pub fn entries_by_status(&self, status: u16) -> Vec<&RequestLogEntry> {
+        self.entries.iter().filter(|e| e.status_code == status).collect()
+    }
+
+    pub fn average_duration_ms(&self) -> u64 {
+        if self.entries.is_empty() {
+            return 0;
+        }
+        let total: u64 = self.entries.iter().map(|e| e.duration_ms).sum();
+        total / self.entries.len() as u64
+    }
+
+    pub fn total_requests(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn failed_requests(&self) -> usize {
+        self.entries.iter().filter(|e| e.status_code >= 400).count()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Network cache
+// ---------------------------------------------------------------------------
+
+/// A single cache entry.
+#[derive(Debug, Clone)]
+pub struct CacheEntry {
+    pub data: Vec<u8>,
+    pub etag: Option<String>,
+    pub inserted_at: u64,
+    pub ttl_ms: u64,
+}
+
+/// Simple in-memory network cache.
+#[derive(Debug, Clone)]
+pub struct NetworkCache {
+    pub entries: HashMap<String, CacheEntry>,
+    next_timestamp: u64,
+}
+
+impl NetworkCache {
+    pub fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+            next_timestamp: 0,
+        }
+    }
+
+    pub fn insert(&mut self, url: &str, data: Vec<u8>, ttl_ms: u64) {
+        let ts = self.next_timestamp;
+        self.next_timestamp += 1;
+        self.entries.insert(url.to_string(), CacheEntry {
+            data,
+            etag: None,
+            inserted_at: ts,
+            ttl_ms,
+        });
+    }
+
+    pub fn insert_with_etag(&mut self, url: &str, data: Vec<u8>, etag: String, ttl_ms: u64) {
+        let ts = self.next_timestamp;
+        self.next_timestamp += 1;
+        self.entries.insert(url.to_string(), CacheEntry {
+            data,
+            etag: Some(etag),
+            inserted_at: ts,
+            ttl_ms,
+        });
+    }
+
+    pub fn get(&self, url: &str) -> Option<&[u8]> {
+        self.entries.get(url).map(|e| e.data.as_slice())
+    }
+
+    pub fn get_etag(&self, url: &str) -> Option<&str> {
+        self.entries.get(url).and_then(|e| e.etag.as_deref())
+    }
+
+    pub fn remove(&mut self, url: &str) -> bool {
+        self.entries.remove(url).is_some()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1127,5 +1269,89 @@ mod tests {
     fn network_is_ascii_printable() {
         assert!(NetworkValidator::is_ascii_printable("Hello World 123"));
         assert!(!NetworkValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn test_request_log_basic() {
+        let mut log = NetworkRequestLog::new();
+        assert_eq!(log.total_requests(), 0);
+        log.log_request("https://example.com", "GET", 200, 100);
+        assert_eq!(log.total_requests(), 1);
+        assert_eq!(log.entries[0].url, "https://example.com");
+        assert_eq!(log.entries[0].method, "GET");
+        assert_eq!(log.entries[0].status_code, 200);
+        assert_eq!(log.entries[0].duration_ms, 100);
+        assert_eq!(log.entries[0].timestamp, 0);
+    }
+
+    #[test]
+    fn test_request_log_filter_by_url() {
+        let mut log = NetworkRequestLog::new();
+        log.log_request("https://a.com", "GET", 200, 50);
+        log.log_request("https://b.com", "POST", 201, 60);
+        log.log_request("https://a.com", "PUT", 200, 70);
+        let filtered = log.entries_for_url("https://a.com");
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].method, "GET");
+        assert_eq!(filtered[1].method, "PUT");
+    }
+
+    #[test]
+    fn test_request_log_filter_by_status() {
+        let mut log = NetworkRequestLog::new();
+        log.log_request("https://a.com", "GET", 200, 50);
+        log.log_request("https://b.com", "GET", 404, 60);
+        log.log_request("https://c.com", "GET", 200, 70);
+        let ok = log.entries_by_status(200);
+        assert_eq!(ok.len(), 2);
+        let not_found = log.entries_by_status(404);
+        assert_eq!(not_found.len(), 1);
+        assert_eq!(log.failed_requests(), 1);
+    }
+
+    #[test]
+    fn test_request_log_average_duration() {
+        let mut log = NetworkRequestLog::new();
+        assert_eq!(log.average_duration_ms(), 0);
+        log.log_request("https://a.com", "GET", 200, 100);
+        log.log_request("https://b.com", "GET", 200, 200);
+        log.log_request("https://c.com", "GET", 200, 300);
+        assert_eq!(log.average_duration_ms(), 200);
+        log.clear();
+        assert_eq!(log.total_requests(), 0);
+    }
+
+    #[test]
+    fn test_cache_insert_and_get() {
+        let mut cache = NetworkCache::new();
+        assert_eq!(cache.len(), 0);
+        cache.insert("https://example.com", b"hello".to_vec(), 5000);
+        assert_eq!(cache.len(), 1);
+        assert_eq!(cache.get("https://example.com"), Some(b"hello".as_slice()));
+        assert!(cache.get("https://other.com").is_none());
+    }
+
+    #[test]
+    fn test_cache_with_etag() {
+        let mut cache = NetworkCache::new();
+        cache.insert_with_etag("https://example.com", b"data".to_vec(), "abc123".to_string(), 3000);
+        assert_eq!(cache.get_etag("https://example.com"), Some("abc123"));
+        assert!(cache.get_etag("https://missing.com").is_none());
+        // Entry without etag
+        cache.insert("https://no-etag.com", b"x".to_vec(), 1000);
+        assert!(cache.get_etag("https://no-etag.com").is_none());
+    }
+
+    #[test]
+    fn test_cache_remove_and_clear() {
+        let mut cache = NetworkCache::new();
+        cache.insert("https://a.com", b"a".to_vec(), 1000);
+        cache.insert("https://b.com", b"b".to_vec(), 1000);
+        assert_eq!(cache.len(), 2);
+        assert!(cache.remove("https://a.com"));
+        assert!(!cache.remove("https://a.com"));
+        assert_eq!(cache.len(), 1);
+        cache.clear();
+        assert_eq!(cache.len(), 0);
     }
 }

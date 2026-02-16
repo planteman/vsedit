@@ -634,6 +634,116 @@ impl Default for RenameHistory {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Impact analysis
+// ---------------------------------------------------------------------------
+
+/// A single location affected by a rename, used for impact analysis display.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImpactLocation {
+    pub file_path: String,
+    pub line: u32,
+    pub column: u32,
+    pub length: u32,
+    pub context: String,
+}
+
+/// Summary of the impact a rename workspace edit would have.
+#[derive(Debug, Clone)]
+pub struct RenameImpactAnalysis {
+    pub files_affected: usize,
+    pub total_edits: usize,
+    pub locations: Vec<ImpactLocation>,
+}
+
+impl RenameImpactAnalysis {
+    /// Build an impact analysis from a `WorkspaceEdit`.
+    pub fn from_workspace_edit(edit: &WorkspaceEdit) -> Self {
+        let mut locations = Vec::new();
+
+        // Collect from flat edits.
+        for e in &edit.edits {
+            locations.push(ImpactLocation {
+                file_path: e.uri.clone(),
+                line: e.line,
+                column: e.start_column,
+                length: e.end_column.saturating_sub(e.start_column),
+                context: format!(
+                    "{}:{}:{}-{} -> \"{}\"",
+                    e.uri, e.line, e.start_column, e.end_column, e.new_text
+                ),
+            });
+        }
+
+        // Collect from changes map.
+        for (uri, text_edits) in &edit.changes {
+            for te in text_edits {
+                locations.push(ImpactLocation {
+                    file_path: uri.clone(),
+                    line: te.start_line,
+                    column: te.start_column,
+                    length: te.end_column.saturating_sub(te.start_column),
+                    context: format!(
+                        "{}:{}:{}-{} -> \"{}\"",
+                        uri, te.start_line, te.start_column, te.end_column, te.new_text
+                    ),
+                });
+            }
+        }
+
+        let files_affected = edit.affected_file_count();
+        let total_edits = locations.len();
+
+        Self {
+            files_affected,
+            total_edits,
+            locations,
+        }
+    }
+
+    /// Unique file paths affected.
+    pub fn files_list(&self) -> Vec<&str> {
+        let mut paths: Vec<&str> = self.locations.iter().map(|l| l.file_path.as_str()).collect();
+        paths.sort();
+        paths.dedup();
+        paths
+    }
+
+    /// Count of edits in a specific file.
+    pub fn edits_in_file(&self, path: &str) -> usize {
+        self.locations.iter().filter(|l| l.file_path == path).count()
+    }
+}
+
+/// Validate that a rename from `old_name` to `new_name` is acceptable.
+///
+/// Returns `Ok(())` when valid, or `Err` with a list of validation failures.
+pub fn rename_validate(old_name: &str, new_name: &str) -> Result<(), Vec<String>> {
+    let mut errors = Vec::new();
+
+    if new_name.is_empty() {
+        errors.push("new name must not be empty".to_string());
+    }
+
+    if new_name == old_name {
+        errors.push("new name must differ from old name".to_string());
+    }
+
+    if new_name.contains('/') || new_name.contains('\\') {
+        errors.push("new name must not contain path separators".to_string());
+    }
+
+    if new_name != new_name.trim() {
+        errors.push("new name must not start or end with whitespace".to_string());
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1111,5 +1221,98 @@ mod tests {
         };
         assert_eq!(te.start_line, 1);
         assert_eq!(te.new_text, "abc");
+    }
+
+    #[test]
+    fn test_rename_location_creation() {
+        let loc = ImpactLocation {
+            file_path: "src/main.rs".into(),
+            line: 10,
+            column: 4,
+            length: 5,
+            context: "let myVar = 1;".into(),
+        };
+        assert_eq!(loc.file_path, "src/main.rs");
+        assert_eq!(loc.line, 10);
+        assert_eq!(loc.column, 4);
+        assert_eq!(loc.length, 5);
+        assert_eq!(loc.context, "let myVar = 1;");
+    }
+
+    #[test]
+    fn test_impact_analysis_from_workspace_edit() {
+        let mut we = WorkspaceEdit::new();
+        we.add_change("a.rs", TextEdit {
+            start_line: 1, start_column: 0, end_line: 1, end_column: 3,
+            new_text: "bar".into(),
+        });
+        we.add_change("b.rs", TextEdit {
+            start_line: 5, start_column: 2, end_line: 5, end_column: 5,
+            new_text: "bar".into(),
+        });
+
+        let analysis = RenameImpactAnalysis::from_workspace_edit(&we);
+        assert_eq!(analysis.files_affected, 2);
+        assert_eq!(analysis.total_edits, 2);
+        assert_eq!(analysis.locations.len(), 2);
+    }
+
+    #[test]
+    fn test_impact_analysis_files_list() {
+        let mut we = WorkspaceEdit::new();
+        we.add_change("a.rs", TextEdit {
+            start_line: 0, start_column: 0, end_line: 0, end_column: 3,
+            new_text: "x".into(),
+        });
+        we.add_change("b.rs", TextEdit {
+            start_line: 0, start_column: 0, end_line: 0, end_column: 3,
+            new_text: "x".into(),
+        });
+        we.add_change("a.rs", TextEdit {
+            start_line: 2, start_column: 0, end_line: 2, end_column: 3,
+            new_text: "x".into(),
+        });
+
+        let analysis = RenameImpactAnalysis::from_workspace_edit(&we);
+        let files = analysis.files_list();
+        assert_eq!(files.len(), 2);
+        assert!(files.contains(&"a.rs"));
+        assert!(files.contains(&"b.rs"));
+        assert_eq!(analysis.edits_in_file("a.rs"), 2);
+        assert_eq!(analysis.edits_in_file("b.rs"), 1);
+    }
+
+    #[test]
+    fn test_rename_validate_success() {
+        assert!(rename_validate("old", "new").is_ok());
+    }
+
+    #[test]
+    fn test_rename_validate_failures() {
+        // empty
+        let err = rename_validate("foo", "").unwrap_err();
+        assert!(err.iter().any(|e| e.contains("empty")));
+
+        // same name
+        let err = rename_validate("foo", "foo").unwrap_err();
+        assert!(err.iter().any(|e| e.contains("differ")));
+
+        // path separator
+        let err = rename_validate("foo", "a/b").unwrap_err();
+        assert!(err.iter().any(|e| e.contains("path separator")));
+
+        // leading whitespace
+        let err = rename_validate("foo", " bar").unwrap_err();
+        assert!(err.iter().any(|e| e.contains("whitespace")));
+    }
+
+    #[test]
+    fn test_rename_validate_multiple_errors() {
+        // empty string triggers both "empty" and "same as old" when old is also empty
+        // Use a case that triggers exactly two independent errors.
+        let err = rename_validate("a/b", "a/b").unwrap_err();
+        assert!(err.len() >= 2);
+        assert!(err.iter().any(|e| e.contains("differ")));
+        assert!(err.iter().any(|e| e.contains("path separator")));
     }
 }

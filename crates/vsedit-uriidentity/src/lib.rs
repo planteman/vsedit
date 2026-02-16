@@ -689,6 +689,105 @@ pub fn uri_relative_path(base: &ResourceUri, target: &ResourceUri) -> Option<Str
     }
 }
 
+/// Computes a simple FNV-1a hash of the URI's canonical form for use as an identity key.
+pub fn uri_identity_hash(uri: &ResourceUri) -> u64 {
+    let canonical = uri_canonical_form(uri);
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for byte in canonical.as_bytes() {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
+/// Returns true if two URIs refer to the same document (same scheme, authority, and path,
+/// ignoring query and fragment differences).
+pub fn uri_same_document(a: &ResourceUri, b: &ResourceUri) -> bool {
+    a.scheme.eq_ignore_ascii_case(&b.scheme)
+        && a.authority.eq_ignore_ascii_case(&b.authority)
+        && a.path == b.path
+}
+
+/// Decomposes a URI string into its components.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UriComponents {
+    pub scheme: Option<String>,
+    pub authority: Option<String>,
+    pub path: String,
+    pub query: Option<String>,
+    pub fragment: Option<String>,
+}
+
+impl UriComponents {
+    /// Parses a URI string into components (basic parsing: split on "://", "?", "#").
+    pub fn parse(uri_str: &str) -> Self {
+        let (scheme, after_scheme) = if let Some(idx) = uri_str.find("://") {
+            (Some(uri_str[..idx].to_string()), &uri_str[idx + 3..])
+        } else {
+            (None, uri_str)
+        };
+
+        let (rest, fragment) = if let Some(idx) = after_scheme.find('#') {
+            (&after_scheme[..idx], Some(after_scheme[idx + 1..].to_string()))
+        } else {
+            (after_scheme, None)
+        };
+
+        let (rest, query) = if let Some(idx) = rest.find('?') {
+            (&rest[..idx], Some(rest[idx + 1..].to_string()))
+        } else {
+            (rest, None)
+        };
+
+        let (authority, path) = if scheme.is_some() {
+            if let Some(idx) = rest.find('/') {
+                let auth = &rest[..idx];
+                (
+                    if auth.is_empty() { None } else { Some(auth.to_string()) },
+                    rest[idx..].to_string(),
+                )
+            } else if rest.is_empty() {
+                (None, String::new())
+            } else {
+                (Some(rest.to_string()), String::new())
+            }
+        } else {
+            (None, rest.to_string())
+        };
+
+        Self {
+            scheme,
+            authority,
+            path,
+            query,
+            fragment,
+        }
+    }
+
+    /// Converts to a ResourceUri.
+    pub fn to_resource_uri(&self) -> ResourceUri {
+        ResourceUri {
+            scheme: self.scheme.clone().unwrap_or_default(),
+            authority: self.authority.clone().unwrap_or_default(),
+            path: self.path.clone(),
+            query: self.query.clone(),
+            fragment: self.fragment.clone(),
+        }
+    }
+
+    pub fn has_authority(&self) -> bool {
+        self.authority.is_some()
+    }
+
+    pub fn has_query(&self) -> bool {
+        self.query.is_some()
+    }
+
+    pub fn has_fragment(&self) -> bool {
+        self.fragment.is_some()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1131,5 +1230,66 @@ mod tests {
     fn uriidentity_is_ascii_printable() {
         assert!(UriidentityValidator::is_ascii_printable("Hello World 123"));
         assert!(!UriidentityValidator::is_ascii_printable("Hello\x00World"));
+    }
+
+    #[test]
+    fn test_uri_identity_hash_equal() {
+        let a = ResourceUri::file("/home/user/file.rs");
+        let b = ResourceUri::file("/home/user/file.rs");
+        assert_eq!(uri_identity_hash(&a), uri_identity_hash(&b));
+    }
+
+    #[test]
+    fn test_uri_identity_hash_different() {
+        let a = ResourceUri::file("/home/user/file.rs");
+        let b = ResourceUri::file("/home/user/other.rs");
+        assert_ne!(uri_identity_hash(&a), uri_identity_hash(&b));
+    }
+
+    #[test]
+    fn test_uri_same_document_true() {
+        let a = ResourceUri::from_string("https://example.com/path?q=1#frag").unwrap();
+        let b = ResourceUri::from_string("https://example.com/path?q=2#other").unwrap();
+        assert!(uri_same_document(&a, &b));
+    }
+
+    #[test]
+    fn test_uri_same_document_false_path() {
+        let a = ResourceUri::from_string("https://example.com/path1").unwrap();
+        let b = ResourceUri::from_string("https://example.com/path2").unwrap();
+        assert!(!uri_same_document(&a, &b));
+    }
+
+    #[test]
+    fn test_uri_same_document_ignores_fragment() {
+        let mut a = ResourceUri::file("/home/user/file.rs");
+        a.fragment = Some("line10".to_string());
+        let mut b = ResourceUri::file("/home/user/file.rs");
+        b.fragment = Some("line20".to_string());
+        assert!(uri_same_document(&a, &b));
+    }
+
+    #[test]
+    fn test_uri_components_parse() {
+        let c = UriComponents::parse("https://example.com/path?q=1#frag");
+        assert_eq!(c.scheme.as_deref(), Some("https"));
+        assert_eq!(c.authority.as_deref(), Some("example.com"));
+        assert_eq!(c.path, "/path");
+        assert_eq!(c.query.as_deref(), Some("q=1"));
+        assert_eq!(c.fragment.as_deref(), Some("frag"));
+        assert!(c.has_authority());
+        assert!(c.has_query());
+        assert!(c.has_fragment());
+    }
+
+    #[test]
+    fn test_uri_components_to_resource_uri() {
+        let c = UriComponents::parse("https://example.com/path?q=1#frag");
+        let uri = c.to_resource_uri();
+        assert_eq!(uri.scheme, "https");
+        assert_eq!(uri.authority, "example.com");
+        assert_eq!(uri.path, "/path");
+        assert_eq!(uri.query.as_deref(), Some("q=1"));
+        assert_eq!(uri.fragment.as_deref(), Some("frag"));
     }
 }
